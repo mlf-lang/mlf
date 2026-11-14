@@ -1,0 +1,2 @@
+module Fixture where
+value = 42

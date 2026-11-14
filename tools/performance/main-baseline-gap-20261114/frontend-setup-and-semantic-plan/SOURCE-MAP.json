@@ -1,0 +1,1050 @@
+{
+  "archive_only_static_preparation": true,
+  "final_actual_source_reports": [
+    {
+      "bytes": 33473,
+      "sha256": "1b5addd5f3ce1821f43ef02f568df5552781f4e41ec1569284bb7554c83bec59",
+      "source_artifact": "main-gap-setup-run04-actual-review/report.json"
+    },
+    {
+      "bytes": 2954,
+      "sha256": "829e8995ac36f517ae4e077a972385ffb22b5f5cb4f9548bd14919908d64c77f",
+      "source_artifact": "main-gap-setup-run04-actual-review/MANIFEST.json"
+    },
+    {
+      "bytes": 10555,
+      "sha256": "81071fc5a605d253c4211a3cc28c6532c349f79a3743d2d5c3b6c32553ddce1c",
+      "source_artifact": "main-gap-setup-v5-source-review/report.json"
+    },
+    {
+      "bytes": 2816,
+      "sha256": "5904cdd926405ddeb4c5be33b773371345efd98726c8a579baf6f46e821ed59b",
+      "source_artifact": "main-gap-setup-v5-source-review/MANIFEST.json"
+    }
+  ],
+  "new_evidence_transformations": {
+    "run04-cli-raw.json": "exact original five stdout/stderr bytes",
+    "run04-completed-commands.json": "full ordered command ledger; literal role-path redactions; original pinned",
+    "run04-full-inventory.json": "complete original file names/bytes/hashes, no private root paths",
+    "run04-publication-raw.json": "exact original selected base64 bytes",
+    "run04-qualification.json": "selected fields; role paths redacted; original report pinned",
+    "run04-rts-redacted.json": "exact raw data except explicitly redacted invocation-header roots; originals pinned"
+  },
+  "no_raw_product_normalization": true,
+  "placeholders": [
+    "<EXPERIMENT_ROOT>",
+    "<GHC_TOOLCHAIN>",
+    "<WORKSPACE>",
+    "<HOME>",
+    "<FRESH_RESOURCE_LOCK>"
+  ],
+  "private_original_roots_and_binding_values_not_published": true,
+  "rows": [
+    {
+      "export": {
+        "bytes": 64620,
+        "sha256": "f69c760601f1c336758a3be08b90fef23884251d538efb42a618d537dd9a105c"
+      },
+      "export_path": "setup-v5/controller.py",
+      "source_artifact": "main-gap-setup-v5-source/controller.py",
+      "source_original": {
+        "bytes": 64664,
+        "sha256": "018b21b47c8010791f7369c80b041b5f6add5e39bfa0589adc84cda944b52bf8"
+      },
+      "transformation": "literal role placeholder substitution; original hashes retained, not executable requalification"
+    },
+    {
+      "export": {
+        "bytes": 16728,
+        "sha256": "0a831a47bd77891fe357209094cd640d07646b9ab5c6b6f0c38de67c3b5c4a8c"
+      },
+      "export_path": "setup-v5/publication_oracle.py",
+      "source_artifact": "main-gap-setup-v5-source/publication_oracle.py",
+      "source_original": {
+        "bytes": 16728,
+        "sha256": "0a831a47bd77891fe357209094cd640d07646b9ab5c6b6f0c38de67c3b5c4a8c"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 14985,
+        "sha256": "eb041cbbbe6c14eb75d369363d200fbf129c51b3996f627c2e41666f90c9e79f"
+      },
+      "export_path": "setup-v5/publication_checks.py",
+      "source_artifact": "main-gap-setup-v5-source/publication_checks.py",
+      "source_original": {
+        "bytes": 14985,
+        "sha256": "eb041cbbbe6c14eb75d369363d200fbf129c51b3996f627c2e41666f90c9e79f"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 14725,
+        "sha256": "abba5edd547286fc02c45e68612ac024a7ebd0ea203db7d2c735d0c8d95c60ea"
+      },
+      "export_path": "setup-v5/source_checks.py",
+      "source_artifact": "main-gap-setup-v5-source/source_checks.py",
+      "source_original": {
+        "bytes": 14725,
+        "sha256": "abba5edd547286fc02c45e68612ac024a7ebd0ea203db7d2c735d0c8d95c60ea"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 5272,
+        "sha256": "5ccbffb7cabae6618ad444c0a24cf5c08627a5ccc5f97bc920ce32f748109155"
+      },
+      "export_path": "setup-v5/delta_checks.py",
+      "source_artifact": "main-gap-setup-v5-source/delta_checks.py",
+      "source_original": {
+        "bytes": 5272,
+        "sha256": "5ccbffb7cabae6618ad444c0a24cf5c08627a5ccc5f97bc920ce32f748109155"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 8233,
+        "sha256": "c0e94b78afd6afc03573965ef697c7738af6ada9c033c133c31ad88985f2f629"
+      },
+      "export_path": "setup-v5/package_field_checks.py",
+      "source_artifact": "main-gap-setup-v5-source/package_field_checks.py",
+      "source_original": {
+        "bytes": 8233,
+        "sha256": "c0e94b78afd6afc03573965ef697c7738af6ada9c033c133c31ad88985f2f629"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 97,
+        "sha256": "bae7885918cfd8ef2192740865444591ed093c744319ecee85715c408114e4df"
+      },
+      "export_path": "setup-v5/SetupCheck.hs",
+      "source_artifact": "main-gap-setup-v5-source/SetupCheck.hs",
+      "source_original": {
+        "bytes": 97,
+        "sha256": "bae7885918cfd8ef2192740865444591ed093c744319ecee85715c408114e4df"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 5370,
+        "sha256": "12977f5735b400f1b5e2f636b2fc0bfe3c1223a447546df0b9d930dac37c3843"
+      },
+      "export_path": "setup-v5/COMMANDS.json",
+      "source_artifact": "main-gap-setup-v5-source/COMMANDS.json",
+      "source_original": {
+        "bytes": 5370,
+        "sha256": "12977f5735b400f1b5e2f636b2fc0bfe3c1223a447546df0b9d930dac37c3843"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 3586,
+        "sha256": "b3f3ac6bc0946a82acd76a242311011af0161c84b058b1ce3df419ef1083146f"
+      },
+      "export_path": "setup-v5/QUALIFICATION.json",
+      "source_artifact": "main-gap-setup-v5-source/QUALIFICATION.json",
+      "source_original": {
+        "bytes": 3718,
+        "sha256": "ed35bb12f5febbf018847232b219a68ccfcedfb2ef6b73efbfe93edd23cc2927"
+      },
+      "transformation": "literal role placeholder substitution; original hashes retained, not executable requalification"
+    },
+    {
+      "export": {
+        "bytes": 19029,
+        "sha256": "d01502d2d57b465063da8881a528934ea08679bd6cf72f2e4ff5c8eec54e1e20"
+      },
+      "export_path": "setup-v5/ORACLE-SOURCE-MAP.json",
+      "source_artifact": "main-gap-setup-v5-source/ORACLE-SOURCE-MAP.json",
+      "source_original": {
+        "bytes": 19249,
+        "sha256": "81691f16a4bd81a5e9c64a8f6724c8a67cef3bbcb8a3fd771ead22e5fdcd4c96"
+      },
+      "transformation": "literal role placeholder substitution; original hashes retained, not executable requalification"
+    },
+    {
+      "export": {
+        "bytes": 5388,
+        "sha256": "0ee1740eb725544f142d6b9be9f8bbf5bf9824f264f87b503622ac19e9b69d19"
+      },
+      "export_path": "setup-v5/controller-vs-v4.patch",
+      "source_artifact": "main-gap-setup-v5-source/controller-vs-v4.patch",
+      "source_original": {
+        "bytes": 5432,
+        "sha256": "eab101027d0f13dceae41df9e91fb6318a8bbeda03d329a93170c9710fdce431"
+      },
+      "transformation": "literal role placeholder substitution; original hashes retained, not executable requalification"
+    },
+    {
+      "export": {
+        "bytes": 1823,
+        "sha256": "454bf86b54a3b8397fb2617e5f1c0f4a23492ebabe2b804c6ff42cd5c587e333"
+      },
+      "export_path": "setup-v5/CONFIG-vs-v4.patch",
+      "source_artifact": "main-gap-setup-v5-source/CONFIG-vs-v4.patch",
+      "source_original": {
+        "bytes": 2307,
+        "sha256": "5f4816c5201da6e888bc647d024a2b86719dfabd3c41fc9af0d6e01689e11cec"
+      },
+      "transformation": "literal role placeholder substitution; original hashes retained, not executable requalification"
+    },
+    {
+      "export": {
+        "bytes": 2364,
+        "sha256": "158dcddba57a7a89183390162825851dc28e0a57468ccef91d55ddefc0bc63ac"
+      },
+      "export_path": "setup-v5/QUALIFICATION-vs-v4.patch",
+      "source_artifact": "main-gap-setup-v5-source/QUALIFICATION-vs-v4.patch",
+      "source_original": {
+        "bytes": 2496,
+        "sha256": "15cc6fa6790f87fa77262038dccf82bce84e0b3127b4ccc7a3ded6e143e77f03"
+      },
+      "transformation": "literal role placeholder substitution; original hashes retained, not executable requalification"
+    },
+    {
+      "export": {
+        "bytes": 299,
+        "sha256": "4305112afa847d65213014c6edb71ae5a3eb2700ba88b10aceec3cde92a037d3"
+      },
+      "export_path": "setup-v5/environment-vs-v4.patch",
+      "source_artifact": "main-gap-setup-v5-source/environment-vs-v4.patch",
+      "source_original": {
+        "bytes": 483,
+        "sha256": "7d7f00616000844cbe53a74cb7fc1e701f28574860650c4c584396011c96e998"
+      },
+      "transformation": "literal role placeholder substitution; original hashes retained, not executable requalification"
+    },
+    {
+      "export": {
+        "bytes": 10973,
+        "sha256": "7cd6ef9e43cd39bfb411661b8f5940e81cea65c6b475f0ad932068e96ae9fc0b"
+      },
+      "export_path": "setup-v5/DESIGN-AT-SOURCE-FREEZE.md",
+      "source_artifact": "main-gap-setup-v5-source/README.md",
+      "source_original": {
+        "bytes": 10973,
+        "sha256": "7cd6ef9e43cd39bfb411661b8f5940e81cea65c6b475f0ad932068e96ae9fc0b"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 10900,
+        "sha256": "8d4d2aa48673c644f6ea3a990bf7cdf4f76469b03a4f3c6972d6f5af06b4cd5a"
+      },
+      "export_path": "setup-v5/recorded-tests/publication-checks.json",
+      "source_artifact": "main-gap-setup-v5-source/publication-checks.json",
+      "source_original": {
+        "bytes": 11032,
+        "sha256": "bdb136942fb719b9c6970777d4a7c7ee929bc38bddada513031bafa874478af2"
+      },
+      "transformation": "literal role placeholder substitution; original hashes retained, not executable requalification"
+    },
+    {
+      "export": {
+        "bytes": 10284,
+        "sha256": "68582ef8fa588f8a4918a201819594a0c25617ba52564c68c08a4392aa460c9e"
+      },
+      "export_path": "setup-v5/recorded-tests/source-checks.json",
+      "source_artifact": "main-gap-setup-v5-source/source-checks.json",
+      "source_original": {
+        "bytes": 10416,
+        "sha256": "5fcdc1ad300a2408585e6ca5467a290b7e2e0f47f1d84e1761363dca685fc793"
+      },
+      "transformation": "literal role placeholder substitution; original hashes retained, not executable requalification"
+    },
+    {
+      "export": {
+        "bytes": 3578,
+        "sha256": "ed39363d8052446f0ea46c30cbbcffbe3d90f0f8b9398228ba0534b8c0256ce2"
+      },
+      "export_path": "setup-v5/recorded-tests/delta-checks.json",
+      "source_artifact": "main-gap-setup-v5-source/delta-checks.json",
+      "source_original": {
+        "bytes": 3666,
+        "sha256": "7ba0866ed9a376728a43bca8981bed8fe373ee9c550aa8d0290a4ca1f2f049d8"
+      },
+      "transformation": "literal role placeholder substitution; original hashes retained, not executable requalification"
+    },
+    {
+      "export": {
+        "bytes": 12004,
+        "sha256": "c194689496cb744d7683eb884fc83a6c250535d4f76aad38b0e457db4e8dae7e"
+      },
+      "export_path": "setup-v5/recorded-tests/package-field-checks.json",
+      "source_artifact": "main-gap-setup-v5-source/package-field-checks.json",
+      "source_original": {
+        "bytes": 12972,
+        "sha256": "f7b08d2af458aa3cb3d4ed10c5489faa4389414ccac06cf740560a84e1cf8e13"
+      },
+      "transformation": "literal role placeholder substitution; original hashes retained, not executable requalification"
+    },
+    {
+      "export": {
+        "bytes": 2226,
+        "sha256": "d4da4db9e025bb42339df8859201f557780317afaf501b55ab600627757b67b5"
+      },
+      "export_path": "setup-v5/recorded-tests/TEST-HISTORY.json",
+      "source_artifact": "main-gap-setup-v5-source/TEST-HISTORY.json",
+      "source_original": {
+        "bytes": 2226,
+        "sha256": "d4da4db9e025bb42339df8859201f557780317afaf501b55ab600627757b67b5"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 6372,
+        "sha256": "627376113991658d21092565153d930f914353a7e7a685a30b67c22270c614d1"
+      },
+      "export_path": "setup-v5/CONFIG.json",
+      "source_artifact": "main-gap-setup-v5-source/CONFIG.json",
+      "source_original": {
+        "bytes": 7563,
+        "sha256": "8be176b18bb7d0d357f358ede76b5172c1b5f7efccb6add80abe5889767b32e8"
+      },
+      "transformation": "role placeholders; concrete shared-lock device/inode withheld; original bindings are NOT replayable"
+    },
+    {
+      "export": {
+        "bytes": 613,
+        "sha256": "4a24751d9d652a3d9e59102aaf91870c3ad45a1b0d8d351ce939091b88b7427a"
+      },
+      "export_path": "setup-v5/environment.json",
+      "source_artifact": "main-gap-setup-v5-source/environment.json",
+      "source_original": {
+        "bytes": 950,
+        "sha256": "f4c7c630cd64b7726dfb66ffdb2c73114ab278de10ff96810ddd4cd708468e72"
+      },
+      "transformation": "role placeholders; concrete shared-lock device/inode withheld; original bindings are NOT replayable"
+    },
+    {
+      "export": {
+        "bytes": 4888,
+        "sha256": "b558556b11af12b117444f6476c5e841fa1b4beddc8f7cfe5e13047f2426a84c"
+      },
+      "export_path": "support/stats.py",
+      "source_artifact": "dense-direct-capture-r24-source/implementation/stats.py",
+      "source_original": {
+        "bytes": 4888,
+        "sha256": "b558556b11af12b117444f6476c5e841fa1b4beddc8f7cfe5e13047f2426a84c"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 11663,
+        "sha256": "cf1346302f2467d74a883e51042d28442d0c0af5f659702e6fcf09ed43c1662b"
+      },
+      "export_path": "support/runtime_pins.py",
+      "source_artifact": "dense-direct-capture-r24-source/implementation/runtime_pins.py",
+      "source_original": {
+        "bytes": 11663,
+        "sha256": "cf1346302f2467d74a883e51042d28442d0c0af5f659702e6fcf09ed43c1662b"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 24833,
+        "sha256": "53a5b322fe8ed9e1a527dda0596215ffc81322b43b1864442827c9056c313d0e"
+      },
+      "export_path": "support/guard.py",
+      "source_artifact": "recovery/tools/performance/full-compiler/continuation-20261111/sparse-attribution-r13/guard.py",
+      "source_original": {
+        "bytes": 24833,
+        "sha256": "53a5b322fe8ed9e1a527dda0596215ffc81322b43b1864442827c9056c313d0e"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 396,
+        "sha256": "522b3106f7dab67ca6f7dd1f3b705acd3d8a5e8113740a6a6ce30eeaaa7efd03"
+      },
+      "export_path": "workloads/inputs/baseline-0/Main.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/baseline-0/Main.hs",
+      "source_original": {
+        "bytes": 396,
+        "sha256": "522b3106f7dab67ca6f7dd1f3b705acd3d8a5e8113740a6a6ce30eeaaa7efd03"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 7751,
+        "sha256": "af48eb052fca7df869588c13f805ccda52e6ac55451d8b4709237943a5677640"
+      },
+      "export_path": "workloads/inputs/flat_functions-128/Main.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/flat_functions-128/Main.hs",
+      "source_original": {
+        "bytes": 7751,
+        "sha256": "af48eb052fca7df869588c13f805ccda52e6ac55451d8b4709237943a5677640"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 1255,
+        "sha256": "a5254beedeb16e7bf58791f4e7e27a44329bed18369bfb501414cbf230049249"
+      },
+      "export_path": "workloads/inputs/flat_functions-16/Main.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/flat_functions-16/Main.hs",
+      "source_original": {
+        "bytes": 1255,
+        "sha256": "a5254beedeb16e7bf58791f4e7e27a44329bed18369bfb501414cbf230049249"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 15559,
+        "sha256": "af2371d80197e98f3fb2aa3ea99bac91e95a8905a1d6f3fe2952426a4ec83881"
+      },
+      "export_path": "workloads/inputs/flat_functions-256/Main.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/flat_functions-256/Main.hs",
+      "source_original": {
+        "bytes": 15559,
+        "sha256": "af2371d80197e98f3fb2aa3ea99bac91e95a8905a1d6f3fe2952426a4ec83881"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 2167,
+        "sha256": "ea9ae079ef50cf57b8c5869466666e774e8524ba735aeca684cdf4be7e493a81"
+      },
+      "export_path": "workloads/inputs/flat_functions-32/Main.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/flat_functions-32/Main.hs",
+      "source_original": {
+        "bytes": 2167,
+        "sha256": "ea9ae079ef50cf57b8c5869466666e774e8524ba735aeca684cdf4be7e493a81"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 3991,
+        "sha256": "a578c5cd2e6dd90dd1c41a85c65cfabcda69ebf5e2f4e3eada29c4b5dcbfe121"
+      },
+      "export_path": "workloads/inputs/flat_functions-64/Main.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/flat_functions-64/Main.hs",
+      "source_original": {
+        "bytes": 3991,
+        "sha256": "a578c5cd2e6dd90dd1c41a85c65cfabcda69ebf5e2f4e3eada29c4b5dcbfe121"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 2592,
+        "sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d"
+      },
+      "export_path": "workloads/inputs/foundation14/Bootstrap/Fresh.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Fresh.hs",
+      "source_original": {
+        "bytes": 2592,
+        "sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 3246,
+        "sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5"
+      },
+      "export_path": "workloads/inputs/foundation14/Bootstrap/Host.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Host.hs",
+      "source_original": {
+        "bytes": 3246,
+        "sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 5573,
+        "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e"
+      },
+      "export_path": "workloads/inputs/foundation14/Bootstrap/IndexVec.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IndexVec.hs",
+      "source_original": {
+        "bytes": 5573,
+        "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 21811,
+        "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e"
+      },
+      "export_path": "workloads/inputs/foundation14/Bootstrap/IntMap.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntMap.hs",
+      "source_original": {
+        "bytes": 21811,
+        "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 6684,
+        "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
+      },
+      "export_path": "workloads/inputs/foundation14/Bootstrap/IntRank.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntRank.hs",
+      "source_original": {
+        "bytes": 6684,
+        "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 17405,
+        "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe"
+      },
+      "export_path": "workloads/inputs/foundation14/Bootstrap/IntSet.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntSet.hs",
+      "source_original": {
+        "bytes": 17405,
+        "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 3727,
+        "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49"
+      },
+      "export_path": "workloads/inputs/foundation14/Bootstrap/IntTree.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntTree.hs",
+      "source_original": {
+        "bytes": 3727,
+        "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 17218,
+        "sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0"
+      },
+      "export_path": "workloads/inputs/foundation14/Bootstrap/Map.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Map.hs",
+      "source_original": {
+        "bytes": 17218,
+        "sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 2539,
+        "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2"
+      },
+      "export_path": "workloads/inputs/foundation14/Bootstrap/ST.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/ST.hs",
+      "source_original": {
+        "bytes": 2539,
+        "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 4093,
+        "sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f"
+      },
+      "export_path": "workloads/inputs/foundation14/Bootstrap/Set.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Set.hs",
+      "source_original": {
+        "bytes": 4093,
+        "sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 20088,
+        "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca"
+      },
+      "export_path": "workloads/inputs/foundation14/Bootstrap/Std.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Std.hs",
+      "source_original": {
+        "bytes": 20088,
+        "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 12757,
+        "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596"
+      },
+      "export_path": "workloads/inputs/foundation14/Bootstrap/Types.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Types.hs",
+      "source_original": {
+        "bytes": 12757,
+        "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 55534,
+        "sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077"
+      },
+      "export_path": "workloads/inputs/foundation14/Bootstrap/Unicode.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Unicode.hs",
+      "source_original": {
+        "bytes": 55534,
+        "sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 327,
+        "sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479"
+      },
+      "export_path": "workloads/inputs/foundation14/Bootstrap/Version.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Version.hs",
+      "source_original": {
+        "bytes": 327,
+        "sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 2496,
+        "sha256": "ba13ac3b8d15d7b1d4c63fcc9698c86b9cbca1b6244dd1b1ee6a89e2e6ce41da"
+      },
+      "export_path": "workloads/inputs/higher_order_chain-128/Main.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/higher_order_chain-128/Main.hs",
+      "source_original": {
+        "bytes": 2496,
+        "sha256": "ba13ac3b8d15d7b1d4c63fcc9698c86b9cbca1b6244dd1b1ee6a89e2e6ce41da"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 816,
+        "sha256": "c5bc5b63bfdcd05b263b625788b77846fdac1d5fe69c7c36ae6abed100c1bb2b"
+      },
+      "export_path": "workloads/inputs/higher_order_chain-16/Main.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/higher_order_chain-16/Main.hs",
+      "source_original": {
+        "bytes": 816,
+        "sha256": "c5bc5b63bfdcd05b263b625788b77846fdac1d5fe69c7c36ae6abed100c1bb2b"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 4416,
+        "sha256": "0747d08346964a72c21f11990bbc9deec4d31e9dd05629e71df8668dc75c76a7"
+      },
+      "export_path": "workloads/inputs/higher_order_chain-256/Main.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/higher_order_chain-256/Main.hs",
+      "source_original": {
+        "bytes": 4416,
+        "sha256": "0747d08346964a72c21f11990bbc9deec4d31e9dd05629e71df8668dc75c76a7"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 1056,
+        "sha256": "5943c0526bd00cbe8d76b60643e1495c8a07122c3c5a6fb2a59215bfd5c3db49"
+      },
+      "export_path": "workloads/inputs/higher_order_chain-32/Main.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/higher_order_chain-32/Main.hs",
+      "source_original": {
+        "bytes": 1056,
+        "sha256": "5943c0526bd00cbe8d76b60643e1495c8a07122c3c5a6fb2a59215bfd5c3db49"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 1536,
+        "sha256": "d8a72fb0850ef38bf04df17b1490061f6d20ccc7d1dd59a7ca29146a70969a8c"
+      },
+      "export_path": "workloads/inputs/higher_order_chain-64/Main.hs",
+      "source_artifact": "main-gap-workloads-v1-source/inputs/higher_order_chain-64/Main.hs",
+      "source_original": {
+        "bytes": 1536,
+        "sha256": "d8a72fb0850ef38bf04df17b1490061f6d20ccc7d1dd59a7ca29146a70969a8c"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 6525,
+        "sha256": "1648034e7bfe721d025d0d0fae1f404713b4e5ab267ed780ac356baed0848f0a"
+      },
+      "export_path": "workloads/generator-source.py",
+      "source_artifact": "main-gap-workloads-v1-source/generator-source.py",
+      "source_original": {
+        "bytes": 6525,
+        "sha256": "1648034e7bfe721d025d0d0fae1f404713b4e5ab267ed780ac356baed0848f0a"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 4448,
+        "sha256": "e52a4bf4276e7c4c2631ed829a000c209a1cf13fd631ea6890ebd7baf17b1e40"
+      },
+      "export_path": "workloads/generator-functions.py",
+      "source_artifact": "main-gap-workloads-v1-source/generator-functions.py",
+      "source_original": {
+        "bytes": 4448,
+        "sha256": "e52a4bf4276e7c4c2631ed829a000c209a1cf13fd631ea6890ebd7baf17b1e40"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 43721,
+        "sha256": "55ae99cd0e854baccc9eff2c444f18f7fe55e08a0ac947a3eea364783187daee"
+      },
+      "export_path": "workloads/CELLS.json",
+      "source_artifact": "main-gap-workloads-v1-source/CELLS.json",
+      "source_original": {
+        "bytes": 47681,
+        "sha256": "3b5a5d5c486186a50cb45f248e2c9522b2437ae69257025770e02189e94ddaf3"
+      },
+      "transformation": "literal role placeholder substitution; original hashes retained, not executable requalification"
+    },
+    {
+      "export": {
+        "bytes": 8078,
+        "sha256": "fb2b27b737a62c461b0b2d1a6c96185e03bd0cf9346b7dde9fe9998b359c244d"
+      },
+      "export_path": "workloads/INPUTS.json",
+      "source_artifact": "main-gap-workloads-v1-source/INPUTS.json",
+      "source_original": {
+        "bytes": 9618,
+        "sha256": "dc8e3d496aac33bd243b3965eae4f2a99ea336630d6df9225fa421d1cf03ed17"
+      },
+      "transformation": "literal role placeholder substitution; original hashes retained, not executable requalification"
+    },
+    {
+      "export": {
+        "bytes": 2612,
+        "sha256": "f8a6e711b1ebeef9b34f99d797d5ac8d3ef0ddce0cd9450688687cc8594fe9b1"
+      },
+      "export_path": "workloads/GENERATOR-PROVENANCE.json",
+      "source_artifact": "main-gap-workloads-v1-source/GENERATOR-PROVENANCE.json",
+      "source_original": {
+        "bytes": 2876,
+        "sha256": "6dfa0d7f71b1fd03252c6b91f48bf2411f67140f9b186f720105e1c434e4d624"
+      },
+      "transformation": "literal role placeholder substitution; original hashes retained, not executable requalification"
+    },
+    {
+      "export": {
+        "bytes": 41445,
+        "sha256": "06d0ce6fecff995b43e882af93b0fe37090d283543bd178b2679b4d33d1ab2cc"
+      },
+      "export_path": "workloads/LEGS.json",
+      "source_artifact": "main-gap-workloads-v1-source/LEGS.json",
+      "source_original": {
+        "bytes": 45845,
+        "sha256": "53dcf311abd779697726d56bfd09a31d77aae0e8c278cd1551cdee280a546be8"
+      },
+      "transformation": "literal role placeholder substitution; original hashes retained, not executable requalification"
+    },
+    {
+      "export": {
+        "bytes": 65931,
+        "sha256": "4afbaf0e914cd48b468cf257ae0583781f383d93f6e5370df5464dfaf5125d9c"
+      },
+      "export_path": "workloads/COMMAND-TEMPLATES.json",
+      "source_artifact": "main-gap-workloads-v1-source/COMMAND-TEMPLATES.json",
+      "source_original": {
+        "bytes": 72671,
+        "sha256": "85fe9bc1e6d9fd1bb9b21ccaa4f7bf1d5f4b7fe00ee06f0955e544ebc69fea27"
+      },
+      "transformation": "literal role placeholder substitution; original hashes retained, not executable requalification"
+    },
+    {
+      "export": {
+        "bytes": 6536,
+        "sha256": "0b3ab27ed921e9c8042bbb620bfc2080f14d5ff9d47e280231232d17a8fa2188"
+      },
+      "export_path": "workloads/checks.json",
+      "source_artifact": "main-gap-workloads-v1-source/checks.json",
+      "source_original": {
+        "bytes": 6536,
+        "sha256": "0b3ab27ed921e9c8042bbb620bfc2080f14d5ff9d47e280231232d17a8fa2188"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 5767,
+        "sha256": "074c41bf5cfbb6d3f59eccdb772427f20aa1d185900c32e4d202dfd3823d2205"
+      },
+      "export_path": "workloads/DESIGN-AT-SOURCE-FREEZE.md",
+      "source_artifact": "main-gap-workloads-v1-source/README.md",
+      "source_original": {
+        "bytes": 5767,
+        "sha256": "074c41bf5cfbb6d3f59eccdb772427f20aa1d185900c32e4d202dfd3823d2205"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 12729,
+        "sha256": "35f79fd21e33a590f2905cebf2ef3e94a48c6681d17905bb272bc54d10918635"
+      },
+      "export_path": "semantic-plan-v2/PLAN.md",
+      "source_artifact": "main-gap-semantic-qualification-plan-v2-source/PLAN.md",
+      "source_original": {
+        "bytes": 12729,
+        "sha256": "35f79fd21e33a590f2905cebf2ef3e94a48c6681d17905bb272bc54d10918635"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 93441,
+        "sha256": "ab4039f20ca81d763c7640308c76e558339ccc7ec02e08bf80e2181729f75fb0"
+      },
+      "export_path": "semantic-plan-v2/COMMANDS.json",
+      "source_artifact": "main-gap-semantic-qualification-plan-v2-source/COMMANDS.json",
+      "source_original": {
+        "bytes": 99869,
+        "sha256": "33e482c315e80efb9c70fe051fd72ce78e43e989da4f0f7e1d5f4a3609c75f9f"
+      },
+      "transformation": "literal role placeholder substitution; original hashes retained, not executable requalification"
+    },
+    {
+      "export": {
+        "bytes": 1536,
+        "sha256": "3cff6e872c4d2359b950b2396fa0053cf54c893ac61541c21d47f100ab7bb8dd"
+      },
+      "export_path": "semantic-plan-v2/BUDGETS.json",
+      "source_artifact": "main-gap-semantic-qualification-plan-v2-source/BUDGETS.json",
+      "source_original": {
+        "bytes": 1536,
+        "sha256": "3cff6e872c4d2359b950b2396fa0053cf54c893ac61541c21d47f100ab7bb8dd"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 41445,
+        "sha256": "06d0ce6fecff995b43e882af93b0fe37090d283543bd178b2679b4d33d1ab2cc"
+      },
+      "export_path": "semantic-plan-v2/LEGS.json",
+      "source_artifact": "main-gap-semantic-qualification-plan-v2-source/LEGS.json",
+      "source_original": {
+        "bytes": 45845,
+        "sha256": "53dcf311abd779697726d56bfd09a31d77aae0e8c278cd1551cdee280a546be8"
+      },
+      "transformation": "literal role placeholder substitution; original hashes retained, not executable requalification"
+    },
+    {
+      "export": {
+        "bytes": 11650,
+        "sha256": "0fd887c58f83adc2a7bd85edc30c159cd00503d116b2594f62913ef03c7be553"
+      },
+      "export_path": "semantic-plan-v2/SAMPLING-CAPS.json",
+      "source_artifact": "main-gap-semantic-qualification-plan-v2-source/SAMPLING-CAPS.json",
+      "source_original": {
+        "bytes": 11650,
+        "sha256": "0fd887c58f83adc2a7bd85edc30c159cd00503d116b2594f62913ef03c7be553"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 22865,
+        "sha256": "b70abf5c5071d9bbe868adab1146b6e93d7944a32f14fcf7384ba3814c91d694"
+      },
+      "export_path": "semantic-plan-v2/DYNAMIC-ORACLES.json",
+      "source_artifact": "main-gap-semantic-qualification-plan-v2-source/DYNAMIC-ORACLES.json",
+      "source_original": {
+        "bytes": 23965,
+        "sha256": "f58b1461b7bbaed12ff042aa0189361e70d3ae11cc15095e384a7d9d18cb5008"
+      },
+      "transformation": "literal role placeholder substitution; original hashes retained, not executable requalification"
+    },
+    {
+      "export": {
+        "bytes": 5628,
+        "sha256": "bc91f75920049a0643614b02813d33486d0d113b1ecb4ea1aace4e0b1206537c"
+      },
+      "export_path": "semantic-plan-v2/ARTIFACT-FLOW.json",
+      "source_artifact": "main-gap-semantic-qualification-plan-v2-source/ARTIFACT-FLOW.json",
+      "source_original": {
+        "bytes": 5628,
+        "sha256": "bc91f75920049a0643614b02813d33486d0d113b1ecb4ea1aace4e0b1206537c"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 4221,
+        "sha256": "e019bb914766123a560ca46f97b025a4662dea0cd776c159f304fee3e2ef8a0e"
+      },
+      "export_path": "semantic-plan-v2/WIRE-CONTRACT.json",
+      "source_artifact": "main-gap-semantic-qualification-plan-v2-source/WIRE-CONTRACT.json",
+      "source_original": {
+        "bytes": 4221,
+        "sha256": "e019bb914766123a560ca46f97b025a4662dea0cd776c159f304fee3e2ef8a0e"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 4062,
+        "sha256": "892b5b71b5e42a60344550d4292b3570743ff811c5cd776cfeb70c492ba6a538"
+      },
+      "export_path": "semantic-plan-v2/REQUIRED-NEGATIVE-TESTS.json",
+      "source_artifact": "main-gap-semantic-qualification-plan-v2-source/REQUIRED-NEGATIVE-TESTS.json",
+      "source_original": {
+        "bytes": 4062,
+        "sha256": "892b5b71b5e42a60344550d4292b3570743ff811c5cd776cfeb70c492ba6a538"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 5486,
+        "sha256": "11be0f410919dfd5092dcbb4735840b9da38986aad5f6e50b50a5d286f231b09"
+      },
+      "export_path": "semantic-plan-v2/contract_model.py",
+      "source_artifact": "main-gap-semantic-qualification-plan-v2-source/contract_model.py",
+      "source_original": {
+        "bytes": 5486,
+        "sha256": "11be0f410919dfd5092dcbb4735840b9da38986aad5f6e50b50a5d286f231b09"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 6324,
+        "sha256": "6433b3ad5f0f5b72baa3bacf54ed4a32f92a89b698f9fbc4260f8419e7fc8647"
+      },
+      "export_path": "semantic-plan-v2/model_tests.py",
+      "source_artifact": "main-gap-semantic-qualification-plan-v2-source/model_tests.py",
+      "source_original": {
+        "bytes": 6324,
+        "sha256": "6433b3ad5f0f5b72baa3bacf54ed4a32f92a89b698f9fbc4260f8419e7fc8647"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 5135,
+        "sha256": "9162f39cac3537ef7555b680d1ca8f611db5e2eaa0109c563b5d289b6ebbae15"
+      },
+      "export_path": "semantic-plan-v2/MODEL-CHECKS.json",
+      "source_artifact": "main-gap-semantic-qualification-plan-v2-source/MODEL-CHECKS.json",
+      "source_original": {
+        "bytes": 5135,
+        "sha256": "9162f39cac3537ef7555b680d1ca8f611db5e2eaa0109c563b5d289b6ebbae15"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 1147,
+        "sha256": "03690b04359aa69af234a79ac860ced9e98765a09c7e210f53537d6f71446a33"
+      },
+      "export_path": "semantic-plan-v2/PLAN-CHECKS.json",
+      "source_artifact": "main-gap-semantic-qualification-plan-v2-source/PLAN-CHECKS.json",
+      "source_original": {
+        "bytes": 1147,
+        "sha256": "03690b04359aa69af234a79ac860ced9e98765a09c7e210f53537d6f71446a33"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 2936,
+        "sha256": "8bfb9988f5aee132e08abbf84c53cd60b30556f1e0c06599ebce026b3e515eed"
+      },
+      "export_path": "evidence/run03-field-differences.json",
+      "source_artifact": "main-gap-setup-run03-raw-diagnosis/field-differences.json",
+      "source_original": {
+        "bytes": 3024,
+        "sha256": "be3becf7a5319770559654f944766838078a25a28f1753f4cafc06a25be0caf1"
+      },
+      "transformation": "literal role placeholder substitution; original hashes retained, not executable requalification"
+    },
+    {
+      "export": {
+        "bytes": 2544,
+        "sha256": "48aa9c734e693105bebb759ba515b07659dac023eafb4c1bd051a9b523e59fcc"
+      },
+      "export_path": "evidence/run03-decoder-coverage.json",
+      "source_artifact": "main-gap-setup-run03-raw-diagnosis/decoder-coverage.json",
+      "source_original": {
+        "bytes": 2544,
+        "sha256": "48aa9c734e693105bebb759ba515b07659dac023eafb4c1bd051a9b523e59fcc"
+      },
+      "transformation": "exact bytes"
+    },
+    {
+      "export": {
+        "bytes": 27476,
+        "sha256": "8fed98d151519ae658770a106e6ab7ff6f463ec9249443e330b1e790a07db912"
+      },
+      "export_path": "evidence/run03-source-causal-excerpts.json",
+      "source_artifact": "main-gap-setup-run03-raw-diagnosis/source-causal-excerpts.json",
+      "source_original": {
+        "bytes": 28268,
+        "sha256": "1541f6d3efa082837be91615b96a1b6fd683a5014ad654003d1b955a84ea869a"
+      },
+      "transformation": "literal role placeholder substitution; original hashes retained, not executable requalification"
+    }
+  ],
+  "schema": "main-frontend-public-export-source-map-v1",
+  "verified_frozen_input_manifests": [
+    {
+      "all_listed_bytes_verified": true,
+      "bytes": 6561,
+      "listed_files": 27,
+      "sha256": "2c63d5ed2dca715b66c7d1e4d4fe194581c78e1b9a812a84b0722f6ea11e347a",
+      "source_artifact": "main-gap-setup-v5-source/MANIFEST.json"
+    },
+    {
+      "all_listed_bytes_verified": true,
+      "bytes": 9597,
+      "listed_files": 37,
+      "sha256": "2cc33af7ec0fe71ff2b6464dde15adb369731df4aaa8fd7622087c5f0eb868a0",
+      "source_artifact": "main-gap-workloads-v1-source/MANIFEST.json"
+    },
+    {
+      "all_listed_bytes_verified": true,
+      "bytes": 4872,
+      "listed_files": 18,
+      "sha256": "d231f096285925b2e30323f54fd26b4356c180e9c1f0164336e0033b95a2d1d8",
+      "source_artifact": "main-gap-semantic-qualification-plan-v2-source/MANIFEST.json"
+    },
+    {
+      "all_listed_bytes_verified": true,
+      "bytes": 4407,
+      "listed_files": 17,
+      "sha256": "afdceb9d05de4c0f7c4117d63acf396fa1aad1ae1aae2e4a42808d3c33769e41",
+      "source_artifact": "main-gap-setup-run03-raw-diagnosis/MANIFEST.json"
+    }
+  ]
+}

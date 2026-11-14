@@ -1,0 +1,185 @@
+{
+  "excerpts": [
+    {
+      "file": {
+        "bytes": 83407,
+        "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-crates/Bootstrap/CrateSession.hs",
+        "sha256": "a13c01632001643b683e54c10775eb9a262faf0d6766c52209a3ec0704fd9bdd"
+      },
+      "line_end": 250,
+      "line_start": 223,
+      "text": "  compileGraphLocked verify spec interfaces prepared plan prefix directory = do {\n    executable <- getExecutablePath;\n    compiler <- fileDigest executable;\n    let { imported = map (\\((,) _ iface) -> Separate.UnitInterface (Artifact.crateId iface)\n          [] [] [] [] [] (Artifact.crateBindings iface) \"metadata\") interfaces;\n      protected = M.fromList compareString (concatMap (compose Artifact.crateProtection snd) interfaces) };\n    compiled <- if Query.validSourceContextDigest compiler\n      then case plan of {\n        Just source -> CrateGraph.compile verify (specIdentity spec) compiler directory imported protected source;\n        Nothing -> CrateGraph.compileLoweredIn (preparedLowered prepared) verify (specIdentity spec) compiler directory imported\n      }\n      else ioReturn (Left \"cannot fingerprint query graph compiler\");\n    case compiled of { Left e -> ioReturn (Left e); Right state -> case CrateGraph.checkedResult state of {\n      (,,,) fragments report contracts session -> case graphInterface spec interfaces prepared fragments contracts of {\n        Left e -> ioReturn (Left e);\n        Right iface -> do {\n          outputStarted <- QueryGraph.clock (CrateGraph.statistics state);\n          made <- Artifact.makeOpenObject iface (map snd interfaces) (map (\\((,,) n f _) -> (,) n f) fragments);\n          case made of { Left e -> ioReturn (Left e); Right object -> do {\n            written <- Artifact.writeObjectEither prefix object;\n            case written of { Left e -> ioReturn (Left e); Right _ -> do {\n              writeFile (prefix ++ \".queries\") (Query.reportJSON (specIdentity spec)\n                (Artifact.semanticFingerprint (Artifact.objectInterface object)) report);\n              QueryGraph.elapsed (CrateGraph.statistics state) 4 outputStarted;\n              publishStarted <- QueryGraph.clock (CrateGraph.statistics state);\n              published <- QueryGraph.publish session;\n              QueryGraph.elapsed (CrateGraph.statistics state) 5 publishStarted;\n              QueryGraph.writeProfile (prefix ++ \".query-profile\") (CrateGraph.statistics state);\n"
+    },
+    {
+      "file": {
+        "bytes": 28172,
+        "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-crates/Bootstrap/CrateGraph.hs",
+        "sha256": "52b0fcf312aec770515980f78d0ee44e1f29e248c496468536f44f20495880ee"
+      },
+      "line_end": 169,
+      "line_start": 155,
+      "text": "  start verify crateId compilerHash cacheDir flavor inventory datatypes contracts groups = do {\n        statistics <- G.profile;\n        graphStarted <- G.clock statistics;\n        auditSetting <- getEnv \"MLF_QUERY_SEMANTIC_AUDIT\";\n        started <- G.begin (cacheDir ++ \"/query-graph-v2\")\n          (Separate.pack [crateId,compilerHash,Q.sourceQueryFormat,\"open-fragment-checker-1/finish-receipt-1\",flavor]);\n        case started of { Left e -> ioReturn (Left e); Right session -> do {\n          initial <- case contracts of { Source.CheckedContracts scope indexed _ ->\n            recordInitialBindings scope (M.toList indexed) session };\n          case initial of { Left e -> ioReturn (Left e); Right first -> do {\n            loaded <- recordDatatypes datatypes first;\n            case loaded of { Left e -> ioReturn (Left e); Right ready -> do {\n              G.elapsed statistics 0 graphStarted;\n              runGroups verify (eqString auditSetting \"1\") crateId inventory groups\n                (State ready contracts M.empty [] 0 0 [] statistics)\n"
+    },
+    {
+      "file": {
+        "bytes": 44928,
+        "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-crates/Bootstrap/QueryGraph.hs",
+        "sha256": "f66d6ff37a13558ec54e4aa3d5243dde63a75ad77d0fd5f614b93195632cdd71"
+      },
+      "line_end": 71,
+      "line_start": 41,
+      "text": "  encodeHashed value = do {\n    result <- Storage.encode 6 [value];\n    case result of { Left e -> ioReturn (Left e); Right bytes -> do {\n      digest <- byteArrayDigest bytes;\n      ioReturn (if validHash digest then Right ((,) digest bytes) else Left \"query result SHA failed\")\n    } }\n  };\n  hashValue value = do {\n    encoded <- encodeHashed value;\n    ioReturn (mapEither fst encoded)\n  };\n  begin :: String -> String -> IO (Either String Session);\n  begin path configuration = do {\n    code <- command [\"/bin/mkdir\",\"-p\",path ++ \"/results\",path ++ \"/generations\",path ++ \"/staging\"];\n    if code /= 0 then ioReturn (Left \"cannot create query graph directory\") else do {\n      let { empty = Session path configuration \"\" M.empty M.empty M.empty };\n      pointer <- readValue (path ++ \"/CURRENT\") Nothing;\n      case pointer of {\n        Right graph -> case W.graphRoots graph of {\n          [root] -> case A.fromGraphText graph root of {\n            Right digest -> if validHash digest then do {\n              saved <- readValue (path ++ \"/generations/\" ++ digest ++ \".mlfqg\") (Just digest);\n              ioReturn (Right (case saved of {\n                Right graph -> case admitIndex configuration graph of {\n                  Right ((,) nodes canonical) -> Session path configuration\n                    (if canonical then digest else \"\") nodes M.empty M.empty;\n                  Left _ -> empty };\n                Left _ -> empty }))\n            } else ioReturn (Right empty);\n            Left _ -> ioReturn (Right empty)\n          };\n"
+    },
+    {
+      "file": {
+        "bytes": 44928,
+        "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-crates/Bootstrap/QueryGraph.hs",
+        "sha256": "f66d6ff37a13558ec54e4aa3d5243dde63a75ad77d0fd5f614b93195632cdd71"
+      },
+      "line_end": 262,
+      "line_start": 225,
+      "text": "  encodeIndex config nodes = do {\n    let { rows = M.elems nodes };\n    addresses <- traverseEither (compose parseAddress nodeKey) rows;\n    let { select pred = map addressId (filter (compose pred addressTag) addresses);\n      evidence = uniqueNames (select (\\tag -> tag == evidenceTag));\n      types = uniqueNames (select (\\tag -> tag == datatypeTag || tag == inputDatatypeTag)) };\n    requests <- traverseEither evidenceParts evidence;\n    let { groups = uniqueNames (append (select isGroup) (map (\\((,,) g _ _) -> g) requests)) };\n    members <- traverseEither membersOf groups;\n    let { declarations = uniqueNames (append (select (\\tag -> tag == bindingTag || tag == inputBindingTag))\n              (concat members));\n      declIds = ranks declarations; groupIds = ranks groups; requestIds = ranks evidence; typeIds = ranks types;\n      encodeAddress (Address tag name) = do {\n        index <- requireKey (if isGroup tag then groupIds else if tag == evidenceTag then requestIds\n          else if tag == datatypeTag || tag == inputDatatypeTag then typeIds else declIds) name;\n        Right (if tag == bindingTag then W.VInt index else W.VNode tag [W.VInt index])\n      };\n      encodeGroup names = mapEither (A.toList W.VInt) (traverseEither (requireKey declIds) names);\n      encodeEvidence ((,,) group site goal) = mapEither\n        (\\i -> W.VNode 414 [W.VInt i,W.VInt site,W.VText goal]) (requireKey groupIds group)\n    };\n    ensure (not (elem eqString \"\" declarations) && not (elem eqString \"\" types)) \"empty snapshot identity\";\n    ensure (not (eqString config \"\")) \"empty query graph configuration\";\n    traverseEither (checkIdentityBudget identityBudget) [declarations,groups,evidence,types,M.keys nodes];\n    encodedGroups <- traverseEither encodeGroup members;\n    encodedEvidence <- traverseEither encodeEvidence requests;\n    keys <- traverseEither encodeAddress addresses;\n    let { byKey = M.fromDistinctAscList (zip (M.keys nodes) keys);\n      encodeRow ((,) descriptor (QueryNode _ digest edges payload)) = do {\n        ensure (validDigest digest payload) \"invalid query graph digest\";\n        reads <- traverseEither (compose (requireKey byKey) fst) edges;\n        Right (W.VNode 413 [descriptor,W.VText digest,W.VNode 1 reads,A.toMaybe A.toText payload])\n      }\n    };\n    entries <- traverseEither encodeRow (zip keys rows);\n    Right (W.VNode 412 [W.VText \"MLF-CRATE-QUERY-GRAPH-2\",W.VText config,A.toList W.VText declarations,\n      W.VNode 1 encodedGroups,W.VNode 1 encodedEvidence,A.toList W.VText types,W.VNode 1 entries])\n  };\n"
+    },
+    {
+      "file": {
+        "bytes": 44928,
+        "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-crates/Bootstrap/QueryGraph.hs",
+        "sha256": "f66d6ff37a13558ec54e4aa3d5243dde63a75ad77d0fd5f614b93195632cdd71"
+      },
+      "line_end": 670,
+      "line_start": 641,
+      "text": "  admitSnapshot configuration graph format config declarations groups evidence types entries = do {\n    f <- A.fromGraphText graph format;\n    c <- A.fromGraphText graph config;\n    ensure (eqString f \"MLF-CRATE-QUERY-GRAPH-2\" && not (eqString c \"\") && eqString c configuration) \"query graph version mismatch\";\n    ds <- decodeNameTable graph declarations (A.fromGraphText graph);\n    gs <- decodeNameTable graph groups (groupAt graph ds);\n    es <- decodeNameTable graph evidence (evidenceAt graph gs);\n    ts <- decodeNameTable graph types (A.fromGraphText graph);\n    ids <- listAt graph entries;\n    let { collect ((,) budget previous) index = do {\n      row@(StoredRow _ name _ _ _) <- storedAt graph (SnapshotTables ds gs es ts) index;\n      next <- chargeIdentity budget name;\n      Right ((,) next ((:) row previous))\n    } };\n    saved <- foldM collect ((,) identityBudget []) ids;\n    let { rows = reverse (snd saved);\n      byDescriptor = IM.fromList (map (\\(StoredRow k name digest _ _) -> (,) k ((,) name digest)) rows);\n      readEdge k = case IM.lookup k byDescriptor of {\n        Just edge -> Right edge; Nothing -> Left \"unpublished query dependency\"\n      };\n      restore (StoredRow _ name digest edges payload) = do {\n        reads <- traverseEither readEdge edges;\n        Right (QueryNode name digest reads payload)\n      }\n    };\n    nodes <- traverseEither restore rows;\n    let { names = map nodeKey nodes; table = M.fromList compareString (zip names nodes) };\n    ensure (length names == M.size table) \"duplicate query node\";\n    validateClosure table;\n    Right ((,) table (eqList eqString names (M.keys table)))\n"
+    },
+    {
+      "file": {
+        "bytes": 44928,
+        "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-crates/Bootstrap/QueryGraph.hs",
+        "sha256": "f66d6ff37a13558ec54e4aa3d5243dde63a75ad77d0fd5f614b93195632cdd71"
+      },
+      "line_end": 740,
+      "line_start": 709,
+      "text": "  publication config previous old nodes =\n    if not (eqString previous \"\") && M.size old == M.size nodes &&\n       eqList sameNode (M.elems old) (M.elems nodes)\n    then ioReturn (Right Nothing)\n    else case validateClosure nodes of {\n      Left e -> ioReturn (Left e);\n      Right _ -> case encodeIndex config nodes of {\n        Left e -> ioReturn (Left e); Right index -> do {\n          encoded <- encodeHashed index;\n          ioReturn (mapEither Just encoded)\n        }\n      }\n    };\n  publish session@(Session path config previous old nodes pending) = do {\n    failpoint <- getEnv \"MLF_QUERY_FAILPOINT\";\n    if eqString failpoint \"before-results\" then ioReturn (Left \"query publication interrupted before results\") else do {\n      encoded <- publication config previous old nodes;\n      case encoded of { Left e -> ioReturn (Left e); Right generation -> do {\n        written <- publishValues failpoint session (M.toList pending);\n        closure <- case written of { Left e -> ioReturn (Left e); Right _ -> verifyPayloads session (M.elems nodes) };\n        case closure of { Left e -> ioReturn (Left e); Right _ -> case generation of {\n          Nothing -> ioReturn (Right False);\n          Just ((,) digest bytes) -> if eqString digest previous then ioReturn (Right False)\n            else if eqString failpoint \"before-index\" then ioReturn (Left \"query publication interrupted before index\")\n            else do {\n              saved <- Storage.writeRawAtomic (path ++ \"/generations/\" ++ digest ++ \".mlfqg\") bytes;\n              case saved of { Left e -> ioReturn (Left e); Right _ ->\n                if eqString failpoint \"before-current\" then ioReturn (Left \"query publication interrupted before current\")\n                else do {\n                  switched <- Storage.writeAtomic 6 (path ++ \"/CURRENT\") [W.VText digest];\n                  ioReturn (mapEither (\\_ -> True) switched)\n                }\n"
+    },
+    {
+      "file": {
+        "bytes": 82558,
+        "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-crates/Bootstrap/Bitstream.hs",
+        "sha256": "f25fe195b5a287fd0c365286acb31839118edac2227f463ea5cc85eb26daedb8"
+      },
+      "line_end": 386,
+      "line_start": 353,
+      "text": "      nodeLength = bytesForBits (foldlStrict (\\total entry -> total + nodeBits nodeWidth symbolWidth entry) 0 nodes);\n      rootLength = bytesForBits (rootCount * nodeWidth);\n      nodeOffset = 80 + symbolLength;\n      rootOffset = nodeOffset + nodeLength;\n      total = rootOffset + rootLength\n    } in\n    if total > maxBytes limits then Left \"binary file byte limit exceeded\"\n    else Right (Layout total symbolCount symbolLength nodeCount nodeOffset nodeLength\n      edges rootCount rootOffset rootLength nodeWidth symbolWidth);\n\n  -- The writer owns its zero-filled buffer exclusively. Bits are little-endian\n  -- within bytes; no intermediate list of output bytes or textual envelope.\n  putBits :: ByteArray -> Int -> Int -> Int -> IO Int;\n  putBits bytes position width bits =\n    if width == 0 then ioReturn position else do {\n      let {\n        offset = position % 8;\n        take = min width (8 - offset);\n        mask = shiftLInt 1 take - 1;\n        piece = shiftLInt (andInt bits mask) offset;\n        byteIndex = position / 8\n      };\n      if take == 8 then writeByteArray bytes byteIndex piece else do {\n        previous <- readByteArray bytes byteIndex;\n        writeByteArray bytes byteIndex (orInt previous piece)\n      };\n      putBits bytes (position + take) (width - take) (unsignedShiftRInt bits take)\n    };\n  putVar :: ByteArray -> Int -> Int -> IO Int;\n  putVar bytes position bits = do {\n    let { final = unsignedLtInt bits 128; byte = orInt (andInt bits 127) (if final then 0 else 128) };\n    next <- putBits bytes position 8 byte;\n    if final then ioReturn next else putVar bytes next (unsignedShiftRInt bits 7)\n  };\n"
+    },
+    {
+      "file": {
+        "bytes": 82558,
+        "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-crates/Bootstrap/Bitstream.hs",
+        "sha256": "f25fe195b5a287fd0c365286acb31839118edac2227f463ea5cc85eb26daedb8"
+      },
+      "line_end": 479,
+      "line_start": 429,
+      "text": "  putReferences :: ByteArray -> Int -> Int -> [] Int -> IO Int;\n  putReferences bytes position width references = case references of {\n    [] -> ioReturn position;\n    (:) index rest -> do {\n      next <- putBits bytes position width index;\n      putReferences bytes next width rest\n    }\n  };\n  putEntry :: ByteArray -> Int -> Int -> Int -> Entry -> IO Int;\n  putEntry bytes position nodeWidth symbolWidth entry = do {\n    next <- putBits bytes position 2 (entryKind entry);\n    case entry of {\n      EInt value -> putVar bytes next (zigzag value);\n      EBits bits -> putBits bytes next 64 bits;\n      EText index -> putBits bytes next symbolWidth index;\n      ENode tag children -> do {\n        more <- putVar bytes next tag;\n        last <- putVar bytes more (length children);\n        putReferences bytes last nodeWidth children\n      }\n    }\n  };\n  putEntries :: ByteArray -> Int -> Int -> Int -> [] Entry -> IO Int;\n  putEntries bytes position nodeWidth symbolWidth entries = case entries of {\n    [] -> ioReturn position;\n    (:) entry rest -> do {\n      next <- putEntry bytes position nodeWidth symbolWidth entry;\n      putEntries bytes next nodeWidth symbolWidth rest\n    }\n  };\n  putWords :: ByteArray -> Int -> [] Int -> IO Int;\n  putWords bytes position words = case words of {\n    [] -> ioReturn position;\n    (:) word rest -> do {\n      next <- putBits bytes position 32 word;\n      putWords bytes next rest\n    }\n  };\n  putHeader :: ByteArray -> Int -> Layout -> IO Int;\n  putHeader bytes schema (Layout total symbols symbolLength nodes nodeOffset nodeLength\n      edges roots rootOffset rootLength nodeWidth symbolWidth) = do {\n    next <- putText bytes 0 magic 0;\n    putWords bytes next ((:) 1 ((:) 0 ((:) schema ((:) 80 ((:) total\n      ((:) symbols ((:) 80 ((:) symbolLength ((:) nodes ((:) nodeOffset ((:) nodeLength\n      ((:) edges ((:) roots ((:) rootOffset ((:) rootLength ((:) nodeWidth\n      ((:) symbolWidth ((:) 0 []))))))))))))))))))\n  };\n\n  -- CRC32/ISO-HDLC. This detects corruption only; it is not a signature,\n  -- MAC or content-addressing substitute. Header checksum bytes 76..79 are\n  -- treated as zero, binding every other header byte and every payload byte.\n"
+    },
+    {
+      "file": {
+        "bytes": 82558,
+        "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-crates/Bootstrap/Bitstream.hs",
+        "sha256": "f25fe195b5a287fd0c365286acb31839118edac2227f463ea5cc85eb26daedb8"
+      },
+      "line_end": 692,
+      "line_start": 657,
+      "text": "  getHeader limits schema actualSize = do {\n    version <- getBits 32;\n    flags <- getBits 32;\n    storedSchema <- getBits 32;\n    headerSize <- getBits 32;\n    total <- getBits 32;\n    symbols <- getBits 32;\n    symbolOffset <- getBits 32;\n    symbolLength <- getBits 32;\n    nodes <- getBits 32;\n    nodeOffset <- getBits 32;\n    nodeLength <- getBits 32;\n    edges <- getBits 32;\n    roots <- getBits 32;\n    rootOffset <- getBits 32;\n    rootLength <- getBits 32;\n    nodeWidth <- getBits 32;\n    symbolWidth <- getBits 32;\n    crc <- getBits 32;\n    checkRead (version == 1) \"unsupported binary format version\";\n    checkRead (flags == 0) \"unknown binary mandatory flags\";\n    checkRead (storedSchema == schema) \"binary artifact schema mismatch\";\n    checkRead (headerSize == 80 && total == actualSize) \"binary file/header length mismatch\";\n    checkRead (symbols <= maxSymbols limits && nodes <= maxNodes limits &&\n      edges <= maxEdges limits && roots <= maxEdges limits) \"binary table count limit exceeded\";\n    checkRead (symbolOffset == 80 && nodeOffset == 80 + symbolLength &&\n      rootOffset == nodeOffset + nodeLength && total == rootOffset + rootLength)\n      \"binary sections overlap, have gaps, or contain trailing bytes\";\n    checkRead (symbols <= symbolLength && bytesForBits (nodes * 2) <= nodeLength)\n      \"binary section count exceeds its byte length\";\n    checkRead (nodeWidth == referenceWidth nodes && symbolWidth == referenceWidth symbols)\n      \"noncanonical binary reference width\";\n    checkRead (rootLength == bytesForBits (roots * nodeWidth)) \"binary root section length mismatch\";\n    returnRead (Header (Layout total symbols symbolLength nodes nodeOffset nodeLength\n      edges roots rootOffset rootLength nodeWidth symbolWidth) crc)\n  };\n"
+    },
+    {
+      "file": {
+        "bytes": 14412,
+        "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/host/ghc/MLF/Primitive.hs",
+        "sha256": "d5a66475293578650a975172ae14d5a6e5506668859fd559d1a18eb08d2160cb"
+      },
+      "line_end": 283,
+      "line_start": 282,
+      "text": "getExecutablePath :: IO String\ngetExecutablePath = IO.v_getExecutablePath\n"
+    },
+    {
+      "file": {
+        "bytes": 14412,
+        "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/host/ghc/MLF/Primitive.hs",
+        "sha256": "d5a66475293578650a975172ae14d5a6e5506668859fd559d1a18eb08d2160cb"
+      },
+      "line_end": 336,
+      "line_start": 335,
+      "text": "fileDigest :: String -> IO String\nfileDigest = IO.v_fileDigest\n"
+    },
+    {
+      "file": {
+        "bytes": 15420,
+        "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/host/ghc/MLF/Host/IO.hs",
+        "sha256": "042164a571c9b60c9fc1abe984ccc687400a01602b3a980cff61342941bfe22a"
+      },
+      "line_end": 67,
+      "line_start": 64,
+      "text": "v_getEnv, v_listDirectory, v_fileDigest, v_processSupervisor :: String -> IO String\nv_getEnv = hostText 0\nv_listDirectory = hostText 4\nv_fileDigest = hostText 8\n"
+    },
+    {
+      "file": {
+        "bytes": 15420,
+        "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/host/ghc/MLF/Host/IO.hs",
+        "sha256": "042164a571c9b60c9fc1abe984ccc687400a01602b3a980cff61342941bfe22a"
+      },
+      "line_end": 122,
+      "line_start": 121,
+      "text": "v_getExecutablePath :: IO String\nv_getExecutablePath = hostText 12 empty\n"
+    },
+    {
+      "file": {
+        "bytes": 9739,
+        "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/host/ghc/cbits/host.c",
+        "sha256": "400d0bb9c4c0b610c7185517697be536da74dbf0dc5cffdac70dcf57462bd5a1"
+      },
+      "line_end": 199,
+      "line_start": 195,
+      "text": "    case 8: value=os_fileDigest(&first);text=1;break;\n    case 9: value=mlf_process_request(&first);text=1;break;\n    case 10: value=host_file_exists(&first);break;\n    case 11: value=host_canonical_path(&first);text=1;break;\n    case 12: value=host_executable_path();text=1;break;\n"
+    },
+    {
+      "file": {
+        "bytes": 14082,
+        "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/runtime/mlf_system.h",
+        "sha256": "cc87aa9445c45e7e6fe66b2631a887be870baf3015f9daa6d6705d356ed37477"
+      },
+      "line_end": 299,
+      "line_start": 248,
+      "text": "static MLF_NOINLINE MlfValue *os_fileDigest(MlfValue *name) {\n    FILE *file = fopen(file_path(name),\"rb\");\n    if (!file) fail(\"IO error: fileDigest failed\");\n#if defined(__APPLE__) && !defined(MLF_TEST_FORCE_PORTABLE_SHA256)\n    CC_SHA256_CTX context;\n    if (!CC_SHA256_Init(&context)) { fclose(file); fail(\"IO error: fileDigest failed\"); }\n    unsigned char buffer[65536], digest[CC_SHA256_DIGEST_LENGTH];\n    size_t n; int failed=0;\n    while ((n=fread(buffer,1,sizeof(buffer),file))) {\n        if (!CC_SHA256_Update(&context,buffer,(CC_LONG)n)) { failed=1; break; }\n    }\n    if(ferror(file))failed=1;\n    if(fclose(file))failed=1;\n    if(failed || !CC_SHA256_Final(digest,&context))fail(\"IO error: fileDigest failed\");\n    char hex[65];\n    static const char digits[]=\"0123456789abcdef\";\n    for(int i=0;i<CC_SHA256_DIGEST_LENGTH;++i){hex[2*i]=digits[digest[i]>>4];hex[2*i+1]=digits[digest[i]&15];}\n    hex[64]=0;\n    return mlf_string(hex,64);\n#else\n    uint32_t h[8]={0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};\n    unsigned char buffer[65536],tail[128]={0};\n    size_t n,remaining=0; uint64_t total=0;\n    while ((n=fread(buffer,1,sizeof(buffer),file))) {\n        total += n;\n        size_t pos=0;\n        if (remaining) { size_t take=n < 64-remaining ? n : 64-remaining; memcpy(tail+remaining,buffer,take); remaining+=take;pos+=take;if(remaining==64){os_sha_block(h,tail);remaining=0;} }\n        while (n-pos>=64) {os_sha_block(h,buffer+pos);pos+=64;}\n        if(pos<n){remaining=n-pos;memcpy(tail,buffer+pos,remaining);}\n    }\n    int failed=ferror(file);if(fclose(file))failed=1;if(failed)fail(\"IO error: fileDigest failed\");\n    size_t size=remaining<56?64:128;memset(tail+remaining,0,size-remaining);tail[remaining]=128;\n    uint64_t bits=total*8;for(int i=0;i<8;++i)tail[size-1-i]=(unsigned char)(bits>>(8*i));\n    os_sha_block(h,tail);if(size==128)os_sha_block(h,tail+64);\n    char hex[65];for(int i=0;i<8;++i)snprintf(hex+8*i,9,\"%08\" PRIx32,h[i]);\n    return mlf_string(hex,64);\n#endif\n}\n#endif\n"
+    },
+    {
+      "file": {
+        "bytes": 64121,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run03/controller.py",
+        "sha256": "891950299023f0991a47cf34e8506da1118a2f0528fdf08ffd510be00828ae9d"
+      },
+      "line_end": 806,
+      "line_start": 804,
+      "text": "        self.prepare_fixture()\n        self.command('new-main-fixed-builtin-pair',[exe['producer'],'--compile-crate',t/'builtin-work/fixture.spec','-o',t/'builtin-work/fixture'],kind='setup_payload',maximum=120,out=b'',err=b'')\n        ordinary=self.fixture_snapshot()\n"
+    },
+    {
+      "file": {
+        "bytes": 64121,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run03/controller.py",
+        "sha256": "891950299023f0991a47cf34e8506da1118a2f0528fdf08ffd510be00828ae9d"
+      },
+      "line_end": 835,
+      "line_start": 824,
+      "text": "            self.command('stats-'+label,[binary,*args],kind='qualification',status=status,out=out,err=err,reports=(sink,),maximum=10)\n        # Preserve every original output, then reconstruct the identical empty paths before the second compile.\n        reference=t/'ordinary-reference';reference.mkdir()\n        (t/'builtin-work').rename(reference/'builtin-work')\n        for p in sorted(t.glob('builtin.*')):p.rename(reference/p.name)\n        require(self.fixture_snapshot(reference,locks=False)==ordinary,'ordinary fixture archive changed bytes')\n        for item in tree_pins(reference):self.remember(item['path'])\n        self.record['ordinary_fixture_raw']={'root':str(reference),'files':ordinary,'same_paths_recreated':True}\n        self.prepare_fixture()\n        self.command('stats-fixed-fixture',[binary,'--compile-crate',t/'builtin-work/fixture.spec','-o',t/'builtin-work/fixture'],kind='qualification',maximum=120,out=b'',err=b'',reports=(sink,))\n        actual=self.fixture_snapshot();require(actual==ordinary,'full raw fixture/query/builtin bytes differ; no normalization permitted')\n        for label,prefix,identity,owners,dependencies in self.show_specs():\n"
+    },
+    {
+      "file": {
+        "bytes": 64121,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run03/controller.py",
+        "sha256": "891950299023f0991a47cf34e8506da1118a2f0528fdf08ffd510be00828ae9d"
+      },
+      "line_end": 866,
+      "line_start": 861,
+      "text": "    def prepare_fixture(self):\n        t=self.folder;work=t/'builtin-work';work.mkdir();(work/'queries').mkdir()\n        (work/'Fixture.emlf').write_bytes(FIXTURE)\n        fields=['MLF-CRATE-1','compiler-shapes/builtin','','false',pack([pack(['Fixture',str(work/'Fixture.emlf')])]),'',str(work/'queries'),str(t/'builtin')]\n        (work/'fixture.spec').write_text(pack(fields))\n        require(not any((t/('builtin'+s)).exists() for s in ['.mlfci','.mlfco','.lock']),'fixed builtin must be genuinely absent')\n"
+    }
+  ],
+  "scope": "read-only exact source lines; no source module executed"
+}

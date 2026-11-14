@@ -1,0 +1,79 @@
+{
+  "actual_decoder_or_runner_test_results": null,
+  "cases": [
+    {
+      "actual_decoder_suite_passed": false,
+      "category": "producer",
+      "required": "wrong actual binary SHA, stale binary pin, copied original hash in stats config, swapped A/B identity, producer/source/object/runtime mismatch"
+    },
+    {
+      "actual_decoder_suite_passed": false,
+      "category": "config",
+      "required": "wrong crate/query/checker/flavor, extra or missing packed field, malformed/noncanonical length, identical unauthorized changes on both sides"
+    },
+    {
+      "actual_decoder_suite_passed": false,
+      "category": "container",
+      "required": "bad magic/version/schema/flags/header/overlap/gap/trailing data, wrong widths/counts, overlong/overflow varint, invalid UTF8, nonzero padding, bad CRC"
+    },
+    {
+      "actual_decoder_suite_passed": false,
+      "category": "graph",
+      "required": "forward/out-of-range references, unknown tag/arity/type, unreachable or duplicate interned nodes, unused/noncanonical symbols, depth/aggregate-work overflow"
+    },
+    {
+      "actual_decoder_suite_passed": false,
+      "category": "CURRENT",
+      "required": "wrong hash, wrong filename, pointer to absent generation, altered generation with recomputed only CRC, extra generations, malformed or extra roots"
+    },
+    {
+      "actual_decoder_suite_passed": false,
+      "category": "snapshot",
+      "required": "changed declaration/group/evidence/type table, changed row identity/hash/location, duplicate row identity, dangling edge, cycle, malformed descriptor/index/address, illegal canonical order"
+    },
+    {
+      "actual_decoder_suite_passed": false,
+      "category": "ordered reads",
+      "required": "same multiset different order rejects; dropped/added occurrence rejects; legal duplicate sequence accepts unchanged; shared payload digest across multiple rows accepts with one exact result file"
+    },
+    {
+      "actual_decoder_suite_passed": false,
+      "category": "result closure",
+      "required": "missing referenced result, extra unreferenced result, wrong filename digest/content, duplicate aliases/symlink/hardlink, staging leftovers"
+    },
+    {
+      "actual_decoder_suite_passed": false,
+      "category": "semantic files",
+      "required": "changed checked pair/query JSON/lock/spec/source byte, omitted/extra file, path or token rewrite, moved archived artifact execution"
+    },
+    {
+      "actual_decoder_suite_passed": false,
+      "category": "freshness",
+      "required": "nonzero reuse, cached0 instead ofFalse, bool count, count/list mismatch, duplicate group id, malformed/extra/missing query field, borrowed old475/Fixture counts"
+    },
+    {
+      "actual_decoder_suite_passed": false,
+      "category": "same-B later oracle",
+      "required": "any changed config/CRC/CURRENT/generation filename or semantic byte rejects; changed binary/source/input/path/dependency/runtime rejects, even if both graph fields look equivalent"
+    },
+    {
+      "actual_decoder_suite_passed": false,
+      "category": "lifecycle",
+      "required": "old setup pins changed, active parent recreated, commands parent missing/precreated guard child, stale sink, report outside exact E, live outer hashed as worker output, incomplete cleanup/lease or changed epoch"
+    },
+    {
+      "actual_decoder_suite_passed": false,
+      "category": "GHC",
+      "required": "extra Main/host dependency rebuild, duplicate/missing Compiling event, wrong source path/tool/private package, extra/missing/empty .hi, any .o/.dyn_o/.dyn_hi/executable"
+    },
+    {
+      "actual_decoder_suite_passed": false,
+      "category": "budgets",
+      "required": "600s cleanup overrun, exhausted shared remainder, missing full next600 entry fit, appended command/retry/warmup/retained window, sample or cell replacement"
+    }
+  ],
+  "independent_mutation_review_required": true,
+  "model_tests_are_only_subset": true,
+  "no_original_failed_artifact_rewritten_for_tests": true,
+  "schema": "semantic-v2-required-negative-suite-plan-v1"
+}

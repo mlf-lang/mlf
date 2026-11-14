@@ -1,0 +1,48 @@
+{
+  "attempts": [
+    {
+      "command": "source_checks.py own AST/read/hash tests",
+      "outcome": "98 pass"
+    },
+    {
+      "command": "package_field_checks.py first copied pure check",
+      "outcome": "Reached inherited whole-v3 inverse assertion and failed because new v5 contract was not inverted by that old test. No target/helper/runtime/guard/lock; no actual source failure."
+    },
+    {
+      "command": "package_field_checks.py adapted pure check",
+      "outcome": "86 pass; registered-field validator exact v4 AST. Separate delta_checks proves entire v5 inverse."
+    },
+    {
+      "command": "publication_checks.py first pure actual/mutation batch",
+      "outcome": "67 pass"
+    },
+    {
+      "command": "delta_checks.py own exact inverse and temporary directory regression",
+      "outcome": "31 pass"
+    },
+    {
+      "command": "publication_checks.py with extra low-level cases",
+      "outcome": "72 pass before source-policy completion"
+    },
+    {
+      "command": "source_checks.py / package_field_checks.py / delta_checks.py final policy version",
+      "outcome": "98 / 86 / 31 pass"
+    },
+    {
+      "command": "publication_checks.py production policy boundary draft",
+      "outcome": "Pure test wrapper lacked ast.Expr lineno; stopped at root-policy extraction TypeError after earlier predicates. Corrected with ast.fix_missing_locations; original artifacts, oracle and all target state unaffected."
+    },
+    {
+      "command": "final publication_checks.py after production policies and wrapper correction",
+      "outcome": "101 pass on exact final oracle bytes; real run03 positive plus coherent byte mutants, exact DP/resource/identity/path predicates. No target execution."
+    }
+  ],
+  "failed_or_partial_check_results_not_qualification": true,
+  "original_target_calls": 0,
+  "schema": "main-gap-setup-v5-author-check-history-v1",
+  "source_review_feedback_applied_before_freeze": [
+    "Preserve repeated reads and their order (QueryGraph source267).",
+    "Preserve unsorted unique group members, not sorted-set equality.",
+    "Add exact default symbol/tag/depth/expanded/aggregate-root policies and typed identity-budget lengths, goal nonempty and4096 query height."
+  ]
+}

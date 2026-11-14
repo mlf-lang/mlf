@@ -1,0 +1,105 @@
+{
+  "cases_explicit": [
+    [
+      "baseline",
+      0
+    ],
+    [
+      "flat_functions",
+      16
+    ],
+    [
+      "flat_functions",
+      32
+    ],
+    [
+      "flat_functions",
+      64
+    ],
+    [
+      "flat_functions",
+      128
+    ],
+    [
+      "flat_functions",
+      256
+    ],
+    [
+      "higher_order_chain",
+      16
+    ],
+    [
+      "higher_order_chain",
+      32
+    ],
+    [
+      "higher_order_chain",
+      64
+    ],
+    [
+      "higher_order_chain",
+      128
+    ],
+    [
+      "higher_order_chain",
+      256
+    ]
+  ],
+  "evaluated_only_literal_constants": [
+    "HEADER",
+    "MAIN"
+  ],
+  "executed_original_function_names": [
+    "balanced",
+    "program",
+    "expected"
+  ],
+  "extracted_functions": {
+    "bytes": 4448,
+    "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/generator-functions.py",
+    "sha256": "e52a4bf4276e7c4c2631ed829a000c209a1cf13fd631ea6890ebd7baf17b1e40"
+  },
+  "foundation_package_manifest": {
+    "bytes": 861,
+    "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/mlf-package.json",
+    "sha256": "e33ad7d2802b6b2ea2560579a5c011935bbb00cef6bfbfcc7ecce3d4ab615b13"
+  },
+  "foundation_source_selection": {
+    "bytes": 37538,
+    "path": "<EXPERIMENT_ROOT>/main-gap-endpoint-contract-source/CLOSURES.json",
+    "sha256": "dbb5ad75715d3f9e3a6386728a8d08a58cde27452bd4c57ce73f527a61c9310f"
+  },
+  "frozen_full_copy": {
+    "bytes": 6525,
+    "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/generator-source.py",
+    "sha256": "1648034e7bfe721d025d0d0fae1f404713b4e5ab267ed780ac356baed0848f0a"
+  },
+  "independent_formula_not_derived_from_target_output": true,
+  "main_full_source_inventory": {
+    "bytes": 1638110,
+    "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/SOURCE-FILES.json",
+    "sha256": "e326f4bea2d229b02dc20fe7504793224889749ac474b8d126ba738ab1934e99"
+  },
+  "never_executed": [
+    "generate",
+    "module imports",
+    "module top-level ROOT assignment",
+    "repository CLI"
+  ],
+  "no_compiler_query_group_inference": true,
+  "original": {
+    "bytes": 6525,
+    "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/tools/performance/compiler-shapes/generate.py",
+    "sha256": "1648034e7bfe721d025d0d0fae1f404713b4e5ab267ed780ac356baed0848f0a"
+  },
+  "pure_function_calls_only": true,
+  "restricted_builtin_names": [
+    "len",
+    "range",
+    "reversed",
+    "max",
+    "ValueError"
+  ],
+  "schema": "main-gap-pure-generator-provenance-v1",
+  "selected_AST_sha256": "6d2c57a27803d24f2b70a05e4735ffa872e8beb7167f8df55685b5c517823316"
+}

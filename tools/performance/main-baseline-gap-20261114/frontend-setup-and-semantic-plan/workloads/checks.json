@@ -1,0 +1,257 @@
+{
+  "actual_semantic_qualification": false,
+  "check_count": 62,
+  "checks": [
+    {
+      "name": "full main generator copied exact",
+      "passed": true
+    },
+    {
+      "name": "exact original pure function AST balanced",
+      "passed": true
+    },
+    {
+      "name": "exact original pure function AST program",
+      "passed": true
+    },
+    {
+      "name": "exact original pure function AST expected",
+      "passed": true
+    },
+    {
+      "name": "extracted generator has no module import or filesystem entry",
+      "passed": true
+    },
+    {
+      "name": "exact12 cell order",
+      "passed": true
+    },
+    {
+      "name": "25 files and215033 sourcebytes",
+      "passed": true
+    },
+    {
+      "name": "same input orderedpaths baseline-0",
+      "passed": true
+    },
+    {
+      "name": "real query/interface/artifact outputs unknown baseline-0",
+      "passed": true
+    },
+    {
+      "name": "GHC same source argv no extra wrapper baseline-0",
+      "passed": true
+    },
+    {
+      "name": "independent formula outputs baseline-0",
+      "passed": true
+    },
+    {
+      "name": "same input orderedpaths flat_functions-16",
+      "passed": true
+    },
+    {
+      "name": "real query/interface/artifact outputs unknown flat_functions-16",
+      "passed": true
+    },
+    {
+      "name": "GHC same source argv no extra wrapper flat_functions-16",
+      "passed": true
+    },
+    {
+      "name": "independent formula outputs flat_functions-16",
+      "passed": true
+    },
+    {
+      "name": "same input orderedpaths flat_functions-32",
+      "passed": true
+    },
+    {
+      "name": "real query/interface/artifact outputs unknown flat_functions-32",
+      "passed": true
+    },
+    {
+      "name": "GHC same source argv no extra wrapper flat_functions-32",
+      "passed": true
+    },
+    {
+      "name": "independent formula outputs flat_functions-32",
+      "passed": true
+    },
+    {
+      "name": "same input orderedpaths flat_functions-64",
+      "passed": true
+    },
+    {
+      "name": "real query/interface/artifact outputs unknown flat_functions-64",
+      "passed": true
+    },
+    {
+      "name": "GHC same source argv no extra wrapper flat_functions-64",
+      "passed": true
+    },
+    {
+      "name": "independent formula outputs flat_functions-64",
+      "passed": true
+    },
+    {
+      "name": "same input orderedpaths flat_functions-128",
+      "passed": true
+    },
+    {
+      "name": "real query/interface/artifact outputs unknown flat_functions-128",
+      "passed": true
+    },
+    {
+      "name": "GHC same source argv no extra wrapper flat_functions-128",
+      "passed": true
+    },
+    {
+      "name": "independent formula outputs flat_functions-128",
+      "passed": true
+    },
+    {
+      "name": "same input orderedpaths flat_functions-256",
+      "passed": true
+    },
+    {
+      "name": "real query/interface/artifact outputs unknown flat_functions-256",
+      "passed": true
+    },
+    {
+      "name": "GHC same source argv no extra wrapper flat_functions-256",
+      "passed": true
+    },
+    {
+      "name": "independent formula outputs flat_functions-256",
+      "passed": true
+    },
+    {
+      "name": "same input orderedpaths higher_order_chain-16",
+      "passed": true
+    },
+    {
+      "name": "real query/interface/artifact outputs unknown higher_order_chain-16",
+      "passed": true
+    },
+    {
+      "name": "GHC same source argv no extra wrapper higher_order_chain-16",
+      "passed": true
+    },
+    {
+      "name": "independent formula outputs higher_order_chain-16",
+      "passed": true
+    },
+    {
+      "name": "same input orderedpaths higher_order_chain-32",
+      "passed": true
+    },
+    {
+      "name": "real query/interface/artifact outputs unknown higher_order_chain-32",
+      "passed": true
+    },
+    {
+      "name": "GHC same source argv no extra wrapper higher_order_chain-32",
+      "passed": true
+    },
+    {
+      "name": "independent formula outputs higher_order_chain-32",
+      "passed": true
+    },
+    {
+      "name": "same input orderedpaths higher_order_chain-64",
+      "passed": true
+    },
+    {
+      "name": "real query/interface/artifact outputs unknown higher_order_chain-64",
+      "passed": true
+    },
+    {
+      "name": "GHC same source argv no extra wrapper higher_order_chain-64",
+      "passed": true
+    },
+    {
+      "name": "independent formula outputs higher_order_chain-64",
+      "passed": true
+    },
+    {
+      "name": "same input orderedpaths higher_order_chain-128",
+      "passed": true
+    },
+    {
+      "name": "real query/interface/artifact outputs unknown higher_order_chain-128",
+      "passed": true
+    },
+    {
+      "name": "GHC same source argv no extra wrapper higher_order_chain-128",
+      "passed": true
+    },
+    {
+      "name": "independent formula outputs higher_order_chain-128",
+      "passed": true
+    },
+    {
+      "name": "same input orderedpaths higher_order_chain-256",
+      "passed": true
+    },
+    {
+      "name": "real query/interface/artifact outputs unknown higher_order_chain-256",
+      "passed": true
+    },
+    {
+      "name": "GHC same source argv no extra wrapper higher_order_chain-256",
+      "passed": true
+    },
+    {
+      "name": "independent formula outputs higher_order_chain-256",
+      "passed": true
+    },
+    {
+      "name": "same input orderedpaths foundation14",
+      "passed": true
+    },
+    {
+      "name": "real query/interface/artifact outputs unknown foundation14",
+      "passed": true
+    },
+    {
+      "name": "GHC same source argv no extra wrapper foundation14",
+      "passed": true
+    },
+    {
+      "name": "Foundation14 complete exact main bytes173594",
+      "passed": true
+    },
+    {
+      "name": "Foundation has no program/runtime formula or guessed declarations",
+      "passed": true
+    },
+    {
+      "name": "exact48 MGG M legs no inter-cell reorder",
+      "passed": true
+    },
+    {
+      "name": "negative different GHC source",
+      "passed": true
+    },
+    {
+      "name": "negative extra GHC Main flag",
+      "passed": true
+    },
+    {
+      "name": "negative future result invented actual_main_fresh_query_groups",
+      "passed": true
+    },
+    {
+      "name": "negative future result invented actual_typed_interface_inventory",
+      "passed": true
+    },
+    {
+      "name": "no active workload directory created",
+      "passed": true
+    }
+  ],
+  "compiler_or_target_or_repo_entry_imported_or_executed": false,
+  "complete": true,
+  "schema": "main-gap-workload-input-source-checks-v1"
+}

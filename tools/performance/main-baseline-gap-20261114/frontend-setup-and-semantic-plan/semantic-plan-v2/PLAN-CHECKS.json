@@ -1,0 +1,48 @@
+{
+  "actual_qualification": false,
+  "check_count": 10,
+  "checks": [
+    {
+      "name": "91rows ordinals kinds labels argv unchanged",
+      "passed": true
+    },
+    {
+      "name": "all old expected byte/spec/formula oracles unchanged",
+      "passed": true
+    },
+    {
+      "name": "budget file exact old frozen copy",
+      "passed": true
+    },
+    {
+      "name": "48leg file exact reviewed input copy",
+      "passed": true
+    },
+    {
+      "name": "sampling maxima510630 unchanged",
+      "passed": true
+    },
+    {
+      "name": "12dynamic oracle slots no actual observed count",
+      "passed": true
+    },
+    {
+      "name": "new pure model tests synthetic only",
+      "passed": true
+    },
+    {
+      "name": "old frozen manifest unchanged main-gap-semantic-qualification-plan-source",
+      "passed": true
+    },
+    {
+      "name": "old frozen manifest unchanged main-gap-workloads-v1-source",
+      "passed": true
+    },
+    {
+      "name": "old frozen manifest unchanged main-gap-setup-run03-raw-diagnosis",
+      "passed": true
+    }
+  ],
+  "runner_implemented": false,
+  "schema": "semantic-v2-source-plan-checks-v1"
+}

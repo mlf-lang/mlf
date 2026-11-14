@@ -1,0 +1,99 @@
+{
+  "adaptation": "Diagnostic Bits/container/snapshot logic rewritten as pure bounded byte predicate; strict typed config/location/alias/raw-span/inventory equality and source-policy budgets added. No original diagnostic module imported or executed.",
+  "independent_diagnostic_decoder": {
+    "bytes": 17708,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-run03-raw-diagnosis/decode_and_compare.py",
+    "sha256": "6bd407973d2b0c3ab77add45a35b49b7f8a7d827fb6529ed4e1a9603d2f82cb0"
+  },
+  "production_sources": [
+    {
+      "pin": {
+        "bytes": 82558,
+        "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-crates/Bootstrap/Bitstream.hs",
+        "sha256": "f25fe195b5a287fd0c365286acb31839118edac2227f463ea5cc85eb26daedb8"
+      },
+      "ranges": [
+        {
+          "first": 43,
+          "last": 73,
+          "text": "  defaultLimits :: Limits;\n  defaultLimits = Limits 268435456 1048576 16777216 134217728\n    4194304 16777216 16384 67108864;\n  maxBytes :: Limits -> Int;\n  maxBytes (Limits x _ _ _ _ _ _ _) = x;\n  maxSymbols :: Limits -> Int;\n  maxSymbols (Limits _ x _ _ _ _ _ _) = x;\n  maxSymbolBytes :: Limits -> Int;\n  maxSymbolBytes (Limits _ _ x _ _ _ _ _) = x;\n  maxTotalSymbolBytes :: Limits -> Int;\n  maxTotalSymbolBytes (Limits _ _ _ x _ _ _ _) = x;\n  maxNodes :: Limits -> Int;\n  maxNodes (Limits _ _ _ _ x _ _ _) = x;\n  maxEdges :: Limits -> Int;\n  maxEdges (Limits _ _ _ _ _ x _ _) = x;\n  maxDepth :: Limits -> Int;\n  maxDepth (Limits _ _ _ _ _ _ x _) = x;\n  maxExpandedWork :: Limits -> Int;\n  maxExpandedWork (Limits _ _ _ _ _ _ _ x) = x;\n  validLimits :: Limits -> Bool;\n  validLimits (Limits bytes symbols single total nodes edges depth work) =\n    bytes >= 80 && bytes <= 2147483647 &&\n    symbols >= 0 && symbols <= 2147483647 &&\n    single >= 0 && single <= total && total <= bytes &&\n    nodes >= 0 && nodes <= 2147483647 &&\n    edges >= 0 && edges <= 2147483647 &&\n    depth >= 1 && depth <= 65536 && work >= 0 && work <= 2147483647;\n  -- Aggregate root work is an explicit caller policy. Keep it in the\n  -- same narrow nonnegative range as the existing codec work limit.\n  validRootBudget :: Int -> Bool;\n  validRootBudget work = work >= 0 && work <= 2147483647;"
+        },
+        {
+          "first": 1128,
+          "last": 1144,
+          "text": "  buildParsed :: Limits -> IntMap Symbol -> IntMap Parsed -> Entry -> Either String Parsed;\n  buildParsed limits symbols nodes entry = case entry of {\n    EInt value -> if maxExpandedWork limits < 1 then Left \"binary expanded-work limit exceeded\"\n      else Right (Parsed entry (VInt value) 1 1);\n    EBits bits -> if maxExpandedWork limits < 1 then Left \"binary expanded-work limit exceeded\"\n      else Right (Parsed entry (VBits bits) 1 1);\n    EText index -> case IM.lookup index symbols of {\n      Nothing -> Left \"binary symbol reference has no symbol\";\n      Just (Symbol text size) -> if size >= maxExpandedWork limits\n        then Left \"binary expanded-work limit exceeded\"\n        else Right (Parsed entry (VText text) 1 (1 + size))\n    };\n    ENode tag children -> do {\n      ensure (maxExpandedWork limits >= 1) \"binary expanded-work limit exceeded\";\n      built <- buildChildren limits nodes children [] 1 1;\n      case built of { (,,) values depth work -> Right (Parsed entry (VNode tag values) depth work) }\n    }"
+        },
+        {
+          "first": 1437,
+          "last": 1465,
+          "text": "  denseChildrenMeta limits nodes children depth work = case children of {\n    [] -> stReturn (Right ((,) depth work));\n    (:) index rest -> stBind (V.fixedGet nodes (V.fromInt index)) (\\checked ->\n      case checked of { DenseInput _ childDepth childWork _ ->\n        if childWork > maxExpandedWork limits - work then stReturn (Left \"binary expanded-work limit exceeded\")\n        else let { nextDepth = max depth (childDepth + 1); nextWork = work + childWork } in\n          if nextDepth > maxDepth limits then stReturn (Left \"binary graph depth limit exceeded\")\n          else seq nextDepth (seq nextWork (denseChildrenMeta limits nodes rest nextDepth nextWork))\n      })\n  };\n  denseInsert :: Limits -> IntMap Symbol -> V.FixedBuilder IOWorld DecodeId DenseInput -> Int -> Entry -> ST IOWorld (Either String ());\n  denseInsert limits symbols nodes index entry =\n    let { write depth work text = stBind (V.fixedSet nodes (V.fromInt index) (DenseInput entry depth work text))\n            (\\_ -> stReturn (Right ())) } in\n    case entry of {\n      EInt _ -> if maxExpandedWork limits < 1 then stReturn (Left \"binary expanded-work limit exceeded\") else write 1 1 \"\";\n      EBits _ -> if maxExpandedWork limits < 1 then stReturn (Left \"binary expanded-work limit exceeded\") else write 1 1 \"\";\n      EText symbol -> case IM.lookup symbol symbols of {\n        Nothing -> stReturn (Left \"binary symbol reference has no symbol\");\n        Just (Symbol text size) -> if size >= maxExpandedWork limits\n          then stReturn (Left \"binary expanded-work limit exceeded\") else write 1 (1 + size) text\n      };\n      ENode _ children -> if maxExpandedWork limits < 1 then stReturn (Left \"binary expanded-work limit exceeded\")\n        else stBind (denseChildrenMeta limits nodes children 1 1) (\\measured -> case measured of {\n          Left message -> stReturn (Left message);\n          Right ((,) depth work) -> write depth work \"\"\n        })\n    };\n  getDenseNodes :: Limits -> Layout -> IntMap Symbol -> V.FixedBuilder IOWorld DecodeId DenseInput -> Read ();"
+        },
+        {
+          "first": 1512,
+          "last": 1528,
+          "text": "  denseMaterialize :: [] DenseInput -> V.IndexVec DecodeId Parsed;\n  denseMaterialize entries = runST (stBind (V.filled (length entries) (panic \"uninitialized binary graph node\")) (\\nodes ->\n    stBind (denseFill nodes 0 entries) (\\_ -> V.freeze nodes)));\n  getDenseRoots :: Limits -> V.IndexVec DecodeId DenseInput -> Int -> Int -> Read ([] Int);\n  getDenseRoots limits nodes width count = getDenseRootsAt limits nodes width count 0 [];\n  getDenseRootsAt :: Limits -> V.IndexVec DecodeId DenseInput -> Int -> Int -> Int -> [] Int -> Read ([] Int);\n  getDenseRootsAt limits nodes width remaining work roots =\n    if remaining == 0 then returnRead (reverse roots) else do {\n      index <- getBits width;\n      case denseLookup nodes index of {\n        Nothing -> failRead \"binary root reference out of range\";\n        Just (DenseInput _ _ rootWork _) -> do {\n          checkRead (rootWork <= maxExpandedWork limits - work) \"binary expanded root-work limit exceeded\";\n          let { nextWork = work + rootWork };\n          seq nextWork (getDenseRootsAt limits nodes width (remaining - 1) nextWork ((:) index roots))\n        }\n      }"
+        }
+      ]
+    },
+    {
+      "pin": {
+        "bytes": 44928,
+        "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-crates/Bootstrap/QueryGraph.hs",
+        "sha256": "f66d6ff37a13558ec54e4aa3d5243dde63a75ad77d0fd5f614b93195632cdd71"
+      },
+      "ranges": [
+        {
+          "first": 199,
+          "last": 201,
+          "text": "  validMembers members = not (null members) && all (\\name -> not (eqString name \"\")) members &&\n    length members == S.size (S.fromList compareString members);\n  membersOf identity = do {"
+        },
+        {
+          "first": 263,
+          "last": 269,
+          "text": "  -- Version 2 makes string sharing explicit in the schema, rather than asking\n  -- the codec to admit a larger unfolded version-1 value. The dictionary is\n  -- sorted, unique and entirely used; rows are ordered by their key IDs.\n  -- Hash references retain the provider's expected value, not the target's\n  -- current value. Repeated reads, including their order, remain significant.\n  data IndexString = IndexString String Bool Int;\n  data IndexNode = IndexNode Int Int ([] ((,) Int Int)) (Maybe Int);"
+        },
+        {
+          "first": 552,
+          "last": 671,
+          "text": "  data SnapshotTables = SnapshotTables (V.IndexVec SnapshotDeclaration String) (V.IndexVec SnapshotGroup String)\n    (V.IndexVec SnapshotEvidence String) (V.IndexVec SnapshotDatatype String);\n  slot :: forall d. V.IndexVec d String -> Int -> Either String String;\n  slot table i = if i < 0 || i >= V.count table then Left \"query snapshot slot out of bounds\"\n    else Right (V.at table (V.fromInt i));\n  -- The wire-work budget is checked by Bitstream before admission. Also cap\n  -- identity expansion through our own table references before joining text.\n  identityBudget = W.maxExpandedWork W.defaultLimits;\n  chargeIdentity :: Int -> String -> Either String Int;\n  chargeIdentity remaining name = let { cost = stringLength name } in\n    if cost > 0 && cost <= remaining then Right (remaining - cost)\n      else Left \"query snapshot identity work limit exceeded\";\n  checkIdentityBudget limit names = mapEither (\\_ -> ()) (foldM chargeIdentity limit names);\n  packLimited fields = do {\n    let { fieldSize field = let { n = stringLength field } in n + stringLength (showInt n) + 1 };\n    ensure (foldlStrict (\\n field -> n + fieldSize field) 0 fields <= identityBudget)\n      \"query snapshot identity work limit exceeded\";\n    Right (Separate.pack fields)\n  };\n  decodeNameTable :: forall d. W.Graph -> Int -> (Int -> Either String String) ->\n    Either String (V.IndexVec d String);\n  decodeNameTable graph list decode = do {\n    entries <- listAt graph list;\n    let { collect ((,,) remaining seen names) entry = do {\n      name <- decode entry;\n      next <- chargeIdentity remaining name;\n      ensure (not (S.member compareString name seen)) \"duplicate query snapshot identity\";\n      Right ((,,) next (S.insert compareString name seen) ((:) name names))\n    } };\n    built <- foldM collect ((,,) identityBudget S.empty []) entries;\n    case built of { (,,) _ _ names -> Right (V.fromList (reverse names)) }\n  };\n  groupAt graph declarations index = do {\n    members <- listAt graph index;\n    names <- traverseEither (\\i -> bindEither (A.fromGraphInt graph i) (slot declarations)) members;\n    ensure (validMembers names) \"invalid query group members\";\n    packLimited names\n  };\n  evidenceAt graph groups index = do {\n    node <- W.lookupGraphNode graph index;\n    case node of {\n      W.GNode 414 [g,s,t] -> do {\n        group <- bindEither (A.fromGraphInt graph g) (slot groups);\n        site <- A.fromGraphInt graph s;\n        goal <- A.fromGraphText graph t;\n        ensure (site >= 0 && not (eqString goal \"\")) \"invalid evidence descriptor\";\n        packLimited [group,showInt site,goal]\n      };\n      _ -> Left \"invalid evidence descriptor\"\n    }\n  };\n  descriptorAt graph (SnapshotTables declarations groups evidence types) index = do {\n    node <- W.lookupGraphNode graph index;\n    let { direct kind table n = bindEither (slot table n) (\\name -> packLimited [kind,name]);\n      leaf kind table n = bindEither (direct kind table n) (\\inner -> packLimited [\"Input\",inner]) };\n    case node of {\n      W.GInt n -> direct \"Binding\" declarations n;\n      W.GNode tag [child] -> do {\n        n <- A.fromGraphInt graph child;\n        if tag == inputBindingTag then leaf \"Binding\" declarations n\n          else if tag == preparedTag then leaf \"Prepared\" groups n\n          else if tag == inventoryTag then leaf \"ScopeInventory\" groups n\n          else if tag == scopeTag then direct \"Scope\" groups n\n          else if tag == inferTag then direct \"InferScc\" groups n\n          else if tag == finishTag then direct \"FinishScc\" groups n\n          else if tag == evidenceTag then direct \"Evidence\" evidence n\n          else if tag == datatypeTag then direct \"Datatype\" types n\n          else if tag == inputDatatypeTag then leaf \"Datatype\" types n\n          else Left \"unknown query snapshot kind\"\n      };\n      _ -> Left \"invalid query snapshot descriptor\"\n    }\n  };\n  data StoredRow = StoredRow Int String String ([] Int) (Maybe String);\n  storedAt graph tables index = do {\n    value <- W.lookupGraphNode graph index;\n    case value of {\n      W.GNode 413 [k,h,reads,location] -> do {\n        wanted <- descriptorAt graph tables k;\n        digest <- A.fromGraphText graph h;\n        edges <- listAt graph reads;\n        p <- A.decodeGraphValue (A.ShapeMaybe A.ShapeText) graph location;\n        payload <- A.expectMaybe A.expectText p;\n        ensure (validDigest digest payload) \"invalid query graph digest\";\n        Right (StoredRow k wanted digest edges payload)\n      };\n      _ -> Left \"invalid query snapshot row\"\n    }\n  };\n  admitSnapshot configuration graph format config declarations groups evidence types entries = do {\n    f <- A.fromGraphText graph format;\n    c <- A.fromGraphText graph config;\n    ensure (eqString f \"MLF-CRATE-QUERY-GRAPH-2\" && not (eqString c \"\") && eqString c configuration) \"query graph version mismatch\";\n    ds <- decodeNameTable graph declarations (A.fromGraphText graph);\n    gs <- decodeNameTable graph groups (groupAt graph ds);\n    es <- decodeNameTable graph evidence (evidenceAt graph gs);\n    ts <- decodeNameTable graph types (A.fromGraphText graph);\n    ids <- listAt graph entries;\n    let { collect ((,) budget previous) index = do {\n      row@(StoredRow _ name _ _ _) <- storedAt graph (SnapshotTables ds gs es ts) index;\n      next <- chargeIdentity budget name;\n      Right ((,) next ((:) row previous))\n    } };\n    saved <- foldM collect ((,) identityBudget []) ids;\n    let { rows = reverse (snd saved);\n      byDescriptor = IM.fromList (map (\\(StoredRow k name digest _ _) -> (,) k ((,) name digest)) rows);\n      readEdge k = case IM.lookup k byDescriptor of {\n        Just edge -> Right edge; Nothing -> Left \"unpublished query dependency\"\n      };\n      restore (StoredRow _ name digest edges payload) = do {\n        reads <- traverseEither readEdge edges;\n        Right (QueryNode name digest reads payload)\n      }\n    };\n    nodes <- traverseEither restore rows;\n    let { names = map nodeKey nodes; table = M.fromList compareString (zip names nodes) };\n    ensure (length names == M.size table) \"duplicate query node\";\n    validateClosure table;\n    Right ((,) table (eqList eqString names (M.keys table)))\n  };"
+        },
+        {
+          "first": 805,
+          "last": 836,
+          "text": "  validateClosure nodes = do {\n    let { ordered = M.elems nodes;\n      bindings = M.fromDistinctAscList (zipWith (\\entry n ->\n        (,) (fst entry) ((,) (V.fromInt n) (nodeHash (snd entry))))\n        (M.toList nodes) (range 0 (M.size nodes - 1)));\n      resolve ((,) key digest) = case M.lookup compareString key bindings of {\n        Nothing -> Left \"unpublished query dependency\";\n        Just ((,) i actual) -> if eqString digest actual then Right i\n          else Left \"query publication has stale dependency version\"\n      }\n    };\n    rows <- traverseEither (\\node -> traverseEither resolve (nodeReads node)) ordered;\n    let { edges = V.fromList rows } in runST (stBind (V.filled (V.count edges) Unseen) (\\marks ->\n      ST.mapE_ (visit edges marks 0) (V.indices edges)))\n  };\n  -- Memoize the longest suffix, since a previously visited short path can\n  -- also be reached from a longer prefix in a different lexical DFS root.\n  data Colour = Unseen | Visiting | Done Int;\n  visit :: forall s. V.IndexVec QueryId ([] (V.Index QueryId)) -> V.Builder s QueryId Colour ->\n    Int -> V.Index QueryId -> ST s (Either String Int);\n  visit rows marks depth i = stBind (V.get marks i) (\\colour -> case colour of {\n    Done height -> if depth + height <= 4096 then ST.pureE height else ST.failE \"cyclic/deep query graph\";\n    Visiting -> ST.failE \"cyclic/deep query graph\";\n    Unseen -> if depth >= 4096 then ST.failE \"cyclic/deep query graph\"\n      else stBind (V.set marks i Visiting) (\\_ ->\n        let { child longest target = ST.bindE (visit rows marks (depth + 1) target)\n               (\\height -> let { next = max longest (height + 1) } in seq next (ST.pureE next)) }\n        in ST.bindE (ST.foldE child 1 (V.at rows i)) (\\height ->\n          stBind (V.set marks i (Done height)) (\\_ -> ST.pureE height)))\n  });\n  verifyPayloads :: Session -> [] QueryNode -> IO (Either String ());\n  verifyPayloads session@(Session _ _ _ _ _ pending) nodes ="
+        }
+      ]
+    },
+    {
+      "pin": {
+        "bytes": 83407,
+        "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-crates/Bootstrap/CrateSession.hs",
+        "sha256": "a13c01632001643b683e54c10775eb9a262faf0d6766c52209a3ec0704fd9bdd"
+      },
+      "ranges": [
+        {
+          "first": 223,
+          "last": 235,
+          "text": "  compileGraphLocked verify spec interfaces prepared plan prefix directory = do {\n    executable <- getExecutablePath;\n    compiler <- fileDigest executable;\n    let { imported = map (\\((,) _ iface) -> Separate.UnitInterface (Artifact.crateId iface)\n          [] [] [] [] [] (Artifact.crateBindings iface) \"metadata\") interfaces;\n      protected = M.fromList compareString (concatMap (compose Artifact.crateProtection snd) interfaces) };\n    compiled <- if Query.validSourceContextDigest compiler\n      then case plan of {\n        Just source -> CrateGraph.compile verify (specIdentity spec) compiler directory imported protected source;\n        Nothing -> CrateGraph.compileLoweredIn (preparedLowered prepared) verify (specIdentity spec) compiler directory imported\n      }\n      else ioReturn (Left \"cannot fingerprint query graph compiler\");\n    case compiled of { Left e -> ioReturn (Left e); Right state -> case CrateGraph.checkedResult state of {"
+        }
+      ]
+    },
+    {
+      "pin": {
+        "bytes": 28172,
+        "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-crates/Bootstrap/CrateGraph.hs",
+        "sha256": "52b0fcf312aec770515980f78d0ee44e1f29e248c496468536f44f20495880ee"
+      },
+      "ranges": [
+        {
+          "first": 155,
+          "last": 161,
+          "text": "  start verify crateId compilerHash cacheDir flavor inventory datatypes contracts groups = do {\n        statistics <- G.profile;\n        graphStarted <- G.clock statistics;\n        auditSetting <- getEnv \"MLF_QUERY_SEMANTIC_AUDIT\";\n        started <- G.begin (cacheDir ++ \"/query-graph-v2\")\n          (Separate.pack [crateId,compilerHash,Q.sourceQueryFormat,\"open-fragment-checker-1/finish-receipt-1\",flavor]);\n        case started of { Left e -> ioReturn (Left e); Right session -> do {"
+        }
+      ]
+    }
+  ],
+  "schema": "main-gap-v5-oracle-source-map-v1",
+  "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "typed_scope": "fixed Fixture only; not future12cell generic admission"
+}

@@ -1,0 +1,1900 @@
+{
+  "GHC_tool": {
+    "bytes": 658,
+    "path": "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+    "sha256": "fa9f3666470de75b798d4f15f983096b07184d33e060a740aa9e8772df0d51f7"
+  },
+  "actual_queries_or_type_outputs_known": false,
+  "cells": [
+    {
+      "GHC_actual_typed_interfaces": null,
+      "GHC_declared_module_interface_path_contract": [
+        "Main.hi"
+      ],
+      "GHC_typed_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-hidir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/baseline-0/Main.hs",
+        "+RTS",
+        "-s<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/ghc.stats",
+        "-RTS"
+      ],
+      "MLF_actual_reference_query_inventory": null,
+      "MLF_reference_compile_argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "MLF_spec_fields": [
+        "MLF-CRATE-1",
+        "compiler-shapes/baseline-0",
+        "Main",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Main",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/baseline-0/Main.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin.mlfci"
+          ]
+        },
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/queries",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin"
+      ],
+      "MLF_stats_candidate_compile_argv": [
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/stats-emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "actual_qualified": false,
+      "candidate_runtime_formula_checks": null,
+      "cell": "baseline-0",
+      "no_path_or_token_normalization": true,
+      "qualified_main_reference_formula_checks": [
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "-1\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "-1"
+          ]
+        },
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "0\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "0"
+          ]
+        },
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "7\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "7"
+          ]
+        }
+      ],
+      "reference_and_stats_copy_require_same_raw_artifacts_at_same_paths": true,
+      "source_rows": [
+        {
+          "file": {
+            "bytes": 396,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/baseline-0/Main.hs",
+            "sha256": "522b3106f7dab67ca6f7dd1f3b705acd3d8a5e8113740a6a6ce30eeaaa7efd03"
+          },
+          "module": "Main",
+          "origin": "exact pure function from pinned main generator"
+        }
+      ]
+    },
+    {
+      "GHC_actual_typed_interfaces": null,
+      "GHC_declared_module_interface_path_contract": [
+        "Main.hi"
+      ],
+      "GHC_typed_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-hidir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-16/Main.hs",
+        "+RTS",
+        "-s<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/ghc.stats",
+        "-RTS"
+      ],
+      "MLF_actual_reference_query_inventory": null,
+      "MLF_reference_compile_argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "MLF_spec_fields": [
+        "MLF-CRATE-1",
+        "compiler-shapes/flat_functions-16",
+        "Main",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Main",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-16/Main.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin.mlfci"
+          ]
+        },
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/queries",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin"
+      ],
+      "MLF_stats_candidate_compile_argv": [
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/stats-emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "actual_qualified": false,
+      "candidate_runtime_formula_checks": null,
+      "cell": "flat_functions-16",
+      "no_path_or_token_normalization": true,
+      "qualified_main_reference_formula_checks": [
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "104\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "-1"
+          ]
+        },
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "120\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "0"
+          ]
+        },
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "232\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "7"
+          ]
+        }
+      ],
+      "reference_and_stats_copy_require_same_raw_artifacts_at_same_paths": true,
+      "source_rows": [
+        {
+          "file": {
+            "bytes": 1255,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-16/Main.hs",
+            "sha256": "a5254beedeb16e7bf58791f4e7e27a44329bed18369bfb501414cbf230049249"
+          },
+          "module": "Main",
+          "origin": "exact pure function from pinned main generator"
+        }
+      ]
+    },
+    {
+      "GHC_actual_typed_interfaces": null,
+      "GHC_declared_module_interface_path_contract": [
+        "Main.hi"
+      ],
+      "GHC_typed_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-hidir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-32/Main.hs",
+        "+RTS",
+        "-s<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/ghc.stats",
+        "-RTS"
+      ],
+      "MLF_actual_reference_query_inventory": null,
+      "MLF_reference_compile_argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "MLF_spec_fields": [
+        "MLF-CRATE-1",
+        "compiler-shapes/flat_functions-32",
+        "Main",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Main",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-32/Main.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin.mlfci"
+          ]
+        },
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/queries",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin"
+      ],
+      "MLF_stats_candidate_compile_argv": [
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/stats-emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "actual_qualified": false,
+      "candidate_runtime_formula_checks": null,
+      "cell": "flat_functions-32",
+      "no_path_or_token_normalization": true,
+      "qualified_main_reference_formula_checks": [
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "464\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "-1"
+          ]
+        },
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "496\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "0"
+          ]
+        },
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "720\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "7"
+          ]
+        }
+      ],
+      "reference_and_stats_copy_require_same_raw_artifacts_at_same_paths": true,
+      "source_rows": [
+        {
+          "file": {
+            "bytes": 2167,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-32/Main.hs",
+            "sha256": "ea9ae079ef50cf57b8c5869466666e774e8524ba735aeca684cdf4be7e493a81"
+          },
+          "module": "Main",
+          "origin": "exact pure function from pinned main generator"
+        }
+      ]
+    },
+    {
+      "GHC_actual_typed_interfaces": null,
+      "GHC_declared_module_interface_path_contract": [
+        "Main.hi"
+      ],
+      "GHC_typed_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-hidir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-64/Main.hs",
+        "+RTS",
+        "-s<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/ghc.stats",
+        "-RTS"
+      ],
+      "MLF_actual_reference_query_inventory": null,
+      "MLF_reference_compile_argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "MLF_spec_fields": [
+        "MLF-CRATE-1",
+        "compiler-shapes/flat_functions-64",
+        "Main",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Main",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-64/Main.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin.mlfci"
+          ]
+        },
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/queries",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin"
+      ],
+      "MLF_stats_candidate_compile_argv": [
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/stats-emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "actual_qualified": false,
+      "candidate_runtime_formula_checks": null,
+      "cell": "flat_functions-64",
+      "no_path_or_token_normalization": true,
+      "qualified_main_reference_formula_checks": [
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "1952\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "-1"
+          ]
+        },
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "2016\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "0"
+          ]
+        },
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "2464\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "7"
+          ]
+        }
+      ],
+      "reference_and_stats_copy_require_same_raw_artifacts_at_same_paths": true,
+      "source_rows": [
+        {
+          "file": {
+            "bytes": 3991,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-64/Main.hs",
+            "sha256": "a578c5cd2e6dd90dd1c41a85c65cfabcda69ebf5e2f4e3eada29c4b5dcbfe121"
+          },
+          "module": "Main",
+          "origin": "exact pure function from pinned main generator"
+        }
+      ]
+    },
+    {
+      "GHC_actual_typed_interfaces": null,
+      "GHC_declared_module_interface_path_contract": [
+        "Main.hi"
+      ],
+      "GHC_typed_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-hidir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-128/Main.hs",
+        "+RTS",
+        "-s<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/ghc.stats",
+        "-RTS"
+      ],
+      "MLF_actual_reference_query_inventory": null,
+      "MLF_reference_compile_argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "MLF_spec_fields": [
+        "MLF-CRATE-1",
+        "compiler-shapes/flat_functions-128",
+        "Main",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Main",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-128/Main.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin.mlfci"
+          ]
+        },
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/queries",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin"
+      ],
+      "MLF_stats_candidate_compile_argv": [
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/stats-emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "actual_qualified": false,
+      "candidate_runtime_formula_checks": null,
+      "cell": "flat_functions-128",
+      "no_path_or_token_normalization": true,
+      "qualified_main_reference_formula_checks": [
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "8000\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "-1"
+          ]
+        },
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "8128\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "0"
+          ]
+        },
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "9024\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "7"
+          ]
+        }
+      ],
+      "reference_and_stats_copy_require_same_raw_artifacts_at_same_paths": true,
+      "source_rows": [
+        {
+          "file": {
+            "bytes": 7751,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-128/Main.hs",
+            "sha256": "af48eb052fca7df869588c13f805ccda52e6ac55451d8b4709237943a5677640"
+          },
+          "module": "Main",
+          "origin": "exact pure function from pinned main generator"
+        }
+      ]
+    },
+    {
+      "GHC_actual_typed_interfaces": null,
+      "GHC_declared_module_interface_path_contract": [
+        "Main.hi"
+      ],
+      "GHC_typed_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-hidir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-256/Main.hs",
+        "+RTS",
+        "-s<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/ghc.stats",
+        "-RTS"
+      ],
+      "MLF_actual_reference_query_inventory": null,
+      "MLF_reference_compile_argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "MLF_spec_fields": [
+        "MLF-CRATE-1",
+        "compiler-shapes/flat_functions-256",
+        "Main",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Main",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-256/Main.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin.mlfci"
+          ]
+        },
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/queries",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin"
+      ],
+      "MLF_stats_candidate_compile_argv": [
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/stats-emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "actual_qualified": false,
+      "candidate_runtime_formula_checks": null,
+      "cell": "flat_functions-256",
+      "no_path_or_token_normalization": true,
+      "qualified_main_reference_formula_checks": [
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "32384\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "-1"
+          ]
+        },
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "32640\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "0"
+          ]
+        },
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "34432\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "7"
+          ]
+        }
+      ],
+      "reference_and_stats_copy_require_same_raw_artifacts_at_same_paths": true,
+      "source_rows": [
+        {
+          "file": {
+            "bytes": 15559,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-256/Main.hs",
+            "sha256": "af2371d80197e98f3fb2aa3ea99bac91e95a8905a1d6f3fe2952426a4ec83881"
+          },
+          "module": "Main",
+          "origin": "exact pure function from pinned main generator"
+        }
+      ]
+    },
+    {
+      "GHC_actual_typed_interfaces": null,
+      "GHC_declared_module_interface_path_contract": [
+        "Main.hi"
+      ],
+      "GHC_typed_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-hidir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-16/Main.hs",
+        "+RTS",
+        "-s<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/ghc.stats",
+        "-RTS"
+      ],
+      "MLF_actual_reference_query_inventory": null,
+      "MLF_reference_compile_argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "MLF_spec_fields": [
+        "MLF-CRATE-1",
+        "compiler-shapes/higher_order_chain-16",
+        "Main",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Main",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-16/Main.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin.mlfci"
+          ]
+        },
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/queries",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin"
+      ],
+      "MLF_stats_candidate_compile_argv": [
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/stats-emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "actual_qualified": false,
+      "candidate_runtime_formula_checks": null,
+      "cell": "higher_order_chain-16",
+      "no_path_or_token_normalization": true,
+      "qualified_main_reference_formula_checks": [
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "15\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "-1"
+          ]
+        },
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "16\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "0"
+          ]
+        },
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "23\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "7"
+          ]
+        }
+      ],
+      "reference_and_stats_copy_require_same_raw_artifacts_at_same_paths": true,
+      "source_rows": [
+        {
+          "file": {
+            "bytes": 816,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-16/Main.hs",
+            "sha256": "c5bc5b63bfdcd05b263b625788b77846fdac1d5fe69c7c36ae6abed100c1bb2b"
+          },
+          "module": "Main",
+          "origin": "exact pure function from pinned main generator"
+        }
+      ]
+    },
+    {
+      "GHC_actual_typed_interfaces": null,
+      "GHC_declared_module_interface_path_contract": [
+        "Main.hi"
+      ],
+      "GHC_typed_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-hidir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-32/Main.hs",
+        "+RTS",
+        "-s<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/ghc.stats",
+        "-RTS"
+      ],
+      "MLF_actual_reference_query_inventory": null,
+      "MLF_reference_compile_argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "MLF_spec_fields": [
+        "MLF-CRATE-1",
+        "compiler-shapes/higher_order_chain-32",
+        "Main",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Main",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-32/Main.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin.mlfci"
+          ]
+        },
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/queries",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin"
+      ],
+      "MLF_stats_candidate_compile_argv": [
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/stats-emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "actual_qualified": false,
+      "candidate_runtime_formula_checks": null,
+      "cell": "higher_order_chain-32",
+      "no_path_or_token_normalization": true,
+      "qualified_main_reference_formula_checks": [
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "31\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "-1"
+          ]
+        },
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "32\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "0"
+          ]
+        },
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "39\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "7"
+          ]
+        }
+      ],
+      "reference_and_stats_copy_require_same_raw_artifacts_at_same_paths": true,
+      "source_rows": [
+        {
+          "file": {
+            "bytes": 1056,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-32/Main.hs",
+            "sha256": "5943c0526bd00cbe8d76b60643e1495c8a07122c3c5a6fb2a59215bfd5c3db49"
+          },
+          "module": "Main",
+          "origin": "exact pure function from pinned main generator"
+        }
+      ]
+    },
+    {
+      "GHC_actual_typed_interfaces": null,
+      "GHC_declared_module_interface_path_contract": [
+        "Main.hi"
+      ],
+      "GHC_typed_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-hidir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-64/Main.hs",
+        "+RTS",
+        "-s<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/ghc.stats",
+        "-RTS"
+      ],
+      "MLF_actual_reference_query_inventory": null,
+      "MLF_reference_compile_argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "MLF_spec_fields": [
+        "MLF-CRATE-1",
+        "compiler-shapes/higher_order_chain-64",
+        "Main",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Main",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-64/Main.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin.mlfci"
+          ]
+        },
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/queries",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin"
+      ],
+      "MLF_stats_candidate_compile_argv": [
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/stats-emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "actual_qualified": false,
+      "candidate_runtime_formula_checks": null,
+      "cell": "higher_order_chain-64",
+      "no_path_or_token_normalization": true,
+      "qualified_main_reference_formula_checks": [
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "63\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "-1"
+          ]
+        },
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "64\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "0"
+          ]
+        },
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "71\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "7"
+          ]
+        }
+      ],
+      "reference_and_stats_copy_require_same_raw_artifacts_at_same_paths": true,
+      "source_rows": [
+        {
+          "file": {
+            "bytes": 1536,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-64/Main.hs",
+            "sha256": "d8a72fb0850ef38bf04df17b1490061f6d20ccc7d1dd59a7ca29146a70969a8c"
+          },
+          "module": "Main",
+          "origin": "exact pure function from pinned main generator"
+        }
+      ]
+    },
+    {
+      "GHC_actual_typed_interfaces": null,
+      "GHC_declared_module_interface_path_contract": [
+        "Main.hi"
+      ],
+      "GHC_typed_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-hidir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-128/Main.hs",
+        "+RTS",
+        "-s<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/ghc.stats",
+        "-RTS"
+      ],
+      "MLF_actual_reference_query_inventory": null,
+      "MLF_reference_compile_argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "MLF_spec_fields": [
+        "MLF-CRATE-1",
+        "compiler-shapes/higher_order_chain-128",
+        "Main",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Main",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-128/Main.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin.mlfci"
+          ]
+        },
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/queries",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin"
+      ],
+      "MLF_stats_candidate_compile_argv": [
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/stats-emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "actual_qualified": false,
+      "candidate_runtime_formula_checks": null,
+      "cell": "higher_order_chain-128",
+      "no_path_or_token_normalization": true,
+      "qualified_main_reference_formula_checks": [
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "127\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "-1"
+          ]
+        },
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "128\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "0"
+          ]
+        },
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "135\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "7"
+          ]
+        }
+      ],
+      "reference_and_stats_copy_require_same_raw_artifacts_at_same_paths": true,
+      "source_rows": [
+        {
+          "file": {
+            "bytes": 2496,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-128/Main.hs",
+            "sha256": "ba13ac3b8d15d7b1d4c63fcc9698c86b9cbca1b6244dd1b1ee6a89e2e6ce41da"
+          },
+          "module": "Main",
+          "origin": "exact pure function from pinned main generator"
+        }
+      ]
+    },
+    {
+      "GHC_actual_typed_interfaces": null,
+      "GHC_declared_module_interface_path_contract": [
+        "Main.hi"
+      ],
+      "GHC_typed_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-hidir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-256/Main.hs",
+        "+RTS",
+        "-s<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/ghc.stats",
+        "-RTS"
+      ],
+      "MLF_actual_reference_query_inventory": null,
+      "MLF_reference_compile_argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "MLF_spec_fields": [
+        "MLF-CRATE-1",
+        "compiler-shapes/higher_order_chain-256",
+        "Main",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Main",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-256/Main.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin.mlfci"
+          ]
+        },
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/queries",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin"
+      ],
+      "MLF_stats_candidate_compile_argv": [
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/stats-emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "actual_qualified": false,
+      "candidate_runtime_formula_checks": null,
+      "cell": "higher_order_chain-256",
+      "no_path_or_token_normalization": true,
+      "qualified_main_reference_formula_checks": [
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "255\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "-1"
+          ]
+        },
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "256\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "0"
+          ]
+        },
+        {
+          "executed": false,
+          "expected_exit": 0,
+          "expected_stderr_utf8": "",
+          "expected_stdout_utf8": "263\n",
+          "reference_argv": [
+            "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+            "--run-crate",
+            "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit.mlfci",
+            "--",
+            "7"
+          ]
+        }
+      ],
+      "reference_and_stats_copy_require_same_raw_artifacts_at_same_paths": true,
+      "source_rows": [
+        {
+          "file": {
+            "bytes": 4416,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-256/Main.hs",
+            "sha256": "0747d08346964a72c21f11990bbc9deec4d31e9dd05629e71df8668dc75c76a7"
+          },
+          "module": "Main",
+          "origin": "exact pure function from pinned main generator"
+        }
+      ]
+    },
+    {
+      "GHC_actual_typed_interfaces": null,
+      "GHC_declared_module_interface_path_contract": [
+        "Bootstrap/Fresh.hi",
+        "Bootstrap/Host.hi",
+        "Bootstrap/IndexVec.hi",
+        "Bootstrap/IntMap.hi",
+        "Bootstrap/IntRank.hi",
+        "Bootstrap/IntSet.hi",
+        "Bootstrap/IntTree.hi",
+        "Bootstrap/Map.hi",
+        "Bootstrap/ST.hi",
+        "Bootstrap/Set.hi",
+        "Bootstrap/Std.hi",
+        "Bootstrap/Types.hi",
+        "Bootstrap/Unicode.hi",
+        "Bootstrap/Version.hi"
+      ],
+      "GHC_typed_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-i<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14",
+        "-odir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-hidir",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Fresh.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Host.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IndexVec.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntMap.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntRank.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntSet.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntTree.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Map.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/ST.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Set.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Std.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Types.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Unicode.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Version.hs",
+        "+RTS",
+        "-s<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/ghc.stats",
+        "-RTS"
+      ],
+      "MLF_actual_reference_query_inventory": null,
+      "MLF_reference_compile_argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "MLF_spec_fields": [
+        "MLF-CRATE-1",
+        "fresh-split/compiler90/mlf-foundation",
+        "",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Bootstrap.Fresh",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Fresh.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.Host",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Host.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.IndexVec",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IndexVec.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.IntMap",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntMap.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.IntRank",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntRank.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.IntSet",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntSet.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.IntTree",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntTree.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.Map",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Map.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.ST",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/ST.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.Set",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Set.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.Std",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Std.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.Types",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Types.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.Unicode",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Unicode.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.Version",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Version.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin.mlfci"
+          ]
+        },
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/queries",
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/builtin"
+      ],
+      "MLF_stats_candidate_compile_argv": [
+        "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>/stats-emlf",
+        "--compile-crate",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/crate.spec",
+        "-o",
+        "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>/unit"
+      ],
+      "actual_qualified": false,
+      "candidate_runtime_formula_checks": null,
+      "cell": "foundation14",
+      "no_path_or_token_normalization": true,
+      "qualified_main_reference_formula_checks": [],
+      "reference_and_stats_copy_require_same_raw_artifacts_at_same_paths": true,
+      "source_rows": [
+        {
+          "file": {
+            "bytes": 2592,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Fresh.hs",
+            "sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d"
+          },
+          "module": "Bootstrap.Fresh",
+          "original_main_source": {
+            "bytes": 2592,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/Fresh.hs",
+            "sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d"
+          }
+        },
+        {
+          "file": {
+            "bytes": 3246,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Host.hs",
+            "sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5"
+          },
+          "module": "Bootstrap.Host",
+          "original_main_source": {
+            "bytes": 3246,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/Host.hs",
+            "sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5"
+          }
+        },
+        {
+          "file": {
+            "bytes": 5573,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IndexVec.hs",
+            "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e"
+          },
+          "module": "Bootstrap.IndexVec",
+          "original_main_source": {
+            "bytes": 5573,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/IndexVec.hs",
+            "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e"
+          }
+        },
+        {
+          "file": {
+            "bytes": 21811,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntMap.hs",
+            "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e"
+          },
+          "module": "Bootstrap.IntMap",
+          "original_main_source": {
+            "bytes": 21811,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/IntMap.hs",
+            "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e"
+          }
+        },
+        {
+          "file": {
+            "bytes": 6684,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntRank.hs",
+            "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
+          },
+          "module": "Bootstrap.IntRank",
+          "original_main_source": {
+            "bytes": 6684,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/IntRank.hs",
+            "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
+          }
+        },
+        {
+          "file": {
+            "bytes": 17405,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntSet.hs",
+            "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe"
+          },
+          "module": "Bootstrap.IntSet",
+          "original_main_source": {
+            "bytes": 17405,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/IntSet.hs",
+            "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe"
+          }
+        },
+        {
+          "file": {
+            "bytes": 3727,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntTree.hs",
+            "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49"
+          },
+          "module": "Bootstrap.IntTree",
+          "original_main_source": {
+            "bytes": 3727,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/IntTree.hs",
+            "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49"
+          }
+        },
+        {
+          "file": {
+            "bytes": 17218,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Map.hs",
+            "sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0"
+          },
+          "module": "Bootstrap.Map",
+          "original_main_source": {
+            "bytes": 17218,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/Map.hs",
+            "sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0"
+          }
+        },
+        {
+          "file": {
+            "bytes": 2539,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/ST.hs",
+            "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2"
+          },
+          "module": "Bootstrap.ST",
+          "original_main_source": {
+            "bytes": 2539,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/ST.hs",
+            "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2"
+          }
+        },
+        {
+          "file": {
+            "bytes": 4093,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Set.hs",
+            "sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f"
+          },
+          "module": "Bootstrap.Set",
+          "original_main_source": {
+            "bytes": 4093,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/Set.hs",
+            "sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f"
+          }
+        },
+        {
+          "file": {
+            "bytes": 20088,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Std.hs",
+            "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca"
+          },
+          "module": "Bootstrap.Std",
+          "original_main_source": {
+            "bytes": 20088,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/Std.hs",
+            "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca"
+          }
+        },
+        {
+          "file": {
+            "bytes": 12757,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Types.hs",
+            "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596"
+          },
+          "module": "Bootstrap.Types",
+          "original_main_source": {
+            "bytes": 12757,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/Types.hs",
+            "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596"
+          }
+        },
+        {
+          "file": {
+            "bytes": 55534,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Unicode.hs",
+            "sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077"
+          },
+          "module": "Bootstrap.Unicode",
+          "original_main_source": {
+            "bytes": 55534,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/Unicode.hs",
+            "sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077"
+          }
+        },
+        {
+          "file": {
+            "bytes": 327,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Version.hs",
+            "sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479"
+          },
+          "module": "Bootstrap.Version",
+          "original_main_source": {
+            "bytes": 327,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/Version.hs",
+            "sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479"
+          }
+        }
+      ]
+    }
+  ],
+  "normalization_allowed": false,
+  "packing": "Apply pack recursively after all placeholders are bound: concat decimal Unicode-scalar length, colon, field. Do not treat this JSON or a placeholder-filled string as an executable spec.",
+  "placeholders": {
+    "output": "<FRESH_PER_CELL_QUALIFICATION_OR_SAMPLE_OUTPUT>",
+    "setup": "<ACTUALLY_QUALIFIED_SETUP_OUTPUT_ROOT>"
+  },
+  "qualified_main_reference": {
+    "BUILD_review": {
+      "bytes": 11989,
+      "path": "<EXPERIMENT_ROOT>/main-baseline-build-actual-review/report.json",
+      "sha256": "1acb2883c21d33ec57250901fc1dfbd88bd4a181a5768ed41e190ebaf6c12c0d"
+    },
+    "CONTROLS_review": {
+      "bytes": 14818,
+      "path": "<EXPERIMENT_ROOT>/main-baseline-controls-actual-review/report.json",
+      "sha256": "619e23eed06688a685a31c5c9114ed570fef3c9c94b1829964bec0aa16a88b41"
+    },
+    "binary": {
+      "bytes": 20192216,
+      "path": "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+      "sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f"
+    },
+    "producer_receipt": {
+      "bytes": 1230015,
+      "path": "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/receipt.json",
+      "sha256": "e5481f38045862a0b5740ab9cb93249a5251af4779ad509992e94b5d89ee55cc"
+    }
+  },
+  "schema": "main-gap-workload-command-templates-v1",
+  "semantic_qualification_not_in_48_timed_legs": true,
+  "stats_candidate_setup_actual_gate": null,
+  "templates_only_not_admitted": true
+}

@@ -1,0 +1,230 @@
+{
+  "check_count": 44,
+  "checks": [
+    {
+      "expected": "accept",
+      "name": "distinct producers each correctly bound, all other fields exact",
+      "passed": true
+    },
+    {
+      "expected": "accept",
+      "name": "identical producer bytes are also correctly authenticated",
+      "passed": true
+    },
+    {
+      "expected": "accept",
+      "name": "legal duplicate reads preserved in both sides",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "wrong original actual binary",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "changed crate",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "changed format version",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "changed checker version",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "changed flavor",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "extra config field",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "dropped read occurrence",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "extra read occurrence",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "missing read target",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "self-cycle",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "changed row digest",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "extra duplicate row identity",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "missing payload file",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "extra unreferenced payload",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "corrupt content-addressed payload",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "changed declaration table",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "changed group table",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "changed types table",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "changed evidence table",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "changed checked bytes",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "missing semantic file",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "extra semantic file",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "invented old475 inferred count",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "boolean inferred count",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "boolean zero reuse",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "nonzero reuse",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "cached integer0 instead ofFalse",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "extra schema field",
+      "passed": true
+    },
+    {
+      "expected": "accept",
+      "name": "mixed ordered repeated reads accepted unchanged",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "same read multiset but different order",
+      "passed": true
+    },
+    {
+      "expected": "accept",
+      "name": "same-binary fullraw exact",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "same-binary no exception for unit.mlfci",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "same-binary no exception for unit.mlfco",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "same-binary no exception for unit.queries",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "same-binary no exception for queries/CURRENT",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "same-binary no exception for queries/generations/B.mlfqg",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "same-binary no exception for queries/results/r.mlfqr",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "same-binary no exception for queries/.lock",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "same-binary rejects different producer",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "same-binary rejects changed generation filename",
+      "passed": true
+    },
+    {
+      "expected": "reject",
+      "name": "same-binary rejects missing file",
+      "passed": true
+    }
+  ],
+  "original_inputs_mutated": false,
+  "real_workload_or_query_counts_used": false,
+  "schema": "semantic-v2-synthetic-contract-model-checks-v1",
+  "scope": "synthetic decoded data only, not actual MLFBIN decoder or qualification",
+  "target_or_repo_helper_executed": false
+}

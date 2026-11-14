@@ -1,0 +1,124 @@
+{
+  "GHC_parity_claim": false,
+  "native_fixedpoint": "paused",
+  "performance_samples": null,
+  "production_source_changed": false,
+  "schema": "main-frontend-preparation-status-v1",
+  "semantic_plan_v2": {
+    "actual_wire_decoder_qualification": false,
+    "historical_plan_actual_bindings_remain_null_by_design": true,
+    "manifest_original": {
+      "bytes": 4872,
+      "sha256": "d231f096285925b2e30323f54fd26b4356c180e9c1f0164336e0033b95a2d1d8",
+      "source_artifact": "main-gap-semantic-qualification-plan-v2-source/MANIFEST.json"
+    },
+    "plan_checks": 10,
+    "preserved": {
+      "cell_order": "original reviewed order",
+      "each_endpoint_samples_each_cell": 2,
+      "fixed_sampling_legs": 48,
+      "input_bytes": 215033,
+      "input_cells": 12,
+      "input_files": 25,
+      "native_fixedpoint_paused": true,
+      "post_setup_proposed_maximum_ns": 1800000000000,
+      "sampling_maximum_each_block_ns": 600000000000,
+      "sampling_maximum_total_ns": 1200000000000,
+      "sampling_nominal_block_seconds": [
+        510,
+        630
+      ],
+      "semantic_RTS_reports": 24,
+      "semantic_commands": 91,
+      "semantic_maximum_cleanup_inclusive_ns": 600000000000,
+      "semantic_nominal_child_seconds": 1420,
+      "within_cell_order": [
+        "M",
+        "G",
+        "G",
+        "M"
+      ]
+    },
+    "remaining_gates": [
+      "successful actual SETUP final source/provenance/private-unit/builtin/runtime/cleanup and independent review; v5 fixture qualification is not the12cell gate",
+      "independent review of the explicit revised cross-producer12cell contract and generic bounded format decoder",
+      "independent required negative/mutation suite covering complete wire/SHA/CRC/CURRENT/provenance/full closure and ordered repeated reads",
+      "reviewed execution adapter, exact positive ownership/path/runtime/support/deadline ledger and fresh admission/epoch/resources",
+      "actual all91 commands and all12 original controls, producer-aware matches and GHC typed acceptances followed by independent actual review",
+      "freeze dynamic per-cell original proofs and complete B/GHC raw oracles from that successful reviewed stage",
+      "separate reviewed/admitted two600s exploratory scopes with exact unchanged48legs and all support work explicitly budgeted"
+    ],
+    "report_original": {
+      "bytes": 9039,
+      "sha256": "bbdd25dd700c53ffa79315c2548a16305bd7ced49d41c677018927c7fb0c4005",
+      "source_artifact": "main-gap-semantic-qualification-plan-v2-source/report.json"
+    },
+    "source_plan_only": true,
+    "successful_SETUP_does_not_bind_or_qualify_12cells": true,
+    "synthetic_model_checks": 44
+  },
+  "setup_v5": {
+    "READY": false,
+    "actual_run04_independent_review": {
+      "bytes": 33473,
+      "sha256": "1b5addd5f3ce1821f43ef02f568df5552781f4e41ec1569284bb7554c83bec59",
+      "source_artifact": "main-gap-setup-run04-actual-review/report.json"
+    },
+    "actual_run04_result": {
+      "RTS": 9,
+      "children": 40,
+      "elapsed_ns": 52358162878,
+      "runtime_queries": 16,
+      "status": "SETUP_QUALIFIED_ONLY"
+    },
+    "fixture_contract_not_general12cell": true,
+    "oracle_original": {
+      "bytes": 16728,
+      "sha256": "0a831a47bd77891fe357209094cd640d07646b9ab5c6b6f0c38de67c3b5c4a8c",
+      "source_artifact": "main-gap-setup-v5-source/publication_oracle.py"
+    },
+    "recorded_pure_test_total": 316,
+    "recorded_pure_tests": {
+      "delta-checks.json": 31,
+      "package-field-checks.json": 86,
+      "publication-checks.json": 101,
+      "source-checks.json": 98
+    },
+    "report_original": {
+      "bytes": 7932,
+      "sha256": "c3220cfd6c9c6d9f01abd7fb4240591cb0f48bfbd41fd04ebf8a7962f6a205d1",
+      "source_artifact": "main-gap-setup-v5-source/report.json"
+    },
+    "source_independent_review": {
+      "bytes": 10555,
+      "sha256": "81071fc5a605d253c4211a3cc28c6532c349f79a3743d2d5c3b6c32553ddce1c",
+      "source_artifact": "main-gap-setup-v5-source-review/report.json"
+    },
+    "source_manifest_original": {
+      "bytes": 6561,
+      "sha256": "2c63d5ed2dca715b66c7d1e4d4fe194581c78e1b9a812a84b0722f6ea11e347a",
+      "source_artifact": "main-gap-setup-v5-source/MANIFEST.json"
+    }
+  },
+  "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "workloads": {
+    "actual_cell_interfaces": null,
+    "actual_cell_owners": null,
+    "actual_cell_queries": null,
+    "cells": 12,
+    "foundation14_bytes": 173594,
+    "input_bytes": 215033,
+    "input_files": 25,
+    "manifest_original": {
+      "bytes": 9597,
+      "sha256": "2cc33af7ec0fe71ff2b6464dde15adb369731df4aaa8fd7622087c5f0eb868a0",
+      "source_artifact": "main-gap-workloads-v1-source/MANIFEST.json"
+    },
+    "review_original": {
+      "bytes": 9420,
+      "sha256": "5390ec985c48b45061c04dc9bf875713eb63689b4e17ff31e0420e1ef1be3f8a",
+      "source_artifact": "main-gap-workloads-v1-source-review/report.json"
+    },
+    "source_review_only": true
+  }
+}

@@ -1,0 +1,61 @@
+--- v4/QUALIFICATION.json
++++ v5/QUALIFICATION.json
+@@ -58,7 +58,38 @@
+       "stdout_utf8": ""
+     }
+   ],
+-  "complete_raw_inventory_equality": true,
++  "complete_raw_inventory_equality": false,
++  "cross_compiler_contract": {
++    "actual_executable_sha_required": true,
++    "all_container_crc_and_content_addresses_verified": true,
++    "all_other_raw_bytes_and_files_equal": true,
++    "allow_only": [
++      "typed snapshot config field1 actual executable SHA",
++      "derived container CRC32",
++      "derived generation SHA256 filename",
++      "CURRENT own generation digest and CRC32"
++    ],
++    "complete_container_decode_required": true,
++    "complete_results_inventory_must_equal_generation_payload_refs": true,
++    "configuration_fields": [
++      "compiler-shapes/builtin",
++      "ACTUAL_EXECUTABLE_SHA256",
++      "MLF-SOURCE-CRATE-QUERY-7",
++      "open-fragment-checker-1/finish-receipt-1",
++      "source"
++    ],
++    "configuration_node_must_not_alias_other_fields": true,
++    "old_run03_still_failed": true,
++    "oracle": {
++      "bytes": 16728,
++      "path": "<EXPERIMENT_ROOT>/main-gap-setup-v5-source/publication_oracle.py",
++      "sha256": "0a831a47bd77891fe357209094cd640d07646b9ab5c6b6f0c38de67c3b5c4a8c"
++    },
++    "ordered_duplicate_reads_preserved": true,
++    "production_cache_identity_unchanged": true,
++    "production_container_and_typed_identity_limits_checked": true,
++    "unsupported_or_extra_fields_or_files_rejected": true
++  },
+   "fixture_fresh_each": 1,
+   "fixture_identity": "compiler-shapes/builtin",
+   "fixture_owners": [
+@@ -68,7 +99,8 @@
+   "fixture_source_utf8": "module Fixture where\nvalue = 42\n",
+   "future_shape_foundation_qualified": false,
+   "normalization_allowed": false,
+-  "schema": "main-gap-setup-qualification-contract-v1",
++  "same_binary_future_complete_raw_inventory_equality_required": true,
++  "schema": "main-gap-setup-qualification-contract-v2",
+   "statistics_report_count": 9,
+   "statistics_used_for_performance": false,
+   "stats_parser": {
+@@ -78,7 +110,7 @@
+   },
+   "typed_control": {
+     "bytes": 97,
+-    "path": "<EXPERIMENT_ROOT>/main-gap-setup-v4-source/SetupCheck.hs",
++    "path": "<EXPERIMENT_ROOT>/main-gap-setup-v5-source/SetupCheck.hs",
+     "sha256": "bae7885918cfd8ef2192740865444591ed093c744319ecee85715c408114e4df"
+   },
+   "typed_expected_files": [

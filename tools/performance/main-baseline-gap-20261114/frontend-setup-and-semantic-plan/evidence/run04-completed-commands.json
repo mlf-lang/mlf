@@ -1,0 +1,1717 @@
+{
+  "commands": [
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "/usr/bin/python3.13"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 572,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/001-runtime-python-before/guard-config.json",
+        "sha256": "b73968563d8ce116bf3f92529755ba13040c256b404a881c00fd672722572ab6"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1145,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/001-runtime-python-before/guard.json",
+        "sha256": "720557facc540de5b9a9dc2b3fbae49e0e8bb1be71fac49f9b2e8fa82ecd054d"
+      },
+      "kind": "runtime",
+      "label": "runtime-python-before",
+      "ordinal": 1,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/001-runtime-python-before/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 414,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/001-runtime-python-before/stdout",
+        "sha256": "74812700dd215ea1c5531f73dd43aeea5b14c6f33b791bba26fe7dc24ff295d0"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<GHC_TOOLCHAIN>/ghc/lib/ghc-9.14.1/bin/ghc-9.14.1"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 647,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/002-runtime-ghc-before/guard-config.json",
+        "sha256": "2bbe282db7b05a907b8d15dcab28476a23078914b5af20a100fe68d7541a1890"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1219,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/002-runtime-ghc-before/guard.json",
+        "sha256": "ebb6bb1640b30f00413aeb3c4d4e6b4ffe7e294ee2f6aab0fc9f7a7a6f82366a"
+      },
+      "kind": "runtime",
+      "label": "runtime-ghc-before",
+      "ordinal": 2,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/002-runtime-ghc-before/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 7830,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/002-runtime-ghc-before/stdout",
+        "sha256": "0609a69ce7ac7abb29d5941dfd4fba15c3847d710aaad096276cf8a1324c0982"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<GHC_TOOLCHAIN>/ghc/lib/ghc-9.14.1/bin/ghc-pkg-9.14.1"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 655,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/003-runtime-ghc-pkg-before/guard-config.json",
+        "sha256": "a63fe52ab85d5b16a0e6fa08a5fc428da45e8d77cf6bd0b8cffc9f8cd804d2a8"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1227,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/003-runtime-ghc-pkg-before/guard.json",
+        "sha256": "49f3f95e6b291b36e85694de4a12be14d0848f801c86d18991efbb5493114fab"
+      },
+      "kind": "runtime",
+      "label": "runtime-ghc-pkg-before",
+      "ordinal": 3,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/003-runtime-ghc-pkg-before/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 7075,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/003-runtime-ghc-pkg-before/stdout",
+        "sha256": "17a32ca6233eb6be5e987531aa1d4a697eca8588098821e1f5b1bf135f03290b"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "/usr/bin/x86_64-linux-gnu-ar"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 577,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/004-runtime-ar-before/guard-config.json",
+        "sha256": "0db08de345c505cbaac4a5c31859770416f439c842f863c62ca4d1e44de79d2f"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1149,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/004-runtime-ar-before/guard.json",
+        "sha256": "f589173aa72f8ebf7d77e025bc73ccc366187600810f402ed00afd49f1701d82"
+      },
+      "kind": "runtime",
+      "label": "runtime-ar-before",
+      "ordinal": 4,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/004-runtime-ar-before/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 513,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/004-runtime-ar-before/stdout",
+        "sha256": "804c200d62e740ffaabf72ab9f2b5dca5d191af8ce8f6fe8e74feb6dcb96b799"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "/usr/bin/x86_64-linux-gnu-gcc-14"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 581,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/005-runtime-cc-before/guard-config.json",
+        "sha256": "7c2fc5dcc87eb62b0fb2c0913dd53416c430b9755ab33de762676823b199ee5b"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1154,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/005-runtime-cc-before/guard.json",
+        "sha256": "f42d8ad527f092553b97b7e67dfb38e7e6859c602694e2478147d3c1c54375cc"
+      },
+      "kind": "runtime",
+      "label": "runtime-cc-before",
+      "ordinal": 5,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/005-runtime-cc-before/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 205,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/005-runtime-cc-before/stdout",
+        "sha256": "7848939bdc114780ef407f9c2fa151930267ba6b97f41b733a46d4ac41d54c7e"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "/usr/bin/bash"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 565,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/006-runtime-shell-before/guard-config.json",
+        "sha256": "8a788ba87940b7e36a35f11e66aafaa5ce1a866a16905c618bdba3b004ff254f"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1138,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/006-runtime-shell-before/guard.json",
+        "sha256": "84d9e49d719b81efda4219946cb254913495cbbfc6103d9f2609443cd2ed29fd"
+      },
+      "kind": "runtime",
+      "label": "runtime-shell-before",
+      "ordinal": 6,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/006-runtime-shell-before/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 280,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/006-runtime-shell-before/stdout",
+        "sha256": "4a883c0ac476ec20450744e77530e99a0835f3e3f75dc37a5800b1059dd272ef"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 669,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/007-runtime-producer-before/guard-config.json",
+        "sha256": "293fdfd2f531bb1d44371a7da257fbdac7c2f275bb9da825824bb2798214047d"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1242,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/007-runtime-producer-before/guard.json",
+        "sha256": "640f957b6f47ab848f76a82fddc46d7c31f728db78b9d77dfcda76db6a3e698d"
+      },
+      "kind": "runtime",
+      "label": "runtime-producer-before",
+      "ordinal": 7,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/007-runtime-producer-before/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 345,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/007-runtime-producer-before/stdout",
+        "sha256": "f21a884e65e893fffa62a59a3bff7e6a3f84410848d6e7d638502f232fe138cd"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-no-link",
+        "-O2",
+        "-XHaskell2010",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-this-unit-id",
+        "mlf-shape-primitives-0.1",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "array",
+        "-package",
+        "bytestring",
+        "-package",
+        "text",
+        "-package",
+        "containers",
+        "-package",
+        "directory",
+        "-i",
+        "-i<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/host/ghc",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/objects",
+        "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/host/ghc/MLF/Primitive.hs"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 1475,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/008-fresh-private-four-module-unit/guard-config.json",
+        "sha256": "9ef76ed2a965f10875df7a8e86c3b9ffa4b88854f5904fc7b1d946cafa82d0a3"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 2370,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/008-fresh-private-four-module-unit/guard.json",
+        "sha256": "a33194df4fc9a2cf319a82f90a722b35cdf950e472729d8976781bb86098266a"
+      },
+      "kind": "setup_payload",
+      "label": "fresh-private-four-module-unit",
+      "ordinal": 8,
+      "seconds": 180,
+      "stderr": {
+        "bytes": 651,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/008-fresh-private-four-module-unit/stderr",
+        "sha256": "228d3cbb475c0b3b4a022d12546779ecb04567b32202f6e6c2fcd557e9a60528"
+      },
+      "stdout": {
+        "bytes": 1190,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/008-fresh-private-four-module-unit/stdout",
+        "sha256": "65ecb7873b6daeccaa7331f5333b9b6e3a5470abdff0371664130a5b69f74e18"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "/usr/bin/x86_64-linux-gnu-ar",
+        "rcs",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/libHSmlf-shape-primitives-0.1.a",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/objects/MLF/Host/Async.o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/objects/MLF/Host/Base.o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/objects/MLF/Host/IO.o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/objects/MLF/Primitive.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/host.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/supervisor.o"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 1417,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/009-archive-private-unit/guard-config.json",
+        "sha256": "ee724ad5de96568fd0bcec544e5c11d670182f85a13015e4dd97c974b9c684c1"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 2013,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/009-archive-private-unit/guard.json",
+        "sha256": "9df10dd1438bdbfe8f4e1adc4e58eb4fef1e4c24de6805d0836e21a5a91e239c"
+      },
+      "kind": "setup_payload",
+      "label": "archive-private-unit",
+      "ordinal": 9,
+      "seconds": 20,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/009-archive-private-unit/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/009-archive-private-unit/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-pkg-9.14.1",
+        "init",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 697,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/010-init-private-db/guard-config.json",
+        "sha256": "facfbbe141397d5a1993668de26e516e84f44f46a67d361cb8bedefe0adffc27"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1269,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/010-init-private-db/guard.json",
+        "sha256": "e3a572a135d0e9a97da40b3e476906c3543ef8e71a770a3b0fa8775911861a72"
+      },
+      "kind": "setup_payload",
+      "label": "init-private-db",
+      "ordinal": 10,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/010-init-private-db/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/010-init-private-db/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-pkg-9.14.1",
+        "--global",
+        "field",
+        "base",
+        "id",
+        "--simple-output"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 631,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/011-global-unit-id-base/guard-config.json",
+        "sha256": "a9fdb137bfe8f394306df7b980c0e11de11db6ed490c45ebee667dd876844351"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1214,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/011-global-unit-id-base/guard.json",
+        "sha256": "21d7254242df348bebdceefc59a6608b080dfb8d08394009497b8bfc91086c70"
+      },
+      "kind": "setup_payload",
+      "label": "global-unit-id-base",
+      "ordinal": 11,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/011-global-unit-id-base/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 19,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/011-global-unit-id-base/stdout",
+        "sha256": "7845169dfa46325b06cdf15ffcc252a14bfd6d6d2bbe5d9799b65b71b5923740"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-pkg-9.14.1",
+        "--global",
+        "field",
+        "array",
+        "id",
+        "--simple-output"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 633,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/012-global-unit-id-array/guard-config.json",
+        "sha256": "6c57d6d613d5bbb92fc9911f517b3c05d9264104ab7df7f444365163832634f1"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1217,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/012-global-unit-id-array/guard.json",
+        "sha256": "0207e2f940997b3ac698b4e8171289838841e6e6282612445b444e59efbf74d9"
+      },
+      "kind": "setup_payload",
+      "label": "global-unit-id-array",
+      "ordinal": 12,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/012-global-unit-id-array/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 19,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/012-global-unit-id-array/stdout",
+        "sha256": "ce8727fdeba3e270047f78b99a2090b75971dfeea9243f3b6e6798b25088acfb"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-pkg-9.14.1",
+        "--global",
+        "field",
+        "bytestring",
+        "id",
+        "--simple-output"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 643,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/013-global-unit-id-bytestring/guard-config.json",
+        "sha256": "8d0db47e250793dcce4a0c03fcf34f26e039d4228b9bfc1b53bc6a4a0d912a06"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1227,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/013-global-unit-id-bytestring/guard.json",
+        "sha256": "a1d5993cc5b310d8a4aacfed21d13de46767ec244b833daaccb5991a77f81016"
+      },
+      "kind": "setup_payload",
+      "label": "global-unit-id-bytestring",
+      "ordinal": 13,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/013-global-unit-id-bytestring/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 25,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/013-global-unit-id-bytestring/stdout",
+        "sha256": "34eddb720e818e3350ab386063876e2f8a83ca41b66248c63e31e50d6932b722"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-pkg-9.14.1",
+        "--global",
+        "field",
+        "text",
+        "id",
+        "--simple-output"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 631,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/014-global-unit-id-text/guard-config.json",
+        "sha256": "7eeb85c1c0bcd9885d34fd4a5e53f04c411421767a610590e069585dac29b34b"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1214,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/014-global-unit-id-text/guard.json",
+        "sha256": "a38546383138603d26248a1051634929de0cf7dbff7142ff706e048753ab9498"
+      },
+      "kind": "setup_payload",
+      "label": "global-unit-id-text",
+      "ordinal": 14,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/014-global-unit-id-text/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 16,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/014-global-unit-id-text/stdout",
+        "sha256": "243a38e3d6a3edfe1be289f089305ba1bde8933ff483bdb981b355828611557f"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-pkg-9.14.1",
+        "--global",
+        "field",
+        "containers",
+        "id",
+        "--simple-output"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 643,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/015-global-unit-id-containers/guard-config.json",
+        "sha256": "0d87d53b4f2006b5095b508f9e023812ede21bf30b7581f05a4fa9c7ccc6713a"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1226,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/015-global-unit-id-containers/guard.json",
+        "sha256": "c8c74696db29c5d8d009331ca6a1a038be998e8d6b9510e75a70745a3d3bffa8"
+      },
+      "kind": "setup_payload",
+      "label": "global-unit-id-containers",
+      "ordinal": 15,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/015-global-unit-id-containers/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 20,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/015-global-unit-id-containers/stdout",
+        "sha256": "c00078ed794846fac47048b3dc25ec6f2f6f3bb841d2b36087c97c885195398c"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-pkg-9.14.1",
+        "--global",
+        "field",
+        "directory",
+        "id",
+        "--simple-output"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 641,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/016-global-unit-id-directory/guard-config.json",
+        "sha256": "60ad79841b0acfcef63b1165424c559c5e935e6a397517719eca576174d44111"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1224,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/016-global-unit-id-directory/guard.json",
+        "sha256": "035ae191e75c71d19544dc9bf2856c5e6f8093a08a712b7f86294940aa1898d1"
+      },
+      "kind": "setup_payload",
+      "label": "global-unit-id-directory",
+      "ordinal": 16,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/016-global-unit-id-directory/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 24,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/016-global-unit-id-directory/stdout",
+        "sha256": "e1312bb80d42baad88c80730d10d8ab3b1a713e676bdd52a26a5390376161588"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-pkg-9.14.1",
+        "--package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "register",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package.conf"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 841,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/017-register-private-unit/guard-config.json",
+        "sha256": "794cc7dc2c9e61bbfd6adec212e2bcb8322be0e57b26987580951e83a92bb276"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1420,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/017-register-private-unit/guard.json",
+        "sha256": "6b171dd8fbfbc1a7e84e2fbddadb38231f0fd7918b5fb0094f64d88bbce54e63"
+      },
+      "kind": "setup_payload",
+      "label": "register-private-unit",
+      "ordinal": 17,
+      "seconds": 20,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/017-register-private-unit/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 153,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/017-register-private-unit/stdout",
+        "sha256": "ab84cb81d8bc4b924c50181ec755e057bedb23817045e5561b0f7ad107d9a8fd"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/builtin-work/fixture.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/builtin-work/fixture"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 870,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/018-new-main-fixed-builtin-pair/guard-config.json",
+        "sha256": "0d28d06856706426d0d3b1411ec39f123c98095b9c23c66e8757bb316455e850"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1469,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/018-new-main-fixed-builtin-pair/guard.json",
+        "sha256": "dbd932f05e66e72f5902f708fe98325b819ab21c1087823936c988b0905e1af0"
+      },
+      "kind": "setup_payload",
+      "label": "new-main-fixed-builtin-pair",
+      "ordinal": 18,
+      "seconds": 120,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/018-new-main-fixed-builtin-pair/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/018-new-main-fixed-builtin-pair/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/builtin-work/fixture.mlfci"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 742,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/019-ordinary-show-fixture/guard-config.json",
+        "sha256": "29c64095d85ac69b10346280e502f73a5cdebe74e107a82fe99fb342479ee566"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1316,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/019-ordinary-show-fixture/guard.json",
+        "sha256": "32a3bb955571be0761248b69533bee2ad72a32d619019c8a315739d38b52f16b"
+      },
+      "kind": "qualification",
+      "label": "ordinary-show-fixture",
+      "ordinal": 19,
+      "seconds": 20,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/019-ordinary-show-fixture/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 265,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/019-ordinary-show-fixture/stdout",
+        "sha256": "258352a55bdf32b8a42137833d770dba90d5a61607d95c09ba64cf02c9e53718"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/builtin.mlfci"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 729,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/020-ordinary-show-builtin/guard-config.json",
+        "sha256": "752cf139c4ee5129f2a82f30cbb1aeea4016db18ae38a40b2df1057b3aa864d6"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1302,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/020-ordinary-show-builtin/guard.json",
+        "sha256": "4977c003a5016d3460679135d1c0a6afb1a8cfb8719667aa2e056f10570aff45"
+      },
+      "kind": "qualification",
+      "label": "ordinary-show-builtin",
+      "ordinal": 20,
+      "seconds": 20,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/020-ordinary-show-builtin/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 11301,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/020-ordinary-show-builtin/stdout",
+        "sha256": "aa9683c00764c3c6e9f291f4a80c2af936e860dc12a4b3cba377e67e3e469944"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "-c",
+        "-fforce-recomp",
+        "-XHaskell2010",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-O2",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-package",
+        "base",
+        "-package",
+        "array",
+        "-package",
+        "bytestring",
+        "-package",
+        "text",
+        "-package",
+        "containers",
+        "-package",
+        "directory",
+        "-i",
+        "-i<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-main",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects",
+        "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/host/ghc/app/emlf/Main.hs",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-main/Main.o",
+        "-ohi",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-main/Main.hi"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 1647,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/021-fresh-original-emlf-Main/guard-config.json",
+        "sha256": "8413141396409905b4def7950d03c1b13f502d1cbe744e879a77a0abada8debe"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 2352,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/021-fresh-original-emlf-Main/guard.json",
+        "sha256": "4eba970fd69b4ba921aab55aa798d5393f8f78c2041370139b2f6e09f16f9e0d"
+      },
+      "kind": "setup_payload",
+      "label": "fresh-original-emlf-Main",
+      "ordinal": 21,
+      "seconds": 60,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/021-fresh-original-emlf-Main/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/021-fresh-original-emlf-Main/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "-XHaskell2010",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-O2",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-package",
+        "base",
+        "-package",
+        "array",
+        "-package",
+        "bytestring",
+        "-package",
+        "text",
+        "-package",
+        "containers",
+        "-package",
+        "directory",
+        "-i",
+        "-i<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-main",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects",
+        "-rtsopts=ignoreAll",
+        "-with-rtsopts=-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/mlf.stats",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-main/Main.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/ArtifactStorage.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/ArtifactStructure.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Bitstream.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/BuiltinPreludeContext.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/BuiltinPreludeLiteral.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/ClassDemand.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Classes.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Compiler.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/CompilerCore.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Constraint.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Crate.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/CrateArtifact.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/CrateCodegen.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/CrateGraph.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/CrateQuery.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/CrateSession.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Data.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Dependency.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Desugar.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Elaborate.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Evidence.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/EvidenceBoundary.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Fresh.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Graph.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Graph/IndexStore.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Graph/Solver.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Host.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/ImportParameters.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/ImportedRoot.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/IndexVec.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/InferenceUnit.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/IntMap.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/IntRank.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/IntSet.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/IntTree.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Kind.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Kinding.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/LLVM.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/LLVM/Analysis.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/LLVM/Argument.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/LLVM/Build.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/LLVM/Codegen.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/LLVM/Kernel.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/LLVM/LazyProducer.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/LLVM/Library.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/LLVM/Native.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/LLVM/Optimize.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/LLVM/Result.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/LLVM/StrictFields.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/LLVM/StrictWrappers.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Layout.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Lexer.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Map.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Module.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/OpenFragment.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Parsec.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Parser.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Prelude.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/PreparedLibraries.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Primitive.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/ProcessHost.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/QueryGraph.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Resolved.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Runtime.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/ST.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Separate.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Set.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/SourceEquality.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/SourceInference.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/SourceUnit.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Standalone.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Std.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Surface.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Types.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Unicode.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/Version.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/X/Check.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/X/Checked.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/X/Parser.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/X/Pretty.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/X/Syntax.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Bootstrap/X/Type.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/MLF/BuiltinPreludeData.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/MLF/Entry/Emlf.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/MLF/NativeBuild.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/MLF/PreparedCompiler.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/MLF/PreparedLibraryData.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/MLF/PreparedNativeData.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Package/Json.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/Package/OS.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/MLF/Primitive.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/MLF/Host/Base.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/MLF/Host/IO.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects/MLF/Host/Async.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/host.o",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/supervisor.o",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 14930,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/022-ordinary-stats-own-relink/guard-config.json",
+        "sha256": "f5eef082d1325d3711cee63af8696e111ab3be34b00b238cb0341404f098d459"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 16125,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/022-ordinary-stats-own-relink/guard.json",
+        "sha256": "70f9afceb8450faed5b80532aa794dab24abdc2ae111092bbdd2380607deaa6b"
+      },
+      "kind": "setup_payload",
+      "label": "ordinary-stats-own-relink",
+      "ordinal": 22,
+      "seconds": 60,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/022-ordinary-stats-own-relink/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/022-ordinary-stats-own-relink/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 656,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/023-runtime-stats-emlf-before/guard-config.json",
+        "sha256": "7f0dee882876c64ac70f972428ff87ebe9ede0ee279a1324cfd6385ff9606144"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1230,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/023-runtime-stats-emlf-before/guard.json",
+        "sha256": "9c8c9a34a32c2fc3a67e9f2a64ec1b359e8e31c4f0d1be3c4fca877db1e5d09b"
+      },
+      "kind": "runtime",
+      "label": "runtime-stats-emlf-before",
+      "ordinal": 23,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/023-runtime-stats-emlf-before/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 345,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/023-runtime-stats-emlf-before/stdout",
+        "sha256": "d1d067688d5704b39fa9f5c3c0bbe994308b860f27de845f131a7ac590b76333"
+      }
+    },
+    {
+      "archived": {
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/mlf.stats": {
+          "bytes": 1081,
+          "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/024-stats-version/reports/0-mlf.stats",
+          "sha256": "6273673b30c004d20eb42b4b0ea7a0e5472f0a038a7f59c4db6b5dcd54fab0d4"
+        }
+      },
+      "cleanup": true,
+      "command": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--version"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 698,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/024-stats-version/guard-config.json",
+        "sha256": "eef895376ca321be28f8fab8b4f05ab102a03552fefb47035c31a32cd72e2102"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1543,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/024-stats-version/guard.json",
+        "sha256": "b7d51b39187a87e85aafc88a7fdc3d0b5d3c3ffe4088b8c7a20fd7001abc4537"
+      },
+      "kind": "qualification",
+      "label": "stats-version",
+      "ordinal": 24,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/024-stats-version/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 11,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/024-stats-version/stdout",
+        "sha256": "05d40051731444c5ddd4388f9213568ee1efbbf8646fe9a3ae02b648e24e32ae"
+      }
+    },
+    {
+      "archived": {
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/mlf.stats": {
+          "bytes": 1097,
+          "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/025-stats-identity/reports/0-mlf.stats",
+          "sha256": "9971431b2865841ee3ffbd5e772536a92f0dc3b9dbc5022f14b8894c731f7837"
+        }
+      },
+      "cleanup": true,
+      "command": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--implementation-identity"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 715,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/025-stats-identity/guard-config.json",
+        "sha256": "e7d5d5c18a6be3bc629fa76239671f77f66123912995411306df7d3f161bc845"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1561,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/025-stats-identity/guard.json",
+        "sha256": "6c85189d51c82ec0c028223cc1b0305a7da95be94b739c298acff3660992efe0"
+      },
+      "kind": "qualification",
+      "label": "stats-identity",
+      "ordinal": 25,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/025-stats-identity/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 26,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/025-stats-identity/stdout",
+        "sha256": "b14c8f8bd9432364e7c7de30e7a8c9f53cbf8e4e58b09050d1f570cb87c479b8"
+      }
+    },
+    {
+      "archived": {
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/mlf.stats": {
+          "bytes": 1118,
+          "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/026-stats-semantic-42/reports/0-mlf.stats",
+          "sha256": "2343f7fcefff08b48a9e130ea0e30839b54a8858195f29884bc25c6a5fc162fd"
+        }
+      },
+      "cleanup": true,
+      "command": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--run",
+        "--expr",
+        "printInt (40 + 2)"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 729,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/026-stats-semantic-42/guard-config.json",
+        "sha256": "65d7b9603ccf64e83682e5811171e68c5026ee8e780e3f2bb85fb6977c55351f"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1584,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/026-stats-semantic-42/guard.json",
+        "sha256": "ccb27b08fdd637dd6262e118a30678dc8749cdbd5651af4fe4dfab563ac0ee72"
+      },
+      "kind": "qualification",
+      "label": "stats-semantic-42",
+      "ordinal": 26,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/026-stats-semantic-42/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 3,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/026-stats-semantic-42/stdout",
+        "sha256": "084c799cd551dd1d8d5c5f9a5d593b2e931f5e36122ee5c793c1d08a19839cc0"
+      }
+    },
+    {
+      "archived": {
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/mlf.stats": {
+          "bytes": 1121,
+          "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/027-stats-unicode-positive/reports/0-mlf.stats",
+          "sha256": "319e06f7f59884a91dbb811dda863bd2b4316c4a9866e4f95f44f3badac225d4"
+        }
+      },
+      "cleanup": true,
+      "command": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--run",
+        "--expr",
+        "putStrLn \"\u03bb\u96ea\ud83d\ude42\""
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 754,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/027-stats-unicode-positive/guard-config.json",
+        "sha256": "fd6d145288441f79a967d373bfd53dc1822d6b598ae8c2e31bd22da3ac5de505"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1614,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/027-stats-unicode-positive/guard.json",
+        "sha256": "5bea81ff117337db5abf10d23dbb31bfdb75978e0c2f4962cede43a4327e63e5"
+      },
+      "kind": "qualification",
+      "label": "stats-unicode-positive",
+      "ordinal": 27,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/027-stats-unicode-positive/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 10,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/027-stats-unicode-positive/stdout",
+        "sha256": "fc2dc3dadfdc026bacbe58f39eb638f8538f336a88746d644fed36d88cf2f97f"
+      }
+    },
+    {
+      "archived": {
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/mlf.stats": {
+          "bytes": 1113,
+          "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/028-stats-type-rejection/reports/0-mlf.stats",
+          "sha256": "1c8a8313d913516fbad5bc34f9bc9992555207a05d109991c855caaeb56103fd"
+        }
+      },
+      "cleanup": true,
+      "command": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--type",
+        "--expr",
+        "(True :: Int)"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 729,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/028-stats-type-rejection/guard-config.json",
+        "sha256": "71cc846eed7ef44eafa08cd7807d6f2a0e892cea1c5293d33c1ba644e4c791bd"
+      },
+      "exit_code": 1,
+      "guard": {
+        "bytes": 1587,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/028-stats-type-rejection/guard.json",
+        "sha256": "275d762af7ce506b9070fa655bfa936e3c06c525cd4e201426d9e717907ecbe4"
+      },
+      "kind": "qualification",
+      "label": "stats-type-rejection",
+      "ordinal": 28,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 72,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/028-stats-type-rejection/stderr",
+        "sha256": "bc84f232aee24ef7f08da7f348f105244218ffb8a39671f296cd4db1376b9fbd"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/028-stats-type-rejection/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "archived": {
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/mlf.stats": {
+          "bytes": 1334,
+          "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/029-stats-fixed-fixture/reports/0-mlf.stats",
+          "sha256": "5c81bffc4fc78aa88dc6de71c6c1c0040c32ea502f51054ea5c42838b08adc7a"
+        }
+      },
+      "cleanup": true,
+      "command": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/builtin-work/fixture.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/builtin-work/fixture"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 948,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/029-stats-fixed-fixture/guard-config.json",
+        "sha256": "9ee2855356ed46c3bdb0433809dfb47e6866026bff0049f79e057305ef608491"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1808,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/029-stats-fixed-fixture/guard.json",
+        "sha256": "a1d548f78de599df943635bf9ab3e99a265402286097ad2babd56474e00194df"
+      },
+      "kind": "qualification",
+      "label": "stats-fixed-fixture",
+      "ordinal": 29,
+      "seconds": 120,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/029-stats-fixed-fixture/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/029-stats-fixed-fixture/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "archived": {
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/mlf.stats": {
+          "bytes": 1214,
+          "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/030-stats-show-fixture/reports/0-mlf.stats",
+          "sha256": "c5257553905fcccfa8e69a17b9c7c234c3dc79386204ad775c5345b3e6e20a4d"
+        }
+      },
+      "cleanup": true,
+      "command": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--show-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/builtin-work/fixture.mlfci"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 825,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/030-stats-show-fixture/guard-config.json",
+        "sha256": "273d378175b62a3bb768e895b121cf649478522f9c990ea1a9da70a95615a16e"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1678,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/030-stats-show-fixture/guard.json",
+        "sha256": "7033df60626badf1f5c251dbd0c68a31f5db03a4e8abe6e90aca39a31e566691"
+      },
+      "kind": "qualification",
+      "label": "stats-show-fixture",
+      "ordinal": 30,
+      "seconds": 20,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/030-stats-show-fixture/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 265,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/030-stats-show-fixture/stdout",
+        "sha256": "258352a55bdf32b8a42137833d770dba90d5a61607d95c09ba64cf02c9e53718"
+      }
+    },
+    {
+      "archived": {
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/mlf.stats": {
+          "bytes": 1201,
+          "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/031-stats-show-builtin/reports/0-mlf.stats",
+          "sha256": "d331371554c5616ca94ce221071d216a5352b8ee54b1891a324aa2d9fce36cbf"
+        }
+      },
+      "cleanup": true,
+      "command": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--show-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/builtin.mlfci"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 812,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/031-stats-show-builtin/guard-config.json",
+        "sha256": "7f339f0ee658bc907074102c1713c00e3f10496e4c52034224bbfb207d1b54ec"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1665,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/031-stats-show-builtin/guard.json",
+        "sha256": "bc7fb927a973ceb72b8ad55e214186a6ca4af83ef0bd978cf5fe473c2fc5f2b4"
+      },
+      "kind": "qualification",
+      "label": "stats-show-builtin",
+      "ordinal": 31,
+      "seconds": 20,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/031-stats-show-builtin/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 11301,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/031-stats-show-builtin/stdout",
+        "sha256": "aa9683c00764c3c6e9f291f4a80c2af936e860dc12a4b3cba377e67e3e469944"
+      }
+    },
+    {
+      "archived": {
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/ghc.stats": {
+          "bytes": 2048,
+          "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/032-ghc-typed-package-RTS-control/reports/0-ghc.stats",
+          "sha256": "5956b9cb4b39f058164c893747915ed24ac697900013f2426383517c2da8b693"
+        }
+      },
+      "cleanup": true,
+      "command": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/ghc-control/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/ghc-control/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/ghc-control/SetupCheck.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/ghc.stats",
+        "-RTS"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 1603,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/032-ghc-typed-package-RTS-control/guard-config.json",
+        "sha256": "09cb01c4808f8cc0be64ef4b4f9669d7986421fe104093626841cc5ff64be8ae"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 2582,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/032-ghc-typed-package-RTS-control/guard.json",
+        "sha256": "61dacc6f29ae4abcf76edfa46100cee2001bede2ac8457cc4a3f9bbddc2ceeaf"
+      },
+      "kind": "qualification",
+      "label": "ghc-typed-package-RTS-control",
+      "ordinal": 32,
+      "seconds": 30,
+      "stderr": {
+        "bytes": 3497,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/032-ghc-typed-package-RTS-control/stderr",
+        "sha256": "bce45090722d57aeb47bbd6f3ac42f97819fe8883e29365950f736614a7ec746"
+      },
+      "stdout": {
+        "bytes": 164,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/032-ghc-typed-package-RTS-control/stdout",
+        "sha256": "20a3aaa7fafafa4a28929ab754f3285a1cc7c880553708c89683c2423b67ebab"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "/usr/bin/python3.13"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 571,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/033-runtime-python-after/guard-config.json",
+        "sha256": "e7fe2e901c6b44768271b8adfe46c1e2fe967f730afaeba7cda3656ac6362233"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1145,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/033-runtime-python-after/guard.json",
+        "sha256": "9fbfe6671faa37cf42e3c6235348f26c71a81aa0896a8ba2fbc73e4002cab342"
+      },
+      "kind": "runtime",
+      "label": "runtime-python-after",
+      "ordinal": 33,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/033-runtime-python-after/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 414,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/033-runtime-python-after/stdout",
+        "sha256": "77116a25f4c3d2e7cbc67080d8bbbda6e5bcb364ab8a25133a79c01bdff0ba65"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<GHC_TOOLCHAIN>/ghc/lib/ghc-9.14.1/bin/ghc-9.14.1"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 646,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/034-runtime-ghc-after/guard-config.json",
+        "sha256": "348427a650b3ae860b6b955ac68d0567ab69e32f249f6b88e13be3820543f209"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1219,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/034-runtime-ghc-after/guard.json",
+        "sha256": "4403c6113c2f62f8bdc9b739efd53c0c153174948be5f05ab9275dedeeeebf28"
+      },
+      "kind": "runtime",
+      "label": "runtime-ghc-after",
+      "ordinal": 34,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/034-runtime-ghc-after/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 7830,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/034-runtime-ghc-after/stdout",
+        "sha256": "0d9e9199686ced70c72e0e0ebd041e7dcc54f46bfd237c5d523179686f1deeab"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<GHC_TOOLCHAIN>/ghc/lib/ghc-9.14.1/bin/ghc-pkg-9.14.1"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 654,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/035-runtime-ghc-pkg-after/guard-config.json",
+        "sha256": "03c661cc5324ee6a5793ea650b85dfc465e825d470f047b880676cbbffc551c4"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1228,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/035-runtime-ghc-pkg-after/guard.json",
+        "sha256": "da22e944e96adefe11fb8f36187f83eef02a8b1bb8ce83e4866d80190a18d4c9"
+      },
+      "kind": "runtime",
+      "label": "runtime-ghc-pkg-after",
+      "ordinal": 35,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/035-runtime-ghc-pkg-after/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 7075,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/035-runtime-ghc-pkg-after/stdout",
+        "sha256": "649224e9b8d17e452e7d694c34355ade5ab6c3d47769439e952fd1e0c3c1b5a6"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "/usr/bin/x86_64-linux-gnu-ar"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 576,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/036-runtime-ar-after/guard-config.json",
+        "sha256": "18d89abc8e5b89395118b46f55c8f0aa444fc70b9360bfdbf948f336f9ca6277"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1150,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/036-runtime-ar-after/guard.json",
+        "sha256": "c15632adb9777954605f7ec7d6426d4db9f1d9aaac17f7e1498ccbbb8bd2df5b"
+      },
+      "kind": "runtime",
+      "label": "runtime-ar-after",
+      "ordinal": 36,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/036-runtime-ar-after/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 513,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/036-runtime-ar-after/stdout",
+        "sha256": "417542e89541a647f628a09d6f2d3b67521113b6491767466f15d0509f15929e"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "/usr/bin/x86_64-linux-gnu-gcc-14"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 580,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/037-runtime-cc-after/guard-config.json",
+        "sha256": "db22b8b611487cd3b3c254c47ab4cc356ca093902419c2d64665b2290820e95d"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1154,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/037-runtime-cc-after/guard.json",
+        "sha256": "10f5dab4c0d51e7440e9a293611c05622dcbbcde81217cefbf769167adc9111b"
+      },
+      "kind": "runtime",
+      "label": "runtime-cc-after",
+      "ordinal": 37,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/037-runtime-cc-after/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 205,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/037-runtime-cc-after/stdout",
+        "sha256": "b54e151fa32a06e87740e2ecc9abf3452549b59a0de387797839323a73a9dff0"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "/usr/bin/bash"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 564,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/038-runtime-shell-after/guard-config.json",
+        "sha256": "b8963d70bf7276dd4007c557eaa8829a85a12f94f6c392768555e2d0d8876810"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1138,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/038-runtime-shell-after/guard.json",
+        "sha256": "26b56451f774733fcd373591cb8774f3c3d1334e117184ec386f4e5b6c55e387"
+      },
+      "kind": "runtime",
+      "label": "runtime-shell-after",
+      "ordinal": 38,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/038-runtime-shell-after/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 280,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/038-runtime-shell-after/stdout",
+        "sha256": "97f7b70e36b227aaea4d938fd90711698500f142d9a2e0f8fd1819843d5f7711"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 668,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/039-runtime-producer-after/guard-config.json",
+        "sha256": "bdd3d49e7e313a5a1cbeb4c1af9195bc9fd9685bf585378fe21eb62ff7a3ce89"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1242,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/039-runtime-producer-after/guard.json",
+        "sha256": "0e2891080a9b346195c341a544e0fc53beae7b11f6f407a4fe5ec2a05fda7bfb"
+      },
+      "kind": "runtime",
+      "label": "runtime-producer-after",
+      "ordinal": 39,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/039-runtime-producer-after/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 345,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/039-runtime-producer-after/stdout",
+        "sha256": "9b802d02a5a3097b1feb66e649d8b5fbcb5f2c8bbd34f490aec9adae2a1029c9"
+      }
+    },
+    {
+      "archived": {},
+      "cleanup": true,
+      "command": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf"
+      ],
+      "complete": true,
+      "config": {
+        "bytes": 655,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/040-runtime-stats-emlf-after/guard-config.json",
+        "sha256": "52f43c2e71cd922b63e82ce0d83ba68d21a61c1786c64932dc1665545e31b0ce"
+      },
+      "exit_code": 0,
+      "guard": {
+        "bytes": 1229,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/040-runtime-stats-emlf-after/guard.json",
+        "sha256": "5c10954f315e14da7cf44084c3163f07eab06d9d81436fa6455d44bf0bf64e38"
+      },
+      "kind": "runtime",
+      "label": "runtime-stats-emlf-after",
+      "ordinal": 40,
+      "seconds": 10,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/040-runtime-stats-emlf-after/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 345,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/040-runtime-stats-emlf-after/stdout",
+        "sha256": "6376f7bc838463235e1d3ad1310bef2924f158961b3be7fa3a9840fb69f5c117"
+      }
+    }
+  ],
+  "no_commands_rerun": true,
+  "original": {
+    "bytes": 83069,
+    "sha256": "b1fc41e96580d5cdf4c3b5bde36e35e70dda4a45f112da7f24444bf298f2f620",
+    "source_artifact": "main-gap-setup-run04-actual-review/completed-children.json"
+  },
+  "representation": "actual complete 40-command ledger with role-path placeholders; original pin below"
+}

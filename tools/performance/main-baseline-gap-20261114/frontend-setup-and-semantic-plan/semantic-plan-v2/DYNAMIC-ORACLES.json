@@ -1,0 +1,602 @@
+{
+  "actual_values_present": false,
+  "cells": [
+    {
+      "actual_GHC_compiling_events": null,
+      "actual_GHC_raw_interface_oracle": null,
+      "actual_GHC_typed_inventory": null,
+      "actual_config_flavor": null,
+      "actual_cross_producer_comparison": null,
+      "actual_formula_outputs": null,
+      "actual_observed_module_owners": null,
+      "actual_original_binary_binding": null,
+      "actual_original_complete_files": null,
+      "actual_original_query_counts": null,
+      "actual_original_query_schema_and_order": null,
+      "actual_qualification_review": null,
+      "actual_query_graph_rows_and_ordered_reads": null,
+      "actual_sampling_authorized": false,
+      "actual_snapshot_table_counts": null,
+      "actual_stats_binary_binding": null,
+      "actual_stats_full_raw_oracle": null,
+      "actual_unique_result_locations_and_files": null,
+      "cell": "baseline-0",
+      "crate_identity_from_frozen_input_spec": "compiler-shapes/baseline-0",
+      "declared_modules_from_frozen_input_spec": [
+        "Main"
+      ],
+      "expected_route_flavor_source_proof_required_before_admission": true,
+      "formula_expected_stdout_from_frozen_spec": [
+        "-1\n",
+        "0\n",
+        "7\n"
+      ],
+      "formula_inputs_from_frozen_spec": [
+        -1,
+        0,
+        7
+      ],
+      "input_files": [
+        {
+          "bytes": 396,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/baseline-0/Main.hs",
+          "sha256": "522b3106f7dab67ca6f7dd1f3b705acd3d8a5e8113740a6a6ce30eeaaa7efd03"
+        }
+      ]
+    },
+    {
+      "actual_GHC_compiling_events": null,
+      "actual_GHC_raw_interface_oracle": null,
+      "actual_GHC_typed_inventory": null,
+      "actual_config_flavor": null,
+      "actual_cross_producer_comparison": null,
+      "actual_formula_outputs": null,
+      "actual_observed_module_owners": null,
+      "actual_original_binary_binding": null,
+      "actual_original_complete_files": null,
+      "actual_original_query_counts": null,
+      "actual_original_query_schema_and_order": null,
+      "actual_qualification_review": null,
+      "actual_query_graph_rows_and_ordered_reads": null,
+      "actual_sampling_authorized": false,
+      "actual_snapshot_table_counts": null,
+      "actual_stats_binary_binding": null,
+      "actual_stats_full_raw_oracle": null,
+      "actual_unique_result_locations_and_files": null,
+      "cell": "flat_functions-16",
+      "crate_identity_from_frozen_input_spec": "compiler-shapes/flat_functions-16",
+      "declared_modules_from_frozen_input_spec": [
+        "Main"
+      ],
+      "expected_route_flavor_source_proof_required_before_admission": true,
+      "formula_expected_stdout_from_frozen_spec": [
+        "104\n",
+        "120\n",
+        "232\n"
+      ],
+      "formula_inputs_from_frozen_spec": [
+        -1,
+        0,
+        7
+      ],
+      "input_files": [
+        {
+          "bytes": 1255,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-16/Main.hs",
+          "sha256": "a5254beedeb16e7bf58791f4e7e27a44329bed18369bfb501414cbf230049249"
+        }
+      ]
+    },
+    {
+      "actual_GHC_compiling_events": null,
+      "actual_GHC_raw_interface_oracle": null,
+      "actual_GHC_typed_inventory": null,
+      "actual_config_flavor": null,
+      "actual_cross_producer_comparison": null,
+      "actual_formula_outputs": null,
+      "actual_observed_module_owners": null,
+      "actual_original_binary_binding": null,
+      "actual_original_complete_files": null,
+      "actual_original_query_counts": null,
+      "actual_original_query_schema_and_order": null,
+      "actual_qualification_review": null,
+      "actual_query_graph_rows_and_ordered_reads": null,
+      "actual_sampling_authorized": false,
+      "actual_snapshot_table_counts": null,
+      "actual_stats_binary_binding": null,
+      "actual_stats_full_raw_oracle": null,
+      "actual_unique_result_locations_and_files": null,
+      "cell": "flat_functions-32",
+      "crate_identity_from_frozen_input_spec": "compiler-shapes/flat_functions-32",
+      "declared_modules_from_frozen_input_spec": [
+        "Main"
+      ],
+      "expected_route_flavor_source_proof_required_before_admission": true,
+      "formula_expected_stdout_from_frozen_spec": [
+        "464\n",
+        "496\n",
+        "720\n"
+      ],
+      "formula_inputs_from_frozen_spec": [
+        -1,
+        0,
+        7
+      ],
+      "input_files": [
+        {
+          "bytes": 2167,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-32/Main.hs",
+          "sha256": "ea9ae079ef50cf57b8c5869466666e774e8524ba735aeca684cdf4be7e493a81"
+        }
+      ]
+    },
+    {
+      "actual_GHC_compiling_events": null,
+      "actual_GHC_raw_interface_oracle": null,
+      "actual_GHC_typed_inventory": null,
+      "actual_config_flavor": null,
+      "actual_cross_producer_comparison": null,
+      "actual_formula_outputs": null,
+      "actual_observed_module_owners": null,
+      "actual_original_binary_binding": null,
+      "actual_original_complete_files": null,
+      "actual_original_query_counts": null,
+      "actual_original_query_schema_and_order": null,
+      "actual_qualification_review": null,
+      "actual_query_graph_rows_and_ordered_reads": null,
+      "actual_sampling_authorized": false,
+      "actual_snapshot_table_counts": null,
+      "actual_stats_binary_binding": null,
+      "actual_stats_full_raw_oracle": null,
+      "actual_unique_result_locations_and_files": null,
+      "cell": "flat_functions-64",
+      "crate_identity_from_frozen_input_spec": "compiler-shapes/flat_functions-64",
+      "declared_modules_from_frozen_input_spec": [
+        "Main"
+      ],
+      "expected_route_flavor_source_proof_required_before_admission": true,
+      "formula_expected_stdout_from_frozen_spec": [
+        "1952\n",
+        "2016\n",
+        "2464\n"
+      ],
+      "formula_inputs_from_frozen_spec": [
+        -1,
+        0,
+        7
+      ],
+      "input_files": [
+        {
+          "bytes": 3991,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-64/Main.hs",
+          "sha256": "a578c5cd2e6dd90dd1c41a85c65cfabcda69ebf5e2f4e3eada29c4b5dcbfe121"
+        }
+      ]
+    },
+    {
+      "actual_GHC_compiling_events": null,
+      "actual_GHC_raw_interface_oracle": null,
+      "actual_GHC_typed_inventory": null,
+      "actual_config_flavor": null,
+      "actual_cross_producer_comparison": null,
+      "actual_formula_outputs": null,
+      "actual_observed_module_owners": null,
+      "actual_original_binary_binding": null,
+      "actual_original_complete_files": null,
+      "actual_original_query_counts": null,
+      "actual_original_query_schema_and_order": null,
+      "actual_qualification_review": null,
+      "actual_query_graph_rows_and_ordered_reads": null,
+      "actual_sampling_authorized": false,
+      "actual_snapshot_table_counts": null,
+      "actual_stats_binary_binding": null,
+      "actual_stats_full_raw_oracle": null,
+      "actual_unique_result_locations_and_files": null,
+      "cell": "flat_functions-128",
+      "crate_identity_from_frozen_input_spec": "compiler-shapes/flat_functions-128",
+      "declared_modules_from_frozen_input_spec": [
+        "Main"
+      ],
+      "expected_route_flavor_source_proof_required_before_admission": true,
+      "formula_expected_stdout_from_frozen_spec": [
+        "8000\n",
+        "8128\n",
+        "9024\n"
+      ],
+      "formula_inputs_from_frozen_spec": [
+        -1,
+        0,
+        7
+      ],
+      "input_files": [
+        {
+          "bytes": 7751,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-128/Main.hs",
+          "sha256": "af48eb052fca7df869588c13f805ccda52e6ac55451d8b4709237943a5677640"
+        }
+      ]
+    },
+    {
+      "actual_GHC_compiling_events": null,
+      "actual_GHC_raw_interface_oracle": null,
+      "actual_GHC_typed_inventory": null,
+      "actual_config_flavor": null,
+      "actual_cross_producer_comparison": null,
+      "actual_formula_outputs": null,
+      "actual_observed_module_owners": null,
+      "actual_original_binary_binding": null,
+      "actual_original_complete_files": null,
+      "actual_original_query_counts": null,
+      "actual_original_query_schema_and_order": null,
+      "actual_qualification_review": null,
+      "actual_query_graph_rows_and_ordered_reads": null,
+      "actual_sampling_authorized": false,
+      "actual_snapshot_table_counts": null,
+      "actual_stats_binary_binding": null,
+      "actual_stats_full_raw_oracle": null,
+      "actual_unique_result_locations_and_files": null,
+      "cell": "flat_functions-256",
+      "crate_identity_from_frozen_input_spec": "compiler-shapes/flat_functions-256",
+      "declared_modules_from_frozen_input_spec": [
+        "Main"
+      ],
+      "expected_route_flavor_source_proof_required_before_admission": true,
+      "formula_expected_stdout_from_frozen_spec": [
+        "32384\n",
+        "32640\n",
+        "34432\n"
+      ],
+      "formula_inputs_from_frozen_spec": [
+        -1,
+        0,
+        7
+      ],
+      "input_files": [
+        {
+          "bytes": 15559,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-256/Main.hs",
+          "sha256": "af2371d80197e98f3fb2aa3ea99bac91e95a8905a1d6f3fe2952426a4ec83881"
+        }
+      ]
+    },
+    {
+      "actual_GHC_compiling_events": null,
+      "actual_GHC_raw_interface_oracle": null,
+      "actual_GHC_typed_inventory": null,
+      "actual_config_flavor": null,
+      "actual_cross_producer_comparison": null,
+      "actual_formula_outputs": null,
+      "actual_observed_module_owners": null,
+      "actual_original_binary_binding": null,
+      "actual_original_complete_files": null,
+      "actual_original_query_counts": null,
+      "actual_original_query_schema_and_order": null,
+      "actual_qualification_review": null,
+      "actual_query_graph_rows_and_ordered_reads": null,
+      "actual_sampling_authorized": false,
+      "actual_snapshot_table_counts": null,
+      "actual_stats_binary_binding": null,
+      "actual_stats_full_raw_oracle": null,
+      "actual_unique_result_locations_and_files": null,
+      "cell": "higher_order_chain-16",
+      "crate_identity_from_frozen_input_spec": "compiler-shapes/higher_order_chain-16",
+      "declared_modules_from_frozen_input_spec": [
+        "Main"
+      ],
+      "expected_route_flavor_source_proof_required_before_admission": true,
+      "formula_expected_stdout_from_frozen_spec": [
+        "15\n",
+        "16\n",
+        "23\n"
+      ],
+      "formula_inputs_from_frozen_spec": [
+        -1,
+        0,
+        7
+      ],
+      "input_files": [
+        {
+          "bytes": 816,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-16/Main.hs",
+          "sha256": "c5bc5b63bfdcd05b263b625788b77846fdac1d5fe69c7c36ae6abed100c1bb2b"
+        }
+      ]
+    },
+    {
+      "actual_GHC_compiling_events": null,
+      "actual_GHC_raw_interface_oracle": null,
+      "actual_GHC_typed_inventory": null,
+      "actual_config_flavor": null,
+      "actual_cross_producer_comparison": null,
+      "actual_formula_outputs": null,
+      "actual_observed_module_owners": null,
+      "actual_original_binary_binding": null,
+      "actual_original_complete_files": null,
+      "actual_original_query_counts": null,
+      "actual_original_query_schema_and_order": null,
+      "actual_qualification_review": null,
+      "actual_query_graph_rows_and_ordered_reads": null,
+      "actual_sampling_authorized": false,
+      "actual_snapshot_table_counts": null,
+      "actual_stats_binary_binding": null,
+      "actual_stats_full_raw_oracle": null,
+      "actual_unique_result_locations_and_files": null,
+      "cell": "higher_order_chain-32",
+      "crate_identity_from_frozen_input_spec": "compiler-shapes/higher_order_chain-32",
+      "declared_modules_from_frozen_input_spec": [
+        "Main"
+      ],
+      "expected_route_flavor_source_proof_required_before_admission": true,
+      "formula_expected_stdout_from_frozen_spec": [
+        "31\n",
+        "32\n",
+        "39\n"
+      ],
+      "formula_inputs_from_frozen_spec": [
+        -1,
+        0,
+        7
+      ],
+      "input_files": [
+        {
+          "bytes": 1056,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-32/Main.hs",
+          "sha256": "5943c0526bd00cbe8d76b60643e1495c8a07122c3c5a6fb2a59215bfd5c3db49"
+        }
+      ]
+    },
+    {
+      "actual_GHC_compiling_events": null,
+      "actual_GHC_raw_interface_oracle": null,
+      "actual_GHC_typed_inventory": null,
+      "actual_config_flavor": null,
+      "actual_cross_producer_comparison": null,
+      "actual_formula_outputs": null,
+      "actual_observed_module_owners": null,
+      "actual_original_binary_binding": null,
+      "actual_original_complete_files": null,
+      "actual_original_query_counts": null,
+      "actual_original_query_schema_and_order": null,
+      "actual_qualification_review": null,
+      "actual_query_graph_rows_and_ordered_reads": null,
+      "actual_sampling_authorized": false,
+      "actual_snapshot_table_counts": null,
+      "actual_stats_binary_binding": null,
+      "actual_stats_full_raw_oracle": null,
+      "actual_unique_result_locations_and_files": null,
+      "cell": "higher_order_chain-64",
+      "crate_identity_from_frozen_input_spec": "compiler-shapes/higher_order_chain-64",
+      "declared_modules_from_frozen_input_spec": [
+        "Main"
+      ],
+      "expected_route_flavor_source_proof_required_before_admission": true,
+      "formula_expected_stdout_from_frozen_spec": [
+        "63\n",
+        "64\n",
+        "71\n"
+      ],
+      "formula_inputs_from_frozen_spec": [
+        -1,
+        0,
+        7
+      ],
+      "input_files": [
+        {
+          "bytes": 1536,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-64/Main.hs",
+          "sha256": "d8a72fb0850ef38bf04df17b1490061f6d20ccc7d1dd59a7ca29146a70969a8c"
+        }
+      ]
+    },
+    {
+      "actual_GHC_compiling_events": null,
+      "actual_GHC_raw_interface_oracle": null,
+      "actual_GHC_typed_inventory": null,
+      "actual_config_flavor": null,
+      "actual_cross_producer_comparison": null,
+      "actual_formula_outputs": null,
+      "actual_observed_module_owners": null,
+      "actual_original_binary_binding": null,
+      "actual_original_complete_files": null,
+      "actual_original_query_counts": null,
+      "actual_original_query_schema_and_order": null,
+      "actual_qualification_review": null,
+      "actual_query_graph_rows_and_ordered_reads": null,
+      "actual_sampling_authorized": false,
+      "actual_snapshot_table_counts": null,
+      "actual_stats_binary_binding": null,
+      "actual_stats_full_raw_oracle": null,
+      "actual_unique_result_locations_and_files": null,
+      "cell": "higher_order_chain-128",
+      "crate_identity_from_frozen_input_spec": "compiler-shapes/higher_order_chain-128",
+      "declared_modules_from_frozen_input_spec": [
+        "Main"
+      ],
+      "expected_route_flavor_source_proof_required_before_admission": true,
+      "formula_expected_stdout_from_frozen_spec": [
+        "127\n",
+        "128\n",
+        "135\n"
+      ],
+      "formula_inputs_from_frozen_spec": [
+        -1,
+        0,
+        7
+      ],
+      "input_files": [
+        {
+          "bytes": 2496,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-128/Main.hs",
+          "sha256": "ba13ac3b8d15d7b1d4c63fcc9698c86b9cbca1b6244dd1b1ee6a89e2e6ce41da"
+        }
+      ]
+    },
+    {
+      "actual_GHC_compiling_events": null,
+      "actual_GHC_raw_interface_oracle": null,
+      "actual_GHC_typed_inventory": null,
+      "actual_config_flavor": null,
+      "actual_cross_producer_comparison": null,
+      "actual_formula_outputs": null,
+      "actual_observed_module_owners": null,
+      "actual_original_binary_binding": null,
+      "actual_original_complete_files": null,
+      "actual_original_query_counts": null,
+      "actual_original_query_schema_and_order": null,
+      "actual_qualification_review": null,
+      "actual_query_graph_rows_and_ordered_reads": null,
+      "actual_sampling_authorized": false,
+      "actual_snapshot_table_counts": null,
+      "actual_stats_binary_binding": null,
+      "actual_stats_full_raw_oracle": null,
+      "actual_unique_result_locations_and_files": null,
+      "cell": "higher_order_chain-256",
+      "crate_identity_from_frozen_input_spec": "compiler-shapes/higher_order_chain-256",
+      "declared_modules_from_frozen_input_spec": [
+        "Main"
+      ],
+      "expected_route_flavor_source_proof_required_before_admission": true,
+      "formula_expected_stdout_from_frozen_spec": [
+        "255\n",
+        "256\n",
+        "263\n"
+      ],
+      "formula_inputs_from_frozen_spec": [
+        -1,
+        0,
+        7
+      ],
+      "input_files": [
+        {
+          "bytes": 4416,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-256/Main.hs",
+          "sha256": "0747d08346964a72c21f11990bbc9deec4d31e9dd05629e71df8668dc75c76a7"
+        }
+      ]
+    },
+    {
+      "actual_GHC_compiling_events": null,
+      "actual_GHC_raw_interface_oracle": null,
+      "actual_GHC_typed_inventory": null,
+      "actual_config_flavor": null,
+      "actual_cross_producer_comparison": null,
+      "actual_formula_outputs": null,
+      "actual_observed_module_owners": null,
+      "actual_original_binary_binding": null,
+      "actual_original_complete_files": null,
+      "actual_original_query_counts": null,
+      "actual_original_query_schema_and_order": null,
+      "actual_qualification_review": null,
+      "actual_query_graph_rows_and_ordered_reads": null,
+      "actual_sampling_authorized": false,
+      "actual_snapshot_table_counts": null,
+      "actual_stats_binary_binding": null,
+      "actual_stats_full_raw_oracle": null,
+      "actual_unique_result_locations_and_files": null,
+      "cell": "foundation14",
+      "crate_identity_from_frozen_input_spec": "fresh-split/compiler90/mlf-foundation",
+      "declared_modules_from_frozen_input_spec": [
+        "Bootstrap.Fresh",
+        "Bootstrap.Host",
+        "Bootstrap.IndexVec",
+        "Bootstrap.IntMap",
+        "Bootstrap.IntRank",
+        "Bootstrap.IntSet",
+        "Bootstrap.IntTree",
+        "Bootstrap.Map",
+        "Bootstrap.ST",
+        "Bootstrap.Set",
+        "Bootstrap.Std",
+        "Bootstrap.Types",
+        "Bootstrap.Unicode",
+        "Bootstrap.Version"
+      ],
+      "expected_route_flavor_source_proof_required_before_admission": true,
+      "formula_expected_stdout_from_frozen_spec": null,
+      "formula_inputs_from_frozen_spec": null,
+      "input_files": [
+        {
+          "bytes": 2592,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Fresh.hs",
+          "sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d"
+        },
+        {
+          "bytes": 3246,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Host.hs",
+          "sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5"
+        },
+        {
+          "bytes": 5573,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IndexVec.hs",
+          "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e"
+        },
+        {
+          "bytes": 21811,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntMap.hs",
+          "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e"
+        },
+        {
+          "bytes": 6684,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntRank.hs",
+          "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
+        },
+        {
+          "bytes": 17405,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntSet.hs",
+          "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe"
+        },
+        {
+          "bytes": 3727,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntTree.hs",
+          "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49"
+        },
+        {
+          "bytes": 17218,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Map.hs",
+          "sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0"
+        },
+        {
+          "bytes": 2539,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/ST.hs",
+          "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2"
+        },
+        {
+          "bytes": 4093,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Set.hs",
+          "sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f"
+        },
+        {
+          "bytes": 20088,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Std.hs",
+          "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca"
+        },
+        {
+          "bytes": 12757,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Types.hs",
+          "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596"
+        },
+        {
+          "bytes": 55534,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Unicode.hs",
+          "sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077"
+        },
+        {
+          "bytes": 327,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Version.hs",
+          "sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479"
+        }
+      ]
+    }
+  ],
+  "counts_not_copied_from_setup_fixture_or_old_experiments": [
+    1,
+    78,
+    87,
+    172,
+    140,
+    475
+  ],
+  "freeze_rule": "Only after all12 actual semantic cells succeed and independent actual review passes, freeze per-cell original proof, cross-producer proof and complete B raw oracle with exact source/runtime/path/provenance bindings.",
+  "schema": "main12-dynamic-oracle-slots-v2",
+  "warning": "The listed numbers name forbidden transferred examples only. None is an expected12cell count. Declared modules and formula expectations are input specifications, not observed owner/semantic results."
+}

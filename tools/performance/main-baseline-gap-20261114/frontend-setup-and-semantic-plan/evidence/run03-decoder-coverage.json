@@ -1,0 +1,26 @@
+{
+  "container_checks": [
+    "MLFBIN magic; version1; flags0; schema6; exact80byte header and total length",
+    "contiguous symbol/node/root sections; exact canonical bit widths and root section length",
+    "bounded byte/node/edge/symbol counts; strict bit reads and canonical unsigned varints <=64bits",
+    "UTF8 strict decode and unique symbols; zero terminal padding in each section",
+    "all node child IDs backward/in-range; root IDs in-range; edge count matches header",
+    "unique interned node entries, complete root reachability and canonical first-visit postorder; symbol first-use order",
+    "CRC32/ISO-HDLC over header with checksum bytes76..79 zero, independently calculated using stdlib zlib"
+  ],
+  "not_a_general_admission_decoder": [
+    "This implementation diagnoses the finite actual run03 corpus; it is not a substitute for a reviewed production or future gate decoder.",
+    "It does not implement every Bitstream defaultLimits aggregate depth/expanded-work policy or the full QueryGraph identity-budget/address parser. Its simple recursive canonical traversal is suitable for these small observed graphs, not certified for arbitrary future workload depth.",
+    "No mutation suite or target-generated malformed corpus was run here. A future adapter must receive independent schema/bounds/negative tests, especially bad CRC/SHA/CURRENT pointers, wrong producer binding, extra changed fields, inventory omission, unreachable/duplicate nodes, reordered reads, malformed varints/types and unknown fields.",
+    "The comparison does not strip config, substitute strings, repair CRCs, synthesize passing artifacts or call the old gate successful. Any new producer-aware acceptance contract is distinct source work and needs independent review."
+  ],
+  "snapshot_checks": [
+    "single root tag412 with exactly7 fields, format MLF-CRATE-QUERY-GRAPH-2",
+    "five canonical decimal-length configuration fields, exact crate/query/checker/flavor values",
+    "typed declarations/groups/evidence/types and every tag413 row/read/payload reference decoded",
+    "172 rows,140 ordered edges form a complete acyclic graph;87 persistent rows resolve to exactly78 actual content-addressed payloads",
+    "complete node/root bytes identical and all decoded fields identical except config compiler SHA",
+    "CURRENT single text root equals corresponding generation filename and SHA256 of full immutable generation bytes",
+    "all87 common nonchanged files byte-identical; all78 .mlfqr filename hashes independently verified"
+  ]
+}

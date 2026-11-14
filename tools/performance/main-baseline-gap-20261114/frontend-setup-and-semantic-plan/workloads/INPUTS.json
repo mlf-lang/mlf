@@ -1,0 +1,191 @@
+{
+  "all_compiler_sides_share_these_exact_paths_and_bytes": true,
+  "inputs": [
+    {
+      "bytes": 22026,
+      "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/MANIFEST.json",
+      "sha256": "8df358ec7ec6f5399dbfde2ece6e6510eef971c2955e7dd6bb8c2d1030f677ee"
+    },
+    {
+      "bytes": 1638110,
+      "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/SOURCE-FILES.json",
+      "sha256": "e326f4bea2d229b02dc20fe7504793224889749ac474b8d126ba738ab1934e99"
+    },
+    {
+      "bytes": 6525,
+      "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/tools/performance/compiler-shapes/generate.py",
+      "sha256": "1648034e7bfe721d025d0d0fae1f404713b4e5ab267ed780ac356baed0848f0a"
+    },
+    {
+      "bytes": 3138,
+      "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/tools/performance/compiler-shapes/worker.py",
+      "sha256": "8b0738f793466822382d21c8888ac6ef5afa0d7bbec927ae143dc44261e83796"
+    },
+    {
+      "bytes": 2894,
+      "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/tools/performance/full-compiler/worker.py",
+      "sha256": "71d4739421c3ab4dcf44d4ddfc21fc9a68ec9d07f7e23c59e944712999e6bb3d"
+    },
+    {
+      "bytes": 58175,
+      "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/bootstrap/MLF/Entry/Emlf.hs",
+      "sha256": "171273f182ff3b4b2b65f1eb03bb8db002ee07a5b57b77cee96e5a8c5f6ba480"
+    },
+    {
+      "bytes": 1326,
+      "path": "<EXPERIMENT_ROOT>/main-gap-endpoint-contract-source/MANIFEST.json",
+      "sha256": "c96154d3e8aa90ceb1e6f4ae112b62edb6cdaca48f4a0e4c4c98c5672ac5ec73"
+    },
+    {
+      "bytes": 3000,
+      "path": "<EXPERIMENT_ROOT>/compiler-gap-scaling-design-source/FIRST-BATCH.json",
+      "sha256": "1f11f3b688370f954915e497ce91cf3cb4a105e37838872b5bdfefaac1ec8354"
+    },
+    {
+      "bytes": 11989,
+      "path": "<EXPERIMENT_ROOT>/main-baseline-build-actual-review/report.json",
+      "sha256": "1acb2883c21d33ec57250901fc1dfbd88bd4a181a5768ed41e190ebaf6c12c0d"
+    },
+    {
+      "bytes": 14818,
+      "path": "<EXPERIMENT_ROOT>/main-baseline-controls-actual-review/report.json",
+      "sha256": "619e23eed06688a685a31c5c9114ed570fef3c9c94b1829964bec0aa16a88b41"
+    }
+  ],
+  "main_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "main_tree": "386f0b41ab5f9b39fca273f3040f51d73df924a1",
+  "query_group_counts_and_outputs_not_imported_from_old_experiments": true,
+  "schema": "main-gap-workloads-all-input-pins-v1",
+  "source_byte_totals": {
+    "all25files": 215033,
+    "foundation14": 173594,
+    "shapes": 41439
+  },
+  "source_files": [
+    {
+      "bytes": 396,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/baseline-0/Main.hs",
+      "sha256": "522b3106f7dab67ca6f7dd1f3b705acd3d8a5e8113740a6a6ce30eeaaa7efd03"
+    },
+    {
+      "bytes": 1255,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-16/Main.hs",
+      "sha256": "a5254beedeb16e7bf58791f4e7e27a44329bed18369bfb501414cbf230049249"
+    },
+    {
+      "bytes": 2167,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-32/Main.hs",
+      "sha256": "ea9ae079ef50cf57b8c5869466666e774e8524ba735aeca684cdf4be7e493a81"
+    },
+    {
+      "bytes": 3991,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-64/Main.hs",
+      "sha256": "a578c5cd2e6dd90dd1c41a85c65cfabcda69ebf5e2f4e3eada29c4b5dcbfe121"
+    },
+    {
+      "bytes": 7751,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-128/Main.hs",
+      "sha256": "af48eb052fca7df869588c13f805ccda52e6ac55451d8b4709237943a5677640"
+    },
+    {
+      "bytes": 15559,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-256/Main.hs",
+      "sha256": "af2371d80197e98f3fb2aa3ea99bac91e95a8905a1d6f3fe2952426a4ec83881"
+    },
+    {
+      "bytes": 816,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-16/Main.hs",
+      "sha256": "c5bc5b63bfdcd05b263b625788b77846fdac1d5fe69c7c36ae6abed100c1bb2b"
+    },
+    {
+      "bytes": 1056,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-32/Main.hs",
+      "sha256": "5943c0526bd00cbe8d76b60643e1495c8a07122c3c5a6fb2a59215bfd5c3db49"
+    },
+    {
+      "bytes": 1536,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-64/Main.hs",
+      "sha256": "d8a72fb0850ef38bf04df17b1490061f6d20ccc7d1dd59a7ca29146a70969a8c"
+    },
+    {
+      "bytes": 2496,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-128/Main.hs",
+      "sha256": "ba13ac3b8d15d7b1d4c63fcc9698c86b9cbca1b6244dd1b1ee6a89e2e6ce41da"
+    },
+    {
+      "bytes": 4416,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-256/Main.hs",
+      "sha256": "0747d08346964a72c21f11990bbc9deec4d31e9dd05629e71df8668dc75c76a7"
+    },
+    {
+      "bytes": 2592,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Fresh.hs",
+      "sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d"
+    },
+    {
+      "bytes": 3246,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Host.hs",
+      "sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5"
+    },
+    {
+      "bytes": 5573,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IndexVec.hs",
+      "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e"
+    },
+    {
+      "bytes": 21811,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntMap.hs",
+      "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e"
+    },
+    {
+      "bytes": 6684,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntRank.hs",
+      "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
+    },
+    {
+      "bytes": 17405,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntSet.hs",
+      "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe"
+    },
+    {
+      "bytes": 3727,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntTree.hs",
+      "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49"
+    },
+    {
+      "bytes": 17218,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Map.hs",
+      "sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0"
+    },
+    {
+      "bytes": 2539,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/ST.hs",
+      "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2"
+    },
+    {
+      "bytes": 4093,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Set.hs",
+      "sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f"
+    },
+    {
+      "bytes": 20088,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Std.hs",
+      "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca"
+    },
+    {
+      "bytes": 12757,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Types.hs",
+      "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596"
+    },
+    {
+      "bytes": 55534,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Unicode.hs",
+      "sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077"
+    },
+    {
+      "bytes": 327,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Version.hs",
+      "sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479"
+    }
+  ]
+}

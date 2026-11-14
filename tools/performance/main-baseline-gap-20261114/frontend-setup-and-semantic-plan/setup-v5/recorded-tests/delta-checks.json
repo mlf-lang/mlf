@@ -1,0 +1,143 @@
+{
+  "check_count": 31,
+  "checks": [
+    {
+      "name": "one exact inverse PB = R / 'main-gap-setup-v5-source'",
+      "passed": true
+    },
+    {
+      "name": "one exact inverse WORK = R / 'main-gap-setup-run04'",
+      "passed": true
+    },
+    {
+      "name": "one exact inverse 'commands','global_packages','publication_oracle']:",
+      "passed": true
+    },
+    {
+      "name": "one exact inverse \n        self.publication=module(verify_pin(c['publication_oracle']),'pinned_p",
+      "passed": true
+    },
+    {
+      "name": "one exact inverse 'closures','environment','publication_oracle']]]",
+      "passed": true
+    },
+    {
+      "name": "one exact inverse         actual=self.fixture_snapshot()\n        ordinary_binary=verify_pin(self",
+      "passed": true
+    },
+    {
+      "name": "one exact inverse 'full_raw_files_equal':actual==ordinary,'cross_compiler_publication':equivalen",
+      "passed": true
+    },
+    {
+      "name": "one exact inverse 'stats_current':str(t),'ordinary_files':ordinary,'files':actual}",
+      "passed": true
+    },
+    {
+      "name": "whole inverse bytes exactly v4",
+      "passed": true
+    },
+    {
+      "name": "whole inverse AST exactly v4",
+      "passed": true
+    },
+    {
+      "name": "READY remains false exactly once",
+      "passed": true
+    },
+    {
+      "name": "sole PB identity constant",
+      "passed": true
+    },
+    {
+      "name": "sole WORK identity constant",
+      "passed": true
+    },
+    {
+      "name": "run04 not created",
+      "passed": true
+    },
+    {
+      "name": "byte exact inherited COMMANDS.json",
+      "passed": true
+    },
+    {
+      "name": "byte exact inherited GLOBAL-PACKAGE-INPUTS.json",
+      "passed": true
+    },
+    {
+      "name": "byte exact inherited SetupCheck.hs",
+      "passed": true
+    },
+    {
+      "name": "CONFIG inverse exact except oracle and relocation",
+      "passed": true
+    },
+    {
+      "name": "environment only TMPDIR relocation",
+      "passed": true
+    },
+    {
+      "name": "actual parent exists, child absent",
+      "passed": true
+    },
+    {
+      "name": "duplicate commands parent rejected",
+      "passed": true
+    },
+    {
+      "name": "mock original guard can create child only once",
+      "passed": true
+    },
+    {
+      "name": "existing child rejected",
+      "passed": true
+    },
+    {
+      "name": "lifecycle controller is not selected by ownership predicate",
+      "passed": true
+    },
+    {
+      "name": "worker_output_relative AST unchanged",
+      "passed": true
+    },
+    {
+      "name": "worker_output_pins AST unchanged",
+      "passed": true
+    },
+    {
+      "name": "launch AST unchanged",
+      "passed": true
+    },
+    {
+      "name": "validate AST unchanged",
+      "passed": true
+    },
+    {
+      "name": "prepare AST unchanged",
+      "passed": true
+    },
+    {
+      "name": "accepted_main_build AST unchanged",
+      "passed": true
+    },
+    {
+      "name": "producer_gate AST unchanged",
+      "passed": true
+    }
+  ],
+  "complete": true,
+  "new_controller": {
+    "bytes": 64664,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-v5-source/controller.py",
+    "sha256": "018b21b47c8010791f7369c80b041b5f6add5e39bfa0589adc84cda944b52bf8"
+  },
+  "no_helper_or_target_executed": true,
+  "original_controller": {
+    "bytes": 64122,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-v4-source/controller.py",
+    "sha256": "eb170081ded4dcb592bd7b5b27f031f7332cbf94be2c0b80aaab746c592bc455"
+  },
+  "schema": "main-gap-v5-inverse-pure-checks-v1",
+  "temporary_directory_tests_not_actual_guard": true
+}

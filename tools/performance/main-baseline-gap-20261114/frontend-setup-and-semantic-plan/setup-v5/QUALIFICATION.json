@@ -1,0 +1,119 @@
+{
+  "GHC_typed_control_not_runtime_semantic_proof": true,
+  "builtin_identity": "mlf:builtin-shared-haskell-v1:13",
+  "builtin_owners": [
+    "Prelude",
+    "MLF.Primitive"
+  ],
+  "cli": [
+    {
+      "argv_tail": [
+        "--version"
+      ],
+      "exit_code": 0,
+      "label": "version",
+      "stderr_utf8": "",
+      "stdout_utf8": "emlf 0.3.0\n"
+    },
+    {
+      "argv_tail": [
+        "--implementation-identity"
+      ],
+      "exit_code": 0,
+      "label": "identity",
+      "stderr_utf8": "",
+      "stdout_utf8": "MLF/shared-haskell-v1 GHC\n"
+    },
+    {
+      "argv_tail": [
+        "--run",
+        "--expr",
+        "printInt (40 + 2)"
+      ],
+      "exit_code": 0,
+      "label": "semantic-42",
+      "stderr_utf8": "",
+      "stdout_utf8": "42\n"
+    },
+    {
+      "argv_tail": [
+        "--run",
+        "--expr",
+        "putStrLn \"\u03bb\u96ea\ud83d\ude42\""
+      ],
+      "exit_code": 0,
+      "label": "unicode-positive",
+      "stderr_utf8": "",
+      "stdout_utf8": "\u03bb\u96ea\ud83d\ude42\n"
+    },
+    {
+      "argv_tail": [
+        "--type",
+        "--expr",
+        "(True :: Int)"
+      ],
+      "exit_code": 1,
+      "label": "type-rejection",
+      "stderr_utf8": "Inference: type constructor mismatch: Con \"Bool\" [] versus Con \"Int\" []\n",
+      "stdout_utf8": ""
+    }
+  ],
+  "complete_raw_inventory_equality": false,
+  "cross_compiler_contract": {
+    "actual_executable_sha_required": true,
+    "all_container_crc_and_content_addresses_verified": true,
+    "all_other_raw_bytes_and_files_equal": true,
+    "allow_only": [
+      "typed snapshot config field1 actual executable SHA",
+      "derived container CRC32",
+      "derived generation SHA256 filename",
+      "CURRENT own generation digest and CRC32"
+    ],
+    "complete_container_decode_required": true,
+    "complete_results_inventory_must_equal_generation_payload_refs": true,
+    "configuration_fields": [
+      "compiler-shapes/builtin",
+      "ACTUAL_EXECUTABLE_SHA256",
+      "MLF-SOURCE-CRATE-QUERY-7",
+      "open-fragment-checker-1/finish-receipt-1",
+      "source"
+    ],
+    "configuration_node_must_not_alias_other_fields": true,
+    "old_run03_still_failed": true,
+    "oracle": {
+      "bytes": 16728,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-v5-source/publication_oracle.py",
+      "sha256": "0a831a47bd77891fe357209094cd640d07646b9ab5c6b6f0c38de67c3b5c4a8c"
+    },
+    "ordered_duplicate_reads_preserved": true,
+    "production_cache_identity_unchanged": true,
+    "production_container_and_typed_identity_limits_checked": true,
+    "unsupported_or_extra_fields_or_files_rejected": true
+  },
+  "fixture_fresh_each": 1,
+  "fixture_identity": "compiler-shapes/builtin",
+  "fixture_owners": [
+    "Fixture"
+  ],
+  "fixture_reused_each": 0,
+  "fixture_source_utf8": "module Fixture where\nvalue = 42\n",
+  "future_shape_foundation_qualified": false,
+  "normalization_allowed": false,
+  "same_binary_future_complete_raw_inventory_equality_required": true,
+  "schema": "main-gap-setup-qualification-contract-v2",
+  "statistics_report_count": 9,
+  "statistics_used_for_performance": false,
+  "stats_parser": {
+    "bytes": 4888,
+    "path": "<EXPERIMENT_ROOT>/dense-direct-capture-r24-source/implementation/stats.py",
+    "sha256": "b558556b11af12b117444f6476c5e841fa1b4beddc8f7cfe5e13047f2426a84c"
+  },
+  "typed_control": {
+    "bytes": 97,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-v5-source/SetupCheck.hs",
+    "sha256": "bae7885918cfd8ef2192740865444591ed093c744319ecee85715c408114e4df"
+  },
+  "typed_expected_files": [
+    "objects/SetupCheck.hi"
+  ]
+}

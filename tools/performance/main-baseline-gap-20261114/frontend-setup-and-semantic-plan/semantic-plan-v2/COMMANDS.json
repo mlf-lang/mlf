@@ -1,0 +1,2563 @@
+{
+  "actual_setup_acceptance": null,
+  "attempts": 1,
+  "bounded_root_template": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>",
+  "caps_sum_not_authorization": 1420,
+  "cleanup_inclusive_maximum_ns": 600000000000,
+  "counts": {
+    "ghc_typed": 12,
+    "reference_compile": 12,
+    "reference_formula": 33,
+    "reference_metadata": 12,
+    "runtime": 10,
+    "stats_compile": 12
+  },
+  "cross_producer_acceptance": "producer-aware full-structure plus full semantic/raw-results equality; never old all-file raw equality",
+  "future_same_stats_binary_acceptance": "unexceptioned whole raw inventory and bytes equality to actual reviewed B oracle",
+  "individual_caps_shrink_to_shared_remainder": true,
+  "nested_total": 91,
+  "no_runner_or_admission": true,
+  "plan_only": true,
+  "rows": [
+    {
+      "argv_template": [
+        "<accepted_setup.runtime_after.python.loader.resolved>",
+        "--list",
+        "<accepted_setup.runtime_after.python.executable.resolved>"
+      ],
+      "executed": false,
+      "kind": "runtime",
+      "label": "runtime-python-before",
+      "maximum_seconds": 10,
+      "oracle": "same actual runtime binding and complete loader resolution; stderr empty, exit0",
+      "ordinal": 1
+    },
+    {
+      "argv_template": [
+        "<accepted_setup.runtime_after.shell.loader.resolved>",
+        "--list",
+        "<accepted_setup.runtime_after.shell.executable.resolved>"
+      ],
+      "executed": false,
+      "kind": "runtime",
+      "label": "runtime-shell-before",
+      "maximum_seconds": 10,
+      "oracle": "same actual runtime binding and complete loader resolution; stderr empty, exit0",
+      "ordinal": 2
+    },
+    {
+      "argv_template": [
+        "<accepted_setup.runtime_after.ghc.loader.resolved>",
+        "--list",
+        "<accepted_setup.runtime_after.ghc.executable.resolved>"
+      ],
+      "executed": false,
+      "kind": "runtime",
+      "label": "runtime-ghc-before",
+      "maximum_seconds": 10,
+      "oracle": "same actual runtime binding and complete loader resolution; stderr empty, exit0",
+      "ordinal": 3
+    },
+    {
+      "argv_template": [
+        "<accepted_setup.runtime_after.producer.loader.resolved>",
+        "--list",
+        "<accepted_setup.runtime_after.producer.executable.resolved>"
+      ],
+      "executed": false,
+      "kind": "runtime",
+      "label": "runtime-producer-before",
+      "maximum_seconds": 10,
+      "oracle": "same actual runtime binding and complete loader resolution; stderr empty, exit0",
+      "ordinal": 4
+    },
+    {
+      "argv_template": [
+        "<accepted_setup.runtime_after.stats-emlf.loader.resolved>",
+        "--list",
+        "<accepted_setup.runtime_after.stats-emlf.executable.resolved>"
+      ],
+      "executed": false,
+      "kind": "runtime",
+      "label": "runtime-stats-emlf-before",
+      "maximum_seconds": 10,
+      "oracle": "same actual runtime binding and complete loader resolution; stderr empty, exit0",
+      "ordinal": 5
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/baseline-0/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/baseline-0/unit"
+      ],
+      "artifact_contract": "fresh complete checked/query publication; its own exact executable-SHA configuration, CRC/SHA/CURRENT and full result closure; dynamic actual oracle remains unknown",
+      "cell": "baseline-0",
+      "crate_spec_fields_template": [
+        "MLF-CRATE-1",
+        "compiler-shapes/baseline-0",
+        "Main",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Main",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/baseline-0/Main.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+          ]
+        },
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/baseline-0/queries",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin"
+      ],
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "reference_compile",
+      "label": "baseline-0/reference-compile",
+      "maximum_seconds": 30,
+      "ordinal": 6
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/baseline-0/unit.mlfci"
+      ],
+      "cell": "baseline-0",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "kind": "reference_metadata",
+      "label": "baseline-0/reference-show",
+      "maximum_seconds": 10,
+      "ordinal": 7,
+      "stdout_contract": {
+        "complete_raw_output_archive": true,
+        "crate": "compiler-shapes/baseline-0",
+        "dependencies": {
+          "mlf:builtin-shared-haskell-v1:13": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+        },
+        "owned_modules": [
+          "Main"
+        ],
+        "semantic_fingerprint": "UNKNOWN_ACTUAL_REFERENCE"
+      }
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/baseline-0/unit.mlfci",
+        "--",
+        "-1"
+      ],
+      "cell": "baseline-0",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "-1\n",
+      "kind": "reference_formula",
+      "label": "baseline-0/reference-formula--1",
+      "maximum_seconds": 5,
+      "ordinal": 8
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/baseline-0/unit.mlfci",
+        "--",
+        "0"
+      ],
+      "cell": "baseline-0",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "0\n",
+      "kind": "reference_formula",
+      "label": "baseline-0/reference-formula-0",
+      "maximum_seconds": 5,
+      "ordinal": 9
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/baseline-0/unit.mlfci",
+        "--",
+        "7"
+      ],
+      "cell": "baseline-0",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "7\n",
+      "kind": "reference_formula",
+      "label": "baseline-0/reference-formula-7",
+      "maximum_seconds": 5,
+      "ordinal": 10
+    },
+    {
+      "argv_template": [
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/stats-emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/baseline-0/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/baseline-0/unit"
+      ],
+      "cell": "baseline-0",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "stats_compile",
+      "label": "baseline-0/stats-compile",
+      "maximum_seconds": 30,
+      "ordinal": 11,
+      "raw_oracle": "same-cell original main semantic files and query results byte-exact; complete snapshot structure and ordered reads exact, configuration field1 authenticated against this own binary; independent CRC/SHA/CURRENT; no strip/normalization; after actual all-cell review freeze this full B raw tree as later same-binary oracle",
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/mlf.stats"
+    },
+    {
+      "argv_template": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/baseline-0/objects",
+        "-hidir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/baseline-0/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/baseline-0/Main.hs",
+        "+RTS",
+        "-s<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/baseline-0/ghc.stats",
+        "-RTS"
+      ],
+      "cell": "baseline-0",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_home_modules": {
+        "Main": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/baseline-0/Main.hs"
+      },
+      "expected_relative_interfaces": [
+        "Main.hi"
+      ],
+      "kind": "ghc_typed",
+      "label": "baseline-0/ghc-typed",
+      "maximum_seconds": 15,
+      "ordinal": 12,
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/baseline-0/ghc.stats",
+      "stdout_stderr_contract": "retain complete raw logs; parse exact unique Compiling module/path inventory, no fixed generic stderr string",
+      "target_object_or_executable_allowed": false
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-16/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-16/unit"
+      ],
+      "artifact_contract": "fresh complete checked/query publication; its own exact executable-SHA configuration, CRC/SHA/CURRENT and full result closure; dynamic actual oracle remains unknown",
+      "cell": "flat_functions-16",
+      "crate_spec_fields_template": [
+        "MLF-CRATE-1",
+        "compiler-shapes/flat_functions-16",
+        "Main",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Main",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-16/Main.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+          ]
+        },
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-16/queries",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin"
+      ],
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "reference_compile",
+      "label": "flat_functions-16/reference-compile",
+      "maximum_seconds": 30,
+      "ordinal": 13
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-16/unit.mlfci"
+      ],
+      "cell": "flat_functions-16",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "kind": "reference_metadata",
+      "label": "flat_functions-16/reference-show",
+      "maximum_seconds": 10,
+      "ordinal": 14,
+      "stdout_contract": {
+        "complete_raw_output_archive": true,
+        "crate": "compiler-shapes/flat_functions-16",
+        "dependencies": {
+          "mlf:builtin-shared-haskell-v1:13": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+        },
+        "owned_modules": [
+          "Main"
+        ],
+        "semantic_fingerprint": "UNKNOWN_ACTUAL_REFERENCE"
+      }
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-16/unit.mlfci",
+        "--",
+        "-1"
+      ],
+      "cell": "flat_functions-16",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "104\n",
+      "kind": "reference_formula",
+      "label": "flat_functions-16/reference-formula--1",
+      "maximum_seconds": 5,
+      "ordinal": 15
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-16/unit.mlfci",
+        "--",
+        "0"
+      ],
+      "cell": "flat_functions-16",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "120\n",
+      "kind": "reference_formula",
+      "label": "flat_functions-16/reference-formula-0",
+      "maximum_seconds": 5,
+      "ordinal": 16
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-16/unit.mlfci",
+        "--",
+        "7"
+      ],
+      "cell": "flat_functions-16",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "232\n",
+      "kind": "reference_formula",
+      "label": "flat_functions-16/reference-formula-7",
+      "maximum_seconds": 5,
+      "ordinal": 17
+    },
+    {
+      "argv_template": [
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/stats-emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-16/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-16/unit"
+      ],
+      "cell": "flat_functions-16",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "stats_compile",
+      "label": "flat_functions-16/stats-compile",
+      "maximum_seconds": 30,
+      "ordinal": 18,
+      "raw_oracle": "same-cell original main semantic files and query results byte-exact; complete snapshot structure and ordered reads exact, configuration field1 authenticated against this own binary; independent CRC/SHA/CURRENT; no strip/normalization; after actual all-cell review freeze this full B raw tree as later same-binary oracle",
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/mlf.stats"
+    },
+    {
+      "argv_template": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-16/objects",
+        "-hidir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-16/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-16/Main.hs",
+        "+RTS",
+        "-s<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-16/ghc.stats",
+        "-RTS"
+      ],
+      "cell": "flat_functions-16",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_home_modules": {
+        "Main": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-16/Main.hs"
+      },
+      "expected_relative_interfaces": [
+        "Main.hi"
+      ],
+      "kind": "ghc_typed",
+      "label": "flat_functions-16/ghc-typed",
+      "maximum_seconds": 15,
+      "ordinal": 19,
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-16/ghc.stats",
+      "stdout_stderr_contract": "retain complete raw logs; parse exact unique Compiling module/path inventory, no fixed generic stderr string",
+      "target_object_or_executable_allowed": false
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-32/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-32/unit"
+      ],
+      "artifact_contract": "fresh complete checked/query publication; its own exact executable-SHA configuration, CRC/SHA/CURRENT and full result closure; dynamic actual oracle remains unknown",
+      "cell": "flat_functions-32",
+      "crate_spec_fields_template": [
+        "MLF-CRATE-1",
+        "compiler-shapes/flat_functions-32",
+        "Main",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Main",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-32/Main.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+          ]
+        },
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-32/queries",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin"
+      ],
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "reference_compile",
+      "label": "flat_functions-32/reference-compile",
+      "maximum_seconds": 30,
+      "ordinal": 20
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-32/unit.mlfci"
+      ],
+      "cell": "flat_functions-32",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "kind": "reference_metadata",
+      "label": "flat_functions-32/reference-show",
+      "maximum_seconds": 10,
+      "ordinal": 21,
+      "stdout_contract": {
+        "complete_raw_output_archive": true,
+        "crate": "compiler-shapes/flat_functions-32",
+        "dependencies": {
+          "mlf:builtin-shared-haskell-v1:13": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+        },
+        "owned_modules": [
+          "Main"
+        ],
+        "semantic_fingerprint": "UNKNOWN_ACTUAL_REFERENCE"
+      }
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-32/unit.mlfci",
+        "--",
+        "-1"
+      ],
+      "cell": "flat_functions-32",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "464\n",
+      "kind": "reference_formula",
+      "label": "flat_functions-32/reference-formula--1",
+      "maximum_seconds": 5,
+      "ordinal": 22
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-32/unit.mlfci",
+        "--",
+        "0"
+      ],
+      "cell": "flat_functions-32",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "496\n",
+      "kind": "reference_formula",
+      "label": "flat_functions-32/reference-formula-0",
+      "maximum_seconds": 5,
+      "ordinal": 23
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-32/unit.mlfci",
+        "--",
+        "7"
+      ],
+      "cell": "flat_functions-32",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "720\n",
+      "kind": "reference_formula",
+      "label": "flat_functions-32/reference-formula-7",
+      "maximum_seconds": 5,
+      "ordinal": 24
+    },
+    {
+      "argv_template": [
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/stats-emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-32/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-32/unit"
+      ],
+      "cell": "flat_functions-32",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "stats_compile",
+      "label": "flat_functions-32/stats-compile",
+      "maximum_seconds": 30,
+      "ordinal": 25,
+      "raw_oracle": "same-cell original main semantic files and query results byte-exact; complete snapshot structure and ordered reads exact, configuration field1 authenticated against this own binary; independent CRC/SHA/CURRENT; no strip/normalization; after actual all-cell review freeze this full B raw tree as later same-binary oracle",
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/mlf.stats"
+    },
+    {
+      "argv_template": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-32/objects",
+        "-hidir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-32/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-32/Main.hs",
+        "+RTS",
+        "-s<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-32/ghc.stats",
+        "-RTS"
+      ],
+      "cell": "flat_functions-32",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_home_modules": {
+        "Main": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-32/Main.hs"
+      },
+      "expected_relative_interfaces": [
+        "Main.hi"
+      ],
+      "kind": "ghc_typed",
+      "label": "flat_functions-32/ghc-typed",
+      "maximum_seconds": 15,
+      "ordinal": 26,
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-32/ghc.stats",
+      "stdout_stderr_contract": "retain complete raw logs; parse exact unique Compiling module/path inventory, no fixed generic stderr string",
+      "target_object_or_executable_allowed": false
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-64/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-64/unit"
+      ],
+      "artifact_contract": "fresh complete checked/query publication; its own exact executable-SHA configuration, CRC/SHA/CURRENT and full result closure; dynamic actual oracle remains unknown",
+      "cell": "flat_functions-64",
+      "crate_spec_fields_template": [
+        "MLF-CRATE-1",
+        "compiler-shapes/flat_functions-64",
+        "Main",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Main",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-64/Main.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+          ]
+        },
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-64/queries",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin"
+      ],
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "reference_compile",
+      "label": "flat_functions-64/reference-compile",
+      "maximum_seconds": 30,
+      "ordinal": 27
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-64/unit.mlfci"
+      ],
+      "cell": "flat_functions-64",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "kind": "reference_metadata",
+      "label": "flat_functions-64/reference-show",
+      "maximum_seconds": 10,
+      "ordinal": 28,
+      "stdout_contract": {
+        "complete_raw_output_archive": true,
+        "crate": "compiler-shapes/flat_functions-64",
+        "dependencies": {
+          "mlf:builtin-shared-haskell-v1:13": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+        },
+        "owned_modules": [
+          "Main"
+        ],
+        "semantic_fingerprint": "UNKNOWN_ACTUAL_REFERENCE"
+      }
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-64/unit.mlfci",
+        "--",
+        "-1"
+      ],
+      "cell": "flat_functions-64",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "1952\n",
+      "kind": "reference_formula",
+      "label": "flat_functions-64/reference-formula--1",
+      "maximum_seconds": 5,
+      "ordinal": 29
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-64/unit.mlfci",
+        "--",
+        "0"
+      ],
+      "cell": "flat_functions-64",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "2016\n",
+      "kind": "reference_formula",
+      "label": "flat_functions-64/reference-formula-0",
+      "maximum_seconds": 5,
+      "ordinal": 30
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-64/unit.mlfci",
+        "--",
+        "7"
+      ],
+      "cell": "flat_functions-64",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "2464\n",
+      "kind": "reference_formula",
+      "label": "flat_functions-64/reference-formula-7",
+      "maximum_seconds": 5,
+      "ordinal": 31
+    },
+    {
+      "argv_template": [
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/stats-emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-64/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-64/unit"
+      ],
+      "cell": "flat_functions-64",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "stats_compile",
+      "label": "flat_functions-64/stats-compile",
+      "maximum_seconds": 30,
+      "ordinal": 32,
+      "raw_oracle": "same-cell original main semantic files and query results byte-exact; complete snapshot structure and ordered reads exact, configuration field1 authenticated against this own binary; independent CRC/SHA/CURRENT; no strip/normalization; after actual all-cell review freeze this full B raw tree as later same-binary oracle",
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/mlf.stats"
+    },
+    {
+      "argv_template": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-64/objects",
+        "-hidir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-64/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-64/Main.hs",
+        "+RTS",
+        "-s<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-64/ghc.stats",
+        "-RTS"
+      ],
+      "cell": "flat_functions-64",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_home_modules": {
+        "Main": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-64/Main.hs"
+      },
+      "expected_relative_interfaces": [
+        "Main.hi"
+      ],
+      "kind": "ghc_typed",
+      "label": "flat_functions-64/ghc-typed",
+      "maximum_seconds": 15,
+      "ordinal": 33,
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-64/ghc.stats",
+      "stdout_stderr_contract": "retain complete raw logs; parse exact unique Compiling module/path inventory, no fixed generic stderr string",
+      "target_object_or_executable_allowed": false
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-128/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-128/unit"
+      ],
+      "artifact_contract": "fresh complete checked/query publication; its own exact executable-SHA configuration, CRC/SHA/CURRENT and full result closure; dynamic actual oracle remains unknown",
+      "cell": "flat_functions-128",
+      "crate_spec_fields_template": [
+        "MLF-CRATE-1",
+        "compiler-shapes/flat_functions-128",
+        "Main",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Main",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-128/Main.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+          ]
+        },
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-128/queries",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin"
+      ],
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "reference_compile",
+      "label": "flat_functions-128/reference-compile",
+      "maximum_seconds": 30,
+      "ordinal": 34
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-128/unit.mlfci"
+      ],
+      "cell": "flat_functions-128",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "kind": "reference_metadata",
+      "label": "flat_functions-128/reference-show",
+      "maximum_seconds": 10,
+      "ordinal": 35,
+      "stdout_contract": {
+        "complete_raw_output_archive": true,
+        "crate": "compiler-shapes/flat_functions-128",
+        "dependencies": {
+          "mlf:builtin-shared-haskell-v1:13": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+        },
+        "owned_modules": [
+          "Main"
+        ],
+        "semantic_fingerprint": "UNKNOWN_ACTUAL_REFERENCE"
+      }
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-128/unit.mlfci",
+        "--",
+        "-1"
+      ],
+      "cell": "flat_functions-128",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "8000\n",
+      "kind": "reference_formula",
+      "label": "flat_functions-128/reference-formula--1",
+      "maximum_seconds": 5,
+      "ordinal": 36
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-128/unit.mlfci",
+        "--",
+        "0"
+      ],
+      "cell": "flat_functions-128",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "8128\n",
+      "kind": "reference_formula",
+      "label": "flat_functions-128/reference-formula-0",
+      "maximum_seconds": 5,
+      "ordinal": 37
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-128/unit.mlfci",
+        "--",
+        "7"
+      ],
+      "cell": "flat_functions-128",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "9024\n",
+      "kind": "reference_formula",
+      "label": "flat_functions-128/reference-formula-7",
+      "maximum_seconds": 5,
+      "ordinal": 38
+    },
+    {
+      "argv_template": [
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/stats-emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-128/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-128/unit"
+      ],
+      "cell": "flat_functions-128",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "stats_compile",
+      "label": "flat_functions-128/stats-compile",
+      "maximum_seconds": 30,
+      "ordinal": 39,
+      "raw_oracle": "same-cell original main semantic files and query results byte-exact; complete snapshot structure and ordered reads exact, configuration field1 authenticated against this own binary; independent CRC/SHA/CURRENT; no strip/normalization; after actual all-cell review freeze this full B raw tree as later same-binary oracle",
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/mlf.stats"
+    },
+    {
+      "argv_template": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-128/objects",
+        "-hidir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-128/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-128/Main.hs",
+        "+RTS",
+        "-s<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-128/ghc.stats",
+        "-RTS"
+      ],
+      "cell": "flat_functions-128",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_home_modules": {
+        "Main": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-128/Main.hs"
+      },
+      "expected_relative_interfaces": [
+        "Main.hi"
+      ],
+      "kind": "ghc_typed",
+      "label": "flat_functions-128/ghc-typed",
+      "maximum_seconds": 15,
+      "ordinal": 40,
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-128/ghc.stats",
+      "stdout_stderr_contract": "retain complete raw logs; parse exact unique Compiling module/path inventory, no fixed generic stderr string",
+      "target_object_or_executable_allowed": false
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-256/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-256/unit"
+      ],
+      "artifact_contract": "fresh complete checked/query publication; its own exact executable-SHA configuration, CRC/SHA/CURRENT and full result closure; dynamic actual oracle remains unknown",
+      "cell": "flat_functions-256",
+      "crate_spec_fields_template": [
+        "MLF-CRATE-1",
+        "compiler-shapes/flat_functions-256",
+        "Main",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Main",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-256/Main.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+          ]
+        },
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-256/queries",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin"
+      ],
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "reference_compile",
+      "label": "flat_functions-256/reference-compile",
+      "maximum_seconds": 30,
+      "ordinal": 41
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-256/unit.mlfci"
+      ],
+      "cell": "flat_functions-256",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "kind": "reference_metadata",
+      "label": "flat_functions-256/reference-show",
+      "maximum_seconds": 10,
+      "ordinal": 42,
+      "stdout_contract": {
+        "complete_raw_output_archive": true,
+        "crate": "compiler-shapes/flat_functions-256",
+        "dependencies": {
+          "mlf:builtin-shared-haskell-v1:13": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+        },
+        "owned_modules": [
+          "Main"
+        ],
+        "semantic_fingerprint": "UNKNOWN_ACTUAL_REFERENCE"
+      }
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-256/unit.mlfci",
+        "--",
+        "-1"
+      ],
+      "cell": "flat_functions-256",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "32384\n",
+      "kind": "reference_formula",
+      "label": "flat_functions-256/reference-formula--1",
+      "maximum_seconds": 5,
+      "ordinal": 43
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-256/unit.mlfci",
+        "--",
+        "0"
+      ],
+      "cell": "flat_functions-256",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "32640\n",
+      "kind": "reference_formula",
+      "label": "flat_functions-256/reference-formula-0",
+      "maximum_seconds": 5,
+      "ordinal": 44
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-256/unit.mlfci",
+        "--",
+        "7"
+      ],
+      "cell": "flat_functions-256",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "34432\n",
+      "kind": "reference_formula",
+      "label": "flat_functions-256/reference-formula-7",
+      "maximum_seconds": 5,
+      "ordinal": 45
+    },
+    {
+      "argv_template": [
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/stats-emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-256/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-256/unit"
+      ],
+      "cell": "flat_functions-256",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "stats_compile",
+      "label": "flat_functions-256/stats-compile",
+      "maximum_seconds": 30,
+      "ordinal": 46,
+      "raw_oracle": "same-cell original main semantic files and query results byte-exact; complete snapshot structure and ordered reads exact, configuration field1 authenticated against this own binary; independent CRC/SHA/CURRENT; no strip/normalization; after actual all-cell review freeze this full B raw tree as later same-binary oracle",
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/mlf.stats"
+    },
+    {
+      "argv_template": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-256/objects",
+        "-hidir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-256/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-256/Main.hs",
+        "+RTS",
+        "-s<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-256/ghc.stats",
+        "-RTS"
+      ],
+      "cell": "flat_functions-256",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_home_modules": {
+        "Main": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-256/Main.hs"
+      },
+      "expected_relative_interfaces": [
+        "Main.hi"
+      ],
+      "kind": "ghc_typed",
+      "label": "flat_functions-256/ghc-typed",
+      "maximum_seconds": 15,
+      "ordinal": 47,
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/flat_functions-256/ghc.stats",
+      "stdout_stderr_contract": "retain complete raw logs; parse exact unique Compiling module/path inventory, no fixed generic stderr string",
+      "target_object_or_executable_allowed": false
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-16/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-16/unit"
+      ],
+      "artifact_contract": "fresh complete checked/query publication; its own exact executable-SHA configuration, CRC/SHA/CURRENT and full result closure; dynamic actual oracle remains unknown",
+      "cell": "higher_order_chain-16",
+      "crate_spec_fields_template": [
+        "MLF-CRATE-1",
+        "compiler-shapes/higher_order_chain-16",
+        "Main",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Main",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-16/Main.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+          ]
+        },
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-16/queries",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin"
+      ],
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "reference_compile",
+      "label": "higher_order_chain-16/reference-compile",
+      "maximum_seconds": 30,
+      "ordinal": 48
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-16/unit.mlfci"
+      ],
+      "cell": "higher_order_chain-16",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "kind": "reference_metadata",
+      "label": "higher_order_chain-16/reference-show",
+      "maximum_seconds": 10,
+      "ordinal": 49,
+      "stdout_contract": {
+        "complete_raw_output_archive": true,
+        "crate": "compiler-shapes/higher_order_chain-16",
+        "dependencies": {
+          "mlf:builtin-shared-haskell-v1:13": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+        },
+        "owned_modules": [
+          "Main"
+        ],
+        "semantic_fingerprint": "UNKNOWN_ACTUAL_REFERENCE"
+      }
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-16/unit.mlfci",
+        "--",
+        "-1"
+      ],
+      "cell": "higher_order_chain-16",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "15\n",
+      "kind": "reference_formula",
+      "label": "higher_order_chain-16/reference-formula--1",
+      "maximum_seconds": 5,
+      "ordinal": 50
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-16/unit.mlfci",
+        "--",
+        "0"
+      ],
+      "cell": "higher_order_chain-16",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "16\n",
+      "kind": "reference_formula",
+      "label": "higher_order_chain-16/reference-formula-0",
+      "maximum_seconds": 5,
+      "ordinal": 51
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-16/unit.mlfci",
+        "--",
+        "7"
+      ],
+      "cell": "higher_order_chain-16",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "23\n",
+      "kind": "reference_formula",
+      "label": "higher_order_chain-16/reference-formula-7",
+      "maximum_seconds": 5,
+      "ordinal": 52
+    },
+    {
+      "argv_template": [
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/stats-emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-16/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-16/unit"
+      ],
+      "cell": "higher_order_chain-16",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "stats_compile",
+      "label": "higher_order_chain-16/stats-compile",
+      "maximum_seconds": 30,
+      "ordinal": 53,
+      "raw_oracle": "same-cell original main semantic files and query results byte-exact; complete snapshot structure and ordered reads exact, configuration field1 authenticated against this own binary; independent CRC/SHA/CURRENT; no strip/normalization; after actual all-cell review freeze this full B raw tree as later same-binary oracle",
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/mlf.stats"
+    },
+    {
+      "argv_template": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-16/objects",
+        "-hidir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-16/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-16/Main.hs",
+        "+RTS",
+        "-s<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-16/ghc.stats",
+        "-RTS"
+      ],
+      "cell": "higher_order_chain-16",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_home_modules": {
+        "Main": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-16/Main.hs"
+      },
+      "expected_relative_interfaces": [
+        "Main.hi"
+      ],
+      "kind": "ghc_typed",
+      "label": "higher_order_chain-16/ghc-typed",
+      "maximum_seconds": 15,
+      "ordinal": 54,
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-16/ghc.stats",
+      "stdout_stderr_contract": "retain complete raw logs; parse exact unique Compiling module/path inventory, no fixed generic stderr string",
+      "target_object_or_executable_allowed": false
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-32/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-32/unit"
+      ],
+      "artifact_contract": "fresh complete checked/query publication; its own exact executable-SHA configuration, CRC/SHA/CURRENT and full result closure; dynamic actual oracle remains unknown",
+      "cell": "higher_order_chain-32",
+      "crate_spec_fields_template": [
+        "MLF-CRATE-1",
+        "compiler-shapes/higher_order_chain-32",
+        "Main",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Main",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-32/Main.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+          ]
+        },
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-32/queries",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin"
+      ],
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "reference_compile",
+      "label": "higher_order_chain-32/reference-compile",
+      "maximum_seconds": 30,
+      "ordinal": 55
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-32/unit.mlfci"
+      ],
+      "cell": "higher_order_chain-32",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "kind": "reference_metadata",
+      "label": "higher_order_chain-32/reference-show",
+      "maximum_seconds": 10,
+      "ordinal": 56,
+      "stdout_contract": {
+        "complete_raw_output_archive": true,
+        "crate": "compiler-shapes/higher_order_chain-32",
+        "dependencies": {
+          "mlf:builtin-shared-haskell-v1:13": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+        },
+        "owned_modules": [
+          "Main"
+        ],
+        "semantic_fingerprint": "UNKNOWN_ACTUAL_REFERENCE"
+      }
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-32/unit.mlfci",
+        "--",
+        "-1"
+      ],
+      "cell": "higher_order_chain-32",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "31\n",
+      "kind": "reference_formula",
+      "label": "higher_order_chain-32/reference-formula--1",
+      "maximum_seconds": 5,
+      "ordinal": 57
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-32/unit.mlfci",
+        "--",
+        "0"
+      ],
+      "cell": "higher_order_chain-32",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "32\n",
+      "kind": "reference_formula",
+      "label": "higher_order_chain-32/reference-formula-0",
+      "maximum_seconds": 5,
+      "ordinal": 58
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-32/unit.mlfci",
+        "--",
+        "7"
+      ],
+      "cell": "higher_order_chain-32",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "39\n",
+      "kind": "reference_formula",
+      "label": "higher_order_chain-32/reference-formula-7",
+      "maximum_seconds": 5,
+      "ordinal": 59
+    },
+    {
+      "argv_template": [
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/stats-emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-32/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-32/unit"
+      ],
+      "cell": "higher_order_chain-32",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "stats_compile",
+      "label": "higher_order_chain-32/stats-compile",
+      "maximum_seconds": 30,
+      "ordinal": 60,
+      "raw_oracle": "same-cell original main semantic files and query results byte-exact; complete snapshot structure and ordered reads exact, configuration field1 authenticated against this own binary; independent CRC/SHA/CURRENT; no strip/normalization; after actual all-cell review freeze this full B raw tree as later same-binary oracle",
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/mlf.stats"
+    },
+    {
+      "argv_template": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-32/objects",
+        "-hidir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-32/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-32/Main.hs",
+        "+RTS",
+        "-s<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-32/ghc.stats",
+        "-RTS"
+      ],
+      "cell": "higher_order_chain-32",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_home_modules": {
+        "Main": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-32/Main.hs"
+      },
+      "expected_relative_interfaces": [
+        "Main.hi"
+      ],
+      "kind": "ghc_typed",
+      "label": "higher_order_chain-32/ghc-typed",
+      "maximum_seconds": 15,
+      "ordinal": 61,
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-32/ghc.stats",
+      "stdout_stderr_contract": "retain complete raw logs; parse exact unique Compiling module/path inventory, no fixed generic stderr string",
+      "target_object_or_executable_allowed": false
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-64/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-64/unit"
+      ],
+      "artifact_contract": "fresh complete checked/query publication; its own exact executable-SHA configuration, CRC/SHA/CURRENT and full result closure; dynamic actual oracle remains unknown",
+      "cell": "higher_order_chain-64",
+      "crate_spec_fields_template": [
+        "MLF-CRATE-1",
+        "compiler-shapes/higher_order_chain-64",
+        "Main",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Main",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-64/Main.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+          ]
+        },
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-64/queries",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin"
+      ],
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "reference_compile",
+      "label": "higher_order_chain-64/reference-compile",
+      "maximum_seconds": 30,
+      "ordinal": 62
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-64/unit.mlfci"
+      ],
+      "cell": "higher_order_chain-64",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "kind": "reference_metadata",
+      "label": "higher_order_chain-64/reference-show",
+      "maximum_seconds": 10,
+      "ordinal": 63,
+      "stdout_contract": {
+        "complete_raw_output_archive": true,
+        "crate": "compiler-shapes/higher_order_chain-64",
+        "dependencies": {
+          "mlf:builtin-shared-haskell-v1:13": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+        },
+        "owned_modules": [
+          "Main"
+        ],
+        "semantic_fingerprint": "UNKNOWN_ACTUAL_REFERENCE"
+      }
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-64/unit.mlfci",
+        "--",
+        "-1"
+      ],
+      "cell": "higher_order_chain-64",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "63\n",
+      "kind": "reference_formula",
+      "label": "higher_order_chain-64/reference-formula--1",
+      "maximum_seconds": 5,
+      "ordinal": 64
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-64/unit.mlfci",
+        "--",
+        "0"
+      ],
+      "cell": "higher_order_chain-64",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "64\n",
+      "kind": "reference_formula",
+      "label": "higher_order_chain-64/reference-formula-0",
+      "maximum_seconds": 5,
+      "ordinal": 65
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-64/unit.mlfci",
+        "--",
+        "7"
+      ],
+      "cell": "higher_order_chain-64",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "71\n",
+      "kind": "reference_formula",
+      "label": "higher_order_chain-64/reference-formula-7",
+      "maximum_seconds": 5,
+      "ordinal": 66
+    },
+    {
+      "argv_template": [
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/stats-emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-64/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-64/unit"
+      ],
+      "cell": "higher_order_chain-64",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "stats_compile",
+      "label": "higher_order_chain-64/stats-compile",
+      "maximum_seconds": 30,
+      "ordinal": 67,
+      "raw_oracle": "same-cell original main semantic files and query results byte-exact; complete snapshot structure and ordered reads exact, configuration field1 authenticated against this own binary; independent CRC/SHA/CURRENT; no strip/normalization; after actual all-cell review freeze this full B raw tree as later same-binary oracle",
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/mlf.stats"
+    },
+    {
+      "argv_template": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-64/objects",
+        "-hidir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-64/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-64/Main.hs",
+        "+RTS",
+        "-s<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-64/ghc.stats",
+        "-RTS"
+      ],
+      "cell": "higher_order_chain-64",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_home_modules": {
+        "Main": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-64/Main.hs"
+      },
+      "expected_relative_interfaces": [
+        "Main.hi"
+      ],
+      "kind": "ghc_typed",
+      "label": "higher_order_chain-64/ghc-typed",
+      "maximum_seconds": 15,
+      "ordinal": 68,
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-64/ghc.stats",
+      "stdout_stderr_contract": "retain complete raw logs; parse exact unique Compiling module/path inventory, no fixed generic stderr string",
+      "target_object_or_executable_allowed": false
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-128/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-128/unit"
+      ],
+      "artifact_contract": "fresh complete checked/query publication; its own exact executable-SHA configuration, CRC/SHA/CURRENT and full result closure; dynamic actual oracle remains unknown",
+      "cell": "higher_order_chain-128",
+      "crate_spec_fields_template": [
+        "MLF-CRATE-1",
+        "compiler-shapes/higher_order_chain-128",
+        "Main",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Main",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-128/Main.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+          ]
+        },
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-128/queries",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin"
+      ],
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "reference_compile",
+      "label": "higher_order_chain-128/reference-compile",
+      "maximum_seconds": 30,
+      "ordinal": 69
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-128/unit.mlfci"
+      ],
+      "cell": "higher_order_chain-128",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "kind": "reference_metadata",
+      "label": "higher_order_chain-128/reference-show",
+      "maximum_seconds": 10,
+      "ordinal": 70,
+      "stdout_contract": {
+        "complete_raw_output_archive": true,
+        "crate": "compiler-shapes/higher_order_chain-128",
+        "dependencies": {
+          "mlf:builtin-shared-haskell-v1:13": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+        },
+        "owned_modules": [
+          "Main"
+        ],
+        "semantic_fingerprint": "UNKNOWN_ACTUAL_REFERENCE"
+      }
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-128/unit.mlfci",
+        "--",
+        "-1"
+      ],
+      "cell": "higher_order_chain-128",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "127\n",
+      "kind": "reference_formula",
+      "label": "higher_order_chain-128/reference-formula--1",
+      "maximum_seconds": 5,
+      "ordinal": 71
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-128/unit.mlfci",
+        "--",
+        "0"
+      ],
+      "cell": "higher_order_chain-128",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "128\n",
+      "kind": "reference_formula",
+      "label": "higher_order_chain-128/reference-formula-0",
+      "maximum_seconds": 5,
+      "ordinal": 72
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-128/unit.mlfci",
+        "--",
+        "7"
+      ],
+      "cell": "higher_order_chain-128",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "135\n",
+      "kind": "reference_formula",
+      "label": "higher_order_chain-128/reference-formula-7",
+      "maximum_seconds": 5,
+      "ordinal": 73
+    },
+    {
+      "argv_template": [
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/stats-emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-128/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-128/unit"
+      ],
+      "cell": "higher_order_chain-128",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "stats_compile",
+      "label": "higher_order_chain-128/stats-compile",
+      "maximum_seconds": 30,
+      "ordinal": 74,
+      "raw_oracle": "same-cell original main semantic files and query results byte-exact; complete snapshot structure and ordered reads exact, configuration field1 authenticated against this own binary; independent CRC/SHA/CURRENT; no strip/normalization; after actual all-cell review freeze this full B raw tree as later same-binary oracle",
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/mlf.stats"
+    },
+    {
+      "argv_template": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-128/objects",
+        "-hidir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-128/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-128/Main.hs",
+        "+RTS",
+        "-s<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-128/ghc.stats",
+        "-RTS"
+      ],
+      "cell": "higher_order_chain-128",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_home_modules": {
+        "Main": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-128/Main.hs"
+      },
+      "expected_relative_interfaces": [
+        "Main.hi"
+      ],
+      "kind": "ghc_typed",
+      "label": "higher_order_chain-128/ghc-typed",
+      "maximum_seconds": 15,
+      "ordinal": 75,
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-128/ghc.stats",
+      "stdout_stderr_contract": "retain complete raw logs; parse exact unique Compiling module/path inventory, no fixed generic stderr string",
+      "target_object_or_executable_allowed": false
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-256/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-256/unit"
+      ],
+      "artifact_contract": "fresh complete checked/query publication; its own exact executable-SHA configuration, CRC/SHA/CURRENT and full result closure; dynamic actual oracle remains unknown",
+      "cell": "higher_order_chain-256",
+      "crate_spec_fields_template": [
+        "MLF-CRATE-1",
+        "compiler-shapes/higher_order_chain-256",
+        "Main",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Main",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-256/Main.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+          ]
+        },
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-256/queries",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin"
+      ],
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "reference_compile",
+      "label": "higher_order_chain-256/reference-compile",
+      "maximum_seconds": 30,
+      "ordinal": 76
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-256/unit.mlfci"
+      ],
+      "cell": "higher_order_chain-256",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "kind": "reference_metadata",
+      "label": "higher_order_chain-256/reference-show",
+      "maximum_seconds": 10,
+      "ordinal": 77,
+      "stdout_contract": {
+        "complete_raw_output_archive": true,
+        "crate": "compiler-shapes/higher_order_chain-256",
+        "dependencies": {
+          "mlf:builtin-shared-haskell-v1:13": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+        },
+        "owned_modules": [
+          "Main"
+        ],
+        "semantic_fingerprint": "UNKNOWN_ACTUAL_REFERENCE"
+      }
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-256/unit.mlfci",
+        "--",
+        "-1"
+      ],
+      "cell": "higher_order_chain-256",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "255\n",
+      "kind": "reference_formula",
+      "label": "higher_order_chain-256/reference-formula--1",
+      "maximum_seconds": 5,
+      "ordinal": 78
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-256/unit.mlfci",
+        "--",
+        "0"
+      ],
+      "cell": "higher_order_chain-256",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "256\n",
+      "kind": "reference_formula",
+      "label": "higher_order_chain-256/reference-formula-0",
+      "maximum_seconds": 5,
+      "ordinal": 79
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-256/unit.mlfci",
+        "--",
+        "7"
+      ],
+      "cell": "higher_order_chain-256",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "263\n",
+      "kind": "reference_formula",
+      "label": "higher_order_chain-256/reference-formula-7",
+      "maximum_seconds": 5,
+      "ordinal": 80
+    },
+    {
+      "argv_template": [
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/stats-emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-256/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-256/unit"
+      ],
+      "cell": "higher_order_chain-256",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "stats_compile",
+      "label": "higher_order_chain-256/stats-compile",
+      "maximum_seconds": 30,
+      "ordinal": 81,
+      "raw_oracle": "same-cell original main semantic files and query results byte-exact; complete snapshot structure and ordered reads exact, configuration field1 authenticated against this own binary; independent CRC/SHA/CURRENT; no strip/normalization; after actual all-cell review freeze this full B raw tree as later same-binary oracle",
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/mlf.stats"
+    },
+    {
+      "argv_template": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-256/objects",
+        "-hidir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-256/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-256/Main.hs",
+        "+RTS",
+        "-s<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-256/ghc.stats",
+        "-RTS"
+      ],
+      "cell": "higher_order_chain-256",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_home_modules": {
+        "Main": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-256/Main.hs"
+      },
+      "expected_relative_interfaces": [
+        "Main.hi"
+      ],
+      "kind": "ghc_typed",
+      "label": "higher_order_chain-256/ghc-typed",
+      "maximum_seconds": 15,
+      "ordinal": 82,
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/higher_order_chain-256/ghc.stats",
+      "stdout_stderr_contract": "retain complete raw logs; parse exact unique Compiling module/path inventory, no fixed generic stderr string",
+      "target_object_or_executable_allowed": false
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/foundation14/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/foundation14/unit"
+      ],
+      "artifact_contract": "fresh complete checked/query publication; its own exact executable-SHA configuration, CRC/SHA/CURRENT and full result closure; dynamic actual oracle remains unknown",
+      "cell": "foundation14",
+      "crate_spec_fields_template": [
+        "MLF-CRATE-1",
+        "fresh-split/compiler90/mlf-foundation",
+        "",
+        "false",
+        {
+          "pack": [
+            {
+              "pack": [
+                "Bootstrap.Fresh",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Fresh.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.Host",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Host.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.IndexVec",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IndexVec.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.IntMap",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntMap.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.IntRank",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntRank.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.IntSet",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntSet.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.IntTree",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntTree.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.Map",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Map.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.ST",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/ST.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.Set",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Set.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.Std",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Std.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.Types",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Types.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.Unicode",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Unicode.hs"
+              ]
+            },
+            {
+              "pack": [
+                "Bootstrap.Version",
+                "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Version.hs"
+              ]
+            }
+          ]
+        },
+        {
+          "pack": [
+            "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+          ]
+        },
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/foundation14/queries",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin"
+      ],
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "reference_compile",
+      "label": "foundation14/reference-compile",
+      "maximum_seconds": 90,
+      "ordinal": 83
+    },
+    {
+      "argv_template": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/foundation14/unit.mlfci"
+      ],
+      "cell": "foundation14",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "kind": "reference_metadata",
+      "label": "foundation14/reference-show",
+      "maximum_seconds": 10,
+      "ordinal": 84,
+      "stdout_contract": {
+        "complete_raw_output_archive": true,
+        "crate": "fresh-split/compiler90/mlf-foundation",
+        "dependencies": {
+          "mlf:builtin-shared-haskell-v1:13": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/builtin.mlfci"
+        },
+        "owned_modules": [
+          "Bootstrap.Fresh",
+          "Bootstrap.Host",
+          "Bootstrap.IndexVec",
+          "Bootstrap.IntMap",
+          "Bootstrap.IntRank",
+          "Bootstrap.IntSet",
+          "Bootstrap.IntTree",
+          "Bootstrap.Map",
+          "Bootstrap.ST",
+          "Bootstrap.Set",
+          "Bootstrap.Std",
+          "Bootstrap.Types",
+          "Bootstrap.Unicode",
+          "Bootstrap.Version"
+        ],
+        "semantic_fingerprint": "UNKNOWN_ACTUAL_REFERENCE"
+      }
+    },
+    {
+      "argv_template": [
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/stats-emlf",
+        "--compile-crate",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/foundation14/crate.spec",
+        "-o",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/foundation14/unit"
+      ],
+      "cell": "foundation14",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_stderr_utf8": "",
+      "expected_stdout_utf8": "",
+      "kind": "stats_compile",
+      "label": "foundation14/stats-compile",
+      "maximum_seconds": 90,
+      "ordinal": 85,
+      "raw_oracle": "same-cell original main semantic files and query results byte-exact; complete snapshot structure and ordered reads exact, configuration field1 authenticated against this own binary; independent CRC/SHA/CURRENT; no strip/normalization; after actual all-cell review freeze this full B raw tree as later same-binary oracle",
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/mlf.stats"
+    },
+    {
+      "argv_template": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-i<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14",
+        "-odir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/foundation14/objects",
+        "-hidir",
+        "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/foundation14/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Fresh.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Host.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IndexVec.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntMap.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntRank.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntSet.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntTree.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Map.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/ST.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Set.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Std.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Types.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Unicode.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Version.hs",
+        "+RTS",
+        "-s<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/foundation14/ghc.stats",
+        "-RTS"
+      ],
+      "cell": "foundation14",
+      "executed": false,
+      "expected_exit": 0,
+      "expected_home_modules": {
+        "Bootstrap.Fresh": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Fresh.hs",
+        "Bootstrap.Host": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Host.hs",
+        "Bootstrap.IndexVec": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IndexVec.hs",
+        "Bootstrap.IntMap": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntMap.hs",
+        "Bootstrap.IntRank": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntRank.hs",
+        "Bootstrap.IntSet": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntSet.hs",
+        "Bootstrap.IntTree": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntTree.hs",
+        "Bootstrap.Map": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Map.hs",
+        "Bootstrap.ST": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/ST.hs",
+        "Bootstrap.Set": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Set.hs",
+        "Bootstrap.Std": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Std.hs",
+        "Bootstrap.Types": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Types.hs",
+        "Bootstrap.Unicode": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Unicode.hs",
+        "Bootstrap.Version": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Version.hs"
+      },
+      "expected_relative_interfaces": [
+        "Bootstrap/Fresh.hi",
+        "Bootstrap/Host.hi",
+        "Bootstrap/IndexVec.hi",
+        "Bootstrap/IntMap.hi",
+        "Bootstrap/IntRank.hi",
+        "Bootstrap/IntSet.hi",
+        "Bootstrap/IntTree.hi",
+        "Bootstrap/Map.hi",
+        "Bootstrap/ST.hi",
+        "Bootstrap/Set.hi",
+        "Bootstrap/Std.hi",
+        "Bootstrap/Types.hi",
+        "Bootstrap/Unicode.hi",
+        "Bootstrap/Version.hi"
+      ],
+      "kind": "ghc_typed",
+      "label": "foundation14/ghc-typed",
+      "maximum_seconds": 30,
+      "ordinal": 86,
+      "report_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/foundation14/ghc.stats",
+      "stdout_stderr_contract": "retain complete raw logs; parse exact unique Compiling module/path inventory, no fixed generic stderr string",
+      "target_object_or_executable_allowed": false
+    },
+    {
+      "argv_template": [
+        "<accepted_setup.runtime_after.python.loader.resolved>",
+        "--list",
+        "<accepted_setup.runtime_after.python.executable.resolved>"
+      ],
+      "executed": false,
+      "kind": "runtime",
+      "label": "runtime-python-after",
+      "maximum_seconds": 10,
+      "oracle": "exact before/after runtime binding equality excluding fresh command authentication; stderr empty, exit0",
+      "ordinal": 87
+    },
+    {
+      "argv_template": [
+        "<accepted_setup.runtime_after.shell.loader.resolved>",
+        "--list",
+        "<accepted_setup.runtime_after.shell.executable.resolved>"
+      ],
+      "executed": false,
+      "kind": "runtime",
+      "label": "runtime-shell-after",
+      "maximum_seconds": 10,
+      "oracle": "exact before/after runtime binding equality excluding fresh command authentication; stderr empty, exit0",
+      "ordinal": 88
+    },
+    {
+      "argv_template": [
+        "<accepted_setup.runtime_after.ghc.loader.resolved>",
+        "--list",
+        "<accepted_setup.runtime_after.ghc.executable.resolved>"
+      ],
+      "executed": false,
+      "kind": "runtime",
+      "label": "runtime-ghc-after",
+      "maximum_seconds": 10,
+      "oracle": "exact before/after runtime binding equality excluding fresh command authentication; stderr empty, exit0",
+      "ordinal": 89
+    },
+    {
+      "argv_template": [
+        "<accepted_setup.runtime_after.producer.loader.resolved>",
+        "--list",
+        "<accepted_setup.runtime_after.producer.executable.resolved>"
+      ],
+      "executed": false,
+      "kind": "runtime",
+      "label": "runtime-producer-after",
+      "maximum_seconds": 10,
+      "oracle": "exact before/after runtime binding equality excluding fresh command authentication; stderr empty, exit0",
+      "ordinal": 90
+    },
+    {
+      "argv_template": [
+        "<accepted_setup.runtime_after.stats-emlf.loader.resolved>",
+        "--list",
+        "<accepted_setup.runtime_after.stats-emlf.executable.resolved>"
+      ],
+      "executed": false,
+      "kind": "runtime",
+      "label": "runtime-stats-emlf-after",
+      "maximum_seconds": 10,
+      "oracle": "exact before/after runtime binding equality excluding fresh command authentication; stderr empty, exit0",
+      "ordinal": 91
+    }
+  ],
+  "schema": "main-gap-semantic-command-plan-v2",
+  "scope_template": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/semantic-qualification-01",
+  "single_guard_seconds": 600,
+  "statistics_are_compatibility_not_measurements": true,
+  "statistics_reports": 24
+}

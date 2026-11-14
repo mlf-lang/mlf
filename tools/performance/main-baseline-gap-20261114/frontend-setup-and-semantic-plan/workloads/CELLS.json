@@ -1,0 +1,1452 @@
+{
+  "actual_cells_qualified": 0,
+  "cell_count": 12,
+  "cells": [
+    {
+      "actual_main_fresh_query_groups": null,
+      "actual_main_reused_groups": null,
+      "actual_qualified": false,
+      "actual_reference_artifacts": null,
+      "actual_stats_candidate_artifacts": null,
+      "actual_typed_interface_inventory": null,
+      "crate_identity": "compiler-shapes/baseline-0",
+      "entry": "Main",
+      "expected_stdout_utf8": [
+        "-1\n",
+        "0\n",
+        "7\n"
+      ],
+      "family": "baseline",
+      "formula_inputs": [
+        -1,
+        0,
+        7
+      ],
+      "formula_results_observed_by_target": false,
+      "id": "baseline-0",
+      "independent_formula": "x",
+      "modules": [
+        {
+          "file": {
+            "bytes": 396,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/baseline-0/Main.hs",
+            "sha256": "522b3106f7dab67ca6f7dd1f3b705acd3d8a5e8113740a6a6ce30eeaaa7efd03"
+          },
+          "module": "Main",
+          "origin": "exact pure function from pinned main generator"
+        }
+      ],
+      "same_input_contract": {
+        "GHC_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/baseline-0/Main.hs"
+        ],
+        "MLF_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/baseline-0/Main.hs"
+        ],
+        "byte_identity_required": true,
+        "extra_GHC_Main": false
+      },
+      "size": 0,
+      "source_bytes": 396,
+      "source_lines": 12,
+      "source_roots": [],
+      "static_source_quantities": {
+        "binding_names": [
+          "entry",
+          "main"
+        ],
+        "data_declarations": 0,
+        "explicit_type_signatures": 2,
+        "generated_flat_function_count": 0,
+        "module_count": 1,
+        "not_compiler_graph_node_or_query_counts": true,
+        "textual_compose_applications_in_entry": 0,
+        "top_level_value_binding_declarations": 2
+      }
+    },
+    {
+      "actual_main_fresh_query_groups": null,
+      "actual_main_reused_groups": null,
+      "actual_qualified": false,
+      "actual_reference_artifacts": null,
+      "actual_stats_candidate_artifacts": null,
+      "actual_typed_interface_inventory": null,
+      "crate_identity": "compiler-shapes/flat_functions-16",
+      "entry": "Main",
+      "expected_stdout_utf8": [
+        "104\n",
+        "120\n",
+        "232\n"
+      ],
+      "family": "flat_functions",
+      "formula_inputs": [
+        -1,
+        0,
+        7
+      ],
+      "formula_results_observed_by_target": false,
+      "id": "flat_functions-16",
+      "independent_formula": "n*x + n*(n-1)//2",
+      "modules": [
+        {
+          "file": {
+            "bytes": 1255,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-16/Main.hs",
+            "sha256": "a5254beedeb16e7bf58791f4e7e27a44329bed18369bfb501414cbf230049249"
+          },
+          "module": "Main",
+          "origin": "exact pure function from pinned main generator"
+        }
+      ],
+      "same_input_contract": {
+        "GHC_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-16/Main.hs"
+        ],
+        "MLF_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-16/Main.hs"
+        ],
+        "byte_identity_required": true,
+        "extra_GHC_Main": false
+      },
+      "size": 16,
+      "source_bytes": 1255,
+      "source_lines": 44,
+      "source_roots": [],
+      "static_source_quantities": {
+        "binding_names": [
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4",
+          "f5",
+          "f6",
+          "f7",
+          "f8",
+          "f9",
+          "f10",
+          "f11",
+          "f12",
+          "f13",
+          "f14",
+          "f15",
+          "entry",
+          "main"
+        ],
+        "data_declarations": 0,
+        "explicit_type_signatures": 18,
+        "generated_flat_function_count": 16,
+        "module_count": 1,
+        "not_compiler_graph_node_or_query_counts": true,
+        "textual_compose_applications_in_entry": 0,
+        "top_level_value_binding_declarations": 18
+      }
+    },
+    {
+      "actual_main_fresh_query_groups": null,
+      "actual_main_reused_groups": null,
+      "actual_qualified": false,
+      "actual_reference_artifacts": null,
+      "actual_stats_candidate_artifacts": null,
+      "actual_typed_interface_inventory": null,
+      "crate_identity": "compiler-shapes/flat_functions-32",
+      "entry": "Main",
+      "expected_stdout_utf8": [
+        "464\n",
+        "496\n",
+        "720\n"
+      ],
+      "family": "flat_functions",
+      "formula_inputs": [
+        -1,
+        0,
+        7
+      ],
+      "formula_results_observed_by_target": false,
+      "id": "flat_functions-32",
+      "independent_formula": "n*x + n*(n-1)//2",
+      "modules": [
+        {
+          "file": {
+            "bytes": 2167,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-32/Main.hs",
+            "sha256": "ea9ae079ef50cf57b8c5869466666e774e8524ba735aeca684cdf4be7e493a81"
+          },
+          "module": "Main",
+          "origin": "exact pure function from pinned main generator"
+        }
+      ],
+      "same_input_contract": {
+        "GHC_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-32/Main.hs"
+        ],
+        "MLF_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-32/Main.hs"
+        ],
+        "byte_identity_required": true,
+        "extra_GHC_Main": false
+      },
+      "size": 32,
+      "source_bytes": 2167,
+      "source_lines": 76,
+      "source_roots": [],
+      "static_source_quantities": {
+        "binding_names": [
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4",
+          "f5",
+          "f6",
+          "f7",
+          "f8",
+          "f9",
+          "f10",
+          "f11",
+          "f12",
+          "f13",
+          "f14",
+          "f15",
+          "f16",
+          "f17",
+          "f18",
+          "f19",
+          "f20",
+          "f21",
+          "f22",
+          "f23",
+          "f24",
+          "f25",
+          "f26",
+          "f27",
+          "f28",
+          "f29",
+          "f30",
+          "f31",
+          "entry",
+          "main"
+        ],
+        "data_declarations": 0,
+        "explicit_type_signatures": 34,
+        "generated_flat_function_count": 32,
+        "module_count": 1,
+        "not_compiler_graph_node_or_query_counts": true,
+        "textual_compose_applications_in_entry": 0,
+        "top_level_value_binding_declarations": 34
+      }
+    },
+    {
+      "actual_main_fresh_query_groups": null,
+      "actual_main_reused_groups": null,
+      "actual_qualified": false,
+      "actual_reference_artifacts": null,
+      "actual_stats_candidate_artifacts": null,
+      "actual_typed_interface_inventory": null,
+      "crate_identity": "compiler-shapes/flat_functions-64",
+      "entry": "Main",
+      "expected_stdout_utf8": [
+        "1952\n",
+        "2016\n",
+        "2464\n"
+      ],
+      "family": "flat_functions",
+      "formula_inputs": [
+        -1,
+        0,
+        7
+      ],
+      "formula_results_observed_by_target": false,
+      "id": "flat_functions-64",
+      "independent_formula": "n*x + n*(n-1)//2",
+      "modules": [
+        {
+          "file": {
+            "bytes": 3991,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-64/Main.hs",
+            "sha256": "a578c5cd2e6dd90dd1c41a85c65cfabcda69ebf5e2f4e3eada29c4b5dcbfe121"
+          },
+          "module": "Main",
+          "origin": "exact pure function from pinned main generator"
+        }
+      ],
+      "same_input_contract": {
+        "GHC_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-64/Main.hs"
+        ],
+        "MLF_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-64/Main.hs"
+        ],
+        "byte_identity_required": true,
+        "extra_GHC_Main": false
+      },
+      "size": 64,
+      "source_bytes": 3991,
+      "source_lines": 140,
+      "source_roots": [],
+      "static_source_quantities": {
+        "binding_names": [
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4",
+          "f5",
+          "f6",
+          "f7",
+          "f8",
+          "f9",
+          "f10",
+          "f11",
+          "f12",
+          "f13",
+          "f14",
+          "f15",
+          "f16",
+          "f17",
+          "f18",
+          "f19",
+          "f20",
+          "f21",
+          "f22",
+          "f23",
+          "f24",
+          "f25",
+          "f26",
+          "f27",
+          "f28",
+          "f29",
+          "f30",
+          "f31",
+          "f32",
+          "f33",
+          "f34",
+          "f35",
+          "f36",
+          "f37",
+          "f38",
+          "f39",
+          "f40",
+          "f41",
+          "f42",
+          "f43",
+          "f44",
+          "f45",
+          "f46",
+          "f47",
+          "f48",
+          "f49",
+          "f50",
+          "f51",
+          "f52",
+          "f53",
+          "f54",
+          "f55",
+          "f56",
+          "f57",
+          "f58",
+          "f59",
+          "f60",
+          "f61",
+          "f62",
+          "f63",
+          "entry",
+          "main"
+        ],
+        "data_declarations": 0,
+        "explicit_type_signatures": 66,
+        "generated_flat_function_count": 64,
+        "module_count": 1,
+        "not_compiler_graph_node_or_query_counts": true,
+        "textual_compose_applications_in_entry": 0,
+        "top_level_value_binding_declarations": 66
+      }
+    },
+    {
+      "actual_main_fresh_query_groups": null,
+      "actual_main_reused_groups": null,
+      "actual_qualified": false,
+      "actual_reference_artifacts": null,
+      "actual_stats_candidate_artifacts": null,
+      "actual_typed_interface_inventory": null,
+      "crate_identity": "compiler-shapes/flat_functions-128",
+      "entry": "Main",
+      "expected_stdout_utf8": [
+        "8000\n",
+        "8128\n",
+        "9024\n"
+      ],
+      "family": "flat_functions",
+      "formula_inputs": [
+        -1,
+        0,
+        7
+      ],
+      "formula_results_observed_by_target": false,
+      "id": "flat_functions-128",
+      "independent_formula": "n*x + n*(n-1)//2",
+      "modules": [
+        {
+          "file": {
+            "bytes": 7751,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-128/Main.hs",
+            "sha256": "af48eb052fca7df869588c13f805ccda52e6ac55451d8b4709237943a5677640"
+          },
+          "module": "Main",
+          "origin": "exact pure function from pinned main generator"
+        }
+      ],
+      "same_input_contract": {
+        "GHC_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-128/Main.hs"
+        ],
+        "MLF_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-128/Main.hs"
+        ],
+        "byte_identity_required": true,
+        "extra_GHC_Main": false
+      },
+      "size": 128,
+      "source_bytes": 7751,
+      "source_lines": 268,
+      "source_roots": [],
+      "static_source_quantities": {
+        "binding_names": [
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4",
+          "f5",
+          "f6",
+          "f7",
+          "f8",
+          "f9",
+          "f10",
+          "f11",
+          "f12",
+          "f13",
+          "f14",
+          "f15",
+          "f16",
+          "f17",
+          "f18",
+          "f19",
+          "f20",
+          "f21",
+          "f22",
+          "f23",
+          "f24",
+          "f25",
+          "f26",
+          "f27",
+          "f28",
+          "f29",
+          "f30",
+          "f31",
+          "f32",
+          "f33",
+          "f34",
+          "f35",
+          "f36",
+          "f37",
+          "f38",
+          "f39",
+          "f40",
+          "f41",
+          "f42",
+          "f43",
+          "f44",
+          "f45",
+          "f46",
+          "f47",
+          "f48",
+          "f49",
+          "f50",
+          "f51",
+          "f52",
+          "f53",
+          "f54",
+          "f55",
+          "f56",
+          "f57",
+          "f58",
+          "f59",
+          "f60",
+          "f61",
+          "f62",
+          "f63",
+          "f64",
+          "f65",
+          "f66",
+          "f67",
+          "f68",
+          "f69",
+          "f70",
+          "f71",
+          "f72",
+          "f73",
+          "f74",
+          "f75",
+          "f76",
+          "f77",
+          "f78",
+          "f79",
+          "f80",
+          "f81",
+          "f82",
+          "f83",
+          "f84",
+          "f85",
+          "f86",
+          "f87",
+          "f88",
+          "f89",
+          "f90",
+          "f91",
+          "f92",
+          "f93",
+          "f94",
+          "f95",
+          "f96",
+          "f97",
+          "f98",
+          "f99",
+          "f100",
+          "f101",
+          "f102",
+          "f103",
+          "f104",
+          "f105",
+          "f106",
+          "f107",
+          "f108",
+          "f109",
+          "f110",
+          "f111",
+          "f112",
+          "f113",
+          "f114",
+          "f115",
+          "f116",
+          "f117",
+          "f118",
+          "f119",
+          "f120",
+          "f121",
+          "f122",
+          "f123",
+          "f124",
+          "f125",
+          "f126",
+          "f127",
+          "entry",
+          "main"
+        ],
+        "data_declarations": 0,
+        "explicit_type_signatures": 130,
+        "generated_flat_function_count": 128,
+        "module_count": 1,
+        "not_compiler_graph_node_or_query_counts": true,
+        "textual_compose_applications_in_entry": 0,
+        "top_level_value_binding_declarations": 130
+      }
+    },
+    {
+      "actual_main_fresh_query_groups": null,
+      "actual_main_reused_groups": null,
+      "actual_qualified": false,
+      "actual_reference_artifacts": null,
+      "actual_stats_candidate_artifacts": null,
+      "actual_typed_interface_inventory": null,
+      "crate_identity": "compiler-shapes/flat_functions-256",
+      "entry": "Main",
+      "expected_stdout_utf8": [
+        "32384\n",
+        "32640\n",
+        "34432\n"
+      ],
+      "family": "flat_functions",
+      "formula_inputs": [
+        -1,
+        0,
+        7
+      ],
+      "formula_results_observed_by_target": false,
+      "id": "flat_functions-256",
+      "independent_formula": "n*x + n*(n-1)//2",
+      "modules": [
+        {
+          "file": {
+            "bytes": 15559,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-256/Main.hs",
+            "sha256": "af2371d80197e98f3fb2aa3ea99bac91e95a8905a1d6f3fe2952426a4ec83881"
+          },
+          "module": "Main",
+          "origin": "exact pure function from pinned main generator"
+        }
+      ],
+      "same_input_contract": {
+        "GHC_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-256/Main.hs"
+        ],
+        "MLF_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-256/Main.hs"
+        ],
+        "byte_identity_required": true,
+        "extra_GHC_Main": false
+      },
+      "size": 256,
+      "source_bytes": 15559,
+      "source_lines": 524,
+      "source_roots": [],
+      "static_source_quantities": {
+        "binding_names": [
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4",
+          "f5",
+          "f6",
+          "f7",
+          "f8",
+          "f9",
+          "f10",
+          "f11",
+          "f12",
+          "f13",
+          "f14",
+          "f15",
+          "f16",
+          "f17",
+          "f18",
+          "f19",
+          "f20",
+          "f21",
+          "f22",
+          "f23",
+          "f24",
+          "f25",
+          "f26",
+          "f27",
+          "f28",
+          "f29",
+          "f30",
+          "f31",
+          "f32",
+          "f33",
+          "f34",
+          "f35",
+          "f36",
+          "f37",
+          "f38",
+          "f39",
+          "f40",
+          "f41",
+          "f42",
+          "f43",
+          "f44",
+          "f45",
+          "f46",
+          "f47",
+          "f48",
+          "f49",
+          "f50",
+          "f51",
+          "f52",
+          "f53",
+          "f54",
+          "f55",
+          "f56",
+          "f57",
+          "f58",
+          "f59",
+          "f60",
+          "f61",
+          "f62",
+          "f63",
+          "f64",
+          "f65",
+          "f66",
+          "f67",
+          "f68",
+          "f69",
+          "f70",
+          "f71",
+          "f72",
+          "f73",
+          "f74",
+          "f75",
+          "f76",
+          "f77",
+          "f78",
+          "f79",
+          "f80",
+          "f81",
+          "f82",
+          "f83",
+          "f84",
+          "f85",
+          "f86",
+          "f87",
+          "f88",
+          "f89",
+          "f90",
+          "f91",
+          "f92",
+          "f93",
+          "f94",
+          "f95",
+          "f96",
+          "f97",
+          "f98",
+          "f99",
+          "f100",
+          "f101",
+          "f102",
+          "f103",
+          "f104",
+          "f105",
+          "f106",
+          "f107",
+          "f108",
+          "f109",
+          "f110",
+          "f111",
+          "f112",
+          "f113",
+          "f114",
+          "f115",
+          "f116",
+          "f117",
+          "f118",
+          "f119",
+          "f120",
+          "f121",
+          "f122",
+          "f123",
+          "f124",
+          "f125",
+          "f126",
+          "f127",
+          "f128",
+          "f129",
+          "f130",
+          "f131",
+          "f132",
+          "f133",
+          "f134",
+          "f135",
+          "f136",
+          "f137",
+          "f138",
+          "f139",
+          "f140",
+          "f141",
+          "f142",
+          "f143",
+          "f144",
+          "f145",
+          "f146",
+          "f147",
+          "f148",
+          "f149",
+          "f150",
+          "f151",
+          "f152",
+          "f153",
+          "f154",
+          "f155",
+          "f156",
+          "f157",
+          "f158",
+          "f159",
+          "f160",
+          "f161",
+          "f162",
+          "f163",
+          "f164",
+          "f165",
+          "f166",
+          "f167",
+          "f168",
+          "f169",
+          "f170",
+          "f171",
+          "f172",
+          "f173",
+          "f174",
+          "f175",
+          "f176",
+          "f177",
+          "f178",
+          "f179",
+          "f180",
+          "f181",
+          "f182",
+          "f183",
+          "f184",
+          "f185",
+          "f186",
+          "f187",
+          "f188",
+          "f189",
+          "f190",
+          "f191",
+          "f192",
+          "f193",
+          "f194",
+          "f195",
+          "f196",
+          "f197",
+          "f198",
+          "f199",
+          "f200",
+          "f201",
+          "f202",
+          "f203",
+          "f204",
+          "f205",
+          "f206",
+          "f207",
+          "f208",
+          "f209",
+          "f210",
+          "f211",
+          "f212",
+          "f213",
+          "f214",
+          "f215",
+          "f216",
+          "f217",
+          "f218",
+          "f219",
+          "f220",
+          "f221",
+          "f222",
+          "f223",
+          "f224",
+          "f225",
+          "f226",
+          "f227",
+          "f228",
+          "f229",
+          "f230",
+          "f231",
+          "f232",
+          "f233",
+          "f234",
+          "f235",
+          "f236",
+          "f237",
+          "f238",
+          "f239",
+          "f240",
+          "f241",
+          "f242",
+          "f243",
+          "f244",
+          "f245",
+          "f246",
+          "f247",
+          "f248",
+          "f249",
+          "f250",
+          "f251",
+          "f252",
+          "f253",
+          "f254",
+          "f255",
+          "entry",
+          "main"
+        ],
+        "data_declarations": 0,
+        "explicit_type_signatures": 258,
+        "generated_flat_function_count": 256,
+        "module_count": 1,
+        "not_compiler_graph_node_or_query_counts": true,
+        "textual_compose_applications_in_entry": 0,
+        "top_level_value_binding_declarations": 258
+      }
+    },
+    {
+      "actual_main_fresh_query_groups": null,
+      "actual_main_reused_groups": null,
+      "actual_qualified": false,
+      "actual_reference_artifacts": null,
+      "actual_stats_candidate_artifacts": null,
+      "actual_typed_interface_inventory": null,
+      "crate_identity": "compiler-shapes/higher_order_chain-16",
+      "entry": "Main",
+      "expected_stdout_utf8": [
+        "15\n",
+        "16\n",
+        "23\n"
+      ],
+      "family": "higher_order_chain",
+      "formula_inputs": [
+        -1,
+        0,
+        7
+      ],
+      "formula_results_observed_by_target": false,
+      "id": "higher_order_chain-16",
+      "independent_formula": "x+n",
+      "modules": [
+        {
+          "file": {
+            "bytes": 816,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-16/Main.hs",
+            "sha256": "c5bc5b63bfdcd05b263b625788b77846fdac1d5fe69c7c36ae6abed100c1bb2b"
+          },
+          "module": "Main",
+          "origin": "exact pure function from pinned main generator"
+        }
+      ],
+      "same_input_contract": {
+        "GHC_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-16/Main.hs"
+        ],
+        "MLF_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-16/Main.hs"
+        ],
+        "byte_identity_required": true,
+        "extra_GHC_Main": false
+      },
+      "size": 16,
+      "source_bytes": 816,
+      "source_lines": 18,
+      "source_roots": [],
+      "static_source_quantities": {
+        "binding_names": [
+          "compose",
+          "step",
+          "identity",
+          "entry",
+          "main"
+        ],
+        "data_declarations": 0,
+        "explicit_type_signatures": 5,
+        "generated_flat_function_count": 0,
+        "module_count": 1,
+        "not_compiler_graph_node_or_query_counts": true,
+        "textual_compose_applications_in_entry": 16,
+        "top_level_value_binding_declarations": 5
+      }
+    },
+    {
+      "actual_main_fresh_query_groups": null,
+      "actual_main_reused_groups": null,
+      "actual_qualified": false,
+      "actual_reference_artifacts": null,
+      "actual_stats_candidate_artifacts": null,
+      "actual_typed_interface_inventory": null,
+      "crate_identity": "compiler-shapes/higher_order_chain-32",
+      "entry": "Main",
+      "expected_stdout_utf8": [
+        "31\n",
+        "32\n",
+        "39\n"
+      ],
+      "family": "higher_order_chain",
+      "formula_inputs": [
+        -1,
+        0,
+        7
+      ],
+      "formula_results_observed_by_target": false,
+      "id": "higher_order_chain-32",
+      "independent_formula": "x+n",
+      "modules": [
+        {
+          "file": {
+            "bytes": 1056,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-32/Main.hs",
+            "sha256": "5943c0526bd00cbe8d76b60643e1495c8a07122c3c5a6fb2a59215bfd5c3db49"
+          },
+          "module": "Main",
+          "origin": "exact pure function from pinned main generator"
+        }
+      ],
+      "same_input_contract": {
+        "GHC_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-32/Main.hs"
+        ],
+        "MLF_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-32/Main.hs"
+        ],
+        "byte_identity_required": true,
+        "extra_GHC_Main": false
+      },
+      "size": 32,
+      "source_bytes": 1056,
+      "source_lines": 18,
+      "source_roots": [],
+      "static_source_quantities": {
+        "binding_names": [
+          "compose",
+          "step",
+          "identity",
+          "entry",
+          "main"
+        ],
+        "data_declarations": 0,
+        "explicit_type_signatures": 5,
+        "generated_flat_function_count": 0,
+        "module_count": 1,
+        "not_compiler_graph_node_or_query_counts": true,
+        "textual_compose_applications_in_entry": 32,
+        "top_level_value_binding_declarations": 5
+      }
+    },
+    {
+      "actual_main_fresh_query_groups": null,
+      "actual_main_reused_groups": null,
+      "actual_qualified": false,
+      "actual_reference_artifacts": null,
+      "actual_stats_candidate_artifacts": null,
+      "actual_typed_interface_inventory": null,
+      "crate_identity": "compiler-shapes/higher_order_chain-64",
+      "entry": "Main",
+      "expected_stdout_utf8": [
+        "63\n",
+        "64\n",
+        "71\n"
+      ],
+      "family": "higher_order_chain",
+      "formula_inputs": [
+        -1,
+        0,
+        7
+      ],
+      "formula_results_observed_by_target": false,
+      "id": "higher_order_chain-64",
+      "independent_formula": "x+n",
+      "modules": [
+        {
+          "file": {
+            "bytes": 1536,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-64/Main.hs",
+            "sha256": "d8a72fb0850ef38bf04df17b1490061f6d20ccc7d1dd59a7ca29146a70969a8c"
+          },
+          "module": "Main",
+          "origin": "exact pure function from pinned main generator"
+        }
+      ],
+      "same_input_contract": {
+        "GHC_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-64/Main.hs"
+        ],
+        "MLF_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-64/Main.hs"
+        ],
+        "byte_identity_required": true,
+        "extra_GHC_Main": false
+      },
+      "size": 64,
+      "source_bytes": 1536,
+      "source_lines": 18,
+      "source_roots": [],
+      "static_source_quantities": {
+        "binding_names": [
+          "compose",
+          "step",
+          "identity",
+          "entry",
+          "main"
+        ],
+        "data_declarations": 0,
+        "explicit_type_signatures": 5,
+        "generated_flat_function_count": 0,
+        "module_count": 1,
+        "not_compiler_graph_node_or_query_counts": true,
+        "textual_compose_applications_in_entry": 64,
+        "top_level_value_binding_declarations": 5
+      }
+    },
+    {
+      "actual_main_fresh_query_groups": null,
+      "actual_main_reused_groups": null,
+      "actual_qualified": false,
+      "actual_reference_artifacts": null,
+      "actual_stats_candidate_artifacts": null,
+      "actual_typed_interface_inventory": null,
+      "crate_identity": "compiler-shapes/higher_order_chain-128",
+      "entry": "Main",
+      "expected_stdout_utf8": [
+        "127\n",
+        "128\n",
+        "135\n"
+      ],
+      "family": "higher_order_chain",
+      "formula_inputs": [
+        -1,
+        0,
+        7
+      ],
+      "formula_results_observed_by_target": false,
+      "id": "higher_order_chain-128",
+      "independent_formula": "x+n",
+      "modules": [
+        {
+          "file": {
+            "bytes": 2496,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-128/Main.hs",
+            "sha256": "ba13ac3b8d15d7b1d4c63fcc9698c86b9cbca1b6244dd1b1ee6a89e2e6ce41da"
+          },
+          "module": "Main",
+          "origin": "exact pure function from pinned main generator"
+        }
+      ],
+      "same_input_contract": {
+        "GHC_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-128/Main.hs"
+        ],
+        "MLF_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-128/Main.hs"
+        ],
+        "byte_identity_required": true,
+        "extra_GHC_Main": false
+      },
+      "size": 128,
+      "source_bytes": 2496,
+      "source_lines": 18,
+      "source_roots": [],
+      "static_source_quantities": {
+        "binding_names": [
+          "compose",
+          "step",
+          "identity",
+          "entry",
+          "main"
+        ],
+        "data_declarations": 0,
+        "explicit_type_signatures": 5,
+        "generated_flat_function_count": 0,
+        "module_count": 1,
+        "not_compiler_graph_node_or_query_counts": true,
+        "textual_compose_applications_in_entry": 128,
+        "top_level_value_binding_declarations": 5
+      }
+    },
+    {
+      "actual_main_fresh_query_groups": null,
+      "actual_main_reused_groups": null,
+      "actual_qualified": false,
+      "actual_reference_artifacts": null,
+      "actual_stats_candidate_artifacts": null,
+      "actual_typed_interface_inventory": null,
+      "crate_identity": "compiler-shapes/higher_order_chain-256",
+      "entry": "Main",
+      "expected_stdout_utf8": [
+        "255\n",
+        "256\n",
+        "263\n"
+      ],
+      "family": "higher_order_chain",
+      "formula_inputs": [
+        -1,
+        0,
+        7
+      ],
+      "formula_results_observed_by_target": false,
+      "id": "higher_order_chain-256",
+      "independent_formula": "x+n",
+      "modules": [
+        {
+          "file": {
+            "bytes": 4416,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-256/Main.hs",
+            "sha256": "0747d08346964a72c21f11990bbc9deec4d31e9dd05629e71df8668dc75c76a7"
+          },
+          "module": "Main",
+          "origin": "exact pure function from pinned main generator"
+        }
+      ],
+      "same_input_contract": {
+        "GHC_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-256/Main.hs"
+        ],
+        "MLF_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-256/Main.hs"
+        ],
+        "byte_identity_required": true,
+        "extra_GHC_Main": false
+      },
+      "size": 256,
+      "source_bytes": 4416,
+      "source_lines": 18,
+      "source_roots": [],
+      "static_source_quantities": {
+        "binding_names": [
+          "compose",
+          "step",
+          "identity",
+          "entry",
+          "main"
+        ],
+        "data_declarations": 0,
+        "explicit_type_signatures": 5,
+        "generated_flat_function_count": 0,
+        "module_count": 1,
+        "not_compiler_graph_node_or_query_counts": true,
+        "textual_compose_applications_in_entry": 256,
+        "top_level_value_binding_declarations": 5
+      }
+    },
+    {
+      "actual_main_fresh_query_groups": null,
+      "actual_main_reused_groups": null,
+      "actual_qualified": false,
+      "actual_reference_artifacts": null,
+      "actual_stats_candidate_artifacts": null,
+      "actual_typed_interface_inventory": null,
+      "crate_identity": "fresh-split/compiler90/mlf-foundation",
+      "entry": "",
+      "expected_stdout_utf8": null,
+      "family": "foundation-anchor",
+      "formula_inputs": null,
+      "id": "foundation14",
+      "independent_formula": null,
+      "modules": [
+        {
+          "file": {
+            "bytes": 2592,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Fresh.hs",
+            "sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d"
+          },
+          "module": "Bootstrap.Fresh",
+          "original_main_source": {
+            "bytes": 2592,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/Fresh.hs",
+            "sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d"
+          }
+        },
+        {
+          "file": {
+            "bytes": 3246,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Host.hs",
+            "sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5"
+          },
+          "module": "Bootstrap.Host",
+          "original_main_source": {
+            "bytes": 3246,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/Host.hs",
+            "sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5"
+          }
+        },
+        {
+          "file": {
+            "bytes": 5573,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IndexVec.hs",
+            "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e"
+          },
+          "module": "Bootstrap.IndexVec",
+          "original_main_source": {
+            "bytes": 5573,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/IndexVec.hs",
+            "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e"
+          }
+        },
+        {
+          "file": {
+            "bytes": 21811,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntMap.hs",
+            "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e"
+          },
+          "module": "Bootstrap.IntMap",
+          "original_main_source": {
+            "bytes": 21811,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/IntMap.hs",
+            "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e"
+          }
+        },
+        {
+          "file": {
+            "bytes": 6684,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntRank.hs",
+            "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
+          },
+          "module": "Bootstrap.IntRank",
+          "original_main_source": {
+            "bytes": 6684,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/IntRank.hs",
+            "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
+          }
+        },
+        {
+          "file": {
+            "bytes": 17405,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntSet.hs",
+            "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe"
+          },
+          "module": "Bootstrap.IntSet",
+          "original_main_source": {
+            "bytes": 17405,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/IntSet.hs",
+            "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe"
+          }
+        },
+        {
+          "file": {
+            "bytes": 3727,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntTree.hs",
+            "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49"
+          },
+          "module": "Bootstrap.IntTree",
+          "original_main_source": {
+            "bytes": 3727,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/IntTree.hs",
+            "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49"
+          }
+        },
+        {
+          "file": {
+            "bytes": 17218,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Map.hs",
+            "sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0"
+          },
+          "module": "Bootstrap.Map",
+          "original_main_source": {
+            "bytes": 17218,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/Map.hs",
+            "sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0"
+          }
+        },
+        {
+          "file": {
+            "bytes": 2539,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/ST.hs",
+            "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2"
+          },
+          "module": "Bootstrap.ST",
+          "original_main_source": {
+            "bytes": 2539,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/ST.hs",
+            "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2"
+          }
+        },
+        {
+          "file": {
+            "bytes": 4093,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Set.hs",
+            "sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f"
+          },
+          "module": "Bootstrap.Set",
+          "original_main_source": {
+            "bytes": 4093,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/Set.hs",
+            "sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f"
+          }
+        },
+        {
+          "file": {
+            "bytes": 20088,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Std.hs",
+            "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca"
+          },
+          "module": "Bootstrap.Std",
+          "original_main_source": {
+            "bytes": 20088,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/Std.hs",
+            "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca"
+          }
+        },
+        {
+          "file": {
+            "bytes": 12757,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Types.hs",
+            "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596"
+          },
+          "module": "Bootstrap.Types",
+          "original_main_source": {
+            "bytes": 12757,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/Types.hs",
+            "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596"
+          }
+        },
+        {
+          "file": {
+            "bytes": 55534,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Unicode.hs",
+            "sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077"
+          },
+          "module": "Bootstrap.Unicode",
+          "original_main_source": {
+            "bytes": 55534,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/Unicode.hs",
+            "sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077"
+          }
+        },
+        {
+          "file": {
+            "bytes": 327,
+            "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Version.hs",
+            "sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479"
+          },
+          "module": "Bootstrap.Version",
+          "original_main_source": {
+            "bytes": 327,
+            "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/libraries/mlf-foundation/Bootstrap/Version.hs",
+            "sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479"
+          }
+        }
+      ],
+      "no_program_entry_or_runtime_formula_for_library": true,
+      "same_input_contract": {
+        "GHC_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Fresh.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Host.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IndexVec.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntMap.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntRank.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntSet.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntTree.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Map.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/ST.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Set.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Std.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Types.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Unicode.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Version.hs"
+        ],
+        "MLF_ordered_source_files": [
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Fresh.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Host.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IndexVec.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntMap.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntRank.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntSet.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntTree.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Map.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/ST.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Set.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Std.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Types.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Unicode.hs",
+          "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Version.hs"
+        ],
+        "byte_identity_required": true,
+        "extra_GHC_Main": false
+      },
+      "size": null,
+      "source_bytes": 173594,
+      "source_lines": 2900,
+      "source_roots": [
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14"
+      ],
+      "static_source_quantities": {
+        "data_declarations": null,
+        "explicit_type_signatures": null,
+        "module_count": 14,
+        "reason_unknown": "No Haskell parser or compiler ran to count Foundation declarations. Only exact modules/bytes/lines known.",
+        "top_level_value_binding_declarations": null
+      }
+    }
+  ],
+  "schema": "main-gap-workload-inputs-v1",
+  "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "source_file_count": 25,
+  "total_cell_source_bytes": 215033
+}

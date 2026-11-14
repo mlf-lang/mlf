@@ -1,0 +1,248 @@
+{
+  "individual_caps_shrink_to_shared_remainder": true,
+  "one_attempt": true,
+  "rows": [
+    {
+      "kind": "runtime",
+      "label": "runtime-python-before",
+      "maximum_seconds": 10,
+      "ordinal": 1
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-ghc-before",
+      "maximum_seconds": 10,
+      "ordinal": 2
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-ghc-pkg-before",
+      "maximum_seconds": 10,
+      "ordinal": 3
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-ar-before",
+      "maximum_seconds": 10,
+      "ordinal": 4
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-cc-before",
+      "maximum_seconds": 10,
+      "ordinal": 5
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-shell-before",
+      "maximum_seconds": 10,
+      "ordinal": 6
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-producer-before",
+      "maximum_seconds": 10,
+      "ordinal": 7
+    },
+    {
+      "kind": "setup_payload",
+      "label": "fresh-private-four-module-unit",
+      "maximum_seconds": 180,
+      "ordinal": 8
+    },
+    {
+      "kind": "setup_payload",
+      "label": "archive-private-unit",
+      "maximum_seconds": 20,
+      "ordinal": 9
+    },
+    {
+      "kind": "setup_payload",
+      "label": "init-private-db",
+      "maximum_seconds": 10,
+      "ordinal": 10
+    },
+    {
+      "kind": "setup_payload",
+      "label": "global-unit-id-base",
+      "maximum_seconds": 10,
+      "ordinal": 11
+    },
+    {
+      "kind": "setup_payload",
+      "label": "global-unit-id-array",
+      "maximum_seconds": 10,
+      "ordinal": 12
+    },
+    {
+      "kind": "setup_payload",
+      "label": "global-unit-id-bytestring",
+      "maximum_seconds": 10,
+      "ordinal": 13
+    },
+    {
+      "kind": "setup_payload",
+      "label": "global-unit-id-text",
+      "maximum_seconds": 10,
+      "ordinal": 14
+    },
+    {
+      "kind": "setup_payload",
+      "label": "global-unit-id-containers",
+      "maximum_seconds": 10,
+      "ordinal": 15
+    },
+    {
+      "kind": "setup_payload",
+      "label": "global-unit-id-directory",
+      "maximum_seconds": 10,
+      "ordinal": 16
+    },
+    {
+      "kind": "setup_payload",
+      "label": "register-private-unit",
+      "maximum_seconds": 20,
+      "ordinal": 17
+    },
+    {
+      "kind": "setup_payload",
+      "label": "new-main-fixed-builtin-pair",
+      "maximum_seconds": 120,
+      "ordinal": 18
+    },
+    {
+      "kind": "qualification",
+      "label": "ordinary-show-fixture",
+      "maximum_seconds": 20,
+      "ordinal": 19
+    },
+    {
+      "kind": "qualification",
+      "label": "ordinary-show-builtin",
+      "maximum_seconds": 20,
+      "ordinal": 20
+    },
+    {
+      "kind": "setup_payload",
+      "label": "fresh-original-emlf-Main",
+      "maximum_seconds": 60,
+      "ordinal": 21
+    },
+    {
+      "kind": "setup_payload",
+      "label": "ordinary-stats-own-relink",
+      "maximum_seconds": 60,
+      "ordinal": 22
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-stats-emlf-before",
+      "maximum_seconds": 10,
+      "ordinal": 23
+    },
+    {
+      "kind": "qualification",
+      "label": "stats-version",
+      "maximum_seconds": 10,
+      "ordinal": 24
+    },
+    {
+      "kind": "qualification",
+      "label": "stats-identity",
+      "maximum_seconds": 10,
+      "ordinal": 25
+    },
+    {
+      "kind": "qualification",
+      "label": "stats-semantic-42",
+      "maximum_seconds": 10,
+      "ordinal": 26
+    },
+    {
+      "kind": "qualification",
+      "label": "stats-unicode-positive",
+      "maximum_seconds": 10,
+      "ordinal": 27
+    },
+    {
+      "kind": "qualification",
+      "label": "stats-type-rejection",
+      "maximum_seconds": 10,
+      "ordinal": 28
+    },
+    {
+      "kind": "qualification",
+      "label": "stats-fixed-fixture",
+      "maximum_seconds": 120,
+      "ordinal": 29
+    },
+    {
+      "kind": "qualification",
+      "label": "stats-show-fixture",
+      "maximum_seconds": 20,
+      "ordinal": 30
+    },
+    {
+      "kind": "qualification",
+      "label": "stats-show-builtin",
+      "maximum_seconds": 20,
+      "ordinal": 31
+    },
+    {
+      "kind": "qualification",
+      "label": "ghc-typed-package-RTS-control",
+      "maximum_seconds": 30,
+      "ordinal": 32
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-python-after",
+      "maximum_seconds": 10,
+      "ordinal": 33
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-ghc-after",
+      "maximum_seconds": 10,
+      "ordinal": 34
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-ghc-pkg-after",
+      "maximum_seconds": 10,
+      "ordinal": 35
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-ar-after",
+      "maximum_seconds": 10,
+      "ordinal": 36
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-cc-after",
+      "maximum_seconds": 10,
+      "ordinal": 37
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-shell-after",
+      "maximum_seconds": 10,
+      "ordinal": 38
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-producer-after",
+      "maximum_seconds": 10,
+      "ordinal": 39
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-stats-emlf-after",
+      "maximum_seconds": 10,
+      "ordinal": 40
+    }
+  ],
+  "schema": "main-gap-setup-command-ledger-v1",
+  "stage_seconds": 600
+}

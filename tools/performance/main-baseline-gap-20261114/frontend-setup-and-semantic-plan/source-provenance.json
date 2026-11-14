@@ -1,0 +1,59 @@
+{
+  "archive_parent": "30553d0cb4e24c84fd4e7f4095a5dbe18053f535",
+  "archive_parent_is_not_a_new_measured_baseline": true,
+  "main_files": [
+    {
+      "bytes": 83407,
+      "path": "libraries/mlf-crates/Bootstrap/CrateSession.hs",
+      "sha256": "a13c01632001643b683e54c10775eb9a262faf0d6766c52209a3ec0704fd9bdd",
+      "url": "https://github.com/mlf-lang/mlf/blob/fc300bc9fdc389b585cbef0630fc8915d53e89c5/libraries/mlf-crates/Bootstrap/CrateSession.hs"
+    },
+    {
+      "bytes": 28172,
+      "path": "libraries/mlf-crates/Bootstrap/CrateGraph.hs",
+      "sha256": "52b0fcf312aec770515980f78d0ee44e1f29e248c496468536f44f20495880ee",
+      "url": "https://github.com/mlf-lang/mlf/blob/fc300bc9fdc389b585cbef0630fc8915d53e89c5/libraries/mlf-crates/Bootstrap/CrateGraph.hs"
+    },
+    {
+      "bytes": 44928,
+      "path": "libraries/mlf-crates/Bootstrap/QueryGraph.hs",
+      "sha256": "f66d6ff37a13558ec54e4aa3d5243dde63a75ad77d0fd5f614b93195632cdd71",
+      "url": "https://github.com/mlf-lang/mlf/blob/fc300bc9fdc389b585cbef0630fc8915d53e89c5/libraries/mlf-crates/Bootstrap/QueryGraph.hs"
+    },
+    {
+      "bytes": 82558,
+      "path": "libraries/mlf-crates/Bootstrap/Bitstream.hs",
+      "sha256": "f25fe195b5a287fd0c365286acb31839118edac2227f463ea5cc85eb26daedb8",
+      "url": "https://github.com/mlf-lang/mlf/blob/fc300bc9fdc389b585cbef0630fc8915d53e89c5/libraries/mlf-crates/Bootstrap/Bitstream.hs"
+    },
+    {
+      "bytes": 141700,
+      "path": "libraries/mlf-crates/Bootstrap/ArtifactStructure.hs",
+      "sha256": "2b4a215dad741f09fa9e9026d15ad44f96fa1a2f0c260c9f030d7c0a2cc5ac23",
+      "url": "https://github.com/mlf-lang/mlf/blob/fc300bc9fdc389b585cbef0630fc8915d53e89c5/libraries/mlf-crates/Bootstrap/ArtifactStructure.hs"
+    },
+    {
+      "bytes": 6525,
+      "path": "tools/performance/compiler-shapes/generate.py",
+      "sha256": "1648034e7bfe721d025d0d0fae1f404713b4e5ab267ed780ac356baed0848f0a",
+      "url": "https://github.com/mlf-lang/mlf/blob/fc300bc9fdc389b585cbef0630fc8915d53e89c5/tools/performance/compiler-shapes/generate.py"
+    },
+    {
+      "bytes": 6387,
+      "path": "tools/shared/resource_watchdog.py",
+      "sha256": "5368803eb84dabc9dcefa89225b6ff56afd637e105f227bade15e40f9a5e923f",
+      "url": "https://github.com/mlf-lang/mlf/blob/fc300bc9fdc389b585cbef0630fc8915d53e89c5/tools/shared/resource_watchdog.py"
+    },
+    {
+      "bytes": 58175,
+      "path": "bootstrap/MLF/Entry/Emlf.hs",
+      "sha256": "171273f182ff3b4b2b65f1eb03bb8db002ee07a5b57b77cee96e5a8c5f6ba480",
+      "url": "https://github.com/mlf-lang/mlf/blob/fc300bc9fdc389b585cbef0630fc8915d53e89c5/bootstrap/MLF/Entry/Emlf.hs"
+    }
+  ],
+  "no_F25_qualification_transfer": true,
+  "no_current_main_or_native_parity_claim": true,
+  "qualified_ordinary_producer_public_archive": "https://github.com/mlf-lang/mlf/tree/30553d0cb4e24c84fd4e7f4095a5dbe18053f535/tools/performance/main-baseline-gap-20261114",
+  "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "source_tree": "386f0b41ab5f9b39fca273f3040f51d73df924a1"
+}

@@ -1,0 +1,1185 @@
+{
+  "no_runner_or_admission": true,
+  "order_per_cell": [
+    "M",
+    "G",
+    "G",
+    "M"
+  ],
+  "reorder_or_retry_authorized": false,
+  "rows": [
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "baseline-0",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "01-baseline-0-M",
+      "lane": "M",
+      "ordinal": 1,
+      "source_files": [
+        {
+          "bytes": 396,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/baseline-0/Main.hs",
+          "sha256": "522b3106f7dab67ca6f7dd1f3b705acd3d8a5e8113740a6a6ce30eeaaa7efd03"
+        }
+      ],
+      "within_cell": 1
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "baseline-0",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "02-baseline-0-G",
+      "lane": "G",
+      "ordinal": 2,
+      "source_files": [
+        {
+          "bytes": 396,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/baseline-0/Main.hs",
+          "sha256": "522b3106f7dab67ca6f7dd1f3b705acd3d8a5e8113740a6a6ce30eeaaa7efd03"
+        }
+      ],
+      "within_cell": 2
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "baseline-0",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "03-baseline-0-G",
+      "lane": "G",
+      "ordinal": 3,
+      "source_files": [
+        {
+          "bytes": 396,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/baseline-0/Main.hs",
+          "sha256": "522b3106f7dab67ca6f7dd1f3b705acd3d8a5e8113740a6a6ce30eeaaa7efd03"
+        }
+      ],
+      "within_cell": 3
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "baseline-0",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "04-baseline-0-M",
+      "lane": "M",
+      "ordinal": 4,
+      "source_files": [
+        {
+          "bytes": 396,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/baseline-0/Main.hs",
+          "sha256": "522b3106f7dab67ca6f7dd1f3b705acd3d8a5e8113740a6a6ce30eeaaa7efd03"
+        }
+      ],
+      "within_cell": 4
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "flat_functions-16",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "05-flat_functions-16-M",
+      "lane": "M",
+      "ordinal": 5,
+      "source_files": [
+        {
+          "bytes": 1255,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-16/Main.hs",
+          "sha256": "a5254beedeb16e7bf58791f4e7e27a44329bed18369bfb501414cbf230049249"
+        }
+      ],
+      "within_cell": 1
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "flat_functions-16",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "06-flat_functions-16-G",
+      "lane": "G",
+      "ordinal": 6,
+      "source_files": [
+        {
+          "bytes": 1255,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-16/Main.hs",
+          "sha256": "a5254beedeb16e7bf58791f4e7e27a44329bed18369bfb501414cbf230049249"
+        }
+      ],
+      "within_cell": 2
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "flat_functions-16",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "07-flat_functions-16-G",
+      "lane": "G",
+      "ordinal": 7,
+      "source_files": [
+        {
+          "bytes": 1255,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-16/Main.hs",
+          "sha256": "a5254beedeb16e7bf58791f4e7e27a44329bed18369bfb501414cbf230049249"
+        }
+      ],
+      "within_cell": 3
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "flat_functions-16",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "08-flat_functions-16-M",
+      "lane": "M",
+      "ordinal": 8,
+      "source_files": [
+        {
+          "bytes": 1255,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-16/Main.hs",
+          "sha256": "a5254beedeb16e7bf58791f4e7e27a44329bed18369bfb501414cbf230049249"
+        }
+      ],
+      "within_cell": 4
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "flat_functions-32",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "09-flat_functions-32-M",
+      "lane": "M",
+      "ordinal": 9,
+      "source_files": [
+        {
+          "bytes": 2167,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-32/Main.hs",
+          "sha256": "ea9ae079ef50cf57b8c5869466666e774e8524ba735aeca684cdf4be7e493a81"
+        }
+      ],
+      "within_cell": 1
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "flat_functions-32",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "10-flat_functions-32-G",
+      "lane": "G",
+      "ordinal": 10,
+      "source_files": [
+        {
+          "bytes": 2167,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-32/Main.hs",
+          "sha256": "ea9ae079ef50cf57b8c5869466666e774e8524ba735aeca684cdf4be7e493a81"
+        }
+      ],
+      "within_cell": 2
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "flat_functions-32",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "11-flat_functions-32-G",
+      "lane": "G",
+      "ordinal": 11,
+      "source_files": [
+        {
+          "bytes": 2167,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-32/Main.hs",
+          "sha256": "ea9ae079ef50cf57b8c5869466666e774e8524ba735aeca684cdf4be7e493a81"
+        }
+      ],
+      "within_cell": 3
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "flat_functions-32",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "12-flat_functions-32-M",
+      "lane": "M",
+      "ordinal": 12,
+      "source_files": [
+        {
+          "bytes": 2167,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-32/Main.hs",
+          "sha256": "ea9ae079ef50cf57b8c5869466666e774e8524ba735aeca684cdf4be7e493a81"
+        }
+      ],
+      "within_cell": 4
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "flat_functions-64",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "13-flat_functions-64-M",
+      "lane": "M",
+      "ordinal": 13,
+      "source_files": [
+        {
+          "bytes": 3991,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-64/Main.hs",
+          "sha256": "a578c5cd2e6dd90dd1c41a85c65cfabcda69ebf5e2f4e3eada29c4b5dcbfe121"
+        }
+      ],
+      "within_cell": 1
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "flat_functions-64",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "14-flat_functions-64-G",
+      "lane": "G",
+      "ordinal": 14,
+      "source_files": [
+        {
+          "bytes": 3991,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-64/Main.hs",
+          "sha256": "a578c5cd2e6dd90dd1c41a85c65cfabcda69ebf5e2f4e3eada29c4b5dcbfe121"
+        }
+      ],
+      "within_cell": 2
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "flat_functions-64",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "15-flat_functions-64-G",
+      "lane": "G",
+      "ordinal": 15,
+      "source_files": [
+        {
+          "bytes": 3991,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-64/Main.hs",
+          "sha256": "a578c5cd2e6dd90dd1c41a85c65cfabcda69ebf5e2f4e3eada29c4b5dcbfe121"
+        }
+      ],
+      "within_cell": 3
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "flat_functions-64",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "16-flat_functions-64-M",
+      "lane": "M",
+      "ordinal": 16,
+      "source_files": [
+        {
+          "bytes": 3991,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-64/Main.hs",
+          "sha256": "a578c5cd2e6dd90dd1c41a85c65cfabcda69ebf5e2f4e3eada29c4b5dcbfe121"
+        }
+      ],
+      "within_cell": 4
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "flat_functions-128",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "17-flat_functions-128-M",
+      "lane": "M",
+      "ordinal": 17,
+      "source_files": [
+        {
+          "bytes": 7751,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-128/Main.hs",
+          "sha256": "af48eb052fca7df869588c13f805ccda52e6ac55451d8b4709237943a5677640"
+        }
+      ],
+      "within_cell": 1
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "flat_functions-128",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "18-flat_functions-128-G",
+      "lane": "G",
+      "ordinal": 18,
+      "source_files": [
+        {
+          "bytes": 7751,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-128/Main.hs",
+          "sha256": "af48eb052fca7df869588c13f805ccda52e6ac55451d8b4709237943a5677640"
+        }
+      ],
+      "within_cell": 2
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "flat_functions-128",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "19-flat_functions-128-G",
+      "lane": "G",
+      "ordinal": 19,
+      "source_files": [
+        {
+          "bytes": 7751,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-128/Main.hs",
+          "sha256": "af48eb052fca7df869588c13f805ccda52e6ac55451d8b4709237943a5677640"
+        }
+      ],
+      "within_cell": 3
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "flat_functions-128",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "20-flat_functions-128-M",
+      "lane": "M",
+      "ordinal": 20,
+      "source_files": [
+        {
+          "bytes": 7751,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-128/Main.hs",
+          "sha256": "af48eb052fca7df869588c13f805ccda52e6ac55451d8b4709237943a5677640"
+        }
+      ],
+      "within_cell": 4
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "flat_functions-256",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "21-flat_functions-256-M",
+      "lane": "M",
+      "ordinal": 21,
+      "source_files": [
+        {
+          "bytes": 15559,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-256/Main.hs",
+          "sha256": "af2371d80197e98f3fb2aa3ea99bac91e95a8905a1d6f3fe2952426a4ec83881"
+        }
+      ],
+      "within_cell": 1
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "flat_functions-256",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "22-flat_functions-256-G",
+      "lane": "G",
+      "ordinal": 22,
+      "source_files": [
+        {
+          "bytes": 15559,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-256/Main.hs",
+          "sha256": "af2371d80197e98f3fb2aa3ea99bac91e95a8905a1d6f3fe2952426a4ec83881"
+        }
+      ],
+      "within_cell": 2
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "flat_functions-256",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "23-flat_functions-256-G",
+      "lane": "G",
+      "ordinal": 23,
+      "source_files": [
+        {
+          "bytes": 15559,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-256/Main.hs",
+          "sha256": "af2371d80197e98f3fb2aa3ea99bac91e95a8905a1d6f3fe2952426a4ec83881"
+        }
+      ],
+      "within_cell": 3
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "flat_functions-256",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "24-flat_functions-256-M",
+      "lane": "M",
+      "ordinal": 24,
+      "source_files": [
+        {
+          "bytes": 15559,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-256/Main.hs",
+          "sha256": "af2371d80197e98f3fb2aa3ea99bac91e95a8905a1d6f3fe2952426a4ec83881"
+        }
+      ],
+      "within_cell": 4
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "higher_order_chain-16",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "25-higher_order_chain-16-M",
+      "lane": "M",
+      "ordinal": 25,
+      "source_files": [
+        {
+          "bytes": 816,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-16/Main.hs",
+          "sha256": "c5bc5b63bfdcd05b263b625788b77846fdac1d5fe69c7c36ae6abed100c1bb2b"
+        }
+      ],
+      "within_cell": 1
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "higher_order_chain-16",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "26-higher_order_chain-16-G",
+      "lane": "G",
+      "ordinal": 26,
+      "source_files": [
+        {
+          "bytes": 816,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-16/Main.hs",
+          "sha256": "c5bc5b63bfdcd05b263b625788b77846fdac1d5fe69c7c36ae6abed100c1bb2b"
+        }
+      ],
+      "within_cell": 2
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "higher_order_chain-16",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "27-higher_order_chain-16-G",
+      "lane": "G",
+      "ordinal": 27,
+      "source_files": [
+        {
+          "bytes": 816,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-16/Main.hs",
+          "sha256": "c5bc5b63bfdcd05b263b625788b77846fdac1d5fe69c7c36ae6abed100c1bb2b"
+        }
+      ],
+      "within_cell": 3
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "higher_order_chain-16",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "28-higher_order_chain-16-M",
+      "lane": "M",
+      "ordinal": 28,
+      "source_files": [
+        {
+          "bytes": 816,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-16/Main.hs",
+          "sha256": "c5bc5b63bfdcd05b263b625788b77846fdac1d5fe69c7c36ae6abed100c1bb2b"
+        }
+      ],
+      "within_cell": 4
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "higher_order_chain-32",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "29-higher_order_chain-32-M",
+      "lane": "M",
+      "ordinal": 29,
+      "source_files": [
+        {
+          "bytes": 1056,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-32/Main.hs",
+          "sha256": "5943c0526bd00cbe8d76b60643e1495c8a07122c3c5a6fb2a59215bfd5c3db49"
+        }
+      ],
+      "within_cell": 1
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "higher_order_chain-32",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "30-higher_order_chain-32-G",
+      "lane": "G",
+      "ordinal": 30,
+      "source_files": [
+        {
+          "bytes": 1056,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-32/Main.hs",
+          "sha256": "5943c0526bd00cbe8d76b60643e1495c8a07122c3c5a6fb2a59215bfd5c3db49"
+        }
+      ],
+      "within_cell": 2
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "higher_order_chain-32",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "31-higher_order_chain-32-G",
+      "lane": "G",
+      "ordinal": 31,
+      "source_files": [
+        {
+          "bytes": 1056,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-32/Main.hs",
+          "sha256": "5943c0526bd00cbe8d76b60643e1495c8a07122c3c5a6fb2a59215bfd5c3db49"
+        }
+      ],
+      "within_cell": 3
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "higher_order_chain-32",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "32-higher_order_chain-32-M",
+      "lane": "M",
+      "ordinal": 32,
+      "source_files": [
+        {
+          "bytes": 1056,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-32/Main.hs",
+          "sha256": "5943c0526bd00cbe8d76b60643e1495c8a07122c3c5a6fb2a59215bfd5c3db49"
+        }
+      ],
+      "within_cell": 4
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "higher_order_chain-64",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "33-higher_order_chain-64-M",
+      "lane": "M",
+      "ordinal": 33,
+      "source_files": [
+        {
+          "bytes": 1536,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-64/Main.hs",
+          "sha256": "d8a72fb0850ef38bf04df17b1490061f6d20ccc7d1dd59a7ca29146a70969a8c"
+        }
+      ],
+      "within_cell": 1
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "higher_order_chain-64",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "34-higher_order_chain-64-G",
+      "lane": "G",
+      "ordinal": 34,
+      "source_files": [
+        {
+          "bytes": 1536,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-64/Main.hs",
+          "sha256": "d8a72fb0850ef38bf04df17b1490061f6d20ccc7d1dd59a7ca29146a70969a8c"
+        }
+      ],
+      "within_cell": 2
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "higher_order_chain-64",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "35-higher_order_chain-64-G",
+      "lane": "G",
+      "ordinal": 35,
+      "source_files": [
+        {
+          "bytes": 1536,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-64/Main.hs",
+          "sha256": "d8a72fb0850ef38bf04df17b1490061f6d20ccc7d1dd59a7ca29146a70969a8c"
+        }
+      ],
+      "within_cell": 3
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "higher_order_chain-64",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "36-higher_order_chain-64-M",
+      "lane": "M",
+      "ordinal": 36,
+      "source_files": [
+        {
+          "bytes": 1536,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-64/Main.hs",
+          "sha256": "d8a72fb0850ef38bf04df17b1490061f6d20ccc7d1dd59a7ca29146a70969a8c"
+        }
+      ],
+      "within_cell": 4
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "higher_order_chain-128",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "37-higher_order_chain-128-M",
+      "lane": "M",
+      "ordinal": 37,
+      "source_files": [
+        {
+          "bytes": 2496,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-128/Main.hs",
+          "sha256": "ba13ac3b8d15d7b1d4c63fcc9698c86b9cbca1b6244dd1b1ee6a89e2e6ce41da"
+        }
+      ],
+      "within_cell": 1
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "higher_order_chain-128",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "38-higher_order_chain-128-G",
+      "lane": "G",
+      "ordinal": 38,
+      "source_files": [
+        {
+          "bytes": 2496,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-128/Main.hs",
+          "sha256": "ba13ac3b8d15d7b1d4c63fcc9698c86b9cbca1b6244dd1b1ee6a89e2e6ce41da"
+        }
+      ],
+      "within_cell": 2
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "higher_order_chain-128",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "39-higher_order_chain-128-G",
+      "lane": "G",
+      "ordinal": 39,
+      "source_files": [
+        {
+          "bytes": 2496,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-128/Main.hs",
+          "sha256": "ba13ac3b8d15d7b1d4c63fcc9698c86b9cbca1b6244dd1b1ee6a89e2e6ce41da"
+        }
+      ],
+      "within_cell": 3
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "higher_order_chain-128",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "40-higher_order_chain-128-M",
+      "lane": "M",
+      "ordinal": 40,
+      "source_files": [
+        {
+          "bytes": 2496,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-128/Main.hs",
+          "sha256": "ba13ac3b8d15d7b1d4c63fcc9698c86b9cbca1b6244dd1b1ee6a89e2e6ce41da"
+        }
+      ],
+      "within_cell": 4
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "higher_order_chain-256",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "41-higher_order_chain-256-M",
+      "lane": "M",
+      "ordinal": 41,
+      "source_files": [
+        {
+          "bytes": 4416,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-256/Main.hs",
+          "sha256": "0747d08346964a72c21f11990bbc9deec4d31e9dd05629e71df8668dc75c76a7"
+        }
+      ],
+      "within_cell": 1
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "higher_order_chain-256",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "42-higher_order_chain-256-G",
+      "lane": "G",
+      "ordinal": 42,
+      "source_files": [
+        {
+          "bytes": 4416,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-256/Main.hs",
+          "sha256": "0747d08346964a72c21f11990bbc9deec4d31e9dd05629e71df8668dc75c76a7"
+        }
+      ],
+      "within_cell": 2
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "higher_order_chain-256",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "43-higher_order_chain-256-G",
+      "lane": "G",
+      "ordinal": 43,
+      "source_files": [
+        {
+          "bytes": 4416,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-256/Main.hs",
+          "sha256": "0747d08346964a72c21f11990bbc9deec4d31e9dd05629e71df8668dc75c76a7"
+        }
+      ],
+      "within_cell": 3
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "higher_order_chain-256",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "44-higher_order_chain-256-M",
+      "lane": "M",
+      "ordinal": 44,
+      "source_files": [
+        {
+          "bytes": 4416,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-256/Main.hs",
+          "sha256": "0747d08346964a72c21f11990bbc9deec4d31e9dd05629e71df8668dc75c76a7"
+        }
+      ],
+      "within_cell": 4
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "foundation14",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "45-foundation14-M",
+      "lane": "M",
+      "ordinal": 45,
+      "source_files": [
+        {
+          "bytes": 2592,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Fresh.hs",
+          "sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d"
+        },
+        {
+          "bytes": 3246,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Host.hs",
+          "sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5"
+        },
+        {
+          "bytes": 5573,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IndexVec.hs",
+          "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e"
+        },
+        {
+          "bytes": 21811,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntMap.hs",
+          "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e"
+        },
+        {
+          "bytes": 6684,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntRank.hs",
+          "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
+        },
+        {
+          "bytes": 17405,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntSet.hs",
+          "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe"
+        },
+        {
+          "bytes": 3727,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntTree.hs",
+          "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49"
+        },
+        {
+          "bytes": 17218,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Map.hs",
+          "sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0"
+        },
+        {
+          "bytes": 2539,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/ST.hs",
+          "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2"
+        },
+        {
+          "bytes": 4093,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Set.hs",
+          "sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f"
+        },
+        {
+          "bytes": 20088,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Std.hs",
+          "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca"
+        },
+        {
+          "bytes": 12757,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Types.hs",
+          "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596"
+        },
+        {
+          "bytes": 55534,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Unicode.hs",
+          "sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077"
+        },
+        {
+          "bytes": 327,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Version.hs",
+          "sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479"
+        }
+      ],
+      "within_cell": 1
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "foundation14",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "46-foundation14-G",
+      "lane": "G",
+      "ordinal": 46,
+      "source_files": [
+        {
+          "bytes": 2592,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Fresh.hs",
+          "sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d"
+        },
+        {
+          "bytes": 3246,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Host.hs",
+          "sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5"
+        },
+        {
+          "bytes": 5573,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IndexVec.hs",
+          "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e"
+        },
+        {
+          "bytes": 21811,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntMap.hs",
+          "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e"
+        },
+        {
+          "bytes": 6684,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntRank.hs",
+          "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
+        },
+        {
+          "bytes": 17405,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntSet.hs",
+          "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe"
+        },
+        {
+          "bytes": 3727,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntTree.hs",
+          "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49"
+        },
+        {
+          "bytes": 17218,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Map.hs",
+          "sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0"
+        },
+        {
+          "bytes": 2539,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/ST.hs",
+          "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2"
+        },
+        {
+          "bytes": 4093,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Set.hs",
+          "sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f"
+        },
+        {
+          "bytes": 20088,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Std.hs",
+          "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca"
+        },
+        {
+          "bytes": 12757,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Types.hs",
+          "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596"
+        },
+        {
+          "bytes": 55534,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Unicode.hs",
+          "sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077"
+        },
+        {
+          "bytes": 327,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Version.hs",
+          "sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479"
+        }
+      ],
+      "within_cell": 2
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "foundation14",
+      "endpoint": "GHC typed interfaces (-fno-code -fwrite-interface -no-link)",
+      "id": "47-foundation14-G",
+      "lane": "G",
+      "ordinal": 47,
+      "source_files": [
+        {
+          "bytes": 2592,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Fresh.hs",
+          "sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d"
+        },
+        {
+          "bytes": 3246,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Host.hs",
+          "sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5"
+        },
+        {
+          "bytes": 5573,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IndexVec.hs",
+          "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e"
+        },
+        {
+          "bytes": 21811,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntMap.hs",
+          "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e"
+        },
+        {
+          "bytes": 6684,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntRank.hs",
+          "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
+        },
+        {
+          "bytes": 17405,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntSet.hs",
+          "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe"
+        },
+        {
+          "bytes": 3727,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntTree.hs",
+          "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49"
+        },
+        {
+          "bytes": 17218,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Map.hs",
+          "sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0"
+        },
+        {
+          "bytes": 2539,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/ST.hs",
+          "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2"
+        },
+        {
+          "bytes": 4093,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Set.hs",
+          "sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f"
+        },
+        {
+          "bytes": 20088,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Std.hs",
+          "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca"
+        },
+        {
+          "bytes": 12757,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Types.hs",
+          "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596"
+        },
+        {
+          "bytes": 55534,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Unicode.hs",
+          "sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077"
+        },
+        {
+          "bytes": 327,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Version.hs",
+          "sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479"
+        }
+      ],
+      "within_cell": 3
+    },
+    {
+      "actual_elapsed": null,
+      "actual_output": null,
+      "actual_qualified": false,
+      "attempts": 1,
+      "cell": "foundation14",
+      "endpoint": "MLF checked+published artifacts",
+      "id": "48-foundation14-M",
+      "lane": "M",
+      "ordinal": 48,
+      "source_files": [
+        {
+          "bytes": 2592,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Fresh.hs",
+          "sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d"
+        },
+        {
+          "bytes": 3246,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Host.hs",
+          "sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5"
+        },
+        {
+          "bytes": 5573,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IndexVec.hs",
+          "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e"
+        },
+        {
+          "bytes": 21811,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntMap.hs",
+          "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e"
+        },
+        {
+          "bytes": 6684,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntRank.hs",
+          "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
+        },
+        {
+          "bytes": 17405,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntSet.hs",
+          "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe"
+        },
+        {
+          "bytes": 3727,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntTree.hs",
+          "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49"
+        },
+        {
+          "bytes": 17218,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Map.hs",
+          "sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0"
+        },
+        {
+          "bytes": 2539,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/ST.hs",
+          "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2"
+        },
+        {
+          "bytes": 4093,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Set.hs",
+          "sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f"
+        },
+        {
+          "bytes": 20088,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Std.hs",
+          "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca"
+        },
+        {
+          "bytes": 12757,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Types.hs",
+          "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596"
+        },
+        {
+          "bytes": 55534,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Unicode.hs",
+          "sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077"
+        },
+        {
+          "bytes": 327,
+          "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Version.hs",
+          "sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479"
+        }
+      ],
+      "within_cell": 4
+    }
+  ],
+  "schema": "main-gap-fixed-leg-order-v1"
+}

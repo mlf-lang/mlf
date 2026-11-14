@@ -1,0 +1,442 @@
+{
+  "actual_build_receipt_read_for_schema_only": {
+    "bytes": 1230015,
+    "path": "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/receipt.json",
+    "sha256": "e5481f38045862a0b5740ab9cb93249a5251af4779ad509992e94b5d89ee55cc"
+  },
+  "actual_main_producer_qualification_claimed": false,
+  "baseline_actual_elapsed_consumed_readonly": 222555214358,
+  "check_count": 98,
+  "checks": [
+    {
+      "name": "disabled only; SETUP600 independent ceiling600",
+      "passed": true
+    },
+    {
+      "name": "real serialized config string/Path equivalent",
+      "passed": true
+    },
+    {
+      "name": "all actual serialized static inputs close read-only",
+      "passed": true
+    },
+    {
+      "name": "changed real source_inventory rejects",
+      "passed": true
+    },
+    {
+      "name": "changed real baseline_controller rejects",
+      "passed": true
+    },
+    {
+      "name": "changed real contract_manifest rejects",
+      "passed": true
+    },
+    {
+      "name": "changed real closures rejects",
+      "passed": true
+    },
+    {
+      "name": "changed real stats_parser rejects",
+      "passed": true
+    },
+    {
+      "name": "changed real runtime_helper rejects",
+      "passed": true
+    },
+    {
+      "name": "changed real ghc_pkg rejects",
+      "passed": true
+    },
+    {
+      "name": "changed real ghc_pkg_elf rejects",
+      "passed": true
+    },
+    {
+      "name": "changed real ar rejects",
+      "passed": true
+    },
+    {
+      "name": "changed real shell rejects",
+      "passed": true
+    },
+    {
+      "name": "changed real commands rejects",
+      "passed": true
+    },
+    {
+      "name": "0 plus600 fits exact600",
+      "passed": true
+    },
+    {
+      "name": "nonzero or invalid independent prefix 1",
+      "passed": true
+    },
+    {
+      "name": "nonzero or invalid independent prefix -1",
+      "passed": true
+    },
+    {
+      "name": "nonzero or invalid independent prefix True",
+      "passed": true
+    },
+    {
+      "name": "nonzero or invalid independent prefix 0.0",
+      "passed": true
+    },
+    {
+      "name": "nonzero or invalid independent prefix None",
+      "passed": true
+    },
+    {
+      "name": "unknown next stage rejects",
+      "passed": true
+    },
+    {
+      "name": "exact integer return envelope",
+      "passed": true
+    },
+    {
+      "name": "bad real envelope field guard_call_returned False",
+      "passed": true
+    },
+    {
+      "name": "bad real envelope field elapsed_ns True",
+      "passed": true
+    },
+    {
+      "name": "bad real envelope field elapsed_ns 6.0",
+      "passed": true
+    },
+    {
+      "name": "bad real envelope field start_ns -1",
+      "passed": true
+    },
+    {
+      "name": "bad real envelope field elapsed_ns 7",
+      "passed": true
+    },
+    {
+      "name": "bad real envelope field return_ns 22",
+      "passed": true
+    },
+    {
+      "name": "actual installed package inventory is list, not guessed dictionary",
+      "passed": true
+    },
+    {
+      "name": "actual serialized base unit id/config closes",
+      "passed": true
+    },
+    {
+      "name": "wrong named package id base rejects",
+      "passed": true
+    },
+    {
+      "name": "actual serialized array unit id/config closes",
+      "passed": true
+    },
+    {
+      "name": "wrong named package id array rejects",
+      "passed": true
+    },
+    {
+      "name": "actual serialized bytestring unit id/config closes",
+      "passed": true
+    },
+    {
+      "name": "wrong named package id bytestring rejects",
+      "passed": true
+    },
+    {
+      "name": "actual serialized text unit id/config closes",
+      "passed": true
+    },
+    {
+      "name": "wrong named package id text rejects",
+      "passed": true
+    },
+    {
+      "name": "actual serialized containers unit id/config closes",
+      "passed": true
+    },
+    {
+      "name": "wrong named package id containers rejects",
+      "passed": true
+    },
+    {
+      "name": "actual serialized directory unit id/config closes",
+      "passed": true
+    },
+    {
+      "name": "wrong named package id directory rejects",
+      "passed": true
+    },
+    {
+      "name": "noncanonical package output b''",
+      "passed": true
+    },
+    {
+      "name": "noncanonical package output b'base'",
+      "passed": true
+    },
+    {
+      "name": "noncanonical package output b'base\\nbase\\n'",
+      "passed": true
+    },
+    {
+      "name": "noncanonical package output b'base  foo\\n'",
+      "passed": true
+    },
+    {
+      "name": "noncanonical package output b'base\\r\\n'",
+      "passed": true
+    },
+    {
+      "name": "noncanonical package output b'\\xff\\n'",
+      "passed": true
+    },
+    {
+      "name": "source closure exactly90 shared plus4 host",
+      "passed": true
+    },
+    {
+      "name": "actual serialized94 source/object/interface joins all close read-only",
+      "passed": true
+    },
+    {
+      "name": "actual import transform retains demand/O2 and strips source search",
+      "passed": true
+    },
+    {
+      "name": "never borrows last Main",
+      "passed": true
+    },
+    {
+      "name": "literal one fresh fixture",
+      "passed": true
+    },
+    {
+      "name": "bad fixture field inferred_groups True",
+      "passed": true
+    },
+    {
+      "name": "bad fixture field reused_groups 1",
+      "passed": true
+    },
+    {
+      "name": "bad fixture field format True",
+      "passed": true
+    },
+    {
+      "name": "bad fixture field crate 'wrong'",
+      "passed": true
+    },
+    {
+      "name": "bad fixture field groups []",
+      "passed": true
+    },
+    {
+      "name": "bad fixture field groups [{'cached': True, 'id': 'x'}]",
+      "passed": true
+    },
+    {
+      "name": "raw pack framing Unicode scalar lengths",
+      "passed": true
+    },
+    {
+      "name": "exact builtin owners accepted",
+      "passed": true
+    },
+    {
+      "name": "missing owner rejected",
+      "passed": true
+    },
+    {
+      "name": "missing dependency rejected",
+      "passed": true
+    },
+    {
+      "name": "fixed40 ledger exact13+11+16",
+      "passed": true
+    },
+    {
+      "name": "six package ID reads are guarded payload commands",
+      "passed": true
+    },
+    {
+      "name": "only one baseline controller launch per setup phase",
+      "passed": true
+    },
+    {
+      "name": "exactly one bounded nested target call site",
+      "passed": true
+    },
+    {
+      "name": "payload setup contains no subprocess calls",
+      "passed": true
+    },
+    {
+      "name": "no native setup helpers or full suite call sites",
+      "passed": true
+    },
+    {
+      "name": "mature require AST unchanged",
+      "passed": true
+    },
+    {
+      "name": "mature safe AST unchanged",
+      "passed": true
+    },
+    {
+      "name": "mature sha AST unchanged",
+      "passed": true
+    },
+    {
+      "name": "mature pin AST unchanged",
+      "passed": true
+    },
+    {
+      "name": "mature verify_pin AST unchanged",
+      "passed": true
+    },
+    {
+      "name": "mature load AST unchanged",
+      "passed": true
+    },
+    {
+      "name": "mature save AST unchanged",
+      "passed": true
+    },
+    {
+      "name": "mature module AST unchanged",
+      "passed": true
+    },
+    {
+      "name": "mature source_check AST unchanged",
+      "passed": true
+    },
+    {
+      "name": "mature entry_ns AST unchanged",
+      "passed": true
+    },
+    {
+      "name": "mature row_sha AST unchanged",
+      "passed": true
+    },
+    {
+      "name": "mature resource_snapshot AST unchanged",
+      "passed": true
+    },
+    {
+      "name": "mature command AST unchanged",
+      "passed": true
+    },
+    {
+      "name": "original run_guard call AST exact",
+      "passed": true
+    },
+    {
+      "name": "original dual lock held/free loop AST exact",
+      "passed": true
+    },
+    {
+      "name": "source package self identity single constant",
+      "passed": true
+    },
+    {
+      "name": "no source or work writes in extracted functions",
+      "passed": true
+    },
+    {
+      "name": "genuine full serialized BUILD+CONTROLS prefix consumer closes",
+      "passed": true
+    },
+    {
+      "name": "historical consumer never reads current boot",
+      "passed": true
+    },
+    {
+      "name": "new SETUP epoch still verifies current boot",
+      "passed": true
+    },
+    {
+      "name": "original historical epoch identity predicate",
+      "passed": true
+    },
+    {
+      "name": "pure historical other-boot identity model accepted, not actual reboot proof",
+      "passed": true
+    },
+    {
+      "name": "pure historical bad identity boot_id",
+      "passed": true
+    },
+    {
+      "name": "pure historical bad identity boot_id",
+      "passed": true
+    },
+    {
+      "name": "pure historical bad identity phase",
+      "passed": true
+    },
+    {
+      "name": "pure historical bad identity created_for",
+      "passed": true
+    },
+    {
+      "name": "independent setup entry remains zero",
+      "passed": true
+    },
+    {
+      "name": "wrong real BUILD identity rejects before module use",
+      "passed": true
+    },
+    {
+      "name": "wrong real CONTROLS identity rejects before module use",
+      "passed": true
+    },
+    {
+      "name": "missing controls does not qualify",
+      "passed": true
+    }
+  ],
+  "complete": true,
+  "genuine_baseline_reviews_read": {
+    "BUILD": {
+      "bytes": 11989,
+      "path": "<EXPERIMENT_ROOT>/main-baseline-build-actual-review/report.json",
+      "sha256": "1acb2883c21d33ec57250901fc1dfbd88bd4a181a5768ed41e190ebaf6c12c0d"
+    },
+    "CONTROLS": {
+      "bytes": 14818,
+      "path": "<EXPERIMENT_ROOT>/main-baseline-controls-actual-review/report.json",
+      "sha256": "619e23eed06688a685a31c5c9114ed570fef3c9c94b1829964bec0aa16a88b41"
+    }
+  },
+  "only_whitelisted_AST_read_hash_literal_functions_executed": [
+    "require",
+    "safe",
+    "sha",
+    "pin",
+    "verify_pin",
+    "load",
+    "configuration",
+    "static_inputs",
+    "envelope_ns",
+    "entry_ns",
+    "row_sha",
+    "inner_command",
+    "command",
+    "import_flags",
+    "pack",
+    "interface",
+    "fresh_fixture",
+    "unit_id",
+    "tree_pins",
+    "completed_epoch_identity"
+  ],
+  "schema": "main-gap-setup-pure-source-checks-v1",
+  "setup_elapsed_inherited": 0,
+  "target_or_helper_or_guard_or_lock_executed": false
+}

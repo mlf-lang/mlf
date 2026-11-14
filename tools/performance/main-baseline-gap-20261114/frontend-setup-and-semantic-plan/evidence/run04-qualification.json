@@ -1,0 +1,590 @@
+{
+  "activation_review_original": {
+    "bytes": 2425,
+    "sha256": "441f95e731e46d1933a5d468f4ebeb8cc77af84b5d3acb6ec71d76d657214f67",
+    "source_artifact": "main-gap-setup-run04-enabled-review/report.json"
+  },
+  "actual_SETUP_passed": true,
+  "actual_stage_review_passed": true,
+  "archive_representation": "selected factual independent-review summary, path-redacted; not original report bytes",
+  "baseline_pin_count_rechecked": 6265,
+  "baseline_source_tool_object_runtime_pins_unchanged": true,
+  "blockers": [],
+  "budget": {
+    "budget_passed": true,
+    "cumulative_ns": 52358162878,
+    "elapsed_ns": 52358162878,
+    "elapsed_valid": true,
+    "includes_outer_cleanup_time": true,
+    "maximum_ns": 600000000000,
+    "original_guard_elapsed_seconds_excludes_cleanup": 52.22660095199535,
+    "prior_ns": 0
+  },
+  "cleanup_inclusive_ns_verified": true,
+  "cleanup_lease_locks_verified": true,
+  "commands": {
+    "all_children_guard_complete_and_cleanup": true,
+    "all_other_child_exits": 0,
+    "count": 40,
+    "detailed_inventory": {
+      "bytes": 83069,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04-actual-review/completed-children.json",
+      "sha256": "b1fc41e96580d5cdf4c3b5bde36e35e70dda4a45f112da7f24444bf298f2f620"
+    },
+    "expected_type_rejection_exit": 1,
+    "expected_type_rejection_ordinal": 28,
+    "full_order_argv_kind_caps_expected_exit_raw_outputs_and_each_nested_guard_verified": true,
+    "order": [
+      {
+        "exit_code": 0,
+        "kind": "runtime",
+        "label": "runtime-python-before",
+        "ordinal": 1
+      },
+      {
+        "exit_code": 0,
+        "kind": "runtime",
+        "label": "runtime-ghc-before",
+        "ordinal": 2
+      },
+      {
+        "exit_code": 0,
+        "kind": "runtime",
+        "label": "runtime-ghc-pkg-before",
+        "ordinal": 3
+      },
+      {
+        "exit_code": 0,
+        "kind": "runtime",
+        "label": "runtime-ar-before",
+        "ordinal": 4
+      },
+      {
+        "exit_code": 0,
+        "kind": "runtime",
+        "label": "runtime-cc-before",
+        "ordinal": 5
+      },
+      {
+        "exit_code": 0,
+        "kind": "runtime",
+        "label": "runtime-shell-before",
+        "ordinal": 6
+      },
+      {
+        "exit_code": 0,
+        "kind": "runtime",
+        "label": "runtime-producer-before",
+        "ordinal": 7
+      },
+      {
+        "exit_code": 0,
+        "kind": "setup_payload",
+        "label": "fresh-private-four-module-unit",
+        "ordinal": 8
+      },
+      {
+        "exit_code": 0,
+        "kind": "setup_payload",
+        "label": "archive-private-unit",
+        "ordinal": 9
+      },
+      {
+        "exit_code": 0,
+        "kind": "setup_payload",
+        "label": "init-private-db",
+        "ordinal": 10
+      },
+      {
+        "exit_code": 0,
+        "kind": "setup_payload",
+        "label": "global-unit-id-base",
+        "ordinal": 11
+      },
+      {
+        "exit_code": 0,
+        "kind": "setup_payload",
+        "label": "global-unit-id-array",
+        "ordinal": 12
+      },
+      {
+        "exit_code": 0,
+        "kind": "setup_payload",
+        "label": "global-unit-id-bytestring",
+        "ordinal": 13
+      },
+      {
+        "exit_code": 0,
+        "kind": "setup_payload",
+        "label": "global-unit-id-text",
+        "ordinal": 14
+      },
+      {
+        "exit_code": 0,
+        "kind": "setup_payload",
+        "label": "global-unit-id-containers",
+        "ordinal": 15
+      },
+      {
+        "exit_code": 0,
+        "kind": "setup_payload",
+        "label": "global-unit-id-directory",
+        "ordinal": 16
+      },
+      {
+        "exit_code": 0,
+        "kind": "setup_payload",
+        "label": "register-private-unit",
+        "ordinal": 17
+      },
+      {
+        "exit_code": 0,
+        "kind": "setup_payload",
+        "label": "new-main-fixed-builtin-pair",
+        "ordinal": 18
+      },
+      {
+        "exit_code": 0,
+        "kind": "qualification",
+        "label": "ordinary-show-fixture",
+        "ordinal": 19
+      },
+      {
+        "exit_code": 0,
+        "kind": "qualification",
+        "label": "ordinary-show-builtin",
+        "ordinal": 20
+      },
+      {
+        "exit_code": 0,
+        "kind": "setup_payload",
+        "label": "fresh-original-emlf-Main",
+        "ordinal": 21
+      },
+      {
+        "exit_code": 0,
+        "kind": "setup_payload",
+        "label": "ordinary-stats-own-relink",
+        "ordinal": 22
+      },
+      {
+        "exit_code": 0,
+        "kind": "runtime",
+        "label": "runtime-stats-emlf-before",
+        "ordinal": 23
+      },
+      {
+        "exit_code": 0,
+        "kind": "qualification",
+        "label": "stats-version",
+        "ordinal": 24
+      },
+      {
+        "exit_code": 0,
+        "kind": "qualification",
+        "label": "stats-identity",
+        "ordinal": 25
+      },
+      {
+        "exit_code": 0,
+        "kind": "qualification",
+        "label": "stats-semantic-42",
+        "ordinal": 26
+      },
+      {
+        "exit_code": 0,
+        "kind": "qualification",
+        "label": "stats-unicode-positive",
+        "ordinal": 27
+      },
+      {
+        "exit_code": 1,
+        "kind": "qualification",
+        "label": "stats-type-rejection",
+        "ordinal": 28
+      },
+      {
+        "exit_code": 0,
+        "kind": "qualification",
+        "label": "stats-fixed-fixture",
+        "ordinal": 29
+      },
+      {
+        "exit_code": 0,
+        "kind": "qualification",
+        "label": "stats-show-fixture",
+        "ordinal": 30
+      },
+      {
+        "exit_code": 0,
+        "kind": "qualification",
+        "label": "stats-show-builtin",
+        "ordinal": 31
+      },
+      {
+        "exit_code": 0,
+        "kind": "qualification",
+        "label": "ghc-typed-package-RTS-control",
+        "ordinal": 32
+      },
+      {
+        "exit_code": 0,
+        "kind": "runtime",
+        "label": "runtime-python-after",
+        "ordinal": 33
+      },
+      {
+        "exit_code": 0,
+        "kind": "runtime",
+        "label": "runtime-ghc-after",
+        "ordinal": 34
+      },
+      {
+        "exit_code": 0,
+        "kind": "runtime",
+        "label": "runtime-ghc-pkg-after",
+        "ordinal": 35
+      },
+      {
+        "exit_code": 0,
+        "kind": "runtime",
+        "label": "runtime-ar-after",
+        "ordinal": 36
+      },
+      {
+        "exit_code": 0,
+        "kind": "runtime",
+        "label": "runtime-cc-after",
+        "ordinal": 37
+      },
+      {
+        "exit_code": 0,
+        "kind": "runtime",
+        "label": "runtime-shell-after",
+        "ordinal": 38
+      },
+      {
+        "exit_code": 0,
+        "kind": "runtime",
+        "label": "runtime-producer-after",
+        "ordinal": 39
+      },
+      {
+        "exit_code": 0,
+        "kind": "runtime",
+        "label": "runtime-stats-emlf-after",
+        "ordinal": 40
+      }
+    ],
+    "payload_count": 13,
+    "qualification_count": 11,
+    "runtime_count": 16
+  },
+  "complete": true,
+  "cross_compiler_publication": {
+    "all_78_payload_result_files_raw_equal": true,
+    "all_other_complete_generation_and_CURRENT_bytes_exact": true,
+    "all_other_raw_bytes_equal": true,
+    "allowed_differences": [
+      "configuration field1 actual executable SHA",
+      "derived container CRC32",
+      "derived generation filename SHA256",
+      "CURRENT exact derived digest and CRC32"
+    ],
+    "artifact_normalization_or_rewrite": false,
+    "compiler_sha_span": [
+      135,
+      199
+    ],
+    "complete": true,
+    "containers_fully_decoded": true,
+    "explicit_CURRENT_differing_spans": {
+      "CRC32": [
+        76,
+        80
+      ],
+      "derived_generation_SHA256": [
+        81,
+        145
+      ]
+    },
+    "explicit_generation_differing_spans": {
+      "CRC32": [
+        76,
+        80
+      ],
+      "actual_executable_SHA256": [
+        135,
+        199
+      ]
+    },
+    "files_each": 89,
+    "full_cross_compiler_raw_equality_claimed": false,
+    "full_union": {
+      "changed": 1,
+      "equal": 87,
+      "ordinary_only": 1,
+      "stats_only": 1
+    },
+    "independently_reparsed_actual_full_raw_inputs": true,
+    "ordinary_compiler_sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f",
+    "ordinary_generation": "builtin-work/queries/query-graph-v2/generations/2ded228ffc947405a39aac13c98efaedb2fe6ceab4bf73d27bc52fe698c2b155.mlfqg",
+    "raw_inventory_evidence": {
+      "bytes": 158818,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04-actual-review/raw-artifact-union.json",
+      "sha256": "1588433d931d501b8e6bdd383d4daa5726693c8fc2de7216afa5becc844a7411"
+    },
+    "result_closure_exact": true,
+    "result_files": 78,
+    "rows": 172,
+    "same_binary_future_raw_identity_required": true,
+    "same_binary_future_raw_identity_requirement_unchanged": true,
+    "schema": "main-gap-cross-compiler-fixture-equivalence-v1",
+    "stats_compiler_sha256": "b0b46ae804c6e55b64d7792fa7a6835f7805d2207d03b47ea2918e65eef49347",
+    "stats_generation": "builtin-work/queries/query-graph-v2/generations/7bc7128b4a1199160cee8ece798f9dbbac8939263a011bb256f72d73c48308e8.mlfqg",
+    "union_path_count": 90
+  },
+  "elapsed_ns": 52358162878,
+  "exact_READY_only_activation_verified": true,
+  "focused_controls": {
+    "five_CLI_expected_raw_bytes_and_exit_verified": true,
+    "fixture_queries_one_fresh_zero_reused": true,
+    "fresh_canonical_builtin_verification_inherited_from_rehashed_qualified_main_producer": {
+      "path": "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/builtin-verification/receipt.json",
+      "sha256": "d0017da4ba27558c208df9396d4b3143e40903df520884ee4e36604d70a9be96"
+    },
+    "full_owner_and_dependency_oracles_verified": true,
+    "ordered_query_bytes_equal": true,
+    "ordinary_stats_builtin_show_raw_equal": true,
+    "ordinary_stats_fixture_show_raw_equal": true
+  },
+  "full_actual_raw_evidence_privately_retained_not_all_public": true,
+  "ghc_typed_control": {
+    "actual_stdout_only_one_home_module": true,
+    "actual_verbose_parser_typechecker_WriteIface_success_verified": true,
+    "flags": [
+      "--make",
+      "-j1",
+      "-O2",
+      "-fforce-recomp",
+      "-fpedantic-bottoms",
+      "-fno-state-hack",
+      "-v",
+      "-package-env",
+      "-",
+      "-clear-package-db",
+      "-global-package-db",
+      "-package-db",
+      "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+      "-no-user-package-db",
+      "-hide-all-packages",
+      "-package",
+      "base",
+      "-package",
+      "mlf-shape-primitives",
+      "-i",
+      "-odir",
+      "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/ghc-control/objects",
+      "-hidir",
+      "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/ghc-control/objects",
+      "-fno-code",
+      "-fwrite-interface",
+      "-no-link"
+    ],
+    "interface": {
+      "bytes": 1913,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/ghc-control/objects/SetupCheck.hi",
+      "sha256": "61914b6556f59eb027611601c72ad019d48d9c8dd90d0b8e9c377731bee1b899"
+    },
+    "no_extra_object_or_link_output": true,
+    "no_object_or_link": true,
+    "only_actual_global_and_fresh_private_package_DBs_loaded": true,
+    "only_two_files_in_control_tree": [
+      "SetupCheck.hs",
+      "objects/SetupCheck.hi"
+    ],
+    "source": {
+      "bytes": 97,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/ghc-control/SetupCheck.hs",
+      "sha256": "bae7885918cfd8ef2192740865444591ed093c744319ecee85715c408114e4df"
+    },
+    "verbose_stderr_preserved_not_misreported_empty": true
+  },
+  "immutable_input_count": 6393,
+  "immutable_output_count": 365,
+  "independent_check_groups": 38,
+  "independently_rehashed_unique_pin_count": 6803,
+  "later12cell_actual_qualification": false,
+  "later48leg_performance_samples": 0,
+  "limitations": [
+    "This is actual SETUP qualification, not qualification or performance evidence for the future semantic frontend workload, its cells or measurement legs.",
+    "The nine RTS records qualify statistics collection and focused controls; they are not performance samples. No wall-time or speedup claim follows.",
+    "The fixed fixture cross-binary publication contract deliberately allows only actual executable identity and derived CRC/content-address/CURRENT changes. Full cross-compiler raw equality is false. Semantic artifacts and all other bytes remain exact.",
+    "Future executions of the same stats binary must retain complete raw equality against these stats qualification artifacts. No dynamic trace or general decoder-equivalence proof is claimed.",
+    "Main fc300bc is the bound main revision. No F25 producer qualification is transferred; no whole CI, GHC semantic parity, production promotion or native-generation fixed-point result is claimed.",
+    "Future admissions and execution remain separately coordinated. This review does not launch, approve an admission or relax old unresolved scopes."
+  ],
+  "maximum_ns": 600000000000,
+  "native_fixedpoint_paused": true,
+  "native_generation_AB_fixedpoint": false,
+  "original_binary": {
+    "bytes": 20192216,
+    "path": "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+    "sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f"
+  },
+  "original_report": {
+    "bytes": 33473,
+    "sha256": "1b5addd5f3ce1821f43ef02f568df5552781f4e41ec1569284bb7554c83bec59",
+    "source_artifact": "main-gap-setup-run04-actual-review/report.json"
+  },
+  "original_review_manifest": {
+    "bytes": 2954,
+    "sha256": "829e8995ac36f517ae4e077a972385ffb22b5f5cb4f9548bd14919908d64c77f",
+    "source_artifact": "main-gap-setup-run04-actual-review/MANIFEST.json"
+  },
+  "outer_success": {
+    "cleanup": true,
+    "complete": true,
+    "exit_code": 0,
+    "lease_cleared": true,
+    "lock_reacquired": true,
+    "reason": null
+  },
+  "performance_claimed": false,
+  "phase": "SETUP",
+  "preserved_prior_failure": {
+    "actual_SETUP_passed": false,
+    "actual_pins_rehashed": true,
+    "new_v5_contract_does_not_retroactively_qualify_run03": true,
+    "old_v4_full_raw_contract_still_failed": true,
+    "report": {
+      "bytes": 16922,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run03-failure-review/report.json",
+      "sha256": "de12631dd6e7cd9955767574fa0fa81e20e3443917ca1c0d9d8b4f6a51dc237e"
+    }
+  },
+  "private_package": {
+    "archive_member_names_and_all_member_bytes_verified": true,
+    "complete_artifact_pins": {
+      "bytes": 3283,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04-actual-review/created-artifacts.json",
+      "sha256": "e1044844cf79d1b216c7af7f1b196b51b6ce181643e8deafe2f47c1e0ccb9415"
+    },
+    "fresh_host_interface_count": 4,
+    "fresh_host_module_count": 4,
+    "fresh_host_object_count": 4,
+    "known_deprecation_warning_preserved": true,
+    "registered_scalar_and_ordered_list_token_fields_verified": true,
+    "same_producer_C_object_count": 2,
+    "six_actual_global_package_IDs_verified": true,
+    "unit_id": "mlf-shape-primitives-0.1"
+  },
+  "production_promotion": false,
+  "runtime": {
+    "actual_guarded_loader_stdout_and_callback_bindings_verified": true,
+    "after_count": 8,
+    "all_required_tool_library_resolution_and_symlink_bindings_unchanged": true,
+    "before_after_bindings_equal_excluding_distinct_command_auth": true,
+    "before_count": 8,
+    "no_ambient_GHCRTS_override": true
+  },
+  "schema": "main-gap-setup-actual-review-v1",
+  "scope": "Independent read-only review of the one completed main-baseline frontend SETUP run04. Qualification is confined to the actual setup, focused semantic/package controls and statistics plumbing enumerated here.",
+  "selected_actual_receipt_pins": {
+    "controller": {
+      "bytes": 6291,
+      "sha256": "0c478590f823262856b7e3ec7f5ec0567a051d5c29127802b733c762512c80b7"
+    },
+    "outer": {
+      "bytes": 4773,
+      "sha256": "fd9939356e8566abb915f1952dcc258ed12d16e42c42643afa16e0f231297d40"
+    },
+    "worker": {
+      "bytes": 581055,
+      "sha256": "ed016dcadc8a20b6c533ac9373a2fd5bc0b22f2eb8fdebb79c534eb682ff5840"
+    }
+  },
+  "setup_qualified": true,
+  "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "source_review_original": {
+    "bytes": 10555,
+    "sha256": "81071fc5a605d253c4211a3cc28c6532c349f79a3743d2d5c3b6c32553ddce1c",
+    "source_artifact": "main-gap-setup-v5-source-review/report.json"
+  },
+  "statistics_relink": {
+    "compiled_in_fixed_absolute_sink": "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/mlf.stats",
+    "flags_exact": [
+      "-XHaskell2010",
+      "-package-env",
+      "-",
+      "-clear-package-db",
+      "-global-package-db",
+      "-no-user-package-db",
+      "-hide-all-packages",
+      "-O2",
+      "-fpedantic-bottoms",
+      "-fno-state-hack",
+      "-package",
+      "base",
+      "-package",
+      "array",
+      "-package",
+      "bytestring",
+      "-package",
+      "text",
+      "-package",
+      "containers",
+      "-package",
+      "directory",
+      "-i",
+      "-i<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects",
+      "-odir",
+      "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-main",
+      "-hidir",
+      "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/objects"
+    ],
+    "fresh_main_interface": {
+      "bytes": 3889,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-main/Main.hi",
+      "sha256": "15f799600854a739ae0e2bc2876843df9fdb7e3f9498506ee35a81485f525279"
+    },
+    "fresh_main_object": {
+      "bytes": 6720,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-main/Main.o",
+      "sha256": "8b08e9f2db7bf74311bcb312056a01bd316c4802c177b4fbb51d3e900c7f349a"
+    },
+    "no_old_Main_object_reuse": true,
+    "same_actual_source_object_interface_runtime_closure_verified": true,
+    "same_original_Main_source": {
+      "bytes": 130,
+      "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/host/ghc/app/emlf/Main.hs",
+      "sha256": "72d926eedd4e5abc40b8f0bc925a39d20995397f0d4144b4abd932ef2aaa6d79"
+    },
+    "same_producer_C_object_count": 2,
+    "same_producer_non_Main_count": 94
+  },
+  "stats_binary": {
+    "bytes": 20205400,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+    "sha256": "b0b46ae804c6e55b64d7792fa7a6835f7805d2207d03b47ea2918e65eef49347"
+  },
+  "worker_output_ownership": {
+    "directories": [
+      "dependencies",
+      "builtin-work",
+      "ordinary-reference",
+      "stats-main",
+      "ghc-control",
+      "commands"
+    ],
+    "exact_complete_inventory_verified": true,
+    "files": [
+      "stats-emlf",
+      "builtin.mlfci",
+      "builtin.mlfco",
+      "builtin.lock"
+    ],
+    "outer_watchdog_controller_and_worker_receipts_excluded_from_worker_owned_outputs": true,
+    "parent_receipts_verified_separately": true
+  }
+}

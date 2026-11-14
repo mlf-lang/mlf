@@ -1,0 +1,51 @@
+--- v4/CONFIG.json
++++ v5/CONFIG.json
+@@ -28,7 +28,7 @@
+   },
+   "commands": {
+     "bytes": 5370,
+-    "path": "<EXPERIMENT_ROOT>/main-gap-setup-v4-source/COMMANDS.json",
++    "path": "<EXPERIMENT_ROOT>/main-gap-setup-v5-source/COMMANDS.json",
+     "sha256": "12977f5735b400f1b5e2f636b2fc0bfe3c1223a447546df0b9d930dac37c3843"
+   },
+   "contract_manifest": {
+@@ -38,8 +38,8 @@
+   },
+   "environment": {
+     "bytes": 950,
+-    "path": "<EXPERIMENT_ROOT>/main-gap-setup-v4-source/environment.json",
+-    "sha256": "4a2b97d037fdad56271be128d39a784fc05c85976deb2bc0d0641315e8078b31"
++    "path": "<EXPERIMENT_ROOT>/main-gap-setup-v5-source/environment.json",
++    "sha256": "f4c7c630cd64b7726dfb66ffdb2c73114ab278de10ff96810ddd4cd708468e72"
+   },
+   "ghc": {
+     "bytes": 658,
+@@ -63,7 +63,7 @@
+   },
+   "global_packages": {
+     "bytes": 39417,
+-    "path": "<EXPERIMENT_ROOT>/main-gap-setup-v4-source/GLOBAL-PACKAGE-INPUTS.json",
++    "path": "<EXPERIMENT_ROOT>/main-gap-setup-v5-source/GLOBAL-PACKAGE-INPUTS.json",
+     "sha256": "745046e2fd27a69b968909c189b54d0fcb4ac62d9e367c76231c1ae5f413dfbf"
+   },
+   "guard": {
+@@ -103,6 +103,11 @@
+       "path": "<EXPERIMENT_ROOT>/main-baseline-controls-actual-review/report.json",
+       "sha256": "619e23eed06688a685a31c5c9114ed570fef3c9c94b1829964bec0aa16a88b41"
+     }
++  },
++  "publication_oracle": {
++    "bytes": 16728,
++    "path": "<EXPERIMENT_ROOT>/main-gap-setup-v5-source/publication_oracle.py",
++    "sha256": "0a831a47bd77891fe357209094cd640d07646b9ab5c6b6f0c38de67c3b5c4a8c"
+   },
+   "python": {
+     "bytes": 6832784,
+@@ -157,6 +162,6 @@
+   },
+   "total_child_commands": 40,
+   "total_guarded_elapsed_ns": 600000000000,
+-  "work": "<EXPERIMENT_ROOT>/main-gap-setup-run03",
++  "work": "<EXPERIMENT_ROOT>/main-gap-setup-run04",
+   "workspace": "<EXPERIMENT_ROOT>"
+ }

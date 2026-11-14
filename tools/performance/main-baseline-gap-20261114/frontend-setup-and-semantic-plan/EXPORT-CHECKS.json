@@ -1,0 +1,426 @@
+{
+  "actual_review_not_replaced_by_export_checks": true,
+  "all_passed": true,
+  "checks": [
+    {
+      "name": "review full manifest bytes and six receipts verified",
+      "passed": true
+    },
+    {
+      "name": "only SETUP qualified; no performance",
+      "passed": true
+    },
+    {
+      "name": "25 original inputs exact",
+      "passed": true
+    },
+    {
+      "name": "oracle exact source bytes",
+      "passed": true
+    },
+    {
+      "name": "disabled template remains disabled",
+      "passed": true
+    },
+    {
+      "name": "privacy scan README.md",
+      "passed": true
+    },
+    {
+      "name": "privacy scan REPRODUCTION.md",
+      "passed": true
+    },
+    {
+      "name": "privacy scan SOURCE-MAP.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan evidence/failed-runs.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan evidence/run03-cause.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan evidence/run03-decoder-coverage.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan evidence/run03-field-differences.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan evidence/run03-full-inventory.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan evidence/run03-publication-raw.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan evidence/run03-source-causal-excerpts.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan evidence/run04-cli-raw.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan evidence/run04-completed-commands.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan evidence/run04-full-inventory.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan evidence/run04-publication-raw.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan evidence/run04-qualification.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan evidence/run04-rts-redacted.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan evidence/source-preparation.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan semantic-plan-v2/ARTIFACT-FLOW.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan semantic-plan-v2/BUDGETS.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan semantic-plan-v2/COMMANDS.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan semantic-plan-v2/DYNAMIC-ORACLES.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan semantic-plan-v2/LEGS.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan semantic-plan-v2/MODEL-CHECKS.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan semantic-plan-v2/PLAN-CHECKS.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan semantic-plan-v2/PLAN.md",
+      "passed": true
+    },
+    {
+      "name": "privacy scan semantic-plan-v2/REQUIRED-NEGATIVE-TESTS.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan semantic-plan-v2/SAMPLING-CAPS.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan semantic-plan-v2/WIRE-CONTRACT.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan semantic-plan-v2/contract_model.py",
+      "passed": true
+    },
+    {
+      "name": "privacy scan semantic-plan-v2/model_tests.py",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/COMMANDS.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/CONFIG-vs-v4.patch",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/CONFIG.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/DESIGN-AT-SOURCE-FREEZE.md",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/Fixture.emlf",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/ORACLE-SOURCE-MAP.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/QUALIFICATION-vs-v4.patch",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/QUALIFICATION.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/SetupCheck.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/controller-vs-v4.patch",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/controller.py",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/delta_checks.py",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/environment-vs-v4.patch",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/environment.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/package_field_checks.py",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/publication_checks.py",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/publication_oracle.py",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/recorded-tests/TEST-HISTORY.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/recorded-tests/delta-checks.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/recorded-tests/package-field-checks.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/recorded-tests/publication-checks.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/recorded-tests/source-checks.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan setup-v5/source_checks.py",
+      "passed": true
+    },
+    {
+      "name": "privacy scan source-provenance.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan support/guard.py",
+      "passed": true
+    },
+    {
+      "name": "privacy scan support/runtime_pins.py",
+      "passed": true
+    },
+    {
+      "name": "privacy scan support/stats.py",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/CELLS.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/COMMAND-TEMPLATES.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/DESIGN-AT-SOURCE-FREEZE.md",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/GENERATOR-PROVENANCE.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/INPUTS.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/LEGS.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/checks.json",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/generator-functions.py",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/generator-source.py",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/baseline-0/Main.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/flat_functions-128/Main.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/flat_functions-16/Main.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/flat_functions-256/Main.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/flat_functions-32/Main.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/flat_functions-64/Main.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/foundation14/Bootstrap/Fresh.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/foundation14/Bootstrap/Host.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/foundation14/Bootstrap/IndexVec.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/foundation14/Bootstrap/IntMap.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/foundation14/Bootstrap/IntRank.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/foundation14/Bootstrap/IntSet.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/foundation14/Bootstrap/IntTree.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/foundation14/Bootstrap/Map.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/foundation14/Bootstrap/ST.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/foundation14/Bootstrap/Set.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/foundation14/Bootstrap/Std.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/foundation14/Bootstrap/Types.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/foundation14/Bootstrap/Unicode.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/foundation14/Bootstrap/Version.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/higher_order_chain-128/Main.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/higher_order_chain-16/Main.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/higher_order_chain-256/Main.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/higher_order_chain-32/Main.hs",
+      "passed": true
+    },
+    {
+      "name": "privacy scan workloads/inputs/higher_order_chain-64/Main.hs",
+      "passed": true
+    },
+    {
+      "name": "raw re-decode run03-publication-raw.json/ordinary/builtin-work/queries/query-graph-v2/CURRENT",
+      "passed": true
+    },
+    {
+      "name": "raw re-decode run03-publication-raw.json/ordinary/builtin-work/queries/query-graph-v2/generations/2ded228ffc947405a39aac13c98efaedb2fe6ceab4bf73d27bc52fe698c2b155.mlfqg",
+      "passed": true
+    },
+    {
+      "name": "raw re-decode run03-publication-raw.json/stats/builtin-work/queries/query-graph-v2/CURRENT",
+      "passed": true
+    },
+    {
+      "name": "raw re-decode run03-publication-raw.json/stats/builtin-work/queries/query-graph-v2/generations/6058d9fda611944fcb1bfcd888687b492333de542d57e1b409e321aa04cb6e19.mlfqg",
+      "passed": true
+    },
+    {
+      "name": "raw re-decode run04-publication-raw.json/ordinary/builtin-work/queries/query-graph-v2/CURRENT",
+      "passed": true
+    },
+    {
+      "name": "raw re-decode run04-publication-raw.json/ordinary/builtin-work/queries/query-graph-v2/generations/2ded228ffc947405a39aac13c98efaedb2fe6ceab4bf73d27bc52fe698c2b155.mlfqg",
+      "passed": true
+    },
+    {
+      "name": "raw re-decode run04-publication-raw.json/stats/builtin-work/queries/query-graph-v2/CURRENT",
+      "passed": true
+    },
+    {
+      "name": "raw re-decode run04-publication-raw.json/stats/builtin-work/queries/query-graph-v2/generations/7bc7128b4a1199160cee8ece798f9dbbac8939263a011bb256f72d73c48308e8.mlfqg",
+      "passed": true
+    }
+  ],
+  "count": 104,
+  "schema": "main-frontend-final-static-export-checks-v1",
+  "source_tests_rerun": false,
+  "targets_helpers_loader_guard_or_exported_code_executed": false
+}

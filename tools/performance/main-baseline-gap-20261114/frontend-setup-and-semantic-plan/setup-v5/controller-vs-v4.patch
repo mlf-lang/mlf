@@ -1,0 +1,59 @@
+--- v4/controller.py
++++ v5/controller.py
+@@ -6,10 +6,10 @@
+ from pathlib import Path
+ import argparse, datetime, fcntl, hashlib, json, os, re, shlex, shutil, subprocess, sys, time, types
+ R = Path('<EXPERIMENT_ROOT>')
+-PB = R / 'main-gap-setup-v4-source'
+-WORK = R / 'main-gap-setup-run03'
++PB = R / 'main-gap-setup-v5-source'
++WORK = R / 'main-gap-setup-run04'
+ READY = False
+-CONFIG_SHA = 'ee5891ce4f22aac5be2923bd827ca1733375fe74c47918e767e6fe14f5918a18'
++CONFIG_SHA = '8be176b18bb7d0d357f358ede76b5172c1b5f7efccb6add80abe5889767b32e8'
+ BUDGETS = {'SETUP': 600}
+ MAX_NS = 600 * 10**9
+ ALLOWED_ENV = {'HOME','PATH','LD_LIBRARY_PATH','LC_ALL','LANG','TZ','GHC_ENVIRONMENT','GHCRTS','OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','MAKEFLAGS','PYTHONDONTWRITEBYTECODE','TMPDIR','CC','TC','LIBRARY_PATH','PKG_CONFIG_PATH'}
+@@ -140,7 +140,7 @@
+     require(inventory['qualification_inherited'] is False and inventory['files'], 'fresh tool-file inventory required')
+     for row in inventory['files']:
+         verify_pin(row)
+-    for key in ['guard','python','git','ghc','cc','environment','history','baseline_controller','baseline_configuration','contract_manifest','closures','stats_parser','runtime_helper','ghc_pkg','ghc_pkg_elf','ar','shell','commands','global_packages']:
++    for key in ['guard','python','git','ghc','cc','environment','history','baseline_controller','baseline_configuration','contract_manifest','closures','stats_parser','runtime_helper','ghc_pkg','ghc_pkg_elf','ar','shell','commands','global_packages','publication_oracle']:
+         verify_pin(c[key])
+     require(sha(c['guard']['path']) == '53a5b322fe8ed9e1a527dda0596215ffc81322b43b1864442827c9056c313d0e', 'immutable guard differs')
+     require(Path(sys.executable).resolve() == Path(c['python']['path']) == Path('/usr/bin/python3').resolve(), 'Python interpreter differs')
+@@ -698,10 +698,11 @@
+         self.a,self.c,self.env,self.guard,self.path,self.digest=a,c,env,guard,path,digest
+         self.folder=WORK/'setup';self.start=time.monotonic();self.number=0
+         self.rp=runtime_module(c);self.stats=module(verify_pin(c['stats_parser']),'exact_external_stats_parser')
++        self.publication=module(verify_pin(c['publication_oracle']),'pinned_pure_publication_oracle')
+         self.auth,self.closure,self.c_objects=authenticate(c)
+         self.producer=Path(c['baseline_work'])/'build/producer';self.source=Path(c['source'])
+         self.inputs=[pin(self.producer/'receipt.json'),pin(PB/'SetupCheck.hs'),*self.c_objects,
+-            *[c[k] for k in ['ghc','ghc_pkg','ghc_pkg_elf','ar','cc','shell','python','stats_parser','runtime_helper','closures','environment']]]
++            *[c[k] for k in ['ghc','ghc_pkg','ghc_pkg_elf','ar','cc','shell','python','stats_parser','runtime_helper','closures','environment','publication_oracle']]]
+         for row in self.closure:self.inputs.extend([row['source'],row['object'],row['interface']])
+         self.inputs.extend(load(c['global_packages']['path'])['files'])
+         self.inputs.append(pin(self.producer/'packages.txt'))
+@@ -831,13 +832,17 @@
+         self.record['ordinary_fixture_raw']={'root':str(reference),'files':ordinary,'same_paths_recreated':True}
+         self.prepare_fixture()
+         self.command('stats-fixed-fixture',[binary,'--compile-crate',t/'builtin-work/fixture.spec','-o',t/'builtin-work/fixture'],kind='qualification',maximum=120,out=b'',err=b'',reports=(sink,))
+-        actual=self.fixture_snapshot();require(actual==ordinary,'full raw fixture/query/builtin bytes differ; no normalization permitted')
++        actual=self.fixture_snapshot()
++        ordinary_binary=verify_pin(self.auth['outputs']['emlf']);stats_binary=verify_pin(self.record['stats_relink']['binary'])
++        ordinary_raw={rel:safe(reference/rel,existing=True).read_bytes() for rel in ordinary}
++        stats_raw={rel:safe(t/rel,existing=True).read_bytes() for rel in actual}
++        equivalence=self.publication.compare_fixture(ordinary_raw,stats_raw,sha(ordinary_binary),sha(stats_binary))
+         for label,prefix,identity,owners,dependencies in self.show_specs():
+             raw,_,_=self.command('stats-show-'+label,[binary,'--show-crate',str(prefix)+'.mlfci'],kind='qualification',maximum=20,err=b'',out=ordinary_shows[label],reports=(sink,))
+             interface(raw.decode(),identity,owners,dependencies)
+-        self.record['fixture_equivalence']={'complete':True,'full_raw_files_equal':True,'fresh_groups_each':1,'reused_groups_each':0,
++        self.record['fixture_equivalence']={'complete':True,'full_raw_files_equal':actual==ordinary,'cross_compiler_publication':equivalence,'fresh_groups_each':1,'reused_groups_each':0,
+             'ordered_query_bytes_equal':True,'fixed_builtin_owners':['Prelude','MLF.Primitive'],'fixture_owners':['Fixture'],
+-            'no_path_or_identity_normalization':True,'ordinary_reference':str(reference),'stats_current':str(t),'files':actual}
++            'no_path_or_identity_normalization':True,'ordinary_reference':str(reference),'stats_current':str(t),'ordinary_files':ordinary,'files':actual}
+         # Small typed-only package/RTS compatibility control, not one of the future 12 cells.
+         check=t/'ghc-control';check.mkdir();co=check/'objects';co.mkdir();cs=check/'SetupCheck.hs'
+         cs.write_bytes((PB/'SetupCheck.hs').read_bytes());self.remember(cs);gs=WORK/'active/ghc.stats'

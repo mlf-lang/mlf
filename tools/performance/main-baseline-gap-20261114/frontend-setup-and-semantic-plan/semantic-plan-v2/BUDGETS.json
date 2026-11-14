@@ -1,0 +1,46 @@
+{
+  "actual_elapsed": null,
+  "approved": false,
+  "counter_or_native_stage_included": false,
+  "entry_rule": "Verified actual accepted prefix ns plus full next stage600e9 must fit its total account; no assumed elapsed or leftover reuse after failure.",
+  "exit_rule": "Actual entire original guard call through return must be recorded as integer monotonic ns; stage and cumulative ceilings include cleanup; missing envelope/failure stops.",
+  "exploration_subaccount_cleanup_inclusive_ns": 1200000000000,
+  "human_review_wait_not_guarded_elapsed": true,
+  "nominal_child_caps_not_total_authorization": true,
+  "post_setup_total_cleanup_inclusive_ns": 1800000000000,
+  "qualified_SETUP_required_before_any_stage": true,
+  "schema": "main-gap-postsetup-proposed-budgets-v1",
+  "setup_or_baseline_rebuild_included": false,
+  "stages": [
+    {
+      "maximum_cleanup_inclusive_ns": 600000000000,
+      "nested_commands": 91,
+      "one_attempt": true,
+      "outer_cap_seconds": 600,
+      "performance_samples": 0,
+      "stage": "SEMANTIC"
+    },
+    {
+      "fixed_legs": [
+        1,
+        24
+      ],
+      "implementation_pending": true,
+      "maximum_cleanup_inclusive_ns": 600000000000,
+      "one_attempt": true,
+      "outer_cap_seconds": 600,
+      "stage": "EXPLORE_1"
+    },
+    {
+      "fixed_legs": [
+        25,
+        48
+      ],
+      "implementation_pending": true,
+      "maximum_cleanup_inclusive_ns": 600000000000,
+      "one_attempt": true,
+      "outer_cap_seconds": 600,
+      "stage": "EXPLORE_2"
+    }
+  ]
+}

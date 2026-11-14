@@ -1,0 +1,168 @@
+{
+  "ar": {
+    "bytes": 52480,
+    "path": "/usr/bin/x86_64-linux-gnu-ar",
+    "sha256": "f8fe09d485b40b1d47c534c96f5cbaaa9148e247aa0494c087104421f48ac5eb"
+  },
+  "attempts_per_stage": 1,
+  "baseline_configuration": {
+    "bytes": 4360,
+    "path": "<EXPERIMENT_ROOT>/main-baseline-ordinary-v1-source/CONFIG.json",
+    "sha256": "f07d4c185efcf2abc90b43a09c7c10156f2ae5db41a17082aae640143f1663ee"
+  },
+  "baseline_controller": {
+    "bytes": 35207,
+    "path": "<EXPERIMENT_ROOT>/main-baseline-ordinary-v1-source/controller.py",
+    "sha256": "0a69bc29a40e9c2d862f07fb54043ba2cb17ca040f9df02eb5978c2817534057"
+  },
+  "baseline_work": "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01",
+  "cc": {
+    "bytes": 1162264,
+    "path": "/usr/bin/x86_64-linux-gnu-gcc-14",
+    "sha256": "a23ecab8ff08f09ad8c80602c2c5df7f49e09c25905cb8975902e101bf72635f"
+  },
+  "closures": {
+    "bytes": 37538,
+    "path": "<EXPERIMENT_ROOT>/main-gap-endpoint-contract-source/CLOSURES.json",
+    "sha256": "dbb5ad75715d3f9e3a6386728a8d08a58cde27452bd4c57ce73f527a61c9310f"
+  },
+  "commands": {
+    "bytes": 5370,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-v5-source/COMMANDS.json",
+    "sha256": "12977f5735b400f1b5e2f636b2fc0bfe3c1223a447546df0b9d930dac37c3843"
+  },
+  "contract_manifest": {
+    "bytes": 1326,
+    "path": "<EXPERIMENT_ROOT>/main-gap-endpoint-contract-source/MANIFEST.json",
+    "sha256": "c96154d3e8aa90ceb1e6f4ae112b62edb6cdaca48f4a0e4c4c98c5672ac5ec73"
+  },
+  "environment": {
+    "bytes": 950,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-v5-source/environment.json",
+    "sha256": "f4c7c630cd64b7726dfb66ffdb2c73114ab278de10ff96810ddd4cd708468e72"
+  },
+  "ghc": {
+    "bytes": 658,
+    "path": "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+    "sha256": "fa9f3666470de75b798d4f15f983096b07184d33e060a740aa9e8772df0d51f7"
+  },
+  "ghc_pkg": {
+    "bytes": 718,
+    "path": "<GHC_TOOLCHAIN>/ghc/bin/ghc-pkg-9.14.1",
+    "sha256": "ef75e0c9851ba61df275e3db5417994520b007845839ee926b48ffef58e5a3a1"
+  },
+  "ghc_pkg_elf": {
+    "bytes": 448432,
+    "path": "<GHC_TOOLCHAIN>/ghc/lib/ghc-9.14.1/bin/ghc-pkg-9.14.1",
+    "sha256": "e658d6fc5575046d4b15ece548ddbc3dd512b7885b1d8dae1817a8f3199e55bb"
+  },
+  "git": {
+    "bytes": 4082768,
+    "path": "/usr/bin/git",
+    "sha256": "356db14e102d68a1a37d8a1ac577dfd678d45d46e92f468bef8b7154e7bfdc60"
+  },
+  "global_packages": {
+    "bytes": 39417,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-v5-source/GLOBAL-PACKAGE-INPUTS.json",
+    "sha256": "745046e2fd27a69b968909c189b54d0fcb4ac62d9e367c76231c1ae5f413dfbf"
+  },
+  "guard": {
+    "bytes": 24833,
+    "path": "<EXPERIMENT_ROOT>/recovery/tools/performance/full-compiler/continuation-20261111/sparse-attribution-r13/guard.py",
+    "sha256": "53a5b322fe8ed9e1a527dda0596215ffc81322b43b1864442827c9056c313d0e"
+  },
+  "history": {
+    "bytes": 2252,
+    "path": "<EXPERIMENT_ROOT>/main-baseline-ordinary-v1-source/HISTORICAL-PINS.json",
+    "sha256": "c02af6d36acc347a430c61c4c689cd9ac6851a8b02bacaaa63e743380d81068c"
+  },
+  "migration_manifest": {
+    "bytes": 22026,
+    "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/MANIFEST.json",
+    "sha256": "8df358ec7ec6f5399dbfde2ece6e6510eef971c2955e7dd6bb8c2d1030f677ee"
+  },
+  "no_default_stdlib_install": true,
+  "no_native_generation_AB_fixedpoint": true,
+  "no_test_direct_main": true,
+  "nominal_guard_limits": {
+    "address_space_mib": 6144,
+    "disk_free_mib": 5120,
+    "host_available_mib": 3072,
+    "inner_output_mib": 2048,
+    "outer_output_mib": 4096,
+    "rss_mib": 5120
+  },
+  "producer_reviews": {
+    "BUILD": {
+      "bytes": 11989,
+      "path": "<EXPERIMENT_ROOT>/main-baseline-build-actual-review/report.json",
+      "sha256": "1acb2883c21d33ec57250901fc1dfbd88bd4a181a5768ed41e190ebaf6c12c0d"
+    },
+    "CONTROLS": {
+      "bytes": 14818,
+      "path": "<EXPERIMENT_ROOT>/main-baseline-controls-actual-review/report.json",
+      "sha256": "619e23eed06688a685a31c5c9114ed570fef3c9c94b1829964bec0aa16a88b41"
+    }
+  },
+  "publication_oracle": {
+    "bytes": 16728,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-v5-source/publication_oracle.py",
+    "sha256": "0a831a47bd77891fe357209094cd640d07646b9ab5c6b6f0c38de67c3b5c4a8c"
+  },
+  "python": {
+    "bytes": 6832784,
+    "path": "/usr/bin/python3.13",
+    "sha256": "889c603f0d17cb54060951bcf4c4f9b8c9ebd9e52b392c70209bbb9755d797d9"
+  },
+  "qualification_commands": 11,
+  "reproduction_lock": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/.mlf-build/.reproduction.lock",
+  "runtime_commands": 16,
+  "runtime_helper": {
+    "bytes": 11663,
+    "path": "<EXPERIMENT_ROOT>/dense-direct-capture-r24-source/implementation/runtime_pins.py",
+    "sha256": "cf1346302f2467d74a883e51042d28442d0c0af5f659702e6fcf09ed43c1662b"
+  },
+  "runtime_paths": {
+    "bytes": 32308,
+    "path": "<EXPERIMENT_ROOT>/main-baseline-ordinary-v1-source/RUNTIME-PATHS.json",
+    "sha256": "48d01b5a548d8abc3beb5e5def1eba531353eccf705109f2abe037a8b187cc23"
+  },
+  "schema": "main-gap-setup-config-v1",
+  "setup_payload_commands": 13,
+  "shared_lock": {
+    "device": null,
+    "inode": null,
+    "observed_identity_omitted": true,
+    "path": "<FRESH_RESOURCE_LOCK>"
+  },
+  "shell": {
+    "bytes": 1298416,
+    "path": "/usr/bin/bash",
+    "sha256": "223fe8564b60636bc738b6178d3ba9a50ef7d791266b0efae6363bb716e4c47f"
+  },
+  "source": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+  "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "source_inventory": {
+    "bytes": 1638110,
+    "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/SOURCE-FILES.json",
+    "sha256": "e326f4bea2d229b02dc20fe7504793224889749ac474b8d126ba738ab1934e99"
+  },
+  "source_tree": "386f0b41ab5f9b39fca273f3040f51d73df924a1",
+  "stage_caps": {
+    "SETUP": 600
+  },
+  "stats_parser": {
+    "bytes": 4888,
+    "path": "<EXPERIMENT_ROOT>/dense-direct-capture-r24-source/implementation/stats.py",
+    "sha256": "b558556b11af12b117444f6476c5e841fa1b4beddc8f7cfe5e13047f2426a84c"
+  },
+  "tool_inventory": {
+    "bytes": 574757,
+    "path": "<EXPERIMENT_ROOT>/main-baseline-ordinary-v1-source/TOOL-FILES.json",
+    "sha256": "25dfb0585e55c29b69a51b999b5dfb4dfa7f7c7092dfffe487c778eb5c154afe"
+  },
+  "total_child_commands": 40,
+  "total_guarded_elapsed_ns": 600000000000,
+  "work": "<EXPERIMENT_ROOT>/main-gap-setup-run04",
+  "workspace": "<EXPERIMENT_ROOT>"
+}

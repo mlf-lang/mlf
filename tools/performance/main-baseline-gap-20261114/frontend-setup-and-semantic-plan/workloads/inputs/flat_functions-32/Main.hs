@@ -1,0 +1,76 @@
+-- mlf:syntax shared-haskell-v1
+{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
+             KindSignatures, FlexibleContexts, FlexibleInstances,
+             MultiParamTypeClasses, OverloadedStrings #-}
+module Main (main) where {
+import MLF.Primitive;
+f0 :: Int -> Int;
+f0 x = addInt x 0;
+f1 :: Int -> Int;
+f1 x = addInt x 1;
+f2 :: Int -> Int;
+f2 x = addInt x 2;
+f3 :: Int -> Int;
+f3 x = addInt x 3;
+f4 :: Int -> Int;
+f4 x = addInt x 4;
+f5 :: Int -> Int;
+f5 x = addInt x 5;
+f6 :: Int -> Int;
+f6 x = addInt x 6;
+f7 :: Int -> Int;
+f7 x = addInt x 7;
+f8 :: Int -> Int;
+f8 x = addInt x 8;
+f9 :: Int -> Int;
+f9 x = addInt x 9;
+f10 :: Int -> Int;
+f10 x = addInt x 10;
+f11 :: Int -> Int;
+f11 x = addInt x 11;
+f12 :: Int -> Int;
+f12 x = addInt x 12;
+f13 :: Int -> Int;
+f13 x = addInt x 13;
+f14 :: Int -> Int;
+f14 x = addInt x 14;
+f15 :: Int -> Int;
+f15 x = addInt x 15;
+f16 :: Int -> Int;
+f16 x = addInt x 16;
+f17 :: Int -> Int;
+f17 x = addInt x 17;
+f18 :: Int -> Int;
+f18 x = addInt x 18;
+f19 :: Int -> Int;
+f19 x = addInt x 19;
+f20 :: Int -> Int;
+f20 x = addInt x 20;
+f21 :: Int -> Int;
+f21 x = addInt x 21;
+f22 :: Int -> Int;
+f22 x = addInt x 22;
+f23 :: Int -> Int;
+f23 x = addInt x 23;
+f24 :: Int -> Int;
+f24 x = addInt x 24;
+f25 :: Int -> Int;
+f25 x = addInt x 25;
+f26 :: Int -> Int;
+f26 x = addInt x 26;
+f27 :: Int -> Int;
+f27 x = addInt x 27;
+f28 :: Int -> Int;
+f28 x = addInt x 28;
+f29 :: Int -> Int;
+f29 x = addInt x 29;
+f30 :: Int -> Int;
+f30 x = addInt x 30;
+f31 :: Int -> Int;
+f31 x = addInt x 31;
+entry :: Int -> Int;
+entry x = addInt (addInt (addInt (addInt (addInt (f0 x) (f1 x)) (addInt (f2 x) (f3 x))) (addInt (addInt (f4 x) (f5 x)) (addInt (f6 x) (f7 x)))) (addInt (addInt (addInt (f8 x) (f9 x)) (addInt (f10 x) (f11 x))) (addInt (addInt (f12 x) (f13 x)) (addInt (f14 x) (f15 x))))) (addInt (addInt (addInt (addInt (f16 x) (f17 x)) (addInt (f18 x) (f19 x))) (addInt (addInt (f20 x) (f21 x)) (addInt (f22 x) (f23 x)))) (addInt (addInt (addInt (f24 x) (f25 x)) (addInt (f26 x) (f27 x))) (addInt (addInt (f28 x) (f29 x)) (addInt (f30 x) (f31 x)))));
+
+main :: IO ();
+main = ioBind (getArg 0) (\text -> printInt (entry (readInt text)))
+}

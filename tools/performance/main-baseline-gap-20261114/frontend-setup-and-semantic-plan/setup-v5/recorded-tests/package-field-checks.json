@@ -1,0 +1,413 @@
+{
+  "actual_fields_original_string_mismatches": [
+    "import-dirs",
+    "library-dirs",
+    "depends"
+  ],
+  "actual_input_pins": [
+    {
+      "bytes": 613,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run02/setup/dependencies/package.conf",
+      "sha256": "6f0650708377ff03de0010fc732962d0aa3855cb1bc39bde01b6d85c764b9f6a"
+    },
+    {
+      "bytes": 711,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run02/setup/dependencies/package-db/mlf-shape-primitives-0.1.conf",
+      "sha256": "84fc705714f2792478d9e833e53b0f1a1f10ab3f041af997198ca6b2ac36a647"
+    },
+    {
+      "bytes": 11663,
+      "path": "<EXPERIMENT_ROOT>/dense-direct-capture-r24-source/implementation/runtime_pins.py",
+      "sha256": "cf1346302f2467d74a883e51042d28442d0c0af5f659702e6fcf09ed43c1662b"
+    },
+    {
+      "bytes": 19,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run02/setup/commands/011-global-unit-id-base/stdout",
+      "sha256": "7845169dfa46325b06cdf15ffcc252a14bfd6d6d2bbe5d9799b65b71b5923740"
+    },
+    {
+      "bytes": 19,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run02/setup/commands/012-global-unit-id-array/stdout",
+      "sha256": "ce8727fdeba3e270047f78b99a2090b75971dfeea9243f3b6e6798b25088acfb"
+    },
+    {
+      "bytes": 25,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run02/setup/commands/013-global-unit-id-bytestring/stdout",
+      "sha256": "34eddb720e818e3350ab386063876e2f8a83ca41b66248c63e31e50d6932b722"
+    },
+    {
+      "bytes": 16,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run02/setup/commands/014-global-unit-id-text/stdout",
+      "sha256": "243a38e3d6a3edfe1be289f089305ba1bde8933ff483bdb981b355828611557f"
+    },
+    {
+      "bytes": 20,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run02/setup/commands/015-global-unit-id-containers/stdout",
+      "sha256": "c00078ed794846fac47048b3dc25ec6f2f6f3bb841d2b36087c97c885195398c"
+    },
+    {
+      "bytes": 24,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run02/setup/commands/016-global-unit-id-directory/stdout",
+      "sha256": "e1312bb80d42baad88c80730d10d8ab3b1a713e676bdd52a26a5390376161588"
+    }
+  ],
+  "all_negative_edits_in_memory": true,
+  "check_count": 86,
+  "checks": [
+    {
+      "name": "actual run02 six guarded IDs are exact ordered authored depends",
+      "passed": true
+    },
+    {
+      "name": "original authored full package accepted",
+      "passed": true
+    },
+    {
+      "name": "actual full registered package accepted",
+      "passed": true
+    },
+    {
+      "name": "old exact-string failure reproduced on actual three fields",
+      "passed": true
+    },
+    {
+      "name": "original parser retains real continuation leading space",
+      "passed": true
+    },
+    {
+      "name": "legal list whitespace exposed-modules",
+      "passed": true
+    },
+    {
+      "name": "identical complete double-quoted tokens exposed-modules",
+      "passed": true
+    },
+    {
+      "name": "extra or duplicate token exposed-modules  \"extra-value\"",
+      "passed": true
+    },
+    {
+      "name": "extra or duplicate token exposed-modules  MLF.Primitive",
+      "passed": true
+    },
+    {
+      "name": "malformed quote exposed-modules",
+      "passed": true
+    },
+    {
+      "name": "nonstring list exposed-modules",
+      "passed": true
+    },
+    {
+      "name": "legal list whitespace hidden-modules",
+      "passed": true
+    },
+    {
+      "name": "identical complete double-quoted tokens hidden-modules",
+      "passed": true
+    },
+    {
+      "name": "extra or duplicate token hidden-modules  \"extra-value\"",
+      "passed": true
+    },
+    {
+      "name": "extra or duplicate token hidden-modules  MLF.Host.Base",
+      "passed": true
+    },
+    {
+      "name": "malformed quote hidden-modules",
+      "passed": true
+    },
+    {
+      "name": "nonstring list hidden-modules",
+      "passed": true
+    },
+    {
+      "name": "legal list whitespace import-dirs",
+      "passed": true
+    },
+    {
+      "name": "identical complete double-quoted tokens import-dirs",
+      "passed": true
+    },
+    {
+      "name": "extra or duplicate token import-dirs  \"extra-value\"",
+      "passed": true
+    },
+    {
+      "name": "extra or duplicate token import-dirs  <EXPERIMENT_ROOT>/main-gap-setup-run02/setup/dependencies/objects",
+      "passed": true
+    },
+    {
+      "name": "malformed quote import-dirs",
+      "passed": true
+    },
+    {
+      "name": "nonstring list import-dirs",
+      "passed": true
+    },
+    {
+      "name": "legal list whitespace library-dirs",
+      "passed": true
+    },
+    {
+      "name": "identical complete double-quoted tokens library-dirs",
+      "passed": true
+    },
+    {
+      "name": "extra or duplicate token library-dirs  \"extra-value\"",
+      "passed": true
+    },
+    {
+      "name": "extra or duplicate token library-dirs  <EXPERIMENT_ROOT>/main-gap-setup-run02/setup/dependencies",
+      "passed": true
+    },
+    {
+      "name": "malformed quote library-dirs",
+      "passed": true
+    },
+    {
+      "name": "nonstring list library-dirs",
+      "passed": true
+    },
+    {
+      "name": "legal list whitespace hs-libraries",
+      "passed": true
+    },
+    {
+      "name": "identical complete double-quoted tokens hs-libraries",
+      "passed": true
+    },
+    {
+      "name": "extra or duplicate token hs-libraries  \"extra-value\"",
+      "passed": true
+    },
+    {
+      "name": "extra or duplicate token hs-libraries  HSmlf-shape-primitives-0.1",
+      "passed": true
+    },
+    {
+      "name": "malformed quote hs-libraries",
+      "passed": true
+    },
+    {
+      "name": "nonstring list hs-libraries",
+      "passed": true
+    },
+    {
+      "name": "legal list whitespace depends",
+      "passed": true
+    },
+    {
+      "name": "identical complete double-quoted tokens depends",
+      "passed": true
+    },
+    {
+      "name": "extra or duplicate token depends  \"extra-value\"",
+      "passed": true
+    },
+    {
+      "name": "extra or duplicate token depends  base-4.22.0.0-66f8",
+      "passed": true
+    },
+    {
+      "name": "malformed quote depends",
+      "passed": true
+    },
+    {
+      "name": "nonstring list depends",
+      "passed": true
+    },
+    {
+      "name": "missing/reordered/replaced/extra/wholequoted depends base-4.22.0.0-66f8 array-0.5.8.0-93e8 bytestring-0.12.2.0-f1bc text-2.1.3-075e containers-0.8-9e90",
+      "passed": true
+    },
+    {
+      "name": "missing/reordered/replaced/extra/wholequoted depends directory-1.3.10.0-b291 containers-0.8-9e90 text-2.1.3-075e bytestring-0.12.2.0-f1bc array-0.5.8.0-93e8 base-4.22.0.0-66f8",
+      "passed": true
+    },
+    {
+      "name": "missing/reordered/replaced/extra/wholequoted depends base-4.22.0.0-66f8 base-4.22.0.0-66f8 bytestring-0.12.2.0-f1bc text-2.1.3-075e containers-0.8-9e90 directory-1.3.10.0-b291",
+      "passed": true
+    },
+    {
+      "name": "missing/reordered/replaced/extra/wholequoted depends base-4.22.0.0-66f8 array-0.5.8.0-93e8 bytestring-0.12.2.0-f1bc text-2.1.3-075e containers-0.8-9e90 directory-1.3.10.0-b291 other-9.0",
+      "passed": true
+    },
+    {
+      "name": "missing/reordered/replaced/extra/wholequoted depends \"base-4.22.0.0-66f8 array-0.5.8.0-93e8 bytestring-0.12.2.0-f1bc text-2.1.3-075e containers-0.8-9e90 directory-1.3.10.0-b291\"",
+      "passed": true
+    },
+    {
+      "name": "exact nonnormalized path import-dirs <EXPERIMENT_ROOT>/main-gap-setup-run02/setup/dependencies/objects/",
+      "passed": true
+    },
+    {
+      "name": "exact nonnormalized path import-dirs <EXPERIMENT_ROOT>/main-gap-setup-run02/setup/dependencies/objects/../objects",
+      "passed": true
+    },
+    {
+      "name": "exact nonnormalized path import-dirs <EXPERIMENT_ROOT>/main-gap-setup-run03/setup/dependencies/objects",
+      "passed": true
+    },
+    {
+      "name": "exact nonnormalized path import-dirs \"<EXPERIMENT_ROOT>/main-gap-setup-run02/setup/dependencies/objects wrong\"",
+      "passed": true
+    },
+    {
+      "name": "exact nonnormalized path import-dirs \"<EXPERIMENT_ROOT>/main-gap-setup-run02/setup/dependencies/objects/other\"",
+      "passed": true
+    },
+    {
+      "name": "exact nonnormalized path import-dirs relative/path",
+      "passed": true
+    },
+    {
+      "name": "exact nonnormalized path library-dirs <EXPERIMENT_ROOT>/main-gap-setup-run02/setup/dependencies/",
+      "passed": true
+    },
+    {
+      "name": "exact nonnormalized path library-dirs <EXPERIMENT_ROOT>/main-gap-setup-run02/setup/dependencies/../dependencies",
+      "passed": true
+    },
+    {
+      "name": "exact nonnormalized path library-dirs <EXPERIMENT_ROOT>/main-gap-setup-run03/setup/dependencies",
+      "passed": true
+    },
+    {
+      "name": "exact nonnormalized path library-dirs \"<EXPERIMENT_ROOT>/main-gap-setup-run02/setup/dependencies wrong\"",
+      "passed": true
+    },
+    {
+      "name": "exact nonnormalized path library-dirs \"<EXPERIMENT_ROOT>/main-gap-setup-run02/setup/dependencies/other\"",
+      "passed": true
+    },
+    {
+      "name": "exact nonnormalized path library-dirs relative/path",
+      "passed": true
+    },
+    {
+      "name": "strict scalar name mlf-shape-primitives ",
+      "passed": true
+    },
+    {
+      "name": "strict scalar name \"mlf-shape-primitives\"",
+      "passed": true
+    },
+    {
+      "name": "strict scalar name wrong",
+      "passed": true
+    },
+    {
+      "name": "strict scalar version 0.1 ",
+      "passed": true
+    },
+    {
+      "name": "strict scalar version \"0.1\"",
+      "passed": true
+    },
+    {
+      "name": "strict scalar version wrong",
+      "passed": true
+    },
+    {
+      "name": "strict scalar id mlf-shape-primitives-0.1 ",
+      "passed": true
+    },
+    {
+      "name": "strict scalar id \"mlf-shape-primitives-0.1\"",
+      "passed": true
+    },
+    {
+      "name": "strict scalar id wrong",
+      "passed": true
+    },
+    {
+      "name": "strict scalar key mlf-shape-primitives-0.1 ",
+      "passed": true
+    },
+    {
+      "name": "strict scalar key \"mlf-shape-primitives-0.1\"",
+      "passed": true
+    },
+    {
+      "name": "strict scalar key wrong",
+      "passed": true
+    },
+    {
+      "name": "strict scalar exposed True ",
+      "passed": true
+    },
+    {
+      "name": "strict scalar exposed \"True\"",
+      "passed": true
+    },
+    {
+      "name": "strict scalar exposed wrong",
+      "passed": true
+    },
+    {
+      "name": "visibility public cannot become private",
+      "passed": true
+    },
+    {
+      "name": "unknown semantic field not silently stripped",
+      "passed": true
+    },
+    {
+      "name": "missing list field rejected",
+      "passed": true
+    },
+    {
+      "name": "duplicate field rejected by exact unchanged parser",
+      "passed": true
+    },
+    {
+      "name": "duplicate unit rejected by unchanged parser",
+      "passed": true
+    },
+    {
+      "name": "extra different unit rejected",
+      "passed": true
+    },
+    {
+      "name": "changed record unit ID rejected",
+      "passed": true
+    },
+    {
+      "name": "registered validator exact v4 AST retained",
+      "passed": true
+    },
+    {
+      "name": "unchanged COMMANDS.json",
+      "passed": true
+    },
+    {
+      "name": "unchanged GLOBAL-PACKAGE-INPUTS.json",
+      "passed": true
+    },
+    {
+      "name": "unchanged SetupCheck.hs",
+      "passed": true
+    },
+    {
+      "name": "raw artifacts remain byte-exact unchanged",
+      "passed": true
+    },
+    {
+      "name": "run04 absent",
+      "passed": true
+    }
+  ],
+  "complete": true,
+  "no_loader_compiler_guard_lock_target_or_admission": true,
+  "no_module_top_level_or_original_helper_entry_executed": true,
+  "only_original_function_extracted": "runtime_pins.package_records pure text parser",
+  "raw_artifact_byte_oracles_not_normalized": true,
+  "schema": "main-gap-setup-registered-package-pure-regression-v1",
+  "source": {
+    "bytes": 64664,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-v5-source/controller.py",
+    "sha256": "018b21b47c8010791f7369c80b041b5f6add5e39bfa0589adc84cda944b52bf8"
+  }
+}

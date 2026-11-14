@@ -1,0 +1,273 @@
+{
+  "not_performance_results": true,
+  "runs": [
+    {
+      "actual_SETUP_passed": false,
+      "actual_controller_error": "RuntimeError('outer not clean/successful')",
+      "actual_exit_code": 1,
+      "actual_outer_reason": "unexpected child exit (124 is not timeout)",
+      "actual_result": "failed_before_first_nested_child_spawn",
+      "actual_worker_error": "ValueError('output parent missing')",
+      "all_original_raw_evidence_in_this_archive": false,
+      "baseline_ordinary_qualification_invalidated": false,
+      "budget_passed_does_not_mean_stage_success": true,
+      "cleanup_lease_locks_verified": true,
+      "compiler_or_payload_targets_started": 0,
+      "completed_nested_command_rows": 0,
+      "counters": {
+        "qualification_count": 0,
+        "runtime_count": 0,
+        "setup_payload_count": 0
+      },
+      "current_epoch_active_and_quarantine_absent": true,
+      "elapsed_ns": 4210335982,
+      "failure_and_cleanup_review_passed": true,
+      "full_private_evidence_retained": true,
+      "independent_budget_maximum_ns": 600000000000,
+      "limitations": [
+        "This accepts the failure evidence and final cleanup only, not SETUP success, qualification, or permission to retry.",
+        "Zero nested payload execution is concluded from the exact traceback and immutable guard pre-spawn ordering plus actual absent child/output inventory, not from counters alone. Git metadata and the outer Python orchestration/authentication ran; zero overall execution is not claimed.",
+        "The budget success flag means only the returned cleanup-inclusive duration was within the fixed ceiling. The outer complete=false/exit1 is retained and not relabelled as successful work.",
+        "Baseline source, producer, objects/interfaces, executables, tools/runtime and original BUILD/CONTROLS reports were rehashed unchanged. No old F25 qualification is transferred and no old r13/r19 termination is inferred.",
+        "Other directory and counter ordering was reviewed statically, not dynamically tested. No remaining compile, private package, fixture, RTS or runtime operation is claimed to work."
+      ],
+      "nested_child_processes_started": 0,
+      "old_run_stays_failed": true,
+      "prior_baseline_file_pins_rehashed": 6265,
+      "reported_RTS_count": 0,
+      "review_manifest_original": {
+        "bytes": 2025,
+        "sha256": "c1bec2d8cc24e5484c49ac0df2b95544234c62c28ce43b5ade85fe3b554662ee",
+        "source_artifact": "main-gap-setup-run01-failure-review/MANIFEST.json"
+      },
+      "review_original": {
+        "bytes": 12662,
+        "sha256": "c5ce8cc7638a471073ab6c82f598245e88822b7edc274937aa3611ef42888917",
+        "source_artifact": "main-gap-setup-run01-failure-review/report.json"
+      },
+      "run": "01",
+      "same_shot_epoch_config_claim_admission_return_verified": true,
+      "selected_raw_evidence_pins": {
+        "outer": {
+          "bytes": 2852,
+          "sha256": "6f158aca78445a7a88e6ad17ff0618594214686c02e28aaedc12b22500f7ff2d"
+        },
+        "traceback": {
+          "bytes": 2925,
+          "sha256": "fd93bfd2c8dc6836381cb08c2d86c350763ae650242b1b1117f5350da326bdab"
+        },
+        "watchdog": {
+          "bytes": 4459,
+          "sha256": "5490bdece52692fe06a1ed0722582b9821af07d9ea0a30426df71d2fb3773c18"
+        },
+        "worker": {
+          "bytes": 95161,
+          "sha256": "c29e3f90f70d45b734dd0aa6bf91bcc82c0843dd419fafff271bede9835bbf05"
+        }
+      },
+      "source_and_full_baseline_pins_unchanged": true,
+      "source_review_correction": "The prior v2 source PASS missed the immutable nested-guard requirement that output.parent already exist. That was a source-review omission. Its pinned original report is preserved; this actual failure supersedes any inference that unmodified v2 is operationally runnable. The previous ownership repair remains valid and does not cause this failure.",
+      "unique_file_pins_verified": 6309
+    },
+    {
+      "actual_SETUP_passed": false,
+      "actual_controller_error": "RuntimeError('outer not clean/successful')",
+      "actual_exit_code": 1,
+      "actual_outer_reason": "unexpected child exit (124 is not timeout)",
+      "actual_result": "failed_after17_completed_nested_commands_at_registered_package_list_field_representation_comparison",
+      "actual_worker_error": "RuntimeError('registered package field differs: import-dirs')",
+      "all_original_raw_evidence_in_this_archive": false,
+      "baseline_ordinary_qualification_invalidated": false,
+      "budget_passed_does_not_mean_stage_success": true,
+      "cleanup_lease_locks_verified": true,
+      "completed_nested_command_rows": 17,
+      "counters": {
+        "qualification_count": 0,
+        "runtime_count": 7,
+        "setup_payload_count": 10
+      },
+      "current_epoch_active_and_quarantine_absent": true,
+      "elapsed_ns": 19896697121,
+      "failure_and_cleanup_review_passed": true,
+      "full_private_evidence_retained": true,
+      "independent_budget_maximum_ns": 600000000000,
+      "limitations": [
+        "This accepts the actual failure and cleanup evidence, not SETUP success or permission to retry.",
+        "Actual runtime queries and one GHC compile did execute in run02; only later fixture/stats/qualification work did not. No zero-execution claim.",
+        "Created8object/interface files and archive are currently pinned; because worker aborted before its final outputs/private_unit receipt, this review does not invent a successful final artifact qualification or claim a final output pin existed in the failed receipt.",
+        "The independent list predicate on actual text demonstrates a minimal semantic correction. No original runtime helper/parser or proposed adapter entrypoint was executed; no actual result is relabelled.",
+        "All baseline pins, source modes/tree, runtime bindings/global package inputs and old8files were checked unchanged. Unrelated historical scope termination is not inferred."
+      ],
+      "old_run_stays_failed": true,
+      "prior_baseline_file_pins_rehashed": 6265,
+      "reported_RTS_count": 0,
+      "review_manifest_original": {
+        "bytes": 2941,
+        "sha256": "38ec021117eef648f1fef660948911a7251bd5091f89a7b5f9059ed6ce6d787d",
+        "source_artifact": "main-gap-setup-run02-failure-review/MANIFEST.json"
+      },
+      "review_original": {
+        "bytes": 14675,
+        "sha256": "1c71cac4a6fd9efcfe2fe2e53f27cea3f77c0d35b90f1ad8b8eeb499658b319a",
+        "source_artifact": "main-gap-setup-run02-failure-review/report.json"
+      },
+      "run": "02",
+      "runtime_after_executed": false,
+      "same_shot_epoch_config_claim_admission_return_verified": true,
+      "selected_raw_evidence_pins": {
+        "outer": {
+          "bytes": 3601,
+          "sha256": "2c7b14296e2e168e38466954906d5bb83c10c2ce0a7040ec27c79bc53d9fbd67"
+        },
+        "traceback": {
+          "bytes": 1084,
+          "sha256": "0d2a20409a611b3af690336d5be61d56b9320594581222aaceb1e417c6d0730a"
+        },
+        "watchdog": {
+          "bytes": 17841,
+          "sha256": "80a1d2660e5a5a6a5818248d970be078d40dbb31cd027062934100189b9aaa3c"
+        },
+        "worker": {
+          "bytes": 213153,
+          "sha256": "41138fe91abf5a4ce5179a45c16b5cc1e0f2bc23fdaf38e8c8c19947972bfba5"
+        }
+      },
+      "source_and_full_baseline_pins_unchanged": true,
+      "source_review_correction": "The prior source review checked package IDs and intended fields but did not exercise actual ghc-pkg folded list formatting. That omitted serialization case is now demonstrated with real registered bytes; previous source PASS is not proof that unchanged v3 completes. Frozen source/review and both failed runs remain unchanged.",
+      "unexecuted_remainder": [
+        "ordinary producer fixed Fixture compile",
+        "fresh stats Main compile and link",
+        "all11 qualification commands including5CLI and typed GHC",
+        "all9 RTS reports",
+        "post runtime queries"
+      ],
+      "unique_file_pins_verified": 6512
+    },
+    {
+      "actual_SETUP_passed": false,
+      "actual_controller_error": "RuntimeError('outer not clean/successful')",
+      "actual_exit_code": 1,
+      "actual_outer_reason": "unexpected child exit (124 is not timeout)",
+      "actual_result": "failed_after29_completed_nested_commands_at_unchanged_full_raw_fixture_query_builtin_equality_gate",
+      "actual_worker_error": "RuntimeError('full raw fixture/query/builtin bytes differ; no normalization permitted')",
+      "additional_RTS_reports_not_produced": 3,
+      "all_original_raw_evidence_in_this_archive": false,
+      "baseline_ordinary_qualification_invalidated": false,
+      "budget_passed_does_not_mean_stage_success": true,
+      "cleanup_lease_locks_verified": true,
+      "completed_boundary": [
+        "all13 payload commands including private4host unit/archive/package registration,ordinary fixture,fresh original Main and own94nonMain+2C stats relink",
+        "8 bounded actual runtime-before queries",
+        "ordinary fixture/builtin show commands",
+        "all5 exact stats binary CLI controls, type-negativeexit1 preserved",
+        "stats-fixed-fixture commandexit0 followed by failed full raw equality"
+      ],
+      "completed_nested_command_rows": 29,
+      "counters": {
+        "qualification_count": 8,
+        "runtime_count": 8,
+        "setup_payload_count": 13
+      },
+      "current_epoch_active_and_quarantine_absent": true,
+      "difference_explanation": {
+        "CURRENT_points_to_different_valid_content_SHA": true,
+        "compiler_identity_field_offsets": [
+          135,
+          199
+        ],
+        "frozen_source_chain": "CrateSession reads getExecutablePath/fileDigest; CrateGraph.start includes compilerHash in configuration; actual generation contains precisely each executable SHA. Bitstream checksum covers full bytes with76:80 zeroed.",
+        "generation_and_CURRENT_CRC_valid": true,
+        "generation_bytes_each": 29031,
+        "generation_diff_spans": [
+          [
+            76,
+            80
+          ],
+          [
+            135,
+            180
+          ],
+          [
+            181,
+            199
+          ]
+        ],
+        "generation_different_bytes": 67,
+        "inference_limit": "Explains the observed cache generation identity difference only. Does not prove every unexecuted semantic gate or permit ignoring/relabeling the full raw failure.",
+        "ordinary_executable_sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f",
+        "other_generation_bytes_except_CRC_equal": true,
+        "stats_executable_sha256": "98b247203372ce26775f6665e6ccc272970d180afcab618aa60369de11baa23e"
+      },
+      "elapsed_ns": 33108900562,
+      "failure_and_cleanup_review_passed": true,
+      "full_private_evidence_retained": true,
+      "full_raw_diff": {
+        "all78_query_result_payloads_equal": true,
+        "both_checked_and_builtin_pairs_equal": true,
+        "bytes_each": 328256,
+        "changed_common_files": 1,
+        "equal_common_files": 87,
+        "full_inventory_equal": false,
+        "ordered_query_report_equal_1fresh0reuse": true,
+        "ordinary_files": 89,
+        "ordinary_only_generation_files": 1,
+        "stats_files": 89,
+        "stats_only_generation_files": 1,
+        "union_files": 90
+      },
+      "independent_budget_maximum_ns": 600000000000,
+      "limitations": [
+        "Failure and cleanup evidence only, not SETUP qualification. 29 real commands and6 genuine RTS reports completed; remaining11 commands and3 RTS reports did not.",
+        "All90 union paths and raw bytes were compared; no cherry-picking, normalization, directory rewrite, object deletion or target rerun occurred.",
+        "Pure strict RTS definitions were extracted and run on existing raw bytes only. Rounded process totals are compatibility evidence, not performance samples, CPU attribution or stable wall claims.",
+        "Baseline source/modes, producer/objects/interfaces/tools/runtime/globalpackage inputs and old8files were reread unchanged. This does not infer unrelated old scope termination."
+      ],
+      "old_run_stays_failed": true,
+      "prior_baseline_file_pins_rehashed": 6265,
+      "reported_RTS_count": 6,
+      "review_manifest_original": {
+        "bytes": 2970,
+        "sha256": "59361d5f17218ff0b1be752c3b3595e968741745e382fa135df2d9297ada8de4",
+        "source_artifact": "main-gap-setup-run03-failure-review/MANIFEST.json"
+      },
+      "review_original": {
+        "bytes": 16922,
+        "sha256": "de12631dd6e7cd9955767574fa0fa81e20e3443917ca1c0d9d8b4f6a51dc237e",
+        "source_artifact": "main-gap-setup-run03-failure-review/report.json"
+      },
+      "run": "03",
+      "runtime_after_executed": false,
+      "same_shot_epoch_config_claim_admission_return_verified": true,
+      "selected_raw_evidence_pins": {
+        "outer": {
+          "bytes": 4448,
+          "sha256": "d2a4b57902cfcc6b38d05d8fdf39e88d3a32f066024fed5027fc599470ed37c8"
+        },
+        "traceback": {
+          "bytes": 1242,
+          "sha256": "7658898505aac6515a179adc6c14b98fa8119cd89e48790264c644eb2f5ff496"
+        },
+        "watchdog": {
+          "bytes": 29193,
+          "sha256": "bba7f0ed0ca9f04e8e71e4c570e68891d73005854db1c079b7adfd5e2944d4fb"
+        },
+        "worker": {
+          "bytes": 305419,
+          "sha256": "39ea02c89e599f2c81f33e8913f408570b0f295cf281d7f02ca7c2287d581867"
+        }
+      },
+      "source_and_full_baseline_pins_unchanged": true,
+      "source_review_correction": "Earlier source review preserved the intended full raw gate but did not identify that the query generation includes the executable hash changed by the stats relink. Actual evidence now establishes this incompatibility. Prior source reviews and all failed scopes remain frozen; this does not retroactively grant SETUP success.",
+      "unexecuted_remainder": [
+        "stats-show-fixture",
+        "stats-show-builtin",
+        "GHC typed RTS compatibility control",
+        "8 runtime-after queries"
+      ],
+      "unique_file_pins_verified": 6747,
+      "whole_registered_package_and_own_relink_provenance_verified": true
+    }
+  ],
+  "schema": "main-frontend-failure-summaries-v1",
+  "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5"
+}

@@ -1,0 +1,85 @@
+{
+  "active_cell_template": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/cells/<cell>",
+  "endpoint_root": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>",
+  "fixed_stats_sink": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/active/mlf.stats",
+  "future_sampling": {
+    "GHC": "same exact tool/private-unit/flags/input/output paths; actual exact Compiling inventory and fresh .hi bytes equal to reviewed per-cell GHC oracle, no other home source compilation or object/native artifacts",
+    "MLF": "use exact accepted stats binary at same active path; empty state; complete raw inventory+bytes equal to frozen same-B oracle including config/CRC/generation filenames/CURRENT with zero exemptions; revalidate freshness/runtime/closure",
+    "RTS_and_logs": "outside semantic payload; retained raw and parsed strictly, never normalized into payload equality",
+    "later_attempt_or_changed_identity": "stop; do not replace/rebase/regenerate oracle or retry implicitly"
+  },
+  "new_qualification_scope": "<INDEPENDENTLY_ACCEPTED_SETUP_WORK>/semantic-qualification-01",
+  "no_actual_artifacts_created": true,
+  "same_absolute_active_cell_paths_required": true,
+  "schema": "main-gap-semantic-artifact-flow-plan-v2",
+  "stages": [
+    {
+      "name": "before-reference",
+      "requirements": [
+        "all setup immutable source/builtin/package/object/runtime pins verified",
+        "active cell path absent, created empty; only exact crate.spec and empty queries initially",
+        "fixed stats sink absent; no target objects/interfaces/query generations imported"
+      ]
+    },
+    {
+      "name": "reference",
+      "requirements": [
+        "original accepted main producer only, not stats copy",
+        "actual complete ordered fresh query report establishes oracle; zero reuse and all cached is false",
+        "checked pair and full query publication byte inventory",
+        "show-crate ownership/dependency/fingerprint validated",
+        "three formula calls for shapes only; inputs[-1,0,7], exact outputs",
+        "artifact pins unchanged across read-only show/run checks",
+        "authenticate generation config field1 against actual executing original binary SHA; complete own container/CRC/SHA/CURRENT proof",
+        "decode full dynamic graph rows and ordered read occurrences without deduplication; exact closure of all present result files"
+      ]
+    },
+    {
+      "name": "archive-reference",
+      "requirements": [
+        "move entire active cell into new append-only qualification/reference/<cell>",
+        "retain file bytes and original absolute path correspondence",
+        "archives never used as new query roots or GHC search roots",
+        "do not execute archived artifact if it embeds old path; formula checks occurred at original path"
+      ]
+    },
+    {
+      "name": "stats-copy",
+      "requirements": [
+        "recreate identical active path, same exact spec/input/dependencies, empty queries and no output pair",
+        "execute qualified stats binary exactly once; fresh RTS goes to external fixed sink and immutable command archive",
+        "authenticate own actual binary SHA in config, complete own CRC/SHA/CURRENT chain and exact result closure",
+        "checked pair, full ordered query JSON, every result/lock/spec/source file exact versus original; no changed or additional arbitrary semantic field permitted",
+        "only the explicitly bound compiler SHA field and its derived CRC/content address/CURRENT may differ across producers; all remaining snapshot fields, every ordered read occurrence, node/root structure and unchanged wire spans exact",
+        "do not strip, globally replace, relabel producers, normalize bytes, rewrite timestamps or fabricate a passing artifact",
+        "move whole B tree to append-only stats archive, preserving full bytes and original absolute path correspondence",
+        "B is only a candidate future raw oracle until all12-cell independent actual review passes; its own output never proves original semantic correctness"
+      ]
+    },
+    {
+      "name": "ghc",
+      "requirements": [
+        "recreate empty same active path and empty objects directory",
+        "same exact source operands; reset -i, only Foundation14 source root when needed",
+        "only pinned private package DB/global units; no host/ghc source root or producer object search path",
+        "actual log lists each expected source/module exactly once and nothing else",
+        "exact new nonempty .hi inventory; no .o/.dyn_o/.dyn_hi/executable/extra Main",
+        "mandatory fresh GHC RTS archive and immutable setup pre/post pins",
+        "move complete tree to qualification/ghc/<cell>; active cell absent afterwards"
+      ]
+    },
+    {
+      "name": "final",
+      "requirements": [
+        "all12 cells completed; no replacement or retained-window filtering",
+        "all91 exact commands and24 reports accounted separately from lifecycle receipt",
+        "all original setup static files pinned unchanged, fixed sink empty, no active target results",
+        "outer/watchdog final hash/return/cleanup/current scoped lease closed, integer guard-return elapsed<=600e9",
+        "independent actual semantic qualification review before any48-leg sampling",
+        "freeze actual successful B full raw files as per-cell same-stats-binary sampling oracles, without cross-producer exemptions",
+        "preserve old run03 and v1 whole-raw mismatch as failed evidence; new contract has a distinct name/review"
+      ]
+    }
+  ],
+  "worker_output_ownership": "positive completed worker archives only; exclude changing outer/controller/watchdog and self receipt"
+}

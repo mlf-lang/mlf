@@ -1,0 +1,74 @@
+{
+  "actual_failure_boundary": {
+    "RTS_reports": 6,
+    "completed_children": 29,
+    "error": "RuntimeError('full raw fixture/query/builtin bytes differ; no normalization permitted')",
+    "failure_after_stats_compile_before_remaining_setup_controls": true,
+    "independent_full_actual_run_review_replaced_by_this_report": false,
+    "setup_receipt": {
+      "bytes": 305419,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run03/setup/setup-receipt.json",
+      "sha256": "39ea02c89e599f2c81f33e8913f408570b0f295cf281d7f02ca7c2287d581867"
+    },
+    "stats_fixed_fixture_child_exit": 0
+  },
+  "actual_setup_qualification_passed": false,
+  "artifacts_normalized_or_modified": false,
+  "causal_chain": [
+    "CrateSession.compileGraphLocked reads getExecutablePath then fileDigest and passes that compiler hash to CrateGraph.compile.",
+    "Host fileDigest dispatches to os_fileDigest, which reads binary bytes and computes SHA256; it is not file mtime.",
+    "CrateGraph.start packs crate identity, compiler hash, sourceQueryFormat, checker/receipt format and flavor as session configuration.",
+    "QueryGraph.encodeIndex writes the complete configuration as the second field of tag412 snapshot; every remaining table/row/read/payload in these two actual snapshots is identical.",
+    "The changed64-character compiler hash changes63 physical bytes and the4-byte CRC. SHA256 of the full generation changes, so publish writes a differently named .mlfqg and CURRENT points to that real digest.",
+    "admitSnapshot requires exact configuration equality; mismatch yields an empty prior session in begin. The compiler identity is operational cache-admission provenance, not disposable logging decoration."
+  ],
+  "complete": true,
+  "configuration": {
+    "actual_binary_A": {
+      "bytes": 20192216,
+      "path": "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+      "sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f"
+    },
+    "actual_binary_B": {
+      "bytes": 20205400,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run03/setup/stats-emlf",
+      "sha256": "98b247203372ce26775f6665e6ccc272970d180afcab618aa60369de11baa23e"
+    },
+    "both_match_actual_binary_bytes": true,
+    "fields_A": [
+      "compiler-shapes/builtin",
+      "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f",
+      "MLF-SOURCE-CRATE-QUERY-7",
+      "open-fragment-checker-1/finish-receipt-1",
+      "source"
+    ],
+    "fields_B": [
+      "compiler-shapes/builtin",
+      "98b247203372ce26775f6665e6ccc272970d180afcab618aa60369de11baa23e",
+      "MLF-SOURCE-CRATE-QUERY-7",
+      "open-fragment-checker-1/finish-receipt-1",
+      "source"
+    ],
+    "meaning": "executing compiler binary SHA256",
+    "only_field_index_changed": 1
+  },
+  "diagnostic_check_count": 50,
+  "not_full_setup_qualification": true,
+  "original_decoder": {
+    "bytes": 17708,
+    "sha256": "6bd407973d2b0c3ab77add45a35b49b7f8a7d827fb6529ed4e1a9603d2f82cb0",
+    "source_artifact": "main-gap-setup-run03-raw-diagnosis/decode_and_compare.py"
+  },
+  "original_manifest": {
+    "bytes": 4407,
+    "sha256": "afdceb9d05de4c0f7c4117d63acf396fa1aad1ae1aae2e4a42808d3c33769e41",
+    "source_artifact": "main-gap-setup-run03-raw-diagnosis/MANIFEST.json"
+  },
+  "original_report": {
+    "bytes": 13377,
+    "sha256": "82fa501afee08a56f20cb98fb1466dbd4e5daea593788cee7f64a4367375c228",
+    "source_artifact": "main-gap-setup-run03-raw-diagnosis/report.json"
+  },
+  "private_full_diagnostic_products_retained": true,
+  "status": "CAUSE_IDENTIFIED_OLD_RAW_QUALIFICATION_REMAINS_FAILED"
+}

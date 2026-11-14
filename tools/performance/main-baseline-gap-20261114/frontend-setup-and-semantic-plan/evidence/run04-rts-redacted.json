@@ -1,0 +1,860 @@
+{
+  "original_parsed_review": {
+    "bytes": 23754,
+    "sha256": "57009245761ac70c57ec26149bdb50b156c00ce925911f192002caf1aa72788a",
+    "source_artifact": "main-gap-setup-run04-actual-review/statistics-reparse.json"
+  },
+  "parsed_statistics": [
+    {
+      "command": "stats-version",
+      "not_performance_sample": true,
+      "parsed": {
+        "allocated_bytes": 58704,
+        "allocation_rate_bytes_per_mut_second": 0,
+        "copied_bytes": 3184,
+        "gc_cpu_fraction_from_rounded_times": 0.0,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0,
+            "collections": 0,
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0,
+            "generation": 0,
+            "maximum_pause_seconds": 0.0,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0002,
+            "collections": 1,
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0,
+            "generation": 1,
+            "maximum_pause_seconds": 0.0002,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 1,
+        "maximum_residency_bytes": 36024,
+        "maximum_slop_bytes": 21320,
+        "productivity_percent": {
+          "elapsed": 27.2,
+          "user": 0.0
+        },
+        "reported_gc_percent": {
+          "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+          "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+          "values": {
+            "cpu": 0.0,
+            "elapsed": 0.0
+          }
+        },
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "               6 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 6.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "GC": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "INIT": {
+            "cpu_seconds": 0.002,
+            "elapsed_seconds": 0.0
+          },
+          "MUT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "Total": {
+            "cpu_seconds": 0.002,
+            "elapsed_seconds": 0.001
+          }
+        }
+      },
+      "raw": {
+        "bytes": 1081,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/024-stats-version/reports/0-mlf.stats",
+        "sha256": "6273673b30c004d20eb42b4b0ea7a0e5472f0a038a7f59c4db6b5dcd54fab0d4"
+      }
+    },
+    {
+      "command": "stats-identity",
+      "not_performance_sample": true,
+      "parsed": {
+        "allocated_bytes": 57808,
+        "allocation_rate_bytes_per_mut_second": 0,
+        "copied_bytes": 3184,
+        "gc_cpu_fraction_from_rounded_times": 0.0,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0,
+            "collections": 0,
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0,
+            "generation": 0,
+            "maximum_pause_seconds": 0.0,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0001,
+            "collections": 1,
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0,
+            "generation": 1,
+            "maximum_pause_seconds": 0.0001,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 1,
+        "maximum_residency_bytes": 36024,
+        "maximum_slop_bytes": 21320,
+        "productivity_percent": {
+          "elapsed": 18.3,
+          "user": 0.0
+        },
+        "reported_gc_percent": {
+          "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+          "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+          "values": {
+            "cpu": 0.0,
+            "elapsed": 0.0
+          }
+        },
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "               6 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 6.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "GC": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "INIT": {
+            "cpu_seconds": 0.003,
+            "elapsed_seconds": 0.001
+          },
+          "MUT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "Total": {
+            "cpu_seconds": 0.003,
+            "elapsed_seconds": 0.001
+          }
+        }
+      },
+      "raw": {
+        "bytes": 1097,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/025-stats-identity/reports/0-mlf.stats",
+        "sha256": "9971431b2865841ee3ffbd5e772536a92f0dc3b9dbc5022f14b8894c731f7837"
+      }
+    },
+    {
+      "command": "stats-semantic-42",
+      "not_performance_sample": true,
+      "parsed": {
+        "allocated_bytes": 6647680,
+        "allocation_rate_bytes_per_mut_second": 1839814924,
+        "copied_bytes": 516120,
+        "gc_cpu_fraction_from_rounded_times": 0.125,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0013,
+            "collections": 1,
+            "cpu_seconds": 0.001,
+            "elapsed_seconds": 0.001,
+            "generation": 0,
+            "maximum_pause_seconds": 0.0013,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0002,
+            "collections": 1,
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0,
+            "generation": 1,
+            "maximum_pause_seconds": 0.0002,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 1,
+        "maximum_residency_bytes": 36024,
+        "maximum_slop_bytes": 29512,
+        "productivity_percent": {
+          "elapsed": 70.8,
+          "user": 45.4
+        },
+        "reported_gc_percent": {
+          "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+          "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+          "values": {
+            "cpu": 0.0,
+            "elapsed": 0.0
+          }
+        },
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "               6 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 6.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.002,
+            "elapsed_seconds": 0.0
+          },
+          "GC": {
+            "cpu_seconds": 0.001,
+            "elapsed_seconds": 0.001
+          },
+          "INIT": {
+            "cpu_seconds": 0.001,
+            "elapsed_seconds": 0.0
+          },
+          "MUT": {
+            "cpu_seconds": 0.004,
+            "elapsed_seconds": 0.005
+          },
+          "Total": {
+            "cpu_seconds": 0.008,
+            "elapsed_seconds": 0.008
+          }
+        }
+      },
+      "raw": {
+        "bytes": 1118,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/026-stats-semantic-42/reports/0-mlf.stats",
+        "sha256": "2343f7fcefff08b48a9e130ea0e30839b54a8858195f29884bc25c6a5fc162fd"
+      }
+    },
+    {
+      "command": "stats-unicode-positive",
+      "not_performance_sample": true,
+      "parsed": {
+        "allocated_bytes": 302806512,
+        "allocation_rate_bytes_per_mut_second": 3477895218,
+        "copied_bytes": 6557016,
+        "gc_cpu_fraction_from_rounded_times": 0.10101010101010101,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0001,
+            "collections": 69,
+            "cpu_seconds": 0.005,
+            "elapsed_seconds": 0.005,
+            "generation": 0,
+            "maximum_pause_seconds": 0.0015,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0012,
+            "collections": 4,
+            "cpu_seconds": 0.005,
+            "elapsed_seconds": 0.005,
+            "generation": 1,
+            "maximum_pause_seconds": 0.0019,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 4,
+        "maximum_residency_bytes": 1032264,
+        "maximum_slop_bytes": 29512,
+        "productivity_percent": {
+          "elapsed": 89.4,
+          "user": 88.0
+        },
+        "reported_gc_percent": {
+          "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+          "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+          "values": {
+            "cpu": 0.0,
+            "elapsed": 0.0
+          }
+        },
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "               8 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 8.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.002,
+            "elapsed_seconds": 0.0
+          },
+          "GC": {
+            "cpu_seconds": 0.01,
+            "elapsed_seconds": 0.01
+          },
+          "INIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "MUT": {
+            "cpu_seconds": 0.087,
+            "elapsed_seconds": 0.086
+          },
+          "Total": {
+            "cpu_seconds": 0.099,
+            "elapsed_seconds": 0.096
+          }
+        }
+      },
+      "raw": {
+        "bytes": 1121,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/027-stats-unicode-positive/reports/0-mlf.stats",
+        "sha256": "319e06f7f59884a91dbb811dda863bd2b4316c4a9866e4f95f44f3badac225d4"
+      }
+    },
+    {
+      "command": "stats-type-rejection",
+      "not_performance_sample": true,
+      "parsed": {
+        "allocated_bytes": 5876080,
+        "allocation_rate_bytes_per_mut_second": 906052179,
+        "copied_bytes": 522432,
+        "gc_cpu_fraction_from_rounded_times": 0.09090909090909091,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0011,
+            "collections": 1,
+            "cpu_seconds": 0.001,
+            "elapsed_seconds": 0.001,
+            "generation": 0,
+            "maximum_pause_seconds": 0.0011,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0001,
+            "collections": 1,
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0,
+            "generation": 1,
+            "maximum_pause_seconds": 0.0001,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 1,
+        "maximum_residency_bytes": 69808,
+        "maximum_slop_bytes": 28496,
+        "productivity_percent": {
+          "elapsed": 78.6,
+          "user": 60.1
+        },
+        "reported_gc_percent": {
+          "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+          "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+          "values": {
+            "cpu": 0.0,
+            "elapsed": 0.0
+          }
+        },
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "               6 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 6.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.001,
+            "elapsed_seconds": 0.0
+          },
+          "GC": {
+            "cpu_seconds": 0.001,
+            "elapsed_seconds": 0.001
+          },
+          "INIT": {
+            "cpu_seconds": 0.002,
+            "elapsed_seconds": 0.001
+          },
+          "MUT": {
+            "cpu_seconds": 0.006,
+            "elapsed_seconds": 0.007
+          },
+          "Total": {
+            "cpu_seconds": 0.011,
+            "elapsed_seconds": 0.009
+          }
+        }
+      },
+      "raw": {
+        "bytes": 1113,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/028-stats-type-rejection/reports/0-mlf.stats",
+        "sha256": "1c8a8313d913516fbad5bc34f9bc9992555207a05d109991c855caaeb56103fd"
+      }
+    },
+    {
+      "command": "stats-fixed-fixture",
+      "not_performance_sample": true,
+      "parsed": {
+        "allocated_bytes": 535860656,
+        "allocation_rate_bytes_per_mut_second": 2338392865,
+        "copied_bytes": 17461144,
+        "gc_cpu_fraction_from_rounded_times": 0.12595419847328243,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0001,
+            "collections": 119,
+            "cpu_seconds": 0.012,
+            "elapsed_seconds": 0.012,
+            "generation": 0,
+            "maximum_pause_seconds": 0.0016,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0021,
+            "collections": 10,
+            "cpu_seconds": 0.021,
+            "elapsed_seconds": 0.021,
+            "generation": 1,
+            "maximum_pause_seconds": 0.0034,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 10,
+        "maximum_residency_bytes": 1354080,
+        "maximum_slop_bytes": 296816,
+        "productivity_percent": {
+          "elapsed": 88.1,
+          "user": 87.5
+        },
+        "reported_gc_percent": {
+          "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+          "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+          "values": {
+            "cpu": 0.0,
+            "elapsed": 0.0
+          }
+        },
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "               9 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 9.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "GC": {
+            "cpu_seconds": 0.033,
+            "elapsed_seconds": 0.033
+          },
+          "INIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.001
+          },
+          "MUT": {
+            "cpu_seconds": 0.229,
+            "elapsed_seconds": 0.249
+          },
+          "Total": {
+            "cpu_seconds": 0.262,
+            "elapsed_seconds": 0.283
+          }
+        }
+      },
+      "raw": {
+        "bytes": 1334,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/029-stats-fixed-fixture/reports/0-mlf.stats",
+        "sha256": "5c81bffc4fc78aa88dc6de71c6c1c0040c32ea502f51054ea5c42838b08adc7a"
+      }
+    },
+    {
+      "command": "stats-show-fixture",
+      "not_performance_sample": true,
+      "parsed": {
+        "allocated_bytes": 1607696,
+        "allocation_rate_bytes_per_mut_second": 3910717586,
+        "copied_bytes": 3184,
+        "gc_cpu_fraction_from_rounded_times": 0.0,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0,
+            "collections": 0,
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0,
+            "generation": 0,
+            "maximum_pause_seconds": 0.0,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0001,
+            "collections": 1,
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0,
+            "generation": 1,
+            "maximum_pause_seconds": 0.0001,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 1,
+        "maximum_residency_bytes": 36024,
+        "maximum_slop_bytes": 21320,
+        "productivity_percent": {
+          "elapsed": 64.5,
+          "user": 8.4
+        },
+        "reported_gc_percent": {
+          "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+          "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+          "values": {
+            "cpu": 0.0,
+            "elapsed": 0.0
+          }
+        },
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "               6 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 6.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.001,
+            "elapsed_seconds": 0.0
+          },
+          "GC": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "INIT": {
+            "cpu_seconds": 0.003,
+            "elapsed_seconds": 0.001
+          },
+          "MUT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.002
+          },
+          "Total": {
+            "cpu_seconds": 0.005,
+            "elapsed_seconds": 0.003
+          }
+        }
+      },
+      "raw": {
+        "bytes": 1214,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/030-stats-show-fixture/reports/0-mlf.stats",
+        "sha256": "c5257553905fcccfa8e69a17b9c7c234c3dc79386204ad775c5345b3e6e20a4d"
+      }
+    },
+    {
+      "command": "stats-show-builtin",
+      "not_performance_sample": true,
+      "parsed": {
+        "allocated_bytes": 95450512,
+        "allocation_rate_bytes_per_mut_second": 5052947779,
+        "copied_bytes": 2282056,
+        "gc_cpu_fraction_from_rounded_times": 0.19999999999999998,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0001,
+            "collections": 20,
+            "cpu_seconds": 0.003,
+            "elapsed_seconds": 0.003,
+            "generation": 0,
+            "maximum_pause_seconds": 0.0005,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0006,
+            "collections": 3,
+            "cpu_seconds": 0.002,
+            "elapsed_seconds": 0.002,
+            "generation": 1,
+            "maximum_pause_seconds": 0.0013,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 3,
+        "maximum_residency_bytes": 316568,
+        "maximum_slop_bytes": 29512,
+        "productivity_percent": {
+          "elapsed": 78.8,
+          "user": 74.9
+        },
+        "reported_gc_percent": {
+          "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+          "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+          "values": {
+            "cpu": 0.0,
+            "elapsed": 0.0
+          }
+        },
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "               7 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 7.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "GC": {
+            "cpu_seconds": 0.005,
+            "elapsed_seconds": 0.005
+          },
+          "INIT": {
+            "cpu_seconds": 0.001,
+            "elapsed_seconds": 0.0
+          },
+          "MUT": {
+            "cpu_seconds": 0.019,
+            "elapsed_seconds": 0.019
+          },
+          "Total": {
+            "cpu_seconds": 0.025,
+            "elapsed_seconds": 0.024
+          }
+        }
+      },
+      "raw": {
+        "bytes": 1201,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/031-stats-show-builtin/reports/0-mlf.stats",
+        "sha256": "d331371554c5616ca94ce221071d216a5352b8ee54b1891a324aa2d9fce36cbf"
+      }
+    },
+    {
+      "command": "ghc-typed-package-RTS-control",
+      "not_performance_sample": true,
+      "parsed": {
+        "allocated_bytes": 38007912,
+        "allocation_rate_bytes_per_mut_second": 955815077,
+        "copied_bytes": 27800168,
+        "gc_cpu_fraction_from_rounded_times": 0.656,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0046,
+            "collections": 6,
+            "cpu_seconds": 0.028,
+            "elapsed_seconds": 0.028,
+            "generation": 0,
+            "maximum_pause_seconds": 0.0109,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0181,
+            "collections": 3,
+            "cpu_seconds": 0.054,
+            "elapsed_seconds": 0.054,
+            "generation": 1,
+            "maximum_pause_seconds": 0.0243,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 3,
+        "maximum_residency_bytes": 8166424,
+        "maximum_slop_bytes": 152552,
+        "productivity_percent": {
+          "elapsed": 32.0,
+          "user": 31.9
+        },
+        "reported_gc_percent": null,
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "              24 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 24.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.001,
+            "elapsed_seconds": 0.001
+          },
+          "GC": {
+            "cpu_seconds": 0.082,
+            "elapsed_seconds": 0.082
+          },
+          "INIT": {
+            "cpu_seconds": 0.002,
+            "elapsed_seconds": 0.001
+          },
+          "MUT": {
+            "cpu_seconds": 0.04,
+            "elapsed_seconds": 0.04
+          },
+          "Total": {
+            "cpu_seconds": 0.125,
+            "elapsed_seconds": 0.124
+          }
+        }
+      },
+      "raw": {
+        "bytes": 2048,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/commands/032-ghc-typed-package-RTS-control/reports/0-ghc.stats",
+        "sha256": "5956b9cb4b39f058164c893747915ed24ac697900013f2426383517c2da8b693"
+      }
+    }
+  ],
+  "records": [
+    {
+      "command": "stats-version",
+      "export_utf8": "'<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf' '--version' +RTS '-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/mlf.stats' \n          58,704 bytes allocated in the heap\n           3,184 bytes copied during GC\n          36,024 bytes maximum residency (1 sample(s))\n          21,320 bytes maximum slop\n               6 MiB total memory in use (0 MiB lost due to fragmentation)\n\n                                     Tot time (elapsed)  Avg pause  Max pause\n  Gen  0         0 colls,     0 par    0.000s   0.000s     0.0000s    0.0000s\n  Gen  1         1 colls,     0 par    0.000s   0.000s     0.0002s    0.0002s\n\n  INIT    time    0.002s  (  0.000s elapsed)\n  MUT     time    0.000s  (  0.000s elapsed)\n  GC      time    0.000s  (  0.000s elapsed)\n  EXIT    time    0.000s  (  0.000s elapsed)\n  Total   time    0.002s  (  0.001s elapsed)\n\n  %GC     time       0.0%  (0.0% elapsed)\n\n  Alloc rate    0 bytes per MUT second\n\n  Productivity   0.0% of total user, 27.2% of total elapsed\n\n",
+      "export_utf8_sha256": "ee5e8e376ba001fb747826eacf0635fe9cc88d22580fb52d2cad90a96901b54d",
+      "not_original_raw_bytes": true,
+      "not_performance_sample": true,
+      "original": {
+        "bytes": 1081,
+        "sha256": "6273673b30c004d20eb42b4b0ea7a0e5472f0a038a7f59c4db6b5dcd54fab0d4"
+      },
+      "transformation": "literal local-root placeholders in RTS invocation header only; all subsequent bytes exact"
+    },
+    {
+      "command": "stats-identity",
+      "export_utf8": "'<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf' '--implementation-identity' +RTS '-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/mlf.stats' \n          57,808 bytes allocated in the heap\n           3,184 bytes copied during GC\n          36,024 bytes maximum residency (1 sample(s))\n          21,320 bytes maximum slop\n               6 MiB total memory in use (0 MiB lost due to fragmentation)\n\n                                     Tot time (elapsed)  Avg pause  Max pause\n  Gen  0         0 colls,     0 par    0.000s   0.000s     0.0000s    0.0000s\n  Gen  1         1 colls,     0 par    0.000s   0.000s     0.0001s    0.0001s\n\n  INIT    time    0.003s  (  0.001s elapsed)\n  MUT     time    0.000s  (  0.000s elapsed)\n  GC      time    0.000s  (  0.000s elapsed)\n  EXIT    time    0.000s  (  0.000s elapsed)\n  Total   time    0.003s  (  0.001s elapsed)\n\n  %GC     time       0.0%  (0.0% elapsed)\n\n  Alloc rate    0 bytes per MUT second\n\n  Productivity   0.0% of total user, 18.3% of total elapsed\n\n",
+      "export_utf8_sha256": "890e6900f509124505aecc04ebc4833a7112f51ad3ed399a1024149093fa2fb0",
+      "not_original_raw_bytes": true,
+      "not_performance_sample": true,
+      "original": {
+        "bytes": 1097,
+        "sha256": "9971431b2865841ee3ffbd5e772536a92f0dc3b9dbc5022f14b8894c731f7837"
+      },
+      "transformation": "literal local-root placeholders in RTS invocation header only; all subsequent bytes exact"
+    },
+    {
+      "command": "stats-semantic-42",
+      "export_utf8": "'<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf' '--run' '--expr' 'printInt (40 + 2)' +RTS '-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/mlf.stats' \n       6,647,680 bytes allocated in the heap\n         516,120 bytes copied during GC\n          36,024 bytes maximum residency (1 sample(s))\n          29,512 bytes maximum slop\n               6 MiB total memory in use (0 MiB lost due to fragmentation)\n\n                                     Tot time (elapsed)  Avg pause  Max pause\n  Gen  0         1 colls,     0 par    0.001s   0.001s     0.0013s    0.0013s\n  Gen  1         1 colls,     0 par    0.000s   0.000s     0.0002s    0.0002s\n\n  INIT    time    0.001s  (  0.000s elapsed)\n  MUT     time    0.004s  (  0.005s elapsed)\n  GC      time    0.001s  (  0.001s elapsed)\n  EXIT    time    0.002s  (  0.000s elapsed)\n  Total   time    0.008s  (  0.008s elapsed)\n\n  %GC     time       0.0%  (0.0% elapsed)\n\n  Alloc rate    1,839,814,924 bytes per MUT second\n\n  Productivity  45.4% of total user, 70.8% of total elapsed\n\n",
+      "export_utf8_sha256": "bc6e8a6ab50b17ef171f110c6ea06256a290b588b13d41d149594cf9b5d8af5d",
+      "not_original_raw_bytes": true,
+      "not_performance_sample": true,
+      "original": {
+        "bytes": 1118,
+        "sha256": "2343f7fcefff08b48a9e130ea0e30839b54a8858195f29884bc25c6a5fc162fd"
+      },
+      "transformation": "literal local-root placeholders in RTS invocation header only; all subsequent bytes exact"
+    },
+    {
+      "command": "stats-unicode-positive",
+      "export_utf8": "'<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf' '--run' '--expr' 'putStrLn \"\u03bb\u96ea\ud83d\ude42\"' +RTS '-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/mlf.stats' \n     302,806,512 bytes allocated in the heap\n       6,557,016 bytes copied during GC\n       1,032,264 bytes maximum residency (4 sample(s))\n          29,512 bytes maximum slop\n               8 MiB total memory in use (0 MiB lost due to fragmentation)\n\n                                     Tot time (elapsed)  Avg pause  Max pause\n  Gen  0        69 colls,     0 par    0.005s   0.005s     0.0001s    0.0015s\n  Gen  1         4 colls,     0 par    0.005s   0.005s     0.0012s    0.0019s\n\n  INIT    time    0.000s  (  0.000s elapsed)\n  MUT     time    0.087s  (  0.086s elapsed)\n  GC      time    0.010s  (  0.010s elapsed)\n  EXIT    time    0.002s  (  0.000s elapsed)\n  Total   time    0.099s  (  0.096s elapsed)\n\n  %GC     time       0.0%  (0.0% elapsed)\n\n  Alloc rate    3,477,895,218 bytes per MUT second\n\n  Productivity  88.0% of total user, 89.4% of total elapsed\n\n",
+      "export_utf8_sha256": "74f89c1c5ab2593946a446b82a9cacf83b30c3d9708b292a3ca4a52245e075ec",
+      "not_original_raw_bytes": true,
+      "not_performance_sample": true,
+      "original": {
+        "bytes": 1121,
+        "sha256": "319e06f7f59884a91dbb811dda863bd2b4316c4a9866e4f95f44f3badac225d4"
+      },
+      "transformation": "literal local-root placeholders in RTS invocation header only; all subsequent bytes exact"
+    },
+    {
+      "command": "stats-type-rejection",
+      "export_utf8": "'<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf' '--type' '--expr' '(True :: Int)' +RTS '-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/mlf.stats' \n       5,876,080 bytes allocated in the heap\n         522,432 bytes copied during GC\n          69,808 bytes maximum residency (1 sample(s))\n          28,496 bytes maximum slop\n               6 MiB total memory in use (0 MiB lost due to fragmentation)\n\n                                     Tot time (elapsed)  Avg pause  Max pause\n  Gen  0         1 colls,     0 par    0.001s   0.001s     0.0011s    0.0011s\n  Gen  1         1 colls,     0 par    0.000s   0.000s     0.0001s    0.0001s\n\n  INIT    time    0.002s  (  0.001s elapsed)\n  MUT     time    0.006s  (  0.007s elapsed)\n  GC      time    0.001s  (  0.001s elapsed)\n  EXIT    time    0.001s  (  0.000s elapsed)\n  Total   time    0.011s  (  0.009s elapsed)\n\n  %GC     time       0.0%  (0.0% elapsed)\n\n  Alloc rate    906,052,179 bytes per MUT second\n\n  Productivity  60.1% of total user, 78.6% of total elapsed\n\n",
+      "export_utf8_sha256": "66bf19a59220fe642fb6371b2f315619a561ce8f8e916fffc7c71c51797ccd46",
+      "not_original_raw_bytes": true,
+      "not_performance_sample": true,
+      "original": {
+        "bytes": 1113,
+        "sha256": "1c8a8313d913516fbad5bc34f9bc9992555207a05d109991c855caaeb56103fd"
+      },
+      "transformation": "literal local-root placeholders in RTS invocation header only; all subsequent bytes exact"
+    },
+    {
+      "command": "stats-fixed-fixture",
+      "export_utf8": "'<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf' '--compile-crate' '<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/builtin-work/fixture.spec' '-o' '<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/builtin-work/fixture' +RTS '-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/mlf.stats' \n     535,860,656 bytes allocated in the heap\n      17,461,144 bytes copied during GC\n       1,354,080 bytes maximum residency (10 sample(s))\n         296,816 bytes maximum slop\n               9 MiB total memory in use (0 MiB lost due to fragmentation)\n\n                                     Tot time (elapsed)  Avg pause  Max pause\n  Gen  0       119 colls,     0 par    0.012s   0.012s     0.0001s    0.0016s\n  Gen  1        10 colls,     0 par    0.021s   0.021s     0.0021s    0.0034s\n\n  INIT    time    0.000s  (  0.001s elapsed)\n  MUT     time    0.229s  (  0.249s elapsed)\n  GC      time    0.033s  (  0.033s elapsed)\n  EXIT    time    0.000s  (  0.000s elapsed)\n  Total   time    0.262s  (  0.283s elapsed)\n\n  %GC     time       0.0%  (0.0% elapsed)\n\n  Alloc rate    2,338,392,865 bytes per MUT second\n\n  Productivity  87.5% of total user, 88.1% of total elapsed\n\n",
+      "export_utf8_sha256": "356ac77120a0a3c58aef6a9bac8d38c170ae7457997be7527a0bffca8a3c659e",
+      "not_original_raw_bytes": true,
+      "not_performance_sample": true,
+      "original": {
+        "bytes": 1334,
+        "sha256": "5c81bffc4fc78aa88dc6de71c6c1c0040c32ea502f51054ea5c42838b08adc7a"
+      },
+      "transformation": "literal local-root placeholders in RTS invocation header only; all subsequent bytes exact"
+    },
+    {
+      "command": "stats-show-fixture",
+      "export_utf8": "'<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf' '--show-crate' '<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/builtin-work/fixture.mlfci' +RTS '-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/mlf.stats' \n       1,607,696 bytes allocated in the heap\n           3,184 bytes copied during GC\n          36,024 bytes maximum residency (1 sample(s))\n          21,320 bytes maximum slop\n               6 MiB total memory in use (0 MiB lost due to fragmentation)\n\n                                     Tot time (elapsed)  Avg pause  Max pause\n  Gen  0         0 colls,     0 par    0.000s   0.000s     0.0000s    0.0000s\n  Gen  1         1 colls,     0 par    0.000s   0.000s     0.0001s    0.0001s\n\n  INIT    time    0.003s  (  0.001s elapsed)\n  MUT     time    0.000s  (  0.002s elapsed)\n  GC      time    0.000s  (  0.000s elapsed)\n  EXIT    time    0.001s  (  0.000s elapsed)\n  Total   time    0.005s  (  0.003s elapsed)\n\n  %GC     time       0.0%  (0.0% elapsed)\n\n  Alloc rate    3,910,717,586 bytes per MUT second\n\n  Productivity   8.4% of total user, 64.5% of total elapsed\n\n",
+      "export_utf8_sha256": "91807989a899492f63f2cba9c890754a4e8b75e28fe713fce3f4b66a3bf568e6",
+      "not_original_raw_bytes": true,
+      "not_performance_sample": true,
+      "original": {
+        "bytes": 1214,
+        "sha256": "c5257553905fcccfa8e69a17b9c7c234c3dc79386204ad775c5345b3e6e20a4d"
+      },
+      "transformation": "literal local-root placeholders in RTS invocation header only; all subsequent bytes exact"
+    },
+    {
+      "command": "stats-show-builtin",
+      "export_utf8": "'<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf' '--show-crate' '<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/builtin.mlfci' +RTS '-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/mlf.stats' \n      95,450,512 bytes allocated in the heap\n       2,282,056 bytes copied during GC\n         316,568 bytes maximum residency (3 sample(s))\n          29,512 bytes maximum slop\n               7 MiB total memory in use (0 MiB lost due to fragmentation)\n\n                                     Tot time (elapsed)  Avg pause  Max pause\n  Gen  0        20 colls,     0 par    0.003s   0.003s     0.0001s    0.0005s\n  Gen  1         3 colls,     0 par    0.002s   0.002s     0.0006s    0.0013s\n\n  INIT    time    0.001s  (  0.000s elapsed)\n  MUT     time    0.019s  (  0.019s elapsed)\n  GC      time    0.005s  (  0.005s elapsed)\n  EXIT    time    0.000s  (  0.000s elapsed)\n  Total   time    0.025s  (  0.024s elapsed)\n\n  %GC     time       0.0%  (0.0% elapsed)\n\n  Alloc rate    5,052,947,779 bytes per MUT second\n\n  Productivity  74.9% of total user, 78.8% of total elapsed\n\n",
+      "export_utf8_sha256": "52df24dc5a78cf786f50aadb5fb24b5a6768b68056a74344cfeedfd85bd0b62a",
+      "not_original_raw_bytes": true,
+      "not_performance_sample": true,
+      "original": {
+        "bytes": 1201,
+        "sha256": "d331371554c5616ca94ce221071d216a5352b8ee54b1891a324aa2d9fce36cbf"
+      },
+      "transformation": "literal local-root placeholders in RTS invocation header only; all subsequent bytes exact"
+    },
+    {
+      "command": "ghc-typed-package-RTS-control",
+      "export_utf8": "'<GHC_TOOLCHAIN>/ghc/lib/ghc-9.14.1/bin/./ghc-9.14.1' '-B<GHC_TOOLCHAIN>/ghc/lib/ghc-9.14.1/lib' '--make' '-j1' '-O2' '-fforce-recomp' '-fpedantic-bottoms' '-fno-state-hack' '-v' '-package-env' '-' '-clear-package-db' '-global-package-db' '-package-db' '<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db' '-no-user-package-db' '-hide-all-packages' '-package' 'base' '-package' 'mlf-shape-primitives' '-i' '-odir' '<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/ghc-control/objects' '-hidir' '<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/ghc-control/objects' '-fno-code' '-fwrite-interface' '-no-link' '<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/ghc-control/SetupCheck.hs' +RTS '-K512M' '-H' '-I5' '-T' '-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/ghc.stats' \n      38,007,912 bytes allocated in the heap\n      27,800,168 bytes copied during GC\n       8,166,424 bytes maximum residency (3 sample(s))\n         152,552 bytes maximum slop\n              24 MiB total memory in use (0 MiB lost due to fragmentation)\n\n                                     Tot time (elapsed)  Avg pause  Max pause\n  Gen  0         6 colls,     0 par    0.028s   0.028s     0.0046s    0.0109s\n  Gen  1         3 colls,     0 par    0.054s   0.054s     0.0181s    0.0243s\n\n  TASKS: 5 (1 bound, 4 peak workers (4 total), using -N1)\n\n  SPARKS: 0 (0 converted, 0 overflowed, 0 dud, 0 GC'd, 0 fizzled)\n\n  INIT    time    0.002s  (  0.001s elapsed)\n  MUT     time    0.040s  (  0.040s elapsed)\n  GC      time    0.082s  (  0.082s elapsed)\n  EXIT    time    0.001s  (  0.001s elapsed)\n  Total   time    0.125s  (  0.124s elapsed)\n\n  Alloc rate    955,815,077 bytes per MUT second\n\n  Productivity  31.9% of total user, 32.0% of total elapsed\n\n",
+      "export_utf8_sha256": "e757de030b6d5f3bde42f03e7e2fdcee0ac904ca504e4da86277d291616897d9",
+      "not_original_raw_bytes": true,
+      "not_performance_sample": true,
+      "original": {
+        "bytes": 2048,
+        "sha256": "5956b9cb4b39f058164c893747915ed24ac697900013f2426383517c2da8b693"
+      },
+      "transformation": "literal local-root placeholders in RTS invocation header only; all subsequent bytes exact"
+    }
+  ],
+  "scope": "nine actual statistics-plumbing controls, not benchmark samples"
+}

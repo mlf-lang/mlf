@@ -1,0 +1,157 @@
+{
+  "Fixture_and_spec_metadata": {
+    "builtin-work/Fixture.emlf": {
+      "A": {
+        "ctime_ns": 1794669681699448682,
+        "device": 27,
+        "inode": 2241737,
+        "mode": 420,
+        "mtime_ns": 1794669681699448682,
+        "nlink": 1
+      },
+      "B": {
+        "ctime_ns": 1794669693969805060,
+        "device": 27,
+        "inode": 2241932,
+        "mode": 420,
+        "mtime_ns": 1794669693969805060,
+        "nlink": 1
+      },
+      "bytes_equal": true
+    },
+    "builtin-work/fixture.spec": {
+      "A": {
+        "ctime_ns": 1794669681699521983,
+        "device": 27,
+        "inode": 2241738,
+        "mode": 420,
+        "mtime_ns": 1794669681699521983,
+        "nlink": 1
+      },
+      "B": {
+        "ctime_ns": 1794669693970135167,
+        "device": 27,
+        "inode": 2241933,
+        "mode": 420,
+        "mtime_ns": 1794669693970135167,
+        "nlink": 1
+      },
+      "bytes_equal": true
+    }
+  },
+  "all_other_snapshot_fields_equal": true,
+  "all_results_byte_identical": true,
+  "binary_A": {
+    "bytes": 20192216,
+    "path": "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+    "sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f"
+  },
+  "binary_B": {
+    "bytes": 20205400,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-run03/setup/stats-emlf",
+    "sha256": "98b247203372ce26775f6665e6ccc272970d180afcab618aa60369de11baa23e"
+  },
+  "compiler_sha_ascii_range": [
+    135,
+    199
+  ],
+  "configuration_fields_A": [
+    "compiler-shapes/builtin",
+    "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f",
+    "MLF-SOURCE-CRATE-QUERY-7",
+    "open-fragment-checker-1/finish-receipt-1",
+    "source"
+  ],
+  "configuration_fields_B": [
+    "compiler-shapes/builtin",
+    "98b247203372ce26775f6665e6ccc272970d180afcab618aa60369de11baa23e",
+    "MLF-SOURCE-CRATE-QUERY-7",
+    "open-fragment-checker-1/finish-receipt-1",
+    "source"
+  ],
+  "crc_field_range": [
+    76,
+    80
+  ],
+  "different_byte_count": 67,
+  "different_byte_offsets": [
+    76,
+    77,
+    78,
+    79,
+    135,
+    136,
+    137,
+    138,
+    139,
+    140,
+    141,
+    142,
+    143,
+    144,
+    145,
+    146,
+    147,
+    148,
+    149,
+    150,
+    151,
+    152,
+    153,
+    154,
+    155,
+    156,
+    157,
+    158,
+    159,
+    160,
+    161,
+    162,
+    163,
+    164,
+    165,
+    166,
+    167,
+    168,
+    169,
+    170,
+    171,
+    172,
+    173,
+    174,
+    175,
+    176,
+    177,
+    178,
+    179,
+    181,
+    182,
+    183,
+    184,
+    185,
+    186,
+    187,
+    188,
+    189,
+    190,
+    191,
+    192,
+    193,
+    194,
+    195,
+    196,
+    197,
+    198
+  ],
+  "generation_file_bytes_each": 29031,
+  "no_artifact_rewritten_or_normalized": true,
+  "node_and_root_sections_exact": true,
+  "results_count": 78,
+  "snapshot_fields_different": [
+    "configuration_raw",
+    "configuration_fields"
+  ],
+  "symbol_indices_different": [
+    1
+  ]
+}

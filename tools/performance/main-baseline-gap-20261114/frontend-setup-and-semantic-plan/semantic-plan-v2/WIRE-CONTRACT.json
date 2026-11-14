@@ -1,0 +1,35 @@
+{
+  "actual_counts_or_results": null,
+  "basis": "pinned main QueryGraph tag412 seven-field snapshot format, not hard-coded fixedFixture row counts",
+  "codec_limits_from_main": {
+    "maxBytes": 268435456,
+    "maxDepth": 16384,
+    "maxEdges": 16777216,
+    "maxExpandedWork": 67108864,
+    "maxNodes": 4194304,
+    "maxSymbolBytes": 16777216,
+    "maxSymbols": 1048576,
+    "maxTotalSymbolBytes": 134217728
+  },
+  "cross_producer_equality": [
+    "Both individually authenticated configurations have the same four non-compiler fields. The compiler field is checked separately against each producer, not stripped to compare normalized objects.",
+    "Every other complete snapshot table, row, descriptor, digest, read occurrence/order, location and root/node representation is equal. No fixed query/table/member/result count from Fixture or older experiments is allowed.",
+    "Compare all unchanged original wire spans. Identify the exact producer-hash field span structurally through canonical config parsing, not fixed offsets or global search. Header CRC and the derived generation/CURRENT content-address relation are separately verified, never ignored.",
+    "Full checked pair and ordered .queries bytes, every result file, lock file and exact input/spec bytes must match with identical relative inventory except the structurally authenticated generation filename change. All other files/fields remain exact.",
+    "CURRENT is separately validated as each own full generation pointer; no other current-container difference is permitted. Do not patch a current pointer or checksum to manufacture equivalence."
+  ],
+  "implementation_status": "plan only; no actual decoder/admission gate supplied by this package",
+  "per_producer_authentication": [
+    "Bind the actual binary file bytes/hash and full accepted producer/source/object/runtime provenance before/after; declared display identity or a copied SHA string is insufficient.",
+    "Strictly validate complete schema6 MLFBIN container: magic/version/flags/header/section geometry/counts/widths/UTF8/varints/padding/backreferences/roots/canonical sharing and symbol/node use, aggregate bounds and CRC.",
+    "Decode exactly one complete supported CURRENT pointer and verify it equals SHA256 of the complete immutable selected generation and its filename. Reject malformed, absent, stale, extra unreachable generation files according to the source-reviewed fresh single-publication contract.",
+    "Decode all seven snapshot fields and their exact types/tags; validate full address/name-table/index/identity-budget/closure rules from pinned main. Field1 of the five-part canonical packed configuration must equal the actual executing binary SHA.",
+    "Bind other configuration fields to exact input crate ID and pinned source format/checker version. Establish the per-cell source/lowered route from source review before execution; do not discover then silently allow a different flavor.",
+    "Read edges are ordered occurrence lists. Validate every target and cycle/closure condition, but preserve legal repeated references and their multiplicities. Do not sort, deduplicate, or reject repeated occurrences merely because they repeat.",
+    "Every non-null payload location must be a valid content digest matching its row hash and an exact result file. The set of distinct location digests must equal the entire results directory, including no extras/missing/staging leftovers. Repeated locations may share one content-addressed file.",
+    "Retain original full wire/raw bytes and immutable all-file inventories. Distinguish transient active files from append-only archives, and exclude no unknown output silently."
+  ],
+  "same_binary_later_equality": "No cross-producer exemption remains. Full file-set names and every raw byte including configuration, checksums, CURRENT and generation filenames must match the successful reviewed B oracle at identical original active paths.",
+  "schema": "main12-producer-aware-wire-contract-plan-v2",
+  "scope_limits_note": "These are codec ceilings, not extra execution/memory/output permission. Future adapter must enforce tighter allowed stage/runtime/root-footprint limits and safe iterative/bounded parsing."
+}
