@@ -1,0 +1,50 @@
+{
+  "original_report": {
+    "bytes": 14818,
+    "sha256": "619e23eed06688a685a31c5c9114ed570fef3c9c94b1829964bec0aa16a88b41"
+  },
+  "original_review_manifest": {
+    "bytes": 1992,
+    "sha256": "f9c091c7b3c550f93273648b4f8dd2d3fb085b4b74e060469caa16b0ca248eb5"
+  },
+  "reviewer_executed_compiler_loader_guard_or_target": false,
+  "sanitization": "Allowlisted evidence summary; private paths, sessions, process identifiers and internal coordination are omitted.",
+  "summary": {
+    "F25_qualification_transferred": false,
+    "GHC_or_native_parity_established": false,
+    "actual_canonical_builtin_exact_regeneration": true,
+    "actual_cleanup_verified": true,
+    "actual_installed_dependency_files_rehashed": 1868,
+    "actual_stage_review_passed": true,
+    "actual_toolchain_files_rehashed": 78,
+    "complete": true,
+    "cumulative_ns": 222555214358,
+    "elapsed_ns": 7019030611,
+    "exact_cli_command_count": 5,
+    "executable_outputs_unchanged": 13,
+    "five_focused_controls_passed": true,
+    "five_raw_byte_oracles_verified": true,
+    "interface_files": 142,
+    "maintained_authenticator_reexecuted_by_reviewer": false,
+    "native_generation_AB_fixedpoint_executed": false,
+    "no_target_compilation_in_CONTROLS": true,
+    "object_files": 142,
+    "ordinary_main_BUILD_CONTROLS_qualified": true,
+    "ordinary_main_BUILD_passed": true,
+    "ordinary_main_focused_CONTROLS_passed": true,
+    "performance_qualified": false,
+    "prior_BUILD_exact_tree_proof_inherited_with_all_files_rehashed": true,
+    "prior_BUILD_verified_file_pins_rehashed": 6235,
+    "producer_receipt_unchanged": true,
+    "qualification_scope": "fc300bc ordinary -O2 maintained full BUILD plus the five original focused CLI controls only",
+    "runtime_loader_reexecuted": false,
+    "source_bytes": 93595321,
+    "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+    "source_files_rehashed": 3876,
+    "source_identity": "builtin-source-v1:7190a5739fd1a1f55dbb0762a9129b83aeb0a6ca81e518cd2e8ca598cd845620",
+    "source_tree": "386f0b41ab5f9b39fca273f3040f51d73df924a1",
+    "static_runtime_bindings_rechecked": 48,
+    "unique_file_pins_verified": 6265,
+    "whole_CI_passed": false
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "GHC_parity_established": false,
+  "chain_maximum_ns": 900000000000,
+  "completed_chain_ns_including_cleanup": 222555214358,
+  "native_fixed_point_executed": false,
+  "no_historical_scope_termination_inferred": true,
+  "ordinary_main_BUILD_focused_CONTROLS_qualified": true,
+  "performance_qualified": false,
+  "stages": {
+    "BUILD": {
+      "actual_complete": true,
+      "budget": {
+        "budget_passed": true,
+        "cumulative_ns": 215536183747,
+        "elapsed_ns": 215536183747,
+        "elapsed_valid": true,
+        "includes_outer_cleanup_time": true,
+        "maximum_ns": 900000000000,
+        "original_guard_elapsed_seconds_excludes_cleanup": 215.41783280800155,
+        "prior_ns": 0
+      },
+      "guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 215.41783280800155,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 600,
+        "test_only": false
+      },
+      "guard_call_elapsed_ns_including_cleanup": 215536183747,
+      "independent_review": "PASS",
+      "original_bounded_receipt": {
+        "bytes": 188481,
+        "sha256": "55d5e9781922fa32d8b6dddba3b1ffc5cda64cd1c06c1e50356443c3170c2578"
+      },
+      "original_controller": {
+        "bytes": 7191,
+        "sha256": "d04a5b43b24e3794bac789ca7e2a0295376fa488427136e0b7695d4eb0dae532"
+      },
+      "original_outer": {
+        "bytes": 9243,
+        "sha256": "89c8ebeaadcd1438d8bf94794617317f11ccb0806ab322f5959b9b8550b30cf4"
+      }
+    },
+    "CONTROLS": {
+      "actual_complete": true,
+      "budget": {
+        "budget_passed": true,
+        "cumulative_ns": 222555214358,
+        "elapsed_ns": 7019030611,
+        "elapsed_valid": true,
+        "includes_outer_cleanup_time": true,
+        "maximum_ns": 900000000000,
+        "original_guard_elapsed_seconds_excludes_cleanup": 6.907201492998865,
+        "prior_ns": 215536183747
+      },
+      "guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 6.907201492998865,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 120,
+        "test_only": false
+      },
+      "guard_call_elapsed_ns_including_cleanup": 7019030611,
+      "independent_review": "PASS",
+      "original_bounded_receipt": {
+        "bytes": 6923,
+        "sha256": "5d9612477598f65e30d3dfdff432bee6c7f6c324125cf11253c274e552748499"
+      },
+      "original_controller": {
+        "bytes": 6479,
+        "sha256": "65c26e1a5a1b5ab79ddf5114058db0388967eb09db69fd594ace5aec49bb6866"
+      },
+      "original_outer": {
+        "bytes": 2918,
+        "sha256": "e1ea32b5fd1aee04e7903efb6f4f2c53194066aa5e99ed61aeb21c6eec37c3bc"
+      },
+      "review": {
+        "bytes": 14818,
+        "sha256": "619e23eed06688a685a31c5c9114ed570fef3c9c94b1829964bec0aa16a88b41"
+      }
+    }
+  },
+  "timing_scope": "Setup stage completion durations, not a comparative performance measurement. Inner guard elapsed_seconds exclude some cleanup.",
+  "unrun_setup_sources_included": false,
+  "whole_CI_passed": false
+}

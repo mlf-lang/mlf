@@ -1,0 +1,148 @@
+{
+  "actual_complete": true,
+  "case_count": 5,
+  "cases": [
+    {
+      "argv": [
+        "${BUILD}/bin/emlf",
+        "--version"
+      ],
+      "byte_oracles_met": true,
+      "cwd": "${SOURCE}",
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "label": "version",
+      "stderr": {
+        "bytes": 0,
+        "exact_original_bytes": true,
+        "expected_utf8": "",
+        "file": "controls/raw/version.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 11,
+        "exact_original_bytes": true,
+        "expected_utf8": "emlf 0.3.0\n",
+        "file": "controls/raw/version.stdout",
+        "sha256": "05d40051731444c5ddd4388f9213568ee1efbbf8646fe9a3ae02b648e24e32ae"
+      }
+    },
+    {
+      "argv": [
+        "${BUILD}/bin/emlf",
+        "--implementation-identity"
+      ],
+      "byte_oracles_met": true,
+      "cwd": "${SOURCE}",
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "label": "identity",
+      "stderr": {
+        "bytes": 0,
+        "exact_original_bytes": true,
+        "expected_utf8": "",
+        "file": "controls/raw/identity.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 26,
+        "exact_original_bytes": true,
+        "expected_utf8": "MLF/shared-haskell-v1 GHC\n",
+        "file": "controls/raw/identity.stdout",
+        "sha256": "b14c8f8bd9432364e7c7de30e7a8c9f53cbf8e4e58b09050d1f570cb87c479b8"
+      }
+    },
+    {
+      "argv": [
+        "${BUILD}/bin/emlf",
+        "--run",
+        "--expr",
+        "printInt (40 + 2)"
+      ],
+      "byte_oracles_met": true,
+      "cwd": "${SOURCE}",
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "label": "semantic-42",
+      "stderr": {
+        "bytes": 0,
+        "exact_original_bytes": true,
+        "expected_utf8": "",
+        "file": "controls/raw/semantic-42.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 3,
+        "exact_original_bytes": true,
+        "expected_utf8": "42\n",
+        "file": "controls/raw/semantic-42.stdout",
+        "sha256": "084c799cd551dd1d8d5c5f9a5d593b2e931f5e36122ee5c793c1d08a19839cc0"
+      }
+    },
+    {
+      "argv": [
+        "${BUILD}/bin/emlf",
+        "--run",
+        "--expr",
+        "putStrLn \"\u03bb\u96ea\ud83d\ude42\""
+      ],
+      "byte_oracles_met": true,
+      "cwd": "${SOURCE}",
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "label": "unicode-positive",
+      "stderr": {
+        "bytes": 0,
+        "exact_original_bytes": true,
+        "expected_utf8": "",
+        "file": "controls/raw/unicode-positive.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 10,
+        "exact_original_bytes": true,
+        "expected_utf8": "\u03bb\u96ea\ud83d\ude42\n",
+        "file": "controls/raw/unicode-positive.stdout",
+        "sha256": "fc2dc3dadfdc026bacbe58f39eb638f8538f336a88746d644fed36d88cf2f97f"
+      }
+    },
+    {
+      "argv": [
+        "${BUILD}/bin/emlf",
+        "--type",
+        "--expr",
+        "(True :: Int)"
+      ],
+      "byte_oracles_met": true,
+      "cwd": "${SOURCE}",
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "label": "type-rejection",
+      "stderr": {
+        "bytes": 72,
+        "exact_original_bytes": true,
+        "expected_utf8": "Inference: type constructor mismatch: Con \"Bool\" [] versus Con \"Int\" []\n",
+        "file": "controls/raw/type-rejection.stderr",
+        "sha256": "bc84f232aee24ef7f08da7f348f105244218ffb8a39671f296cd4db1376b9fbd"
+      },
+      "stdout": {
+        "bytes": 0,
+        "exact_original_bytes": true,
+        "expected_utf8": "",
+        "file": "controls/raw/type-rejection.stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "independent_final_review_status": "PASS",
+  "independent_review": {
+    "bytes": 14818,
+    "sha256": "619e23eed06688a685a31c5c9114ed570fef3c9c94b1829964bec0aa16a88b41"
+  },
+  "original_receipt": {
+    "bytes": 35646,
+    "sha256": "3e4755346fba39387ba17cec644cc16633c9d2ba321fade0110ff9014afbf6c0"
+  },
+  "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "target_compilation_during_controls": false
+}

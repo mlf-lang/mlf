@@ -1,0 +1,46 @@
+{
+  "original_report": {
+    "bytes": 11989,
+    "sha256": "1acb2883c21d33ec57250901fc1dfbd88bd4a181a5768ed41e190ebaf6c12c0d"
+  },
+  "original_review_manifest": {
+    "bytes": 1961,
+    "sha256": "e63f7da08273f564913a46c1a790997d3a0fb8c518bfaa47021c63dffeb371bc"
+  },
+  "reviewer_executed_compiler_loader_guard_or_target": false,
+  "sanitization": "Bounded conclusions and hashes only; private paths, process identities, sessions, leases and internal coordination are omitted.",
+  "summary": {
+    "F25_qualification_transferred": false,
+    "GHC_or_native_parity_established": false,
+    "actual_canonical_builtin_exact_regeneration": true,
+    "actual_inferred_schemes_reparsed": 137,
+    "actual_installed_dependency_files_reconstructed": 1868,
+    "actual_stage_review_passed": true,
+    "actual_toolchain_files_rehashed": 78,
+    "actual_transitive_installed_packages": 23,
+    "builtin_commands_verified": 2,
+    "complete": true,
+    "complete_main_tree_reconstructed": true,
+    "cumulative_ns": 215536183747,
+    "elapsed_ns": 215536183747,
+    "executable_links": 13,
+    "fresh_actual_compiled_modules": 141,
+    "fresh_canonical_builtin_verified": true,
+    "full_actual_build_authentication_contract_checked": true,
+    "host_modules": 4,
+    "interface_files": 142,
+    "object_files": 142,
+    "objects_and_interfaces": 284,
+    "ordinary_main_BUILD_passed": true,
+    "performance_qualified": false,
+    "producer_commands_verified": 18,
+    "shared_modules": 137,
+    "source_bytes": 93595321,
+    "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+    "source_files_verified": 3876,
+    "source_identity": "builtin-source-v1:7190a5739fd1a1f55dbb0762a9129b83aeb0a6ca81e518cd2e8ca598cd845620",
+    "source_tree": "386f0b41ab5f9b39fca273f3040f51d73df924a1",
+    "unique_file_pins_verified": 6235,
+    "whole_CI_passed": false
+  }
+}
