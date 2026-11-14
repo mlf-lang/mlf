@@ -1,0 +1,191 @@
+{
+  "archive_parent": {
+    "commit": "4c940cdcd16d820d808aaba0a0e24fc124c9e30b",
+    "meaning": "Prior public writer-segments archive parent only, NOT the measured source base.",
+    "tree": "6862c6b0ea4ce7308e6f43e2f9d65c3231bfeaf5"
+  },
+  "candidate_bitstream": {
+    "bytes": 83566,
+    "sha256": "9fc2fe7f8d8e38bb7209233980a6d6b05b529acce8152502df31b84637ba7c2b"
+  },
+  "candidate_patch": {
+    "bytes": 1673,
+    "sha256": "fa18680dd53a90573aa53f67759aa96f27542c262a7749b6cdcb88ac91260261"
+  },
+  "common_fixture_v2": {
+    "bytes": 22996,
+    "sha256": "89a98c27a721c4fa3fe6446f57d1d62fc376f6cae3377242d55bca016fb6dc9b"
+  },
+  "compiler": "GHC 9.14.1",
+  "dependency_closure": "Twelve authenticated unchanged home dependencies and two original C objects, same for both sides.",
+  "measured_source_base": {
+    "bitstream": {
+      "bytes": 82558,
+      "sha256": "f25fe195b5a287fd0c365286acb31839118edac2227f463ea5cc85eb26daedb8"
+    },
+    "label": "ordinary F25",
+    "recorded_commit": "bda8f9807c8b13b5ce14753d0320fa54772e4bc4",
+    "recorded_commit_not_remotely_resolvable_at_publication_preflight": true
+  },
+  "not_bundled": [
+    "payload bytes",
+    "builtin",
+    "producer object closure",
+    "dumps",
+    "binaries",
+    "machine-specific execution plans"
+  ],
+  "payload_selection": "Same existing fixed unweighted sample as writer segment diagnostic: smallest/median/largest result by size then filename, plus generation index. Not a full-workload estimate.",
+  "payloads": [
+    {
+      "bytes": 91,
+      "index": 0,
+      "sha256": "8eaf20dd6413d531919d116f1abe49040d550e002b014b65621a6dbbb9f8e3b2"
+    },
+    {
+      "bytes": 1510,
+      "index": 1,
+      "sha256": "dd99703e6016b3dd276ba46e251d0a28b48044c8606f78603a279b59839bd242"
+    },
+    {
+      "bytes": 56187,
+      "index": 2,
+      "sha256": "3aeadffde86e259c20cba46f9bc63ed9aa6c8a266c456aa9a7b939074968f420"
+    },
+    {
+      "bytes": 406975,
+      "index": 3,
+      "sha256": "4d3413140c61f886804351b99fb1f0f621864eaafd9df181e3f17ba75720f077"
+    }
+  ],
+  "same_build_capture_hashes": {
+    "A": {
+      "Bitstream_interface": {
+        "bytes": 102988,
+        "sha256": "9e4d9fe2b4235b75899360a7ef840135825164388b624c6f8906903840dcb834"
+      },
+      "Bitstream_object": {
+        "bytes": 694016,
+        "sha256": "b4e6ad9d8b72e27cc4ce39b5c20164f8f33c84b47fdac98adab071b35839d909"
+      },
+      "Bitstream_source": {
+        "bytes": 82558,
+        "sha256": "f25fe195b5a287fd0c365286acb31839118edac2227f463ea5cc85eb26daedb8"
+      },
+      "Main_interface": {
+        "bytes": 61526,
+        "sha256": "f8fb190c2941977682a45fad4cf7e2ddb15a9fdc2614ff170e6d9744978da57d"
+      },
+      "Main_object": {
+        "bytes": 339384,
+        "sha256": "10d3ec370e3d0b300ddbb253b6d2fe9eb8124b969f69f043529b0beef8cb4816"
+      },
+      "Main_source": {
+        "bytes": 22996,
+        "sha256": "89a98c27a721c4fa3fe6446f57d1d62fc376f6cae3377242d55bca016fb6dc9b"
+      },
+      "dumps": [
+        {
+          "bytes": 2205393,
+          "file": "Bitstream.dump-simpl",
+          "sha256": "a90291e1bbc2a5274a63d8307138ce21c532f9f765888f69e9b44ba8f2d7f46f"
+        },
+        {
+          "bytes": 3024968,
+          "file": "Bitstream.dump-stg-final",
+          "sha256": "deed10c8e3dd5e98e8499659755d86a97bdbd70e746474541137f14d67b8f740"
+        },
+        {
+          "bytes": 780228,
+          "file": "Main.dump-simpl",
+          "sha256": "6435675fa0b2027ea801d6f8317d1d23c30b9b655e8ef55406bfed3ee4548b4a"
+        },
+        {
+          "bytes": 905353,
+          "file": "Main.dump-stg-final",
+          "sha256": "8830b06407825038d007fb4d157d8c6f5dcfae318c9ca069448ab93cae777bdc"
+        }
+      ],
+      "linked_binary": {
+        "bytes": 3494288,
+        "sha256": "020ec006185eb51837706f80e22ee9283e505d056ac029ee6b20d896c8daf8a8"
+      }
+    },
+    "B": {
+      "Bitstream_interface": {
+        "bytes": 103004,
+        "sha256": "3345e8f60727dc2929bb7201e09faca79d4d6549ea1a16e18d9bb6dbd2cabe73"
+      },
+      "Bitstream_object": {
+        "bytes": 699320,
+        "sha256": "6d75d25d4d72f6f478db0ebd755edbb96c9de477dd2a0891deff7bfae0449a99"
+      },
+      "Bitstream_source": {
+        "bytes": 83566,
+        "sha256": "9fc2fe7f8d8e38bb7209233980a6d6b05b529acce8152502df31b84637ba7c2b"
+      },
+      "Main_interface": {
+        "bytes": 61524,
+        "sha256": "bb1d09c9828c641830b1a820de40f8a186354fcbbf97d891cf2ec417348e440d"
+      },
+      "Main_object": {
+        "bytes": 339384,
+        "sha256": "97a5ee2425b3a8016ba48d9289e3ed9f84a6688df292be8437bab13e25ec0425"
+      },
+      "Main_source": {
+        "bytes": 22996,
+        "sha256": "89a98c27a721c4fa3fe6446f57d1d62fc376f6cae3377242d55bca016fb6dc9b"
+      },
+      "dumps": [
+        {
+          "bytes": 2228432,
+          "file": "Bitstream.dump-simpl",
+          "sha256": "5b57bee1b2aca4efbff1877b60a4a326bf43f4c6804a7a44c259f65e3c4437ed"
+        },
+        {
+          "bytes": 3080505,
+          "file": "Bitstream.dump-stg-final",
+          "sha256": "8fa1e2c51fff5a56d9567f3217c66796dda27fa2eae4208700349b1198595005"
+        },
+        {
+          "bytes": 780227,
+          "file": "Main.dump-simpl",
+          "sha256": "d8471c9c8bdadc61a81a409c1f78383f4e7ff8fcfeab2ae7aa9f1657fafcb6c5"
+        },
+        {
+          "bytes": 905353,
+          "file": "Main.dump-stg-final",
+          "sha256": "604ac4a3ee3b4826c0e6aa584ae5145332aab999d33fa173d0d1e6bbb285ca76"
+        }
+      ],
+      "linked_binary": {
+        "bytes": 3498416,
+        "sha256": "b081df53929ba1bcbdc468b641c9d41be37ba18894da1d4b417a2ff9bbaa5e06"
+      }
+    }
+  },
+  "semantic_flags": [
+    "-XHaskell2010",
+    "-package-env",
+    "-",
+    "-clear-package-db",
+    "-global-package-db",
+    "-no-user-package-db",
+    "-hide-all-packages",
+    "-O2",
+    "-fpedantic-bottoms",
+    "-fno-state-hack",
+    "-package",
+    "base",
+    "-package",
+    "array",
+    "-package",
+    "bytestring",
+    "-package",
+    "text",
+    "-package",
+    "containers",
+    "-package",
+    "directory"
+  ]
+}

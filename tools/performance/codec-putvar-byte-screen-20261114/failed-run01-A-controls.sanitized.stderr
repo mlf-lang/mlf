@@ -1,0 +1,9 @@
+codec-control: Uncaught exception main:MLF.Host.Base.HostError:
+
+HostError "putVar outcome mismatch"
+
+HasCallStack backtrace:
+  collectExceptionAnnotation, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:170:37 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:90:42 in ghc-internal:GHC.Internal.Exception
+  throw, called at host/ghc/MLF/Host/Base.hs:114:11 in main:MLF.Host.Base
+

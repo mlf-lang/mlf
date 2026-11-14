@@ -1,0 +1,77 @@
+{
+  "files": [
+    {
+      "bytes": 89,
+      "path": "A-controls.stdout",
+      "sha256": "53296c133dd19707370407a36ec62a90d3f6dfb1c1f2dbc4d9cc9f4c43432e9f"
+    },
+    {
+      "bytes": 980,
+      "path": "A-segments.stdout",
+      "sha256": "3c60cb84be7d2681e90771762092325c5f61ebc4f1c41e85cc095126f651acdb"
+    },
+    {
+      "bytes": 89,
+      "path": "B-controls.stdout",
+      "sha256": "53296c133dd19707370407a36ec62a90d3f6dfb1c1f2dbc4d9cc9f4c43432e9f"
+    },
+    {
+      "bytes": 979,
+      "path": "B-segments.stdout",
+      "sha256": "468cbf23876d770e9245f9d8347d4e0ffb51f4a42ad571253ebad3ce0fdfee14"
+    },
+    {
+      "bytes": 22996,
+      "path": "Main.hs",
+      "sha256": "89a98c27a721c4fa3fe6446f57d1d62fc376f6cae3377242d55bca016fb6dc9b"
+    },
+    {
+      "bytes": 8354,
+      "path": "README.md",
+      "sha256": "9123993e8070cf81047be68bb09dd0ac37429f7e3fa85bb4447c914f8109a275"
+    },
+    {
+      "bytes": 1673,
+      "path": "candidate.patch",
+      "sha256": "fa18680dd53a90573aa53f67759aa96f27542c262a7749b6cdcb88ac91260261"
+    },
+    {
+      "bytes": 476,
+      "path": "failed-run01-A-controls.sanitized.stderr",
+      "sha256": "a9fa221921e5e037e504f96247e68a0c9e13a1af59f3a68e35aa73d91da77618"
+    },
+    {
+      "bytes": 68,
+      "path": "failed-run01-A-controls.stdout",
+      "sha256": "ddf097972f12ba456b9814fffcfa0c6764a6088520a66331261641793f0a240b"
+    },
+    {
+      "bytes": 2464,
+      "path": "failed-run01.json",
+      "sha256": "760505e13bc9083815db5c6a35f0128b9d0934253cbf7ccbb0d789d4947d9414"
+    },
+    {
+      "bytes": 17758,
+      "path": "observations.json",
+      "sha256": "906649a824448b1429e5c9a50103f22f06135756306c6f5c8cafd46aa60fdbef"
+    },
+    {
+      "bytes": 1306,
+      "path": "observer-contract.json",
+      "sha256": "50b4c3869506240f6dbd6c1b21aadf36335462bad7a658863acb9eeea74b4fe3"
+    },
+    {
+      "bytes": 9263,
+      "path": "results.json",
+      "sha256": "36af4363a2077e321c3c421b0ba01b686a89c52dc6e4cc128b839c78ee4ab2d3"
+    },
+    {
+      "bytes": 6037,
+      "path": "source-pins.json",
+      "sha256": "ae247426608f9e9c1dd9f196e103bac1934ffc2c5ec80c14f7bfceb71951e24c"
+    }
+  ],
+  "manifest_self_excluded": true,
+  "schema": "public-experiment-content-manifest-v1",
+  "scope": "tools/performance/codec-putvar-byte-screen-20261114 only"
+}

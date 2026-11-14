@@ -1,0 +1,215 @@
+{
+  "GHC_parity_claim": false,
+  "actual_review": {
+    "actual_control_gate_passed": true,
+    "all_byte_equality_controls_passed": true,
+    "complete": true,
+    "numerical_screen_conditions_passed": true,
+    "raw_result_review_passed": true,
+    "report": {
+      "bytes": 8848,
+      "sha256": "094c78e13a247e4e9be65b09033bfa8f66cb70474b864a538d095bf8cb309422"
+    },
+    "unique_pins_verified": 284
+  },
+  "complete_codec_qualification": false,
+  "condition_interpretation": "Use integer inequalities, not rounded displayed percentages. Passing permits consideration of broader qualification, not automatic promotion or execution.",
+  "emitted_review": {
+    "Main_changed_identifier_mappings": {
+      "Core": 1220,
+      "STG": 3834
+    },
+    "Main_core_and_stg": "Exactly equal after a verified bijection of generated identifier suffixes plus timestamp removal, not timestamp-only equality. All literals, primitive names, instructions, constants, types, strictness and control-flow text retained.",
+    "Main_object": "Every section byte-identical except .strtab; exactly seven changed local generated label names. Full object and interface hashes remain distinct.",
+    "Main_object_text": {
+      "bytes": 112118,
+      "sha256": "efb2cff5190a7a631d7e3d73a61f9b7a69029a2d59952ed2c98659ba6c2b625e"
+    },
+    "active_mechanism": "Private helper inlined into active putVar; fast defined-byte path removes generic width recursion. Negative and overflow-risk positions retain generic fallback. Public putBits and its generic specializations are alpha-equivalent.",
+    "boundary": "Actual writer calls and returned positions/CRC forcing remain inside windows; setup and action closure construction remain outside. Not exact heap attribution.",
+    "evidence_hashes": {
+      "ALPHA-COMPARISON.json": {
+        "bytes": 125040,
+        "sha256": "36b62ac60772fc063e7b708ebc65fd569a170e3816b2457060d38695280e1124"
+      },
+      "EMITTED-EXCERPTS.json": {
+        "bytes": 270480,
+        "sha256": "a5c06a15afe85836692c92e034e49ce80542dab5ca5e7b7f9b6f00eaf826ff36"
+      },
+      "MAIN-ELF-COMPARISON.json": {
+        "bytes": 3134,
+        "sha256": "1ba5dc780b3eab3d0fc7aef34d60d278035c4ee73bdaad93b4c38678cbec4b20"
+      }
+    },
+    "report": {
+      "bytes": 15128,
+      "sha256": "aecdc9098969560cd709a5bb7cc829db665fc9bfcc82746db20269cbe735e14d"
+    },
+    "same_build_dumps_reviewed": 8,
+    "semantics": "Unaligned read/write/read/write order and lazy action-WHNF controls retained; no new mutation/error-order issue found in this emitted route and finite controls.",
+    "status": "Focused same-build artifact binding, active path and diagnostic action-plus-forcing boundaries passed.",
+    "unique_pins_verified": 196
+  },
+  "exact_integer_condition_results": [
+    {
+      "A": 87920,
+      "B": 82736,
+      "index": 0,
+      "payload_bytes": 91,
+      "reduction_bytes": 5184,
+      "reduction_percent": 5.896269335759782,
+      "stage": "whole-writer-reference",
+      "tests": {
+        "no_regression_over_4096_bytes": true
+      }
+    },
+    {
+      "A": 16496,
+      "B": 11312,
+      "index": 0,
+      "payload_bytes": 91,
+      "reduction_bytes": 5184,
+      "reduction_percent": 31.425800193986422,
+      "stage": "entries",
+      "tests": {
+        "no_regression_over_4096_bytes": true
+      }
+    },
+    {
+      "A": 912760,
+      "B": 905968,
+      "index": 1,
+      "payload_bytes": 1510,
+      "reduction_bytes": 6792,
+      "reduction_percent": 0.7441167448179149,
+      "stage": "whole-writer-reference",
+      "tests": {
+        "no_regression_over_4096_bytes": true
+      }
+    },
+    {
+      "A": 24856,
+      "B": 20320,
+      "index": 1,
+      "payload_bytes": 1510,
+      "reduction_bytes": 4536,
+      "reduction_percent": 18.249114901834567,
+      "stage": "entries",
+      "tests": {
+        "no_regression_over_4096_bytes": true
+      }
+    },
+    {
+      "A": 46704696,
+      "B": 42561256,
+      "index": 2,
+      "payload_bytes": 56187,
+      "reduction_bytes": 4143440,
+      "reduction_percent": 8.87157043051945,
+      "stage": "whole-writer-reference",
+      "tests": {
+        "at_least_one_percent_reduction": true,
+        "no_regression_over_4096_bytes": true
+      }
+    },
+    {
+      "A": 20698992,
+      "B": 16693168,
+      "index": 2,
+      "payload_bytes": 56187,
+      "reduction_bytes": 4005824,
+      "reduction_percent": 19.352749158026633,
+      "stage": "entries",
+      "tests": {
+        "no_regression_over_4096_bytes": true,
+        "strict_allocation_reduction": true
+      }
+    },
+    {
+      "A": 307142432,
+      "B": 290357680,
+      "index": 3,
+      "payload_bytes": 406975,
+      "reduction_bytes": 16784752,
+      "reduction_percent": 5.464810541058684,
+      "stage": "whole-writer-reference",
+      "tests": {
+        "at_least_one_percent_reduction": true,
+        "no_regression_over_4096_bytes": true
+      }
+    },
+    {
+      "A": 114738576,
+      "B": 99175448,
+      "index": 3,
+      "payload_bytes": 406975,
+      "reduction_bytes": 15563128,
+      "reduction_percent": 13.563989150431848,
+      "stage": "entries",
+      "tests": {
+        "no_regression_over_4096_bytes": true,
+        "strict_allocation_reduction": true
+      }
+    }
+  ],
+  "frozen_all_required_conditions": {
+    "all_byte_equality_pass_both_sides": true,
+    "all_four_no_regression_condition": "B <= A + 4096 for each listed window of each sample independently",
+    "all_four_no_regression_windows": [
+      "whole-writer-reference",
+      "entries"
+    ],
+    "allocation_tolerance_bytes": 4096,
+    "controls_pass_both_sides": true,
+    "independent_actual_emitted_review_pass": true,
+    "large_payload_entries_allocation_condition": "B < A, separately for samples 2 and 3",
+    "large_payload_samples": [
+      2,
+      3
+    ],
+    "large_payload_whole_writer_allocation_condition": "100 * B <= 99 * A, separately for samples 2 and 3, using this paired screen actual A/B current-thread allocation"
+  },
+  "full_compiler_result": false,
+  "limitations": [
+    "Finite controls and limited same-build emitted review do not establish universal malformed-geometry, bottom/error equivalence or complete codec qualification.",
+    "Exactly one A then B pass on four fixed unweighted payloads is not a stable speed benchmark; no timing threshold was used.",
+    "Current-thread allocation counters have approximately 4 KiB precision and exclude native ForeignPtr allocation bytes and peak RSS. Small changes and zeros must not be overinterpreted.",
+    "Whole writer and segmented writer are separate executions; do not add/subtract windows as exclusive costs or extrapolate these percentages to total compiler savings.",
+    "Action closure creation is outside observations, return-value forcing changes boundaries and execution order changes warm state.",
+    "No full producer build, native fixed-point qualification, compiler workload measurement or parity-to-GHC result is established.",
+    "This archive is not a self-contained reproduction kit; omitted inputs and exact runtime closure are required.",
+    "Publication preparation only reads and packages existing evidence; no compiler, Haskell control, benchmark, runtime-loader invocation or retry is executed."
+  ],
+  "production_promoted": false,
+  "run": {
+    "cleanup_complete": true,
+    "commands_completed": 20,
+    "final": {
+      "bytes": 726,
+      "sha256": "148c0faea56fdb33af069600aa556789376bf84f2f640aa813bb7eb2a9f93f9d"
+    },
+    "observation_order": [
+      "A",
+      "B"
+    ],
+    "outer_seconds": 35.70445400298922,
+    "passes_per_side": 1,
+    "receipt": {
+      "bytes": 288212,
+      "sha256": "485105dfd3275d227dd8b7cb915500e9c873dc59da683868d14e179d75567916"
+    },
+    "rows_per_side": 40
+  },
+  "screen_only": true,
+  "semantic_controls": [
+    "Codec finite roundtrip, four exact corpus roundtrips, schema/empty/negative-schema/corrupt-CRC rejection.",
+    "Independent bit-at-a-time CRC reference including known vector, empty, 75/76/79/80/81 and 1023/1024/1025/4096 lengths, seeded/absolute position cases, mutation, demand/poison and exact bounds failures.",
+    "Decoder scan/fallback shape, schema-before-gate, CRC-before-UTF8, repaired-CRC invalid UTF8, invalid limits and short-header controls.",
+    "Three finite segmented writer inputs plus four fixed corpus inputs; complete bytes, returned positions, lengths and checksum fields compared outside the observation windows.",
+    "160 putVar finite combinations: eight bit offsets, ten varint lengths and two fill patterns. Original generic algorithm and independent unsigned base-128/byte oracle agree on complete surviving buffer and return position.",
+    "Nine buffer boundary cases include partial writes, -1 and -8 positions, signed -1 payload, and two overflow-risk positions, plus six labelled poison/demand cases and lazy IO-action construction for both implementations."
+  ],
+  "stable_time_result": false,
+  "status": "Focused actual raw/control/allocation and independent same-build emitted gates passed; experimental screen only.",
+  "unexpected_other_window_observations": "Symbols decreased by 0, 2256, 137616 and 1221624 counter bytes. Other seven windows were allocation-identical. No exclusive attribution is inferred."
+}

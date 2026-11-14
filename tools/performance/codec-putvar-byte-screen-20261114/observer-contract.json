@@ -1,0 +1,35 @@
+{
+  "all_four_run02_control_and_segment_stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "controls_stdout": {
+    "bytes": 89,
+    "sha256": "53296c133dd19707370407a36ec62a90d3f6dfb1c1f2dbc4d9cc9f4c43432e9f"
+  },
+  "fixed_indices": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "format": "Tab-separated index/stage/signed current-thread-counter bytes/nonnegative nanoseconds",
+  "interpretation": "Do not sum or subtract segments to infer original encodeTables costs; action and forcing boundaries can change demand and specialization.",
+  "numeric_rows_per_side": 40,
+  "observer_stages": [
+    "empty-before",
+    "whole-writer-reference",
+    "buffer-new-zero",
+    "header",
+    "symbols",
+    "entries",
+    "roots",
+    "crc",
+    "crc-write",
+    "empty-after"
+  ],
+  "outside_windows": "Input IO/decode/forceValues, plan/forceTables, layout/forceLayout, action closure construction, complete byte and return-value comparisons.",
+  "segments": "Fresh zero-filled buffer; public header/symbol/entry/root/CRC operations in original order, with returned positions and CRC forced earlier than unsplit writer.",
+  "terminal_line": "PASS codec-writer-segments\n",
+  "whole_writer": "Original encodeTables, as built for each side, executes first."
+}

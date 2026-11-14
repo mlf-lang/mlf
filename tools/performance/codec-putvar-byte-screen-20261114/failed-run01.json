@@ -1,0 +1,48 @@
+{
+  "candidate_compiled": false,
+  "candidate_executed": false,
+  "cleanup_complete": true,
+  "commands_attempted": 9,
+  "controls_exit_code": 1,
+  "correction": "Common v2 Main changes (16, -1, 0) from PutDone 7 to PutBounds integer shift overflow, and labels outcome mismatches. Candidate and finite runtime case list were unchanged.",
+  "diagnostic_limit": "The original unlabeled putVar outcome mismatch does not prove that the known sixth-case negative-shift golden error was the exact first failure or the only failure. No diagnostic run is inferred.",
+  "diagnostic_report": {
+    "bytes": 3534,
+    "sha256": "6d6d1cc594976fb28d574f1ca66ee5f92faa6e33c74a8b1cf9077fb21315aeb2"
+  },
+  "known_authored_oracle_error": {
+    "bits": 0,
+    "buffer_size": 16,
+    "derivation": [
+      "rem(-1,8)=-1; quot(-1,8)=0; take=min8(8-(-1))=8",
+      "Valid byte array and index0 pass first. Value piece=shiftLInt(andInt0 255)(-1).",
+      "Host.Base v_shiftLInt rejects every negative count before shifting, including a zero operand. HostError integer shift overflow occurs before byte mutation.",
+      "Frozen model incorrectly treats negative shiftL as positive right shift. Correcting the model changes the predicted outcome, not candidate behavior."
+    ],
+    "fill": 165,
+    "frozen_expected": "PutDone 7",
+    "position": -1,
+    "source_derived_expected": "PutBounds \"integer shift overflow\" (constructor captures all HostError messages)"
+  },
+  "original_outer": {
+    "bytes": 2668,
+    "sha256": "efeeb0194abe8e0762a2cc006dd7ec0336bc545fa6c3d10e50c621253a292ecb"
+  },
+  "original_receipt": {
+    "bytes": 131483,
+    "sha256": "10dad1f37c020c8a27b3c0c39e6a8fe648215f69f6ec2aeabfef8457cb8700fc"
+  },
+  "outer_seconds": 17.969173227000283,
+  "performance_rows": 0,
+  "prior_pure_model_error": "Negative shift was incorrectly modeled as right shift; the real Host primitive throws even for zero. Passing pure-model checks did not establish Haskell behavior.",
+  "published_stderr": {
+    "bytes": 476,
+    "sha256": "a9fa221921e5e037e504f96247e68a0c9e13a1af59f3a68e35aa73d91da77618"
+  },
+  "raw_stderr": {
+    "bytes": 563,
+    "sha256": "e7ac02bd3905c052b534204648f0ffabbc5be571f50d7c69784a7b71943a6b19"
+  },
+  "status": "Failed baseline-first run, not a candidate regression and not a performance result.",
+  "stderr_sanitization": "Removed local absolute source-root prefix from a backtrace; message and repository-relative source location preserved."
+}

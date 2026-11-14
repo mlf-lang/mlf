@@ -1,0 +1,737 @@
+{
+  "B_minus_A": [
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": 121,
+      "index": 0,
+      "stage": "empty-before"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": -5184,
+      "B_minus_A_nanoseconds": -3326,
+      "index": 0,
+      "stage": "whole-writer-reference"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": -1,
+      "index": 0,
+      "stage": "buffer-new-zero"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": 91,
+      "index": 0,
+      "stage": "header"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": -10,
+      "index": 0,
+      "stage": "symbols"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": -5184,
+      "B_minus_A_nanoseconds": -1883,
+      "index": 0,
+      "stage": "entries"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": 30,
+      "index": 0,
+      "stage": "roots"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": -1262,
+      "index": 0,
+      "stage": "crc"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": -1062,
+      "index": 0,
+      "stage": "crc-write"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": 0,
+      "index": 0,
+      "stage": "empty-after"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": -10,
+      "index": 1,
+      "stage": "empty-before"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": -6792,
+      "B_minus_A_nanoseconds": -1286569,
+      "index": 1,
+      "stage": "whole-writer-reference"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": 131,
+      "index": 1,
+      "stage": "buffer-new-zero"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": -140,
+      "index": 1,
+      "stage": "header"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": -2256,
+      "B_minus_A_nanoseconds": 571,
+      "index": 1,
+      "stage": "symbols"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": -4536,
+      "B_minus_A_nanoseconds": -2544,
+      "index": 1,
+      "stage": "entries"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": 982,
+      "index": 1,
+      "stage": "roots"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": 7461,
+      "index": 1,
+      "stage": "crc"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": -50,
+      "index": 1,
+      "stage": "crc-write"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": -10,
+      "index": 1,
+      "stage": "empty-after"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": 60,
+      "index": 2,
+      "stage": "empty-before"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": -4143440,
+      "B_minus_A_nanoseconds": -3142027,
+      "index": 2,
+      "stage": "whole-writer-reference"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": -781,
+      "index": 2,
+      "stage": "buffer-new-zero"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": -17076,
+      "index": 2,
+      "stage": "header"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": -137616,
+      "B_minus_A_nanoseconds": -322867,
+      "index": 2,
+      "stage": "symbols"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": -4005824,
+      "B_minus_A_nanoseconds": -1134541,
+      "index": 2,
+      "stage": "entries"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": -20,
+      "index": 2,
+      "stage": "roots"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": -356316,
+      "index": 2,
+      "stage": "crc"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": -230,
+      "index": 2,
+      "stage": "crc-write"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": 9,
+      "index": 2,
+      "stage": "empty-after"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": -30,
+      "index": 3,
+      "stage": "empty-before"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": -16784752,
+      "B_minus_A_nanoseconds": -3576701,
+      "index": 3,
+      "stage": "whole-writer-reference"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": -2995,
+      "index": 3,
+      "stage": "buffer-new-zero"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": 1673,
+      "index": 3,
+      "stage": "header"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": -1221624,
+      "B_minus_A_nanoseconds": 2178863,
+      "index": 3,
+      "stage": "symbols"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": -15563128,
+      "B_minus_A_nanoseconds": -2752009,
+      "index": 3,
+      "stage": "entries"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": 100,
+      "index": 3,
+      "stage": "roots"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": 758534,
+      "index": 3,
+      "stage": "crc"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": 1543,
+      "index": 3,
+      "stage": "crc-write"
+    },
+    {
+      "B_minus_A_current_thread_counter_bytes": 0,
+      "B_minus_A_nanoseconds": 120,
+      "index": 3,
+      "stage": "empty-after"
+    }
+  ],
+  "format": "Full 80 numeric observations, plus 40 paired deltas; no discarded rows or repetitions.",
+  "interpretation": "Separate whole-writer and segmented executions, not exclusive additive buckets. Raw times are not stable timing estimates.",
+  "observations": {
+    "A": [
+      {
+        "current_thread_counter_bytes": 0,
+        "index": 0,
+        "nanoseconds": 190,
+        "stage": "empty-before"
+      },
+      {
+        "current_thread_counter_bytes": 87920,
+        "index": 0,
+        "nanoseconds": 59891,
+        "stage": "whole-writer-reference"
+      },
+      {
+        "current_thread_counter_bytes": 288,
+        "index": 0,
+        "nanoseconds": 181,
+        "stage": "buffer-new-zero"
+      },
+      {
+        "current_thread_counter_bytes": 45088,
+        "index": 0,
+        "nanoseconds": 27441,
+        "stage": "header"
+      },
+      {
+        "current_thread_counter_bytes": 16,
+        "index": 0,
+        "nanoseconds": 100,
+        "stage": "symbols"
+      },
+      {
+        "current_thread_counter_bytes": 16496,
+        "index": 0,
+        "nanoseconds": 8904,
+        "stage": "entries"
+      },
+      {
+        "current_thread_counter_bytes": 784,
+        "index": 0,
+        "nanoseconds": 240,
+        "stage": "roots"
+      },
+      {
+        "current_thread_counter_bytes": 22992,
+        "index": 0,
+        "nanoseconds": 13911,
+        "stage": "crc"
+      },
+      {
+        "current_thread_counter_bytes": 2096,
+        "index": 0,
+        "nanoseconds": 2514,
+        "stage": "crc-write"
+      },
+      {
+        "current_thread_counter_bytes": 0,
+        "index": 0,
+        "nanoseconds": 40,
+        "stage": "empty-after"
+      },
+      {
+        "current_thread_counter_bytes": 0,
+        "index": 1,
+        "nanoseconds": 50,
+        "stage": "empty-before"
+      },
+      {
+        "current_thread_counter_bytes": 912760,
+        "index": 1,
+        "nanoseconds": 1656897,
+        "stage": "whole-writer-reference"
+      },
+      {
+        "current_thread_counter_bytes": 1712,
+        "index": 1,
+        "nanoseconds": 400,
+        "stage": "buffer-new-zero"
+      },
+      {
+        "current_thread_counter_bytes": 45088,
+        "index": 1,
+        "nanoseconds": 18898,
+        "stage": "header"
+      },
+      {
+        "current_thread_counter_bytes": 400376,
+        "index": 1,
+        "nanoseconds": 131368,
+        "stage": "symbols"
+      },
+      {
+        "current_thread_counter_bytes": 24856,
+        "index": 1,
+        "nanoseconds": 13210,
+        "stage": "entries"
+      },
+      {
+        "current_thread_counter_bytes": 784,
+        "index": 1,
+        "nanoseconds": 260,
+        "stage": "roots"
+      },
+      {
+        "current_thread_counter_bytes": 437696,
+        "index": 1,
+        "nanoseconds": 170126,
+        "stage": "crc"
+      },
+      {
+        "current_thread_counter_bytes": 2096,
+        "index": 1,
+        "nanoseconds": 1773,
+        "stage": "crc-write"
+      },
+      {
+        "current_thread_counter_bytes": 0,
+        "index": 1,
+        "nanoseconds": 40,
+        "stage": "empty-after"
+      },
+      {
+        "current_thread_counter_bytes": 0,
+        "index": 2,
+        "nanoseconds": 120,
+        "stage": "empty-before"
+      },
+      {
+        "current_thread_counter_bytes": 46704696,
+        "index": 2,
+        "nanoseconds": 9469432,
+        "stage": "whole-writer-reference"
+      },
+      {
+        "current_thread_counter_bytes": 56392,
+        "index": 2,
+        "nanoseconds": 2474,
+        "stage": "buffer-new-zero"
+      },
+      {
+        "current_thread_counter_bytes": 45088,
+        "index": 2,
+        "nanoseconds": 25699,
+        "stage": "header"
+      },
+      {
+        "current_thread_counter_bytes": 11465592,
+        "index": 2,
+        "nanoseconds": 1624088,
+        "stage": "symbols"
+      },
+      {
+        "current_thread_counter_bytes": 20698992,
+        "index": 2,
+        "nanoseconds": 3373885,
+        "stage": "entries"
+      },
+      {
+        "current_thread_counter_bytes": 1368,
+        "index": 2,
+        "nanoseconds": 330,
+        "stage": "roots"
+      },
+      {
+        "current_thread_counter_bytes": 14435008,
+        "index": 2,
+        "nanoseconds": 2466246,
+        "stage": "crc"
+      },
+      {
+        "current_thread_counter_bytes": 2096,
+        "index": 2,
+        "nanoseconds": 1231,
+        "stage": "crc-write"
+      },
+      {
+        "current_thread_counter_bytes": 0,
+        "index": 2,
+        "nanoseconds": 41,
+        "stage": "empty-after"
+      },
+      {
+        "current_thread_counter_bytes": 0,
+        "index": 3,
+        "nanoseconds": 501,
+        "stage": "empty-before"
+      },
+      {
+        "current_thread_counter_bytes": 307142432,
+        "index": 3,
+        "nanoseconds": 47991347,
+        "stage": "whole-writer-reference"
+      },
+      {
+        "current_thread_counter_bytes": 407176,
+        "index": 3,
+        "nanoseconds": 26150,
+        "stage": "buffer-new-zero"
+      },
+      {
+        "current_thread_counter_bytes": 45088,
+        "index": 3,
+        "nanoseconds": 11427,
+        "stage": "header"
+      },
+      {
+        "current_thread_counter_bytes": 87711232,
+        "index": 3,
+        "nanoseconds": 9378895,
+        "stage": "symbols"
+      },
+      {
+        "current_thread_counter_bytes": 114738576,
+        "index": 3,
+        "nanoseconds": 17849171,
+        "stage": "entries"
+      },
+      {
+        "current_thread_counter_bytes": 1368,
+        "index": 3,
+        "nanoseconds": 450,
+        "stage": "roots"
+      },
+      {
+        "current_thread_counter_bytes": 104236736,
+        "index": 3,
+        "nanoseconds": 15217163,
+        "stage": "crc"
+      },
+      {
+        "current_thread_counter_bytes": 2096,
+        "index": 3,
+        "nanoseconds": 1642,
+        "stage": "crc-write"
+      },
+      {
+        "current_thread_counter_bytes": 0,
+        "index": 3,
+        "nanoseconds": 60,
+        "stage": "empty-after"
+      }
+    ],
+    "B": [
+      {
+        "current_thread_counter_bytes": 0,
+        "index": 0,
+        "nanoseconds": 311,
+        "stage": "empty-before"
+      },
+      {
+        "current_thread_counter_bytes": 82736,
+        "index": 0,
+        "nanoseconds": 56565,
+        "stage": "whole-writer-reference"
+      },
+      {
+        "current_thread_counter_bytes": 288,
+        "index": 0,
+        "nanoseconds": 180,
+        "stage": "buffer-new-zero"
+      },
+      {
+        "current_thread_counter_bytes": 45088,
+        "index": 0,
+        "nanoseconds": 27532,
+        "stage": "header"
+      },
+      {
+        "current_thread_counter_bytes": 16,
+        "index": 0,
+        "nanoseconds": 90,
+        "stage": "symbols"
+      },
+      {
+        "current_thread_counter_bytes": 11312,
+        "index": 0,
+        "nanoseconds": 7021,
+        "stage": "entries"
+      },
+      {
+        "current_thread_counter_bytes": 784,
+        "index": 0,
+        "nanoseconds": 270,
+        "stage": "roots"
+      },
+      {
+        "current_thread_counter_bytes": 22992,
+        "index": 0,
+        "nanoseconds": 12649,
+        "stage": "crc"
+      },
+      {
+        "current_thread_counter_bytes": 2096,
+        "index": 0,
+        "nanoseconds": 1452,
+        "stage": "crc-write"
+      },
+      {
+        "current_thread_counter_bytes": 0,
+        "index": 0,
+        "nanoseconds": 40,
+        "stage": "empty-after"
+      },
+      {
+        "current_thread_counter_bytes": 0,
+        "index": 1,
+        "nanoseconds": 40,
+        "stage": "empty-before"
+      },
+      {
+        "current_thread_counter_bytes": 905968,
+        "index": 1,
+        "nanoseconds": 370328,
+        "stage": "whole-writer-reference"
+      },
+      {
+        "current_thread_counter_bytes": 1712,
+        "index": 1,
+        "nanoseconds": 531,
+        "stage": "buffer-new-zero"
+      },
+      {
+        "current_thread_counter_bytes": 45088,
+        "index": 1,
+        "nanoseconds": 18758,
+        "stage": "header"
+      },
+      {
+        "current_thread_counter_bytes": 398120,
+        "index": 1,
+        "nanoseconds": 131939,
+        "stage": "symbols"
+      },
+      {
+        "current_thread_counter_bytes": 20320,
+        "index": 1,
+        "nanoseconds": 10666,
+        "stage": "entries"
+      },
+      {
+        "current_thread_counter_bytes": 784,
+        "index": 1,
+        "nanoseconds": 1242,
+        "stage": "roots"
+      },
+      {
+        "current_thread_counter_bytes": 437696,
+        "index": 1,
+        "nanoseconds": 177587,
+        "stage": "crc"
+      },
+      {
+        "current_thread_counter_bytes": 2096,
+        "index": 1,
+        "nanoseconds": 1723,
+        "stage": "crc-write"
+      },
+      {
+        "current_thread_counter_bytes": 0,
+        "index": 1,
+        "nanoseconds": 30,
+        "stage": "empty-after"
+      },
+      {
+        "current_thread_counter_bytes": 0,
+        "index": 2,
+        "nanoseconds": 180,
+        "stage": "empty-before"
+      },
+      {
+        "current_thread_counter_bytes": 42561256,
+        "index": 2,
+        "nanoseconds": 6327405,
+        "stage": "whole-writer-reference"
+      },
+      {
+        "current_thread_counter_bytes": 56392,
+        "index": 2,
+        "nanoseconds": 1693,
+        "stage": "buffer-new-zero"
+      },
+      {
+        "current_thread_counter_bytes": 45088,
+        "index": 2,
+        "nanoseconds": 8623,
+        "stage": "header"
+      },
+      {
+        "current_thread_counter_bytes": 11327976,
+        "index": 2,
+        "nanoseconds": 1301221,
+        "stage": "symbols"
+      },
+      {
+        "current_thread_counter_bytes": 16693168,
+        "index": 2,
+        "nanoseconds": 2239344,
+        "stage": "entries"
+      },
+      {
+        "current_thread_counter_bytes": 1368,
+        "index": 2,
+        "nanoseconds": 310,
+        "stage": "roots"
+      },
+      {
+        "current_thread_counter_bytes": 14435008,
+        "index": 2,
+        "nanoseconds": 2109930,
+        "stage": "crc"
+      },
+      {
+        "current_thread_counter_bytes": 2096,
+        "index": 2,
+        "nanoseconds": 1001,
+        "stage": "crc-write"
+      },
+      {
+        "current_thread_counter_bytes": 0,
+        "index": 2,
+        "nanoseconds": 50,
+        "stage": "empty-after"
+      },
+      {
+        "current_thread_counter_bytes": 0,
+        "index": 3,
+        "nanoseconds": 471,
+        "stage": "empty-before"
+      },
+      {
+        "current_thread_counter_bytes": 290357680,
+        "index": 3,
+        "nanoseconds": 44414646,
+        "stage": "whole-writer-reference"
+      },
+      {
+        "current_thread_counter_bytes": 407176,
+        "index": 3,
+        "nanoseconds": 23155,
+        "stage": "buffer-new-zero"
+      },
+      {
+        "current_thread_counter_bytes": 45088,
+        "index": 3,
+        "nanoseconds": 13100,
+        "stage": "header"
+      },
+      {
+        "current_thread_counter_bytes": 86489608,
+        "index": 3,
+        "nanoseconds": 11557758,
+        "stage": "symbols"
+      },
+      {
+        "current_thread_counter_bytes": 99175448,
+        "index": 3,
+        "nanoseconds": 15097162,
+        "stage": "entries"
+      },
+      {
+        "current_thread_counter_bytes": 1368,
+        "index": 3,
+        "nanoseconds": 550,
+        "stage": "roots"
+      },
+      {
+        "current_thread_counter_bytes": 104236736,
+        "index": 3,
+        "nanoseconds": 15975697,
+        "stage": "crc"
+      },
+      {
+        "current_thread_counter_bytes": 2096,
+        "index": 3,
+        "nanoseconds": 3185,
+        "stage": "crc-write"
+      },
+      {
+        "current_thread_counter_bytes": 0,
+        "index": 3,
+        "nanoseconds": 180,
+        "stage": "empty-after"
+      }
+    ]
+  },
+  "order": [
+    "A",
+    "B"
+  ],
+  "passes_per_side": 1
+}
