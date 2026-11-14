@@ -1,0 +1,47 @@
+{
+  "complete": true,
+  "qualification_scope": "Four fixed predecoded/forced payloads; one invocation per phase; current-thread counter and sampled elapsed observations for exact action-plus-forcing boundaries, not exclusive library-function cost.",
+  "phase_action_observations_qualified": true,
+  "complete_codec_qualification": false,
+  "exclusive_codec_phase_costs_qualified": false,
+  "full_pipeline_weighted_hotspot_qualified": false,
+  "ordinary_speedup_qualified": false,
+  "manual_emitted_review": {
+    "action_entry_and_result_forcing_boundaries_qualified": true,
+    "action_thunk_and_closure_construction_outside_intervals": true,
+    "active_worker": "Main.$w$sone (called by Main.main1)",
+    "allocation_difference_arithmetic_and_printing_after_intervals": true,
+    "forceTables_control_eliminated": false,
+    "layout_includes_forcing_all_12_fields": true,
+    "observer_order": "allocation-before -> time-before -> action entry -> time-after -> allocation-after",
+    "plan_includes_structural_forcing": true,
+    "primary_phase_work_precomputed_or_floated_outside_observer_found": false,
+    "standalone_crc_is_warm_after_byte_comparison": true,
+    "strict_input_decode_and_force_before_intervals": true,
+    "writer_includes_crc": true
+  },
+  "actual_command_count": 12,
+  "strict_observation_rows": 28,
+  "blockers": [],
+  "source_review_sha256": "99b80c6f54a3d3069c57305362d461c6537d0038ed3b6b1875b9f60231a05b8b",
+  "original_run_receipt_flags_not_modified": true,
+  "same_build_capture": {
+    "source": {
+      "bytes": 4279,
+      "sha256": "83d65cdd6ceb3463420040f1edcddb4f95f9a3f44976dca99a6f3aad59cada22"
+    },
+    "object": {
+      "bytes": 66472,
+      "sha256": "3907d7e9ead8bc15bd18e62a222a4ef15d659596733e58b8d8c9adbf6740be31"
+    },
+    "interface": {
+      "bytes": 12799,
+      "sha256": "dac27a1a787b7f6e7ba763a2b421631df42a57e1ed60b8f96e5a24663409222e"
+    },
+    "linked_binary": {
+      "bytes": 3348960,
+      "sha256": "63b817a4421269b94721ad410e56695d93de6c0aa9f5056dda6cf119f82c83fa"
+    }
+  },
+  "limitations": "One invocation per phase, four unweighted payloads, no statistical confidence or exclusion of scheduling/GC noise. Warm standalone CRC cannot be subtracted as exact writer-exclusive cost. Small current-thread counter values have approximately 4 KiB resolution."
+}

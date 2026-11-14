@@ -1,0 +1,175 @@
+{
+  "kind": "raw-fixed-single-pass-observations",
+  "emitted_review_status": "limited_action_entry_and_forcing_boundaries_passed",
+  "performance_result": false,
+  "observations": [
+    {
+      "current_thread_counter_bytes": 0,
+      "index": 0,
+      "nanoseconds": 90,
+      "stage": "empty-before"
+    },
+    {
+      "current_thread_counter_bytes": 3104,
+      "index": 0,
+      "nanoseconds": 28864,
+      "stage": "plan"
+    },
+    {
+      "current_thread_counter_bytes": 0,
+      "index": 0,
+      "nanoseconds": 2153,
+      "stage": "force-tables-control"
+    },
+    {
+      "current_thread_counter_bytes": 1000,
+      "index": 0,
+      "nanoseconds": 2744,
+      "stage": "layout"
+    },
+    {
+      "current_thread_counter_bytes": 87920,
+      "index": 0,
+      "nanoseconds": 49044,
+      "stage": "writer-plus-crc"
+    },
+    {
+      "current_thread_counter_bytes": 22992,
+      "index": 0,
+      "nanoseconds": 11488,
+      "stage": "standalone-crc"
+    },
+    {
+      "current_thread_counter_bytes": 0,
+      "index": 0,
+      "nanoseconds": 50,
+      "stage": "empty-after"
+    },
+    {
+      "current_thread_counter_bytes": 0,
+      "index": 1,
+      "nanoseconds": 40,
+      "stage": "empty-before"
+    },
+    {
+      "current_thread_counter_bytes": 78352,
+      "index": 1,
+      "nanoseconds": 38819,
+      "stage": "plan"
+    },
+    {
+      "current_thread_counter_bytes": 0,
+      "index": 1,
+      "nanoseconds": 330,
+      "stage": "force-tables-control"
+    },
+    {
+      "current_thread_counter_bytes": 1288,
+      "index": 1,
+      "nanoseconds": 1112,
+      "stage": "layout"
+    },
+    {
+      "current_thread_counter_bytes": 912760,
+      "index": 1,
+      "nanoseconds": 393893,
+      "stage": "writer-plus-crc"
+    },
+    {
+      "current_thread_counter_bytes": 437696,
+      "index": 1,
+      "nanoseconds": 186020,
+      "stage": "standalone-crc"
+    },
+    {
+      "current_thread_counter_bytes": 0,
+      "index": 1,
+      "nanoseconds": 40,
+      "stage": "empty-after"
+    },
+    {
+      "current_thread_counter_bytes": 0,
+      "index": 2,
+      "nanoseconds": 80,
+      "stage": "empty-before"
+    },
+    {
+      "current_thread_counter_bytes": 18557480,
+      "index": 2,
+      "nanoseconds": 5637361,
+      "stage": "plan"
+    },
+    {
+      "current_thread_counter_bytes": 0,
+      "index": 2,
+      "nanoseconds": 36835,
+      "stage": "force-tables-control"
+    },
+    {
+      "current_thread_counter_bytes": 458104,
+      "index": 2,
+      "nanoseconds": 119260,
+      "stage": "layout"
+    },
+    {
+      "current_thread_counter_bytes": 46704696,
+      "index": 2,
+      "nanoseconds": 6789978,
+      "stage": "writer-plus-crc"
+    },
+    {
+      "current_thread_counter_bytes": 14435008,
+      "index": 2,
+      "nanoseconds": 2181266,
+      "stage": "standalone-crc"
+    },
+    {
+      "current_thread_counter_bytes": 0,
+      "index": 2,
+      "nanoseconds": 50,
+      "stage": "empty-after"
+    },
+    {
+      "current_thread_counter_bytes": 0,
+      "index": 3,
+      "nanoseconds": 170,
+      "stage": "empty-before"
+    },
+    {
+      "current_thread_counter_bytes": 100312088,
+      "index": 3,
+      "nanoseconds": 34223913,
+      "stage": "plan"
+    },
+    {
+      "current_thread_counter_bytes": 0,
+      "index": 3,
+      "nanoseconds": 220282,
+      "stage": "force-tables-control"
+    },
+    {
+      "current_thread_counter_bytes": 1679144,
+      "index": 3,
+      "nanoseconds": 461996,
+      "stage": "layout"
+    },
+    {
+      "current_thread_counter_bytes": 307142432,
+      "index": 3,
+      "nanoseconds": 43159643,
+      "stage": "writer-plus-crc"
+    },
+    {
+      "current_thread_counter_bytes": 104236736,
+      "index": 3,
+      "nanoseconds": 18850775,
+      "stage": "standalone-crc"
+    },
+    {
+      "current_thread_counter_bytes": 0,
+      "index": 3,
+      "nanoseconds": 231,
+      "stage": "empty-after"
+    }
+  ]
+}

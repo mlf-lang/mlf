@@ -1,0 +1,27 @@
+{
+  "selection": "one existing fixed sample; smallest/median/largest result by byte size then filename, plus generation index; not workload-weighted estimate",
+  "available_result_count": 1478,
+  "payloads": [
+    {
+      "index": 0,
+      "bytes": 91,
+      "sha256": "8eaf20dd6413d531919d116f1abe49040d550e002b014b65621a6dbbb9f8e3b2"
+    },
+    {
+      "index": 1,
+      "bytes": 1510,
+      "sha256": "dd99703e6016b3dd276ba46e251d0a28b48044c8606f78603a279b59839bd242"
+    },
+    {
+      "index": 2,
+      "bytes": 56187,
+      "sha256": "3aeadffde86e259c20cba46f9bc63ed9aa6c8a266c456aa9a7b939074968f420"
+    },
+    {
+      "index": 3,
+      "bytes": 406975,
+      "sha256": "4d3413140c61f886804351b99fb1f0f621864eaafd9df181e3f17ba75720f077"
+    }
+  ],
+  "payload_bytes_not_bundled": true
+}

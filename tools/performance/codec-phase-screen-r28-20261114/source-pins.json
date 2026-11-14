@@ -1,0 +1,48 @@
+{
+  "fixtures": [
+    {
+      "file": "CodecControl.hs",
+      "bytes": 2267,
+      "sha256": "44347e22b43bc7dd78d82b71b67a9f131c2d6d5459b5d12a86b8a7bcfdc741dd"
+    },
+    {
+      "file": "CodecPhases.hs",
+      "bytes": 4279,
+      "sha256": "83d65cdd6ceb3463420040f1edcddb4f95f9a3f44976dca99a6f3aad59cada22"
+    }
+  ],
+  "production_sources": [
+    {
+      "file": "libraries/mlf-crates/Bootstrap/Bitstream.hs",
+      "bytes": 82558,
+      "sha256": "f25fe195b5a287fd0c365286acb31839118edac2227f463ea5cc85eb26daedb8"
+    },
+    {
+      "file": "libraries/mlf-crates/Bootstrap/CrateGraph.hs",
+      "bytes": 28172,
+      "sha256": "52b0fcf312aec770515980f78d0ee44e1f29e248c496468536f44f20495880ee"
+    },
+    {
+      "file": "libraries/mlf-crates/Bootstrap/QueryGraph.hs",
+      "bytes": 44928,
+      "sha256": "f66d6ff37a13558ec54e4aa3d5243dde63a75ad77d0fd5f614b93195632cdd71"
+    },
+    {
+      "file": "libraries/mlf-crates/Bootstrap/ArtifactStorage.hs",
+      "bytes": 55963,
+      "sha256": "9333997ad7146a32bf99e4dfce79826ed5b68b622492f212b7895f68f7d9b7d7"
+    }
+  ],
+  "same_build_main_dumps": [
+    {
+      "file": "Main.dump-simpl",
+      "bytes": 176434,
+      "sha256": "ca34eafb316e3950b4c0241e5160dd90be2fb4d20bc6436e38bff12020a22b80"
+    },
+    {
+      "file": "Main.dump-stg-final",
+      "bytes": 264413,
+      "sha256": "f37121cb2f9386b26ef09c26c17d2872d179aa73f63db2e4040c9836d762eff6"
+    }
+  ]
+}
