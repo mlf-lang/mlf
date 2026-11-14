@@ -1653,6 +1653,41 @@ module Bootstrap.CrateArtifact where {
          (eqString name entry ||
           (startsWith "select_" name || (startsWith "super_" name || startsWith "instance_" name))))
       bindings;
+  -- A closed monotype has no type instantiation or dictionary application at
+  -- the entry use. The linked binding already carries the checked type; keep
+  -- the import-boundary checks, but do not infer fake declarations for it.
+  directEntryType dictionaries ty = case ty of {
+    XCon name arguments -> not (M.member compareString name dictionaries) &&
+      all (directEntryType dictionaries) arguments;
+    XArrow argument result -> directEntryType dictionaries argument &&
+      directEntryType dictionaries result;
+    XApply function argument -> directEntryType dictionaries function &&
+      directEntryType dictionaries argument;
+    _ -> False
+  };
+  -- Preserve the old import adapter's rejection of noncanonical legacy
+  -- schemes (including dead quantifiers). Bounded schemes use inference.
+  directEntryImport ty = case ty of {
+    XVar _ -> True;
+    XArrow a b -> directEntryImport a && directEntryImport b;
+    XCon _ arguments -> all directEntryImport arguments;
+    XApply f a -> directEntryImport f && directEntryImport a;
+    XForall variable XBot body -> Set.member T.compareTyVar variable (T.freeVars body) && directEntryImport body;
+    XForall variable (XBotKind _) body -> Set.member T.compareTyVar variable (T.freeVars body) && directEntryImport body;
+    _ -> False
+  };
+  directEntry signatures available entry = do {
+    _ <- traverseEither (\((,) name expected) ->
+      case M.lookup compareString name available of {
+        Nothing -> Left ("missing entry symbol: " ++ name);
+        Just ((,) _ actual) -> ensure (T.alphaEq expected actual)
+          ("entry parameter type mismatch: " ++ name)
+      }) (M.toList signatures);
+    case M.lookup compareString entry available of {
+      Nothing -> Left ("missing entry symbol: " ++ entry);
+      Just ((,) name _) -> Right (XVarTerm name)
+    }
+  };
   -- Entry inference instantiates one already checked value. Its closed
   -- implementation dependencies are linked above and need no fake source
   -- parameters here. Keep every generated selector/dictionary external so
@@ -1706,6 +1741,15 @@ module Bootstrap.CrateArtifact where {
                     Separate.sourceScheme (importDictionaries n) ty)
                  signatures
            };
+           case M.lookup compareString entry signatures of {
+             Just ty -> if directEntryType dictionaries ty && all (compose directEntryImport snd) (M.toList signatures)
+               then directEntry signatures available entry
+               else inferEntry serial interfaces available entry visibleInstances signatures conventions externals;
+             Nothing -> inferEntry serial interfaces available entry visibleInstances signatures conventions externals
+           }
+         };
+  inferEntry serial interfaces available entry visibleInstances signatures conventions externals = do {
+           let { classes = concatMap crateClasses interfaces };
            lowered <-
              Classes.lowerSeparateClassesWithImports conventions externals (map fst visibleInstances)
                (SClassProgram (concatMap crateData interfaces) classes (map snd visibleInstances)
@@ -1714,16 +1758,27 @@ module Bootstrap.CrateArtifact where {
            Separate.removeEntryParameters signatures available
              (snd (Separate.freshObject serial (Compiler.compiledTerm compiled)))
          };
-  linkCheckedObjectsV1 objects root =
+  linkCheckedObjectsV1 objects root = linkCheckedObjectsV1From
+    (FragmentState 0 M.empty [] [] Set.empty) [] objects root;
+  -- Compiler-owned closed spines can seed linking after exact installed-image
+  -- admission. Ordinary artifact APIs always start with the empty state above.
+  -- The complete assembled term still receives the final independent check.
+  linkCheckedObjectsV1From = linkCheckedObjectsV1Using finishLinkedState;
+  linkCheckedObjectsV1Using finish initial prelinked objects root =
     do {
-      uniqueNames "object identity" (map (\o -> crateId (objectInterface o)) objects);
       let {
-        interfaces = map objectInterface objects
+        interfaces = append prelinked (map objectInterface objects)
       };
+      uniqueNames "object identity" (map crateId interfaces);
+      ensure (all (compose null crateDependencies) prelinked)
+        "prelinked crate must have no dependencies";
       let {
         byName = interfaceMap interfaces
       };
       ordered <- dependencyClosure byName [] [] ((:) root []);
+      let { ready = map crateId prelinked };
+      ensure (all (\identity -> elem eqString identity (map crateId ordered)) ready)
+        "prelinked crate is outside the dependency closure";
       traverseEither (validateDependencies byName) ordered;
       traverseEither (validateExportBoundary byName) ordered;
       dataEnv <- validateLayouts ordered;
@@ -1737,7 +1792,7 @@ module Bootstrap.CrateArtifact where {
         objectMap =
           M.fromList compareString (map (\o -> (,) (crateId (objectInterface o)) o) objects)
       };
-      program <- openProgram ordered objectMap root;
+      program <- openProgramFrom ready ordered objectMap root;
       state <-
         foldEither
           (\s i ->
@@ -1745,19 +1800,21 @@ module Bootstrap.CrateArtifact where {
                Nothing -> Left "missing crate object";
                Just o -> linkProgramCrate program byName layouts s o
              })
-          (FragmentState 0 M.empty [] [] Set.empty)
-          ordered;
+          initial
+          (filter (\iface -> not (elem eqString (crateId iface) ready)) ordered);
       let {
         rootInterface = M.findWithDefault compareString (panic "missing root crate") root byName
       };
       entry <-
         linkEntry (fragmentSerial state) ordered rootInterface (fragmentBindings state)
           (crateEntry rootInterface);
-      body <-
-        foldEither (\body declarations -> Separate.graft declarations body) entry
-          (fragmentBodies state);
-      Checked.check (XWithData (fragmentData state) body)
+      finish state entry
     };
+  finishLinkedState state entry = do {
+    body <- foldEither (\body declarations -> Separate.graft declarations body) entry
+      (fragmentBodies state);
+    Checked.check (XWithData (fragmentData state) body)
+  };
   linkObjects objects root = mapEither Checked.term (linkCheckedObjects objects root);
   binaryInterfaceFields :: CrateInterface -> Structure.CrateInterfaceFields;
   binaryInterfaceFields (CrateInterface a b c d e f g h i j k l m) =
@@ -1891,7 +1948,8 @@ module Bootstrap.CrateArtifact where {
         Right interfaces ->
           do {
             objects <-
-              mapM (\((,) metadata iface) -> readObject (objectPath metadata) iface) interfaces;
+              mapM (\((,) metadata iface) ->
+                readObjectWithInterfaces (map snd interfaces) (objectPath metadata) iface) interfaces;
             ioReturn
               (bindEither (sequenceEither objects)
                  (\os ->
@@ -3782,8 +3840,15 @@ module Bootstrap.CrateArtifact where {
   legacyObject object = case object of {
     OpenCrateObject iface package -> makeObject iface (map (\((,) name fragment) -> let {
       term = Open.closedTerm fragment;
-      metadata = Separate.UnitInterface name [] [] (Open.declarations (Open.context fragment)) [] []
-        (map (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty)) (Open.bindings fragment))
+      bindings = map (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty)) (Open.bindings fragment);
+      members = sortStrings (map fst bindings);
+      -- Open owners are wire text, whereas a legacy unit name must satisfy
+      -- the compiled module-name grammar. Preserve already-legacy names and
+      -- translate only an exact owner of this crate and its full binding set.
+      unitName = if not (null members) && eqString name (Separate.openGroupName (crateId iface) members)
+        then Separate.queryGroupName (crateId iface) members else name;
+      metadata = Separate.UnitInterface unitName [] [] (Open.declarations (Open.context fragment)) [] []
+        bindings
         (Separate.fingerprint (Pretty.prettyTerm term))
     } in Separate.UnitObject metadata term) (Open.packageFragments package));
     _ -> object
@@ -3880,7 +3945,7 @@ module Bootstrap.CrateArtifact where {
             (\((,) n ty) -> (,) (X.nameHint n) ty) (Open.bindings fragment)) (Open.packageFragments package) };
           mapM_ (\((,) owner fragment) -> let {
             keys = sortStrings (map (compose X.nameHint fst) (Open.bindings fragment))
-          } in ensure (not (null keys) && eqString owner (Separate.queryGroupName (crateId iface) keys))
+          } in ensure (openGroupOwnerMatches (crateId iface) keys owner)
             "open crate fragment owner mismatch") (Open.packageFragments package);
           uniqueNames "open crate binding" (map fst actual);
           ensure (eqList Separate.sameSignature actual (crateBindings iface)) "open crate ownership/type inventory mismatch";
@@ -3889,6 +3954,9 @@ module Bootstrap.CrateArtifact where {
       }
     }
   };
+  openGroupOwnerMatches crate keys owner = not (null keys) &&
+    (eqString owner (Separate.openGroupName crate keys) ||
+     eqString owner (Separate.queryGroupName crate (sortStrings keys)));
   -- Object files name declarations by stable, crate-qualified identities. Only
   -- this link owns the slots below. Never reuse a producer's resolver slot.
   data OpenUnit = OpenUnit;
@@ -3954,10 +4022,11 @@ module Bootstrap.CrateArtifact where {
   };
   -- Closed object formats link their entire bodies. In a mixed session, keep
   -- every export of their open dependencies available for those bodies.
-  openProgram ordered objectMap root = do {
+  openProgram ordered objectMap root = openProgramFrom [] ordered objectMap root;
+  openProgramFrom prelinked ordered objectMap root = do {
     objects <- traverseEither (\i -> case M.lookup compareString (crateId i) objectMap of {
       Nothing -> Left "missing crate object"; Just object -> Right object
-    }) ordered;
+    }) (filter (\iface -> not (elem eqString (crateId iface) prelinked)) ordered);
     if not (any openMarked objects) then Right Nothing else do {
     index <- openIndex ordered objects;
     let { byName = interfaceMap ordered; rootIface = M.findWithDefault compareString (panic "missing root crate") root byName;

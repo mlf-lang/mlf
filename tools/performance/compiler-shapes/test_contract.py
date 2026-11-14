@@ -7,6 +7,7 @@ frozen schedule stays balanced.
 """
 import hashlib
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -18,6 +19,7 @@ sys.path.insert(0, str(HERE))
 import analyze  # noqa: E402
 import bench  # noqa: E402
 import run as runner  # noqa: E402
+import generate  # noqa: E402
 
 STAGES = ['source-to-checked', 'checked-to-llvm', 'llvm-to-executable']
 
@@ -90,6 +92,23 @@ def edit(folder, mutate):
 
 
 class ScheduleTests(unittest.TestCase):
+    def test_inferred_functions_only_remove_generated_signatures(self):
+        for size in [1, 32, 512]:
+            annotated = generate.program('flat_functions', size)
+            inferred = generate.program('inferred_functions', size)
+            self.assertEqual(inferred, re.sub(r'^f\d+ :: Int -> Int;\n', '', annotated,
+                                              flags=re.MULTILINE))
+            self.assertEqual(len(re.findall(r'^f\d+ x =', inferred, re.MULTILINE)), size)
+            for value in [-1, 0, 7]:
+                self.assertEqual(generate.expected('inferred_functions', size, value),
+                                 size * value + size * (size - 1) // 2)
+
+    def test_inferred_functions_is_opt_in(self):
+        _, families, _, _ = bench.resolve('default', None, None)
+        self.assertNotIn('inferred_functions', families)
+        _, chosen, _, _ = bench.resolve('default', ['inferred_functions'], [512])
+        self.assertEqual(chosen, ['inferred_functions'])
+
     def test_balanced_pairs(self):
         self.assertEqual(runner.lanes_for(0, 3), ['ghc', 'mlf', 'mlf', 'ghc', 'ghc', 'mlf'])
         self.assertEqual(runner.lanes_for(1, 3), ['mlf', 'ghc', 'ghc', 'mlf', 'mlf', 'ghc'])
@@ -233,7 +252,8 @@ class AnalyzerTests(unittest.TestCase):
 
 # Graph fixtures are independently encoded by the frozen wire-format reference,
 # not a compiler run and never a substitute for retained measurement evidence.
-def graph_fixture(groups=1, mutate_nodes=None, version=1, mutate_index=None):
+def graph_fixture(groups=1, mutate_nodes=None, version=1, mutate_index=None,
+                  members_per_group=None):
     import base64
     import query_cache as Q
     from artifact_binary_reference import tree_document
@@ -254,12 +274,12 @@ def graph_fixture(groups=1, mutate_nodes=None, version=1, mutate_index=None):
     report = {'format': 1, 'crate': crate, 'inferred_groups': groups,
               'reused_groups': 0, 'groups': []}
     for i in range(groups):
-        members = ['f' + str(i)]
-        key = Q.pack(['InferScc', Q.pack(members)])
+        members = members_per_group[i] if members_per_group is not None else ['f' + str(i)]
+        key = Q.pack(['InferScc', Q.pack(sorted(members))])
         nodes.append({'key': key, 'hash': raw_hash,
                       'reads': [(binding, binding_hash)], 'payload': raw_hash})
         identity = 'Query_' + ''.join(str(ord(c)) + '_' for c in crate) + 'z_' + ''.join(
-            str(ord(c)) + '_' for c in members[0])
+            str(ord(c)) + '_' for c in min(members))
         report['groups'].append({'id': identity, 'members': members,
                                 'cached': False, 'query_key': raw_hash})
     if mutate_nodes:
@@ -312,9 +332,31 @@ class GraphCacheTests(unittest.TestCase):
     def index_error(self, legacy, indexed):
         return legacy if self.version == 1 else indexed
 
-    def check(self, inventory, evidence, groups=1):
-        return analyze.Q.check_graph(inventory, evidence, groups, 1,
+    def check(self, inventory, evidence, groups=1, max_members=1):
+        return analyze.Q.check_graph(inventory, evidence, groups, max_members,
                                      'compiler-shapes/flat_functions-8', 'b' * 64)
+
+    def test_accepts_complete_framed_group_owner(self):
+        for members in [['f0'], ['bc', 'a'], ['中文', 'é']]:
+            inventory, evidence = self.fixture(members_per_group=[members])
+            change_report(evidence, lambda q: q['groups'][0].update(id=analyze.Q.pack([
+                'MLF-OPEN-GROUP-1', q['crate'], analyze.Q.pack(sorted(members))])))
+            with self.subTest(members=members):
+                self.check(inventory, evidence, max_members=len(members))
+
+    def test_rejects_framed_owner_with_different_full_membership(self):
+        crate = 'compiler-shapes/flat_functions-8'
+        for owner_crate, members in [
+            ('other', ['a', 'bc']), (crate, []), (crate, ['a']),
+            (crate, ['a', 'bc', 'd']), (crate, ['ab', 'c']),
+            (crate, ['bc', 'a']), (crate, ['a', 'a', 'bc']),
+        ]:
+            inventory, evidence = self.fixture(members_per_group=[['bc', 'a']])
+            owner = analyze.Q.pack(['MLF-OPEN-GROUP-1', owner_crate, analyze.Q.pack(members)])
+            change_report(evidence, lambda q: q['groups'][0].update(id=owner))
+            with self.subTest(crate=owner_crate, members=members), self.assertRaisesRegex(
+                    ValueError, 'group id matches'):
+                self.check(inventory, evidence, max_members=2)
 
     def test_accepts_extra_nodes_and_content_deduplication(self):
         inventory, evidence = self.fixture(groups=3)

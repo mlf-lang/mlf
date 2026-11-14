@@ -176,7 +176,9 @@ def check_graph(inventory, evidence, fresh, max_members, crate, compiler_sha):
         ids.add(identity)
         members_seen.update(members)
         encoded = lambda value: ''.join(str(ord(c)) + '_' for c in value)
-        require(identity == 'Query_' + encoded(crate) + 'z_' + encoded(min(members)),
+        framed_owner = pack(['MLF-OPEN-GROUP-1', crate, pack(sorted(members))])
+        legacy_owner = 'Query_' + encoded(crate) + 'z_' + encoded(min(members))
+        require(identity in (framed_owner, legacy_owner),
                 'actual query group id matches crate and members')
         key = pack(['InferScc', pack(sorted(members))])
         require(key not in identities and key in nodes and valid_hash(sha) and

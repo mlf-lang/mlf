@@ -65,13 +65,12 @@ def check_receipts(prefix, cache, nodes):
         raw = nodes[raw_key]
         assert finish["reads"][:3] == [(k, nodes[k]["sha"]) for k in
             (raw_key, packed(["Input", packed(["Prepared", identity])]), packed(["Scope", identity]))]
-        owner, content, exports = value_node(read(results / (finish["sha"] + ".mlfqr"), 6), 427, 3)
-        assert text(owner) == g["id"] and finish["payload"] == finish["sha"]
-        contracts = [(text(name), text(h)) for name, h in (value_node(x, 2, 2) for x in list_values(exports))]
-        assert [name for name, _ in contracts] == members
+        owner = ("text", g["id"])
+        assert finish["payload"] is None
+        contracts = [(name, nodes[packed(["Binding", name])]["sha"]) for name in members]
         for name, digest in contracts:
             binding = nodes[packed(["Binding", name])]
-            assert binding["reads"] == [(key, finish["sha"])] and binding["payload"] == binding["sha"] == digest
+            assert binding["reads"] == [(key, finish["sha"])] and binding["payload"] is None
 
         # Object tag 401 references parameter and export types by identity. Query
         # tag 400 stores the export types, including the raw type's binder IDs.
@@ -93,13 +92,16 @@ def check_receipts(prefix, cache, nodes):
             # The rewritten fixtures have closed concrete result types. Their
             # exact final types are independently available from the interface.
             final_types = n(1, *(n(2, b, types[text(binder_name(b))]) for b in list_values(owned)))
+        content = sha(tree_document([n(425, refs, n(400, ("text", "raw"), owner, stamp,
+            params, body, final_types, uses))], schema=6))
+        receipt = packed(["MLF-FINISH-RECEIPT-TEXT-1", g["id"], content,
+                          str(len(contracts)), *(field for pair in contracts for field in pair)])
+        assert sha(receipt.encode("utf-8")) == finish["sha"]
         if same_body and refs == original_refs:
             retained += 1
-            assert text(content) == raw["sha"]
+            assert content == raw["sha"]
         else:
             rewritten += 1
-        final = n(400, ("text", "raw"), owner, stamp, params, body, final_types, uses)
-        assert sha(tree_document([n(425, refs, final)], schema=6)) == text(content), (key, g["id"])
     return {"retained": retained, "rewritten": rewritten}
 
 
@@ -120,13 +122,17 @@ def forge_generation(cache, current, mode):
         fields[3] = "open-fragment-checker-1"
         config = ("text", packed(fields))
     if mode == "stale":
-        result_dir = directory / "results"
-        owner, fragment, exports = value_node(read(result_dir / (text(original) + ".mlfqr"), 6), 427, 3)
-        assert fragment != donor
-        raw = tree_document([n(427, owner, donor, exports)], schema=6)
-        donor = ("text", sha(raw))
-        donor_payload = n(5, donor)
-        (result_dir / (text(donor) + ".mlfqr")).write_bytes(raw)
+        identity = unpack(text(key))[1]
+        members = unpack(identity)
+        raw_node = wire.nodes[packed(["InferScc", identity])]
+        raw_record = read(directory / "results" / (raw_node["payload"] + ".mlfqr"), 6)
+        _, fragment = value_node(raw_record, 425, 2)
+        owner = text(value_node(fragment, 400, 7)[1])
+        contracts = [(name, wire.nodes[packed(["Binding", name])]["sha"]) for name in members]
+        stale = packed(["MLF-FINISH-RECEIPT-TEXT-1", owner, text(donor), str(len(contracts)),
+                        *(field for pair in contracts for field in pair)])
+        donor = ("text", sha(stale.encode("utf-8")))
+        donor_payload = n(4)
     changed = []
     for k, h, edges, payload in rows:
         if mode in ("swapped", "stale", "finish-as-raw"):
@@ -137,7 +143,7 @@ def forge_generation(cache, current, mode):
         elif mode == "reordered" and k == key:
             edges = n(1, *reversed(list_values(edges)))
         elif mode == "wrong-address" and k == key:
-            payload = donor_payload
+            payload = n(5, donor)
         changed.append(n(410, k, h, edges, payload))
     raw = wire.encode_rows(changed, config)
     digest = sha(raw)

@@ -67,6 +67,10 @@ module Bootstrap.Separate where {
   encodedChunks text i = if i >= stringLength text then []
     else (:) (showInt (stringCodeAt text i)) ((:) "_" (encodedChunks text (i + 1)));
   queryGroupName crateId members = "Query_" ++ encoded crateId ++ "z_" ++ encoded (head members);
+  -- Open-fragment owners are wire text, not generated source identifiers.
+  -- Frame the full canonical ownership set once instead of escaping its
+  -- already escaped declaration names. The legacy unit format stays separate.
+  openGroupName crateId members = pack ["MLF-OPEN-GROUP-1",crateId,pack (sortBy compareString members)];
   encoded text = encodedFrom text 0;
   canonicalPreludeConstructor entity =
     (eqString (Modules.owner entity) "Prelude" &&

@@ -30,6 +30,13 @@ def string(value):
 def sequence(values):
     return node(1, *values)
 
+def companion_group_matches(crate, legacy, opened, members):
+    if not members or len(set(members)) != len(members):
+        return False
+    encoded = lambda value: ''.join(str(ord(char)) + '_' for char in value)
+    return (legacy == 'Query_' + encoded(crate) + 'z_' + encoded(sorted(members)[0]) and
+            opened == pack(['MLF-OPEN-GROUP-1', crate, pack(sorted(members))]))
+
 def fingerprint(value):
     return hashlib.sha256(tree_document([value], 6)).hexdigest()
 
@@ -620,7 +627,9 @@ def compare_companion(closed_pair, open_pair, dependency_interfaces, audited_pai
         require(text(hf[7]) == legacy_unit['fingerprint'],
                 'closed unit fingerprint mismatch: ' + str(index))
         group, receipt, data_names, parameters, body, owned, used = fields(fragment, 401, 7)
-        require(group == hf[0], 'ordered companion fragment identity')
+        members = [name(value)[1] for value in items(owned)]
+        require(group == hf[0] or companion_group_matches(text(cf[0]), text(hf[0]), text(group), members),
+                'ordered companion fragment identity')
         require(all(hf[index] == sequence([]) for index in (1, 2, 4, 5)),
                 'unrepresented closed fragment metadata')
         ds, term = fields(term, 84, 2)

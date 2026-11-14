@@ -388,11 +388,7 @@ def main():
         if name == 'body':
             generation, nodes = graph(cache)
             target = next(n for k,n in nodes.items() if unpack(k)[0] == 'FinishScc')
-            path = cache_directory(cache) / 'results' / (target['payload'] + '.mlfqr')
-            path.write_bytes(b'damaged finish receipt')
-            repaired = compile('damaged-finish')
-            assert sha(path.read_bytes()) == target['sha'] and outputs(repaired) == outputs(inc)
-            assert json.loads(repaired.with_suffix('.queries').read_text())['inferred_groups'] == 0
+            assert target['payload'] is None, 'rebuilt finish receipt must not require a result file'
             modes = ('swapped', 'stale', 'reordered', 'wrong-address', 'finish-as-raw', 'previous-format')
             for mode in modes:
                 forged = forge_generation(cache, generation, mode)
@@ -403,7 +399,7 @@ def main():
                 report = json.loads(repaired.with_suffix('.queries').read_text())
                 expected = len(report['groups']) if mode in ('wrong-address', 'previous-format') else int(mode == 'finish-as-raw')
                 assert report['inferred_groups'] == expected
-            record['finish_receipt_recovery'] = ['damaged', 'missing', *modes]
+            record['finish_receipt_recovery'] = ['reconstructed', *modes]
             cache.rename(folder / 'before-concurrent-writers')
             with ThreadPoolExecutor(max_workers=2) as pool:
                 writes = list(pool.map(compile, ['writer-a', 'writer-b']))

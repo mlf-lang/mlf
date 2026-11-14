@@ -4,7 +4,7 @@
              MultiParamTypeClasses, OverloadedStrings #-}
 module MLF.PreparedCompiler
   (Compilation, compileFileWithPrelude, compileSourceWithImports, compileProgramWithPrelude,
-   checkedTerm, compiledTerm, sourceType, reused, dictionaryIdentities, verifyBuiltin, verifyBuiltinImages, installCompilerPrelude, cratePrelude,
+   checkedTerm, compiledTerm, sourceType, reused, dictionaryIdentities, verifyBuiltin, verifyBuiltinImages, installCompilerPrelude, cratePrelude, linkCrateFile,
    emitNativeFileChunks, emitNativeSourceChunks, nativeInstallInfo,
    NativeCompilation, compileNativeFile, compileNativeSource,
    nativeChunks, nativeManifest, nativeExportCount, nativeInlineCount, nativeFallback, nativeInputs,
@@ -333,6 +333,51 @@ module MLF.PreparedCompiler
     acquired <- readByteFileOrError path limit;
     case acquired of { (,) message bytes -> if eqString message ""
       then Storage.sameBytes bytes expected else ioReturn False }
+  };
+  -- The fixed literal is independently checked at runtime and both physical
+  -- images are verified against fresh preparation by the producer build. A
+  -- disk hit must match every byte, as installation does. All other artifacts
+  -- retain ordinary admission, including the envelope's cumulative bounds.
+  linkCrateFile path = do {
+    loaded <- Artifact.loadInterfaces [path];
+    case loaded of {
+      Left message -> ioReturn (Left message);
+      Right interfaces -> case interfaces of {
+        (:) ((,) metadata iface) rest ->
+          if not (eqString (Artifact.crateId iface) Artifact.builtinCrateIdentity)
+          then Artifact.linkCheckedFile path
+          else case prepared of {
+            Left _ -> Artifact.linkCheckedFile path;
+            Right witness -> do {
+              images <- compilerPreludeImages;
+              exact <- case images of {
+                Left _ -> ioReturn False;
+                Right ((,) header body) -> do {
+                  first <- exactImage metadata header;
+                  second <- if first then exactImage (Artifact.objectPath metadata) body else ioReturn False;
+                  ioReturn (first && second && eqString (Artifact.encodeInterface iface)
+                    (Artifact.encodeInterface (Context.interface witness)))
+                }
+              };
+              if not exact then Artifact.linkCheckedFile path else do {
+                admitted <- mapM (\((,) file expected) ->
+                  Artifact.readObjectWithInterfaces (map snd interfaces) (Artifact.objectPath file) expected) rest;
+                case sequenceEither admitted of {
+                  Left message -> ioReturn (Left message);
+                  Right objects -> if any Artifact.envelopeMarked objects then Artifact.linkCheckedFile path
+                    else case reverse interfaces of {
+                      [] -> ioReturn (Left "no root crate metadata");
+                      (:) ((,) _ root) _ -> ioReturn
+                        (Artifact.linkCheckedObjectsV1Using (Context.finishLinked witness) (Context.linked witness)
+                          [Context.interface witness] objects (Artifact.crateId root))
+                    }
+                }
+              }
+            }
+          };
+        [] -> Artifact.linkCheckedFile path
+      }
+    }
   };
   rawNames = case Builtin.builtin of { Context.RawPrelude _ _ _ _ _ _ value _ _ _ _ _ -> value };
   rawEnvironment = case Builtin.builtin of { Context.RawPrelude _ _ _ _ _ _ _ value _ _ _ _ -> value };

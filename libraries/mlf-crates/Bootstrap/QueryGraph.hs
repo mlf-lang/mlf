@@ -33,9 +33,10 @@ module Bootstrap.QueryGraph where {
   validHash text = stringLength text == 64 && validHashFrom text 0;
   validHashFrom text index = if index == 64 then True else let { c = stringCodeAt text index } in
     ((c >= 48 && c <= 57) || (c >= 97 && c <= 102)) && validHashFrom text (index + 1);
-  command args = do {
+  command = commandIn "";
+  commandIn directory args = do {
     actual <- Host.hostArguments args;
-    runProcess "" (concatMapString (\field -> field ++ stringFromCode 0)
+    runProcess directory (concatMapString (\field -> field ++ stringFromCode 0)
       (append ["1800","","",""] actual))
   };
   encodeHashed value = do {
@@ -767,7 +768,8 @@ module Bootstrap.QueryGraph where {
           let { destination = stagingPath session digest };
           saved <- Storage.writeRaw destination bytes;
           case saved of { Left e -> ioReturn (Left e);
-            Right _ -> stageValues session rest ((:) ((,) destination path) staged) }
+            Right _ -> stageValues session rest
+              ((:) ((,) ("staging/" ++ digest ++ ".mlfqr") ("results/" ++ digest ++ ".mlfqr")) staged) }
         }
       }
     }
@@ -790,8 +792,11 @@ module Bootstrap.QueryGraph where {
       windows <- Host.isWindows;
       let { batch = if windows then (,) [first] rest else moveBatch 32768 64 paths;
         absolute path = if Host.absolutePath path then path else "./" ++ path;
-        destinations = if windows then [absolute (snd first)] else [absolute (directory session ++ "/results")] };
-      code <- command (append ["/bin/mv","-f"]
+        destinations = if windows then [absolute (snd first)] else ["results"] };
+      -- Resolve generated names beneath the same cache directory. Keeping the
+      -- common prefix out of argv lets the unchanged byte/count bounds batch
+      -- equally well in short and long checkout paths.
+      code <- commandIn (directory session) (append ["/bin/mv","-f"]
         (append (map (compose absolute fst) (fst batch)) destinations));
       if code /= 0 then ioReturn (Left "cannot publish query result batch") else
         if eqString failpoint "after-result-batch"

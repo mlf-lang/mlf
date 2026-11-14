@@ -25,6 +25,24 @@ def pack(values):
     return ''.join(str(len(value)) + ':' + value for value in values)
 
 
+def same_group_ownership(crate, expected, actual):
+    """Compare full ordered memberships while validating each format's owner."""
+    if len(expected) != len(actual):
+        return False
+    seen = set()
+    for closed, opened in zip(expected, actual):
+        members = closed['members']
+        if not members or members != opened['members'] or len(set(members)) != len(members):
+            return False
+        encoded = lambda value: ''.join(str(ord(char)) + '_' for char in value)
+        legacy = 'Query_' + encoded(crate) + 'z_' + encoded(members[0])
+        owner = pack(['MLF-OPEN-GROUP-1', crate, pack(sorted(members))])
+        if closed['id'] != legacy or opened['id'] != owner or owner in seen:
+            return False
+        seen.add(owner)
+    return True
+
+
 def unpack(source):
     result = []
     while source:
@@ -332,8 +350,9 @@ def run_session_files(H, output, record, inputs, binaries, producer, source,
                     H.require(inferred > 0 and reused == 0 and len(groups) == inferred and
                               all(group['cached'] is False for group in groups),
                               'genuinely fresh inference')
-                H.require([{'id': group['id'], 'members': group['members']} for group in groups]
-                          == expected['groups'], 'complete ordered original inference groups')
+                H.require(report['crate'] == fields[1] and
+                          same_group_ownership(fields[1], expected['groups'], groups),
+                          'complete ordered original inference groups and exact owner formats')
                 actual = raw_files(prefix)
                 if mode == 'cold':
                     cold_files = actual

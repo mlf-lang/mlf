@@ -39,6 +39,18 @@ class ModularControls(unittest.TestCase):
         cls.fixture = SOURCE / 'tools/shared/fixtures/item4/RawBinaryShared.hs'
         cls.rows = M.native_source_closure(SOURCE, cls.fixture, cls.manifest)
 
+    def test_closed_companion_owner_checks_exact_crate_and_full_membership(self):
+        import artifact_binary_open as O
+        crate, members = 'crate/λ', ['a', 'bc']
+        encoded = lambda value: ''.join(str(ord(c)) + '_' for c in value)
+        legacy = 'Query_' + encoded(crate) + 'z_' + encoded(members[0])
+        owner = O.pack(['MLF-OPEN-GROUP-1', crate, O.pack(sorted(members))])
+        self.assertTrue(O.companion_group_matches(crate, legacy, owner, members))
+        self.assertFalse(O.companion_group_matches('other', legacy, owner, members))
+        self.assertFalse(O.companion_group_matches(crate, legacy, owner, ['a']))
+        self.assertFalse(O.companion_group_matches(crate, legacy, owner + 'x', members))
+        self.assertFalse(O.companion_group_matches(crate, 'wrong', owner, members))
+
     def test_query_fixture_separates_dictionary_and_legacy_payload_contracts(self):
         source = (SOURCE / 'tools/shared/fixtures/item4/QueryIndex.hs').read_text()
         self.assertIn('rootRow = row 3 1 [refs 2 0, refs 2 0] (just (W.VInt 0))', source)

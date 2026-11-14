@@ -76,8 +76,12 @@ python3 -B tools/performance/compiler-shapes/bench.py run --workdir W --cohort C
 python3 -B tools/performance/compiler-shapes/bench.py analyze --workdir W --cohort C
 ```
 
-`local_functions` is opt-in and never part of the default matrix. `--family` and
-`--size` replace the matrix selection; they do not add to it.
+`local_functions` and `inferred_functions` are opt-in and never part of the
+default matrix. `--family` and `--size` replace the matrix selection; they do not
+add to it. `inferred_functions` removes only the generated function signatures
+from `flat_functions`; the entry/IO harness stays annotated. See the
+[inferred-function study](../../../docs/compiler-inferred-functions-2026-11-15.md)
+for the measured range and qualification.
 
 On a Mac whose shell cannot inspect processes (`/bin/ps` denied by a sandbox), the
 measurement harness cannot sample the process group and refuses to run. Use the
@@ -104,6 +108,7 @@ docker run --rm -v "$PWD:/work" -w /work mlf-compiler-shapes:9.14.1 \
 | Family | Generated work | Default |
 | --- | --- | --- |
 | `flat_functions` | `n` annotated top-level functions summed in a balanced tree | yes |
+| `inferred_functions` | identical independent functions with their `n` signatures removed; entry/IO harness unchanged | opt in |
 | `dependency_chain` | `n` annotated functions in a strict chain | yes |
 | `inferred_chain` | the same chain with no signature on the generated functions | yes |
 | `recursive_ring` | `n` functions in a mutually recursive cycle | yes |
