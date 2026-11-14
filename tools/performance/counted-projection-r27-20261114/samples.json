@@ -1,0 +1,830 @@
+[
+  {
+    "generation_statistics_from_raw": [
+      {
+        "generation": 0,
+        "collections": 14279,
+        "parallel_collections": 0,
+        "cpu_seconds": 2.258,
+        "elapsed_seconds": 2.263,
+        "average_pause_seconds": 0.0002,
+        "maximum_pause_seconds": 0.0042
+      },
+      {
+        "generation": 1,
+        "collections": 58,
+        "parallel_collections": 0,
+        "cpu_seconds": 1.355,
+        "elapsed_seconds": 1.355,
+        "average_pause_seconds": 0.0234,
+        "maximum_pause_seconds": 0.0775
+      }
+    ],
+    "metrics_from_raw": {
+      "copied_bytes": 4273132416,
+      "maximum_residency_bytes": 36234192,
+      "maximum_slop_bytes": 1616944,
+      "memory_MiB": 105.0,
+      "MUT_cpu_seconds": 16.397,
+      "MUT_elapsed_seconds": 16.508,
+      "GC_cpu_seconds": 3.613,
+      "GC_elapsed_seconds": 3.618,
+      "Total_cpu_seconds": 20.011,
+      "Total_elapsed_seconds": 20.127
+    },
+    "owners": [
+      "Bootstrap.Fresh",
+      "Bootstrap.Host",
+      "Bootstrap.IndexVec",
+      "Bootstrap.IntMap",
+      "Bootstrap.IntRank",
+      "Bootstrap.IntSet",
+      "Bootstrap.IntTree",
+      "Bootstrap.Map",
+      "Bootstrap.ST",
+      "Bootstrap.Set",
+      "Bootstrap.Std",
+      "Bootstrap.Types",
+      "Bootstrap.Unicode",
+      "Bootstrap.Version"
+    ],
+    "index": 1,
+    "role": "A",
+    "allocated_bytes": 60040794280,
+    "wall": 20.174825145004434,
+    "raw_rts": {
+      "sha256": "0f8510a33d4ad001da785d4898eb5afc5fe9bf24926d08720a5f9b35338e0078"
+    },
+    "copied_bytes": 4273132416,
+    "maximum_residency_bytes": 36234192,
+    "maximum_slop_bytes": 1616944,
+    "memory_MiB": 105.0,
+    "MUT_cpu_seconds": 16.397,
+    "MUT_elapsed_seconds": 16.508,
+    "GC_cpu_seconds": 3.613,
+    "GC_elapsed_seconds": 3.618,
+    "Total_cpu_seconds": 20.011,
+    "Total_elapsed_seconds": 20.127,
+    "fresh": 475,
+    "reused": 0
+  },
+  {
+    "generation_statistics_from_raw": [
+      {
+        "generation": 0,
+        "collections": 14279,
+        "parallel_collections": 0,
+        "cpu_seconds": 2.365,
+        "elapsed_seconds": 2.369,
+        "average_pause_seconds": 0.0002,
+        "maximum_pause_seconds": 0.005
+      },
+      {
+        "generation": 1,
+        "collections": 58,
+        "parallel_collections": 0,
+        "cpu_seconds": 1.297,
+        "elapsed_seconds": 1.297,
+        "average_pause_seconds": 0.0224,
+        "maximum_pause_seconds": 0.066
+      }
+    ],
+    "metrics_from_raw": {
+      "copied_bytes": 4269756528,
+      "maximum_residency_bytes": 36245320,
+      "maximum_slop_bytes": 1617904,
+      "memory_MiB": 105.0,
+      "MUT_cpu_seconds": 17.232,
+      "MUT_elapsed_seconds": 17.351,
+      "GC_cpu_seconds": 3.662,
+      "GC_elapsed_seconds": 3.666,
+      "Total_cpu_seconds": 20.895,
+      "Total_elapsed_seconds": 21.017
+    },
+    "owners": [
+      "Bootstrap.Fresh",
+      "Bootstrap.Host",
+      "Bootstrap.IndexVec",
+      "Bootstrap.IntMap",
+      "Bootstrap.IntRank",
+      "Bootstrap.IntSet",
+      "Bootstrap.IntTree",
+      "Bootstrap.Map",
+      "Bootstrap.ST",
+      "Bootstrap.Set",
+      "Bootstrap.Std",
+      "Bootstrap.Types",
+      "Bootstrap.Unicode",
+      "Bootstrap.Version"
+    ],
+    "index": 2,
+    "role": "B",
+    "allocated_bytes": 60040489688,
+    "wall": 21.06266290700296,
+    "raw_rts": {
+      "sha256": "1d579ee0f16ae92b17b76dbb5d3f2bb4290b648022f08d662f453d64da1ab8b0"
+    },
+    "copied_bytes": 4269756528,
+    "maximum_residency_bytes": 36245320,
+    "maximum_slop_bytes": 1617904,
+    "memory_MiB": 105.0,
+    "MUT_cpu_seconds": 17.232,
+    "MUT_elapsed_seconds": 17.351,
+    "GC_cpu_seconds": 3.662,
+    "GC_elapsed_seconds": 3.666,
+    "Total_cpu_seconds": 20.895,
+    "Total_elapsed_seconds": 21.017,
+    "fresh": 475,
+    "reused": 0
+  },
+  {
+    "generation_statistics_from_raw": [
+      {
+        "generation": 0,
+        "collections": 14279,
+        "parallel_collections": 0,
+        "cpu_seconds": 2.201,
+        "elapsed_seconds": 2.2,
+        "average_pause_seconds": 0.0002,
+        "maximum_pause_seconds": 0.0043
+      },
+      {
+        "generation": 1,
+        "collections": 58,
+        "parallel_collections": 0,
+        "cpu_seconds": 1.213,
+        "elapsed_seconds": 1.213,
+        "average_pause_seconds": 0.0209,
+        "maximum_pause_seconds": 0.0546
+      }
+    ],
+    "metrics_from_raw": {
+      "copied_bytes": 4269909840,
+      "maximum_residency_bytes": 36245320,
+      "maximum_slop_bytes": 1617904,
+      "memory_MiB": 105.0,
+      "MUT_cpu_seconds": 15.974,
+      "MUT_elapsed_seconds": 16.064,
+      "GC_cpu_seconds": 3.413,
+      "GC_elapsed_seconds": 3.413,
+      "Total_cpu_seconds": 19.388,
+      "Total_elapsed_seconds": 19.477
+    },
+    "owners": [
+      "Bootstrap.Fresh",
+      "Bootstrap.Host",
+      "Bootstrap.IndexVec",
+      "Bootstrap.IntMap",
+      "Bootstrap.IntRank",
+      "Bootstrap.IntSet",
+      "Bootstrap.IntTree",
+      "Bootstrap.Map",
+      "Bootstrap.ST",
+      "Bootstrap.Set",
+      "Bootstrap.Std",
+      "Bootstrap.Types",
+      "Bootstrap.Unicode",
+      "Bootstrap.Version"
+    ],
+    "index": 3,
+    "role": "B",
+    "allocated_bytes": 60040489688,
+    "wall": 19.50825328301289,
+    "raw_rts": {
+      "sha256": "49f6ce2b90001bcf7d11223953f186f41abf4d3cdf312b243de8309dbd23f776"
+    },
+    "copied_bytes": 4269909840,
+    "maximum_residency_bytes": 36245320,
+    "maximum_slop_bytes": 1617904,
+    "memory_MiB": 105.0,
+    "MUT_cpu_seconds": 15.974,
+    "MUT_elapsed_seconds": 16.064,
+    "GC_cpu_seconds": 3.413,
+    "GC_elapsed_seconds": 3.413,
+    "Total_cpu_seconds": 19.388,
+    "Total_elapsed_seconds": 19.477,
+    "fresh": 475,
+    "reused": 0
+  },
+  {
+    "generation_statistics_from_raw": [
+      {
+        "generation": 0,
+        "collections": 14279,
+        "parallel_collections": 0,
+        "cpu_seconds": 2.299,
+        "elapsed_seconds": 2.303,
+        "average_pause_seconds": 0.0002,
+        "maximum_pause_seconds": 0.0222
+      },
+      {
+        "generation": 1,
+        "collections": 58,
+        "parallel_collections": 0,
+        "cpu_seconds": 1.304,
+        "elapsed_seconds": 1.305,
+        "average_pause_seconds": 0.0225,
+        "maximum_pause_seconds": 0.0623
+      }
+    ],
+    "metrics_from_raw": {
+      "copied_bytes": 4273134552,
+      "maximum_residency_bytes": 36234192,
+      "maximum_slop_bytes": 1616944,
+      "memory_MiB": 105.0,
+      "MUT_cpu_seconds": 16.532,
+      "MUT_elapsed_seconds": 16.665,
+      "GC_cpu_seconds": 3.602,
+      "GC_elapsed_seconds": 3.608,
+      "Total_cpu_seconds": 20.134,
+      "Total_elapsed_seconds": 20.273
+    },
+    "owners": [
+      "Bootstrap.Fresh",
+      "Bootstrap.Host",
+      "Bootstrap.IndexVec",
+      "Bootstrap.IntMap",
+      "Bootstrap.IntRank",
+      "Bootstrap.IntSet",
+      "Bootstrap.IntTree",
+      "Bootstrap.Map",
+      "Bootstrap.ST",
+      "Bootstrap.Set",
+      "Bootstrap.Std",
+      "Bootstrap.Types",
+      "Bootstrap.Unicode",
+      "Bootstrap.Version"
+    ],
+    "index": 4,
+    "role": "A",
+    "allocated_bytes": 60040794280,
+    "wall": 20.305072737988667,
+    "raw_rts": {
+      "sha256": "96bb28e63c1f41c626fbcff9f3152bd93052f3ec65b46c7c4fce7aa58879f98a"
+    },
+    "copied_bytes": 4273134552,
+    "maximum_residency_bytes": 36234192,
+    "maximum_slop_bytes": 1616944,
+    "memory_MiB": 105.0,
+    "MUT_cpu_seconds": 16.532,
+    "MUT_elapsed_seconds": 16.665,
+    "GC_cpu_seconds": 3.602,
+    "GC_elapsed_seconds": 3.608,
+    "Total_cpu_seconds": 20.134,
+    "Total_elapsed_seconds": 20.273,
+    "fresh": 475,
+    "reused": 0
+  },
+  {
+    "generation_statistics_from_raw": [
+      {
+        "generation": 0,
+        "collections": 14279,
+        "parallel_collections": 0,
+        "cpu_seconds": 2.261,
+        "elapsed_seconds": 2.261,
+        "average_pause_seconds": 0.0002,
+        "maximum_pause_seconds": 0.0043
+      },
+      {
+        "generation": 1,
+        "collections": 58,
+        "parallel_collections": 0,
+        "cpu_seconds": 1.21,
+        "elapsed_seconds": 1.21,
+        "average_pause_seconds": 0.0209,
+        "maximum_pause_seconds": 0.0422
+      }
+    ],
+    "metrics_from_raw": {
+      "copied_bytes": 4273135368,
+      "maximum_residency_bytes": 36234192,
+      "maximum_slop_bytes": 1616944,
+      "memory_MiB": 105.0,
+      "MUT_cpu_seconds": 16.187,
+      "MUT_elapsed_seconds": 16.301,
+      "GC_cpu_seconds": 3.471,
+      "GC_elapsed_seconds": 3.471,
+      "Total_cpu_seconds": 19.659,
+      "Total_elapsed_seconds": 19.773
+    },
+    "owners": [
+      "Bootstrap.Fresh",
+      "Bootstrap.Host",
+      "Bootstrap.IndexVec",
+      "Bootstrap.IntMap",
+      "Bootstrap.IntRank",
+      "Bootstrap.IntSet",
+      "Bootstrap.IntTree",
+      "Bootstrap.Map",
+      "Bootstrap.ST",
+      "Bootstrap.Set",
+      "Bootstrap.Std",
+      "Bootstrap.Types",
+      "Bootstrap.Unicode",
+      "Bootstrap.Version"
+    ],
+    "index": 5,
+    "role": "A",
+    "allocated_bytes": 60040794280,
+    "wall": 19.820589766997728,
+    "raw_rts": {
+      "sha256": "045f37c53ac44a03931b8818808c8e1a1f1f31b5422e66497d370685555aad9c"
+    },
+    "copied_bytes": 4273135368,
+    "maximum_residency_bytes": 36234192,
+    "maximum_slop_bytes": 1616944,
+    "memory_MiB": 105.0,
+    "MUT_cpu_seconds": 16.187,
+    "MUT_elapsed_seconds": 16.301,
+    "GC_cpu_seconds": 3.471,
+    "GC_elapsed_seconds": 3.471,
+    "Total_cpu_seconds": 19.659,
+    "Total_elapsed_seconds": 19.773,
+    "fresh": 475,
+    "reused": 0
+  },
+  {
+    "generation_statistics_from_raw": [
+      {
+        "generation": 0,
+        "collections": 14279,
+        "parallel_collections": 0,
+        "cpu_seconds": 2.24,
+        "elapsed_seconds": 2.24,
+        "average_pause_seconds": 0.0002,
+        "maximum_pause_seconds": 0.0029
+      },
+      {
+        "generation": 1,
+        "collections": 58,
+        "parallel_collections": 0,
+        "cpu_seconds": 1.178,
+        "elapsed_seconds": 1.178,
+        "average_pause_seconds": 0.0203,
+        "maximum_pause_seconds": 0.0393
+      }
+    ],
+    "metrics_from_raw": {
+      "copied_bytes": 4269720280,
+      "maximum_residency_bytes": 36245320,
+      "maximum_slop_bytes": 1617904,
+      "memory_MiB": 105.0,
+      "MUT_cpu_seconds": 16.226,
+      "MUT_elapsed_seconds": 16.304,
+      "GC_cpu_seconds": 3.418,
+      "GC_elapsed_seconds": 3.418,
+      "Total_cpu_seconds": 19.645,
+      "Total_elapsed_seconds": 19.722
+    },
+    "owners": [
+      "Bootstrap.Fresh",
+      "Bootstrap.Host",
+      "Bootstrap.IndexVec",
+      "Bootstrap.IntMap",
+      "Bootstrap.IntRank",
+      "Bootstrap.IntSet",
+      "Bootstrap.IntTree",
+      "Bootstrap.Map",
+      "Bootstrap.ST",
+      "Bootstrap.Set",
+      "Bootstrap.Std",
+      "Bootstrap.Types",
+      "Bootstrap.Unicode",
+      "Bootstrap.Version"
+    ],
+    "index": 6,
+    "role": "B",
+    "allocated_bytes": 60040489688,
+    "wall": 19.83366608900542,
+    "raw_rts": {
+      "sha256": "09108b8cc869cc91618bbc8cd587e4cd91d69f83f8478982562a9d3000aa878e"
+    },
+    "copied_bytes": 4269720280,
+    "maximum_residency_bytes": 36245320,
+    "maximum_slop_bytes": 1617904,
+    "memory_MiB": 105.0,
+    "MUT_cpu_seconds": 16.226,
+    "MUT_elapsed_seconds": 16.304,
+    "GC_cpu_seconds": 3.418,
+    "GC_elapsed_seconds": 3.418,
+    "Total_cpu_seconds": 19.645,
+    "Total_elapsed_seconds": 19.722,
+    "fresh": 475,
+    "reused": 0
+  },
+  {
+    "generation_statistics_from_raw": [
+      {
+        "generation": 0,
+        "collections": 14279,
+        "parallel_collections": 0,
+        "cpu_seconds": 2.357,
+        "elapsed_seconds": 2.371,
+        "average_pause_seconds": 0.0002,
+        "maximum_pause_seconds": 0.0136
+      },
+      {
+        "generation": 1,
+        "collections": 58,
+        "parallel_collections": 0,
+        "cpu_seconds": 1.365,
+        "elapsed_seconds": 1.37,
+        "average_pause_seconds": 0.0236,
+        "maximum_pause_seconds": 0.101
+      }
+    ],
+    "metrics_from_raw": {
+      "copied_bytes": 4269755024,
+      "maximum_residency_bytes": 36245320,
+      "maximum_slop_bytes": 1617904,
+      "memory_MiB": 105.0,
+      "MUT_cpu_seconds": 16.912,
+      "MUT_elapsed_seconds": 17.058,
+      "GC_cpu_seconds": 3.722,
+      "GC_elapsed_seconds": 3.741,
+      "Total_cpu_seconds": 20.634,
+      "Total_elapsed_seconds": 20.8
+    },
+    "owners": [
+      "Bootstrap.Fresh",
+      "Bootstrap.Host",
+      "Bootstrap.IndexVec",
+      "Bootstrap.IntMap",
+      "Bootstrap.IntRank",
+      "Bootstrap.IntSet",
+      "Bootstrap.IntTree",
+      "Bootstrap.Map",
+      "Bootstrap.ST",
+      "Bootstrap.Set",
+      "Bootstrap.Std",
+      "Bootstrap.Types",
+      "Bootstrap.Unicode",
+      "Bootstrap.Version"
+    ],
+    "index": 7,
+    "role": "B",
+    "allocated_bytes": 60040489688,
+    "wall": 20.842044538003393,
+    "raw_rts": {
+      "sha256": "a88043b047f90b460e90739e7c78061129392b82fabc5ad41a3c433a9b4f12f3"
+    },
+    "copied_bytes": 4269755024,
+    "maximum_residency_bytes": 36245320,
+    "maximum_slop_bytes": 1617904,
+    "memory_MiB": 105.0,
+    "MUT_cpu_seconds": 16.912,
+    "MUT_elapsed_seconds": 17.058,
+    "GC_cpu_seconds": 3.722,
+    "GC_elapsed_seconds": 3.741,
+    "Total_cpu_seconds": 20.634,
+    "Total_elapsed_seconds": 20.8,
+    "fresh": 475,
+    "reused": 0
+  },
+  {
+    "generation_statistics_from_raw": [
+      {
+        "generation": 0,
+        "collections": 14279,
+        "parallel_collections": 0,
+        "cpu_seconds": 2.234,
+        "elapsed_seconds": 2.234,
+        "average_pause_seconds": 0.0002,
+        "maximum_pause_seconds": 0.0113
+      },
+      {
+        "generation": 1,
+        "collections": 58,
+        "parallel_collections": 0,
+        "cpu_seconds": 1.227,
+        "elapsed_seconds": 1.227,
+        "average_pause_seconds": 0.0212,
+        "maximum_pause_seconds": 0.0496
+      }
+    ],
+    "metrics_from_raw": {
+      "copied_bytes": 4273134216,
+      "maximum_residency_bytes": 36234192,
+      "maximum_slop_bytes": 1616944,
+      "memory_MiB": 105.0,
+      "MUT_cpu_seconds": 16.147,
+      "MUT_elapsed_seconds": 16.232,
+      "GC_cpu_seconds": 3.461,
+      "GC_elapsed_seconds": 3.461,
+      "Total_cpu_seconds": 19.608,
+      "Total_elapsed_seconds": 19.693
+    },
+    "owners": [
+      "Bootstrap.Fresh",
+      "Bootstrap.Host",
+      "Bootstrap.IndexVec",
+      "Bootstrap.IntMap",
+      "Bootstrap.IntRank",
+      "Bootstrap.IntSet",
+      "Bootstrap.IntTree",
+      "Bootstrap.Map",
+      "Bootstrap.ST",
+      "Bootstrap.Set",
+      "Bootstrap.Std",
+      "Bootstrap.Types",
+      "Bootstrap.Unicode",
+      "Bootstrap.Version"
+    ],
+    "index": 8,
+    "role": "A",
+    "allocated_bytes": 60040794280,
+    "wall": 19.77674462000141,
+    "raw_rts": {
+      "sha256": "918429f4bde7c36b6aa88a966c6aa40d8f3b2ebbcf7114c1716811b1861f49f4"
+    },
+    "copied_bytes": 4273134216,
+    "maximum_residency_bytes": 36234192,
+    "maximum_slop_bytes": 1616944,
+    "memory_MiB": 105.0,
+    "MUT_cpu_seconds": 16.147,
+    "MUT_elapsed_seconds": 16.232,
+    "GC_cpu_seconds": 3.461,
+    "GC_elapsed_seconds": 3.461,
+    "Total_cpu_seconds": 19.608,
+    "Total_elapsed_seconds": 19.693,
+    "fresh": 475,
+    "reused": 0
+  },
+  {
+    "generation_statistics_from_raw": [
+      {
+        "generation": 0,
+        "collections": 14279,
+        "parallel_collections": 0,
+        "cpu_seconds": 2.226,
+        "elapsed_seconds": 2.228,
+        "average_pause_seconds": 0.0002,
+        "maximum_pause_seconds": 0.0041
+      },
+      {
+        "generation": 1,
+        "collections": 58,
+        "parallel_collections": 0,
+        "cpu_seconds": 1.236,
+        "elapsed_seconds": 1.238,
+        "average_pause_seconds": 0.0214,
+        "maximum_pause_seconds": 0.0705
+      }
+    ],
+    "metrics_from_raw": {
+      "copied_bytes": 4273134248,
+      "maximum_residency_bytes": 36234192,
+      "maximum_slop_bytes": 1616944,
+      "memory_MiB": 105.0,
+      "MUT_cpu_seconds": 16.236,
+      "MUT_elapsed_seconds": 16.374,
+      "GC_cpu_seconds": 3.462,
+      "GC_elapsed_seconds": 3.467,
+      "Total_cpu_seconds": 19.699,
+      "Total_elapsed_seconds": 19.841
+    },
+    "owners": [
+      "Bootstrap.Fresh",
+      "Bootstrap.Host",
+      "Bootstrap.IndexVec",
+      "Bootstrap.IntMap",
+      "Bootstrap.IntRank",
+      "Bootstrap.IntSet",
+      "Bootstrap.IntTree",
+      "Bootstrap.Map",
+      "Bootstrap.ST",
+      "Bootstrap.Set",
+      "Bootstrap.Std",
+      "Bootstrap.Types",
+      "Bootstrap.Unicode",
+      "Bootstrap.Version"
+    ],
+    "index": 9,
+    "role": "A",
+    "allocated_bytes": 60040794280,
+    "wall": 19.927137865990517,
+    "raw_rts": {
+      "sha256": "ee493bff64b4bde5e3d48fcc36ca9dbd44e91a500cd9d9026d55c785fa4de9ae"
+    },
+    "copied_bytes": 4273134248,
+    "maximum_residency_bytes": 36234192,
+    "maximum_slop_bytes": 1616944,
+    "memory_MiB": 105.0,
+    "MUT_cpu_seconds": 16.236,
+    "MUT_elapsed_seconds": 16.374,
+    "GC_cpu_seconds": 3.462,
+    "GC_elapsed_seconds": 3.467,
+    "Total_cpu_seconds": 19.699,
+    "Total_elapsed_seconds": 19.841,
+    "fresh": 475,
+    "reused": 0
+  },
+  {
+    "generation_statistics_from_raw": [
+      {
+        "generation": 0,
+        "collections": 14279,
+        "parallel_collections": 0,
+        "cpu_seconds": 2.248,
+        "elapsed_seconds": 2.249,
+        "average_pause_seconds": 0.0002,
+        "maximum_pause_seconds": 0.0054
+      },
+      {
+        "generation": 1,
+        "collections": 58,
+        "parallel_collections": 0,
+        "cpu_seconds": 1.212,
+        "elapsed_seconds": 1.213,
+        "average_pause_seconds": 0.0209,
+        "maximum_pause_seconds": 0.0417
+      }
+    ],
+    "metrics_from_raw": {
+      "copied_bytes": 4269909672,
+      "maximum_residency_bytes": 36245320,
+      "maximum_slop_bytes": 1617904,
+      "memory_MiB": 105.0,
+      "MUT_cpu_seconds": 16.369,
+      "MUT_elapsed_seconds": 16.498,
+      "GC_cpu_seconds": 3.461,
+      "GC_elapsed_seconds": 3.462,
+      "Total_cpu_seconds": 19.83,
+      "Total_elapsed_seconds": 19.96
+    },
+    "owners": [
+      "Bootstrap.Fresh",
+      "Bootstrap.Host",
+      "Bootstrap.IndexVec",
+      "Bootstrap.IntMap",
+      "Bootstrap.IntRank",
+      "Bootstrap.IntSet",
+      "Bootstrap.IntTree",
+      "Bootstrap.Map",
+      "Bootstrap.ST",
+      "Bootstrap.Set",
+      "Bootstrap.Std",
+      "Bootstrap.Types",
+      "Bootstrap.Unicode",
+      "Bootstrap.Version"
+    ],
+    "index": 10,
+    "role": "B",
+    "allocated_bytes": 60040489688,
+    "wall": 20.10064203100046,
+    "raw_rts": {
+      "sha256": "fb143f18dad8a6b8cc7a17acac13b06dcc8d50b61d06a184756260a6feebf172"
+    },
+    "copied_bytes": 4269909672,
+    "maximum_residency_bytes": 36245320,
+    "maximum_slop_bytes": 1617904,
+    "memory_MiB": 105.0,
+    "MUT_cpu_seconds": 16.369,
+    "MUT_elapsed_seconds": 16.498,
+    "GC_cpu_seconds": 3.461,
+    "GC_elapsed_seconds": 3.462,
+    "Total_cpu_seconds": 19.83,
+    "Total_elapsed_seconds": 19.96,
+    "fresh": 475,
+    "reused": 0
+  },
+  {
+    "generation_statistics_from_raw": [
+      {
+        "generation": 0,
+        "collections": 14279,
+        "parallel_collections": 0,
+        "cpu_seconds": 2.254,
+        "elapsed_seconds": 2.259,
+        "average_pause_seconds": 0.0002,
+        "maximum_pause_seconds": 0.0053
+      },
+      {
+        "generation": 1,
+        "collections": 58,
+        "parallel_collections": 0,
+        "cpu_seconds": 1.204,
+        "elapsed_seconds": 1.204,
+        "average_pause_seconds": 0.0208,
+        "maximum_pause_seconds": 0.0424
+      }
+    ],
+    "metrics_from_raw": {
+      "copied_bytes": 4269754896,
+      "maximum_residency_bytes": 36245320,
+      "maximum_slop_bytes": 1617904,
+      "memory_MiB": 105.0,
+      "MUT_cpu_seconds": 16.364,
+      "MUT_elapsed_seconds": 16.501,
+      "GC_cpu_seconds": 3.457,
+      "GC_elapsed_seconds": 3.463,
+      "Total_cpu_seconds": 19.822,
+      "Total_elapsed_seconds": 19.964
+    },
+    "owners": [
+      "Bootstrap.Fresh",
+      "Bootstrap.Host",
+      "Bootstrap.IndexVec",
+      "Bootstrap.IntMap",
+      "Bootstrap.IntRank",
+      "Bootstrap.IntSet",
+      "Bootstrap.IntTree",
+      "Bootstrap.Map",
+      "Bootstrap.ST",
+      "Bootstrap.Set",
+      "Bootstrap.Std",
+      "Bootstrap.Types",
+      "Bootstrap.Unicode",
+      "Bootstrap.Version"
+    ],
+    "index": 11,
+    "role": "B",
+    "allocated_bytes": 60040489688,
+    "wall": 19.983171053012484,
+    "raw_rts": {
+      "sha256": "7e0015a08b28ad296d8511ed811866f8c55ad908d2b38b4cc413a4514f854aff"
+    },
+    "copied_bytes": 4269754896,
+    "maximum_residency_bytes": 36245320,
+    "maximum_slop_bytes": 1617904,
+    "memory_MiB": 105.0,
+    "MUT_cpu_seconds": 16.364,
+    "MUT_elapsed_seconds": 16.501,
+    "GC_cpu_seconds": 3.457,
+    "GC_elapsed_seconds": 3.463,
+    "Total_cpu_seconds": 19.822,
+    "Total_elapsed_seconds": 19.964,
+    "fresh": 475,
+    "reused": 0
+  },
+  {
+    "generation_statistics_from_raw": [
+      {
+        "generation": 0,
+        "collections": 14279,
+        "parallel_collections": 0,
+        "cpu_seconds": 2.274,
+        "elapsed_seconds": 2.285,
+        "average_pause_seconds": 0.0002,
+        "maximum_pause_seconds": 0.0373
+      },
+      {
+        "generation": 1,
+        "collections": 58,
+        "parallel_collections": 0,
+        "cpu_seconds": 1.203,
+        "elapsed_seconds": 1.204,
+        "average_pause_seconds": 0.0208,
+        "maximum_pause_seconds": 0.0565
+      }
+    ],
+    "metrics_from_raw": {
+      "copied_bytes": 4273134168,
+      "maximum_residency_bytes": 36234192,
+      "maximum_slop_bytes": 1616944,
+      "memory_MiB": 105.0,
+      "MUT_cpu_seconds": 16.263,
+      "MUT_elapsed_seconds": 16.401,
+      "GC_cpu_seconds": 3.478,
+      "GC_elapsed_seconds": 3.489,
+      "Total_cpu_seconds": 19.741,
+      "Total_elapsed_seconds": 19.89
+    },
+    "owners": [
+      "Bootstrap.Fresh",
+      "Bootstrap.Host",
+      "Bootstrap.IndexVec",
+      "Bootstrap.IntMap",
+      "Bootstrap.IntRank",
+      "Bootstrap.IntSet",
+      "Bootstrap.IntTree",
+      "Bootstrap.Map",
+      "Bootstrap.ST",
+      "Bootstrap.Set",
+      "Bootstrap.Std",
+      "Bootstrap.Types",
+      "Bootstrap.Unicode",
+      "Bootstrap.Version"
+    ],
+    "index": 12,
+    "role": "A",
+    "allocated_bytes": 60040794280,
+    "wall": 20.062657464004587,
+    "raw_rts": {
+      "sha256": "9f34e9ea43075b1a03723d1aad2a1806706d675f27d88f6f025c067f7e739f19"
+    },
+    "copied_bytes": 4273134168,
+    "maximum_residency_bytes": 36234192,
+    "maximum_slop_bytes": 1616944,
+    "memory_MiB": 105.0,
+    "MUT_cpu_seconds": 16.263,
+    "MUT_elapsed_seconds": 16.401,
+    "GC_cpu_seconds": 3.478,
+    "GC_elapsed_seconds": 3.489,
+    "Total_cpu_seconds": 19.741,
+    "Total_elapsed_seconds": 19.89,
+    "fresh": 475,
+    "reused": 0
+  }
+]

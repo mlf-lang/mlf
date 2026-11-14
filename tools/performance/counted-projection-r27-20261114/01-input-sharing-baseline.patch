@@ -1,0 +1,213 @@
+diff --git a/libraries/mlf-inference/Bootstrap/Graph.hs b/libraries/mlf-inference/Bootstrap/Graph.hs
+index 380d29e7b951da022b49517237d74df2ecd3ee3a..1af237ff2df16dfed44291832814ef13094cac7c 100644
+--- a/libraries/mlf-inference/Bootstrap/Graph.hs
++++ b/libraries/mlf-inference/Bootstrap/Graph.hs
+@@ -1254,12 +1254,202 @@ module Bootstrap.Graph where {
+            (\kinds -> foldE (firstOrder kinds) before equations);
+   unify :: [] ((,) Int Int) -> Graph -> Either String Graph;
+   unify equations before =
+-    bindE (validateGraph before)
+-      (\ignored ->
+-         bindE (checkedFirstOrder equations before)
+-           (\skeleton ->
+-              bindE (rebind before (canonicalize skeleton))
+-                (\rebuilt -> bindE (validateGraph rebuilt) (\verified -> Right rebuilt))));
++    let {
++      validateThen :: forall s. [] ((,) Int Int) -> Graph -> Int -> Int -> ST s (Either String Graph);
++      validateThen equations graph low high =
++        let {
++          count = ((high - low) + 1)
++        } in
++        stBind (newSTArray count Nothing)
++          (\table ->
++             stBind (newSTArray count [])
++               (\descendants ->
++                  stBind (newSTArray count 0)
++                    (\colours ->
++                       stBind (newSTArray count Star)
++                         (\kinds ->
++                            stBind (newSTArray count (0 - 1))
++                              (\starts ->
++                                 stBind (newSTArray count (0 - 1))
++                                   (\ends ->
++                                      stBind (newSTArray count (0 - 1))
++                                        (\visited ->
++                                           let {
++                                             state =
++                                               DenseValidation graph low high table descendants colours
++                                                 kinds
++                                                 starts
++                                                 ends
++                                                 visited
++                                           } in
++                                           let {
++                                             entries = IM.toList (nodes graph)
++                                           } in
++                                           stBind (denseLoadValidation low table entries)
++                                             (\loaded -> ST.bindE (denseValidateEntries state entries)
++                                               (\checked ->
++                                                 ST.bindE (stReturn (checkedFirstOrder equations graph))
++                                                   (\skeleton ->
++                                                     ST.bindE (rebindFromInput graph (canonicalize skeleton) low high table)
++                                                       (\rebuilt -> stReturn
++                                                         (bindE (validateGraph rebuilt) (\verified -> Right rebuilt)))))))))))));
++      rebindFromInput :: forall s. Graph -> Graph -> Int -> Int -> STArray s (Maybe Node) -> ST s (Either String Graph);
++      rebindFromInput old skeleton low high oldNodes =
++        let {
++          count = ((high - low) + 1)
++        } in
++        stBind (newSTArray count Nothing)
++               (\newNodes ->
++                  stBind (newSTArray count 0)
++                    (\images ->
++                       stBind (newSTArray count [])
++                         (\classes ->
++                            stBind (newSTArray count Flexible)
++                              (\flags ->
++                                 stBind (newSTArray count [])
++                                   (\parents ->
++                                      stBind (newSTArray count Nothing)
++                                        (\tree ->
++                                           stBind (newSTArray count 0)
++                                             (\depths ->
++                                                stBind (newSTArray count 0)
++                                                  (\colours ->
++                                                     stBind (newSTArray count 0)
++                                                       (\grafted ->
++                                                          stBind (newSTArray count Nothing)
++                                                            (\oldBinders ->
++                                                               stBind (newSTArray count Nothing)
++                                                                 (\raised ->
++                                                                    let {
++                                                                      state =
++                                                                        DenseRebinding old skeleton low
++                                                                          high
++                                                                          oldNodes
++                                                                          newNodes
++                                                                          images
++                                                                          classes
++                                                                          flags
++                                                                          parents
++                                                                          tree
++                                                                          depths
++                                                                          colours
++                                                                          grafted
++                                                                          oldBinders
++                                                                          raised
++                                                                    } in
++                                                                    let {
++                                                                      originals = IM.toList (nodes old)
++                                                                    } in
++                                                                    let {
++                                                                      remaining =
++                                                                        IM.toList (nodes skeleton)
++                                                                    } in
++                                                                    stBind
++                                                                      (loadOriginalsFromInput state
++                                                                         originals)
++                                                                      (\loadedOld ->
++                                                                         stBind
++                                                                           (denseLoadRemainings state
++                                                                              remaining)
++                                                                           (\loadedNew ->
++                                                                              stBind
++                                                                                (denseMarkOriginals
++                                                                                   state
++                                                                                   originals)
++                                                                                (\marked ->
++                                                                                   ST.bindE
++                                                                                     (densePlaceEntries
++                                                                                        state
++                                                                                        remaining)
++                                                                                     (\placed ->
++                                                                                        ST.bindE
++                                                                                          (denseFinalNodes
++                                                                                             state
++                                                                                             remaining)
++                                                                                          (\final ->
++                                                                                             ST.bindE
++                                                                                               (denseRaiseOriginals
++                                                                                                  state
++                                                                                                  originals)
++                                                                                               (\up ->
++                                                                                                  stBind
++                                                                                                    (newDensePermissions
++                                                                                                       low
++                                                                                                       high
++                                                                                                       oldNodes
++                                                                                                       oldBinders
++                                                                                                       originals)
++                                                                                                    (\oldPermissions ->
++                                                                                                       stBind
++                                                                                                         (raisedDensePermissions
++                                                                                                            oldPermissions
++                                                                                                            low
++                                                                                                            high
++                                                                                                            oldNodes
++                                                                                                            oldBinders
++                                                                                                            raised
++                                                                                                            originals)
++                                                                                                         (\raisedPermissions ->
++                                                                                                            ST.bindE
++                                                                                                              (denseCheckOriginals
++                                                                                                                 state
++                                                                                                                 oldPermissions
++                                                                                                                 raisedPermissions
++                                                                                                                 originals)
++                                                                                                              (\checked ->
++                                                                                                                 ST.bindE
++                                                                                                                   (denseCheckMergeEntries
++                                                                                                                      low
++                                                                                                                      classes
++                                                                                                                      raised
++                                                                                                                      raisedPermissions
++                                                                                                                      remaining)
++                                                                                                                   (\merged ->
++                                                                                                                      ST.pureE
++                                                                                                                        (mkGraph
++                                                                                                                           (nodesFromDistinctAscList
++                                                                                                                              final)
++                                                                                                                           (links
++                                                                                                                              skeleton)
++                                                                                                                           (nextId
++                                                                                                                              skeleton)))))))))))))))))))))));
++      loadOriginalFromInput :: forall s. DenseRebinding s -> (,) Int Node -> ST s ();
++      loadOriginalFromInput state ((,) n v) =
++        case state of {
++          DenseRebinding old skeleton low high oldNodes newNodes images classes flags parents tree depths colours grafted oldBinders raised ->
++            let {
++              image = resolve skeleton n
++            } in
++            stBind (writeDense low oldBinders n (binder v))
++                   (\bound ->
++                      stBind (writeDense low images n image)
++                        (\mapped ->
++                           stBind (readDense low classes image)
++                             (\previous ->
++                                stBind (writeDense low classes image ((:) n previous))
++                                  (\added ->
++                                     if equalFlag (flag v) Rigid
++                                     then writeDense low flags image Rigid
++                                     else stReturn ()))))
++        };
++      loadOriginalsFromInput :: forall s. DenseRebinding s -> [] ((,) Int Node) -> ST s ();
++      loadOriginalsFromInput state values =
++        case values of {
++          [] -> stReturn ();
++          (:) entry rest ->
++            stBind (loadOriginalFromInput state entry) (\ignored -> loadOriginalsFromInput state rest)
++        };
++    } in
++    case denseBounds before of {
++      Nothing ->
++            bindE (validateGraph before)
++              (\ignored ->
++                 bindE (checkedFirstOrder equations before)
++                   (\skeleton ->
++                      bindE (rebind before (canonicalize skeleton))
++                        (\rebuilt -> bindE (validateGraph rebuilt) (\verified -> Right rebuilt))));
++      Just ((,) low high) -> runST (validateThen equations before low high)
++    };
+   graftedNodes :: Graph -> Graph -> IntSet;
+   graftedNodes old skeleton =
+     L.foldlStrict

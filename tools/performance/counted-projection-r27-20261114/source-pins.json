@@ -1,0 +1,42 @@
+{
+  "public_base": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "local_commits_not_claimed_remote": true,
+  "patch_application_checked": true,
+  "independent_review_sha256": "43188e24fb81f2113ef1ac200b991386939232efa5454b16de3a6c96128b5664",
+  "sources": {
+    "A": {
+      "local_provenance_commit": "bda8f9807c8b13b5ce14753d0320fa54772e4bc4",
+      "files": {
+        "libraries/mlf-inference/Bootstrap/Graph.hs": {
+          "sha256": "d1b9b9552b6b9fbc48e6091d259caf7d96349686eb486443722ec4b04061d5e0",
+          "bytes": 152996
+        },
+        "libraries/mlf-inference/Bootstrap/Graph/Solver.hs": {
+          "sha256": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612",
+          "bytes": 99201
+        },
+        "bootstrap/MLF/BuiltinPreludeData.hs": {
+          "sha256": "5d0aea520a32ee8f1111943cf7d7288678bcd02666ea22aceea9c56ddb84878b",
+          "bytes": 2220407
+        }
+      }
+    },
+    "B": {
+      "local_provenance_commit": "838dddfb5432039caa6df666a087b6df9ebbcdb6",
+      "files": {
+        "libraries/mlf-inference/Bootstrap/Graph.hs": {
+          "sha256": "d1b9b9552b6b9fbc48e6091d259caf7d96349686eb486443722ec4b04061d5e0",
+          "bytes": 152996
+        },
+        "libraries/mlf-inference/Bootstrap/Graph/Solver.hs": {
+          "sha256": "0ac70398a30bf57259e7b5cd235cd4c7083385dd67bc1c68fbb54cee56137e57",
+          "bytes": 99993
+        },
+        "bootstrap/MLF/BuiltinPreludeData.hs": {
+          "sha256": "047f92cbe547811c7d4a863a4c7f9c2ad4b34724a499b940ee65deef0a5cb6b4",
+          "bytes": 2220407
+        }
+      }
+    }
+  }
+}

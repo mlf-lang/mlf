@@ -1,0 +1,53 @@
+diff --git a/libraries/mlf-inference/Bootstrap/Graph/Solver.hs b/libraries/mlf-inference/Bootstrap/Graph/Solver.hs
+index ac4807fa23c0763ba83a0f9c52c1c734cc059720..cd7fe759cfc1245b51edb6029108de8e3fe60e99 100644
+--- a/libraries/mlf-inference/Bootstrap/Graph/Solver.hs
++++ b/libraries/mlf-inference/Bootstrap/Graph/Solver.hs
+@@ -2028,6 +2028,16 @@ module Bootstrap.Graph.Solver where {
+                                   ((,,,) Graph ([] ((,) Int Int)) ([] ((,) Int Node))
+                                     ((,,) (Rank.MapIndex Node) (IntMap (Maybe Int)) (IntMap Int)));
+   preparedFallbackProjection solver current first fresh equations =
++    G.bindE (preparedFallbackProjectionCounted solver current first fresh equations)
++      (\((,) projection count) -> Right projection);
++  -- Internal use by convention; this module has no explicit export list.
++  -- Keep the existing count thunk lazy and retain the public four-field result.
++  preparedFallbackProjectionCounted :: Solver -> Graph -> Int -> [] ((,) Int Node) ->
++                                       [] ((,) Int Int) ->
++                                       Either String
++                                         ((,) ((,,,) Graph ([] ((,) Int Int)) ([] ((,) Int Node))
++                                           ((,,) (Rank.MapIndex Node) (IntMap (Maybe Int)) (IntMap Int))) Int);
++  preparedFallbackProjectionCounted solver current first fresh equations =
+     G.bindE
+       (componentCanonicalNodesVisit solver IM.empty IS.empty
+         (L.append (L.filter (\n -> n < first) (L.concatMap G.equationNodes equations))
+@@ -2058,9 +2068,9 @@ module Bootstrap.Graph.Solver where {
+         let { local = G.mkGraph
+           (G.nodesFromDistinctAscList (L.append existing placeholders)) IM.empty
+           (count + L.length hiddenRoots) } in
+-        Right ((,,,) local
++        Right ((,) ((,,,) local
+           (L.map (\((,) a b) -> (,) (compact a) (compact b)) equations)
+-          originals ((,,) forward scopes stubs)));
++          originals ((,,) forward scopes stubs)) count));
+   restoreExpandedKnownNode :: Graph -> (Int -> Either String Int) ->
+                               Int -> Node -> Node -> Either String ((,) Int Node);
+   restoreExpandedKnownNode withAliases backward original previous node =
+@@ -2142,8 +2152,8 @@ module Bootstrap.Graph.Solver where {
+         case pending of {
+           [] -> Right (L.foldlStrict addNode (withGraph current solver) fresh);
+           (:) head tail -> G.bindE
+-            (preparedFallbackProjection solver current first fresh pending)
+-            (\((,,,) local localEquations originals ((,,) forward scopes stubs)) ->
++            (preparedFallbackProjectionCounted solver current first fresh pending)
++            (\((,) ((,,,) local localEquations originals ((,,) forward scopes stubs)) count) ->
+               G.bindE (G.unify localEquations local)
+                 (\solved -> G.bindE
+                   (G.mapE_ (\stub -> G.check
+@@ -2153,7 +2163,7 @@ module Bootstrap.Graph.Solver where {
+                   (\checkedStubs -> G.bindE
+                     (G.mapE_ (checkPreservedScope current solved forward scopes) originals)
+                     (\checkedScopes -> restoreExpandedProjection solver current first
+-                      originals forward (L.length originals) solved))))
++                      originals forward count solved))))
+         });
+   instantiateExpandedPrepared :: Int -> Int -> Solver -> Either String Solver;
+   instantiateExpandedPrepared source target solver =
