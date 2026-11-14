@@ -3840,8 +3840,15 @@ module Bootstrap.CrateArtifact where {
   legacyObject object = case object of {
     OpenCrateObject iface package -> makeObject iface (map (\((,) name fragment) -> let {
       term = Open.closedTerm fragment;
-      metadata = Separate.UnitInterface name [] [] (Open.declarations (Open.context fragment)) [] []
-        (map (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty)) (Open.bindings fragment))
+      bindings = map (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty)) (Open.bindings fragment);
+      members = sortStrings (map fst bindings);
+      -- Open owners are wire text, whereas a legacy unit name must satisfy
+      -- the compiled module-name grammar. Preserve already-legacy names and
+      -- translate only an exact owner of this crate and its full binding set.
+      unitName = if not (null members) && eqString name (Separate.openGroupName (crateId iface) members)
+        then Separate.queryGroupName (crateId iface) members else name;
+      metadata = Separate.UnitInterface unitName [] [] (Open.declarations (Open.context fragment)) [] []
+        bindings
         (Separate.fingerprint (Pretty.prettyTerm term))
     } in Separate.UnitObject metadata term) (Open.packageFragments package));
     _ -> object
