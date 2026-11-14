@@ -1,0 +1,40 @@
+{
+  "all_other_bytes_identical": true,
+  "changes": [
+    {
+      "fixture_line_1based": 368,
+      "original_path_byte_count": 216,
+      "published_path": "inputs/00.bin",
+      "substitutions": 1
+    },
+    {
+      "fixture_line_1based": 369,
+      "original_path_byte_count": 216,
+      "published_path": "inputs/01.bin",
+      "substitutions": 1
+    },
+    {
+      "fixture_line_1based": 370,
+      "original_path_byte_count": 216,
+      "published_path": "inputs/02.bin",
+      "substitutions": 1
+    },
+    {
+      "fixture_line_1based": 371,
+      "original_path_byte_count": 220,
+      "published_path": "inputs/03.bin",
+      "substitutions": 1
+    }
+  ],
+  "exactly_four_path_string_substitutions": true,
+  "original_fixture": {
+    "bytes": 28962,
+    "sha256": "e6b16a23ad51e7600a6f940ef6e4b6eb0d2d2ca3773f8363656467cb980d676d"
+  },
+  "privacy_boundary": "Original machine-specific path strings are intentionally omitted. Their private reverse mapping was checked locally; public hashes cannot reconstruct omitted paths. The published fixture was not recompiled during publication.",
+  "published_fixture": {
+    "bytes": 28146,
+    "sha256": "f9550efa5aafc3a9d32eb2985ce71c6e29c73c3e44111ffdfc879c3331a8781a"
+  },
+  "reverse_substitution_verified_byte_for_byte": true
+}

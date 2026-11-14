@@ -1,0 +1,208 @@
+{
+  "GHC_parity_qualified": false,
+  "aggregate": {
+    "A_total_allocated_bytes": 333907832,
+    "B_total_allocated_bytes": 309574216,
+    "Foundation_weighting_established": false,
+    "all_denominators_positive": true,
+    "all_four_nonregression": true,
+    "extra_samples_or_retries": false,
+    "first_payload_retained": true,
+    "largest_two_each_at_least1percent": true,
+    "numeric_local_material": true,
+    "payload_bytes": 464763,
+    "raw_observations_subtracted": false,
+    "saved_percent_of_selected_four_sum": 7.287524780191439,
+    "saved_total_bytes": 24333616,
+    "side_absolute_elapsed_seconds": {
+      "A": 2.499455148994457,
+      "B": 2.468463478013291
+    },
+    "stable_wall_speedup_established": false,
+    "whole_compiler_improvement_established": false,
+    "zero_empty_allocations": true
+  },
+  "allocation_domain": "Current-thread heap allocation for prepared encodeTables including CRC; not whole-process/native buffer/RSS or exclusive reference-write cost.",
+  "builtin_freshness_qualification": false,
+  "candidate_full_producer_qualified": false,
+  "current_main_qualified": false,
+  "gate": "All four B <= A; samples 2 and 3 each A - B >= ceil(A / 100); positive denominators; zero empty allocations; exact controls and full-byte equality; independent emitted gate required.",
+  "largest_B_time_is_slower": true,
+  "limitations": [
+    "Finite actual controls and saved actual emitted artifacts are not an exhaustive proof over all Haskell partial values or overflow states.",
+    "Four selected already-prepared shapes are not all producer inputs, lazy-producer construction costs, Foundation call weighting or reference-only exclusive attribution.",
+    "Raw artifact pins and observations remain exact; alpha renaming is only the declared Main IR comparison, not output normalization.",
+    "No full compiler, current-main, stable wall-time or native fixed-point parity result. Native-generation A/B remains paused.",
+    "Comprehensive emitted semantics are inherited from the separately pinned complete review. This composition rechecks evidence, excerpts, scope and numbers without rerunning Haskell."
+  ],
+  "new_ordinary_stage_results_included": false,
+  "per_payload": [
+    {
+      "A_allocated_bytes": 82784,
+      "A_writer_ns": 59559,
+      "B_allocated_bytes": 82152,
+      "B_writer_ns": 47401,
+      "index": 0,
+      "nonregression": true,
+      "one_percent": false,
+      "one_percent_required_bytes": 828,
+      "payload_bytes": 91,
+      "saved_bytes": 632,
+      "saved_percent": 0.7634325473521454,
+      "sha256": "8eaf20dd6413d531919d116f1abe49040d550e002b014b65621a6dbbb9f8e3b2",
+      "timing_is_single_unqualified_observation": true
+    },
+    {
+      "A_allocated_bytes": 906016,
+      "A_writer_ns": 332391,
+      "B_allocated_bytes": 904336,
+      "B_writer_ns": 323067,
+      "index": 1,
+      "nonregression": true,
+      "one_percent": false,
+      "one_percent_required_bytes": 9061,
+      "payload_bytes": 1510,
+      "saved_bytes": 1680,
+      "saved_percent": 0.1854271889238159,
+      "sha256": "dd99703e6016b3dd276ba46e251d0a28b48044c8606f78603a279b59839bd242",
+      "timing_is_single_unqualified_observation": true
+    },
+    {
+      "A_allocated_bytes": 42561304,
+      "A_writer_ns": 5985057,
+      "B_allocated_bytes": 40034640,
+      "B_writer_ns": 5612325,
+      "index": 2,
+      "nonregression": true,
+      "one_percent": true,
+      "one_percent_required_bytes": 425614,
+      "payload_bytes": 56187,
+      "saved_bytes": 2526664,
+      "saved_percent": 5.936528636434636,
+      "sha256": "3aeadffde86e259c20cba46f9bc63ed9aa6c8a266c456aa9a7b939074968f420",
+      "timing_is_single_unqualified_observation": true
+    },
+    {
+      "A_allocated_bytes": 290357728,
+      "A_writer_ns": 38861605,
+      "B_allocated_bytes": 268553088,
+      "B_writer_ns": 39760064,
+      "index": 3,
+      "nonregression": true,
+      "one_percent": true,
+      "one_percent_required_bytes": 2903578,
+      "payload_bytes": 406975,
+      "saved_bytes": 21804640,
+      "saved_percent": 7.509577978237934,
+      "sha256": "4d3413140c61f886804351b99fb1f0f621864eaafd9df181e3f17ba75720f077",
+      "timing_is_single_unqualified_observation": true
+    }
+  ],
+  "raw_rows": {
+    "A": [
+      {
+        "bytes_equal": 1,
+        "empty_after_alloc": 0,
+        "empty_after_ns": 40,
+        "empty_before_alloc": 0,
+        "empty_before_ns": 71,
+        "encode_alloc": 82784,
+        "encode_ns": 59559,
+        "index": 0,
+        "payload_bytes": 91,
+        "payload_sha256": "8eaf20dd6413d531919d116f1abe49040d550e002b014b65621a6dbbb9f8e3b2"
+      },
+      {
+        "bytes_equal": 1,
+        "empty_after_alloc": 0,
+        "empty_after_ns": 60,
+        "empty_before_alloc": 0,
+        "empty_before_ns": 50,
+        "encode_alloc": 906016,
+        "encode_ns": 332391,
+        "index": 1,
+        "payload_bytes": 1510,
+        "payload_sha256": "dd99703e6016b3dd276ba46e251d0a28b48044c8606f78603a279b59839bd242"
+      },
+      {
+        "bytes_equal": 1,
+        "empty_after_alloc": 0,
+        "empty_after_ns": 50,
+        "empty_before_alloc": 0,
+        "empty_before_ns": 50,
+        "encode_alloc": 42561304,
+        "encode_ns": 5985057,
+        "index": 2,
+        "payload_bytes": 56187,
+        "payload_sha256": "3aeadffde86e259c20cba46f9bc63ed9aa6c8a266c456aa9a7b939074968f420"
+      },
+      {
+        "bytes_equal": 1,
+        "empty_after_alloc": 0,
+        "empty_after_ns": 171,
+        "empty_before_alloc": 0,
+        "empty_before_ns": 351,
+        "encode_alloc": 290357728,
+        "encode_ns": 38861605,
+        "index": 3,
+        "payload_bytes": 406975,
+        "payload_sha256": "4d3413140c61f886804351b99fb1f0f621864eaafd9df181e3f17ba75720f077"
+      }
+    ],
+    "B": [
+      {
+        "bytes_equal": 1,
+        "empty_after_alloc": 0,
+        "empty_after_ns": 40,
+        "empty_before_alloc": 0,
+        "empty_before_ns": 60,
+        "encode_alloc": 82152,
+        "encode_ns": 47401,
+        "index": 0,
+        "payload_bytes": 91,
+        "payload_sha256": "8eaf20dd6413d531919d116f1abe49040d550e002b014b65621a6dbbb9f8e3b2"
+      },
+      {
+        "bytes_equal": 1,
+        "empty_after_alloc": 0,
+        "empty_after_ns": 40,
+        "empty_before_alloc": 0,
+        "empty_before_ns": 80,
+        "encode_alloc": 904336,
+        "encode_ns": 323067,
+        "index": 1,
+        "payload_bytes": 1510,
+        "payload_sha256": "dd99703e6016b3dd276ba46e251d0a28b48044c8606f78603a279b59839bd242"
+      },
+      {
+        "bytes_equal": 1,
+        "empty_after_alloc": 0,
+        "empty_after_ns": 60,
+        "empty_before_alloc": 0,
+        "empty_before_ns": 81,
+        "encode_alloc": 40034640,
+        "encode_ns": 5612325,
+        "index": 2,
+        "payload_bytes": 56187,
+        "payload_sha256": "3aeadffde86e259c20cba46f9bc63ed9aa6c8a266c456aa9a7b939074968f420"
+      },
+      {
+        "bytes_equal": 1,
+        "empty_after_alloc": 0,
+        "empty_after_ns": 70,
+        "empty_before_alloc": 0,
+        "empty_before_ns": 500,
+        "encode_alloc": 268553088,
+        "encode_ns": 39760064,
+        "index": 3,
+        "payload_bytes": 406975,
+        "payload_sha256": "4d3413140c61f886804351b99fb1f0f621864eaafd9df181e3f17ba75720f077"
+      }
+    ]
+  },
+  "scope": "Single actual fixed-four prepared-shape ordinary whole encodeTables writer A/B screen, including CRC and action effects. Not a compiler producer or current-main/Foundation/native qualification.",
+  "stable_wall_claimed": false,
+  "static_B_object_growth_bytes": 13728,
+  "status": "Focused source, actual raw/lifecycle and complete same-shot emitted gates passed",
+  "whole_compiler_qualified": false
+}

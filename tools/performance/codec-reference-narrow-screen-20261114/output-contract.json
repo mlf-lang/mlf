@@ -1,0 +1,31 @@
+{
+  "schema": "writer-reference-narrow-output-v1",
+  "controls_count": 8,
+  "controls_summary": [
+    "SUMMARY",
+    "controls",
+    "8"
+  ],
+  "measure_count": 4,
+  "measure_summary": [
+    "SUMMARY",
+    "measure",
+    "4",
+    "464763"
+  ],
+  "columns": [
+    "MEASURE",
+    "index",
+    "sha",
+    "bytes",
+    "empty_before_alloc",
+    "empty_before_ns",
+    "encode_alloc",
+    "encode_ns",
+    "empty_after_alloc",
+    "empty_after_ns",
+    "bytes_equal"
+  ],
+  "local_material": "all B<=A; index2,3 A-B>=ceil(A/100); all alloc>0",
+  "no_automatic_full_producer": true
+}

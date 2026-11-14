@@ -1,0 +1,9 @@
+PASS codec-control
+PASS crc-boundaries
+PASS putvar-controls
+PASS narrow-finite
+PASS narrow-bounds
+PASS narrow-demand
+PASS narrow-entry
+PASS real-payloads
+SUMMARY	controls	8

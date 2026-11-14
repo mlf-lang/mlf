@@ -1,0 +1,34 @@
+{
+  "encoding": "standard base64 with line wrapping",
+  "payloads": [
+    {
+      "bytes": 91,
+      "decoded_file": "inputs/00.bin",
+      "index": 0,
+      "sha256": "8eaf20dd6413d531919d116f1abe49040d550e002b014b65621a6dbbb9f8e3b2",
+      "stored_file": "inputs/00.base64"
+    },
+    {
+      "bytes": 1510,
+      "decoded_file": "inputs/01.bin",
+      "index": 1,
+      "sha256": "dd99703e6016b3dd276ba46e251d0a28b48044c8606f78603a279b59839bd242",
+      "stored_file": "inputs/01.base64"
+    },
+    {
+      "bytes": 56187,
+      "decoded_file": "inputs/02.bin",
+      "index": 2,
+      "sha256": "3aeadffde86e259c20cba46f9bc63ed9aa6c8a266c456aa9a7b939074968f420",
+      "stored_file": "inputs/02.base64"
+    },
+    {
+      "bytes": 406975,
+      "decoded_file": "inputs/03.bin",
+      "index": 3,
+      "sha256": "4d3413140c61f886804351b99fb1f0f621864eaafd9df181e3f17ba75720f077",
+      "stored_file": "inputs/03.base64"
+    }
+  ],
+  "total_decoded_bytes": 464763
+}

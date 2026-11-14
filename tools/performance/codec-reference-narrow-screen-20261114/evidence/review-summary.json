@@ -1,0 +1,73 @@
+{
+  "actual_controls": {
+    "all_control_stdout_bytes_equal": true,
+    "all_empty_before_after_allocations_zero": true,
+    "all_payload_bytes_equal_flags": true,
+    "control_groups": [
+      "codec-control",
+      "crc-boundaries",
+      "putvar-controls",
+      "narrow-finite",
+      "narrow-bounds",
+      "narrow-demand",
+      "narrow-entry",
+      "real-payloads"
+    ],
+    "groups_each": 8,
+    "rows_each": 4
+  },
+  "combined_passed": true,
+  "complete_emitted_passed": true,
+  "emitted_independent_checks": 209,
+  "emitted_independent_pins": 462,
+  "finite_control_coverage": "256 valid reference cases with independent byte oracle; 1344 bounds/fallback combinations; partial writes, poison ordering, action-WHNF/execution/result forcing and ENode prefix effects; retained codec/CRC/putVar tests.",
+  "lifecycle_passed": true,
+  "new_scope_cleanup_confirmed": true,
+  "no_full_producer_or_current_main_or_GHC_parity_claim": true,
+  "original_report_pins": {
+    "combined": {
+      "bytes": 14299,
+      "sha256": "7799adaffb3685e906fdf459f19d00c79c59f8168538c77b61b1cffce51e5fe6"
+    },
+    "complete_manifest": {
+      "bytes": 4317,
+      "sha256": "ecd680e86c110c4c7a7435e6ac99d2aa3b24d2e1c5fd05bcbdf69a2076dd6348"
+    },
+    "emitted": {
+      "bytes": 7880,
+      "sha256": "7ff3276665e6be5d8e6a5dd5739f8ba45c80d7bd768e35bf287159bb17bf7827"
+    },
+    "raw": {
+      "bytes": 19947,
+      "sha256": "e8c9abe6aeb253ea9897bb9729625e84c698833a4f511492191aaab269012219"
+    },
+    "source": {
+      "bytes": 20264,
+      "sha256": "a91f86d14683a42575c1febad9f0d77b0e1ea42570eb7c20259a79ac05f570ae"
+    }
+  },
+  "raw_passed": true,
+  "raw_pending_emitted_flag_preserved_in_original_history": true,
+  "raw_unique_files_hashed": 2709,
+  "same_shot_emitted_findings": {
+    "action_closure_creation_outside_identically_on_both_sides": true,
+    "actual_finite_bounds_and_three_demand_layer_controls_passed": true,
+    "domain_evidence": "Actual schema6 headers plus successful canonical preparation and byte-equal whole outputs; no dynamic branch instrumentation.",
+    "dynamic_branch_counts_claimed": false,
+    "generic_out_of_domain_fallback_retained": true,
+    "in_domain_generic_fragment_recursion_removed": true,
+    "measured_node_widths": [
+      2,
+      3,
+      12,
+      14
+    ],
+    "next_reference_list_recursion_and_bounded_closures_remain": true,
+    "no_output_prewarm_or_equivalent_carrier_shift_detected": true,
+    "observer_order": "allocation before, clock before, action, clock after, allocation after",
+    "preparation_decode_Value_Tables_and_all12Layout_fields_outside_window": true,
+    "static_B_object_growth_bytes": 13728,
+    "whole_Main_alpha_equivalent": true,
+    "whole_encodeTables_output_allocation_writes_CRC_inside_action_window": true
+  }
+}

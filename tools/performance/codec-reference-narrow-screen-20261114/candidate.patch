@@ -1,0 +1,59 @@
+--- qualified-putVar/Bootstrap/Bitstream.hs
++++ candidate/Bootstrap/Bitstream.hs
+@@ -450,11 +450,55 @@
+       putSymbols bytes more rest
+     }
+   };
++  -- Private narrow specialization only for the per-reference write below.
++  -- Every public out-of-domain call delegates unchanged. Indices remain arbitrary:
++  -- do not inspect/range-check bits before the original first buffer operation.
++  putReferenceBits :: ByteArray -> Int -> Int -> Int -> IO Int;
++  putReferenceBits bytes position width bits =
++    if width < 1 || width > 16 then putBits bytes position width bits
++    else if position < 0 || position > 9223372036854775791
++      then putBits bytes position width bits
++    else do {
++      let {
++        offset = position % 8;
++        first = min width (8 - offset);
++        mask = shiftLInt 1 first - 1;
++        piece = shiftLInt (andInt bits mask) offset;
++        byteIndex = position / 8
++      };
++      if first == 8 then writeByteArray bytes byteIndex piece else do {
++        previous <- readByteArray bytes byteIndex;
++        writeByteArray bytes byteIndex (orInt previous piece)
++      };
++      if first == width then ioReturn (position + first) else do {
++        let {
++          next = position + first;
++          remaining = width - first;
++          shifted = unsignedShiftRInt bits first;
++          nextIndex = next / 8
++        };
++        if remaining < 8 then do {
++          previous <- readByteArray bytes nextIndex;
++          writeByteArray bytes nextIndex
++            (orInt previous (andInt shifted (shiftLInt 1 remaining - 1)));
++          ioReturn (next + remaining)
++        } else do {
++          writeByteArray bytes nextIndex (andInt shifted 255);
++          if remaining == 8 then ioReturn (next + 8) else do {
++            following <- readByteArray bytes (nextIndex + 1);
++            writeByteArray bytes (nextIndex + 1)
++              (orInt following (andInt (unsignedShiftRInt shifted 8)
++                (shiftLInt 1 (remaining - 8) - 1)));
++            ioReturn (next + remaining)
++          }
++        }
++      }
++    };
+   putReferences :: ByteArray -> Int -> Int -> [] Int -> IO Int;
+   putReferences bytes position width references = case references of {
+     [] -> ioReturn position;
+     (:) index rest -> do {
+-      next <- putBits bytes position width index;
++      next <- putReferenceBits bytes position width index;
+       putReferences bytes next width rest
+     }
+   };
