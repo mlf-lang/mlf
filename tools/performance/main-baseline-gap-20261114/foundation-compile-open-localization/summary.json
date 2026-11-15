@@ -1,0 +1,184 @@
+{
+  "schema": "foundation-checked-compile-open-localization-v1",
+  "status": "ACTUAL_SINGLE_D_DIAGNOSTIC_PASS_INDEPENDENTLY_REVIEWED",
+  "ready_for_parent_publication_review": true,
+  "baseline_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "baseline_tree": "386f0b41ab5f9b39fca273f3040f51d73df924a1",
+  "D_binary_sha256": "2ec725e642b8e983ff4d4ed1432ef9d9a07c974d7a69bc71384e1e72b4c6a8a0",
+  "D_binary_bytes": 20229072,
+  "compiler": "ordinary GHC 9.14.1 -O2, fresh 95 Haskell-module build, baseline IntRank",
+  "overlay_modules": [
+    "Bootstrap.CompilerCore",
+    "Bootstrap.InferenceUnit",
+    "Bootstrap.CrateGraph",
+    "Bootstrap.QueryGraph"
+  ],
+  "workload": {
+    "crate": "mlf-foundation/0.3.0/library",
+    "baseline_modules": 15,
+    "source_bytes": 211763,
+    "entry": "NoEntry",
+    "fresh_query_cache": true,
+    "existing_builtin_read_only": true,
+    "compiler_overlay_used_as_workload": false
+  },
+  "method": {
+    "target_calls_planned": 1,
+    "target_budget_seconds": 180,
+    "phase_budget_seconds": 300,
+    "address_space_per_process_bytes": 4294967296,
+    "profile_environment": {
+      "MLF_QUERY_PROFILE": "1"
+    },
+    "performance_samples": 0,
+    "native_or_fixed_point_calls": 0,
+    "retry_or_extra_samples": false,
+    "clock": "existing in-process monotonic wall-ms counters; direct-child wait4 for target wall/CPU/maxRSS",
+    "observer_callback_type": "IO Int and Int -> Int -> IO (); no polymorphic observer callback parameter",
+    "original_pure_APIs_preserved": true,
+    "additional_deep_forcing": false,
+    "target_calls_actual": 1
+  },
+  "profile_contract": {
+    "fields": [
+      "graph_ms",
+      "load_ms",
+      "infer_ms",
+      "finish_ms",
+      "output_ms",
+      "publish_ms",
+      "infer_compile_open_ms",
+      "infer_canonical_ms",
+      "infer_validate_prepared_ms",
+      "infer_record_ms",
+      "infer_record_encode_ms",
+      "infer_record_digest_ms",
+      "compile_prepare_ms",
+      "compile_generate_ms",
+      "compile_solve_prepared_ms",
+      "compile_evidence_elaboration_ms",
+      "compile_closed_check_ms",
+      "compile_type_erasure_agreement_ms",
+      "compile_open_admission_ms"
+    ],
+    "inclusive_hierarchy": {
+      "infer_ms": [
+        "infer_compile_open_ms",
+        "infer_canonical_ms",
+        "infer_validate_prepared_ms",
+        "infer_record_ms"
+      ],
+      "infer_record_ms": [
+        "infer_record_encode_ms",
+        "infer_record_digest_ms"
+      ],
+      "infer_compile_open_ms": [
+        "compile_prepare_ms",
+        "compile_generate_ms",
+        "compile_solve_prepared_ms",
+        "compile_evidence_elaboration_ms",
+        "compile_closed_check_ms",
+        "compile_type_erasure_agreement_ms",
+        "compile_open_admission_ms"
+      ]
+    },
+    "signed_residual_levels": [
+      "CLI minus original six",
+      "infer minus its four immediate children",
+      "compile-open minus its seven immediate children",
+      "record minus encode/digest"
+    ],
+    "cannot_sum_all_fields": true,
+    "cannot_clamp_negative_residuals": true,
+    "solve_prepared_includes_validation": "prepare/unify/evaluatePreparedSteps/finishNormalized, including full graph and index audit",
+    "causal_scope": "Natural Either constructor/IO wall boundaries; successful payloads remain lazy and costs may move downstream. Not exclusive CPU or pure-solver attribution."
+  },
+  "required_reference_match": {
+    "raw_CI_CO": "exact byte equality with original A Foundation reference",
+    "ordered_query_ids_members": "exact original order equality",
+    "fresh_groups": 532,
+    "members": 539,
+    "value_owners_and_witnesses": 14,
+    "whole_queries": "retained, additionally reported as equal or different"
+  },
+  "D_actual": {
+    "status": "PASS_D_ONLY_FOUNDATION15_COMPILE_OPEN_DIAGNOSTIC_REFERENCE_MATCH",
+    "exit_code": 0,
+    "wall_ns": 24077424109,
+    "user_seconds": 23.879555,
+    "system_seconds": 0.234432,
+    "cpu_seconds": 24.113987,
+    "maxrss_kib": 137320,
+    "whole_phase_ns": 42758155343,
+    "performance_samples": 0,
+    "raw_CI_CO_byte_equal": true,
+    "original_ordered_id_members_equal": true,
+    "whole_query_report_byte_equal": true,
+    "fresh_groups": 532,
+    "members": 539,
+    "value_owners": 14,
+    "profile_ms": {
+      "graph_ms": 1138,
+      "load_ms": 1,
+      "infer_ms": 20928,
+      "finish_ms": 200,
+      "output_ms": 672,
+      "publish_ms": 353,
+      "infer_compile_open_ms": 19516,
+      "infer_canonical_ms": 273,
+      "infer_validate_prepared_ms": 4,
+      "infer_record_ms": 1131,
+      "infer_record_encode_ms": 1109,
+      "infer_record_digest_ms": 19,
+      "compile_prepare_ms": 64,
+      "compile_generate_ms": 1749,
+      "compile_solve_prepared_ms": 14902,
+      "compile_evidence_elaboration_ms": 2307,
+      "compile_closed_check_ms": 317,
+      "compile_type_erasure_agreement_ms": 6,
+      "compile_open_admission_ms": 159
+    },
+    "original_six_bucket_sum_ms": 23292,
+    "signed_residual_ns": {
+      "CLI": 785424109,
+      "infer": 4000000,
+      "compile_open": 12000000,
+      "record": 3000000
+    },
+    "artifacts": {
+      "mlfci": {
+        "bytes": 329841,
+        "sha256": "dfa6266e6047c9a7a5b2eee5ac60aa6dad60e106564c1d1779d7134d04d6a756"
+      },
+      "mlfco": {
+        "bytes": 1072662,
+        "sha256": "ed7309dfe0d30204cf601e8e600c101f7b68b4d0121de58b6bdcfd4a14abdd6e"
+      }
+    },
+    "queries": {
+      "bytes": 666349,
+      "sha256": "6ee52ac1b9cf6a1bdceaaebceb5aaa21533c9804879c2cdc6f5c3d8a26b16ff2"
+    },
+    "input_postchecks_verified": true,
+    "cleanup_verified": true,
+    "locks_reacquired": true
+  },
+  "independent_actual_review": {
+    "verdict": "VERIFIED_ONE_D_FOUNDATION15_COMPILE_OPEN_DIAGNOSTIC_AND_REFERENCE_BYTES_MATCH",
+    "blocking_findings": [],
+    "report_sha256": "701744c3d34fe59affe218cb5aeaa7afe68e8d2e4909f78f3101cc5aa9e84239"
+  },
+  "limitations": [
+    "One instrumented diagnostic, zero performance samples",
+    "Do not compare A/C/D times as speedup evidence",
+    "Foundation15 is a normal library boundary, not whole compiler/package/native qualification",
+    "Raw output equality is workload-specific, not an independent full semantic decoder or proof for all inputs"
+  ],
+  "localization": "The observed solvePrepared interval is 14902 ms of 19516 ms inclusive compile-open (76.35786%). It includes prepare/unify/evaluation and finishNormalized graph/index audit; this does not isolate pure solving or justify removing checks. No A/C/D speed comparison.",
+  "complete_actual_byte_backup_verified": {
+    "files": 1670,
+    "original_bytes": 12005100,
+    "bytes_and_modes_privately_archived_and_read_back": true,
+    "private_storage_identifiers_omitted": true
+  }
+}

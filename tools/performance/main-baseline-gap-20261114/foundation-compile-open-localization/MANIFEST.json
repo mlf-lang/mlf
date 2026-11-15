@@ -1,0 +1,30 @@
+{
+  "schema": "foundation-compile-open-public-export-manifest-v1",
+  "status": "SEALED_READY_FOR_PARENT_PUBLICATION_REVIEW",
+  "repository_destination": "tools/performance/main-baseline-gap-20261114/foundation-compile-open-localization",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 4653,
+      "sha256": "aa46459cd49ce3ee3333377c8093465aee56df40e23dff027be71b5b9aad14cb"
+    },
+    {
+      "path": "diagnostic.patch",
+      "bytes": 14596,
+      "sha256": "f45b423218725e88c9d8d2f83475f024e9e235600184f27919239aef13164393"
+    },
+    {
+      "path": "from-C.delta.patch",
+      "bytes": 10534,
+      "sha256": "7e408670320bea8aaf1d6e9f86b8e3f899579f8bc0a541fd11bd7f1d6dd9b27f"
+    },
+    {
+      "path": "summary.json",
+      "bytes": 6716,
+      "sha256": "e97ce8edb1250259ca3e8b7def72fc4fd83a01ca280fe578cfd3638442206255"
+    }
+  ],
+  "manifest_self_hash": "excluded to avoid self-reference",
+  "independent_actual_review_report_sha256": "701744c3d34fe59affe218cb5aeaa7afe68e8d2e4909f78f3101cc5aa9e84239",
+  "privacy_audit": "No local absolute paths, user identity, private storage/access IDs, execution IDs, private links, raw binaries or private runners."
+}

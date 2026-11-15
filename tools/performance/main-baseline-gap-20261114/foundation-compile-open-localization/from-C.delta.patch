@@ -1,0 +1,184 @@
+--- C/libraries/mlf-inference/Bootstrap/CompilerCore.hs
++++ D/libraries/mlf-inference/Bootstrap/CompilerCore.hs
+@@ -76,5 +76,52 @@
+                then Left (CompileError Verification "elaboration changed source erasure")
+                else Right (Compilation checked graph (Classes.prettyQualified names ty))
+         }
++    };
++  -- Diagnostic IO entry only. The pure finishCompilation API above is intact.
++  -- Callbacks avoid any dependency from inference back to QueryGraph.
++  -- Only the Either constructor required by the original bind is observed.
++  observeEither :: forall e a. IO Int -> (Int -> Int -> IO ()) -> Int ->
++    Either e a -> IO (Either e a);
++  observeEither clock elapsed index value = do {
++    started <- clock;
++    case value of {
++      Left error -> do { elapsed index started; ioReturn (Left error) };
++      Right result -> do { elapsed index started; ioReturn (Right result) }
++    }
++  };
++  finishCompilationObserved :: IO Int -> (Int -> Int -> IO ()) ->
++    (,) SProgram (Map String String) -> IO (Either CompileError Compilation);
++  finishCompilationObserved clock elapsed ((,) program names) =
++    case program of {
++      SClassProgram _ _ _ _ ->
++        ioReturn (Left (CompileError Inference "class translation did not produce a core program"));
++      SProgram declarations expression -> do {
++        generated <- observeEither clock elapsed 13 (atPhase Inference (C.generateProgram program));
++        case generated of { Left error -> ioReturn (Left error); Right constraints -> do {
++          answer <- observeEither clock elapsed 14 (atPhase Inference (C.solvePrepared constraints));
++          case answer of { Left error -> ioReturn (Left error); Right solved -> do {
++            let { graph = Solver.solverGraph solved; types = E.prepareTypes graph };
++            elaborated <- observeEither clock elapsed 15 (do {
++              evidence <- atPhase Resolution (E.resolveEvidenceIn types (C.skeleton constraints));
++              body <- atPhase Elaboration (E.elaboratePreparedIn types solved evidence (C.skeleton constraints));
++              Right ((,) evidence body)
++            });
++            case elaborated of { Left error -> ioReturn (Left error); Right ((,) evidence body) -> do {
++              let { term = if L.null declarations then body else XWithData declarations body };
++              admitted <- observeEither clock elapsed 16 (atPhase Verification (Checked.check term));
++              case admitted of { Left error -> ioReturn (Left error); Right checked -> do {
++                let { ty = Checked.typeOf checked;
++                  expected = E.schemeTypeIn types (C.generalization (C.skeleton constraints)) };
++                observeEither clock elapsed 17
++                  (if L.not (T.alphaEq ty expected)
++                   then Left (CompileError Verification "elaboration changed the inferred type")
++                   else if L.not (X.equalErased (X.erase term) (C.eraseSourceWith evidence (C.skeleton constraints)))
++                     then Left (CompileError Verification "elaboration changed source erasure")
++                     else Right (Compilation checked graph (Classes.prettyQualified names ty)))
++              } }
++            } }
++          } }
++        } }
++      }
+     }
+ }
+--- C/libraries/mlf-crates/Bootstrap/InferenceUnit.hs
++++ D/libraries/mlf-crates/Bootstrap/InferenceUnit.hs
+@@ -389,5 +389,71 @@
+         (sortBy compareString (map (\((,,) n _ _) -> n) members)))
+       "inference fragment changed declaration ownership";
+     Right checked
++  };
++  -- Diagnostic-only counterparts. Original pure open-group APIs stay intact.
++  compileOpenGroupObserved clock elapsed name dependencies datatypes members = do {
++    prepared <- Compiler.observeEither clock elapsed 12 (prepareNamedGroup dependencies datatypes members);
++    case prepared of { Left error -> ioReturn (Left error); Right ((,) externalTypes lowered) ->
++      finishOpenGroupObserved clock elapsed externalTypes members lowered }
++  };
++  compileOpenGroupIndexedObserved clock elapsed name parameters datatypes members = do {
++    prepared <- Compiler.observeEither clock elapsed 12 (prepareIndexedGroup parameters datatypes members);
++    case prepared of { Left error -> ioReturn (Left error); Right ((,) externalTypes lowered) ->
++      finishOpenGroupObserved clock elapsed externalTypes (map snd members) lowered }
++  };
++  compileGroupBodyFromObserved externalTypes compiled = do {
++      let {
++        coreAndData =
++          case Compiler.compiledTerm compiled of {
++            XWithData ds term -> (,) ds term;
++            term -> (,) [] term
++          }
++      };
++      let {
++        declarations = fst coreAndData
++      };
++      let {
++        core = snd coreAndData
++      };
++      boundValueShared9 <-
++        if M.null externalTypes
++        then Right ((,) [] core)
++        else case core of {
++               XLetRec bindings rest ->
++                 do {
++                   ensure
++                     (eqList eqString (map (\((,,) n _ _) -> X.nameHint n) bindings)
++                        (M.keys externalTypes))
++                     "inference parameter order mismatch";
++                   traverseEither
++                     (\((,,) n ty _) ->
++                        ensure
++                          (case M.lookup compareString (X.nameHint n) externalTypes of {
++                             Nothing -> False;
++                             Just expected -> T.alphaEq ty expected
++                           })
++                          ("dependency scheme changed during inference: " ++ X.nameHint n))
++                     bindings;
++                   Right ((,) (map (\((,,) n ty _) -> (,) n ty) bindings) rest)
++                 };
++               _ -> Left "inference did not retain external parameters"
++             };
++      Right ((,,) declarations (fst boundValueShared9) (snd boundValueShared9))
++  };
++  finishOpenGroupObserved clock elapsed externalTypes members lowered = do {
++    answer <- Compiler.finishCompilationObserved clock elapsed lowered;
++    case mapLeft Compiler.prettyError answer of {
++      Left error -> ioReturn (Left error);
++      Right compiled -> Compiler.observeEither clock elapsed 18 (do {
++        (,,) declarations parameters implementation <- compileGroupBodyFromObserved externalTypes compiled;
++        env <- Open.environment declarations;
++        checked <- Open.check env parameters implementation;
++        ensure
++          (eqList eqString (sortBy compareString (map (\((,) n _) -> X.nameHint n) (Open.bindings checked)))
++            (sortBy compareString (map (\((,,) n _ _) -> n) members)))
++          "inference fragment changed declaration ownership";
++        Right checked
++      })
++    }
+   }
+ }
+--- C/libraries/mlf-crates/Bootstrap/CrateGraph.hs
++++ D/libraries/mlf-crates/Bootstrap/CrateGraph.hs
+@@ -245,12 +245,17 @@
+                           Left _ -> do {
+                             -- Inclusive checked compilation, not a pure solver timer.
+                             -- Keep the same natural Either boundaries and lazy payloads.
+-                            compiled <- G.profileEither statistics 6
+-                              (if Source.usesIndexedTerms scope then do {
+-                                members <- Source.indexedMembers slots prepared;
+-                                Inference.compileOpenGroupIndexed group (Source.expectedParameters slots prepared) declarations members
+-                              } else Inference.compileOpenGroup group
+-                                [Q.dependencyInterface (Source.groupBindings prepared)] declarations (Source.groupMembers prepared));
++                            compileStarted <- G.clock statistics;
++                            compiled <- if Source.usesIndexedTerms scope then
++                              case Source.indexedMembers slots prepared of {
++                                Left error -> ioReturn (Left error);
++                                Right members -> Inference.compileOpenGroupIndexedObserved
++                                  (G.clock statistics) (G.elapsed statistics) group
++                                  (Source.expectedParameters slots prepared) declarations members
++                              }
++                              else Inference.compileOpenGroupObserved (G.clock statistics) (G.elapsed statistics) group
++                                [Q.dependencyInterface (Source.groupBindings prepared)] declarations (Source.groupMembers prepared);
++                            G.elapsed statistics 6 compileStarted;
+                             case compiled of { Left e -> ioReturn (Left e); Right fragment -> do {
+                               canonical <- G.profileEither statistics 7 (Source.canonicalOpen fragment);
+                               case canonical of { Left e -> ioReturn (Left e); Right normalized -> do {
+--- C/libraries/mlf-crates/Bootstrap/QueryGraph.hs
++++ D/libraries/mlf-crates/Bootstrap/QueryGraph.hs
+@@ -881,7 +881,7 @@
+   -- Optional phase clocks are kept outside deterministic output/query hashes.
+   profile = do {
+     enabled <- getEnv "MLF_QUERY_PROFILE";
+-    if eqString enabled "1" then do { counters <- newIntArray 12 0; ioReturn (Just counters) }
++    if eqString enabled "1" then do { counters <- newIntArray 19 0; ioReturn (Just counters) }
+     else ioReturn Nothing
+   };
+   clock settings = case settings of {
+@@ -904,12 +904,15 @@
+   writeProfile path settings = case settings of {
+     Nothing -> ioReturn ();
+     Just counters -> do {
+-      values <- mapM (readIntArray counters) [0,1,2,3,4,5,6,7,8,9,10,11];
++      values <- mapM (readIntArray counters) [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18];
+       writeFile path ("{" ++ intercalate "," (map (\((,) name value) ->
+         "\"" ++ name ++ "\":" ++ showInt value)
+         (zip ["graph_ms","load_ms","infer_ms","finish_ms","output_ms","publish_ms",
+               "infer_compile_open_ms","infer_canonical_ms","infer_validate_prepared_ms",
+-              "infer_record_ms","infer_record_encode_ms","infer_record_digest_ms"] values)) ++ "}\n")
++              "infer_record_ms","infer_record_encode_ms","infer_record_digest_ms",
++              "compile_prepare_ms","compile_generate_ms","compile_solve_prepared_ms",
++              "compile_evidence_elaboration_ms","compile_closed_check_ms",
++              "compile_type_erasure_agreement_ms","compile_open_admission_ms"] values)) ++ "}\n")
+     }
+   }
+ }
