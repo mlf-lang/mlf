@@ -1,0 +1,317 @@
+{
+  "schema": "ordinary-checked-reuse-foundation-fixed-four-sample-v1",
+  "scope": "One separately admitted same-current-path Foundation15 diagnostic screen; two preliminary qualifications excluded from statistics.",
+  "decision": "HOLD_NO_MERGE_NO_ADDITIONAL_SAMPLES",
+  "producer_baseline_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "producers": {
+    "A": {
+      "bytes": 20192272,
+      "sha256": "4eab562e58373f5d6dccc8a5460d8d7b909571ee6e88ea91a110f53dc5c10c71"
+    },
+    "C": {
+      "bytes": 20192504,
+      "sha256": "f6c260a3c0ea3f003206e8632ce108912e96885c74f573b88fc4ad31d81abae9"
+    }
+  },
+  "candidate_only_source": "libraries/mlf-crates/Bootstrap/InferenceUnit.hs",
+  "candidate_source_sha256": "1cf59344b469f3b48898e4bb72b4bf891e357b609ccfce668816707f6cf9528b",
+  "workload": {
+    "crate_id": "mlf-foundation/0.3.0/library",
+    "entry": "NoEntry",
+    "command": "--compile-crate",
+    "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+    "source_tree": "386f0b41ab5f9b39fca273f3040f51d73df924a1",
+    "package_manifest": {
+      "relative": "libraries/mlf-foundation/mlf-package.json",
+      "bytes": 861,
+      "sha256": "e33ad7d2802b6b2ea2560579a5c011935bbb00cef6bfbfcc7ecce3d4ab615b13"
+    },
+    "module_count": 15,
+    "source_bytes": 211763,
+    "modules": [
+      {
+        "module": "Bootstrap.Fresh",
+        "relative": "libraries/mlf-foundation/Bootstrap/Fresh.hs",
+        "bytes": 2592,
+        "sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d"
+      },
+      {
+        "module": "Bootstrap.Host",
+        "relative": "libraries/mlf-foundation/Bootstrap/Host.hs",
+        "bytes": 3246,
+        "sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5"
+      },
+      {
+        "module": "Bootstrap.IndexVec",
+        "relative": "libraries/mlf-foundation/Bootstrap/IndexVec.hs",
+        "bytes": 5573,
+        "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e"
+      },
+      {
+        "module": "Bootstrap.IntMap",
+        "relative": "libraries/mlf-foundation/Bootstrap/IntMap.hs",
+        "bytes": 21811,
+        "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e"
+      },
+      {
+        "module": "Bootstrap.IntRank",
+        "relative": "libraries/mlf-foundation/Bootstrap/IntRank.hs",
+        "bytes": 6684,
+        "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
+      },
+      {
+        "module": "Bootstrap.IntSet",
+        "relative": "libraries/mlf-foundation/Bootstrap/IntSet.hs",
+        "bytes": 17405,
+        "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe"
+      },
+      {
+        "module": "Bootstrap.IntTree",
+        "relative": "libraries/mlf-foundation/Bootstrap/IntTree.hs",
+        "bytes": 3727,
+        "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49"
+      },
+      {
+        "module": "Bootstrap.Map",
+        "relative": "libraries/mlf-foundation/Bootstrap/Map.hs",
+        "bytes": 17218,
+        "sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0"
+      },
+      {
+        "module": "Bootstrap.Regex",
+        "relative": "libraries/mlf-foundation/Bootstrap/Regex.hs",
+        "bytes": 38169,
+        "sha256": "016cda4d5a9cd2ed0161976ab4150d74c1b2843cb6a5a046aef72eccc1945b0d"
+      },
+      {
+        "module": "Bootstrap.ST",
+        "relative": "libraries/mlf-foundation/Bootstrap/ST.hs",
+        "bytes": 2539,
+        "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2"
+      },
+      {
+        "module": "Bootstrap.Set",
+        "relative": "libraries/mlf-foundation/Bootstrap/Set.hs",
+        "bytes": 4093,
+        "sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f"
+      },
+      {
+        "module": "Bootstrap.Std",
+        "relative": "libraries/mlf-foundation/Bootstrap/Std.hs",
+        "bytes": 20088,
+        "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca"
+      },
+      {
+        "module": "Bootstrap.Types",
+        "relative": "libraries/mlf-foundation/Bootstrap/Types.hs",
+        "bytes": 12757,
+        "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596"
+      },
+      {
+        "module": "Bootstrap.Unicode",
+        "relative": "libraries/mlf-foundation/Bootstrap/Unicode.hs",
+        "bytes": 55534,
+        "sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077"
+      },
+      {
+        "module": "Bootstrap.Version",
+        "relative": "libraries/mlf-foundation/Bootstrap/Version.hs",
+        "bytes": 327,
+        "sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479"
+      }
+    ],
+    "ordered_module_rows_sha256": "119c8cf5788a16bdec7e13137911df490c50bc95ce830c54e900f7a5002559ae",
+    "ordered_module_rows_hash_encoding": "UTF-8 JSON of modules with sorted object keys, separators comma/colon, no trailing newline.",
+    "value_bearing_owners": 14,
+    "datatype_only_modules": [
+      "Bootstrap.Types"
+    ],
+    "source_is_baseline_not_candidate_overlay": true,
+    "dependency_artifacts": [
+      {
+        "role": "builtin mlfci",
+        "bytes": 40417,
+        "sha256": "cb7140bce683550c8b16dcc189fc8c582b64eaac9b91da4d6b9b3a9ed2d66c05"
+      },
+      {
+        "role": "builtin mlfco",
+        "bytes": 190840,
+        "sha256": "476df4e37a9306a2e5a20f109b7ca499e0296101e464c9b624e1fc51e4248481"
+      }
+    ],
+    "input_path_contract": "All six calls used the same current absolute builtin metadata locator and exact source bytes. Only per-call output/query roots differed. Private filesystem paths are not included."
+  },
+  "call_order": [
+    "A reproduction (not a sample)",
+    "C qualification (not a sample)",
+    "A1",
+    "C1",
+    "C2",
+    "A2"
+  ],
+  "sample_order": [
+    "A",
+    "C",
+    "C",
+    "A"
+  ],
+  "qualification_calls": 2,
+  "performance_samples": 4,
+  "timing": {
+    "method": "Direct child Popen launch through blocking wait4 return, excluding Python startup and timing JSON serialization. Outer supervision elapsed is budget-only.",
+    "wall_unit": "nanoseconds",
+    "cpu_units": "seconds; original JSON decimal lexemes retained as strings",
+    "cpu_total_rule": "Exact decimal sum of the saved user_seconds and system_seconds lexemes, including their original binary-float rendering artifacts.",
+    "rss_unit": "Linux wait4 peak resident set size in KiB",
+    "cache_boundary": "Fresh query caches for each call; not a claim of cold OS pages."
+  },
+  "samples": [
+    {
+      "sample": "sample-A1",
+      "position": 1,
+      "producer": "A",
+      "target_exit_code": 0,
+      "wall_ns": 25175527678,
+      "user_seconds": "24.751253",
+      "system_seconds": "0.438527",
+      "cpu_total_seconds": "25.189780",
+      "maxrss_kib": 140228,
+      "original_timing_sha256": "4fe46f230bea2aaf5239bc532ba048ce12d146f79506ed08fbbf882d7183fc0e",
+      "all_output_pins": "shared_outputs"
+    },
+    {
+      "sample": "sample-C1",
+      "position": 2,
+      "producer": "C",
+      "target_exit_code": 0,
+      "wall_ns": 24967919318,
+      "user_seconds": "24.617774",
+      "system_seconds": "0.375696",
+      "cpu_total_seconds": "24.993470",
+      "maxrss_kib": 133220,
+      "original_timing_sha256": "19bd3cbb0ac28e39779d92c0f7908cadc38db73adbba120f3758c6d2a40b4349",
+      "all_output_pins": "shared_outputs"
+    },
+    {
+      "sample": "sample-C2",
+      "position": 3,
+      "producer": "C",
+      "target_exit_code": 0,
+      "wall_ns": 24637950786,
+      "user_seconds": "24.225816",
+      "system_seconds": "0.42595",
+      "cpu_total_seconds": "24.651766",
+      "maxrss_kib": 133284,
+      "original_timing_sha256": "858902b403decc67c9bbc6d7ae1d1385acd0618f9acbc92cc3d37b0d30ce1520",
+      "all_output_pins": "shared_outputs"
+    },
+    {
+      "sample": "sample-A2",
+      "position": 4,
+      "producer": "A",
+      "target_exit_code": 0,
+      "wall_ns": 24519733997,
+      "user_seconds": "24.116354",
+      "system_seconds": "0.40737599999999996",
+      "cpu_total_seconds": "24.52372999999999996",
+      "maxrss_kib": 140108,
+      "original_timing_sha256": "9fa9da3ae3aca5c5c11101cd74557d9cc372aaed217993d0d2d4d4ad91c1faef",
+      "all_output_pins": "shared_outputs"
+    }
+  ],
+  "pair_rule": "C1/A1 and C2/A2. Percent = 100*(C/A-1); negative values are lower. Geometric percent = 100*(sqrt(ratio1*ratio2)-1).",
+  "pairs": [
+    {
+      "candidate": "sample-C1",
+      "baseline": "sample-A1",
+      "C_over_A": {
+        "wall_ns": "0.9917535647055604091080215569970544948671",
+        "cpu_total_seconds": "0.9922067600431603610670676758590190148544",
+        "user_seconds": "0.9946071821091239300087151143418880652224",
+        "system_seconds": "0.8567226191317752384687829939775658055262",
+        "maxrss_kib": "0.9500242462275722394956784664974184898879"
+      },
+      "C_minus_A_percent": {
+        "wall_ns": "-0.8246435294439590891978443002945505132900",
+        "cpu_total_seconds": "-0.7793239956839638932932324140980985145600",
+        "user_seconds": "-0.5392817890876069991284885658111934777600",
+        "system_seconds": "-14.32773808682247615312170060224341944738",
+        "maxrss_kib": "-4.997575377242776050432153350258151011210"
+      }
+    },
+    {
+      "candidate": "sample-C2",
+      "baseline": "sample-A2",
+      "C_over_A": {
+        "wall_ns": "1.004821291658974109383769103210960906412",
+        "cpu_total_seconds": "1.005220902366809618284365228889421989696",
+        "user_seconds": "1.004538911644770183751656655894170404034",
+        "system_seconds": "1.045594242174305903695283195309090736350",
+        "maxrss_kib": "0.9512947155051817169612013589516658577669"
+      },
+      "C_minus_A_percent": {
+        "wall_ns": "0.482129165897410938376910321096090641200",
+        "cpu_total_seconds": "0.522090236680961828436522888942198969600",
+        "user_seconds": "0.453891164477018375165665589417040403400",
+        "system_seconds": "4.559424217430590369528319530909073635000",
+        "maxrss_kib": "-4.870528449481828303879864104833414223310"
+      }
+    }
+  ],
+  "geometric_C_minus_A_percent": {
+    "wall_ns": "-0.1733954351429837640229455102225853046900",
+    "cpu_total_seconds": "-0.1307367272074946346852098400598428101700",
+    "user_seconds": "-0.0439288372151408024870678526021529635400",
+    "system_seconds": "-5.354121182976221522700389837581499841790",
+    "maxrss_kib": "-4.934073136686715488050548415704436432970"
+  },
+  "shared_outputs": {
+    "mlfci": {
+      "bytes": 329951,
+      "sha256": "9d2d6006f38296e0b3682397c5edd81bdab0df55b0e083407da94e389ffa0abe"
+    },
+    "mlfco": {
+      "bytes": 1072662,
+      "sha256": "ed7309dfe0d30204cf601e8e600c101f7b68b4d0121de58b6bdcfd4a14abdd6e"
+    },
+    "queries": {
+      "bytes": 666349,
+      "sha256": "6ee52ac1b9cf6a1bdceaaebceb5aaa21533c9804879c2cdc6f5c3d8a26b16ff2"
+    }
+  },
+  "all_six_call_checks": {
+    "raw_ci_co_exact_equal": true,
+    "fresh_inferred_groups": 532,
+    "reused_groups": 0,
+    "query_members": 539,
+    "value_bearing_owners": 14,
+    "ordered_id_members_sha256": "05a1998a626b1c03c6b263cc36be69f8ef9bdbfc05b77bc3b14d4905b5241f2b",
+    "ordered_id_members_equal": true,
+    "whole_queries_equal_observation_only": true,
+    "builtin_bytes_mode_mtime_preserved": true,
+    "forbidden_installer_outputs_absent": true,
+    "all_exit_codes_zero": true,
+    "inputs_post_and_cleanup_and_locks_pass": true,
+    "runtime_normalization": false
+  },
+  "original_historical_reference_failure": {
+    "status": "INCONCLUSIVE_PRESERVED",
+    "baseline_target_exit": 0,
+    "candidate_calls": 0,
+    "performance_samples": 0,
+    "difference": "Historical CI encoded a different builtin dependency locator: +109 UTF-8 bytes and +1 length-prefix byte in the current-path CI. Node/root payloads, CO and complete queries matched in the independent bounded audit. The original failure was not edited or reclassified.",
+    "new_contract": "A reproduction against the separately admitted current-path reference, then C full raw/ordered qualification, passed before the four fixed samples. No runtime path-normalization exception."
+  },
+  "independent_actual_review_sha256": "38f105645255e52063fa97e8f0712ad6ed88fc95fe783e68404170e5a377fb61",
+  "evidence_preservation": {
+    "actual_files": 9989,
+    "actual_bytes": 68211823,
+    "full_actual_and_independent_review_read_back_verified": true
+  },
+  "interpretation": [
+    "Wall and total CPU pairs have opposite directions. The near-zero geometric points do not establish an overall speed improvement.",
+    "Peak RSS was lower in both observed pairs, roughly 5%; it is not allocated bytes, retained heap, a GC result, or an established causal mechanism.",
+    "All four samples are retained. Two pairs do not establish stable/significant performance or generalization; no pooling with other experiments.",
+    "HOLD: no merge and no additional timing samples for this candidate. No native/fixed-point or whole-PR conclusion."
+  ]
+}

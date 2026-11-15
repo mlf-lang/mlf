@@ -1,0 +1,55 @@
+{
+  "schema": "ordinary-checked-reuse-public-source-pins-v1",
+  "repository": "https://github.com/mlf-lang/mlf",
+  "baseline_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "baseline_inferenceunit_sha256": "ab3bf4aa00ac0c2eea90b4bfc7d35b5430b1ac959187f3e2d99850f1bd35e46e",
+  "candidate_inferenceunit_sha256": "1cf59344b469f3b48898e4bb72b4bf891e357b609ccfce668816707f6cf9528b",
+  "only_production_file": "libraries/mlf-crates/Bootstrap/InferenceUnit.hs",
+  "api_sources_at_baseline": {
+    "libraries/mlf-crates/Bootstrap/InferenceUnit.hs": "ab3bf4aa00ac0c2eea90b4bfc7d35b5430b1ac959187f3e2d99850f1bd35e46e",
+    "libraries/mlf-crates/Bootstrap/OpenFragment.hs": "e392aae043afc2c13cda16e00caa6a3562dc5180d78dce27f699da7046c57c8b",
+    "libraries/mlf-crates/Bootstrap/Separate.hs": "1b3d1d917d86ffa5fc9e8de8cfe9becb1a6faa7e115842b0b2286cc2907343ba",
+    "libraries/mlf-inference/Bootstrap/CompilerCore.hs": "00b0274c05dc10f65e5fd2c1df13acdf0382d352c2dd07aa74e79f7c2cdcb8e2",
+    "libraries/mlf-xmlf/Bootstrap/X/Checked.hs": "825ce97070f081c11ff316979004eb8dfcffa3ac0e885f25c7cff2381082ab7a",
+    "libraries/mlf-xmlf/Bootstrap/X/Check.hs": "5c299a3617d07a9d7fe89f88039134491630eee256dbdd57ebe8270e41f78f1c",
+    "libraries/mlf-language-core/Bootstrap/Data.hs": "80545c6378de8e846d3a13df8b5418b8fd7854d011346f12dbfd4c99c47c7558"
+  },
+  "bundle_source_files": {
+    "candidate.patch": {
+      "bytes": 1727,
+      "sha256": "13d56a35a120105e67ac07e49f0395b81ea1164eeb17a44a406401171efa22cd"
+    },
+    "fixtures/Main.hs": {
+      "bytes": 7474,
+      "sha256": "dde55742964ce816c39328729f652be2234cb38a8766cacfa9213003f567315e"
+    },
+    "fixtures/DiagnosticBaseline/InferenceUnit.hs": {
+      "bytes": 19350,
+      "sha256": "9fe7a286ec130b1517060d7ee233fb9c02de696701ef16781605265999b50bb9"
+    },
+    "expected.stdout": {
+      "bytes": 71,
+      "sha256": "c6300bff300314c454aa5de750546123a6382aa32d104b983029e3aceaccd5bb"
+    }
+  },
+  "source_review_sha256": "3686c24df0bd7f7526eaffcac1ac7279618e3d91caf145bc6bbcf5bae1ef4df8",
+  "focused_actual_review_sha256": "23cbcf9055378f7571dd773d0ee7d583740f2e0645b65bd46d671af33a80ba12",
+  "ordinary_build_actual_review_sha256": "d8a2cee2ad2b4441cf179883c4847df8856996b32cd89ca1959d435bfd64610a",
+  "toolchain": {
+    "ghc": "9.14.1",
+    "platform": "Linux x86_64",
+    "c_compiler": "GCC 14",
+    "packages": {
+      "base": "4.22.0.0",
+      "array": "0.5.8.0",
+      "bytestring": "0.12.2.0",
+      "text": "2.1.3",
+      "containers": "0.8",
+      "directory": "1.3.10.0"
+    }
+  },
+  "artifact_boundary": "Review digests identify retained private evidence, not publicly downloadable proof files. No binary, runtime library, private controller or private source path is included.",
+  "foundation_actual_review_sha256": "38f105645255e52063fa97e8f0712ad6ed88fc95fe783e68404170e5a377fb61",
+  "foundation_result_sha256": "551199bdccbb21496c8a63414933499d0adca7cb82367d9ce8218cc0561fbe10",
+  "foundation_workload_ordered_module_rows_sha256": "119c8cf5788a16bdec7e13137911df490c50bc95ce830c54e900f7a5002559ae"
+}

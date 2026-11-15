@@ -1,0 +1,104 @@
+{
+  "schema": "ordinary-checked-reuse-public-results-v1",
+  "state": "FINAL_LOCAL_ARCHIVE_HOLD",
+  "baseline_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "candidate": {
+    "only_production_file": "libraries/mlf-crates/Bootstrap/InferenceUnit.hs",
+    "sha256": "1cf59344b469f3b48898e4bb72b4bf891e357b609ccfce668816707f6cf9528b",
+    "mechanism": "Reuse the ordinary compiler checked receipt only for an empty external environment and an actual XLet/XLetRec implementation root; otherwise retain the old Open.check path."
+  },
+  "focused": {
+    "status": "PASS_INDEPENDENT_ORDINARY_CHECKED_REUSE_FOCUSED_ACTUAL_ONLY",
+    "optimization_levels": [
+      "O0",
+      "O2"
+    ],
+    "home_modules_per_lane": 55,
+    "cases_per_lane": 13,
+    "expected_categories": {
+      "Right": 6,
+      "Left": 6,
+      "Probe": 1
+    },
+    "sidecars_per_lane": 63,
+    "stdout_bytes_per_lane": 71,
+    "stderr_bytes_per_lane": 0,
+    "raw_typed_outcome_results": "All complete A/C pairs satisfy the frozen strict fixture gates. No canonicalization or mismatch exemption.",
+    "cross_optimization_observation": "All 63 corresponding saved files, covering all 13 cases and complete A/C raw/typed/outcomes/results, are byte-identical across O0 and O2. This is an additional observation, not a substituted oracle.",
+    "audit_sha256": "23cbcf9055378f7571dd773d0ee7d583740f2e0645b65bd46d671af33a80ba12"
+  },
+  "ordinary_producer_build": {
+    "status": "PASS_INDEPENDENT_TWO_ORDINARY_PRODUCER_ACTUAL_BUILD_ONLY",
+    "home_modules_per_lane": 95,
+    "link_progress_total_per_lane": 96,
+    "fresh_home_objects_per_lane": 95,
+    "fresh_home_interfaces_per_lane": 95,
+    "only_candidate_source_difference": "Bootstrap.InferenceUnit",
+    "entry": "host/ghc/app/emlf/Main.hs",
+    "optimization": "O2",
+    "ghc_version": "9.14.1",
+    "flags_equal_except_source_overlay_and_output_paths": true,
+    "old_objects_reused": false,
+    "producers": {
+      "A": {
+        "bytes": 20192272,
+        "sha256": "4eab562e58373f5d6dccc8a5460d8d7b909571ee6e88ea91a110f53dc5c10c71"
+      },
+      "C": {
+        "bytes": 20192504,
+        "sha256": "f6c260a3c0ea3f003206e8632ce108912e96885c74f573b88fc4ad31d81abae9"
+      }
+    },
+    "entrypoint_calls_in_build_phase": 0,
+    "audit_sha256": "d8a2cee2ad2b4441cf179883c4847df8856996b32cd89ca1959d435bfd64610a"
+  },
+  "foundation": {
+    "state": "PASS_SEPARATE_CURRENT_PATH_REFERENCE_AND_FIXED_FOUR_SAMPLE_SCREEN",
+    "historical_reference_attempt": {
+      "status": "INCONCLUSIVE_PRESERVED",
+      "baseline_target_exit": 0,
+      "candidate_executed": false,
+      "performance_samples": 0,
+      "stop": "The unchanged historical CI raw-equality gate rejected the baseline output before C ran.",
+      "bounded_difference": "The stored builtin dependency location changed after environment restoration. Independent wire comparison accounted for the CI difference by that serialized path and framing/CRC; CO and complete queries were byte-identical as an offline observation. No raw normalizer or relaxed equality was applied.",
+      "candidate_regression_established": false,
+      "audit_sha256": "88d4d5de2214e1f13f0459e827d47bd9e7eef3a0d8b74ca382a48cb0f2241556"
+    },
+    "new_result": {
+      "file": "foundation.json",
+      "raw_ci_co_equal_all_six": true,
+      "ordered_groups_members_owners": [
+        532,
+        539,
+        14
+      ],
+      "qualifications_excluded_from_statistics": 2,
+      "samples": 4,
+      "order": [
+        "A",
+        "C",
+        "C",
+        "A"
+      ],
+      "geometric_C_minus_A_percent": {
+        "wall_ns": "-0.1733954351429837640229455102225853046900",
+        "cpu_total_seconds": "-0.1307367272074946346852098400598428101700",
+        "user_seconds": "-0.0439288372151408024870678526021529635400",
+        "system_seconds": "-5.354121182976221522700389837581499841790",
+        "maxrss_kib": "-4.934073136686715488050548415704436432970"
+      },
+      "wall_and_cpu_pair_directions": "mixed",
+      "interpretation": "No overall speed improvement established. Lower OS peak RSS in both observed pairs is not an allocation or GC conclusion.",
+      "audit_sha256": "38f105645255e52063fa97e8f0712ad6ed88fc95fe783e68404170e5a377fb61"
+    }
+  },
+  "performance_conclusion": "HOLD: opposite wall/CPU pair directions and near-zero geometric points; no established overall speed benefit, no merge or additional samples.",
+  "performance_samples_in_reported_focused_and_build_phases": 0,
+  "limits": [
+    "Thirteen focused cases are not universal semantic equivalence or arbitrary forged-receipt qualification.",
+    "Six same-current-path Foundation calls passed raw/ordered gates; only four fixed calls are timing samples.",
+    "Historical run01 remains INCONCLUSIVE and C was not executed there; its failure is not erased by the separately admitted new-path result.",
+    "Two observed timing pairs do not establish stability/significance/generalization; no pooling, allocation inference, native qualification or whole-PR claim.",
+    "This archive records actual focused/build/workload evidence; the portable fixture recipe was syntax-checked only, not executed as another run."
+  ]
+}

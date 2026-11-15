@@ -1,0 +1,86 @@
+{
+  "schema": "ordinary-checked-reuse-public-test-contract-v1",
+  "cases": [
+    {
+      "label": "unsigned literal",
+      "expected_outcome": "Right"
+    },
+    {
+      "label": "signed literal",
+      "expected_outcome": "Right"
+    },
+    {
+      "label": "imports fallback",
+      "expected_outcome": "Right"
+    },
+    {
+      "label": "signed recursive",
+      "expected_outcome": "Right"
+    },
+    {
+      "label": "datatype",
+      "expected_outcome": "Right"
+    },
+    {
+      "label": "empty",
+      "expected_outcome": "Left"
+    },
+    {
+      "label": "annotation mismatch",
+      "expected_outcome": "Left"
+    },
+    {
+      "label": "duplicate parameter before body",
+      "expected_outcome": "Left"
+    },
+    {
+      "label": "owned label mismatch",
+      "expected_outcome": "Left"
+    },
+    {
+      "label": "root unit fallback",
+      "expected_outcome": "Right"
+    },
+    {
+      "label": "deferred inventory nonunit tail",
+      "expected_outcome": "Left",
+      "exact_outcome_utf8": "Left \"invalid inference fragment: expected declarations ending in ()\"\n"
+    },
+    {
+      "label": "compiler error before ownership",
+      "expected_outcome": "Left"
+    },
+    {
+      "label": "source-demand",
+      "expected_outcome": "Probe"
+    }
+  ],
+  "expected_result_utf8": "PASS\n",
+  "probe_expected_utf8": "Probe Probe \"source\"\n",
+  "successful_work_files": 63,
+  "Right": [
+    "result PASS",
+    "A/C Right outcomes",
+    "both complete original raw Values byte-equal",
+    "both complete original typed Values byte-equal"
+  ],
+  "Left": [
+    "result PASS",
+    "both complete original Left error messages byte-equal"
+  ],
+  "Probe": [
+    "result PASS",
+    "both exact tagged synchronous Probe source"
+  ],
+  "not_included": [
+    "canonical erasure normalization",
+    "PR51 monotype/ground fastpath",
+    "raw mismatch waiver"
+  ],
+  "failure": "Preserve partial evidence on first failure. Do not synthesize missing files or retry.",
+  "fixture_internal_gates": [
+    "Expected Right/Left category is required, not merely equal results.",
+    "Every Right also checks the original ordered parameters/owned bindings using exact names and alpha-equivalent schemes, plus both original fragment audits.",
+    "No runtime execution of the source recursive function; it is only compiled/checked by the fixture."
+  ]
+}
