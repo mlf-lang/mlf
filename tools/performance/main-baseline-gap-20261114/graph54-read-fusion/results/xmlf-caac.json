@@ -1,0 +1,312 @@
+{
+  "status": "INDEPENDENTLY_VERIFIED_FIXED_FOUR_LEGS_TWO_PAIRS_ONLY",
+  "order": "CAAC",
+  "producer_sha256": {
+    "A": "29c58e2b48324957cee5965a1c76dc7e688c9b25264bd5150c3f7f085dbc23ef",
+    "C": "7770f188b578391f0468eff2df09e5237c33db1245f90a6880f5185759efac39"
+  },
+  "workload": {
+    "crate": "mlf-xmlf/0.3.0/library",
+    "modules": 6,
+    "source_bytes": 86429,
+    "entry": "NoEntry",
+    "fresh_groups": 173,
+    "members": 207,
+    "member_roles": {
+      "value": 207
+    },
+    "owners": 6,
+    "owner_member_counts": {
+      "Bootstrap.X.Check": 36,
+      "Bootstrap.X.Checked": 47,
+      "Bootstrap.X.Parser": 57,
+      "Bootstrap.X.Pretty": 31,
+      "Bootstrap.X.Syntax": 17,
+      "Bootstrap.X.Type": 19
+    },
+    "fresh_query_cache_each_leg": true,
+    "cold_OS_cache_claim": false,
+    "dependency_interfaces_reused_without_rebuild": [
+      "mlf-foundation/0.3.0/library",
+      "mlf-frontend/0.3.0/library",
+      "mlf-language-core/0.3.0/library",
+      "builtin"
+    ],
+    "scope": "Compile the complete Xmlf crate only, not a full compiler self-build or execution of produced guest/native programs. Module coverage comes from exact manifest/spec inputs and compiler loading; query coverage checks local declarations and witnesses. Wire framing/CRC is not independent typed CI semantic decoding."
+  },
+  "source_manifest_sha256": "6f9a6c0a2d703ba884dd256fd494665c580ed028db04dedc3c7b748ec393f6f3",
+  "source_modules": [
+    {
+      "module": "Bootstrap.X.Check",
+      "bytes": 17179,
+      "sha256": "5c299a3617d07a9d7fe89f88039134491630eee256dbdd57ebe8270e41f78f1c"
+    },
+    {
+      "module": "Bootstrap.X.Checked",
+      "bytes": 26092,
+      "sha256": "825ce97070f081c11ff316979004eb8dfcffa3ac0e885f25c7cff2381082ab7a"
+    },
+    {
+      "module": "Bootstrap.X.Parser",
+      "bytes": 16487,
+      "sha256": "094d226d36b65d09a75b6f7feeee2997c49de792dd81242fba9db0b87c829209"
+    },
+    {
+      "module": "Bootstrap.X.Pretty",
+      "bytes": 12549,
+      "sha256": "77a96c4912188d23b00fa95315038878b9a40ea683c5d9d4ed8baa893fa32d3f"
+    },
+    {
+      "module": "Bootstrap.X.Syntax",
+      "bytes": 4813,
+      "sha256": "654d43b2739219704757cd3a3ee0e9f8106ae07ec931eb1a399dd004af1c0a9d"
+    },
+    {
+      "module": "Bootstrap.X.Type",
+      "bytes": 9309,
+      "sha256": "5ae7191adc5df556b83901682ee17e3de889a99e9fe35e97d7370ec2443d0d3d"
+    }
+  ],
+  "reused_dependency_artifacts": [
+    {
+      "identity": "mlf-foundation/0.3.0/library",
+      "CI": {
+        "bytes": 329841,
+        "sha256": "dfa6266e6047c9a7a5b2eee5ac60aa6dad60e106564c1d1779d7134d04d6a756"
+      },
+      "CO": {
+        "bytes": 1072662,
+        "sha256": "ed7309dfe0d30204cf601e8e600c101f7b68b4d0121de58b6bdcfd4a14abdd6e"
+      }
+    },
+    {
+      "identity": "mlf-frontend/0.3.0/library",
+      "CI": {
+        "bytes": 341254,
+        "sha256": "4503e583f33e6825ef78e5946fb1df3099943aee32b1a409fe4915b312ae8872"
+      },
+      "CO": {
+        "bytes": 2072979,
+        "sha256": "44aa038ff8e3b14e93d61b21bc54b7bb765651cb02eba4b42b4ed0b61a7d393f"
+      }
+    },
+    {
+      "identity": "mlf-language-core/0.3.0/library",
+      "CI": {
+        "bytes": 28500,
+        "sha256": "53d15f24422b26732379b1fb7f3e5b34dc10ce0358d383e632a3f9ea7f28ff39"
+      },
+      "CO": {
+        "bytes": 331418,
+        "sha256": "81a91e933746a6a956c4688cb5e81ac05b5e7219f8c05f003c0d483a0a8031e3"
+      }
+    },
+    {
+      "identity": "builtin",
+      "CI": {
+        "bytes": 40417,
+        "sha256": "cb7140bce683550c8b16dcc189fc8c582b64eaac9b91da4d6b9b3a9ed2d66c05"
+      },
+      "CO": {
+        "bytes": 190840,
+        "sha256": "476df4e37a9306a2e5a20f109b7ca499e0296101e464c9b624e1fc51e4248481"
+      }
+    }
+  ],
+  "dependency_artifact_scope": "Existing original A artifacts, not rebuilt or repacked. CI files are the explicit metadata inputs; companion CO bytes are also pinned. These hashes do not add dependency compilation to the measured window.",
+  "samples": [
+    {
+      "side": "C",
+      "position": 1,
+      "wall_ns": 17799162853,
+      "wall_seconds": 17.799162853,
+      "user_seconds": 17.163219,
+      "system_seconds": 0.6673479999999999,
+      "cpu_seconds": 17.830567000000002,
+      "maxrss_kib": 132888
+    },
+    {
+      "side": "A",
+      "position": 2,
+      "wall_ns": 18158699261,
+      "wall_seconds": 18.158699261,
+      "user_seconds": 17.781412,
+      "system_seconds": 0.41136999999999996,
+      "cpu_seconds": 18.192782,
+      "maxrss_kib": 122652
+    },
+    {
+      "side": "A",
+      "position": 3,
+      "wall_ns": 19322916824,
+      "wall_seconds": 19.322916824,
+      "user_seconds": 18.832479,
+      "system_seconds": 0.529358,
+      "cpu_seconds": 19.361836999999998,
+      "maxrss_kib": 122524
+    },
+    {
+      "side": "C",
+      "position": 4,
+      "wall_ns": 17338599832,
+      "wall_seconds": 17.338599832,
+      "user_seconds": 16.832056,
+      "system_seconds": 0.518215,
+      "cpu_seconds": 17.350271000000003,
+      "maxrss_kib": 132604
+    }
+  ],
+  "metrics": {
+    "wall_seconds": {
+      "paired_C_over_A": [
+        0.9802003214639835,
+        0.8973075850776637
+      ],
+      "paired_log_C_over_A": [
+        -0.019998318549200853,
+        -0.10835657149011128
+      ],
+      "geometric_mean_C_over_A": 0.9378385699816343,
+      "descriptive_C_change_percent": -6.2161430018365715,
+      "arithmetic_mean_by_side": {
+        "A": 18.7408080425,
+        "C": 17.5688813425
+      },
+      "arithmetic_mean_C_over_A": 0.9374665864277394
+    },
+    "cpu_seconds": {
+      "paired_C_over_A": [
+        0.9800901808200637,
+        0.8961066555823193
+      ],
+      "paired_log_C_over_A": [
+        -0.02011069030625151,
+        -0.10969583784321536
+      ],
+      "geometric_mean_C_over_A": 0.9371581158501152,
+      "descriptive_C_change_percent": -6.284188414988479,
+      "arithmetic_mean_by_side": {
+        "A": 18.7773095,
+        "C": 17.590419000000004
+      },
+      "arithmetic_mean_C_over_A": 0.9367912373175722
+    },
+    "user_seconds": {
+      "paired_C_over_A": [
+        0.9652337508404846,
+        0.8937780310282041
+      ],
+      "paired_log_C_over_A": [
+        -0.035384978125579274,
+        -0.11229782207754005
+      ],
+      "geometric_mean_C_over_A": 0.9288189927581026,
+      "descriptive_C_change_percent": -7.118100724189736,
+      "arithmetic_mean_by_side": {
+        "A": 18.306945499999998,
+        "C": 16.997637500000003
+      },
+      "arithmetic_mean_C_over_A": 0.9284802590361131
+    },
+    "system_seconds": {
+      "paired_C_over_A": [
+        1.6222573352456426,
+        0.9789499733639616
+      ],
+      "paired_log_C_over_A": [
+        0.4838185961582587,
+        -0.02127473748763866
+      ],
+      "geometric_mean_C_over_A": 1.2602018787195222,
+      "descriptive_C_change_percent": 26.020187871952217,
+      "arithmetic_mean_by_side": {
+        "A": 0.470364,
+        "C": 0.5927815
+      },
+      "arithmetic_mean_C_over_A": 1.260261201962735
+    },
+    "maxrss_kib": {
+      "paired_C_over_A": [
+        1.083455630564524,
+        1.0822695961607522
+      ],
+      "paired_log_C_over_A": [
+        0.0801555910538362,
+        0.07906031404666744
+      ],
+      "geometric_mean_C_over_A": 1.0828624509831157,
+      "descriptive_C_change_percent": 8.286245098311573,
+      "arithmetic_mean_by_side": {
+        "A": 122588.0,
+        "C": 132746.0
+      },
+      "arithmetic_mean_C_over_A": 1.0828629229614644
+    }
+  },
+  "formula": "Adjacent pairs C1/A2 and C4/A3. Geometric ratio = exp(mean(log(C/A))); descriptive C change percent = 100*(ratio - 1). CPU = user + system. RSS is maximum resident size in KiB, not heap allocation.",
+  "correctness": {
+    "all_four_exit_zero": true,
+    "all_four_raw_CI_CO_equal_original_A": true,
+    "all_four_original_ordered_query_contract_equal": true,
+    "all_four_reused_zero_and_uncached": true,
+    "first_C_and_each_leg_gated_before_sample_inclusion_and_next_start": true,
+    "whole_query_bytes_equal_observation": [
+      true,
+      true,
+      true,
+      true
+    ],
+    "whole_query_equality_is_hard_gate": false
+  },
+  "reference": {
+    "CI": {
+      "bytes": 71110,
+      "sha256": "92de300c2538f770c0d9837b7f91fd4df7b420b8b8da8ec519283959f42b7407"
+    },
+    "CO": {
+      "bytes": 505846,
+      "sha256": "ae25dc2735bb934588a959f6978a872aa59472f37c4058d2699e30afd9dfdc0f"
+    },
+    "ordered_id_members_sha256": "844c948b09f477930899b7f01f6bf532a9e66690c8069056080d351840781606",
+    "original_A_qualification_receipt_sha256": "d17593706064cfdebadf320716efe6988ab90fbfacb5c0b94bb6957843a86988",
+    "original_A_independent_review_sha256": "6a8ba45e94d1c92db20e792456c6cfdd1cde5b534831442263f8cfcbc63afb9b",
+    "scope": "Actual original A output, not an independently proven semantic oracle. Its qualification timing is excluded from this window."
+  },
+  "evidence": {
+    "original_receipt_sha256": "a359f5e082ac6c2a7bcc76abb82a4529b8a667da8a757c930993f0fcaab42b1a",
+    "original_final_seal_sha256": "d76062390710f0725e4afcad93b10882ead6b0d4d3fbdb19552853c1f1a71435",
+    "original_wait4_timing_sha256_in_order": [
+      "1e32f4b902fc04359dc47818c3ab06b79c26e37ee7eba8a9651c2c51650ff849",
+      "09064983ab113f75d9c84084859ed442927b0918049e2605dd59044a9490c9be",
+      "43a27405cc0822a20b43618ccc161ff11dce96ac57191a6230f574e7e52b5dc1",
+      "35488405e22a83407a586893e7592a6710bf0b0d7e62d891c95103578066ee07"
+    ],
+    "independent_actual_review_sha256": "90d6c8b7ad4138ba67a2c2d8dec7908efbd66383f5b87e6c21f777b6909de820",
+    "export_is_sanitized_summary_not_original_receipt": true,
+    "independent_numeric_manifest_sha256": "24cd26a647adb80f1ebbc7c0d68d5a77f97c5183a1365f89888a89f0222d7000",
+    "independent_numeric_results_sha256": "e2d20477774285fb000351c8304c0796b17c0b4f1b6731748361a784b158ade6"
+  },
+  "interpretation": "Both fixed Xmlf pairs have lower C wall, total CPU and user time, but maximum RSS is higher in both pairs. The wall reductions differ substantially (1.9800% and 10.2692%); the slower A3 is retained. Descriptive geometric changes are wall -6.2161%, CPU -6.2842%, system +26.0202% and RSS +8.2862%. System time is higher in the first pair and lower in the second. No causal attribution, sample exclusion, adjustment or extra sampling follows. Two pairs do not establish stable or statistically significant benefit, general compiler improvement, allocation reduction or merge readiness. Foundation remains mixed; Xmlf, Foundation, Async and Frontend are separate results with no pooled estimate.",
+  "timing": "Direct child Popen launch through blocking wait4 return, excluding timing-wrapper startup and serialization. Ordinary compilers, not profiling-way. Hashing and artifact checks occur outside the target timing interval. No global-idle/isolation claim.",
+  "sampling": {
+    "fixed_target_calls": 4,
+    "pairs": 2,
+    "additional_qualification_calls_in_window": 0,
+    "dropped_or_adjusted_samples": 0,
+    "adaptive_additional_samples": 0,
+    "native_or_fixed_point_calls": 0,
+    "qualification_time_included": false,
+    "automatic_followup_workload": false,
+    "performance_samples": 4
+  },
+  "within_side_context_not_extra_pair": {
+    "A3_over_A2": {
+      "wall_seconds": 1.0641134888719936,
+      "cpu_seconds": 1.0642592760139706,
+      "user_seconds": 1.0591104350993048,
+      "system_seconds": 1.2868172205070862,
+      "maxrss_kib": 0.9989563969605062
+    },
+    "interpretation": "A3 was 6.4113% slower than A2 in wall and 6.4259% in total CPU. It remains included unchanged. This observation is not an extra C/A pair or a causal explanation; no filtering, adjustment or replacement was performed."
+  }
+}
