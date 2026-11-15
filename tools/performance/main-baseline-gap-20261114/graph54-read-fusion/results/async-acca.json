@@ -1,0 +1,214 @@
+{
+  "status": "INDEPENDENTLY_VERIFIED_FIXED_FOUR_LEGS_TWO_PAIRS_ONLY",
+  "order": "ACCA",
+  "producer_sha256": {
+    "A": "29c58e2b48324957cee5965a1c76dc7e688c9b25264bd5150c3f7f085dbc23ef",
+    "C": "7770f188b578391f0468eff2df09e5237c33db1245f90a6880f5185759efac39"
+  },
+  "workload": {
+    "crate": "mlf-async/0.3.0/library",
+    "modules": 5,
+    "source_bytes": 66516,
+    "entry": "NoEntry",
+    "fresh_groups": 86,
+    "members": 87,
+    "owners": 4,
+    "import_reexport_only_facade": "Async.Task.Internal",
+    "fresh_query_cache_each_leg": true,
+    "cold_OS_cache_claim": false,
+    "dependency_interfaces_reused_without_rebuild": [
+      "mlf-foundation/0.3.0/library",
+      "builtin"
+    ],
+    "scope": "Compile the complete async crate only; do not execute its process or task APIs. Module coverage comes from the exact manifest/spec inputs and compiler load; query coverage checks four local-value owners, not a fifth facade owner or an independent typed CI decode."
+  },
+  "source_manifest_sha256": "15e9ac789b283257d3ff3f1ab3053f03430859a6cbadd621d214f113994778ff",
+  "source_modules": [
+    {
+      "module": "Async.Process",
+      "bytes": 11490,
+      "sha256": "482169c6d92a16b5a3071088ec24ee7206324995f8e69f6df073cc24559fcb73"
+    },
+    {
+      "module": "Async.Process.Internal",
+      "bytes": 2819,
+      "sha256": "ef551f51dcf7da4b48e49f2807e2d5efe84c009cfa911913402c493fce7a25bc"
+    },
+    {
+      "module": "Async.Task",
+      "bytes": 1335,
+      "sha256": "cce3de39e4e4fe7537944da1f6b000a8146737340bd0d05ba03fc7e3550acd3b"
+    },
+    {
+      "module": "Async.Task.Internal",
+      "bytes": 1019,
+      "sha256": "a87ab11e316ec7c4ff28a5f9974b61ecb58aebeeb3f3227646d02ed3e7416e00"
+    },
+    {
+      "module": "Async.Task.Core",
+      "bytes": 49853,
+      "sha256": "0a75da421779203053d535e09367bce368e245e3608b12cad23507358dedf1af"
+    }
+  ],
+  "samples": [
+    {
+      "side": "A",
+      "position": 1,
+      "wall_ns": 9977921104,
+      "wall_seconds": 9.977921104,
+      "user_seconds": 9.663533,
+      "system_seconds": 0.327208,
+      "cpu_seconds": 9.990741,
+      "maxrss_kib": 84220
+    },
+    {
+      "side": "C",
+      "position": 2,
+      "wall_ns": 9119370803,
+      "wall_seconds": 9.119370803,
+      "user_seconds": 8.840238,
+      "system_seconds": 0.286841,
+      "cpu_seconds": 9.127079,
+      "maxrss_kib": 86252
+    },
+    {
+      "side": "C",
+      "position": 3,
+      "wall_ns": 9030533312,
+      "wall_seconds": 9.030533312,
+      "user_seconds": 8.861312,
+      "system_seconds": 0.18068299999999998,
+      "cpu_seconds": 9.041995,
+      "maxrss_kib": 86408
+    },
+    {
+      "side": "A",
+      "position": 4,
+      "wall_ns": 9627321482,
+      "wall_seconds": 9.627321482,
+      "user_seconds": 9.428386,
+      "system_seconds": 0.198015,
+      "cpu_seconds": 9.626401,
+      "maxrss_kib": 84220
+    }
+  ],
+  "metrics": {
+    "wall_seconds": {
+      "paired_C_over_A": [
+        0.913954992021753,
+        0.9380109855980396
+      ],
+      "paired_log_C_over_A": [
+        -0.08997395160505954,
+        -0.06399361831950515
+      ],
+      "geometric_mean_C_over_A": 0.9259048670671156,
+      "descriptive_gain_fraction": 0.07409513293288439,
+      "arithmetic_mean_by_side": {
+        "A": 9.802621293,
+        "C": 9.0749520575
+      },
+      "arithmetic_mean_C_over_A": 0.9257678927146125
+    },
+    "cpu_seconds": {
+      "paired_C_over_A": [
+        0.9135537594258524,
+        0.9392913301658637
+      ],
+      "paired_log_C_over_A": [
+        -0.09041305494946725,
+        -0.0626295921255492
+      ],
+      "geometric_mean_C_over_A": 0.9263331613783101,
+      "descriptive_gain_fraction": 0.07366683862168988,
+      "arithmetic_mean_by_side": {
+        "A": 9.808571,
+        "C": 9.084537000000001
+      },
+      "arithmetic_mean_C_over_A": 0.9261835388661611
+    },
+    "user_seconds": {
+      "paired_C_over_A": [
+        0.9148039335096181,
+        0.9398546050193533
+      ],
+      "paired_log_C_over_A": [
+        -0.08904551698528039,
+        -0.062030091192904355
+      ],
+      "geometric_mean_C_over_A": 0.9272446762310543,
+      "descriptive_gain_fraction": 0.07275532376894567,
+      "arithmetic_mean_by_side": {
+        "A": 9.545959499999999,
+        "C": 8.850774999999999
+      },
+      "arithmetic_mean_C_over_A": 0.9271750000615444
+    },
+    "maxrss_kib": {
+      "paired_C_over_A": [
+        1.024127285680361,
+        1.025979577297554
+      ],
+      "paired_log_C_over_A": [
+        0.02384082131463757,
+        0.02564784138239124
+      ],
+      "geometric_mean_C_over_A": 1.0250530130979705,
+      "descriptive_gain_fraction": -0.025053013097970478,
+      "arithmetic_mean_by_side": {
+        "A": 84220.0,
+        "C": 86330.0
+      },
+      "arithmetic_mean_C_over_A": 1.0250534314889574
+    }
+  },
+  "formula": "Adjacent pairs C2/A1 and C3/A4. Geometric ratio = exp(mean(log(C/A))); descriptive gain = 1 - ratio. CPU = user + system. RSS is maximum resident size in KiB, not heap allocation.",
+  "correctness": {
+    "all_four_exit_zero": true,
+    "all_four_raw_CI_CO_equal_original_A": true,
+    "all_four_original_ordered_query_contract_equal": true,
+    "all_four_reused_zero_and_uncached": true,
+    "whole_query_bytes_equal_observation": [
+      true,
+      true,
+      true,
+      true
+    ],
+    "whole_query_equality_is_hard_gate": false
+  },
+  "reference": {
+    "CI": {
+      "bytes": 37344,
+      "sha256": "968dc650a96b0ecf1caa8b529008aaeda4016689dc5891eff672ced046735c65"
+    },
+    "CO": {
+      "bytes": 243359,
+      "sha256": "80d8c319c65d4df613299c6e7a7532bf136385e447cbe755d65cd4a92041c0e5"
+    },
+    "ordered_id_members_sha256": "c283defcbc0390d2e5cd7e4e36d3050b8e5bc4b799c3d15cc8de2d55d7d0d493",
+    "original_A_qualification_receipt_sha256": "28a9c00c14eb644b64dc76488fdad32614b92232df8150e3a8f2674a4b5a47d3",
+    "original_A_independent_review_sha256": "27546a1037f6cab3f213de684f5899782f6aea97ca1bd4171e7ec4acac49c639"
+  },
+  "evidence": {
+    "original_receipt_sha256": "b215517e13827a863053e5dca30964f662babd3c13525c01241aa212477a97cd",
+    "original_final_seal_sha256": "6a3ecfe39d2f89766da8b5b46682c12bef6670cdb1be46a09060847f1acaa337",
+    "original_wait4_timing_sha256_in_order": [
+      "f14bf2483db9f4c2f198b9a098befbed26d4e7742a1e8c3bd78715066e869614",
+      "ebff41c7ee996cf741d1ac667c082340ba86eecba8ed8d6e7a7125817308e784",
+      "f94ea3cfc1ef87816689774672b226856389182e1a9f0b3a839bcf1ad046b76b",
+      "b0b4d6b5d8a484df991218b05885261c934f23da86432a7523de38eaada585c5"
+    ],
+    "independent_actual_review_sha256": "ffece386196f2dbb9d0487f913cb7f37bb0c3a77540fb4c4d0ad7c55d664855e",
+    "export_is_sanitized_summary_not_original_receipt": true
+  },
+  "interpretation": "Two descriptive pairs only. C has lower wall and CPU time in both pairs here, and higher maximum RSS in both. This is a positive signal on this workload, not proof of a stable or statistically significant gain, general compiler improvement or merge readiness. No heap allocation saving is inferred. Foundation remains mixed; results are neither pooled nor averaged across workloads.",
+  "timing": "Direct child Popen launch through blocking wait4 return, excluding timing-wrapper startup and serialization. Ordinary compilers, not profiling-way. Hashing and artifact checks occur outside the target timing interval. No global-idle/isolation claim.",
+  "sampling": {
+    "fixed_target_calls": 4,
+    "pairs": 2,
+    "additional_qualification_calls_in_window": 0,
+    "dropped_or_adjusted_samples": 0,
+    "adaptive_additional_samples": 0,
+    "native_or_fixed_point_calls": 0
+  }
+}
