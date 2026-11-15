@@ -1,0 +1,32 @@
+{
+  "schema": "foundation-infer-localization-public-export-manifest-v1",
+  "status": "INDEPENDENTLY_AUDITED_RESULT_REDACTED_FOR_PUBLICATION",
+  "independent_actual_run_review": "VERIFIED_SINGLE_C_DIAGNOSTIC_ONLY",
+  "repository_destination": "tools/performance/main-baseline-gap-20261114/foundation-infer-localization",
+  "files": [
+    {
+      "path": "diagnostic.patch",
+      "bytes": 7027,
+      "sha256": "3d21c7aea2ae5bf99914fa37791284d8f3bbbc121cf480ee437b9451aa9b8dce"
+    },
+    {
+      "path": "README.md",
+      "bytes": 4631,
+      "sha256": "6a97f969d434f2fd7ad0f6d47f96b6bd37fb42c775c5f3a1090b6264b4f76fd5"
+    },
+    {
+      "path": "summary.json",
+      "bytes": 6278,
+      "sha256": "824c45fe6dd46c619e05a69da7ba0c7b91c9d40ee13b13525dbfc39315cf1343"
+    }
+  ],
+  "manifest_self_hash": "excluded to avoid self-reference",
+  "excluded": [
+    "local absolute paths",
+    "user identity",
+    "private storage/access identifiers",
+    "execution session identifiers",
+    "raw binaries",
+    "private runners"
+  ]
+}

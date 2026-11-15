@@ -1,0 +1,169 @@
+{
+  "schema": "foundation-infer-localization-summary-v1",
+  "status": "ACTUAL_SINGLE_C_DIAGNOSTIC_PASS",
+  "source": {
+    "baseline_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+    "baseline_tree": "386f0b41ab5f9b39fca273f3040f51d73df924a1",
+    "diagnostic_overlay_modules": [
+      "Bootstrap.CrateGraph",
+      "Bootstrap.QueryGraph"
+    ],
+    "IntRank": "baseline unchanged"
+  },
+  "workload": {
+    "crate_id": "mlf-foundation/0.3.0/library",
+    "normal_manifest_boundary": true,
+    "module_count": 15,
+    "source_bytes": 211763,
+    "entry": "NoEntry",
+    "external_shared_imports": [
+      "MLF.Primitive"
+    ],
+    "builtin_reused_read_only": true,
+    "fresh_cache": true
+  },
+  "method": {
+    "build": "ordinary GHC 9.14.1, -O2, fresh 95-module compiler C, baseline IntRank",
+    "C_binary_sha256": "e314309fc0304ffe2a5f752667c964f420e5175f35da02f4950544b2dfe32735",
+    "diagnostic_target_calls_planned": 1,
+    "target_budget_seconds": 180,
+    "phase_budget_seconds": 300,
+    "address_space_per_process_bytes": 4294967296,
+    "performance_samples": 0,
+    "native_or_fixed_point_runs": 0,
+    "profile_environment": {
+      "MLF_QUERY_PROFILE": "1"
+    },
+    "timing": "Direct-child wait4 wall/user/system/maxrss; wrapper startup outside target interval; maxrss is not aggregate process-tree peak.",
+    "comparison_gate": [
+      "Raw CI and CO exact bytes equal to original Foundation A reference",
+      "Original ordered query IDs and members equal",
+      "532 fresh groups, 539 members, 14 value owners and witnesses; no reuse"
+    ],
+    "diagnostic_target_calls_actual": 1
+  },
+  "A_reference": {
+    "status": "PASS_SINGLE_FOUNDATION15_CHECKED_REFERENCE",
+    "wall_ns": 26057009766,
+    "maxrss_kib": 142244,
+    "fresh_groups": 532,
+    "members": 539,
+    "value_owners": 14,
+    "profile_ms": {
+      "graph_ms": 1210,
+      "load_ms": 1,
+      "infer_ms": 22531,
+      "finish_ms": 226,
+      "output_ms": 783,
+      "publish_ms": 400
+    },
+    "original_six_bucket_sum_ms": 25151,
+    "signed_unclassified_wall_ns": 906009766,
+    "artifacts": {
+      "mlfci": {
+        "bytes": 329841,
+        "sha256": "dfa6266e6047c9a7a5b2eee5ac60aa6dad60e106564c1d1779d7134d04d6a756"
+      },
+      "mlfco": {
+        "bytes": 1072662,
+        "sha256": "ed7309dfe0d30204cf601e8e600c101f7b68b4d0121de58b6bdcfd4a14abdd6e"
+      }
+    }
+  },
+  "C_diagnostic": {
+    "status": "PASS_C_ONLY_FOUNDATION15_INFER_DIAGNOSTIC_REFERENCE_MATCH",
+    "exit_code": 0,
+    "wall_ns": 25159405473,
+    "user_seconds": 24.924526,
+    "system_seconds": 0.269012,
+    "cpu_seconds": 25.193538,
+    "maxrss_kib": 137064,
+    "whole_phase_ns": 42786176385,
+    "performance_samples": 0,
+    "raw_CI_CO_byte_equal": true,
+    "original_ordered_id_members_equal": true,
+    "full_query_report_byte_equal": true,
+    "fresh_groups": 532,
+    "members": 539,
+    "value_owners": 14,
+    "profile_ms": {
+      "graph_ms": 1168,
+      "load_ms": 1,
+      "infer_ms": 21810,
+      "finish_ms": 226,
+      "output_ms": 821,
+      "publish_ms": 376,
+      "infer_compile_open_ms": 20378,
+      "infer_canonical_ms": 273,
+      "infer_validate_prepared_ms": 3,
+      "infer_record_ms": 1149,
+      "infer_record_encode_ms": 1121,
+      "infer_record_digest_ms": 22
+    },
+    "original_six_bucket_sum_ms": 24402,
+    "signed_unclassified_wall_ns": 757405473,
+    "signed_infer_unclassified_ns": 7000000,
+    "signed_record_unclassified_ns": 6000000,
+    "artifacts": {
+      "mlfci": {
+        "bytes": 329841,
+        "sha256": "dfa6266e6047c9a7a5b2eee5ac60aa6dad60e106564c1d1779d7134d04d6a756"
+      },
+      "mlfco": {
+        "bytes": 1072662,
+        "sha256": "ed7309dfe0d30204cf601e8e600c101f7b68b4d0121de58b6bdcfd4a14abdd6e"
+      }
+    },
+    "queries": {
+      "bytes": 666349,
+      "sha256": "6ee52ac1b9cf6a1bdceaaebceb5aaa21533c9804879c2cdc6f5c3d8a26b16ff2"
+    },
+    "post_run_inputs_verified": true,
+    "cleanup_verified": true,
+    "locks_reacquired": true
+  },
+  "profile_contract": {
+    "fields": [
+      "graph_ms",
+      "load_ms",
+      "infer_ms",
+      "finish_ms",
+      "output_ms",
+      "publish_ms",
+      "infer_compile_open_ms",
+      "infer_canonical_ms",
+      "infer_validate_prepared_ms",
+      "infer_record_ms",
+      "infer_record_encode_ms",
+      "infer_record_digest_ms"
+    ],
+    "inclusive_hierarchy": {
+      "infer_ms": [
+        "infer_compile_open_ms",
+        "infer_canonical_ms",
+        "infer_validate_prepared_ms",
+        "infer_record_ms"
+      ],
+      "infer_record_ms": [
+        "infer_record_encode_ms",
+        "infer_record_digest_ms"
+      ]
+    },
+    "residuals": "Signed CLI-minus-original-six, infer-minus-four-immediate-children and record-minus-encode/digest. Never sum inclusive parents with children or clamp negative residuals.",
+    "scope": "Instrumented natural Either/IO wall boundaries, not exclusive CPU or causal attribution. compile_open includes generation, solver, elaboration and checked admission. Lazy demand and GHC optimization can move work across labels; no deep-force added."
+  },
+  "limits": [
+    "Single instrumented diagnostic, zero performance samples; no A/B speedup claim",
+    "Foundation15 is not the whole compiler/package workload",
+    "Raw output equality is not an independent full typed decoder or proof for all programs",
+    "Prior 90-module monolithic checked-crate A diagnostic reported out of memory and exited 251 under its unchanged 4 GiB address-space limit. Its actual peak memory was not recorded. This is not a B regression and remains INCONCLUSIVE; no rerun or promotion to PASS."
+  ],
+  "ready_for_parent_publication_review": true,
+  "independent_actual_run_review": {
+    "status": "VERIFIED_SINGLE_C_DIAGNOSTIC_ONLY",
+    "review_sha256": "ad36179ce0cb490b44a47e63ef997595892c20608652c6b17731fb4ffdb4d20f",
+    "all_1670_files_verified": true,
+    "private_exact_backup_full_readback": true
+  },
+  "localization_conclusion": "In this instrumented run, compile-open accounted for 20378 of 21810 infer milliseconds (~93.4%); raw record encode was 1121 ms and digest 22 ms. The next localization priority is the natural checked compilation pipeline inside compile-open, not encoding/hash. This is not a pure solver, CPU or performance attribution."
+}

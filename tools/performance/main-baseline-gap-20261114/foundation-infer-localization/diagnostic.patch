@@ -1,0 +1,119 @@
+--- a/libraries/mlf-crates/Bootstrap/QueryGraph.hs
++++ b/libraries/mlf-crates/Bootstrap/QueryGraph.hs
+@@ -45,6 +45,28 @@
+       ioReturn (if validHash digest then Right ((,) digest bytes) else Left "query result SHA failed")
+     } }
+   };
++  -- Diagnostic-only subclocks for the raw InferScc record. Other records keep
++  -- the original path. These two intervals are nested inside infer_record_ms.
++  encodeHashedProfiled settings value = do {
++    started <- clock settings;
++    result <- Storage.encode 6 [value];
++    elapsed settings 10 started;
++    case result of { Left e -> ioReturn (Left e); Right bytes -> do {
++      digestStarted <- clock settings;
++      digest <- byteArrayDigest bytes;
++      elapsed settings 11 digestStarted;
++      ioReturn (if validHash digest then Right ((,) digest bytes) else Left "query result SHA failed")
++    } }
++  };
++  -- Observe only the Either constructor already demanded by the next bind.
++  -- Never force the successful payload to NF or add a traversal for timing.
++  profileEither settings index value = do {
++    started <- clock settings;
++    case value of {
++      Left e -> do { elapsed settings index started; ioReturn (Left e) };
++      Right result -> do { elapsed settings index started; ioReturn (Right result) }
++    }
++  };
+   hashValue value = do {
+     encoded <- encodeHashed value;
+     ioReturn (mapEither fst encoded)
+@@ -120,6 +142,11 @@
+   -- Publication neither traverses the raw AST again nor encodes it a second time.
+   record wanted reads persist value session = do {
+     encoded <- encodeHashed value;
++    ioReturn (mapEither (\((,) digest bytes) -> recordDigest wanted reads
++      (if persist then Just digest else Nothing) digest (if persist then Just bytes else Nothing) session) encoded)
++  };
++  recordProfiled settings wanted reads persist value session = do {
++    encoded <- encodeHashedProfiled settings value;
+     ioReturn (mapEither (\((,) digest bytes) -> recordDigest wanted reads
+       (if persist then Just digest else Nothing) digest (if persist then Just bytes else Nothing) session) encoded)
+   };
+@@ -854,7 +881,7 @@
+   -- Optional phase clocks are kept outside deterministic output/query hashes.
+   profile = do {
+     enabled <- getEnv "MLF_QUERY_PROFILE";
+-    if eqString enabled "1" then do { counters <- newIntArray 6 0; ioReturn (Just counters) }
++    if eqString enabled "1" then do { counters <- newIntArray 12 0; ioReturn (Just counters) }
+     else ioReturn Nothing
+   };
+   clock settings = case settings of {
+@@ -877,10 +904,12 @@
+   writeProfile path settings = case settings of {
+     Nothing -> ioReturn ();
+     Just counters -> do {
+-      values <- mapM (readIntArray counters) [0,1,2,3,4,5];
++      values <- mapM (readIntArray counters) [0,1,2,3,4,5,6,7,8,9,10,11];
+       writeFile path ("{" ++ intercalate "," (map (\((,) name value) ->
+         "\"" ++ name ++ "\":" ++ showInt value)
+-        (zip ["graph_ms","load_ms","infer_ms","finish_ms","output_ms","publish_ms"] values)) ++ "}\n")
++        (zip ["graph_ms","load_ms","infer_ms","finish_ms","output_ms","publish_ms",
++              "infer_compile_open_ms","infer_canonical_ms","infer_validate_prepared_ms",
++              "infer_record_ms","infer_record_encode_ms","infer_record_digest_ms"] values)) ++ "}\n")
+     }
+   }
+ }
+--- a/libraries/mlf-crates/Bootstrap/CrateGraph.hs
++++ b/libraries/mlf-crates/Bootstrap/CrateGraph.hs
+@@ -239,25 +239,37 @@
+                         };
+                         seq cached (G.elapsed statistics 1 loadStarted);
+                         inferStarted <- G.clock statistics;
+-                        let { hit = case cached of { Right _ -> True; Left _ -> False };
+-                          raw = case cached of {
+-                            Right fragment -> Right fragment;
+-                            Left _ -> do {
+-                              fragment <- if Source.usesIndexedTerms scope then do {
++                        let { hit = case cached of { Right _ -> True; Left _ -> False } };
++                        raw <- case cached of {
++                          Right fragment -> ioReturn (Right fragment);
++                          Left _ -> do {
++                            -- Inclusive checked compilation, not a pure solver timer.
++                            -- Keep the same natural Either boundaries and lazy payloads.
++                            compiled <- G.profileEither statistics 6
++                              (if Source.usesIndexedTerms scope then do {
+                                 members <- Source.indexedMembers slots prepared;
+                                 Inference.compileOpenGroupIndexed group (Source.expectedParameters slots prepared) declarations members
+                               } else Inference.compileOpenGroup group
+-                                [Q.dependencyInterface (Source.groupBindings prepared)] declarations (Source.groupMembers prepared);
+-                              canonical <- Source.canonicalOpen fragment;
+-                              Source.validatePreparedOpen slots prepared canonical;
+-                              Right canonical
+-                            }
+-                          } };
++                                [Q.dependencyInterface (Source.groupBindings prepared)] declarations (Source.groupMembers prepared));
++                            case compiled of { Left e -> ioReturn (Left e); Right fragment -> do {
++                              canonical <- G.profileEither statistics 7 (Source.canonicalOpen fragment);
++                              case canonical of { Left e -> ioReturn (Left e); Right normalized -> do {
++                                valid <- G.profileEither statistics 8 (Source.validatePreparedOpen slots prepared normalized);
++                                ioReturn (mapEither (\_ -> normalized) valid)
++                              } }
++                            } }
++                          }
++                        };
+                         case raw of { Left e -> ioReturn (Left e); Right fragment -> do {
+                           recorded <- if hit then case previous of {
+                             Just node -> ioReturn (Right ((,) node active));
+                             Nothing -> ioReturn (Left "missing validated source query")
+-                          } else G.record rawKey reads True (rawValue references group fragment) active;
++                          } else do {
++                            recordStarted <- G.clock statistics;
++                            result <- G.recordProfiled statistics rawKey reads True (rawValue references group fragment) active;
++                            G.elapsed statistics 9 recordStarted;
++                            ioReturn result
++                          };
+                           G.elapsed statistics 2 inferStarted;
+                           finishStarted <- G.clock statistics;
+                           case recorded of { Left e -> ioReturn (Left e); Right ((,) rawNode fourth) ->
