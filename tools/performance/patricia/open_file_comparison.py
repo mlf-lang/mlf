@@ -472,6 +472,26 @@ def compare_open_file(closed_files, open_files, dependency_interfaces,
     except Invalid as error:
         raise ComparisonError(str(error)) from error
 
+def match_group_identity(crate, legacy, opened, members):
+    if not members or len(set(members)) != len(members):
+        return False
+    encoded = lambda value: ''.join(str(ord(char)) + '_' for char in value)
+    expected_legacy = 'Query_' + encoded(crate) + 'z_' + encoded(members[0])
+    expected_open = pack(['MLF-OPEN-GROUP-1', crate, pack(sorted(members))])
+    return legacy == expected_legacy and opened == expected_open
+
+
+def fragment_equal(parameters, opened_parameters, closed, opened):
+    require(len(parameters) == len(opened_parameters), 'fragment parameter count changed')
+    for (original, ty), current in reversed(list(zip(parameters, opened_parameters))):
+        closed = node(71, original, ty, closed)
+        opened = node(71, current, ty, opened)
+    try:
+        return linked_equal(closed, opened)
+    except ComparisonError as error:
+        raise ComparisonError('complete original fragment body changed: ' + str(error)) from error
+
+
 def _compare(closed_files, open_files, dependency_interfaces,
              audited_open_files, closed_linked_bytes, open_linked_bytes, entry_selection):
     suffixes = {'.mlfci', '.mlfco'}
@@ -527,11 +547,14 @@ def _compare(closed_files, open_files, dependency_interfaces,
     require(len(units) == len(fragments) and len(units) > 0, 'fragment inventory changed')
     groups, used_bindings, used_data, exports = [], set(), set(), []
     group_reports = []
+    all_bodies_exact = True
     for unit, fragment in zip(units, fragments):
         header, term = fields(unit, 241, 2)
         hf = fields(header, 240, 8)
         group, receipt, data_names, parameters, body, owned, used = fields(fragment, 401, 7)
-        require(group == hf[0], 'ordered fragment identity changed')
+        members = [name(value)[1] for value in items(owned)]
+        require(group == hf[0] or match_group_identity(rootid, text(hf[0]), text(group), members),
+                'ordered fragment identity changed')
         group_name = text(group)
         require(group_name not in groups, 'duplicate fragment group')
         groups.append(group_name)
@@ -544,9 +567,10 @@ def _compare(closed_files, open_files, dependency_interfaces,
         while term[0] == 'node' and term[1] == 71:
             parameter, ty, term = fields(term, 71, 3)
             ps.append((parameter, ty))
-        require(term == body, 'complete original fragment body changed')
         raw_parameters, raw_owned = list(items(parameters)), list(items(owned))
-        require(raw_parameters == [p for p, _ in ps], 'ordered parameter names changed')
+        exact_body = term == body and raw_parameters == [p for p, _ in ps]
+        all_bodies_exact = all_bodies_exact and exact_body
+        alpha_body = fragment_equal(ps, raw_parameters, term, body)
         require(len({name(p)[0] for p in raw_parameters}) == len(raw_parameters), 'duplicate parameter identity')
         external_alpha = 0
         for parameter, ty in ps:
@@ -576,7 +600,7 @@ def _compare(closed_files, open_files, dependency_interfaces,
             require(key in declarations, 'fragment datatype missing')
             star_pairs += same_declaration(declaration, declarations[key])
             used_data.add(key)
-        group_reports.append({'group': group_name, 'body_exact': True,
+        group_reports.append({'group': group_name, 'body_exact': exact_body, 'body_alpha': alpha_body,
             'external_alpha_schemes': external_alpha, 'all_star_representation_pairs': star_pairs})
     require(br == sorted(used_bindings), 'binding reference inventory is not complete/exact')
     require(dr == sorted(used_data), 'datatype reference inventory is not complete/exact')
@@ -598,7 +622,8 @@ def _compare(closed_files, open_files, dependency_interfaces,
             'audit_scope': 'exact same-format pair; not schema7-to-8 migration', 'groups': group_reports,
             'fragment_count': len(groups), 'group_count': len(groups), 'binding_reference_count': len(br),
             'datatype_reference_count': len(dr), 'compatibility_identity': compatibility,
-            'interface_content_exact': True, 'all_original_fragment_bodies_exact': True,
+            'interface_content_exact': True, 'all_original_fragment_bodies_exact': all_bodies_exact,
+            'all_original_fragment_bodies_lexically_equivalent': True,
             'audited_rebuild_original_bytes_equal': True, 'linked': linked,
             'entry_selection': selection,
             'native_validation_required': 'Public read/link of both originals, old checksums and Open.audit with returned fragments.'}

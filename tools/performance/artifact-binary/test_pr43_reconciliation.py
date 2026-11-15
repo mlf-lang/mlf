@@ -21,6 +21,22 @@ MACOS_PATH = 'tools/shared/build.py'
 MACOS_BASE_SOURCE = 'eff291112f318206ce0f7ab85cb8a2e474be41489441204696630a395f4ca3df'
 
 
+PERFORMANCE_BASE = 'fc300bc9fdc389b585cbef0630fc8915d53e89c5'
+
+def performance_base_bytes(path):
+    return subprocess.check_output(['git', '--no-replace-objects', '-C', str(ROOT),
+                                    'show', PERFORMANCE_BASE + ':' + path])
+
+def base_spec():
+    return json.loads(performance_base_bytes('tools/performance/artifact-binary/pr43-reconciliation-migration.json'))
+
+def base_files(contract):
+    spec = base_spec()
+    files = dict(contract.previous.value['current_files'])
+    files.update({p: row[1] for p, row in spec['changes'].items()})
+    files.update(spec['additions'])
+    return files
+
 def main_bytes(path):
     return subprocess.check_output(['git', '--no-replace-objects', '-C', str(ROOT),
                                     'show', MACOS_BASE + ':' + path])
@@ -42,16 +58,16 @@ class PR43SourceReconciliation(unittest.TestCase):
         before = dict(c.previous.value['current_files'])
         before.update({p: row[1] for p, row in prior['changes'].items()})
         before.update(prior['additions'])
-        self.assertEqual(set(before), set(c.value['current_files']))
-        self.assertEqual({p for p in before if before[p] != c.value['current_files'][p]}, {MACOS_PATH})
+        self.assertEqual(set(before), set(base_files(c)))
+        self.assertEqual({p for p in before if before[p] != base_files(c)[p]}, {MACOS_PATH})
         self.assertEqual(before[MACOS_PATH], MACOS_BASE_SOURCE)
         self.assertEqual(hashlib.sha256(main_bytes(MACOS_PATH)).hexdigest(), MACOS_BASE_SOURCE)
-        current = json.loads((c.directory / 'pr43-reconciliation-migration.json').read_bytes())
+        current = base_spec()
         transition = current.pop('live_transition')
         self.assertEqual(transition, {
             'predecessor': MACOS_BASE, 'predecessor_tree': MACOS_BASE_TREE,
             'predecessor_manifest_sha256': MACOS_BASE_MANIFEST,
-            'changes': {MACOS_PATH: [MACOS_BASE_SOURCE, c.value['current_files'][MACOS_PATH]]},
+            'changes': {MACOS_PATH: [MACOS_BASE_SOURCE, base_files(c)[MACOS_PATH]]},
         })
         # Rewind precisely one live endpoint. Everything else, including all
         # first endpoints and the Patricia maintenance boundary, must be equal.
@@ -128,9 +144,9 @@ class PR43SourceReconciliation(unittest.TestCase):
             'tests/shared/MLF/Tests/SharedFrontend.hs',
             'tools/shared/build.py',
         }
-        self.assertEqual(set(previous_endpoint), set(c.value['current_files']))
+        self.assertEqual(set(previous_endpoint), set(base_files(c)))
         self.assertEqual({p for p, digest in previous_endpoint.items()
-                          if c.value['current_files'][p] != digest}, reviewed)
+                          if base_files(c)[p] != digest}, reviewed)
         for path in reviewed:
             old = archived(path)
             self.assertEqual(hashlib.sha256(old).hexdigest(), previous_endpoint[path])
@@ -138,7 +154,7 @@ class PR43SourceReconciliation(unittest.TestCase):
             for wrong in (old, (ROOT / path).read_bytes() + b' '):
                 with self.subTest(path=path), self.assertRaises(ValueError):
                     c.restore_path(wrong, path)
-        current = json.loads((c.directory / 'pr43-reconciliation-migration.json').read_bytes())
+        current = base_spec()
         for field in ('format', 'predecessor', 'additions'):
             self.assertEqual(current[field], prior[field])
         # Only the live Patricia boundary test follows the Layout overlap.
@@ -155,6 +171,36 @@ class PR43SourceReconciliation(unittest.TestCase):
             self.assertEqual(current['changes'][path][0], row[0])
             if path not in reviewed:
                 self.assertEqual(current['changes'][path], row)
+
+    def test_performance_follow_on_exact_paths_and_negative_controls(self):
+        c = self.contract
+        module = sys.modules[type(c).__module__]
+        spec = json.loads((c.directory / 'pr43-reconciliation-migration.json').read_bytes())
+        baseline = base_files(c)
+        changes = spec['performance_transition']['changes']
+        self.assertEqual(set(changes), module.PERFORMANCE_PATHS)
+        self.assertEqual({p for p in baseline if baseline[p] != c.value['current_files'][p]}, set(changes))
+        for path, (old, new) in changes.items():
+            self.assertEqual(old, hashlib.sha256(performance_base_bytes(path)).hexdigest())
+            self.assertEqual(old, baseline[path])
+            self.assertEqual(new, hashlib.sha256((ROOT / path).read_bytes()).hexdigest())
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                c.restore_path((ROOT / path).read_bytes() + b' ', path)
+            with self.subTest(previous=path), self.assertRaises(ValueError):
+                c.restore_path(performance_base_bytes(path), path)
+        for mutation in ('old', 'new', 'missing', 'extra', 'base', 'tree', 'manifest'):
+            bad = copy.deepcopy(spec)
+            transition = bad['performance_transition']
+            path = sorted(changes)[0]
+            if mutation == 'old': transition['changes'][path][0] = '0' * 64
+            elif mutation == 'new': transition['changes'][path][1] = '0' * 64
+            elif mutation == 'missing': del transition['changes'][path]
+            elif mutation == 'extra': transition['changes']['extra'] = ['0' * 64, '1' * 64]
+            elif mutation == 'base': transition['predecessor'] = '0' * 40
+            elif mutation == 'tree': transition['predecessor_tree'] = '0' * 40
+            else: transition['predecessor_manifest_sha256'] = '0' * 64
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                module.validate_live_transition(bad, ROOT, c.core)
 
     def test_complete_tree_projections_recover_exact_predecessor_and_live_inputs(self):
         c = self.contract

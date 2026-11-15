@@ -73,8 +73,16 @@ findBinding wanted (T.XLetRec bs rest) = case [(n,rhs)|(n,_,rhs)<-bs,X.nameHint 
  [] -> findBinding wanted rest
  _ -> error "duplicate definition"
 findBinding _ _ = error "missing definition"
-close definitions fragment rhs =
+close definitions fragment rhs = do
  let ps = O.parameters fragment
+     dependencyData (n,_) = case lookup (X.nameHint n) definitions of
+       Just (T.XWithData declarations _) -> declarations
+       Just _ -> []
+       Nothing -> error ("missing dependency " ++ B.unpack (X.nameHint n))
+ declarations <- foldM (\acc declaration -> expect "linked dependency datatype context"
+   (U.mergeDeclaration acc declaration)) (O.declarations (O.context fragment))
+   (concatMap dependencyData ps)
+ let
      ids = foldl (\acc (n,t)->U.typeIdentities t (IS.insert (X.nameId n) acc)) (U.termIdentities rhs IS.empty) ps
      start = 1 + maximum (0 : IS.toList ids)
      step (serial,bindings) (n,_) =
@@ -82,10 +90,10 @@ close definitions fragment rhs =
         Nothing -> error ("missing dependency " ++ B.unpack (X.nameHint n))
         Just definition -> let (next,term)=U.freshObject serial (strip definition) in (next,bindings++[(n,term)])
      (_,bindings)=foldl step (start,[]) ps
- in T.XWithData (O.declarations (O.context fragment)) (foldr (\(n,t) b->T.XLet n t b) rhs bindings)
+ pure (T.XWithData declarations (foldr (\(n,t) b->T.XLet n t b) rhs bindings))
 collect definitions (_,fragment) = foldM (\values (name,_) -> do
  let (_,rhs)=findBinding (X.nameHint name) (O.body fragment)
-     term=close definitions fragment rhs
+ term<-close definitions fragment rhs
  _ <- expect "independent final body check" (Checked.check term)
  pure (values ++ [(X.nameHint name,term)])) definitions (O.bindings fragment)
 observe definitions (name,_,expected,_) = case expected of

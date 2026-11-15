@@ -465,5 +465,47 @@ class RootPackageComparatorControls(ComparatorControls):
             self.assertEqual(C.text(ci[11]), hashlib.sha256(files['.mlfco']).hexdigest())
         self.assertEqual(negatives[2]['open_files'], self.data['open_files'])
 
+class GroupIdentityControls(unittest.TestCase):
+    def test_closed_and_open_owners_validate_full_ordered_membership(self):
+        import run_open_file_controls as F
+        crate = 'crate/λ'
+        members = ['a', 'bc']
+        encoded = lambda value: ''.join(str(ord(c)) + '_' for c in value)
+        legacy = 'Query_' + encoded(crate) + 'z_' + encoded(members[0])
+        owner = F.pack(['MLF-OPEN-GROUP-1', crate, F.pack(sorted(members))])
+        expected = [{'id': legacy, 'members': members}]
+        actual = [{'id': owner, 'members': members, 'cached': False}]
+        self.assertTrue(F.same_group_ownership(crate, expected, actual))
+        for bad in [
+            [{'id': owner, 'members': ['a', 'changed']}],
+            [{'id': owner, 'members': list(reversed(members))}],
+            [{'id': F.pack(['MLF-OPEN-GROUP-1', 'other', F.pack(members)]), 'members': members}],
+            [{'id': F.pack(['MLF-OPEN-GROUP-1', crate, F.pack(['a'])]), 'members': members}],
+            [], actual + actual,
+        ]:
+            with self.subTest(bad=bad):
+                self.assertFalse(F.same_group_ownership(crate, expected, bad))
+        self.assertFalse(F.same_group_ownership(crate, [{'id': 'wrong', 'members': members}], actual))
+
+    def test_artifact_group_identity_requires_exact_crate_and_members(self):
+        crate, members = 'crate/λ', ['a', 'bc']
+        encoded = lambda value: ''.join(str(ord(c)) + '_' for c in value)
+        legacy = 'Query_' + encoded(crate) + 'z_' + encoded(members[0])
+        owner = C.pack(['MLF-OPEN-GROUP-1', crate, C.pack(sorted(members))])
+        self.assertTrue(C.match_group_identity(crate, legacy, owner, members))
+        self.assertFalse(C.match_group_identity('other', legacy, owner, members))
+        self.assertFalse(C.match_group_identity(crate, legacy, owner, ['a']))
+        self.assertFalse(C.match_group_identity(crate, legacy, owner + 'x', members))
+
+    def test_fragment_identity_renaming_is_lexical_and_injective(self):
+        old = N(75, X(9, 'out'), N(70, X(3, 'input')), UNIT)
+        new = N(75, X(4, 'out'), N(70, X(0, 'input')), UNIT)
+        C.fragment_equal([(X(3, 'input'), TY)], [X(0, 'input')], old, new)
+        for bad in [N(75, X(4, 'out'), N(70, X(4, 'input')), UNIT),
+                    N(75, X(4, 'out'), N(77, I(3)), UNIT),
+                    N(75, X(4, 'changed'), N(70, X(0, 'input')), UNIT)]:
+            with self.subTest(bad=bad), self.assertRaises(C.ComparisonError):
+                C.fragment_equal([(X(3, 'input'), TY)], [X(0, 'input')], old, bad)
+
 if __name__=='__main__':
     unittest.main()
