@@ -1,0 +1,315 @@
+{
+  "status": "INDEPENDENTLY_VERIFIED_FIXED_FOUR_LEGS_TWO_PAIRS_ONLY",
+  "order": "CAAC",
+  "producer_sha256": {
+    "A": "29c58e2b48324957cee5965a1c76dc7e688c9b25264bd5150c3f7f085dbc23ef",
+    "C": "7770f188b578391f0468eff2df09e5237c33db1245f90a6880f5185759efac39"
+  },
+  "workload": {
+    "crate": "mlf-frontend/0.3.0/library",
+    "modules": 11,
+    "source_bytes": 371912,
+    "entry": "NoEntry",
+    "fresh_groups": 763,
+    "members": 858,
+    "member_roles": {
+      "value": 849,
+      "instance": 9
+    },
+    "owners": 11,
+    "owner_member_counts": {
+      "Bootstrap.Dependency": 101,
+      "Bootstrap.Desugar": 11,
+      "Bootstrap.Layout": 35,
+      "Bootstrap.Lexer": 79,
+      "Bootstrap.Module": 208,
+      "Bootstrap.Parsec": 45,
+      "Bootstrap.Parser": 175,
+      "Bootstrap.Prelude": 59,
+      "Bootstrap.Resolved": 11,
+      "Bootstrap.Standalone": 68,
+      "Bootstrap.Surface": 66
+    },
+    "fresh_query_cache_each_leg": true,
+    "cold_OS_cache_claim": false,
+    "dependency_interfaces_reused_without_rebuild": [
+      "mlf-foundation/0.3.0/library",
+      "mlf-language-core/0.3.0/library",
+      "builtin"
+    ],
+    "scope": "Compile the complete frontend crate only, not a full compiler self-build or execution of produced guest/native programs. Module coverage comes from exact manifest/spec inputs and compiler loading; query coverage checks local declarations and witnesses. Wire framing/CRC is not independent typed CI semantic decoding."
+  },
+  "source_manifest_sha256": "4c1b09d6b55932e589ed909ff675349d1ccf7b4b47e36086967d516bf1b5c71a",
+  "source_modules": [
+    {
+      "module": "Bootstrap.Dependency",
+      "bytes": 32565,
+      "sha256": "c525a88ad424e0e79c30209f646a0f270f54cc7109d3096cf6953a5d9b93baa2"
+    },
+    {
+      "module": "Bootstrap.Desugar",
+      "bytes": 10638,
+      "sha256": "6ea33b5a1c642f984bc8c22be951be774863fe5bb4ea44d5066a8df59e073a37"
+    },
+    {
+      "module": "Bootstrap.Layout",
+      "bytes": 20056,
+      "sha256": "b64c7f09bdf23a9652baa1fbd74729287dac243fd5a3801fbbc83e6abe5f58c8"
+    },
+    {
+      "module": "Bootstrap.Lexer",
+      "bytes": 44635,
+      "sha256": "d053db12391324d4305a78ac5dad24b3fe81c449007e318e14183c4e464adb43"
+    },
+    {
+      "module": "Bootstrap.Module",
+      "bytes": 79471,
+      "sha256": "1f7ea629418456d898ad30227abd9aab444494199425b489d4330319ca9b42ca"
+    },
+    {
+      "module": "Bootstrap.Parsec",
+      "bytes": 11604,
+      "sha256": "38cce5767b935e27292b0c0fb35f1750e3d02ff5ef5ef111c615b04001ebce90"
+    },
+    {
+      "module": "Bootstrap.Parser",
+      "bytes": 70221,
+      "sha256": "02e9eecfdf3460bdb3b0fdd83a7f96963202c1c58052c220f238ccb73779e16c"
+    },
+    {
+      "module": "Bootstrap.Prelude",
+      "bytes": 29247,
+      "sha256": "aa15cd106e481e569545d0a224ad9baf7cb03c69b5493b002e03edb2626fbed2"
+    },
+    {
+      "module": "Bootstrap.Resolved",
+      "bytes": 5990,
+      "sha256": "1ebcc702cfb7ade22dad92d870dda79d57788420ef60627acb6522d54a509052"
+    },
+    {
+      "module": "Bootstrap.Standalone",
+      "bytes": 30989,
+      "sha256": "31ee00d6ba44ca91b613176f20cc1726b8ff4348b9ac3a101c2e81e96af8e9f5"
+    },
+    {
+      "module": "Bootstrap.Surface",
+      "bytes": 36496,
+      "sha256": "eac10f8d5981fe36b9b5f8b141b1efdf0da2512dc717b1c588451a6aa9b980aa"
+    }
+  ],
+  "reused_dependency_artifacts": [
+    {
+      "identity": "mlf-foundation/0.3.0/library",
+      "CI": {
+        "bytes": 329841,
+        "sha256": "dfa6266e6047c9a7a5b2eee5ac60aa6dad60e106564c1d1779d7134d04d6a756"
+      },
+      "CO": {
+        "bytes": 1072662,
+        "sha256": "ed7309dfe0d30204cf601e8e600c101f7b68b4d0121de58b6bdcfd4a14abdd6e"
+      }
+    },
+    {
+      "identity": "mlf-language-core/0.3.0/library",
+      "CI": {
+        "bytes": 28500,
+        "sha256": "53d15f24422b26732379b1fb7f3e5b34dc10ce0358d383e632a3f9ea7f28ff39"
+      },
+      "CO": {
+        "bytes": 331418,
+        "sha256": "81a91e933746a6a956c4688cb5e81ac05b5e7219f8c05f003c0d483a0a8031e3"
+      }
+    },
+    {
+      "identity": "builtin",
+      "CI": {
+        "bytes": 40417,
+        "sha256": "cb7140bce683550c8b16dcc189fc8c582b64eaac9b91da4d6b9b3a9ed2d66c05"
+      },
+      "CO": {
+        "bytes": 190840,
+        "sha256": "476df4e37a9306a2e5a20f109b7ca499e0296101e464c9b624e1fc51e4248481"
+      }
+    }
+  ],
+  "dependency_artifact_scope": "Existing original A artifacts, not rebuilt or repacked. CI files are the explicit metadata inputs; companion CO bytes are also pinned. These hashes do not add dependency compilation to the measured window.",
+  "samples": [
+    {
+      "side": "C",
+      "position": 1,
+      "wall_ns": 64708192788,
+      "wall_seconds": 64.708192788,
+      "user_seconds": 63.460332,
+      "system_seconds": 1.381262,
+      "cpu_seconds": 64.841594,
+      "maxrss_kib": 341528
+    },
+    {
+      "side": "A",
+      "position": 2,
+      "wall_ns": 69879963881,
+      "wall_seconds": 69.879963881,
+      "user_seconds": 68.797816,
+      "system_seconds": 1.194769,
+      "cpu_seconds": 69.99258499999999,
+      "maxrss_kib": 316632
+    },
+    {
+      "side": "A",
+      "position": 3,
+      "wall_ns": 69224960680,
+      "wall_seconds": 69.22496068,
+      "user_seconds": 68.164191,
+      "system_seconds": 1.145029,
+      "cpu_seconds": 69.30922,
+      "maxrss_kib": 316672
+    },
+    {
+      "side": "C",
+      "position": 4,
+      "wall_ns": 64377182290,
+      "wall_seconds": 64.37718229,
+      "user_seconds": 63.174789,
+      "system_seconds": 1.332972,
+      "cpu_seconds": 64.507761,
+      "maxrss_kib": 340996
+    }
+  ],
+  "metrics": {
+    "wall_seconds": {
+      "paired_C_over_A": [
+        0.9259906444455652,
+        0.9299706588146811
+      ],
+      "paired_log_C_over_A": [
+        -0.07689114757752956,
+        -0.07260224299416969
+      ],
+      "geometric_mean_C_over_A": 0.9279785178932072,
+      "descriptive_C_change_percent": -7.202148210679282,
+      "arithmetic_mean_by_side": {
+        "A": 69.5524622805,
+        "C": 64.542687539
+      },
+      "arithmetic_mean_C_over_A": 0.9279712812855433
+    },
+    "cpu_seconds": {
+      "paired_C_over_A": [
+        0.9264066186439608,
+        0.9307240941392791
+      ],
+      "paired_log_C_over_A": [
+        -0.07644202771142275,
+        -0.07179239993465654
+      ],
+      "geometric_mean_C_over_A": 0.9285628470610016,
+      "descriptive_C_change_percent": -7.143715293899843,
+      "arithmetic_mean_by_side": {
+        "A": 69.6509025,
+        "C": 64.6746775
+      },
+      "arithmetic_mean_C_over_A": 0.9285547663937305
+    },
+    "user_seconds": {
+      "paired_C_over_A": [
+        0.9224178279147699,
+        0.926803180279804
+      ],
+      "paired_log_C_over_A": [
+        -0.08075698246605037,
+        -0.07601405496691599
+      ],
+      "geometric_mean_C_over_A": 0.9246079041724647,
+      "descriptive_C_change_percent": -7.539209582753525,
+      "arithmetic_mean_by_side": {
+        "A": 68.4810035,
+        "C": 63.3175605
+      },
+      "arithmetic_mean_C_over_A": 0.9246003601568134
+    },
+    "system_seconds": {
+      "paired_C_over_A": [
+        1.1560912611559222,
+        1.1641382008665282
+      ],
+      "paired_log_C_over_A": [
+        0.14504471277075384,
+        0.15198107152826132
+      ],
+      "geometric_mean_C_over_A": 1.160107753960627,
+      "descriptive_C_change_percent": 16.010775396062705,
+      "arithmetic_mean_by_side": {
+        "A": 1.169899,
+        "C": 1.3571170000000001
+      },
+      "arithmetic_mean_C_over_A": 1.1600291991018028
+    },
+    "maxrss_kib": {
+      "paired_C_over_A": [
+        1.0786275550165492,
+        1.0768113379143087
+      ],
+      "paired_log_C_over_A": [
+        0.07568945061539055,
+        0.07400420911952539
+      ],
+      "geometric_mean_C_over_A": 1.0777190638698984,
+      "descriptive_C_change_percent": 7.771906386989835,
+      "arithmetic_mean_by_side": {
+        "A": 316652.0,
+        "C": 341262.0
+      },
+      "arithmetic_mean_C_over_A": 1.0777193891085481
+    }
+  },
+  "formula": "Adjacent pairs C1/A2 and C4/A3. Geometric ratio = exp(mean(log(C/A))); descriptive C change percent = 100*(ratio - 1). CPU = user + system. RSS is maximum resident size in KiB, not heap allocation.",
+  "correctness": {
+    "all_four_exit_zero": true,
+    "all_four_raw_CI_CO_equal_original_A": true,
+    "all_four_original_ordered_query_contract_equal": true,
+    "all_four_reused_zero_and_uncached": true,
+    "first_C_and_each_leg_gated_before_sample_inclusion_and_next_start": true,
+    "whole_query_bytes_equal_observation": [
+      true,
+      true,
+      true,
+      true
+    ],
+    "whole_query_equality_is_hard_gate": false
+  },
+  "reference": {
+    "CI": {
+      "bytes": 341254,
+      "sha256": "4503e583f33e6825ef78e5946fb1df3099943aee32b1a409fe4915b312ae8872"
+    },
+    "CO": {
+      "bytes": 2072979,
+      "sha256": "44aa038ff8e3b14e93d61b21bc54b7bb765651cb02eba4b42b4ed0b61a7d393f"
+    },
+    "ordered_id_members_sha256": "76c2d8e7d3e7769bf4958f55bbee0e0e03607128c107bdf22685fabb5389df98",
+    "original_A_qualification_receipt_sha256": "12e52a66bfe21b1f4e107429e9788e745063f458cd8510d32b5b17ce7908d55c",
+    "original_A_independent_review_sha256": "1581a0ff69e663c725bffb780fb199db45535b52b3275539e7e805d897e1a185"
+  },
+  "evidence": {
+    "original_receipt_sha256": "482bc3e90ff330156ed8dba39091d89569bfbf4d00469cc0da3a0f6765a99e59",
+    "original_final_seal_sha256": "05a1f9373db091537765c1e0230a42e4cab2efcf755ed1c3a989d8e51f1b7ed5",
+    "original_wait4_timing_sha256_in_order": [
+      "92f2533f36ec3be1bf25c58c19968f4f8b7199986f0d87880bb619f936cb2319",
+      "087591998df530979a3a1fdbfde45ca7e31182ca2707f15b4a0c48defbfe3678",
+      "f0e60ddf37b270bbf9d612c819b68035d13d8e6c31733a5cef91da890efc0a83",
+      "175b59a0aa5e3be9acc46ab504d02be40a666458adfffa93692b422847624a17"
+    ],
+    "independent_actual_review_sha256": "ee8fcee29c7b1930e80d85277caa70602cff5919e296c68c2c00b7ff07091848",
+    "export_is_sanitized_summary_not_original_receipt": true
+  },
+  "interpretation": "Both fixed Frontend pairs have lower C wall, total CPU and user time, but higher system time and maximum RSS. The descriptive geometric changes are wall -7.2021%, CPU -7.1437%, system +16.0108% and RSS +7.7719%. This observed RSS cost is larger than Async (+2.5053% geometric); this is a comparison of separate workload results, not pooling or a causal explanation. Two pairs do not establish stable or statistically significant benefit, general compiler improvement, allocation reduction or merge readiness. Foundation remains mixed; no cross-workload aggregate is calculated.",
+  "timing": "Direct child Popen launch through blocking wait4 return, excluding timing-wrapper startup and serialization. Ordinary compilers, not profiling-way. Hashing and artifact checks occur outside the target timing interval. No global-idle/isolation claim.",
+  "sampling": {
+    "fixed_target_calls": 4,
+    "pairs": 2,
+    "additional_qualification_calls_in_window": 0,
+    "dropped_or_adjusted_samples": 0,
+    "adaptive_additional_samples": 0,
+    "native_or_fixed_point_calls": 0
+  }
+}

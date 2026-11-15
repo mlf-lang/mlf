@@ -5,15 +5,16 @@
   "baseline_ordinary_compiler_sha256": "29c58e2b48324957cee5965a1c76dc7e688c9b25264bd5150c3f7f085dbc23ef",
   "candidate_ordinary_compiler_sha256": "7770f188b578391f0468eff2df09e5237c33db1245f90a6880f5185759efac39",
   "files": {
-    "README.md": "7c60c2c718adf6826989bb24d755bebbf9a58315c321d08285ab9a2c88a7ce12",
+    "README.md": "7d61784b4067723189ae06926635c545a73bde1d28fef8239a27671164d6933a",
     "candidate.patch": "c14188360d939fdcd4d9c3cb52b61f8c3635b11064171a5e086d109e73d8597d",
     "results/async-acca.json": "d3f57c9ff8450dbf94c3cef51d814fa48a4cdf0678ef604b2267cfb1ea314b00",
     "results/codegen.json": "bf5620a6e415301033d20b77d7e6efa446e4012b14e42bf5f631fc0844b3b1c2",
     "results/foundation-caac.json": "5803462662b0d0ffc9654b962cee3a22be3e57150be54a27fc300aaa19fb8b32",
+    "results/frontend-caac.json": "fc7b9d21f359a9e77d4466f3ce1f32358434b12d062ecbd7a0cc4efb31b3bbd5",
     "results/semantic.json": "0294c4a53b72653f220624c72161412f40147b838eeb133540715b4ab51d0443",
     "tests/Corpus.hs": "2c16e77209300abfc6f6ad35c157601c60dd00e3809b8a42490e19ee65efec8d",
     "tests/Main.hs": "a18e7686c33f60ab49b14f3f6d39c675c3069d1d0800da9ea32e4294071eb23d",
     "tests/expected.stdout": "9c548eb8927bb096871d2393f9ca9378776f01a0771d7bd99e8cc5cc2bc1d149"
   },
-  "self_hash": "Omitted to avoid recursive self-hash; external delivery inventory contains all 10 file hashes."
+  "self_hash": "Omitted to avoid recursive self-hash; external delivery inventory contains all 11 file hashes."
 }
