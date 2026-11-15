@@ -557,12 +557,12 @@ module Bootstrap.Module where {
       let {
         entries = append values (append datatypes classes)
       };
-      let {
-        keys = map (\entry -> (,) (space entry) (spelling entry)) entries
-      };
-      unless (length keys == length (nubBy (\a b -> (compareKey a b == 0)) keys))
+      -- The interface map uses the exact namespace/spelling key needed by
+      -- duplicate admission. Reuse it instead of a second inventory scan.
+      let { declared = interface entries };
+      unless (length entries == M.size (interfaceMap declared))
         (Left (moduleIdentity source ++ ": duplicate declaration"));
-      uniqueInterface (moduleIdentity source) (interface entries)
+      uniqueInterface (moduleIdentity source) declared
     };
   implicitMode :: PreludeMode -> Bool;
   implicitMode ImplicitPrelude = True;

@@ -1116,100 +1116,139 @@ module Bootstrap.LLVM.Optimize where {
   -- This route is reserved for finite checked input, after the optimizer's
   -- initial copy establishes globally unique binders. Legacy raw/partial tree
   -- entry points above retain their original traversal and demand behavior.
-  -- A witness records a free callee directly applied to a non-variable first
-  -- argument. Every complete spine containing it fails commonCalls, for every
-  -- positive arity. Missing witnesses merely take the ordinary fallback.
+  -- A witness records a free callee whose first argument is not an outer
+  -- variable: either a non-variable or a variable absent from the root's free
+  -- names. Every containing complete spine fails commonCalls at any positive
+  -- arity. Owned binder uniqueness keeps these witnesses valid after copying.
   negativeCalls :: UseTree -> Set XName;
-  negativeCalls tree =
+  negativeCalls tree = negativeCallsIn (useCounts tree) tree;
+  negativeCallsIn outer tree =
     case useChildren tree of {
       UseLeaf -> S.empty;
-      UseAbs name body -> S.delete compareName name (negativeCalls body);
+      UseAbs name body -> S.delete compareName name (negativeCallsIn outer body);
       UseApp function argument ->
-        let { nested = S.union compareName (negativeCalls function) (negativeCalls argument) } in
+        let { nested = S.union compareName (negativeCallsIn outer function) (negativeCallsIn outer argument) } in
         case useTerm function of {
           XEVar name -> case useTerm argument of {
-            XEVar _ -> nested;
+            XEVar argumentName -> if M.member compareName argumentName outer then nested
+              else S.insert compareName name nested;
             _ -> S.insert compareName name nested
           };
           _ -> nested
         };
       UseLet name value body ->
-        S.union compareName (negativeCalls value)
-          (S.delete compareName name (negativeCalls body));
+        S.union compareName (negativeCallsIn outer value)
+          (S.delete compareName name (negativeCallsIn outer body));
       UseRec bindings body ->
         S.difference compareName
-          (S.unions compareName ((:) (negativeCalls body) (L.map (\entry -> negativeCalls (L.snd entry)) bindings)))
+          (S.unions compareName ((:) (negativeCallsIn outer body) (L.map (\entry -> negativeCallsIn outer (L.snd entry)) bindings)))
           (S.fromList compareName (L.map L.fst bindings));
       UseCase subject alternatives ->
-        S.union compareName (negativeCalls subject)
+        S.union compareName (negativeCallsIn outer subject)
           (S.unions compareName
              (L.map
                 (\((,) pattern body) ->
-                   S.difference compareName (negativeCalls body)
+                   S.difference compareName (negativeCallsIn outer body)
                      (S.fromList compareName (X.patternNames pattern)))
                 alternatives))
     };
+  -- Keep exact counts through three occurrences, with four meaning "many".
+  -- This extra root summary leaves the public UseTree's 0/1/many contract
+  -- unchanged. It is built once at a boundary, then updated by substitution.
+  mergePendingUses a b = M.unionWith compareName (\x y -> L.min 4 (x + y)) a b;
+  limitedUses tree = case useChildren tree of {
+    UseLeaf -> useCounts tree;
+    UseAbs name body -> M.delete compareName name (limitedUses body);
+    UseApp function argument -> mergePendingUses (limitedUses function) (limitedUses argument);
+    UseLet name value body -> mergePendingUses (limitedUses value)
+      (M.delete compareName name (limitedUses body));
+    UseRec bindings body -> deleteUses (L.map L.fst bindings)
+      (L.foldl (\counts entry -> mergePendingUses counts (limitedUses (L.snd entry))) (limitedUses body) bindings);
+    UseCase subject alternatives -> L.foldl
+      (\counts entry -> mergePendingUses counts
+        (deleteUses (X.patternNames (L.fst entry)) (limitedUses (L.snd entry))))
+      (limitedUses subject) alternatives
+  };
   -- The base skeleton is immutable. Entries are already fresh-copied at the
   -- original inner-to-outer let decision, never when materializing. Counts and
   -- witnesses describe the effective expanded body, not just the skeleton.
-  data PendingBody = PendingBody UseTree (Map XName UseTree) (Map XName Int) (Set XName);
+  -- A queue supplies a distinct copy for every occurrence, in original DFS
+  -- order. No binder identity is shared between several substitutions.
+  data PendingBody = PendingBody UseTree (Map XName ([] UseTree)) (Map XName Int) (Set XName);
   pendingCounts :: PendingBody -> Map XName Int;
-  pendingCounts (PendingBody _ _ counts _) = counts;
+  pendingCounts (PendingBody _ _ counts _) = M.map (L.min 2) counts;
+  pendingLimitedCounts (PendingBody _ _ counts _) = counts;
   pendingCalls :: PendingBody -> Set XName;
   pendingCalls (PendingBody _ _ _ calls) = calls;
   beginPending :: UseTree -> PendingBody;
-  beginPending body = PendingBody body M.empty (useCounts body) (negativeCalls body);
+  beginPending body = PendingBody body M.empty (limitedUses body) (negativeCalls body);
   -- Expand each delayed occurrence once, including outer replacements inside
   -- earlier copied RHSs. Scope uniqueness makes masking unnecessary: a copied
   -- RHS cannot mention an eliminated inner let's binder. The dependency graph
   -- therefore points strictly outward and is acyclic. No rewrite or Fresh
   -- action runs during this walk; freshly exposed redexes wait for the next pass.
-  materializeBody :: Map XName UseTree -> UseTree -> UseTree;
+  materializeBody :: Map XName ([] UseTree) -> UseTree -> (,) UseTree (Map XName ([] UseTree));
   materializeBody replacements tree =
     case useChildren tree of {
       UseLeaf -> case useTerm tree of {
         XEVar name -> case M.lookup compareName name replacements of {
-          Nothing -> tree;
-          Just value -> materializeBody replacements value
+          Just ((:) value rest) -> materializeBody (M.insert compareName name rest replacements) value;
+          _ -> (,) tree replacements
         };
-        _ -> tree
+        _ -> (,) tree replacements
       };
-      UseAbs name body -> useAbs name (materializeBody replacements body);
-      UseApp function argument ->
-        useApp (materializeBody replacements function) (materializeBody replacements argument);
-      UseLet name value body ->
-        useLet name (materializeBody replacements value) (materializeBody replacements body);
-      UseRec bindings body ->
-        useRec
-          (L.map (\((,) name value) -> (,) name (materializeBody replacements value)) bindings)
-          (materializeBody replacements body);
-      UseCase subject alternatives ->
-        useCase (materializeBody replacements subject)
-          (L.map (\((,) pattern body) -> (,) pattern (materializeBody replacements body)) alternatives)
+      UseAbs name body -> let { next = materializeBody replacements body }
+        in (,) (useAbs name (L.fst next)) (L.snd next);
+      UseApp function argument -> let {
+        first = materializeBody replacements function;
+        next = materializeBody (L.snd first) argument
+      } in (,) (useApp (L.fst first) (L.fst next)) (L.snd next);
+      UseLet name value body -> let {
+        first = materializeBody replacements value;
+        next = materializeBody (L.snd first) body
+      } in (,) (useLet name (L.fst first) (L.fst next)) (L.snd next);
+      UseRec bindings body -> let {
+        first = materializePairs replacements bindings;
+        next = materializeBody (L.snd first) body
+      } in (,) (useRec (L.fst first) (L.fst next)) (L.snd next);
+      UseCase subject alternatives -> let {
+        first = materializeBody replacements subject;
+        next = materializePairs (L.snd first) alternatives
+      } in (,) (useCase (L.fst first) (L.fst next)) (L.snd next)
     };
+  materializePairs replacements entries = case entries of {
+    [] -> (,) [] replacements;
+    (:) ((,) key value) rest -> let {
+      first = materializeBody replacements value;
+      next = materializePairs (L.snd first) rest
+    } in (,) ((:) ((,) key (L.fst first)) (L.fst next)) (L.snd next)
+  };
   materializePending :: PendingBody -> UseTree;
   materializePending (PendingBody body replacements _ _) =
-    if M.null replacements then body else materializeBody replacements body;
+    if M.null replacements then body else L.fst (materializeBody replacements body);
   delayOwnedLet :: XName -> UseTree -> PendingBody -> Fresh PendingBody;
   delayOwnedLet name value pending =
     let {
+      uses = M.findWithDefault compareName 0 name (pendingLimitedCounts pending);
       eligible = case useTerm value of {
         XEAbs _ _ ->
           smallValue (useTerm value) &&
-          (M.findWithDefault compareName 0 name (pendingCounts pending) == 1 &&
+          (uses > 0 && uses < 4 &&
            S.member compareName name (pendingCalls pending));
         _ -> False
       }
     } in
     if eligible
     then do {
-      copied <- copy M.empty (useTerm value);
-      let { replacement = indexUses copied };
+      copies <- traverseFresh (\_ -> copy M.empty (useTerm value)) (L.range 1 uses);
+      let { replacementsHere = L.map indexUses copies;
+        replacement = L.head replacementsHere };
       case pending of {
         PendingBody body replacements counts calls ->
           freshPure
-            (PendingBody body (M.insert compareName name replacement replacements)
-               (mergeUses (M.delete compareName name counts) (useCounts replacement))
+            (PendingBody body (M.insert compareName name replacementsHere replacements)
+               (mergePendingUses (M.delete compareName name counts)
+                 (M.map (\count -> L.min 4 (count * uses)) (limitedUses replacement)))
                (S.union compareName (S.delete compareName name calls) (negativeCalls replacement)))
       }
     }
@@ -1463,6 +1502,90 @@ module Bootstrap.LLVM.Optimize where {
       specialized <- specializeHigherOrder simple;
       iterationsOwned arities 16 specialized
     };
+  -- Recognize finite nonrecursive iterators by binding identity. A summary is
+  -- the number of applications of the first parameter to the second; it does
+  -- not depend on source names, types' printed spelling or a benchmark size.
+  -- Counts are bounded before addition. Recursive groups and unknown callbacks
+  -- keep the ordinary optimizer path.
+  addIterationCounts a b =
+    if a <= 2147483647 - b then Just (a + b) else Nothing;
+  iterationBody summaries step argument expression = case expression of {
+    XEVar name -> if eqName name argument then Just 0 else Nothing;
+    XEApp (XEVar name) value -> if eqName name step then case iterationBody summaries step argument value of {
+      Just count -> addIterationCounts 1 count; Nothing -> Nothing
+    } else Nothing;
+    XEApp (XEApp (XEVar name) (XEVar callback)) value ->
+      if eqName callback step then case M.lookup compareName name summaries of {
+        Just count -> case iterationBody summaries step argument value of {
+          Just rest -> addIterationCounts count rest; Nothing -> Nothing
+        };
+        Nothing -> Nothing
+      } else Nothing;
+    _ -> Nothing
+  };
+  iterationSummary summaries expression = case expression of {
+    XEAbs step (XEAbs argument body) ->
+      if eqName step argument then Nothing else
+        iterationBody (M.delete compareName step (M.delete compareName argument summaries)) step argument body;
+    XEVar name -> M.lookup compareName name summaries;
+    _ -> Nothing
+  };
+  data IterationStep = IntegerTranslation Int | BooleanNegation;
+  iterationStep expression = case expression of {
+    XEAbs parameter body -> case applications body of {
+      (,) (XEPrimitive PAddInt) [XEVar name,XEInt amount] ->
+        if eqName name parameter then Just (IntegerTranslation amount) else Nothing;
+      (,) (XEPrimitive PAddInt) [XEInt amount,XEVar name] ->
+        if eqName name parameter then Just (IntegerTranslation amount) else Nothing;
+      (,) (XEPrimitive PSubInt) [XEVar name,XEInt amount] ->
+        if eqName name parameter then Just (IntegerTranslation (0 - amount)) else Nothing;
+      (,) (XEPrimitive PIfThenElse) [XEVar name,XEBool False,XEBool True] ->
+        if eqName name parameter then Just BooleanNegation else Nothing;
+      _ -> Nothing
+    };
+    _ -> Nothing
+  };
+  reduceIteration summaries expression = case applications expression of {
+    (,) (XEVar name) [callback,argument] -> case M.lookup compareName name summaries of {
+      Nothing -> expression;
+      Just count -> if count == 0 then argument else case iterationStep callback of {
+        Just (IntegerTranslation amount) ->
+          -- Language Int operations wrap at 64 bits; translation composition
+          -- therefore uses the same multiplication/addition ring. No Double
+          -- reassociation, quotient, effect or general callback is admitted.
+          XEApp (XEApp (XEPrimitive PAddInt) argument) (XEInt (count * amount));
+        Just BooleanNegation -> if count % 2 == 0 then argument
+          else XEApp (XEApp (XEApp (XEPrimitive PIfThenElse) argument) (XEBool False)) (XEBool True);
+        Nothing -> expression
+      }
+    };
+    _ -> expression
+  };
+  simplifyIterations summaries expression = case expression of {
+    XEAbs name body -> XEAbs name (simplifyIterations (M.delete compareName name summaries) body);
+    XEApp function argument -> reduceIteration summaries
+      (XEApp (simplifyIterations summaries function) (simplifyIterations summaries argument));
+    XELet name value body -> let {
+      normalized = simplifyIterations summaries value;
+      following = case iterationSummary summaries normalized of {
+        Just count -> M.insert compareName name count summaries;
+        Nothing -> M.delete compareName name summaries
+      }
+    } in XELet name normalized (simplifyIterations following body);
+    XELetRec bindings body -> let {
+      scope = L.foldl (\current entry -> M.delete compareName (L.fst entry) current) summaries bindings
+    } in XELetRec (L.map (\((,) name value) -> (,) name (simplifyIterations scope value)) bindings)
+      (simplifyIterations scope body);
+    XECase subject alternatives -> XECase (simplifyIterations summaries subject)
+      (L.map (\(XErasedAlternative pattern body) -> XErasedAlternative pattern
+        (simplifyIterations (L.foldl (\current name -> M.delete compareName name current)
+          summaries (X.patternNames pattern)) body)) alternatives);
+    _ -> expression
+  };
+  -- This extra algebraic pass is for finite checked programs. Its rewrites
+  -- introduce no binders and preserve evaluation of the single input value.
+  -- Keep the raw and exact legacy-pass interfaces available independently.
+  optimizeChecked expression = optimizeOwned (simplifyIterations M.empty expression);
   optimizeOwned :: XErased -> XErased;
   optimizeOwned expression =
     case runFresh (optimizeOwnedWork expression) (L.advanceIdentity 1 (maxIdentity expression)) of {

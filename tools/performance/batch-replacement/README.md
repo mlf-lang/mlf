@@ -2,7 +2,7 @@
 
 A restricted owned optimizer records already-fresh-copied substitutions while unwinding contiguous nonrecursive lets and materializes the body once at a boundary. The checked standalone and fixed-library LLVM entry points use it; the public raw optimizer remains unchanged.
 
-## Current decision
+## Historical adoption (2026-11-01)
 
 **Accepted under the user-updated rule of 2026-11-01: structural improvements require measured gain strictly greater than zero, not at least 5%.** Both required 2048-point whole-compilation gains, 3.14% and 5.07%, are positive; correctness, mechanism qualification and the existing regression guards passed. The [current project rule](../../../docs/performance/optimization-workflow-research.md) applies to subsequent structural optimizations as well.
 
@@ -12,7 +12,11 @@ The fixed discovery window originally required both gains to be at least 5% and 
 
 ## Algorithm and obligations
 
-Admission requires a normalized syntactic lambda with the existing bounded `smallValue` property, exactly one free use, and a scoped sufficient witness that legacy common-call specialization would reject. Copies execute at the original inner-to-outer decision points. A separate `PendingBody` stores the original skeleton, direct identity-keyed already-copied replacements, exact capped root counts, and sufficient negative-call witnesses. It never presents stale child indices as current.
+Admission requires a normalized syntactic lambda with the existing bounded `smallValue` property, one to three free uses, and a scoped sufficient witness that legacy common-call specialization would reject. The 2026-11-15 extension also recognizes a locally bound first argument that is absent from the root free-name inventory; binder identities, not hint strings, establish that scope. Copies execute at the original inner-to-outer decision points. A separate `PendingBody` stores the original skeleton, identity-keyed queues of already-copied replacements, exact root counts capped at four, and sufficient negative-call witnesses. It never presents stale child indices as current.
+
+Each occurrence receives its own fresh copy, at the same original inner-to-outer decision point. Materialization consumes queues in the legacy depth-first occurrence order. Four or more uses take the original fallback. Independent exact-term, fresh-order, scope, demand and interpreted controls cover both admitted multiplicities and fallback cases.
+
+The checked entry also summarizes pure iterator lambdas. It combines finite application counts and folds only literal Int64 add/subtract callbacks and Boolean negation, preserving wrapping arithmetic and demand. Unknown callbacks, effects, recursive bindings and overflowing counts retain the ordinary optimizer. The raw public optimizer remains unchanged. Current performance qualification is the separate polymorphic-chain study; its requirement to beat GHC in both elapsed time and growth slope supersedes the historical positive-gain rule for this task.
 
 Each outer RHS is out of scope of eliminated inner binders; globally unique binder identities make recursive map expansion acyclic and capture-free. Materialization performs no Fresh operation or beta reduction. A missing witness or unsupported let first flushes the body, then uses the original rewrite logic. Existing nonvariable-argument witnesses survive leaf substitution; incomplete witness discovery only falls back. This is an output-sensitive improvement for admitted batches; map lookups/updates, use-index construction and fallback still have costs. It is not a claim that all compiler work is linear.
 
@@ -31,7 +35,7 @@ Values are descriptive geometric times; no confidence interval or portability cl
 
 The two non-chain guard cells were added before the first sample because full witness scans and materialization may penalize sparse admissions or repeated fallback. Neither triggered the predefined regression rule (slower by both more than 5% and more than 0.1 second). That limited screen does not prove absence of regressions elsewhere.
 
-## Mechanism evidence
+## Historical mechanism evidence (2026-11-01)
 
 Both chain families gave the following demanded diagnostic events. All eight diagnostic LLVM outputs exactly matched ordinary baseline LLVM bytes.
 

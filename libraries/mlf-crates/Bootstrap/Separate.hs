@@ -535,7 +535,21 @@ module Bootstrap.Separate where {
     } in seq nextA (seq nextB (canonicalFingerprintState rest nextA nextB));
     _ -> fingerprintStateChars chars a b
   };
-  fingerprint text = case canonicalFingerprintState (textToChars text) 0 1 of {
+  -- ASCII fields are common in artifacts. Read four scalars directly without
+  -- allocating a character-list cell for each byte. On the first non-ASCII
+  -- block, stream just the remaining suffix so Unicode stays a linear scan.
+  canonicalFingerprintText text index size a b =
+    if size - index < 4 then canonicalFingerprintState
+      (textToChars (stringSlice text index (size - index))) a b
+    else let {
+      x0 = stringCodeAt text index; x1 = stringCodeAt text (index + 1);
+      x2 = stringCodeAt text (index + 2); x3 = stringCodeAt text (index + 3)
+    } in if x0 < 128 && x1 < 128 && x2 < 128 && x3 < 128 then let {
+      nextA = (a * 1172642095 + x0 * 780718649 + x1 * 8261507 + x2 * 65599 + x3) % 2147483647;
+      nextB = (b * 294499921 + x0 * 2248091 + x1 * 17161 + x2 * 131 + x3) % 2147483629
+    } in seq nextA (seq nextB (canonicalFingerprintText text (index + 4) size nextA nextB))
+    else canonicalFingerprintState (textToChars (stringSlice text index (size - index))) a b;
+  fingerprint text = case canonicalFingerprintText text 0 (stringLength text) 0 1 of {
     (,) a b -> showInt a ++ "-" ++ showInt b
   };
   -- Exact summaries of the two existing rolling checksums. A summary composes
@@ -585,7 +599,7 @@ module Bootstrap.Separate where {
          if ((count % 2) == 0) then squared else ((squared * base) % modulus);
   fingerprintPart :: String -> (,,,) Int Int Int Int;
   fingerprintPart text =
-    case canonicalFingerprintState (textToChars text) 0 0 of {
+    case canonicalFingerprintText text 0 (stringLength text) 0 0 of {
       (,) a b ->
         (,,,) (fingerprintPower 65599 (stringLength text) 2147483647)
           (fingerprintPower 131 (stringLength text) 2147483629)

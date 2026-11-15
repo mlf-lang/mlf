@@ -60,7 +60,7 @@ def resolve(matrix_name, families, sizes):
     if 'baseline' in chosen_families:
         raise SystemExit('baseline is added by the matrix flag, not by --family')
     for size in chosen_sizes:
-        if not 0 < size <= 1024:
+        if not 0 < size <= 8192:
             raise SystemExit('size out of the bounded range: ' + str(size))
     include_baseline = bool(matrix['baseline'])
     if families is None and not include_baseline:
@@ -122,7 +122,7 @@ def command_prepare(args):
 
 def command_run(args, setup=None):
     workdir = args.workdir.resolve()
-    setup = Path(setup or workdir / 'setup' / 'setup.json').resolve()
+    setup = Path(setup or args.setup or workdir / 'setup' / 'setup.json').resolve()
     if not setup.is_file():
         raise SystemExit('missing setup; run "prepare" first: ' + str(setup))
     cohort = args.cohort
@@ -170,7 +170,7 @@ def main():
 
     listing = sub.add_parser('list', help='show the resolved matrix without running anything')
     listing.add_argument('--matrix', default='default')
-    listing.add_argument('--endpoint', default='crate-bootstrap-v1')
+    listing.add_argument('--endpoint', default=registry()['default_endpoint'])
     listing.add_argument('--family', action='append')
     listing.add_argument('--size', action='append', type=int)
     listing.set_defaults(func=command_list)
@@ -183,14 +183,14 @@ def main():
     prepare.add_argument('--build-builtin', action='store_true')
     prepare.add_argument('--ghc')
     prepare.add_argument('--clang')
-    prepare.add_argument('--endpoint', default='crate-bootstrap-v1')
+    prepare.add_argument('--endpoint', default=registry()['default_endpoint'])
     prepare.set_defaults(func=command_prepare)
 
     runner = sub.add_parser('run', help='run one frozen cohort')
     runner.add_argument('--workdir', type=Path, required=True)
     runner.add_argument('--cohort', required=True)
     runner.add_argument('--matrix', default='default')
-    runner.add_argument('--endpoint', default='crate-bootstrap-v1')
+    runner.add_argument('--endpoint', default=registry()['default_endpoint'])
     runner.add_argument('--family', action='append')
     runner.add_argument('--size', action='append', type=int)
     runner.add_argument('--repeats', type=int)
@@ -208,7 +208,7 @@ def main():
     everything.add_argument('--workdir', type=Path, required=True)
     everything.add_argument('--cohort', required=True)
     everything.add_argument('--matrix', default='default')
-    everything.add_argument('--endpoint', default='crate-bootstrap-v1')
+    everything.add_argument('--endpoint', default=registry()['default_endpoint'])
     everything.add_argument('--family', action='append')
     everything.add_argument('--size', action='append', type=int)
     everything.add_argument('--repeats', type=int)

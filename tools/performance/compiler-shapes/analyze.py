@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Offline descriptive analysis. Reject incomplete/duplicate/nonfinite/incompatible cohorts."""
 from pathlib import Path
+import worker
 import argparse
 import collections
 import csv
@@ -85,7 +86,7 @@ def analyze(folder):
                 row['fresh']=rs[0]['fresh'];row['reused']=0;row['max_group_members']=rs[0]['max_group_members']
                 require(all(r['fresh']==row['fresh'] for r in rs),'stable query group count')
                 require(sum(r['raw_compared_with_first_mlf_leg'] for r in rs)==repeats-1,'actual raw-byte comparisons on every repetition')
-                for stage in ['source-to-checked','checked-to-llvm','llvm-to-executable']:
+                for stage in worker.mlf_stage_names(plan['benchmark']['endpoint']['id']):
                     ss=[next(s for s in r['stages']['stages'] if s['name']==stage) for r in rs]
                     for metric in ['wall_seconds','user_seconds','system_seconds']:
                         require(all(math.isfinite(s[metric]) and s[metric]>=0 for s in ss),'valid stage timings')

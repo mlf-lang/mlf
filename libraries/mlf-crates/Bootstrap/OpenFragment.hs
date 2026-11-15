@@ -5,12 +5,14 @@
 module Bootstrap.OpenFragment
   (Environment, environment, declarations, dataEnvironment, Fragment, check, fromChecked,
    parameters, body, bindings, usedParameters, context, fingerprint,
-   normalize, encodeBody, decodeTrusted, decodeTrustedIds, audit, closedTerm, fresh,
-   Package, makePackage, readPackage, packageFragments, packageBytes,
-   packageHash, packageMetadata, packageFamily, declarationValue, compatibilityIdentity) where {
+   normalize, withNameHints, encodeBody, decodeTrusted, decodeTrustedIds, audit, closedTerm, fresh,
+   Package, makePackage, readPackage, readPackageProfiled, packageFragments, packageBytes,
+   packageHash, packageMetadata, packageFamily, declarationValue, compatibilityIdentity,
+   MetadataReceipt, makeMetadataReceipt, metadataReceiptHash, withMetadataReceipt, cachedMetadata) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
+  import qualified Bootstrap.Host as Host;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.IntSet as IS;
@@ -27,6 +29,7 @@ module Bootstrap.OpenFragment
   import qualified Bootstrap.Bitstream as W;
   import qualified Bootstrap.ArtifactStructure as Structure;
   import qualified Bootstrap.ArtifactStorage as Storage;
+  import qualified Bootstrap.QueryGraph as QueryGraph;
 
   -- Environments and receipts are immutable. The constructor is private;
   -- decoding below is the only trusted-disk admission, after a byte SHA match.
@@ -68,6 +71,17 @@ module Bootstrap.OpenFragment
      Separate.pack (map (\((,) n ty) -> Separate.pack [X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) bs)]);
   make env ps term bs = Fragment env ps term bs
     (Boundary.nubNames (Boundary.freeNames term)) (stamp env ps term bs);
+  -- Hints are labels, never binder identities. This transformation starts from
+  -- an opaque checked fragment and changes every occurrence consistently. It
+  -- preserves the environment, all IDs, types, evidence and free-use inventory;
+  -- callers cannot attach a different type or an unchecked term through it.
+  withNameHints hints fragment = let {
+    rename n = XName (X.nameId n) (M.findWithDefault compareInt (X.nameHint n) (X.nameId n) hints);
+    ps = map (\((,) n ty) -> (,) (rename n) ty) (parameters fragment);
+    term = Separate.mapTerm rename (\v -> v) (body fragment);
+    bs = map (\((,) n ty) -> (,) (rename n) ty) (bindings fragment);
+    env = context fragment
+  } in Fragment env ps term bs (map rename (usedParameters fragment)) (stamp env ps term bs);
   check :: Environment -> [] ((,) XName XType) -> XTerm -> Either String Fragment;
   check env@(Environment _ ds) ps term = do {
     let { names = map fst ps };
@@ -216,11 +230,30 @@ module Bootstrap.OpenFragment
     value <- W.lookupGraphNode graph index;
     case value of { W.GText text -> Right text; _ -> Left "expected open fragment text" }
   };
-  data Package = Package String ([] ((,) String Fragment)) ByteArray String;
-  packageMetadata (Package metadata _ _ _) = metadata;
-  packageFragments (Package _ fragments _ _) = fragments;
-  packageBytes (Package _ _ bytes _) = bytes;
-  packageHash (Package _ _ _ digest) = digest;
+  -- This private receipt records the exact value admitted by the canonical
+  -- schema-6 encoder. It cannot be made from a caller-supplied digest.
+  data MetadataReceipt = MetadataReceipt W.Value String;
+  makeMetadataReceipt value = do {
+    hashed <- QueryGraph.encodeHashed value;
+    ioReturn (mapEither (\((,) digest _) -> MetadataReceipt value digest) hashed)
+  };
+  metadataReceiptHash (MetadataReceipt _ digest) = digest;
+  data Package = Package String ([] ((,) String Fragment)) ByteArray String (Maybe MetadataReceipt);
+  packageMetadata (Package metadata _ _ _ _) = metadata;
+  packageFragments (Package _ fragments _ _ _) = fragments;
+  packageBytes (Package _ _ bytes _ _) = bytes;
+  packageHash (Package _ _ _ digest _) = digest;
+  withMetadataReceipt receipt (Package metadata fragments bytes digest _) = do {
+    manifest <- Separate.unpack metadata;
+    ensure (case manifest of {
+      (:) root _ -> eqString root (metadataReceiptHash receipt); [] -> False
+    }) "open object metadata receipt mismatch";
+    Right (Package metadata fragments bytes digest (Just receipt))
+  };
+  cachedMetadata value (Package _ _ _ _ receipt) = case receipt of {
+    Just (MetadataReceipt original digest) -> if sameSyntax original value then Just digest else Nothing;
+    Nothing -> Nothing
+  };
   packageFormat :: String;
   packageFormat = "MLF-OPEN-CRATE-1/checker-1";
   -- packageFormat remains part of the existing semantic checker identity.
@@ -302,15 +335,41 @@ module Bootstrap.OpenFragment
         }
     };
 
+  -- Retain one fully validated syntax value. Equal consecutive references
+  -- have identical canonical bytes, but still consume their entire expanded
+  -- work budget. Equality is structural, never a hash-only admission, and is
+  -- bounded by the previously accepted value. No cache survives this call.
+  data SyntaxHash = SyntaxHash W.Value String Int;
+  sameSyntax left right = case (,) left right of {
+    (,) (W.VInt a) (W.VInt b) -> a == b;
+    (,) (W.VBits a) (W.VBits b) -> a == b;
+    (,) (W.VText a) (W.VText b) -> eqString a b;
+    (,) (W.VNode a xs) (W.VNode b ys) -> a == b && eqList sameSyntax xs ys;
+    _ -> False
+  };
+  hashSyntaxMemo previous remaining value = case previous of {
+    Just (SyntaxHash old digest used) ->
+      if used <= remaining && remaining <= 2147483647 && sameSyntax old value
+      then ioReturn (Right ((,,) digest (remaining - used) previous))
+      else hashSyntaxFresh remaining value;
+    Nothing -> hashSyntaxFresh remaining value
+  };
+  hashSyntaxFresh remaining value = do {
+    hashed <- hashSyntaxBudget remaining value;
+    ioReturn (mapEither (\((,) digest next) ->
+      (,,) digest next (Just (SyntaxHash value digest (remaining - next)))) hashed)
+  };
   referenceHashesBudget encode entries remaining reversed =
+    referenceHashesMemo Nothing encode entries remaining reversed;
+  referenceHashesMemo previous encode entries remaining reversed =
     case entries of {
       [] -> ioReturn (Right ((,) (reverse reversed) remaining));
       (:) ((,) key value) rest -> do {
-        hashed <- hashSyntaxBudget remaining (encode value);
+        hashed <- hashSyntaxMemo previous remaining (encode value);
         case hashed of {
           Left message -> ioReturn (Left message);
-          Right ((,) digest next) ->
-            seq next (referenceHashesBudget encode rest next
+          Right ((,,) digest next cached) ->
+            seq next (referenceHashesMemo cached encode rest next
               ((:) ((,) key digest) reversed))
         }
       }
@@ -319,6 +378,8 @@ module Bootstrap.OpenFragment
   -- One map is also the duplicate-reference check. Its values are the same
   -- verified shared external values, not copies decoded from the package.
   validateReferencesBudget encode available references remaining checked =
+    validateReferencesMemo Nothing encode available references remaining checked;
+  validateReferencesMemo previous encode available references remaining checked =
     case references of {
       [] -> ioReturn (Right ((,) checked remaining));
       (:) ((,) name expected) rest ->
@@ -327,16 +388,16 @@ module Bootstrap.OpenFragment
         else case M.lookup compareString name available of {
           Nothing -> ioReturn (Left ("missing open crate reference: " ++ name));
           Just value -> do {
-            hashed <- hashSyntaxBudget remaining (encode value);
+            hashed <- hashSyntaxMemo previous remaining (encode value);
             case hashed of {
               Left message -> ioReturn (Left message);
-              Right ((,) actual next) ->
+              Right ((,,) actual next cached) ->
                 if not (eqString actual expected)
                 then ioReturn (Left ("open crate dependency changed: " ++ name))
                 else let {
                   following = M.insert compareString name value checked
                 } in seq next (seq following
-                  (validateReferencesBudget encode available rest next following))
+                  (validateReferencesMemo cached encode available rest next following))
             }
           }
         }
@@ -344,25 +405,26 @@ module Bootstrap.OpenFragment
 
   -- Reading a recognized schema never retries a different parser.
   -- Both selected readers authenticate the complete original byte snapshot.
-  readPackage bytes expected compiler metadata allBindings allDeclarations = do {
+  readPackage = readPackageProfiled Nothing;
+  readPackageProfiled profile bytes expected compiler metadata allBindings allDeclarations = Host.phaseIO profile "validate_ms" (do {
     schema <- packageSchema bytes;
     if schema == 8
-    then readPackage8 bytes expected compiler metadata allBindings allDeclarations
+    then readPackage8Profiled profile bytes expected compiler metadata allBindings allDeclarations
     else if schema == 7
-    then readPackage7 bytes expected compiler metadata allBindings allDeclarations
+    then readPackage7Profiled profile bytes expected compiler metadata allBindings allDeclarations
     else ioReturn (Left "unsupported open crate schema")
-  };
+  });
 
   data PackageHeader8 = PackageHeader8 W.Graph
     ([] ((,) String String)) ([] ((,) String String)) ([] Int) Int;
-  readPackage8 bytes expected compiler metadata allBindings allDeclarations = do {
+  readPackage8Profiled profile bytes expected compiler metadata allBindings allDeclarations = do {
     auditSetting <- getEnv "MLF_QUERY_SEMANTIC_AUDIT";
     digest <- byteArrayDigest bytes;
     if not (eqString digest expected)
     then ioReturn (Left "open crate SHA mismatch")
     else do {
-      decoded <- W.decodeGraphRootBounded
-        W.defaultLimits packageWorkLimit 8 bytes;
+      decoded <- Host.phaseIO profile "wire_decode_ms" (W.decodeGraphRootBounded
+        W.defaultLimits packageWorkLimit 8 bytes);
       case do {
         graph <- decoded;
         roots <- case W.graphRoots graph of {
@@ -393,8 +455,7 @@ module Bootstrap.OpenFragment
                   "open crate fragment count mismatch";
                 bindings <- referenceList graph b;
                 declarations <- referenceList graph d;
-                stats <- W.graphResourceStats graph;
-                let { used = W.resourceExpandedWork stats };
+                used <- W.graphExpandedWork graph;
                 ensure (used >= 0 && used <= packageWorkLimit)
                   "open crate package-work accounting mismatch";
                 let { remaining = packageWorkLimit - used };
@@ -408,26 +469,32 @@ module Bootstrap.OpenFragment
       } of {
         Left message -> ioReturn (Left message);
         Right (PackageHeader8 graph references dataReferences entries remaining) -> do {
-          bs <- validateReferencesBudget
-            Structure.toXType allBindings references remaining M.empty;
+          bs <- Host.phaseIO profile "reference_validate_ms" (validateReferencesBudget
+            Structure.toXType allBindings references remaining M.empty);
           case bs of {
             Left message -> ioReturn (Left message);
             Right ((,) checkedBindings afterBindings) -> do {
-              ds <- validateReferencesBudget declarationValue
-                allDeclarations dataReferences afterBindings M.empty;
+              ds <- Host.phaseIO profile "reference_validate_ms" (validateReferencesBudget declarationValue
+                allDeclarations dataReferences afterBindings M.empty);
               case ds of {
                 Left message -> ioReturn (Left message);
-                Right ((,) checkedDeclarations _) -> ioReturn (do {
-                  -- Validate all record envelopes/metadata first.
+                Right ((,) checkedDeclarations _) -> do {
+                  -- Demand the admission result before the next phase starts.
                   let { rows = M.toList checkedBindings; types = V.fromList (map snd rows);
                     table = M.fromDistinctAscList (zip (map fst rows) (V.indices types)) };
-                  prepared <- prepareFinals8 graph ((,) table types)
-                    checkedDeclarations M.empty S.empty entries;
-                  -- This is a fresh graph-local typed memo, never reusable
-                  -- with another graph. The typed 64Mi work limit is unchanged.
-                  decodedBodies <- Structure.decodeGraphMany
-                    Structure.ShapeXTerm graph (map finalBodyIndex8 prepared);
-                  bodies <- traverseEither Structure.expectXTerm decodedBodies;
+                  headers <- Host.phaseValue profile "validate_ms" (Host.phaseEither length)
+                    (prepareFinals8 graph ((,) table types) checkedDeclarations M.empty S.empty entries);
+                  case headers of {
+                    Left message -> ioReturn (Left message);
+                    Right prepared -> do {
+                  -- A fresh graph-local typed memo, with the unchanged 64Mi bound.
+                  decoded <- Host.phaseValue profile "syntax_decode_ms" (Host.phaseEither length) (do {
+                    values <- Structure.decodeGraphMany
+                      Structure.ShapeXTerm graph (map finalBodyIndex8 prepared);
+                    traverseEither Structure.expectXTerm values
+                  });
+                  Host.phaseIO profile "fragment_validate_ms" (ioReturn (do {
+                  bodies <- decoded;
                   fragments <- restoreFinals8 prepared bodies;
                   let { usedKeys = S.fromList compareString (concatMap (\((,) _ fragment) ->
                     map (compose X.nameHint fst) (append (parameters fragment) (bindings fragment))) fragments) };
@@ -435,8 +502,11 @@ module Bootstrap.OpenFragment
                   if eqString auditSetting "1"
                     then mapM_ (compose audit snd) fragments
                     else Right ();
-                  Right (Package metadata fragments bytes digest)
-                })
+                  Right (Package metadata fragments bytes digest Nothing)
+                  }))
+                    }
+                  }
+                }
               }
             }
           }
@@ -553,7 +623,7 @@ module Bootstrap.OpenFragment
                   Left message -> ioReturn (Left message);
                   Right bytes -> do {
                     digest <- byteArrayDigest bytes;
-                    ioReturn (Right (Package metadata fragments bytes digest))
+                    ioReturn (Right (Package metadata fragments bytes digest Nothing))
                   }
                 }
               }
@@ -565,11 +635,11 @@ module Bootstrap.OpenFragment
   };
   -- Only an acquired immutable object snapshot, its paired interface checksum,
   -- and checked dependency metadata can restore final receipts. No AST enters.
-  readPackage7 bytes expected compiler metadata allBindings allDeclarations = do {
+  readPackage7Profiled profile bytes expected compiler metadata allBindings allDeclarations = do {
     auditSetting <- getEnv "MLF_QUERY_SEMANTIC_AUDIT";
     digest <- byteArrayDigest bytes;
     if not (eqString digest expected) then ioReturn (Left "open crate SHA mismatch") else do {
-      decoded <- W.decodeGraph W.defaultLimits 7 bytes;
+      decoded <- Host.phaseIO profile "wire_decode_ms" (W.decodeGraph W.defaultLimits 7 bytes);
       case do {
         graph <- decoded;
         root <- case W.graphRoots graph of { [r] -> Right r; _ -> Left "open crate root count" };
@@ -601,7 +671,7 @@ module Bootstrap.OpenFragment
             ensure (S.size usedKeys == length rows) "open crate binding reference inventory mismatch";
             ensure (length fragments == length (nubBy eqString (map fst fragments))) "duplicate open crate fragment";
             if eqString auditSetting "1" then mapM_ (compose audit snd) fragments else Right ();
-            Right (Package metadata fragments bytes digest)
+            Right (Package metadata fragments bytes digest Nothing)
           })
         }
       }

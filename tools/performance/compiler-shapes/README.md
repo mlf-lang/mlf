@@ -14,10 +14,9 @@ rather than workload gates.
 
 ## Compile endpoint
 
-The measured endpoint is `crate-bootstrap-v1`:
+The default measured endpoint is `crate-fused-v1`:
 
-- `PRODUCER/bin/emlf --compile-crate SPEC -o UNIT` (source to checked xMLF)
-- `PRODUCER/bin/emlf --crate-to-llvm-gc UNIT.mlfci` (checked to LLVM)
+- `PRODUCER/bin/emlf --compile-crate-to-llvm-gc SPEC -o UNIT` (source to checked xMLF and LLVM in one invocation)
 - `clang -O2 -Wno-override-module UNIT.ll runtime.o -lgc -lgmp -lm -lpthread -ldl`
 
 This is the low-level crate route over a **bootstrap-only** producer
@@ -52,6 +51,20 @@ user objects on the repeat. The installed MLF command recompiles user code. Pass
 `prepared_verification.kind == "empty"`, which is what a bootstrap-only build has.
 A native installation cannot be passed off as this endpoint.
 
+The default publishes the checked object, metadata and query cache, then passes
+the retained checked root to the ordinary linker and LLVM backend. Its stage
+names are `source-to-llvm` and `llvm-to-executable`. `matrix.json` supplies the
+same default to `bench.py list/prepare/run/all` and the direct prepare/run tools.
+The explicit `--endpoint crate-bootstrap-v1` option preserves the two-process
+route: `--compile-crate` followed by `--crate-to-llvm-gc`, then the same Clang
+link. Use that option in both preparation and execution when reproducing an old
+cohort. Old setup files and recorded cohort labels are never silently changed;
+an endpoint mismatch is rejected, and different endpoints cannot be pooled.
+This is still a GHC-hosted bootstrap compiler, distinct from the installed
+`emlf SOURCE -o OUTPUT` driver.
+See the [default-entry integration study](../../../docs/default-fused-build-2026-11-15.md)
+for package/cache regressions and a fresh paired growth comparison.
+
 ## Running it
 
 ```sh
@@ -76,7 +89,8 @@ python3 -B tools/performance/compiler-shapes/bench.py run --workdir W --cohort C
 python3 -B tools/performance/compiler-shapes/bench.py analyze --workdir W --cohort C
 ```
 
-`local_functions`, `inferred_functions` and `inferred_poly_functions` are opt-in
+`local_functions`, `inferred_functions`, `inferred_poly_functions` and
+`inferred_poly_chain` are opt-in
 and never part of the default matrix. `--family` and `--size` replace the matrix
 selection; they do not add to it. `inferred_functions` removes only the generated function signatures
 from `flat_functions`; the entry/IO harness stays annotated. See the
@@ -89,6 +103,14 @@ definitions without signatures. Every generated function is instantiated at both
 oracle. The entry/IO harness retains its annotations, as in the other families.
 See the [polymorphic-function study](../../../docs/compiler-polymorphic-functions-2026-11-15.md)
 for the before/after measurements and preserved type inventories.
+
+`inferred_poly_chain` defines unsigned functions `f0 step y = step y` and
+`fi step y = step (fprevious step y)`. The final function is used with both an
+integer increment and a Boolean negation, so every layer is reachable at two
+types. Its independent oracle checks the accumulated increment and negation
+parity. The entry/IO harness retains its signatures.
+See the [polymorphic-chain study](../../../docs/compiler-polymorphic-chain-2026-11-15.md)
+for the separate endpoint results, slope criteria and qualification limits.
 
 On a Mac whose shell cannot inspect processes (`/bin/ps` denied by a sandbox), the
 measurement harness cannot sample the process group and refuses to run. Use the
@@ -119,6 +141,7 @@ docker run --rm -v "$PWD:/work" -w /work mlf-compiler-shapes:9.14.1 \
 | `inferred_poly_functions` | unsigned independent identity/constant/application/composition functions; each used at `Int` and `Bool` with runtime-dependent branches | opt in |
 | `dependency_chain` | `n` annotated functions in a strict chain | yes |
 | `inferred_chain` | the same chain with no signature on the generated functions | yes |
+| `inferred_poly_chain` | unsigned dependency chain applying a supplied step once per layer, used at both `Int` and `Bool` | opt in |
 | `recursive_ring` | `n` functions in a mutually recursive cycle | yes |
 | `mono_calls` | `n` monomorphic constructor pack/unpack calls | yes |
 | `poly_calls` | the same calls through a rank-1 `forall` | yes |
@@ -149,8 +172,8 @@ output for three inputs, including a negative one for the ring family.
   identities are compared, and every produced executable is run on all three inputs
   with an exact stdout/stderr comparison.
 - **One pipeline at a time, ordinary flags.** GHC runs
-  `--make -j1 -O2 -fforce-recomp` with an isolated package DB; MLF runs the three
-  stages above; Clang runs plain `-O2`. All arguments are recorded in the plan and
+  `--make -j1 -O2 -fforce-recomp` with an isolated package DB; MLF runs the selected
+  endpoint above; Clang runs plain `-O2`. All arguments are recorded in the plan and
   re-recorded per leg.
 - **Order is frozen before samples.** Cells are shuffled with seed `20261031`. Each
   cell runs three paired rounds and alternates which compiler starts, so both
@@ -222,7 +245,7 @@ the index mapping or closure and must be re-measured, not retroactively filled i
 
 ## CI
 
-- Every ordinary PR runs `test_contract.py` (39 contract tests: refusals, graph evidence, schedule
+- Every ordinary PR runs `test_contract.py` (82 contract tests: defaults, refusals, graph evidence, schedule
   balance and matrix shape; no compiler needed) and
   the `smoke` matrix — 3 cells, 18 timed compilations — inside the existing
   GHC O2 job, uploading its results and raw receipts even on failure.
@@ -344,3 +367,11 @@ evidence budget, which was still sized for the older 41-cell windows. Its 148
 retained legs are kept locally as an aborted cohort, carry `complete: false` with
 their original records, and are excluded from every result above.
 
+
+Explicit `--size` values may range from 1 through 8192. The default matrix and
+all time, memory, disk and output guards are unchanged. A larger requested size
+is a qualification attempt, not a promise that every compiler shape supports
+it: preserve compiler depth-limit failures in the receipt and report them.
+`bench.py run --setup PATH` uses that existing setup (and still authenticates
+its producer and endpoint). For the disk-entry phase diagnostic, see
+[`MLF_CRATE_PROFILE`](../../../docs/crate-compilation.md#profiling-the-disk-to-llvm-entry).

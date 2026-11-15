@@ -25,8 +25,176 @@ module Bootstrap.CrateGraph where {
   import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.Surface as Surface;
 
+  data ContractHash = ContractHash W.Value String;
+  data InferenceCaches = InferenceCaches (Map String Open.Environment) (Map String Open.Fragment)
+    (Map String ((,) String ByteArray)) (Maybe ContractHash);
   data State = State G.Session Source.CheckedContracts
-    (Map String Open.Environment) ([] ((,,) String Open.Fragment ([] (V.Index Declaration)))) Int Int ([] Q.GroupResult) (Maybe IntArray);
+    InferenceCaches ([] ((,,) String Open.Fragment ([] (V.Index Declaration)))) Int Int ([] Q.GroupResult) (Maybe IntArray);
+  -- This bounded memo belongs to one compilation. A template is an abstract,
+  -- already checked implementation, not a saved result for a declaration ID.
+  -- The key includes current datatype-node hashes, closed dependency schemes,
+  -- and a deliberately small resolved source grammar. No generalizer is
+  -- replaced: the first occurrence still uses ordinary MLF inference.
+  templateExpression globals names depth expression = let {
+    child = templateExpression globals names depth;
+    variable slot = Right (Q.node "variable" [showInt slot]);
+    lambda scope name body = mapEither (\text -> Q.node "lambda" [name,text])
+      (templateExpression scope (M.insert compareString name depth names) (depth + 1) body)
+  } in case expression of {
+    SGlobal identity _ -> case M.lookup compareInt (V.toInt identity) globals of {
+      Just slot -> variable slot; Nothing -> Left "template has an unknown declaration reference"
+    };
+    SVar name -> case M.lookup compareString name names of {
+      Just slot -> variable slot; Nothing -> Left "template needs resolved external references"
+    };
+    SDeclScope [identity] (SLam name Nothing body) -> do {
+      ensure (not (M.member compareInt (V.toInt identity) globals)) "template binder identity is already in scope";
+      lambda (M.insert compareInt (V.toInt identity) depth globals) name body
+    };
+    SLam name Nothing body -> lambda globals name body;
+    SApp function argument -> do {
+      f <- child function; a <- child argument; Right (Q.node "application" [f,a])
+    };
+    SPrimitive _ -> Right (Q.encodeExpression expression);
+    SIntLit _ -> Right (Q.encodeExpression expression);
+    SBoolLit _ -> Right (Q.encodeExpression expression);
+    SStringLit _ -> Right (Q.encodeExpression expression);
+    _ -> Left "expression is outside the inference-template grammar"
+  };
+  inferenceTemplateKey context parameters members = case members of {
+    [(,) owner ((,,) _ Nothing body)] -> do {
+      ensure (any (\((,,) _ _ ty) -> case ty of { XForall _ _ _ -> True; _ -> False }) parameters)
+        "template needs a polymorphic dependency";
+      let { ids = map (compose V.toInt (\((,,) i _ _) -> i)) parameters;
+        globals = M.fromList compareInt (zip ids (range 0 (length ids - 1)));
+        names = map (\((,,) _ name _) -> name) parameters };
+      ensure (M.size globals == length parameters && M.size (M.fromList compareString (zip names ids)) == length parameters)
+        "duplicate template parameter";
+      ensure (not (M.member compareInt (V.toInt owner) globals)) "template imports its own owner";
+      _ <- foldM Inference.mergeExternal M.empty (map (\((,,) _ name ty) -> (,) name ty) parameters);
+      source <- templateExpression globals M.empty (length parameters) body;
+      Right (Q.node "checked-inference-template-1"
+        [context,Q.list (\((,,) _ _ ty) -> Q.encodeXType (Separate.normalType ty)) parameters,source])
+    };
+    _ -> Left "template requires one unsigned nonrecursive definition"
+  };
+  attachInferenceTemplate declarations parameters members template = case (,) members (Open.bindings template) of {
+    (,) [(,) _ ((,,) name Nothing _)] [(,) owner expected] -> do {
+      let { old = Open.parameters template };
+      ensure (eqList (\a b -> eqString (Q.encodeDatatype a) (Q.encodeDatatype b))
+        declarations (Open.declarations (Open.context template))) "template datatype environment mismatch";
+      ensure (length old == length parameters && all (\((,) ((,) _ a) ((,,) _ _ b)) -> T.alphaEq a b) (zip old parameters))
+        "template dependency scheme mismatch";
+      let { names = M.fromList compareInt ((:) ((,) (X.nameId owner) name)
+          (zipWith (\((,) n _) ((,,) _ hint _) -> (,) (X.nameId n) hint) old parameters)) };
+      ensure (M.size names == length parameters + 1) "template identities overlap";
+      let { checked = Open.withNameHints names template };
+      ensure (case Open.bindings checked of {
+        [(,) n ty] -> eqString name (X.nameHint n) && T.alphaEq expected ty; _ -> False
+      }) "template changed its exported type";
+      Right checked
+    };
+    _ -> Left "template ownership mismatch"
+  };
+  compileIndexedMemo context templates group parameters declarations members =
+    compileIndexedMemoWithKey (inferenceTemplateKey context parameters members)
+      templates group parameters declarations members;
+  compileIndexedMemoWithKey key templates group parameters declarations members = do {
+    let { reused = do {
+        identity <- key;
+        template <- case M.lookup compareString identity templates of {
+          Just value -> Right value; Nothing -> Left "no checked inference template"
+        };
+        attachInferenceTemplate declarations parameters members template
+      } };
+    case reused of {
+      Right fragment -> Right ((,) fragment templates);
+      Left _ -> do {
+        fragment <- Inference.compileOpenGroupIndexed group parameters declarations members;
+        let { ordered = eqList eqString (map (compose X.nameHint fst) (Open.parameters fragment))
+              (map (\((,,) _ name _) -> name) parameters);
+          next = case key of {
+            Right identity -> if ordered && M.size templates < 64 then M.insert compareString identity fragment templates else templates;
+            Left _ -> templates
+          } };
+        Right ((,) fragment next)
+      }
+    }
+  };
+  -- A template's private disk payload uses local parameter/owner names. The
+  -- declaration-specific source key and read edges remain in the query graph.
+  -- Its full structural key binds the payload to the resolved source grammar,
+  -- dependency schemes and datatype versions. Loading authenticates the saved
+  -- checked fragment and permits only consistent hint changes after matching
+  -- the current parameter schemes and declaration; explicit audit also checks
+  -- the renamed proof semantically.
+  data TemplateInfo = TemplateInfo String
+    ([] ((,,) (V.Index Declaration) String XType))
+    ([] ((,) (V.Index Declaration) ((,,) String (Maybe SAnnotation) SExpr)))
+    ([] ((,,) (V.Index Declaration) String XType))
+    ([] ((,) (V.Index Declaration) ((,,) String (Maybe SAnnotation) SExpr)));
+  templateInfo context slots prepared = do {
+    members <- Source.indexedMembers slots prepared;
+    let { parameters = Source.expectedParameters slots prepared };
+    identity <- inferenceTemplateKey context parameters members;
+    let { canonicalParameters = zipWith (\index ((,,) i _ ty) ->
+            (,,) i ("templateParameter" ++ showInt index) (Separate.normalType ty))
+          (range 0 (length parameters - 1)) parameters };
+    case members of {
+      [(,) owner ((,,) _ annotation body)] ->
+        Right (TemplateInfo identity parameters members canonicalParameters
+          [(,) owner ((,,) "templateOwner" annotation body)]);
+      _ -> Left "template ownership mismatch"
+    }
+  };
+  templateReferences :: String -> [] ((,) String String);
+  templateReferences identity = [(,) "checked-inference-template-1" identity];
+  templateValue declarations info fragment = case info of {
+    TemplateInfo identity _ _ parameters members -> do {
+      renamed <- attachInferenceTemplate declarations parameters members fragment;
+      canonical <- Source.canonicalOpen renamed;
+      Right (rawValue (templateReferences identity) "template" canonical)
+    }
+  };
+  rawValueFor info declarations references group fragment = case info of {
+    Right template -> templateValue declarations template fragment;
+    Left _ -> Right (rawValue references group fragment)
+  };
+  recordRaw info declarations cached wanted reads references group fragment session =
+    case info of {
+      Left _ -> do {
+        recorded <- G.record wanted reads True (rawValue references group fragment) session;
+        ioReturn (mapEither (\entry -> (,) entry cached) recorded)
+      };
+      Right template@(TemplateInfo identity _ _ _ _) -> do {
+        encoded <- case M.lookup compareString identity cached of {
+          Just payload -> ioReturn (Right payload);
+          Nothing -> case templateValue declarations template fragment of {
+            Left e -> ioReturn (Left e); Right value -> G.encodeHashed value
+          }
+        };
+        ioReturn (mapEither (\payload -> let {
+          digest = fst payload; bytes = snd payload;
+          next = if M.size cached < 64 then M.insert compareString identity payload cached else cached
+        } in (,) (G.recordDigest wanted reads (Just digest) digest (Just bytes) session) next) encoded)
+      }
+    };
+  loadRaw info declarations path digest references group env slots prepared owners names =
+    case info of {
+      Left _ -> Open.decodeTrustedIds path digest references "raw" group env
+        (Source.expectedParameters slots prepared) (zip owners names);
+      Right (TemplateInfo identity parameters members canonicalParameters canonicalMembers) -> do {
+        loaded <- Open.decodeTrustedIds path digest (templateReferences identity) "raw" "template" env
+          canonicalParameters (map (\((,) i ((,,) name _ _)) -> (,) i name) canonicalMembers);
+        ioReturn (do {
+          template <- loaded;
+          renamed <- attachInferenceTemplate declarations parameters members template;
+          canonical <- Source.canonicalOpen renamed;
+          Source.validatePreparedOpen slots prepared canonical;
+          Right canonical
+        })
+      }
+    };
   bindingKey scope i = G.key "Binding" (Source.declStable scope i);
   requireBindings scope ids = requireNodes (map (bindingKey scope) ids);
   -- In-memory SCC queries use the full ordered member list. Packing its
@@ -136,7 +304,37 @@ module Bootstrap.CrateGraph where {
       cost = stringLength (showInt size) + 1 + size } in
       if cost > limit - total then Nothing else framedSize limit (total + cost) rest
   };
-  hashRebuiltValue value = case W.prepareGraphPlan W.defaultLimits [value] of {
+  -- These internal receipts contain only text leaves and constructor nodes.
+  -- A small unfolded tree gives conservative bounds without interning it:
+  -- 256 nodes/255 edges, 8 levels, at most 65536 UTF-8 bytes and 65792 work.
+  -- Even charging each text as a distinct symbol and every reference as eight
+  -- bits leaves the complete envelope below 80000 bytes. Larger or differently
+  -- shaped values keep the exact planner and its diagnostics.
+  smallRebuiltValue value = let { limits = W.defaultLimits } in
+    W.validLimits limits && W.maxBytes limits >= 80000 &&
+    W.maxSymbols limits >= 256 && W.maxSymbolBytes limits >= 65536 &&
+    W.maxTotalSymbolBytes limits >= 65536 && W.maxNodes limits >= 256 &&
+    W.maxEdges limits >= 256 && W.maxDepth limits >= 8 &&
+    W.maxExpandedWork limits >= 65792 &&
+    case smallRebuiltTree 1 256 16384 value of { Just _ -> True; Nothing -> False };
+  smallRebuiltTree depth nodes scalars value =
+    if depth > 8 || nodes == 0 then Nothing else case value of {
+      W.VText text -> let { size = stringLength text } in
+        if size > scalars then Nothing else Just ((,) (nodes - 1) (scalars - size));
+      W.VNode tag children -> if tag < 0 || tag > 2147483647 then Nothing
+        else smallRebuiltChildren (depth + 1) (nodes - 1) scalars children;
+      _ -> Nothing
+    };
+  smallRebuiltChildren depth nodes scalars values = case values of {
+    [] -> Just ((,) nodes scalars);
+    (:) value rest -> case smallRebuiltTree depth nodes scalars value of {
+      Nothing -> Nothing;
+      Just ((,) more remaining) -> smallRebuiltChildren depth more remaining rest
+    }
+  };
+  validateRebuiltValue value = if smallRebuiltValue value then Right ()
+    else mapEither (\_ -> ()) (W.prepareGraphPlan W.defaultLimits [value]);
+  hashRebuiltValue value = case validateRebuiltValue value of {
     Left message -> ioReturn (Left message);
     Right _ -> case rebuiltFields value of {
       Left _ -> G.hashValue value;
@@ -264,13 +462,13 @@ module Bootstrap.CrateGraph where {
           let { initial = case contracts of { Source.CheckedContracts _ indexed _ -> indexed } };
           G.elapsed statistics 0 graphStarted;
           runGroups verify (eqString auditSetting "1") crateId inventory initial ((,) Nothing Nothing) groups
-            (State session contracts M.empty [] 0 0 [] statistics)
+            (State session contracts (InferenceCaches M.empty M.empty M.empty Nothing) [] 0 0 [] statistics)
         } }
     };
   runGroups verify audit crateId inventory initial scopeHashes groups state = case groups of {
     [] -> ioReturn (Right state);
     (:) ((,) owners prepare) rest -> case state of {
-      State session contracts contexts objects inferred reused reports statistics ->
+      State session contracts (InferenceCaches contexts templates payloads contractHash) objects inferred reused reports statistics ->
         let { scope = Source.checkedScope contracts; names = map (Source.declName scope) owners } in
         case bindEither (prepare contracts) (Source.slotPrepared contracts owners) of {
           Left e -> ioReturn (Left e);
@@ -305,6 +503,8 @@ module Bootstrap.CrateGraph where {
                           Just env -> Right env; Nothing -> Open.environment declarations } };
                       case environment of { Left e -> ioReturn (Left e); Right env -> do {
                         let { currentContexts = M.insert compareString dataIdentity env contexts;
+                          template = if Source.usesIndexedTerms scope then templateInfo dataIdentity slots prepared
+                            else Left "template needs indexed declarations";
                           references = append (map G.edge bindingNodes) (map G.edge dataNodes);
                           reads = append [G.edge sourceNode,G.edge scopeNode] references;
                           validated = G.validate rawKey third;
@@ -316,12 +516,13 @@ module Bootstrap.CrateGraph where {
                           Just node -> case G.nodePayload node of {
                             Nothing -> ioReturn (Left "query result is absent");
                             Just digest -> do {
-                              loaded <- Open.decodeTrustedIds (G.payloadPath active digest) digest references "raw" group env
-                                (Source.expectedParameters slots prepared) (zip owners names);
+                              loaded <- loadRaw template declarations (G.payloadPath active digest) digest
+                                references group env slots prepared owners names;
                               case loaded of {
                                 Left e -> ioReturn (Left e);
                                 Right fragment -> do {
-                                  fingerprint <- if verify then G.hashValue (rawValue references group fragment)
+                                  fingerprint <- if verify then case rawValueFor template declarations references group fragment of {
+                                    Left e -> ioReturn (Left e); Right value -> G.hashValue value }
                                     else ioReturn (Right digest);
                                   ioReturn (do {
                                     actual <- fingerprint;
@@ -341,26 +542,32 @@ module Bootstrap.CrateGraph where {
                         inferStarted <- G.clock statistics;
                         let { hit = case cached of { Right _ -> True; Left _ -> False };
                           raw = case cached of {
-                            Right fragment -> Right fragment;
+                            Right fragment -> Right ((,) fragment templates);
                             Left _ -> do {
-                              fragment <- if Source.usesIndexedTerms scope then do {
-                                members <- Source.indexedMembers slots prepared;
-                                Inference.compileOpenGroupIndexed group (Source.expectedParameters slots prepared) declarations members
-                              } else Inference.compileOpenGroup group
-                                [Q.dependencyInterface (Source.groupBindings prepared)] declarations (Source.groupMembers prepared);
-                              canonical <- Source.canonicalOpen fragment;
+                              inferredResult <- if Source.usesIndexedTerms scope then case template of {
+                                -- templateInfo already resolved these immutable members,
+                                -- parameters and their complete structural key above.
+                                Right (TemplateInfo identity parameters members _ _) ->
+                                  compileIndexedMemoWithKey (Right identity) templates group parameters declarations members;
+                                Left _ -> do {
+                                  members <- Source.indexedMembers slots prepared;
+                                  compileIndexedMemo dataIdentity templates group (Source.expectedParameters slots prepared) declarations members
+                                }
+                              } else mapEither (\fragment -> (,) fragment templates) (Inference.compileOpenGroup group
+                                [Q.dependencyInterface (Source.groupBindings prepared)] declarations (Source.groupMembers prepared));
+                              canonical <- Source.canonicalOpen (fst inferredResult);
                               Source.validatePreparedOpen slots prepared canonical;
-                              Right canonical
+                              Right ((,) canonical (snd inferredResult))
                             }
                           } };
-                        case raw of { Left e -> ioReturn (Left e); Right fragment -> do {
+                        case raw of { Left e -> ioReturn (Left e); Right ((,) fragment nextTemplates) -> do {
                           recorded <- if hit then case previous of {
-                            Just node -> ioReturn (Right ((,) node active));
+                            Just node -> ioReturn (Right ((,) ((,) node active) payloads));
                             Nothing -> ioReturn (Left "missing validated source query")
-                          } else G.record rawKey reads True (rawValue references group fragment) active;
+                          } else recordRaw template declarations payloads rawKey reads references group fragment active;
                           G.elapsed statistics 2 inferStarted;
                           finishStarted <- G.clock statistics;
-                          case recorded of { Left e -> ioReturn (Left e); Right ((,) rawNode fourth) ->
+                          case recorded of { Left e -> ioReturn (Left e); Right ((,) ((,) rawNode fourth) nextPayloads) ->
                             case Source.prepareOpenFinish slots contracts prepared fragment of {
                               Left e -> ioReturn (Left e);
                               Right finish -> do {
@@ -386,13 +593,13 @@ module Bootstrap.CrateGraph where {
                                   finalRefs = append bindingEdges (map G.edge dataNodes);
                                   reads = append [G.edge rawNode,G.edge sourceNode,G.edge scopeNode]
                                     (append evidenceReads bindingEdges) };
-                                content <- finishContentHash (verify || audit) group body final rawNode references finalRefs;
+                                content <- finishContentHashFor (verify || audit) template declarations group body final rawNode references finalRefs;
                                 supplied <- case content of { Left e -> ioReturn (Left e); Right hash ->
-                                  recordFinish slots group hash delta reads afterInputs };
-                                case supplied of { Left e -> ioReturn (Left e); Right next -> do {
+                                  recordFinishCached contractHash slots group hash delta reads afterInputs };
+                                case supplied of { Left e -> ioReturn (Left e); Right ((,) next nextContractHash) -> do {
                                     G.elapsed statistics 3 finishStarted;
                                     runGroups verify audit crateId inventory initial ((,) inventoryHash scopeHash) rest
-                                      (State next (Source.publishContracts contracts delta) currentContexts
+                                      (State next (Source.publishContracts contracts delta) (InferenceCaches currentContexts nextTemplates nextPayloads nextContractHash)
                                         ((:) ((,,) group final (map fst delta)) objects)
                                         (inferred + if hit then 0 else 1) (reused + if hit then 1 else 0)
                                         ((:) (Q.GroupResult group names hit
@@ -421,12 +628,16 @@ module Bootstrap.CrateGraph where {
   -- regardless of how it was produced. KeepRawBody proves the body is exactly
   -- the one obtained from InferScc. A changed environment invalidates reuse.
   finishContentHash recheck group body final rawNode rawRefs finalRefs =
+    finishContentHashFor recheck (Left "ordinary fragment") [] group body final rawNode rawRefs finalRefs;
+  finishContentHashFor recheck template declarations group body final rawNode rawRefs finalRefs =
     let { same = case body of {
       Source.KeepRawBody -> eqList (eqPair eqString eqString) rawRefs finalRefs;
       Source.AdaptedBody _ -> False
     }; rawHash = G.nodeHash rawNode } in
     if same && not recheck then ioReturn (Right rawHash) else do {
-      hashed <- G.hashValue (rawValue finalRefs group final);
+      hashed <- case if same then rawValueFor template declarations finalRefs group final
+        else Right (rawValue finalRefs group final) of {
+        Left e -> ioReturn (Left e); Right value -> G.hashValue value };
       ioReturn (do { digest <- hashed;
         ensure (not same || eqString digest rawHash) "retained final fragment SHA mismatch";
         Right digest })
@@ -437,21 +648,71 @@ module Bootstrap.CrateGraph where {
   -- share the same canonical content hashes as their Binding nodes.
   sortedDelta slots = sortBy (\a b -> compareString (Source.declName (Source.slotScope slots) (fst a))
     (Source.declName (Source.slotScope slots) (fst b)));
+  -- One successfully encoded, immutable contract value belongs to this run.
+  -- Exact Value equality reuses its canonical digest; names and dependency
+  -- reads are recorded independently for every declaration. Only a bounded
+  -- tree is retained, so deep or large contracts keep the ordinary encoder.
+  contractHashBudget depth remaining value =
+    if depth > 16 || remaining <= 0 then Nothing else case value of {
+      W.VNode _ children -> contractHashChildren (depth + 1) (remaining - 1) children;
+      W.VText text -> if stringLength text <= 256 then Just (remaining - 1) else Nothing;
+      _ -> Just (remaining - 1)
+    };
+  contractHashChildren depth remaining values = case values of {
+    [] -> Just remaining;
+    (:) value rest -> case contractHashBudget depth remaining value of {
+      Nothing -> Nothing;
+      Just next -> contractHashChildren depth next rest
+    }
+  };
+  sameContractValue left right = case (,) left right of {
+    (,) (W.VInt a) (W.VInt b) -> a == b;
+    (,) (W.VBits a) (W.VBits b) -> a == b;
+    (,) (W.VText a) (W.VText b) -> eqString a b;
+    (,) (W.VNode a xs) (W.VNode b ys) -> a == b && eqList sameContractValue xs ys;
+    _ -> False
+  };
+  hashContractCached previous value = case previous of {
+    Just (ContractHash old digest) -> if sameContractValue old value
+      then ioReturn (Right ((,) digest previous)) else hashContractFresh value;
+    Nothing -> hashContractFresh value
+  };
+  hashContractFresh value = do {
+    hashed <- G.hashValue value;
+    ioReturn (mapEither (\digest -> (,) digest (case contractHashBudget 1 128 value of {
+      Just _ -> Just (ContractHash value digest); Nothing -> Nothing
+    })) hashed)
+  };
+  encodeContractsCached previous entries = case entries of {
+    [] -> ioReturn (Right ((,) [] previous));
+    (:) ((,) i contract) rest -> do {
+      hashed <- hashContractCached previous (contractValue contract);
+      case hashed of {
+        Left message -> ioReturn (Left message);
+        Right ((,) digest next) -> do {
+          following <- encodeContractsCached next rest;
+          ioReturn (mapEither (\((,) values final) -> (,) ((:) ((,) i digest) values) final) following)
+        }
+      }
+    }
+  };
   recordFinish slots group fragmentHash delta reads session = do {
-    encoded <- mapM (\((,) i contract) -> do {
-      result <- G.encodeHashed (contractValue contract);
-      ioReturn (mapEither (\((,) digest bytes) -> (,,) i digest bytes) result)
-    }) (sortedDelta slots delta);
-    case sequenceEither encoded of { Left e -> ioReturn (Left e); Right entries -> do {
-      let { scope = Source.slotScope slots; contracts = map (\((,,) i digest _) -> (,) (Source.declName scope i) digest) entries;
+    result <- recordFinishCached Nothing slots group fragmentHash delta reads session;
+    ioReturn (mapEither fst result)
+  };
+  recordFinishCached previous slots group fragmentHash delta reads session = do {
+    encoded <- encodeContractsCached previous (sortedDelta slots delta);
+    case encoded of { Left e -> ioReturn (Left e); Right ((,) entries nextHash) -> do {
+      let { scope = Source.slotScope slots; contracts = map (\((,) i digest) -> (,) (Source.declName scope i) digest) entries;
         receipt = W.VNode 427 [W.VText group,W.VText fragmentHash,A.toList (A.toPair A.toText A.toText) contracts];
-        binding dependency current ((,,) i digest _) = snd (G.recordDigest (bindingKey scope i)
+        binding dependency current ((,) i digest) = snd (G.recordDigest (bindingKey scope i)
           [dependency] Nothing digest Nothing current) };
       -- These values are rebuilt from current checked contracts on every run.
       -- Only InferScc and Evidence payloads are read from disk. Keep all value
       -- hashes and dependency edges in the generation, without unused files.
       recorded <- recordRebuilt (groupKey FinishQuery slots) reads receipt session;
-      ioReturn (mapEither (\((,) finish next) -> foldlStrict (binding (G.edge finish)) next entries) recorded)
+      ioReturn (mapEither (\((,) finish next) ->
+        (,) (foldlStrict (binding (G.edge finish)) next entries) nextHash) recorded)
     } }
   };
   checkedResult (State session contracts _ objects inferred reused reports _) =

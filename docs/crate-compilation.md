@@ -96,6 +96,32 @@ not added by this migration. See the [migration evidence](crate-migration.md).
 | `PREFIX.mlfco` | Independently checked SCC fragments and their import parameters |
 | `PREFIX.queries` | Inferred/reused groups, stable member inventories and query fingerprints |
 
+`emlf --compile-crate-to-llvm-gc SPEC -o PREFIX > program.ll` writes the same
+artifacts and publishes the query generation, then links the retained checked
+root and emits LLVM in the same invocation. Dependency implementation objects
+still undergo ordinary admission against the metadata snapshot used for
+inference. The root comes from an opaque file-owned compilation receipt; it is
+not recovered from an unchecked AST or an LLVM cache. The existing linker and
+closed-program checks still run. A source or publication failure emits no LLVM;
+a later link/code-generation failure can leave the successfully published
+checked artifacts. `-Zincremental-verify-ich` is supported by this entry too.
+
+Add `--codegen-cache DIRECTORY --query-report FILE` to use the ordinary
+input/optimized LLVM caches and publish an invocation-owned report. The retained
+root and the disk CLI use the same admitted-Prelude linking path, canonical
+codegen keys and compiler-identity salt. A report is written only after successful
+emission; report publication failure produces no LLVM on stdout.
+
+The package manager uses this entry for fresh complete executable/test targets
+when the selected compiler advertises the `--codegen-cache` protocol. Library
+actions still use `--compile-crate`. The compile action stores retained LLVM and
+its report in its checksummed artifact; the separate emission action verifies
+the compiler, root metadata/object digests and retained-file digests before
+copying them into its own cache. The scheduler keeps both action boundaries.
+Outer cache hits do not invoke the compiler. Checked-only artifacts and older
+seed compilers retain the disk emission route and its codegen cache/report
+protocol. Failed compile/emission actions do not publish a new executable.
+
 Compilation reads dependency metadata recursively. It does not read upstream
 source or implementation objects. The linker subsequently loads implementation
 objects, rejects crate cycles and ownership conflicts, freshens binders, compares
@@ -235,3 +261,56 @@ uses these counts and retains subtrees with no reference to the substituted
 variable. Child order, rewrite rules and fresh-name allocation order are
 unchanged. Permanent tests compare each index with independent scoped scans and
 compare complete normalized trees with the preceding rewrite algorithm.
+
+### Profiling the disk-to-LLVM entry
+
+Set `MLF_CRATE_PROFILE` to a JSON destination when invoking the uncached disk
+entry. This is diagnostic output, separate from LLVM stdout, checked artifacts
+and query cache identities:
+
+```sh
+MLF_CRATE_PROFILE=/tmp/crate-phases.json emlf --crate-to-llvm-gc build/unit.mlfci > build/unit.ll
+```
+
+The monotonic clock has millisecond resolution. Counters are exclusive, including
+nested phases; sum the fields to obtain the measured portion of the invocation.
+Process startup, report publication and the later Clang invocation are outside
+these counters. The current open-object reader reports:
+
+| Field | Work |
+| --- | --- |
+| `read_ms` | Bounded interface/object byte reads, including exact Prelude image reads |
+| `decode_ms` | Interface wire/UTF-8 decoding |
+| `wire_decode_ms` | Open-object wire graph decoding, CRC, canonicality and resource bounds |
+| `syntax_decode_ms` | Graph-local typed body reconstruction with its original work bound |
+| `image_decode_ms` | Decoding the compiler-owned Prelude images |
+| `validate_ms` | Remaining interface/dependency/object admission and exact image comparison |
+| `metadata_hash_ms` | Canonical interface association hashes |
+| `reference_validate_ms` | Reference inventory and dependency type/layout hash checks |
+| `fragment_validate_ms` | Restored fragment fingerprints, inventory and optional semantic audit |
+| `prelude_check_ms` | Independent checking of the compiler-owned Prelude witness |
+| `link_ms` | Dependency selection and linking preparation |
+| `final_check_ms` | Final spine materialization/Prelude selection and independent checking |
+| `optimize_ms` | Erasure, checked optimization and wrapper lowering |
+| `emit_ms` | LLVM generation and streaming stdout |
+| `other_ms` | Remaining disk-entry orchestration |
+
+To compare the five broad phases, sum the four decode fields and, separately,
+the four artifact validation fields. Keep Prelude and final independent checking
+visible as additional validation costs. Legacy text/v1 formats retain their
+existing combined syntax/admission steps under `validate_ms`; the envelope
+fallback keeps its combined linking/checking under `link_ms`. A zero counter
+can mean work below the clock's resolution, or work included in a documented
+combined phase.
+
+Pure results are demanded at phase boundaries, including the complete lowered
+runtime tree before LLVM emission. Profiling therefore changes demand and adds
+traversal/clock overhead; use runs with `MLF_CRATE_PROFILE` unset for end-to-end
+performance comparisons. This variable instruments the uncached disk entry,
+`--run-crate` and crate display. It does not instrument the codegen cache path.
+The ordinary independent checks and artifact limits remain in effect.
+
+Run `python3 tools/shared/test_crate_profile.py --build-receipt PRODUCER/receipt.json
+--builtin BUILTIN_PREFIX --output FRESH_DIR` for authenticated fused/disk LLVM
+parity, runtime output, artifact immutability, corrupt-object rejection and
+missing-file diagnostics with profiling both enabled and disabled.

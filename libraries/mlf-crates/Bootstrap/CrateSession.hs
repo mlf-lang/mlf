@@ -3,7 +3,8 @@
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
 -- File-owned candidate route. No raw AST, Solver, region, or callback escapes.
-module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, compileSpecFileWithVerification, compileSpecFileUsingInstaller) where {
+module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, compileSpecFileWithVerification, compileSpecFileUsingInstaller,
+    CompiledCrate, compiledObject, compiledInterfaces, compileSpecFileRetainedUsingInstaller) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
@@ -46,6 +47,14 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   import qualified Bootstrap.X.Syntax as X;
   import qualified Bootstrap.X.Type as T;
   import qualified Bootstrap.X.Pretty as Pretty;
+
+  -- Only the file-owned compiler can construct this receipt. It survives
+  -- successful object/query publication and owns the exact checked root plus
+  -- the dependency metadata snapshot used to infer it.
+  data CompiledCrate = CompiledCrate Artifact.CrateObject
+    ([] ((,) String Artifact.CrateInterface));
+  compiledObject (CompiledCrate object _) = object;
+  compiledInterfaces (CompiledCrate _ interfaces) = interfaces;
 
   compilePreparedWithEncoding :: forall a. Bool -> Bool ->
     (Artifact.CrateObject -> String -> Query.QueryReport -> a) ->
@@ -174,7 +183,11 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
     [] ((,) String Artifact.CrateInterface) -> String -> IO (Either String ());
   compileSourcesWithEncoding verifyAll witness = compileSourcesUsingInstaller verifyAll (ensureBuiltinWith witness);
   compileSourcesUsingInstaller = compileSourcesLoading Artifact.loadInterfaces;
-  compileSourcesLoading load verifyAll install shareEncoding spec sources interfaces prefix =
+  compileSourcesLoading load verifyAll install shareEncoding spec sources interfaces prefix = do {
+    result <- compileSourcesRetainedLoading load verifyAll install shareEncoding spec sources interfaces prefix;
+    ioReturn (mapEither (\_ -> ()) result)
+  };
+  compileSourcesRetainedLoading load verifyAll install shareEncoding spec sources interfaces prefix =
     do {
       dependencies <- withPreludeLoading load install spec sources interfaces;
       case do {
@@ -204,7 +217,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
                       names
                 } in
                 ioReturn (Left (Modules.displayNames diagnostics message));
-              Right _ -> ioReturn (Right ())
+              Right object -> ioReturn (Right (CompiledCrate object loaded))
             }
           }
       }
@@ -249,7 +262,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
               published <- QueryGraph.publish session;
               QueryGraph.elapsed (CrateGraph.statistics state) 5 publishStarted;
               QueryGraph.writeProfile (prefix ++ ".query-profile") (CrateGraph.statistics state);
-              ioReturn (mapEither (\_ -> ()) published)
+              ioReturn (mapEither (\_ -> object) published)
             } }
           } }
         }
@@ -319,7 +332,11 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   compileSpecFileWithPrelude = compileSpecFileWithVerification False;
   compileSpecFileWithVerification :: Bool -> Maybe ((,) Builtin.PreparedPrelude String) -> String -> String -> IO (Either String ());
   compileSpecFileWithVerification verifyAll witness = compileSpecFileUsingInstaller verifyAll (ensureBuiltinWith witness);
-  compileSpecFileUsingInstaller verifyAll install file prefix =
+  compileSpecFileUsingInstaller verifyAll install file prefix = do {
+    result <- compileSpecFileRetainedUsingInstaller verifyAll install file prefix;
+    ioReturn (mapEither (\_ -> ()) result)
+  };
+  compileSpecFileRetainedUsingInstaller verifyAll install file prefix =
     do {
       present <- fileExists file;
       if not present
@@ -347,7 +364,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
                        -- parsers/decoders above, not caller-supplied lazy ASTs.
                        -- Reuse this invocation's admitted dependency snapshot;
                        -- the loader still admits any newly installed Prelude.
-                       compileSourcesLoading (Artifact.loadGraph [] interfaces)
+                       compileSourcesRetainedLoading (Artifact.loadGraph [] interfaces)
                          verifyAll install True normalized sources interfaces prefix
                    }
                  }

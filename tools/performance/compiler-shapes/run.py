@@ -11,6 +11,7 @@ import sys
 import types
 import generate as G
 import query_cache as Q
+import worker
 
 ROOT=Path(__file__).resolve().parents[3]
 HERE=Path(__file__).resolve().parent
@@ -62,7 +63,7 @@ def main():
     parser.add_argument('--size',action='append',type=int)
     parser.add_argument('--repeats',type=int,default=data['repeats'])
     parser.add_argument('--cohort')
-    parser.add_argument('--endpoint',default='crate-bootstrap-v1',choices=sorted(data['endpoints']))
+    parser.add_argument('--endpoint',default=data['default_endpoint'],choices=sorted(data['endpoints']))
     args=parser.parse_args(); out=args.output.resolve(); out.mkdir(parents=True,exist_ok=False)
     hp=ROOT/'tools/performance/a1-private-index/helper.py'
     H=types.ModuleType('unchanged_resource_helper');H.__file__=str(hp);exec(compile(hp.read_bytes(),str(hp),'exec'),H.__dict__)
@@ -74,7 +75,7 @@ def main():
     repeats=1 if args.pilot else args.repeats
     H.require(repeats>=1,'positive repeats')
     sizes=args.size or ((8,) if args.pilot else tuple(data['sizes']))
-    H.require(all(0<n<=1024 for n in sizes),'bounded positive sizes')
+    H.require(all(0<n<=8192 for n in sizes),'bounded positive sizes')
     cases=G.generate(out/'sources',sizes=sizes,families=args.family)
     seed=data['seed']; rng=random.Random(seed); order=list(cases);rng.shuffle(order)
     schedule=[]
@@ -120,9 +121,7 @@ def main():
         'ghc_arguments':['--make','-j1','-O2','-fforce-recomp','-package-env','-','-clear-package-db',
             '-global-package-db','-package-db',setup['package_db'],'-no-user-package-db','-hide-all-packages',
             '-package','base','-package','mlf-shape-primitives','-i','-odir','<leg>','-hidir','<leg>','<source>','-o','<leg>/program'],
-        'mlf_stages':['source-to-checked: PRODUCER/bin/emlf --compile-crate <spec> -o <leg>/unit',
-            'checked-to-llvm: PRODUCER/bin/emlf --crate-to-llvm-gc <leg>/unit.mlfci',
-            'llvm-to-executable: CLANG -O2 -Wno-override-module <leg>/unit.ll <runtime.o> <gc/gmp libs> -lm -lpthread -ldl'],
+        'mlf_stages':worker.mlf_stage_names(args.endpoint),
         'timing_boundary':'exact-child worker launch through wait4; common Python dispatcher included; preparation and validation excluded'}
     plan_path=out/'plan.json';H.save(plan_path,plan);plan_sha=H.sha(plan_path)
     scripts=out/'scripts';scripts.mkdir()

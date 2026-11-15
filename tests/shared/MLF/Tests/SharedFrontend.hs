@@ -1564,6 +1564,68 @@ module MLF.Tests.SharedFrontend where {
     ordinaryType <- recursiveRight (label ++ " ordinary frozen target") (Independent.checkClosed b);
     check (label ++ " independent type") (XT.alphaEq actualType ordinaryType)
   };
+  templateGroupChecks = do {
+    let { a = XTyVar 100; ty = XForall a XBot
+          (XArrow (XArrow (XVar a) (XVar a)) (XArrow (XVar a) (XVar a)));
+      parameters = \identity name scheme -> [(,,) (Index.fromInt identity) name scheme];
+      member = \foreignId owner stepId argId name -> [(,) (Index.fromInt owner) ((,,) name Nothing
+        (SDeclScope [Index.fromInt stepId] (SLam "step" Nothing
+          (SDeclScope [Index.fromInt argId] (SLam "value" Nothing
+            (SApp (SGlobal (Index.fromInt stepId) "step")
+              (SApp (SApp (SGlobal (Index.fromInt foreignId) "wrong hint")
+                (SGlobal (Index.fromInt stepId) "step")) (SGlobal (Index.fromInt argId) "value"))))))))];
+      ps = parameters 3 "previous" ty;
+      first = member 3 10 11 12 "first";
+      second = member 23 30 31 32 "second" };
+    installed <- recursiveRight "template initial inference"
+      (CrateGraph.compileIndexedMemo "context" M.empty "first" ps [] first);
+    check "checked polymorphic template is retained" (M.size (snd installed) == 1);
+    repeated <- recursiveRight "template renamed inference"
+      (CrateGraph.compileIndexedMemo "context" (snd installed) "second"
+        (parameters 23 "otherPrevious" ty) [] second);
+    check "alpha-equivalent dependency and owner use one template" (M.size (snd repeated) == 1);
+    inferenceGroupCase (\inputs members _ -> mapEither fst
+        (CrateGraph.compileIndexedMemo "context" (snd installed) "second" inputs [] members))
+      "reused polymorphic template" True (parameters 23 "otherPrevious" ty) second;
+    key <- recursiveRight "template source key" (CrateGraph.inferenceTemplateKey "context" ps first);
+    let { b = XTyVar 200;
+      alpha = XForall b XBot (XArrow (XArrow (XVar b) (XVar b)) (XArrow (XVar b) (XVar b)));
+      bounded = XForall a (XCon "Int" [])
+        (XArrow (XArrow (XVar a) (XVar a)) (XArrow (XVar a) (XVar a)));
+      application = XForall a XBot (XForall b XBot
+        (XArrow (XArrow (XVar a) (XVar b)) (XArrow (XVar a) (XVar b))));
+      different label context inputs members = do {
+        other <- recursiveRight label (CrateGraph.inferenceTemplateKey context inputs members);
+        check label (not (eqString key other))
+      } };
+    renamedKey <- recursiveRight "template alpha-renamed key"
+      (CrateGraph.inferenceTemplateKey "context" (parameters 23 "otherPrevious" alpha) second);
+    check "template alpha-renaming preserves the key" (eqString key renamedKey);
+    different "template includes datatype context" "other-context" ps first;
+    different "template includes quantified bounds" "context" (parameters 3 "previous" bounded) first;
+    check "unsupported bounded dependency is not accepted through an older template"
+      (isLeft (Inference.compileOpenGroupIndexed "bounded" (parameters 3 "previous" bounded) [] first) &&
+       isLeft (CrateGraph.compileIndexedMemo "context" (snd installed) "bounded"
+         (parameters 3 "previous" bounded) [] first));
+    inferenceGroupCase (\inputs members _ -> mapEither fst
+        (CrateGraph.compileIndexedMemo "context" (snd installed) "application" inputs [] members))
+      "changed dependency scheme is inferred again" True (parameters 3 "previous" application) first;
+    let { two = append ps (parameters 4 "spare" ty) };
+    leftKey <- recursiveRight "first dependency position" (CrateGraph.inferenceTemplateKey "context" two first);
+    rightKey <- recursiveRight "second dependency position"
+      (CrateGraph.inferenceTemplateKey "context" two (member 4 10 11 12 "first"));
+    check "template distinguishes equally typed dependencies" (not (eqString leftKey rightKey));
+    check "template rejects unresolved identities"
+      (isLeft (CrateGraph.inferenceTemplateKey "context" ps (member 99 10 11 12 "first")));
+    check "template rejects binder identity capture"
+      (isLeft (CrateGraph.inferenceTemplateKey "context" ps (member 3 10 3 12 "first")));
+    check "template rejects recursive ownership"
+      (isLeft (CrateGraph.inferenceTemplateKey "context" ps (member 10 10 11 12 "first")));
+    let { full = M.fromList compareString (map (\i -> (,) (showInt i) (fst installed)) (range 1 64)) };
+    limited <- recursiveRight "bounded template inventory"
+      (CrateGraph.compileIndexedMemo "context" full "second" (parameters 23 "otherPrevious" ty) [] second);
+    check "template inventory stays bounded" (M.size (snd limited) == 64)
+  };
   groundGroupChecks = do {
     groundAliasChecks;
     let { a = XTyVar 100; b = XTyVar 101; c = XTyVar 102;
@@ -1852,12 +1914,52 @@ module MLF.Tests.SharedFrontend where {
     invalid <- CrateGraph.hashRebuiltValue (Wire.VNode (-1) []);
     check "rebuilt hash preserves wire admission rejection" (isLeft invalid)
   };
+  declarationInventoryChecks :: IO ();
+  declarationInventoryChecks = do {
+    let { names = ["z", "alpha", "a", "last"];
+      equation name = P.Equation name [] Nothing (SIntLit 1);
+      declarations ns = map (\name -> (,,) name Nothing (SIntLit 1)) ns;
+      moduleFor ns ds cs = SourceModule "Inventory.hs" (Just "Inventory") Nothing
+        [] ds cs [] (declarations ns) Nothing SharedHaskellV1;
+      duplicate result = case result of {
+        Left message -> eqString message "Inventory: duplicate declaration";
+        Right _ -> False
+      } };
+    grouped <- recursiveRight "distinct declaration inventory" (P.groupValues (map equation names));
+    check "group inventory preserves source order"
+      (eqList eqString (map (\((,,) name _ _) -> name) grouped) names);
+    check "separated equations retain their duplicate diagnostic"
+      (case P.groupValues (map equation ["z", "a", "z"]) of {
+        Left message -> eqString message "function equations must be contiguous; duplicate value declaration";
+        Right _ -> False
+      });
+    check "adjacent equations still form one declaration"
+      (accept "choose True = 1\nchoose False = 2");
+    let { large = map (\n -> "value" ++ showInt n) (range 0 1023) };
+    check "large distinct module inventory" (isRight (Modules.locals (moduleFor large [] [])));
+    check "identical duplicate entity cannot disappear in a set"
+      (duplicate (Modules.locals (moduleFor (append large ["value0"]) [] [])));
+    check "duplicate final key is rejected"
+      (duplicate (Modules.locals (moduleFor (append large ["value1023"]) [] [])));
+    let { thing = DataDecl "Thing" [] [ConstructorDecl "Thing" []] };
+    check "type and constructor may share their spelling"
+      (isRight (Modules.locals (moduleFor [] [thing] [])));
+    check "constructor and value share the term namespace"
+      (duplicate (Modules.locals (moduleFor ["Thing"] [thing] [])));
+    check "class and datatype share the type namespace"
+      (duplicate (Modules.locals (moduleFor [] [thing] [SClassDecl "Thing" [] [] []])));
+    check "method and value share the term namespace"
+      (duplicate (Modules.locals (moduleFor ["method"] []
+        [SClassDecl "Class" [] [] [(,) "method" (STVar "a")]])))
+  };
   frontendChecks :: IO ();
   frontendChecks =
     do {
+      declarationInventoryChecks;
       formatterChecks;
       monomorphicGroupChecks;
       groundGroupChecks;
+      templateGroupChecks;
       sourceCandidateChecks;
       rebuiltHashChecks;
       check "legacy malformed pragma comment"

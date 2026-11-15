@@ -16,7 +16,7 @@ main :: IO ();
 main = ioBind (getArg 0) (\text -> printInt (entry (readInt text)))
 }
 '''
-FAMILIES = ('flat_functions', 'inferred_functions', 'inferred_poly_functions', 'local_functions', 'dependency_chain', 'inferred_chain', 'recursive_ring',
+FAMILIES = ('flat_functions', 'inferred_functions', 'inferred_poly_functions', 'inferred_poly_chain', 'local_functions', 'dependency_chain', 'inferred_chain', 'recursive_ring',
             'mono_calls', 'poly_calls', 'tree_chain', 'balanced_tree',
             'literal_table', 'higher_order_chain')
 
@@ -44,6 +44,12 @@ def program(family, n):
         if family == 'local_functions':
             expression = 'let {\n'+declarations+'} in '+expression
             declarations = ''
+    elif family == 'inferred_poly_chain':
+        declarations = 'f0 step y = step y;\n'
+        declarations += ''.join(f'f{i} step y = step (f{i-1} step y);\n' for i in range(1, n))
+        integer = f'f{n-1} (\\value -> addInt value 1) x'
+        boolean = f'f{n-1} (\\value -> if value then False else True) (ltInt x 0)'
+        expression = f'if {boolean} then {integer} else subInt 0 ({integer})'
     elif family == 'inferred_poly_functions':
         bodies = ('y = y', 'y z = y', 'f y = f y', 'f g y = f (g y)')
         declarations = ''.join(f'f{i} {bodies[i % 4]};\n' for i in range(n))
@@ -102,6 +108,9 @@ def expected(family, n, x):
         return n*x + n*(n-1)//2
     if family in ('dependency_chain', 'inferred_chain', 'higher_order_chain'):
         return x+n
+    if family == 'inferred_poly_chain':
+        positive = (x < 0) != (n % 2 == 1)
+        return x+n if positive else -(x+n)
     if family == 'inferred_poly_functions':
         negative = max(0, min(n, x + 1))
         return n*x + n*(n-1)//2 - 2*(negative*x + negative*(negative-1)//2)
@@ -117,7 +126,7 @@ def generate(out, sizes=(8,32,128), families=None):
     cases = []
     if families is None:
         # The default matrix keeps the ten shape families and one minimal baseline.
-        selected = [f for f in FAMILIES if f not in ('local_functions', 'inferred_functions', 'inferred_poly_functions')]
+        selected = [f for f in FAMILIES if f not in ('local_functions', 'inferred_functions', 'inferred_poly_functions', 'inferred_poly_chain')]
         pairs = [('baseline', 0)]
         for family in selected:
             pairs.extend((family, n) for n in sizes)

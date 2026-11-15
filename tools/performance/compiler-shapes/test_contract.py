@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -20,6 +21,9 @@ import analyze  # noqa: E402
 import bench  # noqa: E402
 import run as runner  # noqa: E402
 import generate  # noqa: E402
+import prepare  # noqa: E402
+
+import worker
 
 STAGES = ['source-to-checked', 'checked-to-llvm', 'llvm-to-executable']
 
@@ -63,7 +67,7 @@ def write_cohort(root, label='screen', family='flat_functions', size=8, repeats=
         times = mlf_seconds if item['lane'] == 'mlf' else ghc_seconds
         wall = times[item['position'] // 2 if item['position'] // 2 < len(times) else 0]
         stages = [{'name': name, 'wall_seconds': wall / 3, 'user_seconds': wall / 4,
-                   'system_seconds': wall / 20} for name in STAGES] if item['lane'] == 'mlf' else []
+                   'system_seconds': wall / 20} for name in (worker.mlf_stage_names(endpoint) if endpoint in ['crate-bootstrap-v1','crate-fused-v1'] else STAGES)] if item['lane'] == 'mlf' else []
         runs.append({'case': case['id'], 'position': item['position'], 'lane': item['lane'], 'complete': True,
                      'output_correct': True, 'fresh': 1 if item['lane'] == 'mlf' else None,
                      'reused': 0 if item['lane'] == 'mlf' else None, 'max_group_members': 1,
@@ -92,6 +96,83 @@ def edit(folder, mutate):
 
 
 class ScheduleTests(unittest.TestCase):
+    def test_explicit_large_sizes_preserve_default_matrix(self):
+        self.assertEqual(bench.resolve('default', None, None)[2], [8, 32, 128])
+        self.assertEqual(bench.resolve('default', ['inferred_poly_chain'], [8192])[2], [8192])
+        for n in [0, -1, 8193]:
+            with self.assertRaises(SystemExit):
+                bench.resolve('default', ['inferred_poly_chain'], [n])
+
+    def test_run_uses_explicit_setup(self):
+        import argparse
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            setup = root / 'existing-setup.json'
+            setup.write_text('{}')
+            args = argparse.Namespace(workdir=root / 'other', setup=setup,
+                cohort='explicit', matrix='smoke', family=None, size=None,
+                repeats=3, endpoint='crate-bootstrap-v1')
+            with mock.patch.object(bench, 'run') as run_command:
+                bench.command_run(args)
+            argv = run_command.call_args.args[0]
+            self.assertEqual(argv[argv.index('--setup') + 1], setup.resolve())
+
+    def test_all_build_entry_parsers_default_to_fused_and_allow_two_stage(self):
+        # Exercise the real CLI parsers, stopping before any build or filesystem
+        # action. Old setups must still require explicit endpoint selection.
+        class Parsed(Exception):
+            pass
+
+        original = bench.argparse.ArgumentParser.parse_args
+        entries = [(bench, ['list']),
+                   (bench, ['prepare', '--workdir', '/unused']),
+                   (bench, ['run', '--workdir', '/unused', '--cohort', 'test']),
+                   (bench, ['all', '--workdir', '/unused', '--cohort', 'test']),
+                   (prepare, ['--producer', '/unused', '--output', '/unused']),
+                   (runner, ['--setup', '/unused', '--output', '/unused'])]
+        for module, arguments in entries:
+            for extra, expected in [([], 'crate-fused-v1'),
+                                    (['--endpoint', 'crate-bootstrap-v1'], 'crate-bootstrap-v1')]:
+                with self.subTest(module=module.__name__, arguments=arguments, extra=extra):
+                    found = []
+                    def capture(parser):
+                        found.append(original(parser, arguments + extra))
+                        raise Parsed()
+                    with mock.patch.object(bench.argparse.ArgumentParser, 'parse_args', capture), \
+                         mock.patch.object(sys, 'argv', [module.__name__, *arguments, *extra]):
+                        with self.assertRaises(Parsed):
+                            module.main()
+                    self.assertEqual(found[0].endpoint, expected)
+
+    def test_inferred_poly_chain_is_unsigned_and_every_layer_is_reached_at_two_types(self):
+        for size in [1, 3, 32, 512]:
+            source = generate.program('inferred_poly_chain', size)
+            declarations = re.findall(r'^(f\d+) (.*);$', source, re.MULTILINE)
+            self.assertEqual(len(declarations), size)
+            self.assertNotRegex(source, r'f\d+ ::')
+            for i, (name, body) in enumerate(declarations):
+                self.assertEqual(name, 'f' + str(i))
+                self.assertEqual(re.findall(r'\bf\d+\b', body), [] if i == 0 else ['f' + str(i - 1)])
+            entry = next(line for line in source.splitlines() if line.startswith('entry x ='))
+            self.assertEqual(re.findall(r'\bf\d+\b', entry), ['f' + str(size - 1)] * 3)
+            self.assertIn('addInt value 1', entry)
+            self.assertIn('if value then False else True', entry)
+            for value in [-1, 0, 7, size]:
+                integer, boolean = value, value < 0
+                for _ in range(size):
+                    integer += 1
+                    boolean = not boolean
+                self.assertEqual(generate.expected('inferred_poly_chain', size, value),
+                                 integer if boolean else -integer)
+        self.assertEqual([generate.expected('inferred_poly_chain', 1, x) for x in [-1, 0, 7]], [0, 1, 8])
+        self.assertEqual([generate.expected('inferred_poly_chain', 4, x) for x in [-1, 0, 7]], [3, -4, -11])
+
+    def test_inferred_poly_chain_is_opt_in(self):
+        _, families, _, _ = bench.resolve('default', None, None)
+        self.assertNotIn('inferred_poly_chain', families)
+        _, chosen, _, _ = bench.resolve('default', ['inferred_poly_chain'], [512])
+        self.assertEqual(chosen, ['inferred_poly_chain'])
+
     def test_inferred_poly_functions_are_unsigned_independent_and_used_at_two_types(self):
         for size in [4, 32, 512]:
             source = generate.program('inferred_poly_functions', size)
@@ -151,6 +232,17 @@ class ScheduleTests(unittest.TestCase):
         self.assertNotIn('local_functions', families)
         _, chosen, _, _ = bench.resolve('default', ['local_functions'], [512])
         self.assertEqual(chosen, ['local_functions'])
+
+    def test_fused_endpoint_has_its_own_command_and_stages(self):
+        endpoint = bench.measured_endpoint('crate-fused-v1')
+        self.assertIn('--compile-crate-to-llvm-gc', endpoint['driver'])
+        self.assertEqual(worker.mlf_stage_names('crate-fused-v1'), ['source-to-llvm','llvm-to-executable'])
+        commands = worker.mlf_commands('crate-fused-v1', Path('/emlf'), Path('/spec'), Path('/out'))
+        self.assertEqual(commands[0][1], [Path('/emlf'),'--compile-crate-to-llvm-gc',Path('/spec'),'-o',Path('/out/unit')])
+        self.assertEqual(commands[0][2], Path('/out/unit.ll'))
+        self.assertEqual(worker.mlf_stage_names('crate-bootstrap-v1'), STAGES)
+        with self.assertRaises(ValueError):
+            worker.mlf_stage_names('unknown')
 
     def test_installed_endpoint_is_separate_from_crate_runner(self):
         self.assertIn('emlf-source-v1', bench.registry()['paired_endpoints'])
@@ -248,9 +340,15 @@ class AnalyzerTests(unittest.TestCase):
             self.assertTrue((output / name).is_file(), name)
         self.assertIn('MLF median', (output / 'summary.md').read_text())
 
+    def test_fused_analysis_keeps_its_stage_inventory(self):
+        folder = write_cohort(self.root, endpoint='crate-fused-v1')
+        rows, _, _, _ = analyze.analyze(folder)
+        self.assertIn('source-to-llvm_wall_seconds_median', rows[0])
+        self.assertNotIn('source-to-checked_wall_seconds_median', rows[0])
+
     def test_cli_rejects_incompatible_cohorts(self):
         write_cohort(self.root, label='screen')
-        write_cohort(self.root, label='other', endpoint='emlf-source-v1')
+        write_cohort(self.root, label='other', endpoint='crate-fused-v1')
         process = subprocess.run([sys.executable, '-B', str(HERE / 'analyze.py'),
                                   str(self.root / 'screen'), str(self.root / 'other'),
                                   '--output', str(self.root / 'results')], capture_output=True, text=True)

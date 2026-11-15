@@ -4,7 +4,7 @@
 module Main where
 import Prelude
 import Control.Monad (unless, forM_, zipWithM_)
-import Control.Exception (try, evaluate, bracket)
+import Control.Exception (try, evaluate, bracket, SomeException, displayException)
 import System.Mem.StableName (makeStableName, eqStableName)
 import System.Environment (getArgs, getExecutablePath)
 import System.Directory (doesPathExist, createDirectory, renameFile)
@@ -942,6 +942,9 @@ main = do
       wireCheck (directory ++ "/constructors.bin") roots
       readBounded (directory ++ "/constructors.bin") >>= graphConstructorTests
       semanticEdges directory
+      phaseReaderControls
+      interfaceEqualityControls
+      interfaceInventoryControls
       rbSelfTests
       putStrLn ("PASS constructors " ++ show (length roots))
     ["source-admission",directory] -> sourceAdmissionTests directory
@@ -1685,6 +1688,11 @@ rbRoundtrip name lim aggregate roots = do
   zipWithM_ (rbGraphValue graph) (W.graphRoots graph) roots
   stats <- rbExpect (name ++ " stats") (W.graphResourceStats graph)
   size <- P.lengthByteArray bytes
+  summarized <- rbExpect (name ++ " retained work summaries") (W.graphExpandedWork graph)
+  rbNeed (name ++ " exact retained work including repeated roots") (summarized == used)
+  plannedGraph <- rbExpect (name ++ " planned graph") (W.planGraph (rbWork aggregate lim) roots)
+  plannedWork <- rbExpect (name ++ " planned retained work") (W.graphExpandedWork plannedGraph)
+  rbNeed (name ++ " planned graph charges the same expanded forest") (plannedWork == used)
   rbNeed (name ++ " resource expansion")
     (W.resourceExpandedNodes stats == expandedNodes &&
      W.resourceExpandedTextBytes stats == expandedText &&
@@ -2002,6 +2010,10 @@ rbCompareGraph name original bounded = case (original,bounded) of
     rbNeed (name ++ " bounded-root root IDs") (W.graphRoots a == W.graphRoots b)
     sa <- rbExpect (name ++ " ordinary graph stats") (W.graphResourceStats a)
     sb <- rbExpect (name ++ " bounded graph stats") (W.graphResourceStats b)
+    wa <- rbExpect (name ++ " ordinary work summary") (W.graphExpandedWork a)
+    wb <- rbExpect (name ++ " bounded work summary") (W.graphExpandedWork b)
+    rbNeed (name ++ " both decoder routes preserve exact root charging")
+      (wa == W.resourceExpandedWork sa && wb == W.resourceExpandedWork sb)
     rbNeed (name ++ " bounded-root exact work")
       (W.resourceExpandedWork sa == W.resourceExpandedWork sb &&
        W.resourceBytes sa == W.resourceBytes sb)
@@ -2035,3 +2047,74 @@ auditStamp prefix = do
     _ -> error "audit seed requires one Int owner"
   let forged = T.XLet binder (T.XBoolTerm True) (T.XConstructor "()" [])
   putStrLn (B.unpack (stamp forged))
+
+-- Differential controls retain the original exported recurrence as oracle.
+observeBitRead action = do
+ result <- try (action >>= evaluate)
+ case result of
+  Left e -> pure (Left (takeWhile (/='\n') (displayException (e :: SomeException))))
+  Right (T.Left m) -> pure (Left (B.unpack m))
+  Right (T.Right (value,W.Cursor _ pos end)) -> evaluate (value+pos+end) >> pure (Right (value,pos,end))
+phaseReaderControls = do
+ array <- P.newByteArray 137 0
+ forM_ [0..136] $ \i -> P.writeByteArray array i ((37*i+11) `mod` 256)
+ forM_ [-1..64] $ \width -> forM_ [-9,-1,0,1,2,3,4,5,6,7,8,31,32,63,64,1031,1087,1095,1096] $ \pos ->
+  forM_ [pos-1,pos,pos+width-1,pos+width,1096,1104] $ \end -> do
+   let old = if width < 0 || width > 64 || width > end-pos then pure (T.Left "truncated binary bitstream") else W.getBitsAt array pos end width 0 0
+   a <- observeBitRead old
+   let W.Read read = W.getBits width
+   b <- observeBitRead (read (W.Cursor array pos end))
+   unless (a==b) (fail (show (width,pos,end,a,b)))
+ pure ()
+
+interfaceEqualityControls = do
+  let fromFields (A.CrateInterfaceFields a b c d e f g h i j k l m) =
+        CrateArtifact.CrateInterface a b c d e f g h i j k l m
+      base = fromFields (sampleCrateInterfaceFields 3)
+      CrateArtifact.CrateInterface a b c d e f g h i j k l m = base
+      make = CrateArtifact.CrateInterface
+      variants = [base, fromFields (sampleCrateInterfaceFields 4),
+        make "changed" b c d e f g h i j k l m,
+        make a [] c d e f g h i j k l m,
+        make a b [] d e f g h i j k l m,
+        make a b c [] e f g h i j k l m,
+        make a b c d [] f g h i j k l m,
+        make a b c d e [] g h i j k l m,
+        make a b c d e f [] h i j k l m,
+        make a b c d e f g [] i j k l m,
+        make a b c d e f g h [] j k l m,
+        make a b c d e f g h i [] k l m,
+        make a b c d e f g h i j "changed" l m,
+        make a b c d e f g h i j k "changed" m,
+        make a b c d e f g h i j k l [],
+        make a (reverse b) (reverse c) (reverse d) (reverse e)
+          (reverse f) (reverse g) (reverse h) (reverse i) (reverse j) k l (reverse m)]
+  forM_ variants $ \left -> forM_ variants $ \right ->
+    need "canonical interface field comparison equals full encoding comparison"
+      (CrateArtifact.sameInterface left right ==
+        (CrateArtifact.encodeInterface left == CrateArtifact.encodeInterface right))
+
+interfaceInventoryControls = do
+  let key n = CrateArtifact.definitionName "inventory" (M.Entity "Main" n M.Value)
+      entry = key "<crate-entry>"
+      bindings = [(key "a", T.XCon "Int" []), (entry, T.XCon "Int" [])]
+      protection = [(key "a", False), (entry, True)]
+      make bs ps e = CrateArtifact.CrateInterface "inventory" [] ["Main"]
+        [("Main",[])] [("Main",[])] [] [] [] [] bs e "object" ps
+      good label iface = CrateArtifact.validateInterface iface >>= \_ -> T.Right label
+      bad label wanted iface = case CrateArtifact.validateInterface iface of
+        T.Left message -> need label (message == wanted)
+        T.Right _ -> error ("accepted " ++ label)
+  expect "valid binding and entry inventory" (good "valid" (make bindings protection entry))
+  expect "protection order is not binding order" (good "reordered" (make bindings (reverse protection) entry))
+  expect "empty library inventory" (good "empty" (make [] [] ""))
+  bad "duplicate binding before inventory mismatch" "duplicate crate binding"
+    (make (bindings ++ [(key "a", T.XCon "Int" [])]) [] entry)
+  bad "duplicate protection before inventory mismatch" "duplicate crate binding protection"
+    (make bindings (protection ++ [(key "a", False)]) entry)
+  bad "missing protection" "crate protection inventory differs from owned bindings"
+    (make bindings [(entry, True)] entry)
+  bad "extra protection" "crate protection inventory differs from owned bindings"
+    (make bindings (protection ++ [(key "extra", False)]) entry)
+  bad "entry must be an admitted binding" "crate entry is not an owned binding"
+    (make bindings protection (key "missing"))

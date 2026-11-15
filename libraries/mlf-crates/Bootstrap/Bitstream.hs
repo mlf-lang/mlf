@@ -25,7 +25,7 @@ module Bootstrap.Bitstream (
   collectRoots, decode, decodeChecked, decodeTables,
   Graph, GraphNode(..), decodeGraph, decodeGraphWithText, decodeGraphWithGate,
   firstShortTextMatches, graphRoots, graphNodeCount, lookupGraphNode,
-  ResourceStats, planMeasured, planGraph, GraphPlan, prepareGraphPlan, realizeGraphPlan, graphNodeDepth, graphResourceStats,
+  ResourceStats, planMeasured, planGraph, GraphPlan, prepareGraphPlan, realizeGraphPlan, graphNodeDepth, graphResourceStats, graphExpandedWork,
   resourceBytes, resourceNodes, resourceEdges, resourceSymbols,
   resourceSymbolBytes, resourceDepth, resourceMaxSymbolBytes,
   resourceExpandedNodes, resourceExpandedTextBytes, resourceExpandedWork) where {
@@ -123,6 +123,33 @@ module Bootstrap.Bitstream (
     };
   data SymbolState = Symbols (Map String ((,) Int Int)) ([] Symbol) Int Int;
   data NodeState = Nodes (Map Entry Int) ([] Entry) Int Int;
+  -- A hash narrows structural lookup; it never establishes equality. Exact
+  -- collisions use the original balanced map, so even deliberately colliding
+  -- inputs retain logarithmic bucket lookup instead of a linear chain.
+  data EntryBucket = UniqueEntry Entry Int | CollidingEntries (Map Entry Int);
+  data EntryIndex = EntryIndex (IntMap EntryBucket);
+  data EntryLookup = ExistingEntry Int | MissingEntry (Int -> EntryIndex);
+  emptyEntryIndex = EntryIndex IM.empty;
+  mixEntry hash word = xorInt (hash * 1099511628211) word;
+  entryHash entry = case entry of {
+    EInt value -> mixEntry 1 value;
+    EBits value -> mixEntry 2 value;
+    EText value -> mixEntry 3 value;
+    ENode tag children -> foldlStrict mixEntry (mixEntry 4 tag) children
+  };
+  internIndexed entry index = internIndexedAt (entryHash entry) entry index;
+  internIndexedAt hash entry (EntryIndex buckets) =
+    let { insert bucket = EntryIndex (IM.insert hash bucket buckets) } in
+    case IM.lookup hash buckets of {
+      Nothing -> MissingEntry (\value -> insert (UniqueEntry entry value));
+      Just (UniqueEntry old value) -> if compareEntry entry old == 0 then ExistingEntry value
+        else MissingEntry (\next -> insert (CollidingEntries
+          (M.insert compareEntry entry next (M.singleton old value))));
+      Just (CollidingEntries entries) -> case intern compareEntry entry entries of {
+        Found value -> ExistingEntry value;
+        Inserted fill -> MissingEntry (\value -> insert (CollidingEntries (fill value)))
+      }
+    };
   data PlanState = PlanState SymbolState NodeState Int;
   data Tables = Tables ([] Symbol) ([] Entry) ([] Int) Int Int Int Int;
   data EncodeTask = EncodeValues Int ([] Value) | EncodeOne Int Value | EncodeClose Int Int;
@@ -490,11 +517,47 @@ module Bootstrap.Bitstream (
           first = xorInt (unsignedShiftRInt start 4) (crcNibble start) } in
     xorInt (unsignedShiftRInt first 4) (crcNibble first);
   checksum :: ByteArray -> Int -> IO Int;
-  checksum bytes size = if size < 1024 then checksumAt bytes size 0 4294967295 else do {
+  checksum bytes size = if size >= 16384 then checksumFour bytes size
+    else if size < 1024 then checksumAt bytes size 0 4294967295 else do {
     table <- newIntArray 256 0;
     buildCRCTable table 0;
     checksumBytes table bytes size 0 4294967295
   };
+  -- Four reflected CRC tables advance four bytes at once. Each table is
+  -- derived from the existing byte recurrence, and the wire checksum field
+  -- remains logically zero. Small buffers keep their cheaper one-table path.
+  checksumFour bytes size = do {
+    table <- newIntArray 1024 0;
+    buildCRCFour table 0;
+    crc <- crcFourRange table bytes size 0 4294967295;
+    ioReturn (xorInt crc 4294967295)
+  };
+  buildCRCFour table index = if index == 256 then ioReturn () else do {
+    let { a = crcByte 0 index; b = crcByte a 0; c = crcByte b 0; d = crcByte c 0 };
+    writeIntArray table index a;
+    writeIntArray table (256 + index) b;
+    writeIntArray table (512 + index) c;
+    writeIntArray table (768 + index) d;
+    buildCRCFour table (index + 1)
+  };
+  crcFourWord bytes position = if position == 76 then ioReturn 0 else do {
+    a <- readByteArray bytes position;
+    b <- readByteArray bytes (position + 1);
+    c <- readByteArray bytes (position + 2);
+    d <- readByteArray bytes (position + 3);
+    ioReturn (orInt a (orInt (shiftLInt b 8) (orInt (shiftLInt c 16) (shiftLInt d 24))))
+  };
+  crcFourRange table bytes size position crc =
+    if size - position < 4 then crcRange table bytes size position crc else do {
+      word <- crcFourWord bytes position;
+      let { value = xorInt crc word };
+      a <- readIntArray table (768 + andInt value 255);
+      b <- readIntArray table (512 + andInt (unsignedShiftRInt value 8) 255);
+      c <- readIntArray table (256 + andInt (unsignedShiftRInt value 16) 255);
+      d <- readIntArray table (unsignedShiftRInt value 24);
+      let { next = xorInt a (xorInt b (xorInt c d)) };
+      seq next (crcFourRange table bytes size (position + 4) next)
+    };
   -- CRC is linear over XOR. The one-byte remainder is crcByte 0 index,
   -- while every higher input bit shifts down by eight positions.
   buildCRCTable table index = if index == 256 then ioReturn () else do {
@@ -538,7 +601,7 @@ module Bootstrap.Bitstream (
       Left message -> ioReturn (Left message);
       Right ((,) tables _) -> case layout limits tables of {
         Left message -> ioReturn (Left message);
-        Right geometry -> encodeTables schema geometry tables
+        Right geometry -> encodeTablesOwned schema geometry tables
       }
     };
   encodeChecked :: Limits -> Int -> [] Value -> IO (Either String ByteArray);
@@ -548,9 +611,51 @@ module Bootstrap.Bitstream (
       Left message -> ioReturn (Left message);
       Right tables -> case layout limits tables of {
         Left message -> ioReturn (Left message);
-        Right geometry -> encodeTables schema geometry tables
+        Right geometry -> encodeTablesOwned schema geometry tables
       }
     };
+  -- The owned encoder can retain a partially filled byte across fields.
+  -- Flush each complete byte once; public putBits keeps its read/modify/write
+  -- semantics for callers writing into an existing buffer. The continuation
+  -- carries byte index, occupied bits and pending byte without an IO tuple.
+  packedBits bytes index used pending width bits next =
+    if width == 0 then next index used pending else let {
+      room = 8 - used;
+      amount = min room width;
+      mask = shiftLInt 1 amount - 1;
+      byte = orInt pending (shiftLInt (andInt bits mask) used)
+    } in if width < room then next index (used + width) byte else do {
+      writeByteArray bytes index byte;
+      packedBits bytes (index + 1) 0 0 (width - room) (unsignedShiftRInt bits room) next
+    };
+  packedVar bytes index used pending bits next = let {
+    final = unsignedLtInt bits 128;
+    byte = orInt (andInt bits 127) (if final then 0 else 128)
+  } in packedBits bytes index used pending 8 byte (\i u p ->
+    if final then next i u p else packedVar bytes i u p (unsignedShiftRInt bits 7) next);
+  packedRefs bytes width references index used pending next = case references of {
+    [] -> next index used pending;
+    (:) value rest -> packedBits bytes index used pending width value
+      (\i u p -> packedRefs bytes width rest i u p next)
+  };
+  packedEntry bytes nodeWidth symbolWidth entry index used pending next =
+    packedBits bytes index used pending 2 (entryKind entry) (\i u p -> case entry of {
+      EInt value -> packedVar bytes i u p (zigzag value) next;
+      EBits bits -> packedBits bytes i u p 64 bits next;
+      EText symbol -> packedBits bytes i u p symbolWidth symbol next;
+      ENode tag children -> packedVar bytes i u p tag (\i1 u1 p1 ->
+        packedVar bytes i1 u1 p1 (length children) (\i2 u2 p2 ->
+          packedRefs bytes nodeWidth children i2 u2 p2 next))
+    });
+  packedEntries bytes nodeWidth symbolWidth entries index used pending next = case entries of {
+    [] -> next index used pending;
+    (:) entry rest -> packedEntry bytes nodeWidth symbolWidth entry index used pending
+      (\i u p -> packedEntries bytes nodeWidth symbolWidth rest i u p next)
+  };
+  packedFinish bytes index used pending = do {
+    if used == 0 then ioReturn () else writeByteArray bytes index pending;
+    ioReturn (index * 8 + used)
+  };
   encodeTables :: Int -> Layout -> Tables -> IO (Either String ByteArray);
   encodeTables schema geometry tables = case geometry of {
     Layout total _ _ _ nodeOffset _ _ _ rootOffset _ nodeWidth symbolWidth ->
@@ -561,6 +666,27 @@ module Bootstrap.Bitstream (
           symbolEnd <- putSymbols bytes 640 symbols;
           nodeEnd <- putEntries bytes (nodeOffset * 8) nodeWidth symbolWidth entries;
           rootEnd <- putReferences bytes (rootOffset * 8) nodeWidth roots;
+          if headerEnd /= 640 || symbolEnd /= nodeOffset * 8 ||
+             bytesForBits nodeEnd /= rootOffset || bytesForBits rootEnd /= total
+          then ioReturn (Left "binary encoder internal measured-size mismatch") else do {
+            crc <- checksum bytes total;
+            end <- putBits bytes 608 32 crc;
+            ioReturn (Right bytes)
+          }
+        }
+      }
+  };
+
+  encodeTablesOwned :: Int -> Layout -> Tables -> IO (Either String ByteArray);
+  encodeTablesOwned schema geometry tables = case geometry of {
+    Layout total _ _ _ nodeOffset _ _ _ rootOffset _ nodeWidth symbolWidth ->
+      case tables of {
+        Tables symbols entries roots _ _ _ _ -> do {
+          bytes <- newByteArray total 0;
+          headerEnd <- putHeader bytes schema geometry;
+          symbolEnd <- putSymbols bytes 640 symbols;
+          nodeEnd <- packedEntries bytes nodeWidth symbolWidth entries nodeOffset 0 0 (packedFinish bytes);
+          rootEnd <- packedRefs bytes nodeWidth roots rootOffset 0 0 (packedFinish bytes);
           if headerEnd /= 640 || symbolEnd /= nodeOffset * 8 ||
              bytesForBits nodeEnd /= rootOffset || bytesForBits rootEnd /= total
           then ioReturn (Left "binary encoder internal measured-size mismatch") else do {
@@ -604,8 +730,24 @@ module Bootstrap.Bitstream (
     Cursor bytes position end ->
       if width < 0 || width > 64 || width > end - position
       then ioReturn (Left "truncated binary bitstream")
+      else if position >= 0 && width > 0 && width <= 16
+        then getSmallBits bytes position end width
       else getBitsAt bytes position end width 0 0
   });
+  -- Tags, varint bytes and ordinary node IDs occupy at most three bytes.
+  -- Keep the section check above and read exactly the same bytes in order,
+  -- avoiding a fresh recursive IO result/cursor for each partial byte.
+  getSmallBits bytes position end width = do {
+    let { index = position / 8; offset = position % 8;
+      available = 8 - offset; mask = shiftLInt 1 width - 1 };
+    first <- readByteArray bytes index;
+    second <- if width > available then readByteArray bytes (index + 1) else ioReturn 0;
+    third <- if width > available + 8 then readByteArray bytes (index + 2) else ioReturn 0;
+    let { bits = orInt (unsignedShiftRInt first offset)
+      (orInt (shiftLInt second available) (shiftLInt third (available + 8)));
+      result = andInt bits mask };
+    seq result (ioReturn (Right ((,) result (Cursor bytes (position + width) end))))
+  };
   getBitsAt :: ByteArray -> Int -> Int -> Int -> Int -> Int -> IO (Either String ((,) Int Cursor));
   getBitsAt bytes position end remaining consumed result =
     if remaining == 0 then ioReturn (Right ((,) result (Cursor bytes position end))) else do {
@@ -999,6 +1141,29 @@ module Bootstrap.Bitstream (
           }
         }
     };
+  -- Both graph constructors are private and contain summaries checked by
+  -- the planner or wire decoder. A consumer needing only total expanded work
+  -- can sum root summaries without rebuilding the complete resource report.
+  -- Repeated roots are charged repeatedly, including shared descendants.
+  graphExpandedWork :: Graph -> Either String Int;
+  graphExpandedWork graph = graphRootWork graph (graphRoots graph) 0;
+  graphRootWork graph roots total = case roots of {
+    [] -> Right total;
+    (:) index rest -> do {
+      work <- case graph of {
+        Graph nodes _ -> case IM.lookup index nodes of {
+          Nothing -> Left "binary resource root has no node";
+          Just parsed -> Right (parsedWork parsed)
+        };
+        DenseGraph nodes _ _ -> case denseLookup nodes index of {
+          Nothing -> Left "binary resource root has no node";
+          Just (DenseInput _ _ used _) -> Right used
+        }
+      };
+      next <- measuredAdd total work;
+      graphRootWork graph rest next
+    }
+  };
   graphResourceStats :: Graph -> Either String ResourceStats;
   graphResourceStats graph = graphResourceStatsFrom (graphMap graph) (graphRoots graph);
   graphResourceStatsFrom :: IntMap Parsed -> [] Int -> Either String ResourceStats;
@@ -1464,8 +1629,8 @@ module Bootstrap.Bitstream (
     };
   getDenseNodes :: Limits -> Layout -> IntMap Symbol -> V.FixedBuilder IOWorld DecodeId DenseInput -> Read ();
   getDenseNodes limits (Layout _ symbolCount _ count _ _ edges _ _ _ nodeWidth symbolWidth) symbols nodes =
-    getDenseNodesAt limits symbols nodes symbolCount count nodeWidth symbolWidth 0 0 edges M.empty;
-  getDenseNodesAt :: Limits -> IntMap Symbol -> V.FixedBuilder IOWorld DecodeId DenseInput -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Map Entry Int -> Read ();
+    getDenseNodesAt limits symbols nodes symbolCount count nodeWidth symbolWidth 0 0 edges emptyEntryIndex;
+  getDenseNodesAt :: Limits -> IntMap Symbol -> V.FixedBuilder IOWorld DecodeId DenseInput -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> EntryIndex -> Read ();
   getDenseNodesAt limits symbols nodes symbolCount count nodeWidth symbolWidth index nextSymbol remainingEdges keys =
     if index == count then do {
       checkRead (remainingEdges == 0) "binary edge count mismatch";
@@ -1473,8 +1638,8 @@ module Bootstrap.Bitstream (
       returnRead ()
     } else do {
       entry <- getEntry limits nodeWidth symbolWidth index symbolCount remainingEdges;
-      nextKeys <- case intern compareEntry entry keys of {
-        Found _ -> failRead "duplicate binary structural node"; Inserted fill -> returnRead (fill index)
+      nextKeys <- case internIndexed entry keys of {
+        ExistingEntry _ -> failRead "duplicate binary structural node"; MissingEntry fill -> returnRead (fill index)
       };
       followingSymbol <- case entry of {
         EText symbol -> do {

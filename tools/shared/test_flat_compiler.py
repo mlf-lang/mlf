@@ -31,6 +31,8 @@ def main():
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--inferred', action='store_true',
                         help='omit signatures on the independent consumer functions')
+    parser.add_argument('--fused', action='store_true',
+                        help='compile consumer roots through the retained checked-object entry')
     args = parser.parse_args()
     receipt = args.build_receipt.resolve(strict=True)
     producer = receipt.parent
@@ -39,7 +41,7 @@ def main():
         parser.error('output must be separate from the producer')
     authenticate_build(receipt, producer / 'bin')
     output.mkdir(parents=True, exist_ok=False)
-    evidence = {'complete': False, 'inferred_functions': args.inferred, 'producer_receipt': str(receipt),
+    evidence = {'complete': False, 'inferred_functions': args.inferred, 'fused': args.fused, 'producer_receipt': str(receipt),
                 'producer_sha256': sha(receipt), 'driver_sha256': sha(__file__),
                 'commands': [], 'checks': []}
 
@@ -89,8 +91,15 @@ def main():
     main_spec = spec('Main', consumer, [Path(str(lib_prefix) + '.mlfci')], 'Main')
 
     def compile(name, specification, prefix, status=0):
-        runner.run(name, [emlf, '--compile-crate', specification, '-o', prefix],
-                   status=status, timeout=120)
+        fused = args.fused and prefix == main_prefix
+        result = runner.run(name, [emlf, '--compile-crate-to-llvm-gc' if fused else '--compile-crate',
+                                  specification, '-o', prefix], status=status, timeout=120)
+        if fused and status == 0:
+            check(name + ' emits LLVM', b'define ' in result.stdout)
+            runner.run(name + '-disk-link-parity', [emlf, '--crate-to-llvm-gc', str(prefix) + '.mlfci'],
+                       expected=result.stdout, timeout=120)
+        elif status != 0:
+            check(name + ' emits no partial LLVM', not result.stdout)
         if status == 0:
             return json.loads(Path(str(prefix) + '.queries').read_text())
 
@@ -160,10 +169,22 @@ def main():
     corrupt = runner.run('corrupt-builtin-rejected', [emlf, '--crate-to-llvm-gc', str(main_prefix) + '.mlfci'],
                          status=1, timeout=120)
     check('corrupt builtin fails physical admission', b'binary checksum mismatch' in corrupt.stderr)
+    if args.fused:
+        result = runner.run('fused-corrupt-builtin-rejected',
+                            [emlf, '--compile-crate-to-llvm-gc', main_spec, '-o', main_prefix],
+                            status=1, timeout=120)
+        check('retained root cannot bypass dependency integrity',
+              b'binary checksum mismatch' in result.stderr and not result.stdout)
     Path(str(builtin) + '.mlfco').write_bytes(good_builtin + b'\0')
     trailing = runner.run('trailing-builtin-rejected', [emlf, '--crate-to-llvm-gc', str(main_prefix) + '.mlfci'],
                           status=1, timeout=120)
     check('trailing builtin bytes fail physical admission', b'binary file/header length mismatch' in trailing.stderr)
+    if args.fused:
+        result = runner.run('fused-trailing-builtin-rejected',
+                            [emlf, '--compile-crate-to-llvm-gc', main_spec, '-o', main_prefix],
+                            status=1, timeout=120)
+        check('retained root rejects trailing dependency bytes',
+              b'binary file/header length mismatch' in result.stderr and not result.stdout)
     Path(str(builtin) + '.mlfco').write_bytes(good_builtin)
     run('physical-builtin-restored', main_prefix, '12\n')
     consumer.write_text(HEADER + 'module Main (main) where { import MLF.Primitive; '

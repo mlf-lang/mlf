@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, KindSignatures, FlexibleInstances, ForeignFunctionInterface, ConstraintKinds, MagicHash #-}
+{-# LANGUAGE RankNTypes, KindSignatures, FlexibleInstances, ForeignFunctionInterface, ConstraintKinds, MagicHash, ExtendedLiterals #-}
 module MLF.Host.Base
   ( Int, Integer, Bool(..), Double, Char, IO, String, ST, STArray
   , MLFCallStack, MLFHasCallStack, MLFStackFrame(..), MLFStackEvidence(..)
@@ -43,6 +43,8 @@ import qualified Data.Array.Base as AB
 import GHC.Float (castDoubleToWord64, castWord64ToDouble)
 import GHC.Conc (pseq)
 import GHC.Exts (isTrue#, (<#))
+import qualified GHC.Exts as G
+import qualified GHC.Int as GI
 import GHC.Num.Integer (Integer(IS))
 import Foreign.C (CInt(..), CDouble(..), CString, peekCStringLen)
 import Foreign.Marshal.Alloc (allocaBytes)
@@ -319,8 +321,15 @@ v_stringCodeAt text@(String t size offsets) index =
      else case t of
        TI.Text bytes offset byteLength
          | byteLength == size -> fromIntegral (TA.unsafeIndex bytes (offset + fromIntegral n))
-         | otherwise -> let pos = scalarOffset t size offsets (fromIntegral n)
-                        in fromIntegral (ord (T.head (TI.text bytes (offset+pos) (byteLength-pos))))
+         | otherwise -> unicodeCodeAt t size offsets (fromIntegral n)
+{-# INLINE v_stringCodeAt #-}
+-- Keep the uncommon scalar-index path out of ASCII codec loops. The private
+-- String constructors already establish valid UTF-8; the caller checks bounds.
+unicodeCodeAt :: T.Text -> P.Int -> Array.UArray P.Int P.Int -> P.Int -> Int
+unicodeCodeAt t@(TI.Text bytes offset byteLength) size offsets index =
+  let pos = scalarOffset t size offsets index
+  in fromIntegral (ord (T.head (TI.text bytes (offset+pos) (byteLength-pos))))
+{-# NOINLINE unicodeCodeAt #-}
 v_stringSlice :: String -> Int -> Int -> String
 v_stringSlice text@(String t size characters) start count = text `pseq` start `pseq` count `pseq`
   let i=bounded "string slice out of bounds" (fromIntegral size) start
@@ -385,7 +394,60 @@ v_shiftRInt = orderedStrict (\x n -> if n<0 then failure "integer shift overflow
   else if n>=64 then if x<0 then -1 else 0 else Bits.shiftR x (fromIntegral n))
 v_unsignedShiftRInt = orderedStrict (\x n -> if n<0 then failure "integer shift overflow"
   else if n>=64 then 0 else fromIntegral (Bits.shiftR (fromIntegral x :: Word.Word64) (fromIntegral n)))
+-- Expose fixed codec shifts to the caller while retaining orderedStrict's
+-- operand barrier and the original negative/large-shift cases.
+{-# INLINE v_andInt #-}
+{-# INLINE v_orInt #-}
+{-# INLINE v_xorInt #-}
+{-# INLINE v_shiftLInt #-}
+{-# INLINE v_shiftRInt #-}
+{-# INLINE v_unsignedShiftRInt #-}
 v_countLeadingZerosInt, v_countTrailingZerosInt, v_popCountInt :: Int -> Int
 v_countLeadingZerosInt = fromIntegral . Bits.countLeadingZeros
 v_countTrailingZerosInt = fromIntegral . Bits.countTrailingZeros
 v_popCountInt = fromIntegral . Bits.popCount
+
+-- pseq's lazy barrier orders possibly failing operands. A literal Int64 is
+-- already a total value, so that barrier carries no ordering obligation for
+-- the literal itself. Expose only these exact constants; unknown operands and
+-- continuations retain the barrier. This lets GHC fold binary widths, masks
+-- and rolling-checksum arithmetic without relaxing primitive error order.
+{-# RULES
+"mlf/total-int/0" G.lazy (GI.I64# 0#Int64) = GI.I64# 0#Int64
+"mlf/total-int/1" G.lazy (GI.I64# 1#Int64) = GI.I64# 1#Int64
+"mlf/total-int/2" G.lazy (GI.I64# 2#Int64) = GI.I64# 2#Int64
+"mlf/total-int/3" G.lazy (GI.I64# 3#Int64) = GI.I64# 3#Int64
+"mlf/total-int/4" G.lazy (GI.I64# 4#Int64) = GI.I64# 4#Int64
+"mlf/total-int/7" G.lazy (GI.I64# 7#Int64) = GI.I64# 7#Int64
+"mlf/total-int/8" G.lazy (GI.I64# 8#Int64) = GI.I64# 8#Int64
+"mlf/total-int/15" G.lazy (GI.I64# 15#Int64) = GI.I64# 15#Int64
+"mlf/total-int/16" G.lazy (GI.I64# 16#Int64) = GI.I64# 16#Int64
+"mlf/total-int/24" G.lazy (GI.I64# 24#Int64) = GI.I64# 24#Int64
+"mlf/total-int/31" G.lazy (GI.I64# 31#Int64) = GI.I64# 31#Int64
+"mlf/total-int/32" G.lazy (GI.I64# 32#Int64) = GI.I64# 32#Int64
+"mlf/total-int/63" G.lazy (GI.I64# 63#Int64) = GI.I64# 63#Int64
+"mlf/total-int/64" G.lazy (GI.I64# 64#Int64) = GI.I64# 64#Int64
+"mlf/total-int/127" G.lazy (GI.I64# 127#Int64) = GI.I64# 127#Int64
+"mlf/total-int/128" G.lazy (GI.I64# 128#Int64) = GI.I64# 128#Int64
+"mlf/total-int/131" G.lazy (GI.I64# 131#Int64) = GI.I64# 131#Int64
+"mlf/total-int/255" G.lazy (GI.I64# 255#Int64) = GI.I64# 255#Int64
+"mlf/total-int/256" G.lazy (GI.I64# 256#Int64) = GI.I64# 256#Int64
+"mlf/total-int/512" G.lazy (GI.I64# 512#Int64) = GI.I64# 512#Int64
+"mlf/total-int/768" G.lazy (GI.I64# 768#Int64) = GI.I64# 768#Int64
+"mlf/total-int/1024" G.lazy (GI.I64# 1024#Int64) = GI.I64# 1024#Int64
+"mlf/total-int/2048" G.lazy (GI.I64# 2048#Int64) = GI.I64# 2048#Int64
+"mlf/total-int/65535" G.lazy (GI.I64# 65535#Int64) = GI.I64# 65535#Int64
+"mlf/total-int/65536" G.lazy (GI.I64# 65536#Int64) = GI.I64# 65536#Int64
+"mlf/total-int/65599" G.lazy (GI.I64# 65599#Int64) = GI.I64# 65599#Int64
+"mlf/total-int/17161" G.lazy (GI.I64# 17161#Int64) = GI.I64# 17161#Int64
+"mlf/total-int/2248091" G.lazy (GI.I64# 2248091#Int64) = GI.I64# 2248091#Int64
+"mlf/total-int/8261507" G.lazy (GI.I64# 8261507#Int64) = GI.I64# 8261507#Int64
+"mlf/total-int/294499921" G.lazy (GI.I64# 294499921#Int64) = GI.I64# 294499921#Int64
+"mlf/total-int/780718649" G.lazy (GI.I64# 780718649#Int64) = GI.I64# 780718649#Int64
+"mlf/total-int/1172642095" G.lazy (GI.I64# 1172642095#Int64) = GI.I64# 1172642095#Int64
+"mlf/total-int/2147483629" G.lazy (GI.I64# 2147483629#Int64) = GI.I64# 2147483629#Int64
+"mlf/total-int/2147483647" G.lazy (GI.I64# 2147483647#Int64) = GI.I64# 2147483647#Int64
+"mlf/total-int/2147483648" G.lazy (GI.I64# 2147483648#Int64) = GI.I64# 2147483648#Int64
+"mlf/total-int/4294967295" G.lazy (GI.I64# 4294967295#Int64) = GI.I64# 4294967295#Int64
+"mlf/total-int/1099511628211" G.lazy (GI.I64# 1099511628211#Int64) = GI.I64# 1099511628211#Int64
+#-}

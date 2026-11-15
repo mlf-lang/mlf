@@ -154,10 +154,11 @@ module Package.Scheduler where {
             };
             let {
               compilation =
-                J.set "name" (J.str name)
+                J.set "codegen-identity" (J.str (M.crateIdentity p ("target-" ++ label)))
+                 (J.set "name" (J.str name)
                   (J.set "entry" (J.str entry)
                      (J.set "modules" (J.Array (S.map moduleJson modules))
-                        (J.set "no-prelude" (J.Boolean noPrelude) (job "target" compileId deps))))
+                        (J.set "no-prelude" (J.Boolean noPrelude) (job "target" compileId deps)))))
             };
             let {
               emission =
@@ -292,7 +293,8 @@ module Package.Scheduler where {
                B.libraryResult b q dependencies (J.getBool "no-prelude" False selected)
              }
         else if MLF.Primitive.eqString matchValueShared2 "target"
-             then B.compileCrateResult b p ("target-" ++ J.getText "name" "" selected)
+             then B.compileTargetCrateResult b p ("target-" ++ J.getText "name" "" selected)
+                    (J.getText "codegen-identity" "" selected)
                     (J.getText "entry" "" selected)
                     (S.map moduleFrom (J.values (J.get "modules" selected)))
                     dependencies

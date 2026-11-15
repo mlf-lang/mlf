@@ -14,6 +14,7 @@ module Bootstrap.Parser where {
   import qualified Bootstrap.Desugar as Desugar;
   import Bootstrap.Fresh;
   import qualified Bootstrap.Std as SharedSyntax;
+  import qualified Bootstrap.Set as Set;
   data Top = DataTop DataDecl | ClassTop SClassDecl | InstanceTop SInstanceDecl | ValueTop Value;
   data SharedStatement =
     SharedBind SPattern SExpr SourceSpan |
@@ -409,7 +410,7 @@ module Bootstrap.Parser where {
         let {
           names = map (\((,,) n _ _) -> n) values
         } in
-        if (length names == length (nubBy eqString names))
+        if (length names == Set.size (Set.fromList compareString names))
         then Right values
         else Left "function equations must be contiguous; duplicate value declaration"
     };
