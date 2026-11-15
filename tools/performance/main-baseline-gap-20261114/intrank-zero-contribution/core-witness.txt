@@ -1,0 +1,108 @@
+EXPORTED ANNOTATED EXCERPTS, NOT ORIGINAL RUN RECEIPTS
+Relative source labels replace private storage locations. Selected code lines are unchanged.
+Original full dumps/stdout and failed/successful run artifacts are retained separately.
+Line numbers refer to original baseline dumps or exact candidate stdout slices.
+
+=== baseline/IntRank.dump-simpl; SHA256 04cafd2ad680cf7f1784400a9ec98be3b7e3a33a0cbabd5f9127b746297746f5; original lines 277-282 ===
+277: Bootstrap.IntRank.mapRankTree1 :: GHC.Internal.Int.Int64
+278: [GblId,
+279:  Unf=Unf{Src=<vanilla>, TopLvl=True,
+280:          Value=True, ConLike=True, WorkFree=True, Expandable=True,
+281:          Guidance=IF_ARGS [] 10 10}]
+282: Bootstrap.IntRank.mapRankTree1 = GHC.Internal.Int.I64# 0#Int64
+
+=== baseline/IntRank.dump-simpl; SHA256 04cafd2ad680cf7f1784400a9ec98be3b7e3a33a0cbabd5f9127b746297746f5; original lines 1495-1537 ===
+1495:             __DEFAULT ->
+1496:               Bootstrap.IntRank.mapRankTree_$smapRankTree
+1497:                 @a_amVT
+1498:                 sc_sn5D
+1499:                 (case offset_amNf of { GHC.Internal.Int.I64# x#_a59D ->
+1500:                  case GHC.Internal.Magic.lazy
+1501:                         @Int
+1502:                         (case prefix_amNk of { GHC.Internal.Int.I64# x_a5SA ->
+1503:                          case P.signBit of { GHC.Internal.Int.I64# y_a5SD ->
+1504:                          case GHC.Internal.Prim.eqInt64# x_a5SA y_a5SD of {
+1505:                            __DEFAULT -> mapTreeSize @a_amVT left_amNl;
+1506:                            1# -> Bootstrap.IntRank.mapRankTree1
+1507:                          }
+1508:                          }
+1509:                          })
+1510:                  of
+1511:                  { GHC.Internal.Int.I64# y#_a59G ->
+1512:                  GHC.Internal.Int.I64#
+1513:                    (GHC.Internal.Prim.plusInt64# x#_a59D y#_a59G)
+1514:                  }
+1515:                  })
+1516:                 right_amNm;
+1517:             1# ->
+1518:               Bootstrap.IntRank.mapRankTree_$smapRankTree
+1519:                 @a_amVT
+1520:                 sc_sn5D
+1521:                 (case offset_amNf of { GHC.Internal.Int.I64# x#_a59D ->
+1522:                  case GHC.Internal.Magic.lazy
+1523:                         @Int
+1524:                         (case prefix_amNk of { GHC.Internal.Int.I64# x_a5SA ->
+1525:                          case P.signBit of { GHC.Internal.Int.I64# y_a5SD ->
+1526:                          case GHC.Internal.Prim.eqInt64# x_a5SA y_a5SD of {
+1527:                            __DEFAULT -> Bootstrap.IntRank.mapRankTree1;
+1528:                            1# -> mapTreeSize @a_amVT right_amNm
+1529:                          }
+1530:                          }
+1531:                          })
+1532:                  of
+1533:                  { GHC.Internal.Int.I64# y#_a59G ->
+1534:                  GHC.Internal.Int.I64#
+1535:                    (GHC.Internal.Prim.plusInt64# x#_a59D y#_a59G)
+1536:                  }
+1537:                  })
+
+=== candidate/IntRank.core-stdout-slice; SHA256 3fffc9fa0614a5ba041d89c6d8a82516ee6b0b0ae40ee20f7f0679b721e08662; original lines 1522-1558 ===
+1522:                                 case prefix1_X9 of { GHC.Internal.Int.I64# x4_Xi ->
+1523:                                 case GHC.Internal.Prim.eqInt64# x4_Xi y_a5SD of {
+1524:                                   __DEFAULT ->
+1525:                                     jump $smapRankTree_sn5i
+1526:                                       right1_Xb
+1527:                                       (case sc1_sn5g of { GHC.Internal.Int.I64# x#_a59D ->
+1528:                                        case GHC.Internal.Magic.lazy
+1529:                                               @Int (mapTreeSize @a_amVT left1_Xa)
+1530:                                        of
+1531:                                        { GHC.Internal.Int.I64# y#_a59G ->
+1532:                                        GHC.Internal.Int.I64#
+1533:                                          (GHC.Internal.Prim.plusInt64# x#_a59D y#_a59G)
+1534:                                        }
+1535:                                        })
+1536:                                       sc2_sn5f;
+1537:                                   1# -> jump $smapRankTree_sn5i right1_Xb sc1_sn5g sc2_sn5f
+1538:                                 }
+1539:                                 };
+1540:                               1# ->
+1541:                                 case prefix1_X9 of { GHC.Internal.Int.I64# x4_Xi ->
+1542:                                 case GHC.Internal.Prim.eqInt64# x4_Xi y_a5SD of {
+1543:                                   __DEFAULT -> jump $smapRankTree_sn5i left1_Xa sc1_sn5g sc2_sn5f;
+1544:                                   1# ->
+1545:                                     jump $smapRankTree_sn5i
+1546:                                       left1_Xa
+1547:                                       (case sc1_sn5g of { GHC.Internal.Int.I64# x#_a59D ->
+1548:                                        case GHC.Internal.Magic.lazy
+1549:                                               @Int (mapTreeSize @a_amVT right1_Xb)
+1550:                                        of
+1551:                                        { GHC.Internal.Int.I64# y#_a59G ->
+1552:                                        GHC.Internal.Int.I64#
+1553:                                          (GHC.Internal.Prim.plusInt64# x#_a59D y#_a59G)
+1554:                                        }
+1555:                                        })
+1556:                                       sc2_sn5f
+1557:                                 }
+1558:                                 }
+
+=== candidate/IntRank.core-stdout-slice; SHA256 3fffc9fa0614a5ba041d89c6d8a82516ee6b0b0ae40ee20f7f0679b721e08662; original lines 1639-1642 ===
+1639:                             }
+1640:                             }
+1641:                         }; } in
+1642:                   jump $smapRankTree_sn5y right_amNm offset_amNf x_in18
+
+=== candidate/IntRank.core-stdout-slice; SHA256 3fffc9fa0614a5ba041d89c6d8a82516ee6b0b0ae40ee20f7f0679b721e08662; original lines 1717-1719 ===
+1717:                             }
+1718:                         }; } in
+1719:                   jump $smapRankTree_sn5O left_amNl offset_amNf x_in18;
+

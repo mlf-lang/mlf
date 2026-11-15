@@ -1,0 +1,148 @@
+EXPORTED ANNOTATED EXCERPTS, NOT ORIGINAL RUN RECEIPTS
+Relative source labels replace private storage locations. Selected code lines are unchanged.
+Original full dumps/stdout and failed/successful run artifacts are retained separately.
+Line numbers refer to original baseline dumps or exact candidate stdout slices.
+
+=== baseline/IntRank.dump-stg-final; SHA256 521c3f48e5c5b3161f1db7f3c707784948808c06fa94d70a8edf49a27f6ad8cc; original lines 2129-2163 ===
+2129:                       mapRankTree_$smapRankTree_sat_snfI [Occ=Once1] :: MLF.Host.Base.Int
+2130:                       [LclId] =
+2131:                           {left_snfr, wild1_snft, offset_snfh} \u []
+2132:                               case offset_snfh of wild2_snfy {
+2133:                               GHC.Internal.Int.I64# x#_snfz [Occ=Once1] ->
+2134:                               case
+2135:                                   case wild1_snft<TagProper> of wild3_snfA {
+2136:                                   GHC.Internal.Int.I64# x_snfB [Occ=Once1] ->
+2137:                                   case Bootstrap.IntTree.signBit of wild4_snfC {
+2138:                                   GHC.Internal.Int.I64# y_snfD [Occ=Once1] ->
+2139:                                   case eqInt64# [x_snfB y_snfD] of lwild1_snfE {
+2140:                                     __DEFAULT -> Bootstrap.IntRank.mapTreeSize left_snfr;
+2141:                                     1# -> Bootstrap.IntRank.mapRankTree1<TagProper>;
+2142:                                   };
+2143:                                   };
+2144:                                   }
+2145:                               of
+2146:                               wild3_snfF
+2147:                               {
+2148:                               GHC.Internal.Int.I64# y#_snfG [Occ=Once1] ->
+2149:                               case
+2150:                                   plusInt64# [x#_snfz y#_snfG]
+2151:                               of
+2152:                               mapRankTree_$smapRankTree_sat_snfH
+2153:                               {
+2154:                               __DEFAULT ->
+2155:                               GHC.Internal.Int.I64# [mapRankTree_$smapRankTree_sat_snfH];
+2156:                               };
+2157:                               };
+2158:                               };
+2159:                     } in 
+2160:                       case right_snfs of right_tnkx [Occ=Once2] {
+2161:                       __DEFAULT ->
+2162:                       Bootstrap.IntRank.mapRankTree_$smapRankTree
+2163:                           sc_snfg mapRankTree_$smapRankTree_sat_snfI right_tnkx;
+
+=== baseline/IntRank.dump-stg-final; SHA256 521c3f48e5c5b3161f1db7f3c707784948808c06fa94d70a8edf49a27f6ad8cc; original lines 2167-2201 ===
+2167:                       mapRankTree_$smapRankTree_sat_snfT [Occ=Once1] :: MLF.Host.Base.Int
+2168:                       [LclId] =
+2169:                           {right_snfs, wild1_snft, offset_snfh} \u []
+2170:                               case offset_snfh of wild2_snfJ {
+2171:                               GHC.Internal.Int.I64# x#_snfK [Occ=Once1] ->
+2172:                               case
+2173:                                   case wild1_snft<TagProper> of wild3_snfL {
+2174:                                   GHC.Internal.Int.I64# x_snfM [Occ=Once1] ->
+2175:                                   case Bootstrap.IntTree.signBit of wild4_snfN {
+2176:                                   GHC.Internal.Int.I64# y_snfO [Occ=Once1] ->
+2177:                                   case eqInt64# [x_snfM y_snfO] of lwild1_snfP {
+2178:                                     __DEFAULT -> Bootstrap.IntRank.mapRankTree1<TagProper>;
+2179:                                     1# -> Bootstrap.IntRank.mapTreeSize right_snfs;
+2180:                                   };
+2181:                                   };
+2182:                                   }
+2183:                               of
+2184:                               wild3_snfQ
+2185:                               {
+2186:                               GHC.Internal.Int.I64# y#_snfR [Occ=Once1] ->
+2187:                               case
+2188:                                   plusInt64# [x#_snfK y#_snfR]
+2189:                               of
+2190:                               mapRankTree_$smapRankTree_sat_snfS
+2191:                               {
+2192:                               __DEFAULT ->
+2193:                               GHC.Internal.Int.I64# [mapRankTree_$smapRankTree_sat_snfS];
+2194:                               };
+2195:                               };
+2196:                               };
+2197:                     } in 
+2198:                       case left_snfr of left_tnkz [Occ=Once2] {
+2199:                       __DEFAULT ->
+2200:                       Bootstrap.IntRank.mapRankTree_$smapRankTree
+2201:                           sc_snfg mapRankTree_$smapRankTree_sat_snfT left_tnkz;
+
+=== candidate/IntRank.stg-stdout-slice; SHA256 d0eda6ac557db15ae3022e4c48f7f30a7b4adcdb1c59edb8008d21379894dac2; original lines 2117-2135 ===
+2117:                     case wild2_sngk<TagProper> of wild3_sngp {
+2118:                     GHC.Internal.Int.I64# x2_sngq [Occ=Once1] ->
+2119:                     case Bootstrap.IntTree.signBit of wild4_sngr {
+2120:                     GHC.Internal.Int.I64# y_sngs ->
+2121:                     case eqInt64# [x2_sngq y_sngs] of lwild1_sngt {
+2122:                       __DEFAULT ->
+2123:                           let {
+2124:                             mapRankTree_sat_snha [Occ=Once1] :: GHC.Internal.Int.Int64
+2125:                             [LclId] =
+2126:                                 {left_sngg, offset_sng4} \u []
+2127:                                     case offset_sng4 of wild5_snh5 {
+2128:                                     GHC.Internal.Int.I64# x#_snh6 [Occ=Once1] ->
+2129:                                     case Bootstrap.IntRank.mapTreeSize left_sngg of wild6_snh7 {
+2130:                                     GHC.Internal.Int.I64# y#_snh8 [Occ=Once1] ->
+2131:                                     case plusInt64# [x#_snh6 y#_snh8] of mapRankTree_sat_snh9 {
+2132:                                     __DEFAULT -> GHC.Internal.Int.I64# [mapRankTree_sat_snh9];
+2133:                                     };
+2134:                                     };
+2135:                                     };
+
+=== candidate/IntRank.stg-stdout-slice; SHA256 d0eda6ac557db15ae3022e4c48f7f30a7b4adcdb1c59edb8008d21379894dac2; original lines 2216-2237 ===
+2216:                                                     1# ->
+2217:                                                         case
+2218:                                                             right1_sngH
+2219:                                                         of
+2220:                                                         right1_tnn6 [Occ=Once3]
+2221:                                                         {
+2222:                                                         __DEFAULT ->
+2223:                                                         $smapRankTree_sngu
+2224:                                                             right1_tnn6 sc1_sngw sc2_sngx;
+2225:                                                         };
+2226:                                                   };
+2227:                                                   };
+2228:                                               1# ->
+2229:                                                   case wild6_sngI<TagProper> of wild7_sngW {
+2230:                                                   GHC.Internal.Int.I64# x4_sngX [Occ=Once1] ->
+2231:                                                   case eqInt64# [x4_sngX y_sngs] of lwild3_sngY {
+2232:                                                     __DEFAULT ->
+2233:                                                         case left1_sngG of left1_tnn8 [Occ=Once3] {
+2234:                                                         __DEFAULT ->
+2235:                                                         $smapRankTree_sngu
+2236:                                                             left1_tnn8 sc1_sngw sc2_sngx;
+2237:                                                         };
+
+=== candidate/IntRank.stg-stdout-slice; SHA256 d0eda6ac557db15ae3022e4c48f7f30a7b4adcdb1c59edb8008d21379894dac2; original lines 2427-2429 ===
+2427:                             case right_sngh of right_tnnm [Occ=Once3] {
+2428:                             __DEFAULT -> $smapRankTree_snhb right_tnnm offset_sng4 x_sngj;
+2429:                             };
+
+=== candidate/IntRank.stg-stdout-slice; SHA256 d0eda6ac557db15ae3022e4c48f7f30a7b4adcdb1c59edb8008d21379894dac2; original lines 2578-2594 ===
+2578:                             case left_sngg of left_tnnw [Occ=Once3] {
+2579:                             __DEFAULT -> $smapRankTree_snhR left_tnnw offset_sng4 x_sngj;
+2580:                             };
+2581:                       1# ->
+2582:                           let {
+2583:                             mapRankTree_sat_snj8 [Occ=Once1] :: GHC.Internal.Int.Int64
+2584:                             [LclId] =
+2585:                                 {right_sngh, offset_sng4} \u []
+2586:                                     case offset_sng4 of wild5_snj3 {
+2587:                                     GHC.Internal.Int.I64# x#_snj4 [Occ=Once1] ->
+2588:                                     case Bootstrap.IntRank.mapTreeSize right_sngh of wild6_snj5 {
+2589:                                     GHC.Internal.Int.I64# y#_snj6 [Occ=Once1] ->
+2590:                                     case plusInt64# [x#_snj4 y#_snj6] of mapRankTree_sat_snj7 {
+2591:                                     __DEFAULT -> GHC.Internal.Int.I64# [mapRankTree_sat_snj7];
+2592:                                     };
+2593:                                     };
+2594:                                     };
+

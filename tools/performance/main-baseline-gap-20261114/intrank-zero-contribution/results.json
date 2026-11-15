@@ -1,0 +1,244 @@
+{
+  "schema": "mlf-intrank-zero-contribution-public-experiment-v1",
+  "export_status": "FROZEN_NARROW_EMITTED_CODE_AND_O0_O2_FIXTURE_ONLY",
+  "export_kind": "Sanitized relative-path summary and annotated excerpts; not original run receipts. Full original evidence is retained separately.",
+  "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "source_tree": "386f0b41ab5f9b39fca273f3040f51d73df924a1",
+  "toolchain": "official GHC 9.14.1",
+  "source_patch_scope": "Only the two zero-contribution branches in Bootstrap.IntRank.mapRankTree; no production source is changed by this archive.",
+  "source_sha256": {
+    "original_IntRank_hs": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725",
+    "candidate_IntRank_hs_before_module_rename": "af253844857613f28507e00638da02495e12e68f9a105a9756cdcc912a5dacf4",
+    "fixture_IntRankCandidate_hs": "8a514a479959235056d8d9b822426b8506ce5ff603f9563088b4da96b07d06a0",
+    "fixture_Main_hs": "ba8cf16ca504e3210e4f4316355ef5b1c3c1907fd643531bb57d3375846fb24b",
+    "candidate_patch": "ff7232a975427e9513ad32ec67b61904f7b98c009d0c070115151b6747014aef"
+  },
+  "baseline": {
+    "capture_status": "INCONCLUSIVE_UNCHANGED",
+    "ghc_exit": 0,
+    "modules_compiled": 14,
+    "link_or_target_run": false,
+    "capture_failure": "Absolute source names caused GHC to emit dumps beside source files rather than in the expected dump directory. The original capture rejected its dump-location/file-set checks.",
+    "separate_posthoc_status": "PASS_POSTHOC_INPUT_IDENTITY_AND_EXACT_DUMP_RECOVERY_ONLY",
+    "posthoc_scope": "42 emitted dumps (14 modules x 3 kinds) were recovered byte-for-byte. Source/toolchain/host identity checks were recorded separately; this does not upgrade the original capture.",
+    "original_receipt_sha256": "81923514fc8a88e544ca60a649f6fd39ee9f27f2232b5e1a6688c2cb2f1fd3d9",
+    "posthoc_recovery_record_sha256": "59d6a3ccf98b79a203424e45be33a236e0a6e54473da3500288f36daf45a185c"
+  },
+  "candidate": {
+    "capture_status": "PASS_CANDIDATE_DUMP_CAPTURE_ONLY",
+    "ghc_exit": 0,
+    "modules_compiled": 14,
+    "link_or_target_run": false,
+    "original_receipt_sha256": "1efe443d06af84be93420774b541965860580e98bb7dc78cf8f0b483b253a734",
+    "original_stdout_sha256": "f98438a0a9c20049f39991f7e6e95093ff69063ed3b256e402eff37618bb6d03"
+  },
+  "emitted_code_observation": {
+    "zero_paths": "Outer entry and both zero-contribution routes in each of four local recursive joins pass the old offset directly. The accumulator thunk/add-zero/reboxing at those specific edges disappears.",
+    "contributing_paths": "Retain lazy offset-first plus sibling-size computation and result boxing.",
+    "actual_callers": "Actual Solver rankIdentity, canonical-node mapping, expandedCompact and unifyDistinct compact/equation paths still call the rank implementation. No workload frequency or end-to-end speedup follows.",
+    "limits": "Existing incoming offset thunks, contribution thunks, Maybe construction and caller allocations remain. This is not allocation-free rank.",
+    "candidate_all_four_join_zero_line_ranges": [
+      [
+        2216,
+        2225,
+        2228,
+        2237
+      ],
+      [
+        2367,
+        2372,
+        2375,
+        2384
+      ],
+      [
+        2518,
+        2523,
+        2526,
+        2535
+      ],
+      [
+        2675,
+        2684,
+        2687,
+        2696
+      ]
+    ],
+    "witnesses": {
+      "core-witness.txt": [
+        {
+          "relative_source_label": "baseline/IntRank.dump-simpl",
+          "source_sha256": "04cafd2ad680cf7f1784400a9ec98be3b7e3a33a0cbabd5f9127b746297746f5",
+          "source_lines_inclusive": [
+            277,
+            282
+          ]
+        },
+        {
+          "relative_source_label": "baseline/IntRank.dump-simpl",
+          "source_sha256": "04cafd2ad680cf7f1784400a9ec98be3b7e3a33a0cbabd5f9127b746297746f5",
+          "source_lines_inclusive": [
+            1495,
+            1537
+          ]
+        },
+        {
+          "relative_source_label": "candidate/IntRank.core-stdout-slice",
+          "source_sha256": "3fffc9fa0614a5ba041d89c6d8a82516ee6b0b0ae40ee20f7f0679b721e08662",
+          "source_lines_inclusive": [
+            1522,
+            1558
+          ]
+        },
+        {
+          "relative_source_label": "candidate/IntRank.core-stdout-slice",
+          "source_sha256": "3fffc9fa0614a5ba041d89c6d8a82516ee6b0b0ae40ee20f7f0679b721e08662",
+          "source_lines_inclusive": [
+            1639,
+            1642
+          ]
+        },
+        {
+          "relative_source_label": "candidate/IntRank.core-stdout-slice",
+          "source_sha256": "3fffc9fa0614a5ba041d89c6d8a82516ee6b0b0ae40ee20f7f0679b721e08662",
+          "source_lines_inclusive": [
+            1717,
+            1719
+          ]
+        }
+      ],
+      "stg-witness.txt": [
+        {
+          "relative_source_label": "baseline/IntRank.dump-stg-final",
+          "source_sha256": "521c3f48e5c5b3161f1db7f3c707784948808c06fa94d70a8edf49a27f6ad8cc",
+          "source_lines_inclusive": [
+            2129,
+            2163
+          ]
+        },
+        {
+          "relative_source_label": "baseline/IntRank.dump-stg-final",
+          "source_sha256": "521c3f48e5c5b3161f1db7f3c707784948808c06fa94d70a8edf49a27f6ad8cc",
+          "source_lines_inclusive": [
+            2167,
+            2201
+          ]
+        },
+        {
+          "relative_source_label": "candidate/IntRank.stg-stdout-slice",
+          "source_sha256": "d0eda6ac557db15ae3022e4c48f7f30a7b4adcdb1c59edb8008d21379894dac2",
+          "source_lines_inclusive": [
+            2117,
+            2135
+          ]
+        },
+        {
+          "relative_source_label": "candidate/IntRank.stg-stdout-slice",
+          "source_sha256": "d0eda6ac557db15ae3022e4c48f7f30a7b4adcdb1c59edb8008d21379894dac2",
+          "source_lines_inclusive": [
+            2216,
+            2237
+          ]
+        },
+        {
+          "relative_source_label": "candidate/IntRank.stg-stdout-slice",
+          "source_sha256": "d0eda6ac557db15ae3022e4c48f7f30a7b4adcdb1c59edb8008d21379894dac2",
+          "source_lines_inclusive": [
+            2427,
+            2429
+          ]
+        },
+        {
+          "relative_source_label": "candidate/IntRank.stg-stdout-slice",
+          "source_sha256": "d0eda6ac557db15ae3022e4c48f7f30a7b4adcdb1c59edb8008d21379894dac2",
+          "source_lines_inclusive": [
+            2578,
+            2594
+          ]
+        }
+      ]
+    }
+  },
+  "tradeoffs": {
+    "sign_test": "Earlier sign branching before descent, even for misses or Maybe-WHNF-only observations that can avoid the old lazy offset computation.",
+    "code_shape": "One baseline recursive specialization becomes four candidate local recursive joins; these are let-no-escape joins, not four heap closures.",
+    "whole_IntRank_object_text_bytes": {
+      "baseline": 21414,
+      "candidate": 24366,
+      "increase": 2952,
+      "increase_percent": 13.785
+    },
+    "whole_IntRank_object_file_bytes": {
+      "baseline": 49216,
+      "candidate": 52808
+    },
+    "dynamic_effect": "UNKNOWN"
+  },
+  "semantic": {
+    "status": "PASS_NARROW_18525_CHECK_FIXTURE_O0_O2_ONLY",
+    "O0": {
+      "status": "PASS_NARROW_FIXTURE_ONLY",
+      "runs": 1,
+      "checks": 18525,
+      "exit_code": 0,
+      "stdout_utf8": "PASS narrow IntRank semantic probe: 18525 checks; constructor/payload, valid/raw trees, demand and first-error only; no performance claim\n",
+      "stdout_sha256": "7e492f3b83afab2fd9379041610d1fc7d7fc50f97f073de92aaff8485d6f5e8e",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "run_receipt_sha256": "d7702b3bd7131f2358a746f4c542134ca4f86f47009f369ae8de3b2927566763",
+      "source_object_mapping_sha256": "bd3ebd7bfbe27d0422aa4fc471327ce16f5bd451ed1106994b3f9cc475fbdda8",
+      "actual_binary_sha256": "d1a186b15c72c6b6155fa3bb82878f78a3ca40f4899557445cf421d37c5aa975",
+      "binary_metadata_sha256": "f1bd5e7607ca658ec773c127b8f29a98f895375fe7ea3952d7bd132a2079bb9a",
+      "compiled_haskell_modules": 13
+    },
+    "O2": {
+      "status": "PASS_NARROW_FIXTURE_ONLY",
+      "runs": 1,
+      "checks": 18525,
+      "exit_code": 0,
+      "stdout_utf8": "PASS narrow IntRank semantic probe: 18525 checks; constructor/payload, valid/raw trees, demand and first-error only; no performance claim\n",
+      "stdout_sha256": "7e492f3b83afab2fd9379041610d1fc7d7fc50f97f073de92aaff8485d6f5e8e",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "run_receipt_sha256": "a530e46922abcbf810749826c14a84056562c21c71b54f4bc075875ccdda8b35",
+      "source_object_mapping_sha256": "912354ded6946bcbaf61168a001e48ad20f378316b945e21cd3656a24112062b",
+      "actual_binary_sha256": "e19c645d3c1e0e3f9ccac75e62a2d4d0d775e20fe7eff4e3a5b82498649e25c1",
+      "binary_metadata_sha256": "d3963c2531a8f3519ddd90cadda550f3e4ba3ae00dfcdd5e48872da9a6442d7c",
+      "compiled_haskell_modules": 13
+    },
+    "fixture_status": "The unchanged archived fixture was actually compiled and run once at each optimization level; both streams matched the original frozen golden. This is finite narrow semantic evidence, not a general proof.",
+    "actual_run_label": "semantic-run02",
+    "actual_receipt_sha256": "f81381bd838f825f15719b005e8b3c08b4ad671883312a2ce405058c386d2955",
+    "actual_final_seal_sha256": "06aaf2f91bf772ad24834077740ecde45426e838b77dc4a0ac7abd948383ceee",
+    "six_core_steps_completed": 6,
+    "two_metadata_substeps_completed": 2,
+    "inputs_after_status_recorded": "verified",
+    "cleanup_and_locks_reacquired_recorded": true,
+    "within_limit_recorded": true,
+    "execution_method": "Separate bounded execution controller, not the reproduction recipe in this export.",
+    "prior_failed_attempt": {
+      "label": "semantic-run01",
+      "status": "INCONCLUSIVE_UNCHANGED",
+      "semantic_runs": 0,
+      "failure": "Live output inventory encountered FileNotFoundError while a transient GHC file disappeared; cleanup interrupted compilation after linking progress. No semantic fixture was run.",
+      "original_receipt_sha256": "dfef7148dc66cadfeda649bcf8bd863bc2b8177ee6246f4c6431cf97b2085da5",
+      "original_final_seal_sha256": "8330372815eca50962e497d3e916829b11efba799fea978954c28f845edf8623"
+    },
+    "independent_recheck_scope": "Actual step receipts/streams, original golden, compile-source/object mappings, fresh objects/interfaces, and both ELF binaries/backups were read and hashed. Full toolchain/runtime closure verification remains a separate retained record.",
+    "scope_exercised": [
+      "signed/extreme/duplicate/missing/rank-select",
+      "raw constructors and forged counts",
+      "poison payload, selected/unselected subtree and sibling size",
+      "poison initial offset",
+      "Nothing/Just constructor-only versus forced result",
+      "synchronous explicit HostError and first-error ordering; asynchronous exceptions are not swallowed"
+    ]
+  },
+  "performance": {
+    "status": "NOT_MEASURED",
+    "whole_compiler_qualification": "UNKNOWN",
+    "speedup_claim": false,
+    "ci_qualification": "NOT_ESTABLISHED"
+  },
+  "export_recipe_executed": false,
+  "publication_frozen": true
+}

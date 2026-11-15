@@ -1,0 +1,29 @@
+EXPORTED size -A OUTPUT; labels normalized to relative stage names.
+Not an original receipt. Actual .o bytes were read without executing them.
+
+baseline/Bootstrap/IntRank.o  :
+section            size   addr
+.text             21414      0
+.data              1328      0
+.bss                  0      0
+.rodata.str         125      0
+.note.GNU-stack       0      0
+.comment             12      0
+Total             22879
+
+
+candidate/Bootstrap/IntRank.o  :
+section            size   addr
+.text             24366      0
+.data              1280      0
+.bss                  0      0
+.rodata.str         125      0
+.note.GNU-stack       0      0
+.comment             12      0
+Total             25783
+
+
+
+Whole-module .text: +2952 bytes (+13.785%); not a function-only size.
+Object file bytes: baseline 49216; candidate 52808 (+3592).
+No dynamic performance inference.

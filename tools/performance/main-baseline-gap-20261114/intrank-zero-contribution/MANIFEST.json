@@ -1,0 +1,54 @@
+{
+  "schema": "mlf-public-experiment-payload-manifest-v1",
+  "status": "FROZEN_NARROW_EMITTED_CODE_AND_O0_O2_FIXTURE_ONLY",
+  "not_original_run_receipt": true,
+  "publication_frozen": true,
+  "self_excluded": true,
+  "files": [
+    {
+      "file": "LICENSES.txt",
+      "bytes": 3988,
+      "sha256": "36e78f500144578767dc8a7aeece4104318f1ff00fe51e010df413d88ee97c90"
+    },
+    {
+      "file": "README.md",
+      "bytes": 8817,
+      "sha256": "e89b080680cf56cc7f8372f89c73ce845907d116d827ee3281f092d8c800814d"
+    },
+    {
+      "file": "candidate.patch",
+      "bytes": 877,
+      "sha256": "ff7232a975427e9513ad32ec67b61904f7b98c009d0c070115151b6747014aef"
+    },
+    {
+      "file": "core-witness.txt",
+      "bytes": 6318,
+      "sha256": "c439fb60b1b8c2c6aea720305553d54e42f71e9d006c832a77ddac5b3ad03846"
+    },
+    {
+      "file": "fixture/IntRankCandidate.hs",
+      "bytes": 6738,
+      "sha256": "8a514a479959235056d8d9b822426b8506ce5ff603f9563088b4da96b07d06a0"
+    },
+    {
+      "file": "fixture/Main.hs",
+      "bytes": 10844,
+      "sha256": "ba8cf16ca504e3210e4f4316355ef5b1c3c1907fd643531bb57d3375846fb24b"
+    },
+    {
+      "file": "object-sizes.txt",
+      "bytes": 860,
+      "sha256": "8e09828f33ffdf1ff79392b64c42213a87ca5b7a530c0bec09627aa2b1b320df"
+    },
+    {
+      "file": "results.json",
+      "bytes": 11297,
+      "sha256": "fa8147a1d24eaf40afda2ef46a9b4e75901905c8736b99f4e3ee33045e592da8"
+    },
+    {
+      "file": "stg-witness.txt",
+      "bytes": 9933,
+      "sha256": "6e4815a9f4b7c5b1e9b9cbf7e4e81c48342973f53e6ff2ff95a8b2bf16a1f2ee"
+    }
+  ]
+}

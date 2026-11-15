@@ -1,0 +1,14 @@
+--- a/libraries/mlf-foundation/Bootstrap/IntRank.hs
++++ b/libraries/mlf-foundation/Bootstrap/IntRank.hs
+@@ -78,8 +78,9 @@
+     IntMapNil -> Nothing;
+     IntMapTip previous value -> if key == previous then Just offset else Nothing;
+     IntMapBin count prefix left right ->
+-      if P.left key prefix then mapRankTree key (offset + (if P.signBranch prefix then mapTreeSize right else 0)) left
+-      else mapRankTree key (offset + (if P.signBranch prefix then 0 else mapTreeSize left)) right
++      if P.left key prefix
++      then if P.signBranch prefix then mapRankTree key (offset + mapTreeSize right) left else mapRankTree key offset left
++      else if P.signBranch prefix then mapRankTree key offset right else mapRankTree key (offset + mapTreeSize left) right
+   };
+   mapEntryTree :: forall a. Int -> IntMapTree a -> Maybe ((,) Int a);
+   mapEntryTree position tree =
