@@ -1,0 +1,149 @@
+{
+  "schema": "host-bytearray-3inline-codegen-result-v1",
+  "status": "STOP_NO_WHOLE95_PRODUCER",
+  "method": "Read-only ordinary O2 machine-code analysis of freshly rebuilt baseline A and three-INLINE candidate C from the same batch; no new target execution.",
+  "analysis_manifest_sha256": "1a36d56e151f0207fa6d1ff12e2c16007d6168b2b173eaa514e2f0a5c6044e32",
+  "analysis_findings_sha256": "2fecf780c37a1b6d4dd06e7ee34e59ced20b03b389698ad1bf3d50ca226964a0",
+  "analysis_ledger_sha256": "cabdd3a6b257d4940ab896c0b1ceedc90f45c479abc9016d78be3d0cb042b1c2",
+  "actual_artifact_audit_sha256": "9e6cb62de98f793bfb03b7d42f4b3b5fed21d22c1e54b33cbed8f05b92861324",
+  "inputs": [
+    {
+      "lane": "a-o2",
+      "artifact": "MLF/Host/IO.o",
+      "bytes": 142928,
+      "sha256": "e04d3f4cb026efdd2fbc87d344e72a48cfa8f0d00511d65ef67d1b67e7217b52"
+    },
+    {
+      "lane": "a-o2",
+      "artifact": "MLF/Host/IO.hi",
+      "bytes": 52886,
+      "sha256": "b38de173b24b872780f960612b6f46bc3ff547ea8f3ece5e8f7948e01c080c6b"
+    },
+    {
+      "lane": "c-o2",
+      "artifact": "MLF/Host/IO.o",
+      "bytes": 142288,
+      "sha256": "4e399585577d03267d084d069598ac1286f0b1815340ce879a4293292e054f6b"
+    },
+    {
+      "lane": "c-o2",
+      "artifact": "MLF/Host/IO.hi",
+      "bytes": 52668,
+      "sha256": "c3bab4e5c775fbe86dd4a89202c4c7856fbd81d1ee7db115ba90f515736ea8e1"
+    },
+    {
+      "lane": "a-o2",
+      "artifact": "MLF/Primitive.o",
+      "bytes": 51784,
+      "sha256": "4734f7769a3ade3e0677d5847bd8f6ff636883bd1aaa8bc44e3a83b5d63f148f"
+    },
+    {
+      "lane": "a-o2",
+      "artifact": "MLF/Primitive.hi",
+      "bytes": 30476,
+      "sha256": "19ab1bae4ed951f8777e93fc38282cced04849ed8008ab1943b3b0dbb16f1990"
+    },
+    {
+      "lane": "c-o2",
+      "artifact": "MLF/Primitive.o",
+      "bytes": 51784,
+      "sha256": "e3b90b86759e5dde05efc50eee8361e2b7de2637f00bb3bb09cf25bcff548a60"
+    },
+    {
+      "lane": "c-o2",
+      "artifact": "MLF/Primitive.hi",
+      "bytes": 30333,
+      "sha256": "80edddd1995de6199c67e165c8e3365e66e7755f09ee4a2b7bbe2fee25a95f9b"
+    },
+    {
+      "lane": "a-o2",
+      "artifact": "Bootstrap/Bitstream.o",
+      "bytes": 694016,
+      "sha256": "b4e6ad9d8b72e27cc4ce39b5c20164f8f33c84b47fdac98adab071b35839d909"
+    },
+    {
+      "lane": "a-o2",
+      "artifact": "Bootstrap/Bitstream.hi",
+      "bytes": 102987,
+      "sha256": "1f13b0fad30f0768617853db82c0ed89257f6db1af524f02500cd29d3b8cf23b"
+    },
+    {
+      "lane": "c-o2",
+      "artifact": "Bootstrap/Bitstream.o",
+      "bytes": 711400,
+      "sha256": "1102b4292976e475172d46809442d8ea833be6bd6d59c53c96e522b2970cb64b"
+    },
+    {
+      "lane": "c-o2",
+      "artifact": "Bootstrap/Bitstream.hi",
+      "bytes": 101175,
+      "sha256": "2e2a94b4b17158b640b493f07dc67283e85713022a3799b53e6aae223e6e9e5f"
+    }
+  ],
+  "text_sections": {
+    "IO": {
+      "baseline_bytes": 45334,
+      "candidate_bytes": 45238,
+      "delta_bytes": -96
+    },
+    "Primitive": {
+      "baseline_bytes": 5902,
+      "candidate_bytes": 5902,
+      "delta_bytes": 0
+    },
+    "Bitstream": {
+      "baseline_bytes": 287063,
+      "candidate_bytes": 297479,
+      "delta_bytes": 10416
+    }
+  },
+  "combined_three_module_text": {
+    "baseline_bytes": 338299,
+    "candidate_bytes": 348619,
+    "delta_bytes": 10320,
+    "interpretation": "Static .text sections including GHC tables, not instruction counts."
+  },
+  "selected_successful_two_ASCII_loop": {
+    "A": {
+      "index_boxes": 32,
+      "constructor_closures": 304,
+      "position_thunks": 64,
+      "Host_write_components": 128,
+      "subtotal": 528,
+      "with_position_result_boxes": 560
+    },
+    "C": {
+      "index_boxes": 32,
+      "constructor_closures": 320,
+      "position_thunks": 64,
+      "inlined_write_components": 128,
+      "subtotal": 544,
+      "with_position_result_boxes": 576
+    }
+  },
+  "selected_local_read_primitive_bytes": {
+    "A": 56,
+    "C_sameAscii": 56
+  },
+  "mechanism": {
+    "inlining_reached_actual_consumers": true,
+    "Primitive_facade_entries": "The three public entries remain 5-byte direct jumps; no heap-allocating facade wrapper was removed.",
+    "ASCII_constructor_change": "The 16-byte Int64 code box is replaced by a 24-byte updateable checked-Word8 thunk. Startup constructor 144->152 bytes; steady constructor 152->160 bytes. Other counted scalar-index, position-thunk and successful write components remain.",
+    "write_order_and_owner": "The selected inlined path still demands array then index, checks unsigned bounds before the checked byte value, stores the byte, and retains the ForeignPtr owner via keepAlive.",
+    "read_path": "Actual sameAscii read inlining retains 16-byte index box + 24-byte keepAlive read action + 16-byte Int64 result = 56 bytes.",
+    "loop_return": "Retained recursive tail and next-position thunk return to the actual loop; allocation is not judged from disappearance of the Host call alone."
+  },
+  "accounting_limits": [
+    "The two-character values are conditional static successful-path accounting, not measured heap totals or an ordinary runtime regression.",
+    "The 528/544 subtotals exclude position-thunk result boxes; including both gives 560/576. Do not add these two presentations together.",
+    "Counts exclude common stringCodeAt internals, arbitrary operand thunks, RTS keepAlive/scheduler/GC internals and unrelated paths.",
+    "Reservation rollbacks and both writes/loop returns are included under the original matched ledger convention.",
+    "No complete allocation total is claimed for every non-ASCII branch, sameAscii continuation, or other consumer.",
+    "Same-batch baseline A objects for these three modules equal the previously inspected ordinary baseline objects, but new candidate paths were traced separately."
+  ],
+  "decision": "Stop this sole three-INLINE candidate: the selected matched recurrence adds 16 local bytes per two ASCII characters and combined text grows. No 95-module build or performance window follows.",
+  "performance_samples": 0,
+  "measured_speedup_or_regression": false,
+  "whole_compiler_or_native_qualified": false,
+  "PR51_complete_port_or_CI_result": false
+}

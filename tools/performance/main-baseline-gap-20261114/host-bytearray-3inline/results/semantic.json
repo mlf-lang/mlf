@@ -1,0 +1,176 @@
+{
+  "schema": "host-bytearray-3inline-semantic-result-v1",
+  "status": "PASS_HOST_BYTEARRAY_3INLINE_A_C_O0_O2_FIXTURE_ARTIFACTS_ONLY",
+  "independent_actual_review": {
+    "status": "PASS_INDEPENDENT_ACTUAL_HOST_BYTEARRAY_3INLINE_A_C_O0_O2_FIXTURE_ARTIFACTS_ONLY",
+    "sha256": "9e6cb62de98f793bfb03b7d42f4b3b5fed21d22c1e54b33cbed8f05b92861324",
+    "bytes": 100574
+  },
+  "receipt_sha256": "f5198987da42f3ed30f797db16c53737a59c72891ca5f0f1b8f1b9ba4427549a",
+  "final_seal_sha256": "feb74ce35b7a066d958c523952bf34797c27f06ca8447b391f3997f7d6161e9b",
+  "baseline_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "production_change": "Only INLINE annotations for v_readByteArray, v_writeByteArray, v_lengthByteArray. Bodies, ForeignPtr representation, Host ABI, Primitive and Bitstream source unchanged.",
+  "fixed_core_steps": 10,
+  "metadata_only_ldd_calls": 4,
+  "actual_source_closure_each": {
+    "home_modules": 14,
+    "production_modules": 13,
+    "fixture_modules": 1,
+    "fresh_O0_O2_baseline_candidate": true,
+    "old_home_objects_or_interfaces_reused": false
+  },
+  "lanes": [
+    {
+      "lane": "a-o0",
+      "optimization": "O0",
+      "production_variant": "baseline",
+      "actual_module_count": 14,
+      "expected_modules_exact": [
+        "Bootstrap.Bitstream",
+        "Bootstrap.IndexVec",
+        "Bootstrap.IntMap",
+        "Bootstrap.IntRank",
+        "Bootstrap.IntSet",
+        "Bootstrap.IntTree",
+        "Bootstrap.Map",
+        "Bootstrap.Std",
+        "Bootstrap.Types",
+        "MLF.Host.Async",
+        "MLF.Host.Base",
+        "MLF.Host.IO",
+        "MLF.Primitive",
+        "Main"
+      ],
+      "fixture_exit_code": 0,
+      "named_checks": 39,
+      "stdout_bytes": 1525,
+      "stdout_sha256": "cd8d3eb7e450839d047c50764e79292ec9e73f0a5324f7c60e22b7317d7e133f",
+      "stderr_bytes": 0,
+      "binary_bytes": 3542416,
+      "binary_sha256": "80f719dac899e45f38e9e52a8611b2c05973378c1a445d190b90b3b05bf5121b"
+    },
+    {
+      "lane": "c-o0",
+      "optimization": "O0",
+      "production_variant": "three_INLINE_annotations",
+      "actual_module_count": 14,
+      "expected_modules_exact": [
+        "Bootstrap.Bitstream",
+        "Bootstrap.IndexVec",
+        "Bootstrap.IntMap",
+        "Bootstrap.IntRank",
+        "Bootstrap.IntSet",
+        "Bootstrap.IntTree",
+        "Bootstrap.Map",
+        "Bootstrap.Std",
+        "Bootstrap.Types",
+        "MLF.Host.Async",
+        "MLF.Host.Base",
+        "MLF.Host.IO",
+        "MLF.Primitive",
+        "Main"
+      ],
+      "fixture_exit_code": 0,
+      "named_checks": 39,
+      "stdout_bytes": 1525,
+      "stdout_sha256": "cd8d3eb7e450839d047c50764e79292ec9e73f0a5324f7c60e22b7317d7e133f",
+      "stderr_bytes": 0,
+      "binary_bytes": 3542416,
+      "binary_sha256": "dcc666be194c2c39f36892225665ee3eb6cc494945586b9d600a749a89a7c925"
+    },
+    {
+      "lane": "a-o2",
+      "optimization": "O2",
+      "production_variant": "baseline",
+      "actual_module_count": 14,
+      "expected_modules_exact": [
+        "Bootstrap.Bitstream",
+        "Bootstrap.IndexVec",
+        "Bootstrap.IntMap",
+        "Bootstrap.IntRank",
+        "Bootstrap.IntSet",
+        "Bootstrap.IntTree",
+        "Bootstrap.Map",
+        "Bootstrap.Std",
+        "Bootstrap.Types",
+        "MLF.Host.Async",
+        "MLF.Host.Base",
+        "MLF.Host.IO",
+        "MLF.Primitive",
+        "Main"
+      ],
+      "fixture_exit_code": 0,
+      "named_checks": 39,
+      "stdout_bytes": 1525,
+      "stdout_sha256": "cd8d3eb7e450839d047c50764e79292ec9e73f0a5324f7c60e22b7317d7e133f",
+      "stderr_bytes": 0,
+      "binary_bytes": 3413328,
+      "binary_sha256": "169698e961836ce32aa673d228547ccfdd451cdef3a635b83870acd9f699ba05"
+    },
+    {
+      "lane": "c-o2",
+      "optimization": "O2",
+      "production_variant": "three_INLINE_annotations",
+      "actual_module_count": 14,
+      "expected_modules_exact": [
+        "Bootstrap.Bitstream",
+        "Bootstrap.IndexVec",
+        "Bootstrap.IntMap",
+        "Bootstrap.IntRank",
+        "Bootstrap.IntSet",
+        "Bootstrap.IntTree",
+        "Bootstrap.Map",
+        "Bootstrap.Std",
+        "Bootstrap.Types",
+        "MLF.Host.Async",
+        "MLF.Host.Base",
+        "MLF.Host.IO",
+        "MLF.Primitive",
+        "Main"
+      ],
+      "fixture_exit_code": 0,
+      "named_checks": 39,
+      "stdout_bytes": 1525,
+      "stdout_sha256": "cd8d3eb7e450839d047c50764e79292ec9e73f0a5324f7c60e22b7317d7e133f",
+      "stderr_bytes": 0,
+      "binary_bytes": 3424512,
+      "binary_sha256": "fa7beb34d002fed36c04ddadde17f1fe4eb66a293d723c998d654517aa59e5d3"
+    }
+  ],
+  "oracle": {
+    "kind": "Independent literal expected values, exact error labels and fixed byte/CRC vectors; not just A=C",
+    "named_cases": 39,
+    "same_golden_all_four_lanes": true,
+    "expected_stdout_utf8": "PASS cold read array and index\nPASS cold write array index value\nPASS cold length array\nPASS read array before index\nPASS write array before index and value\nPASS length demands array when executed\nPASS read index forced even result ignored\nPASS write index before value\nPASS write bounds before value and no mutation\nPASS write value before mutation\nPASS zero length is zero\nPASS zero read checked despite discarded result\nPASS zero write bounds before value\nPASS zero initializer still validated\nPASS negative read index\nPASS minimum Int64 read index\nPASS maximum Int64 read index\nPASS upper exclusive read bound\nPASS minimum Int64 write index\nPASS maximum Int64 write index\nPASS negative byte value rejected\nPASS byte value 256 rejected\nPASS minimum Int64 byte rejected\nPASS maximum Int64 byte rejected\nPASS boundary bytes and length\nPASS same read action observes alias mutation\nPASS same write action executes twice\nPASS read write actions retain owner across GC\nPASS prior synchronous error skips write\nPASS later synchronous error follows write\nPASS unselected action has no demand or effect\nPASS raw negative length observed without access\nPASS UTF8 byte view has fixed bytes\nPASS real Bitstream aligned ASCII Unicode preserves sentinel\nPASS real Bitstream empty text does not demand array\nPASS real Bitstream invalid text index precedes array\nPASS real Bitstream insufficient buffer preserves first write\nPASS real Bitstream unaligned fixed bit bytes\nPASS real Bitstream standard CRC32 check vector\nTOTAL 39 FAILED 0\n",
+    "expected_stdout_sha256": "cd8d3eb7e450839d047c50764e79292ec9e73f0a5324f7c60e22b7317d7e133f",
+    "expected_stderr_bytes": 0
+  },
+  "control_summary": {
+    "source_and_toolchain_after": "verified",
+    "cleanup": true,
+    "locks_released_reacquired": true,
+    "final_within_limit": true,
+    "limits": {
+      "compile_aggregate_seconds": 180,
+      "semantic_aggregate_seconds": 120,
+      "whole_seconds": 360,
+      "per_GHC_seconds": 60,
+      "per_fixture_seconds": 30,
+      "address_space_bytes": 4294967296
+    }
+  },
+  "performance_samples": 0,
+  "native_or_whole_compiler_qualified": false,
+  "limitations": [
+    "Finite Linux/GHC facade and consumer checks, not complete Host or codec semantics.",
+    "GC case observes actions retaining their real owner across one forced collection; not a general lifetime proof.",
+    "No raw malformed-buffer reads/writes were performed.",
+    "Semantic pass and artifact capture alone do not establish optimization benefit.",
+    "This is not a PR51 CI result or evidence of CI failure causality."
+  ],
+  "full_actual_output_archive": {
+    "files": 180,
+    "bytes": 43050763,
+    "all_file_hashes_verified_by_independent_review": true
+  }
+}
