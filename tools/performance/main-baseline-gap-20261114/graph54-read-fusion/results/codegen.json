@@ -1,0 +1,68 @@
+{
+  "status": "INDEPENDENTLY_VERIFIED_LOCAL_FUSION_WITH_CODE_SIZE_COST",
+  "ordinary_GHC": "9.14.1 O2 -fpedantic-bottoms -fno-state-hack",
+  "objects": {
+    "baseline": {
+      "bytes": 781024,
+      "sha256": "ebe745b5d50f8dfc113e252bff8dc726716e45125ae75857d6965e181c050e20"
+    },
+    "candidate": {
+      "bytes": 794184,
+      "sha256": "7f328e979d016c6078d25d987a1a8131a90495d1ca2c45fa759ad887eabc8931"
+    }
+  },
+  "section_sizes": {
+    "baseline": {
+      ".text": 346382,
+      ".data": 27032,
+      ".rodata.str": 2213,
+      ".rodata": 256
+    },
+    "candidate": {
+      ".text": 354814,
+      ".data": 27504,
+      ".rodata.str": 2213,
+      ".rodata": 256
+    }
+  },
+  "growth": {
+    "text_bytes": 8432,
+    "text_percent": 2.4343066325617384,
+    "data_bytes": 472,
+    "data_percent": 1.7460787215152411,
+    "object_file_bytes": 13160
+  },
+  "public_readDense": {
+    "arity_baseline": 3,
+    "arity_candidate": 3,
+    "seven_code_ranges_bytes_and_normalized_relocations_identical": true,
+    "construction_bytes": 56,
+    "components": "32 B lazy updateable offset thunk + 24 B ST action; first offset force still 16 B I64 box. Public mechanism not removed."
+  },
+  "denseContains_static_success_path": {
+    "conditions": "Fresh action constructed once, all three bounds checks succeed, no heap-check slow-path/exception; only identified Graph closures, not total runtime allocations. Returned Bool thunk need not be forced for these array reads.",
+    "baseline_bytes": 352,
+    "baseline_formula": "96 +3*(56+16) +40",
+    "candidate_bytes": 176,
+    "candidate_formula": "104 +2*16 +40",
+    "reduction_bytes": 176,
+    "meaning": "Static closure accounting, NOT measured allocation/speedup or an event-frequency estimate."
+  },
+  "selected_findings": [
+    "denseContains three loads fused into state action; pure ancestor offset shared; offset boxes remain.",
+    "denseKind initial colour/cached-kind direct loads; shared offset remains.",
+    "densePlace selected colour/graft/parent/class direct loads; separate depth offset remains.",
+    "denseGetNode already fused: no new win there. All 34 changed public function arities retained; selected callers inspected, not every possible worker/escape."
+  ],
+  "whole_producer": {
+    "modules": 95,
+    "baseline_modules": 94,
+    "only_changed_module": "Bootstrap.Graph",
+    "binary": {
+      "bytes": 20200288,
+      "sha256": "7770f188b578391f0468eff2df09e5237c33db1245f90a6880f5185759efac39"
+    },
+    "Graph_object_byte_exact_with_single_c": true
+  },
+  "limits": "Static closure accounting is conditional, not measured total heap or saved time. Text includes GHC info tables. Baseline --make versus initial candidate single-c distinction preserved; later full-build Graph.o byte-identical."
+}

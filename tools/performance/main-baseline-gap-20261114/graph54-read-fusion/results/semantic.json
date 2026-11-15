@@ -1,0 +1,46 @@
+{
+  "status": "INDEPENDENTLY_VERIFIED_REAL_GRAPH_A_C_O0_O2_FIXTURE_ONLY",
+  "variants": {
+    "a-o0": {
+      "actual_module_rows": 16,
+      "Graph_source_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+      "stdout_bytes": 134,
+      "stdout_sha256": "9c548eb8927bb096871d2393f9ca9378776f01a0771d7bd99e8cc5cc2bc1d149",
+      "stderr_bytes": 0,
+      "exit_code": 0
+    },
+    "c-o0": {
+      "actual_module_rows": 16,
+      "Graph_source_sha256": "fdb9e899392ac0068f9f11432d512d1168934455a6da733a10e7cabb52d19df3",
+      "stdout_bytes": 134,
+      "stdout_sha256": "9c548eb8927bb096871d2393f9ca9378776f01a0771d7bd99e8cc5cc2bc1d149",
+      "stderr_bytes": 0,
+      "exit_code": 0
+    },
+    "a-o2": {
+      "actual_module_rows": 16,
+      "Graph_source_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+      "stdout_bytes": 134,
+      "stdout_sha256": "9c548eb8927bb096871d2393f9ca9378776f01a0771d7bd99e8cc5cc2bc1d149",
+      "stderr_bytes": 0,
+      "exit_code": 0
+    },
+    "c-o2": {
+      "actual_module_rows": 16,
+      "Graph_source_sha256": "fdb9e899392ac0068f9f11432d512d1168934455a6da733a10e7cabb52d19df3",
+      "stdout_bytes": 134,
+      "stdout_sha256": "9c548eb8927bb096871d2393f9ca9378776f01a0771d7bd99e8cc5cc2bc1d149",
+      "stderr_bytes": 0,
+      "exit_code": 0
+    }
+  },
+  "corpus": {
+    "validation_cases": 12000,
+    "unification_cases": 5616,
+    "normalization_cases": 624,
+    "supplement_cases": 14,
+    "golden_bytes": 134
+  },
+  "source_version": "v2; Prelude imports only fromInteger, project Maybe/Either from Bootstrap.Types; original Either do retained with Bootstrap.Std instances",
+  "scope": "Actual Graph/Graph.Solver corpus plus denseContains state/demand supplement. Not old extracted-helper tests, not exhaustive 34-function/raw-state proof. Foundation output gate separately checked."
+}

@@ -1,0 +1,120 @@
+{
+  "status": "INDEPENDENTLY_VERIFIED_FIXED_FOUR_LEGS_TWO_PAIRS_ONLY",
+  "order": "CAAC",
+  "workload": {
+    "modules": 15,
+    "source_bytes": 211763,
+    "entry": "NoEntry",
+    "fresh_groups": 532,
+    "members": 539,
+    "owners": 14,
+    "fresh_query_cache_each_leg": true,
+    "cold_OS_cache_claim": false
+  },
+  "samples": [
+    {
+      "side": "C",
+      "position": 1,
+      "wall_seconds": 23.97401211,
+      "user_seconds": 23.476562,
+      "system_seconds": 0.542986,
+      "cpu_seconds": 24.019548,
+      "maxrss_kib": 136356
+    },
+    {
+      "side": "A",
+      "position": 2,
+      "wall_seconds": 26.411618306,
+      "user_seconds": 24.569714,
+      "system_seconds": 1.913291,
+      "cpu_seconds": 26.483005000000002,
+      "maxrss_kib": 133332
+    },
+    {
+      "side": "A",
+      "position": 3,
+      "wall_seconds": 25.208852161,
+      "user_seconds": 24.86737,
+      "system_seconds": 0.38459,
+      "cpu_seconds": 25.25196,
+      "maxrss_kib": 133332
+    },
+    {
+      "side": "C",
+      "position": 4,
+      "wall_seconds": 25.63585839,
+      "user_seconds": 25.203019,
+      "system_seconds": 0.49555699999999997,
+      "cpu_seconds": 25.698576000000003,
+      "maxrss_kib": 136280
+    }
+  ],
+  "metrics": {
+    "wall_seconds": {
+      "paired_C_over_A": [
+        0.9077070489298172,
+        1.016938741449744
+      ],
+      "geometric_mean_C_over_A": 0.9607718063847156,
+      "descriptive_gain_fraction": 0.0392281936152844,
+      "arithmetic_mean_by_side": {
+        "A": 25.810235233500002,
+        "C": 24.80493525
+      },
+      "arithmetic_mean_C_over_A": 0.9610503362559366
+    },
+    "cpu_seconds": {
+      "paired_C_over_A": [
+        0.9069797026432611,
+        1.0176863894921424
+      ],
+      "geometric_mean_C_over_A": 0.9607397664954217,
+      "descriptive_gain_fraction": 0.0392602335045783,
+      "arithmetic_mean_by_side": {
+        "A": 25.8674825,
+        "C": 24.859062
+      },
+      "arithmetic_mean_C_over_A": 0.9610159009482272
+    },
+    "user_seconds": {
+      "paired_C_over_A": [
+        0.955508151214133,
+        1.013497567294008
+      ],
+      "geometric_mean_C_over_A": 0.9840758033734591,
+      "descriptive_gain_fraction": 0.015924196626540876,
+      "arithmetic_mean_by_side": {
+        "A": 24.718542,
+        "C": 24.3397905
+      },
+      "arithmetic_mean_C_over_A": 0.9846774336447514
+    },
+    "maxrss_kib": {
+      "paired_C_over_A": [
+        1.022680226802268,
+        1.022110221102211
+      ],
+      "geometric_mean_C_over_A": 1.0223951842285475,
+      "descriptive_gain_fraction": -0.02239518422854747,
+      "arithmetic_mean_by_side": {
+        "A": 133332.0,
+        "C": 136318.0
+      },
+      "arithmetic_mean_C_over_A": 1.0223952239522396
+    }
+  },
+  "formula": "Paired ratio is C/A for each adjacent pair regardless of order. Geometric ratio=exp(mean(log(C/A))); descriptive gain=1-ratio. CPU=user+system. RSS reported in KiB, not heap allocation.",
+  "correctness": {
+    "all_four_exit_zero": true,
+    "all_four_raw_CI_CO_equal_original_A": true,
+    "all_four_original_ordered_query_contract_equal": true,
+    "whole_query_bytes_equal_observation": [
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "interpretation": "Two pairs only; wall/CPU/user directions oppose. First A system time is elevated, cause unknown. No sample deletion, adjustment or additional samples. Descriptive point estimates do not establish stable benefit, significance or regression, and are not merge evidence.",
+  "timing": "Direct child launch through blocking wait4 return; no timing-wrapper startup/serialization included. Ordinary compiler, not profiling-way."
+}

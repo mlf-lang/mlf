@@ -1,0 +1,18 @@
+{
+  "baseline_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "baseline_Graph_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+  "candidate_Graph_sha256": "fdb9e899392ac0068f9f11432d512d1168934455a6da733a10e7cabb52d19df3",
+  "baseline_ordinary_compiler_sha256": "29c58e2b48324957cee5965a1c76dc7e688c9b25264bd5150c3f7f085dbc23ef",
+  "candidate_ordinary_compiler_sha256": "7770f188b578391f0468eff2df09e5237c33db1245f90a6880f5185759efac39",
+  "files": {
+    "README.md": "81ef78f7af8d9d606ca30a552cb8ca750070d0653c0bc7286c8dddd4ea79a3bf",
+    "candidate.patch": "c14188360d939fdcd4d9c3cb52b61f8c3635b11064171a5e086d109e73d8597d",
+    "results/codegen.json": "bf5620a6e415301033d20b77d7e6efa446e4012b14e42bf5f631fc0844b3b1c2",
+    "results/foundation-caac.json": "5803462662b0d0ffc9654b962cee3a22be3e57150be54a27fc300aaa19fb8b32",
+    "results/semantic.json": "0294c4a53b72653f220624c72161412f40147b838eeb133540715b4ab51d0443",
+    "tests/Corpus.hs": "2c16e77209300abfc6f6ad35c157601c60dd00e3809b8a42490e19ee65efec8d",
+    "tests/Main.hs": "a18e7686c33f60ab49b14f3f6d39c675c3069d1d0800da9ea32e4294071eb23d",
+    "tests/expected.stdout": "9c548eb8927bb096871d2393f9ca9378776f01a0771d7bd99e8cc5cc2bc1d149"
+  },
+  "self_hash": "Omitted to avoid recursive self-hash; external delivery inventory contains all9 file hashes."
+}
