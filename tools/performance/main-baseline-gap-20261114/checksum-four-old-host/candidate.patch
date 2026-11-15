@@ -1,0 +1,51 @@
+--- a/libraries/mlf-crates/Bootstrap/Bitstream.hs
++++ b/libraries/mlf-crates/Bootstrap/Bitstream.hs
+@@ -490,11 +490,47 @@
+           first = xorInt (unsignedShiftRInt start 4) (crcNibble start) } in
+     xorInt (unsignedShiftRInt first 4) (crcNibble first);
+   checksum :: ByteArray -> Int -> IO Int;
+-  checksum bytes size = if size < 1024 then checksumAt bytes size 0 4294967295 else do {
++  checksum bytes size = if size >= 16384 then checksumFour bytes size
++    else if size < 1024 then checksumAt bytes size 0 4294967295 else do {
+     table <- newIntArray 256 0;
+     buildCRCTable table 0;
+     checksumBytes table bytes size 0 4294967295
+   };
++  -- Four reflected CRC tables advance four bytes at once. Each table is
++  -- derived from the existing byte recurrence, and the wire checksum field
++  -- remains logically zero. Small buffers keep their cheaper one-table path.
++  checksumFour bytes size = do {
++    table <- newIntArray 1024 0;
++    buildCRCFour table 0;
++    crc <- crcFourRange table bytes size 0 4294967295;
++    ioReturn (xorInt crc 4294967295)
++  };
++  buildCRCFour table index = if index == 256 then ioReturn () else do {
++    let { a = crcByte 0 index; b = crcByte a 0; c = crcByte b 0; d = crcByte c 0 };
++    writeIntArray table index a;
++    writeIntArray table (256 + index) b;
++    writeIntArray table (512 + index) c;
++    writeIntArray table (768 + index) d;
++    buildCRCFour table (index + 1)
++  };
++  crcFourWord bytes position = if position == 76 then ioReturn 0 else do {
++    a <- readByteArray bytes position;
++    b <- readByteArray bytes (position + 1);
++    c <- readByteArray bytes (position + 2);
++    d <- readByteArray bytes (position + 3);
++    ioReturn (orInt a (orInt (shiftLInt b 8) (orInt (shiftLInt c 16) (shiftLInt d 24))))
++  };
++  crcFourRange table bytes size position crc =
++    if size - position < 4 then crcRange table bytes size position crc else do {
++      word <- crcFourWord bytes position;
++      let { value = xorInt crc word };
++      a <- readIntArray table (768 + andInt value 255);
++      b <- readIntArray table (512 + andInt (unsignedShiftRInt value 8) 255);
++      c <- readIntArray table (256 + andInt (unsignedShiftRInt value 16) 255);
++      d <- readIntArray table (unsignedShiftRInt value 24);
++      let { next = xorInt a (xorInt b (xorInt c d)) };
++      seq next (crcFourRange table bytes size (position + 4) next)
++    };
+   -- CRC is linear over XOR. The one-byte remainder is crcByte 0 index,
+   -- while every higher input bit shifts down by eight positions.
+   buildCRCTable table index = if index == 256 then ioReturn () else do {

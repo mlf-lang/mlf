@@ -1,0 +1,39 @@
+{
+  "baseline_source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "imported_PR_source_commit": "63fbd13d253a3f1a54170311dcbe076f1d0718f4",
+  "candidate_Bitstream_sha256": "f56f534dc845a3a98a52c32341eeaaa965c8ef18ae1bc6aca554cafc66d71d75",
+  "candidate_patch_sha256": "bf66b30a2cf78df411d9b314755f8be0be5af2431ee4f2ce3fea4669c10e3839",
+  "GHC_version": "9.14.1",
+  "ordinary_flags": [
+    "-XHaskell2010",
+    "-fpedantic-bottoms",
+    "-fno-state-hack",
+    "-Werror=incomplete-patterns",
+    "-Werror=incomplete-uni-patterns"
+  ],
+  "source_review_sha256": "2802d9403332e13801fd0e275165cafebd3211791244e09a02f0c7f7623f9ec9",
+  "controller_review_sha256": "698eb861e3cfa64e85e354223d3f24856c5edadcd2d22a81cbed03b5a6932697",
+  "actual_review_sha256": "72a5ca67a33feb852193638bac22c7ccaf59be69b466f55b78e6ba04a87ad72c",
+  "fixture_executables": {
+    "a-o0": {
+      "bytes": 3524704,
+      "sha256": "60550729e3b909bdf426ad633643b35188de53beee89922853aaa602f9909616"
+    },
+    "c-o0": {
+      "bytes": 3537672,
+      "sha256": "17b63cb75e39b2fe6850b9ccc206369ad3d0958f65beb5373bad7257cefca1f7"
+    },
+    "a-o2": {
+      "bytes": 3357792,
+      "sha256": "1a4a25a0df03de343dfc2b18e0e74e203e929dd1d754a099940b5a0acf5077b9"
+    },
+    "c-o2": {
+      "bytes": 3369784,
+      "sha256": "2976f3dfdb9d1c70a80909586c05c630f83005df1fa9ce574431520766d73380"
+    }
+  },
+  "withdrawn_codegate_v1_manifest_sha256": "5b5ca0062b4b3f9c309fb5481068620a94f708983f82ff403039a640f6807c40",
+  "v1_rejection_review_sha256": "edb7c3d119569e6e11b9ac2fbac624f32a3d383a1cfdfe459febebc273342635",
+  "corrected_body_independent_review_sha256": "ff2fefab8dc8cb837637d54568d160978e1edcbbe22b66e1bfd153539991de73",
+  "finalized_decision_manifest_sha256": "e3ccdbbff23ff85d969b6d813506d2f6841f33d6c6ee8430eed702e9c13d2068"
+}

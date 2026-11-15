@@ -1,0 +1,82 @@
+{
+  "verdict": "HOLD_COMPLETE_AMORTIZATION_NOT_ESTABLISHED_DEFER_NO_FURTHER_CRC_EXPERIMENT_IN_THIS_PASS",
+  "semantic_scope": "Four fresh 15-home-module builds; each executes the fixed22-vector checksum fixture plus tagged demand/error, header mutation, shared-action checks. Not whole-codec or native qualification.",
+  "lanes": [
+    {
+      "name": "a-o0",
+      "optimization": "O0",
+      "exit_code": 0,
+      "stdout": "CHECKSUM_FOUR_SEMANTIC_PASS 22 vectors + demand/header/shared-action checks\n",
+      "stderr_bytes": 0,
+      "actual_home_modules": 15,
+      "owned_link_objects": 17,
+      "generated_link_objects": 2
+    },
+    {
+      "name": "c-o0",
+      "optimization": "O0",
+      "exit_code": 0,
+      "stdout": "CHECKSUM_FOUR_SEMANTIC_PASS 22 vectors + demand/header/shared-action checks\n",
+      "stderr_bytes": 0,
+      "actual_home_modules": 15,
+      "owned_link_objects": 17,
+      "generated_link_objects": 2
+    },
+    {
+      "name": "a-o2",
+      "optimization": "O2",
+      "exit_code": 0,
+      "stdout": "CHECKSUM_FOUR_SEMANTIC_PASS 22 vectors + demand/header/shared-action checks\n",
+      "stderr_bytes": 0,
+      "actual_home_modules": 15,
+      "owned_link_objects": 17,
+      "generated_link_objects": 2
+    },
+    {
+      "name": "c-o2",
+      "optimization": "O2",
+      "exit_code": 0,
+      "stdout": "CHECKSUM_FOUR_SEMANTIC_PASS 22 vectors + demand/header/shared-action checks\n",
+      "stderr_bytes": 0,
+      "actual_home_modules": 15,
+      "owned_link_objects": 17,
+      "generated_link_objects": 2
+    }
+  ],
+  "machine_code": {
+    "only_candidate_source_module": "Bootstrap.Bitstream",
+    "Host_Base_IO_Primitive_objects_identical_between_lanes": true,
+    "A_four_normal_bytes_local_steady_allocation_bytes": 1024,
+    "C_same_complete_local_normal_cycle_allocation_bytes": 856,
+    "local_body_difference_bytes": 168,
+    "conditions": "Successful non-header in-bounds no-GC normal body. Includes actual RTS apply/PAP chains. The constructed IntArray table stores evaluated values. Header, tails, full initialization and finalization are not included in these body figures.",
+    "A_per_byte_body_bytes": 120,
+    "A_per_byte_additional_PAP_bytes": [
+      32,
+      40,
+      64
+    ],
+    "known_table_build_construction_delta_bytes": 61440,
+    "complete_other_setup_header_tail_finalization_delta_bound_established": false,
+    "Bitstream_text_bytes": {
+      "A": 287063,
+      "C": 298599,
+      "delta": 11536
+    },
+    "table_cells": {
+      "A": 256,
+      "C": 1024
+    },
+    "runtime_regression_or_savings_measured": false
+  },
+  "performance_samples": 0,
+  "wholecompiler_builds": 0,
+  "native_runs": 0,
+  "scope_limit": "Isolated CRC change on baseline Host, not new-Host PR or whole PR performance. Local body allocation improvement is verified; complete allocation or runtime improvement is not.",
+  "correction": {
+    "old_A480_complete_claim_withdrawn": true,
+    "old_C504_greater_than_A480_negative_proof_withdrawn": true,
+    "old_lazy_table_first_touch_claim_withdrawn": true,
+    "reason": "Actual runtime apply/PAP allocations were omitted; Host writeArray evaluates values before storing."
+  }
+}
