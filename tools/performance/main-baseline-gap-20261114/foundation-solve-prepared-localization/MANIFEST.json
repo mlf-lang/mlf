@@ -1,0 +1,30 @@
+{
+  "schema": "foundation-solve-prepared-public-export-manifest-v1",
+  "status": "SEALED_READY_FOR_PARENT_PUBLICATION_REVIEW",
+  "repository_destination": "tools/performance/main-baseline-gap-20261114/foundation-solve-prepared-localization",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 4410,
+      "sha256": "389983e59f8f3ec19c3bb1370087a6dda133e176e76eed85187236d5975a4bcd"
+    },
+    {
+      "path": "diagnostic.patch",
+      "bytes": 15926,
+      "sha256": "d004eaefee277e57175ced4e7f94e8c9c6cbe3a2705ca8b1c4feab26b514cb3c"
+    },
+    {
+      "path": "from-D.delta.patch",
+      "bytes": 4186,
+      "sha256": "fe0f9410f1eee6bce1f8de9c8306298fdc16e660dcfef5298b3a3683e549d130"
+    },
+    {
+      "path": "summary.json",
+      "bytes": 8242,
+      "sha256": "6a619835ecc3cbc0b73647762e4afdef7da2fd0f5b0abafd78529806ea731abd"
+    }
+  ],
+  "manifest_self_hash": "excluded to avoid self-reference",
+  "independent_actual_review_report_sha256": "69c553c54abd97b706a778a46945f17400ee91be921a7b2d3c8fc1d26ee5b8d2",
+  "privacy_audit": "No local absolute paths, user identity, private storage/access IDs, execution IDs, private links, raw binaries or private runners."
+}

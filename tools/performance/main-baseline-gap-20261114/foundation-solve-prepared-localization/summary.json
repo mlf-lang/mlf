@@ -1,0 +1,217 @@
+{
+  "schema": "foundation-solve-prepared-localization-v1",
+  "status": "ACTUAL_SINGLE_E_DIAGNOSTIC_PASS_INDEPENDENTLY_REVIEWED",
+  "ready_for_parent_publication_review": true,
+  "baseline_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "baseline_tree": "386f0b41ab5f9b39fca273f3040f51d73df924a1",
+  "compiler": "ordinary GHC 9.14.1 -O2, fresh 95 Haskell-module build, baseline IntRank",
+  "overlay_modules": [
+    "Bootstrap.CompilerCore",
+    "Bootstrap.InferenceUnit",
+    "Bootstrap.CrateGraph",
+    "Bootstrap.QueryGraph"
+  ],
+  "workload": {
+    "crate": "mlf-foundation/0.3.0/library",
+    "baseline_modules": 15,
+    "source_bytes": 211763,
+    "entry": "NoEntry",
+    "fresh_query_cache": true,
+    "existing_builtin_read_only": true,
+    "compiler_overlay_used_as_workload": false
+  },
+  "method": {
+    "target_calls_planned": 1,
+    "target_budget_seconds": 180,
+    "phase_budget_seconds": 300,
+    "address_space_per_process_bytes": 4294967296,
+    "profile_environment": {
+      "MLF_QUERY_PROFILE": "1"
+    },
+    "performance_samples": 0,
+    "native_or_fixed_point_calls": 0,
+    "retry_or_extra_samples": false,
+    "clock": "existing in-process monotonic wall-ms counters; direct-child wait4 for target wall/CPU/maxRSS",
+    "observer_callback_type": "IO Int and Int -> Int -> IO (); no polymorphic observer callback parameter",
+    "original_pure_APIs_preserved": true,
+    "additional_deep_forcing": false,
+    "target_calls_actual": 1
+  },
+  "profile_contract": {
+    "fields": [
+      "graph_ms",
+      "load_ms",
+      "infer_ms",
+      "finish_ms",
+      "output_ms",
+      "publish_ms",
+      "infer_compile_open_ms",
+      "infer_canonical_ms",
+      "infer_validate_prepared_ms",
+      "infer_record_ms",
+      "infer_record_encode_ms",
+      "infer_record_digest_ms",
+      "compile_prepare_ms",
+      "compile_generate_ms",
+      "compile_solve_prepared_ms",
+      "compile_evidence_elaboration_ms",
+      "compile_closed_check_ms",
+      "compile_type_erasure_agreement_ms",
+      "compile_open_admission_ms",
+      "solve_prepare_boundary_ms",
+      "solve_unify_boundary_ms",
+      "solve_evaluate_steps_boundary_ms",
+      "solve_finish_normalized_boundary_ms"
+    ],
+    "inclusive_hierarchy": {
+      "infer_ms": [
+        "infer_compile_open_ms",
+        "infer_canonical_ms",
+        "infer_validate_prepared_ms",
+        "infer_record_ms"
+      ],
+      "infer_record_ms": [
+        "infer_record_encode_ms",
+        "infer_record_digest_ms"
+      ],
+      "infer_compile_open_ms": [
+        "compile_prepare_ms",
+        "compile_generate_ms",
+        "compile_solve_prepared_ms",
+        "compile_evidence_elaboration_ms",
+        "compile_closed_check_ms",
+        "compile_type_erasure_agreement_ms",
+        "compile_open_admission_ms"
+      ],
+      "compile_solve_prepared_ms": [
+        "solve_prepare_boundary_ms",
+        "solve_unify_boundary_ms",
+        "solve_evaluate_steps_boundary_ms",
+        "solve_finish_normalized_boundary_ms"
+      ]
+    },
+    "signed_residual_levels": [
+      "CLI minus original six",
+      "infer minus four immediate children",
+      "compile-open minus seven immediate children",
+      "solve-prepared minus four immediate children",
+      "record minus encode/digest"
+    ],
+    "cannot_sum_all_fields": true,
+    "cannot_clamp_negative_residuals": true,
+    "solve_prepared_includes_validation": "prepare/unify/evaluatePreparedSteps/finishNormalized, including full graph and index audit",
+    "causal_scope": "Natural Either constructor/IO monotonic wall boundaries only. Payloads remain lazy, including prepare indexes and returned normalized graph, so costs can migrate. finish_normalized_boundary is neither normalization cost nor exclusive audit cost. No exclusive CPU or pure-solver attribution."
+  },
+  "required_reference_match": {
+    "raw_CI_CO": "exact byte equality with original A Foundation reference",
+    "ordered_query_ids_members": "exact original order equality",
+    "fresh_groups": 532,
+    "members": 539,
+    "value_owners_and_witnesses": 14,
+    "whole_queries": "retained, additionally reported as equal or different"
+  },
+  "independent_actual_review": {
+    "verdict": "VERIFIED_ONE_E_FOUNDATION15_SOLVE_PREPARED_DIAGNOSTIC_AND_REFERENCE_BYTES_MATCH",
+    "blocking_findings": [],
+    "report_sha256": "69c553c54abd97b706a778a46945f17400ee91be921a7b2d3c8fc1d26ee5b8d2"
+  },
+  "limitations": [
+    "One instrumented diagnostic, zero performance samples",
+    "Do not compare A/C/D/E times as speedup evidence",
+    "Foundation15 is a normal library boundary, not whole compiler/package/native qualification",
+    "Raw output equality is workload-specific, not an independent full semantic decoder or proof for all inputs",
+    "wait4 maxRSS is a direct-child statistic, not a measured simultaneous whole-process-tree peak"
+  ],
+  "localization": "The observed evaluatePreparedSteps boundary is 11186 ms of 15764 ms inclusive solvePrepared (70.95915%). It covers ordered Instantiate/ProjectCase evaluation and can demand deferred earlier work. No per-operation or pure CPU attribution, audit deletion, or A/C/D/E speed comparison follows.",
+  "E_binary_sha256": "aebbc19f0922a1437c1b94c1c4be5f484171ab90ad3dd2fedd17934321199379",
+  "E_binary_bytes": 20232104,
+  "only_overlay_modules_changed_from_D": [
+    "Bootstrap.CompilerCore",
+    "Bootstrap.QueryGraph"
+  ],
+  "D_overlay_bytes_reused": [
+    "Bootstrap.InferenceUnit",
+    "Bootstrap.CrateGraph"
+  ],
+  "Constraint_Solver_and_all_audits_unchanged": true,
+  "E_actual": {
+    "status": "PASS_E_ONLY_FOUNDATION15_SOLVE_PREPARED_DIAGNOSTIC_REFERENCE_MATCH",
+    "exit_code": 0,
+    "wall_ns": 25477982665,
+    "user_seconds": 24.92494,
+    "system_seconds": 0.595501,
+    "cpu_seconds": 25.520441,
+    "maxrss_kib": 139692,
+    "whole_phase_ns": 44816170625,
+    "performance_samples": 0,
+    "raw_CI_CO_byte_equal": true,
+    "original_ordered_id_members_equal": true,
+    "whole_query_report_byte_equal": true,
+    "fresh_groups": 532,
+    "members": 539,
+    "value_owners": 14,
+    "profile_ms": {
+      "graph_ms": 1188,
+      "load_ms": 2,
+      "infer_ms": 22005,
+      "finish_ms": 283,
+      "output_ms": 748,
+      "publish_ms": 391,
+      "infer_compile_open_ms": 20487,
+      "infer_canonical_ms": 291,
+      "infer_validate_prepared_ms": 3,
+      "infer_record_ms": 1222,
+      "infer_record_encode_ms": 1187,
+      "infer_record_digest_ms": 32,
+      "compile_prepare_ms": 69,
+      "compile_generate_ms": 1839,
+      "compile_solve_prepared_ms": 15764,
+      "compile_evidence_elaboration_ms": 2312,
+      "compile_closed_check_ms": 319,
+      "compile_type_erasure_agreement_ms": 7,
+      "compile_open_admission_ms": 164,
+      "solve_prepare_boundary_ms": 638,
+      "solve_unify_boundary_ms": 2339,
+      "solve_evaluate_steps_boundary_ms": 11186,
+      "solve_finish_normalized_boundary_ms": 1596
+    },
+    "original_six_bucket_sum_ms": 24617,
+    "signed_residual_ns": {
+      "CLI": 860982665,
+      "infer": 2000000,
+      "compile_open": 13000000,
+      "solve_prepared": 5000000,
+      "record": 3000000
+    },
+    "artifacts": {
+      "mlfci": {
+        "bytes": 329841,
+        "sha256": "dfa6266e6047c9a7a5b2eee5ac60aa6dad60e106564c1d1779d7134d04d6a756"
+      },
+      "mlfco": {
+        "bytes": 1072662,
+        "sha256": "ed7309dfe0d30204cf601e8e600c101f7b68b4d0121de58b6bdcfd4a14abdd6e"
+      }
+    },
+    "queries": {
+      "bytes": 666349,
+      "sha256": "6ee52ac1b9cf6a1bdceaaebceb5aaa21533c9804879c2cdc6f5c3d8a26b16ff2"
+    },
+    "input_postchecks_verified": true,
+    "cleanup_verified": true,
+    "locks_reacquired": true
+  },
+  "continuity": {
+    "main_unchanged": true,
+    "native_generation_and_fixed_point_paused": true,
+    "prior_full90_INCONCLUSIVE_preserved": true,
+    "prior_90_OOM_scope": "A-only checked-crate exit251 reported out of memory under the existing4GiB limit; no measured proof that the exact cap was exceeded and no B-regression conclusion.",
+    "no_merge_or_optimization_claim": true
+  },
+  "complete_actual_byte_backup_verified": {
+    "files": 1670,
+    "original_bytes": 12007767,
+    "bytes_and_modes_privately_archived_and_read_back": true,
+    "private_storage_identifiers_omitted": true
+  }
+}

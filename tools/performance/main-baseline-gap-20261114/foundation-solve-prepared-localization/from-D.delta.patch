@@ -1,0 +1,71 @@
+--- D/libraries/mlf-inference/Bootstrap/CompilerCore.hs
++++ E/libraries/mlf-inference/Bootstrap/CompilerCore.hs
+@@ -89,6 +89,22 @@
+       Right result -> do { elapsed index started; ioReturn (Right result) }
+     }
+   };
++  -- Diagnostic mirror of Constraint.solvePrepared's four ordered binds.
++  -- The original pure API is unchanged. Observe Either, never force its payload.
++  solvePreparedObserved :: IO Int -> (Int -> Int -> IO ()) ->
++    Constraints -> IO (Either String Solver);
++  solvePreparedObserved clock elapsed constraints = do {
++    preparedResult <- observeEither clock elapsed 19 (Solver.prepare (C.initialGraph constraints));
++    case preparedResult of { Left error -> ioReturn (Left error); Right prepared -> do {
++      initialResult <- observeEither clock elapsed 20 (Solver.solverUnify (C.equalities constraints) prepared);
++      case initialResult of { Left error -> ioReturn (Left error); Right initial -> do {
++        solvedResult <- observeEither clock elapsed 21 (C.evaluatePreparedSteps initial (C.solveSteps constraints));
++        case solvedResult of { Left error -> ioReturn (Left error); Right solved ->
++          observeEither clock elapsed 22 (Solver.finishNormalized solved)
++        }
++      } }
++    } }
++  };
+   finishCompilationObserved :: IO Int -> (Int -> Int -> IO ()) ->
+     (,) SProgram (Map String String) -> IO (Either CompileError Compilation);
+   finishCompilationObserved clock elapsed ((,) program names) =
+@@ -98,8 +114,12 @@
+       SProgram declarations expression -> do {
+         generated <- observeEither clock elapsed 13 (atPhase Inference (C.generateProgram program));
+         case generated of { Left error -> ioReturn (Left error); Right constraints -> do {
+-          answer <- observeEither clock elapsed 14 (atPhase Inference (C.solvePrepared constraints));
+-          case answer of { Left error -> ioReturn (Left error); Right solved -> do {
++          solveStarted <- clock;
++          solveResult <- solvePreparedObserved clock elapsed constraints;
++          case atPhase Inference solveResult of {
++            Left error -> do { elapsed 14 solveStarted; ioReturn (Left error) };
++            Right solved -> do {
++            elapsed 14 solveStarted;
+             let { graph = Solver.solverGraph solved; types = E.prepareTypes graph };
+             elaborated <- observeEither clock elapsed 15 (do {
+               evidence <- atPhase Resolution (E.resolveEvidenceIn types (C.skeleton constraints));
+--- D/libraries/mlf-crates/Bootstrap/QueryGraph.hs
++++ E/libraries/mlf-crates/Bootstrap/QueryGraph.hs
+@@ -881,7 +881,7 @@
+   -- Optional phase clocks are kept outside deterministic output/query hashes.
+   profile = do {
+     enabled <- getEnv "MLF_QUERY_PROFILE";
+-    if eqString enabled "1" then do { counters <- newIntArray 19 0; ioReturn (Just counters) }
++    if eqString enabled "1" then do { counters <- newIntArray 23 0; ioReturn (Just counters) }
+     else ioReturn Nothing
+   };
+   clock settings = case settings of {
+@@ -904,7 +904,7 @@
+   writeProfile path settings = case settings of {
+     Nothing -> ioReturn ();
+     Just counters -> do {
+-      values <- mapM (readIntArray counters) [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18];
++      values <- mapM (readIntArray counters) [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22];
+       writeFile path ("{" ++ intercalate "," (map (\((,) name value) ->
+         "\"" ++ name ++ "\":" ++ showInt value)
+         (zip ["graph_ms","load_ms","infer_ms","finish_ms","output_ms","publish_ms",
+@@ -912,7 +912,9 @@
+               "infer_record_ms","infer_record_encode_ms","infer_record_digest_ms",
+               "compile_prepare_ms","compile_generate_ms","compile_solve_prepared_ms",
+               "compile_evidence_elaboration_ms","compile_closed_check_ms",
+-              "compile_type_erasure_agreement_ms","compile_open_admission_ms"] values)) ++ "}\n")
++              "compile_type_erasure_agreement_ms","compile_open_admission_ms",
++              "solve_prepare_boundary_ms","solve_unify_boundary_ms",
++              "solve_evaluate_steps_boundary_ms","solve_finish_normalized_boundary_ms"] values)) ++ "}\n")
+     }
+   }
+ }
