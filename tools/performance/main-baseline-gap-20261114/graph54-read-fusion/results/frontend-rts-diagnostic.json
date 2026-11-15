@@ -1,0 +1,468 @@
+{
+  "status": "INDEPENDENTLY_VERIFIED_TWO_DIAGNOSTIC_CALLS_ONLY",
+  "order": "AC",
+  "performance_samples": 0,
+  "diagnostic_observations": 2,
+  "producer_sha256": {
+    "A-stats": "8c17c4a7894d46fcb37c9bea6eb0063ae29d0665f54e45f944aecaf70f1d6956",
+    "C-stats": "9e4a14651c3a15785dfa6d969e88f3b6180eaecadf8df78d950b2cc3a80feffe"
+  },
+  "producer_scope": {
+    "source_relationship": "95 original Haskell object modules plus two C objects per side; only the Graph54 Bootstrap.Graph source differs between original A and C.",
+    "relink_method": "Separate object-only ordinary relinks with baked -s and RtsOptsIgnoreAll. GHC generated and compiled small C main and assembly-note objects; no Haskell modules were recompiled. These have new binary identities and layouts, not the historical CAAC performance identities.",
+    "rts_way": "ordinary non-threaded, not profiling-way",
+    "command_line_RTS_options_added": false,
+    "GHCRTS_environment_present": false,
+    "historical_ordinary_producer_sha256": {
+      "A": "29c58e2b48324957cee5965a1c76dc7e688c9b25264bd5150c3f7f085dbc23ef",
+      "C": "7770f188b578391f0468eff2df09e5237c33db1245f90a6880f5185759efac39"
+    }
+  },
+  "workload": {
+    "crate": "mlf-frontend/0.3.0/library",
+    "modules": 11,
+    "source_bytes": 371912,
+    "entry": "NoEntry",
+    "fresh_groups": 763,
+    "members": 858,
+    "member_roles": {
+      "value": 849,
+      "instance": 9
+    },
+    "owners": 11,
+    "owner_member_counts": {
+      "Bootstrap.Dependency": 101,
+      "Bootstrap.Desugar": 11,
+      "Bootstrap.Layout": 35,
+      "Bootstrap.Lexer": 79,
+      "Bootstrap.Module": 208,
+      "Bootstrap.Parsec": 45,
+      "Bootstrap.Parser": 175,
+      "Bootstrap.Prelude": 59,
+      "Bootstrap.Resolved": 11,
+      "Bootstrap.Standalone": 68,
+      "Bootstrap.Surface": 66
+    },
+    "cold_OS_cache_claim": false,
+    "dependency_interfaces_reused_without_rebuild": [
+      "mlf-foundation/0.3.0/library",
+      "mlf-language-core/0.3.0/library",
+      "builtin"
+    ],
+    "scope": "Compile the complete frontend crate only, not a full compiler self-build or execution of produced guest/native programs. Module coverage comes from exact manifest/spec inputs and compiler loading; query coverage checks local declarations and witnesses. Wire framing/CRC is not independent typed CI semantic decoding.",
+    "fresh_query_cache_each_diagnostic": true
+  },
+  "source_manifest_sha256": "4c1b09d6b55932e589ed909ff675349d1ccf7b4b47e36086967d516bf1b5c71a",
+  "source_modules": [
+    {
+      "module": "Bootstrap.Dependency",
+      "bytes": 32565,
+      "sha256": "c525a88ad424e0e79c30209f646a0f270f54cc7109d3096cf6953a5d9b93baa2"
+    },
+    {
+      "module": "Bootstrap.Desugar",
+      "bytes": 10638,
+      "sha256": "6ea33b5a1c642f984bc8c22be951be774863fe5bb4ea44d5066a8df59e073a37"
+    },
+    {
+      "module": "Bootstrap.Layout",
+      "bytes": 20056,
+      "sha256": "b64c7f09bdf23a9652baa1fbd74729287dac243fd5a3801fbbc83e6abe5f58c8"
+    },
+    {
+      "module": "Bootstrap.Lexer",
+      "bytes": 44635,
+      "sha256": "d053db12391324d4305a78ac5dad24b3fe81c449007e318e14183c4e464adb43"
+    },
+    {
+      "module": "Bootstrap.Module",
+      "bytes": 79471,
+      "sha256": "1f7ea629418456d898ad30227abd9aab444494199425b489d4330319ca9b42ca"
+    },
+    {
+      "module": "Bootstrap.Parsec",
+      "bytes": 11604,
+      "sha256": "38cce5767b935e27292b0c0fb35f1750e3d02ff5ef5ef111c615b04001ebce90"
+    },
+    {
+      "module": "Bootstrap.Parser",
+      "bytes": 70221,
+      "sha256": "02e9eecfdf3460bdb3b0fdd83a7f96963202c1c58052c220f238ccb73779e16c"
+    },
+    {
+      "module": "Bootstrap.Prelude",
+      "bytes": 29247,
+      "sha256": "aa15cd106e481e569545d0a224ad9baf7cb03c69b5493b002e03edb2626fbed2"
+    },
+    {
+      "module": "Bootstrap.Resolved",
+      "bytes": 5990,
+      "sha256": "1ebcc702cfb7ade22dad92d870dda79d57788420ef60627acb6522d54a509052"
+    },
+    {
+      "module": "Bootstrap.Standalone",
+      "bytes": 30989,
+      "sha256": "31ee00d6ba44ca91b613176f20cc1726b8ff4348b9ac3a101c2e81e96af8e9f5"
+    },
+    {
+      "module": "Bootstrap.Surface",
+      "bytes": 36496,
+      "sha256": "eac10f8d5981fe36b9b5f8b141b1efdf0da2512dc717b1c588451a6aa9b980aa"
+    }
+  ],
+  "reused_dependency_artifacts": [
+    {
+      "identity": "mlf-foundation/0.3.0/library",
+      "CI": {
+        "bytes": 329841,
+        "sha256": "dfa6266e6047c9a7a5b2eee5ac60aa6dad60e106564c1d1779d7134d04d6a756"
+      },
+      "CO": {
+        "bytes": 1072662,
+        "sha256": "ed7309dfe0d30204cf601e8e600c101f7b68b4d0121de58b6bdcfd4a14abdd6e"
+      }
+    },
+    {
+      "identity": "mlf-language-core/0.3.0/library",
+      "CI": {
+        "bytes": 28500,
+        "sha256": "53d15f24422b26732379b1fb7f3e5b34dc10ce0358d383e632a3f9ea7f28ff39"
+      },
+      "CO": {
+        "bytes": 331418,
+        "sha256": "81a91e933746a6a956c4688cb5e81ac05b5e7219f8c05f003c0d483a0a8031e3"
+      }
+    },
+    {
+      "identity": "builtin",
+      "CI": {
+        "bytes": 40417,
+        "sha256": "cb7140bce683550c8b16dcc189fc8c582b64eaac9b91da4d6b9b3a9ed2d66c05"
+      },
+      "CO": {
+        "bytes": 190840,
+        "sha256": "476df4e37a9306a2e5a20f109b7ca499e0296101e464c9b624e1fc51e4248481"
+      }
+    }
+  ],
+  "reference": {
+    "CI": {
+      "bytes": 341254,
+      "sha256": "4503e583f33e6825ef78e5946fb1df3099943aee32b1a409fe4915b312ae8872"
+    },
+    "CO": {
+      "bytes": 2072979,
+      "sha256": "44aa038ff8e3b14e93d61b21bc54b7bb765651cb02eba4b42b4ed0b61a7d393f"
+    },
+    "ordered_id_members_sha256": "76c2d8e7d3e7769bf4958f55bbee0e0e03607128c107bdf22685fabb5389df98",
+    "original_A_qualification_receipt_sha256": "12e52a66bfe21b1f4e107429e9788e745063f458cd8510d32b5b17ce7908d55c",
+    "original_A_independent_review_sha256": "1581a0ff69e663c725bffb780fb199db45535b52b3275539e7e805d897e1a185"
+  },
+  "observations": [
+    {
+      "side": "A-stats",
+      "position": 1,
+      "producer_bytes": 20202992,
+      "wait4": {
+        "wall_ns": 63884016909,
+        "user_seconds": 63.034593,
+        "system_seconds": 0.963733,
+        "maxrss_kib": 325616,
+        "target_exit_code": 0
+      },
+      "wait4_scope": "Direct child launch through wait4 completion; timing retained for diagnostics only, not a performance sample. Linux maximum RSS is in KiB.",
+      "rts_summary": {
+        "schema": "ordinary-ghc-9.14.1-two-generation-summary-v1",
+        "raw_stderr_sha256": "beb1a686c4500836cb8b2a98d44540e86751d29c821f045a871724636b625e5e",
+        "raw_stderr_bytes": 870,
+        "allocated_bytes": 205612874424,
+        "copied_bytes": 14402168936,
+        "maximum_residency_bytes": 115208728,
+        "residency_major_gc_samples": 84,
+        "maximum_slop_bytes": 4017640,
+        "rts_memory_mib": 303,
+        "fragmentation_mib": 0,
+        "generations": [
+          {
+            "generation": 0,
+            "collections": 48849,
+            "parallel_collections": 0,
+            "cpu_seconds": 7.415,
+            "elapsed_seconds": 7.418,
+            "average_pause_seconds": 0.0002,
+            "max_pause_seconds": 0.0484
+          },
+          {
+            "generation": 1,
+            "collections": 84,
+            "parallel_collections": 0,
+            "cpu_seconds": 4.007,
+            "elapsed_seconds": 4.011,
+            "average_pause_seconds": 0.0477,
+            "max_pause_seconds": 0.0868
+          }
+        ],
+        "times": {
+          "INIT": {
+            "cpu_seconds": 0.001,
+            "elapsed_seconds": 0.0
+          },
+          "MUT": {
+            "cpu_seconds": 52.334,
+            "elapsed_seconds": 52.447
+          },
+          "GC": {
+            "cpu_seconds": 11.422,
+            "elapsed_seconds": 11.429
+          },
+          "EXIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "Total": {
+            "cpu_seconds": 63.757,
+            "elapsed_seconds": 63.876
+          }
+        },
+        "gc_percent_cpu_elapsed": [
+          0.0,
+          0.0
+        ],
+        "allocation_bytes_per_mut_cpu_second": 3928875159,
+        "productivity_percent_cpu_elapsed": [
+          82.1,
+          82.1
+        ],
+        "scope": "Managed heap/RTS summary, not process RSS; residency is sampled at major GC; times/percentages rounded, not exact-sum constraints"
+      },
+      "original_stderr_utf8": " 205,612,874,424 bytes allocated in the heap\n  14,402,168,936 bytes copied during GC\n     115,208,728 bytes maximum residency (84 sample(s))\n       4,017,640 bytes maximum slop\n             303 MiB total memory in use (0 MiB lost due to fragmentation)\n\n                                     Tot time (elapsed)  Avg pause  Max pause\n  Gen  0     48849 colls,     0 par    7.415s   7.418s     0.0002s    0.0484s\n  Gen  1        84 colls,     0 par    4.007s   4.011s     0.0477s    0.0868s\n\n  INIT    time    0.001s  (  0.000s elapsed)\n  MUT     time   52.334s  ( 52.447s elapsed)\n  GC      time   11.422s  ( 11.429s elapsed)\n  EXIT    time    0.000s  (  0.000s elapsed)\n  Total   time   63.757s  ( 63.876s elapsed)\n\n  %GC     time       0.0%  (0.0% elapsed)\n\n  Alloc rate    3,928,875,159 bytes per MUT second\n\n  Productivity  82.1% of total user, 82.1% of total elapsed\n\n",
+      "correctness": {
+        "raw_CI_CO_equal_original_A": true,
+        "ordered_groups_equal_original_A": true,
+        "fresh_uncached_groups": 763,
+        "members": 858,
+        "value_members": 849,
+        "instance_members": 9,
+        "owners": 11,
+        "whole_query_bytes_equal_observation": true,
+        "whole_query_equality_is_hard_gate": false
+      },
+      "raw_wait4_record_sha256": "dd2bbc2e414a5626bde7864140de5c2da8c8e532e06bea2c61e0960fe2ffab57"
+    },
+    {
+      "side": "C-stats",
+      "position": 2,
+      "producer_bytes": 20212720,
+      "wait4": {
+        "wall_ns": 60580807490,
+        "user_seconds": 59.739387,
+        "system_seconds": 0.9305669999999999,
+        "maxrss_kib": 341460,
+        "target_exit_code": 0
+      },
+      "wait4_scope": "Direct child launch through wait4 completion; timing retained for diagnostics only, not a performance sample. Linux maximum RSS is in KiB.",
+      "rts_summary": {
+        "schema": "ordinary-ghc-9.14.1-two-generation-summary-v1",
+        "raw_stderr_sha256": "a933117daf8a2823e24ce69f07608f7de7089cefe209572762d7eaa0a1c6aee4",
+        "raw_stderr_bytes": 870,
+        "allocated_bytes": 188138716008,
+        "copied_bytes": 13698509664,
+        "maximum_residency_bytes": 123082488,
+        "residency_major_gc_samples": 79,
+        "maximum_slop_bytes": 3899784,
+        "rts_memory_mib": 318,
+        "fragmentation_mib": 0,
+        "generations": [
+          {
+            "generation": 0,
+            "collections": 44642,
+            "parallel_collections": 0,
+            "cpu_seconds": 6.956,
+            "elapsed_seconds": 6.96,
+            "average_pause_seconds": 0.0002,
+            "max_pause_seconds": 0.0047
+          },
+          {
+            "generation": 1,
+            "collections": 79,
+            "parallel_collections": 0,
+            "cpu_seconds": 3.979,
+            "elapsed_seconds": 3.98,
+            "average_pause_seconds": 0.0504,
+            "max_pause_seconds": 0.104
+          }
+        ],
+        "times": {
+          "INIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "MUT": {
+            "cpu_seconds": 49.5,
+            "elapsed_seconds": 49.631
+          },
+          "GC": {
+            "cpu_seconds": 10.935,
+            "elapsed_seconds": 10.941
+          },
+          "EXIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "Total": {
+            "cpu_seconds": 60.435,
+            "elapsed_seconds": 60.572
+          }
+        },
+        "gc_percent_cpu_elapsed": [
+          0.0,
+          0.0
+        ],
+        "allocation_bytes_per_mut_cpu_second": 3800810878,
+        "productivity_percent_cpu_elapsed": [
+          81.9,
+          81.9
+        ],
+        "scope": "Managed heap/RTS summary, not process RSS; residency is sampled at major GC; times/percentages rounded, not exact-sum constraints"
+      },
+      "original_stderr_utf8": " 188,138,716,008 bytes allocated in the heap\n  13,698,509,664 bytes copied during GC\n     123,082,488 bytes maximum residency (79 sample(s))\n       3,899,784 bytes maximum slop\n             318 MiB total memory in use (0 MiB lost due to fragmentation)\n\n                                     Tot time (elapsed)  Avg pause  Max pause\n  Gen  0     44642 colls,     0 par    6.956s   6.960s     0.0002s    0.0047s\n  Gen  1        79 colls,     0 par    3.979s   3.980s     0.0504s    0.1040s\n\n  INIT    time    0.000s  (  0.000s elapsed)\n  MUT     time   49.500s  ( 49.631s elapsed)\n  GC      time   10.935s  ( 10.941s elapsed)\n  EXIT    time    0.000s  (  0.000s elapsed)\n  Total   time   60.435s  ( 60.572s elapsed)\n\n  %GC     time       0.0%  (0.0% elapsed)\n\n  Alloc rate    3,800,810,878 bytes per MUT second\n\n  Productivity  81.9% of total user, 81.9% of total elapsed\n\n",
+      "correctness": {
+        "raw_CI_CO_equal_original_A": true,
+        "ordered_groups_equal_original_A": true,
+        "fresh_uncached_groups": 763,
+        "members": 858,
+        "value_members": 849,
+        "instance_members": 9,
+        "owners": 11,
+        "whole_query_bytes_equal_observation": true,
+        "whole_query_equality_is_hard_gate": false
+      },
+      "raw_wait4_record_sha256": "8a29d5d484bbebfa5f094988f6ee7a8071c4de5889457af239829ac3f6eae86b"
+    }
+  ],
+  "descriptive_memory_differences": {
+    "allocated_bytes": {
+      "A": 205612874424,
+      "C": 188138716008,
+      "C_minus_A": -17474158416,
+      "percent_change": -8.498572117602935
+    },
+    "copied_bytes": {
+      "A": 14402168936,
+      "C": 13698509664,
+      "C_minus_A": -703659272,
+      "percent_change": -4.885786822296722
+    },
+    "maximum_residency_bytes": {
+      "A": 115208728,
+      "C": 123082488,
+      "C_minus_A": 7873760,
+      "percent_change": 6.834343314683589
+    },
+    "residency_major_gc_samples": {
+      "A": 84,
+      "C": 79,
+      "C_minus_A": -5,
+      "percent_change": -5.9523809523809526
+    },
+    "maximum_slop_bytes": {
+      "A": 4017640,
+      "C": 3899784,
+      "C_minus_A": -117856,
+      "percent_change": -2.9334634262900607
+    },
+    "rts_memory_mib": {
+      "A": 303,
+      "C": 318,
+      "C_minus_A": 15,
+      "percent_change": 4.9504950495049505
+    },
+    "fragmentation_mib": {
+      "A": 0,
+      "C": 0,
+      "C_minus_A": 0,
+      "percent_change": null
+    },
+    "gen0_collections": {
+      "A": 48849,
+      "C": 44642,
+      "C_minus_A": -4207,
+      "percent_change": -8.612254089131815
+    },
+    "gen1_collections": {
+      "A": 84,
+      "C": 79,
+      "C_minus_A": -5,
+      "percent_change": -5.9523809523809526
+    },
+    "maxrss_kib": {
+      "A": 325616,
+      "C": 341460,
+      "C_minus_A": 15844,
+      "percent_change": 4.86585425777603
+    }
+  },
+  "difference_formula": "C minus A, and 100*(C-A)/A for nonzero A. These are two diagnostic observations, not a timing/performance pair or repeated-sample estimate. No timing ratio is calculated.",
+  "gc_percent_reporting_caveat": {
+    "literal_reported_cpu_elapsed_percent_A_C": [
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ],
+    "explanation": "The literal 0.0% GC fields are retained; in this GHC 9.14.1 non-threaded report path, integer division truncates the GC/total fraction before printing, so these fields do not mean no GC occurred. The separate generation and GC-time rows remain nonzero. Productivity uses floating-point conversion before division. No corrected percentage is substituted.",
+    "official_release_source": {
+      "url": "https://github.com/ghc/ghc/blob/ghc-9.14.1-release/rts/Stats.c",
+      "sha256": "ee0534b46fbface42747a766e6017ed12f43cf0f8321145777e22fd4b5751f34",
+      "integer_division_lines": [
+        1379,
+        1382
+      ],
+      "percentage_print_lines": [
+        940,
+        942
+      ],
+      "productivity_conversion_lines": [
+        1400,
+        1415
+      ]
+    },
+    "type_evidence": [
+      {
+        "header": "RtsAPI.h",
+        "sha256": "ff086c742d4fe8e83d3dbd15b04c7dfa781c0648103fee68d8ffa4b0e1974920",
+        "fields": "GC and total CPU/elapsed use Time"
+      },
+      {
+        "header": "rts/Time.h",
+        "sha256": "bb63c11bb0043ab30aa045c036a1ac37f1a4435777c3aa36631bafe536822429",
+        "declaration": "Time is int64_t"
+      }
+    ]
+  },
+  "interpretation": [
+    "Managed allocated bytes decreased by 8.4986% and copied bytes by 4.8858% in this single diagnostic comparison; major-GC-sampled maximum live bytes increased by 6.8343%, RTS memory by 4.9505%, and process maximum RSS by 4.8659%.",
+    "The major-GC residency observations were sampled 84 times for A-stats and 79 times for C-stats, at different collection schedules. They are not a continuous matched peak-live trace.",
+    "Managed allocation volume, copied bytes, sampled live maximum, RTS memory/fragmentation and process RSS are distinct quantities. The results do not identify the cause of the historical RSS cost or attribute an exact byte saving to a particular closure or source call.",
+    "The reported fragmentation is 0 MiB on both sides, a limited aggregate with whole-MiB truncation. It does not establish zero allocator slack, pinned-object fragmentation or OS-level fragmentation. Maximum slop is a separate counter. RTS memory and process RSS maxima need not occur simultaneously; their difference is not a partition of memory.",
+    "One fixed A-stats then C-stats diagnostic, zero performance samples. New relinked layouts and baked statistics differ from historical producers. No speedup estimate, stability/significance claim, merge readiness, or pooling with the earlier Frontend CAAC, Async or Foundation windows.",
+    "Original Frontend raw and ordered-query gates passed after each diagnostic. No extra qualification calls, retries, adaptive additions or native/fixed-point calls."
+  ],
+  "evidence": {
+    "diagnostics_sha256": "7f32adc4fbd1f5dd63517b6af6f17db08ae579a98e97a5ee36c491119ddac71f",
+    "original_receipt_sha256": "d9b386d8bd1385e9315a9a770e21d571aebed042c50bfa4c5e0c6524ad66bb3b",
+    "original_final_seal_sha256": "47fd8ced0d0d2750fb7ee298d9a900b43dd5d1a73b3cdacb177f9d5231a893fc",
+    "independent_actual_review_sha256": "407598e41ff3015f06d19c8d51ce959f35376a4d260d218811dac8a45084e8ec",
+    "independent_counter_recomputation_sha256": "fbe4789980779c84d2038629adfa9d5db16b6567983f6e58ae1658d9c922ea17",
+    "independent_GC_percent_source_note_sha256": "af04eeca9b066e380b8351c9fb2009652cc37492d720493cedb73e391c84582e",
+    "independent_counter_review_manifest_sha256": "46000efa98026159a54d9e0c276fe450f34c75105d6b62853943952b30fe93f2",
+    "independent_stats_producer_build_review_sha256": "1b5f8a2df5787d0814aa87eefa3113175335a56d933be3136f08ee2d27419845",
+    "parser_sha256": "ce4c4834a2e0c714802fa1ee4a0656160e76923af186d32338edcaaad8ae9260",
+    "export_is_sanitized_summary_not_original_receipt": true,
+    "raw_RTS_stderr_preserved_verbatim": true
+  }
+}
