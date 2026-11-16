@@ -1,0 +1,220 @@
+{
+  "repository": "mlf-lang/mlf",
+  "base_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "source_reference": "https://github.com/mlf-lang/mlf/tree/fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "production_changes": [],
+  "home_count": 16,
+  "home_source_bytes": 409805,
+  "home_sources": [
+    {
+      "module": "Bootstrap.Graph",
+      "path": "libraries/mlf-inference/Bootstrap/Graph.hs",
+      "origin": "baseline repository",
+      "bytes": 137874,
+      "sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f"
+    },
+    {
+      "module": "Bootstrap.Graph.Solver",
+      "path": "libraries/mlf-inference/Bootstrap/Graph/Solver.hs",
+      "origin": "baseline repository",
+      "bytes": 99201,
+      "sha256": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612"
+    },
+    {
+      "module": "Bootstrap.IndexVec",
+      "path": "libraries/mlf-foundation/Bootstrap/IndexVec.hs",
+      "origin": "baseline repository",
+      "bytes": 5573,
+      "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e"
+    },
+    {
+      "module": "Bootstrap.IntMap",
+      "path": "libraries/mlf-foundation/Bootstrap/IntMap.hs",
+      "origin": "baseline repository",
+      "bytes": 21811,
+      "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e"
+    },
+    {
+      "module": "Bootstrap.IntRank",
+      "path": "libraries/mlf-foundation/Bootstrap/IntRank.hs",
+      "origin": "baseline repository",
+      "bytes": 6684,
+      "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
+    },
+    {
+      "module": "Bootstrap.IntSet",
+      "path": "libraries/mlf-foundation/Bootstrap/IntSet.hs",
+      "origin": "baseline repository",
+      "bytes": 17405,
+      "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe"
+    },
+    {
+      "module": "Bootstrap.IntTree",
+      "path": "libraries/mlf-foundation/Bootstrap/IntTree.hs",
+      "origin": "baseline repository",
+      "bytes": 3727,
+      "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49"
+    },
+    {
+      "module": "Bootstrap.ST",
+      "path": "libraries/mlf-foundation/Bootstrap/ST.hs",
+      "origin": "baseline repository",
+      "bytes": 2539,
+      "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2"
+    },
+    {
+      "module": "Bootstrap.Std",
+      "path": "libraries/mlf-foundation/Bootstrap/Std.hs",
+      "origin": "baseline repository",
+      "bytes": 20088,
+      "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca"
+    },
+    {
+      "module": "Bootstrap.Types",
+      "path": "libraries/mlf-foundation/Bootstrap/Types.hs",
+      "origin": "baseline repository",
+      "bytes": 12757,
+      "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596"
+    },
+    {
+      "module": "MLF.Host.Async",
+      "path": "host/ghc/MLF/Host/Async.hs",
+      "origin": "baseline repository",
+      "bytes": 8881,
+      "sha256": "13e23c116edb65b36be54f78b477d080da62010651f76984c7c9cf895d03d1e5"
+    },
+    {
+      "module": "MLF.Host.Base",
+      "path": "host/ghc/MLF/Host/Base.hs",
+      "origin": "baseline repository",
+      "bytes": 19364,
+      "sha256": "b324805ea2d62b3aaccf3c49e973b7839f952b164bcbe4cc37bf483b07518116"
+    },
+    {
+      "module": "MLF.Host.IO",
+      "path": "host/ghc/MLF/Host/IO.hs",
+      "origin": "baseline repository",
+      "bytes": 15420,
+      "sha256": "042164a571c9b60c9fc1abe984ccc687400a01602b3a980cff61342941bfe22a"
+    },
+    {
+      "module": "MLF.Primitive",
+      "path": "host/ghc/MLF/Primitive.hs",
+      "origin": "baseline repository",
+      "bytes": 14412,
+      "sha256": "d5a66475293578650a975172ae14d5a6e5506668859fd559d1a18eb08d2160cb"
+    },
+    {
+      "module": "Main",
+      "path": "tests/Main.hs",
+      "origin": "this bundle",
+      "bytes": 16577,
+      "sha256": "cd6e49a64c0d2a9e5ffad1a7957465bf4d7116bec882a62a85a49c869a2af4d0"
+    },
+    {
+      "module": "Prototype.LocalSnapshot",
+      "path": "Prototype/LocalSnapshot.hs",
+      "origin": "this bundle",
+      "bytes": 7492,
+      "sha256": "a5725293979a9f4b28cc6704ec07c77baf28cb84d03b87c6b2784db3e6967e48"
+    }
+  ],
+  "c_and_configuration_inputs": [
+    {
+      "path": "shared-sources.json",
+      "bytes": 23024,
+      "sha256": "7264b9d556d1112d6c6883e6a1269ff812c76e4eb6557f6445bc67dd28e031a4"
+    },
+    {
+      "path": "host/ghc/cbits/host.c",
+      "bytes": 9739,
+      "sha256": "400d0bb9c4c0b610c7185517697be536da74dbf0dc5cffdac70dcf57462bd5a1"
+    },
+    {
+      "path": "runtime/mlf_process_supervisor.c",
+      "bytes": 43367,
+      "sha256": "b24d362a891e966bf1a456f1983221eaf848fe6da80379850beb5067c63944e9"
+    },
+    {
+      "path": "runtime/mlf_build_runner_hash.h",
+      "bytes": 2455,
+      "sha256": "cbbdfd06eb43324dceef594e42b21621559df3e3d4e91d62f2b73e2b04d9e778"
+    },
+    {
+      "path": "runtime/mlf_byte_file.h",
+      "bytes": 2472,
+      "sha256": "04e5b38198c49bd7aa3795de5f450011343cce1fd54ecdb116eda422ae210d98"
+    },
+    {
+      "path": "runtime/mlf_process_binding.h",
+      "bytes": 10279,
+      "sha256": "c9ef41739a3a388ec40701c5a9c778032618c9b8bf5c3d48e213840c0d242afa"
+    },
+    {
+      "path": "runtime/mlf_process_supervisor.h",
+      "bytes": 6088,
+      "sha256": "808e2b68f101b03f6250d448b2e1100e1bdde2e060c669d783a0513b21d8fc05"
+    },
+    {
+      "path": "runtime/mlf_process_supervisor_posix.h",
+      "bytes": 3557,
+      "sha256": "fd0d199345e9d6310aaabe3dbab858a121a03c5cfafd28de50042d78ae0438ac"
+    },
+    {
+      "path": "runtime/mlf_system.h",
+      "bytes": 14082,
+      "sha256": "cc87aa9445c45e7e6fe66b2631a887be870baf3015f9daa6d6705d356ed37477"
+    },
+    {
+      "path": "runtime/mlf_system_windows.h",
+      "bytes": 9575,
+      "sha256": "31b4de3c8a5bd6051f7c8916624a250f8b4b305b40b4cc7923aa648894d654f3"
+    },
+    {
+      "path": "runtime/mlf_windows.h",
+      "bytes": 3423,
+      "sha256": "618fb88b0c854fcbe8dffee5b961a74025d79b89c00d7158dc540b15066e4b56"
+    },
+    {
+      "path": "runtime/mlf_windows_path.h",
+      "bytes": 5951,
+      "sha256": "e52b718c63e0603cb653a3874ae1a6130cd5a184121dde7868c4d03376c84e05"
+    }
+  ],
+  "exported_source_files": [
+    {
+      "path": "Prototype/LocalSnapshot.hs",
+      "bytes": 7492,
+      "sha256": "a5725293979a9f4b28cc6704ec07c77baf28cb84d03b87c6b2784db3e6967e48",
+      "git_blob_sha1": "eed49c9bb7f71977ab93646003ae32ed23a7f937",
+      "git_mode": "100644"
+    },
+    {
+      "path": "tests/Main.hs",
+      "bytes": 16577,
+      "sha256": "cd6e49a64c0d2a9e5ffad1a7957465bf4d7116bec882a62a85a49c869a2af4d0",
+      "git_blob_sha1": "d05c24c4be0e33c5e0bed4cb342247e3b59d61ea",
+      "git_mode": "100644"
+    },
+    {
+      "path": "tests/expected.stdout",
+      "bytes": 67,
+      "sha256": "c8a6881fe60a5f1f2ba20b35e7bd17174896d4e44f804ba1e4523147bed612a8",
+      "git_blob_sha1": "f840b8e43751d30212abb94b374d8f3a8128255d",
+      "git_mode": "100644"
+    }
+  ],
+  "source_evidence": {
+    "frozen_source_manifest_sha256": "6f4e497c38ae2c1c8eb72f769988fd943a018f30af2a272235e328054ca364b9",
+    "independent_source_review_sha256": "68862b8fe9b32de4c3f231ca5ec049418ab6d004639024f223e6a60f7f615689",
+    "review_scope": "Static source only; new counterexample not yet executed."
+  },
+  "actual_evidence": {
+    "independent_actual_review_sha256": "ace7fc4b993a4c391ef97f12de033cc95e163fd23a6191874eb3676abec245cb",
+    "actual_review_manifest_sha256": "5302ba7853a40c28ee3d1c39f103deccb58eaf0596892de77415b7cd449a1135",
+    "receipt_sha256": "c2741dc661b0a72ba1ec0b9e78199e966bc39bbf9af3b9ccf08cd40a34ca84a5",
+    "final_seal_sha256": "0f4b49e9b7ca0f5dca35a4ef7cc69b02f865b25c2d56e920327551976f4c4984",
+    "new_literal_sha256": "5d9a503c9a344d8b21c529a6feaa87472fcdd999f1679cab4ebc69a349ff04b5",
+    "evidence_scope": "Finite O0/O2 fixture; no production adoption, generated Constraint reachability, native or performance conclusion."
+  }
+}

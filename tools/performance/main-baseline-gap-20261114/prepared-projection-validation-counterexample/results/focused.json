@@ -1,0 +1,52 @@
+{
+  "status": "PASS_FINITE_PREPARED_PROJECTION_COUNTEREXAMPLE_O0_O2",
+  "base_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "production_overlays": [],
+  "optimization_levels": [
+    "O0",
+    "O2"
+  ],
+  "ordinary_ghc_version": "9.14.1",
+  "actual_home_modules_each": 16,
+  "actual_source_bytes_each": 409805,
+  "records_per_lane": 50,
+  "sidecars_per_lane": 150,
+  "stdout_each": {
+    "bytes": 67,
+    "sha256": "c8a6881fe60a5f1f2ba20b35e7bd17174896d4e44f804ba1e4523147bed612a8"
+  },
+  "stderr_each_bytes": 0,
+  "fixture_exit_codes": [
+    0,
+    0
+  ],
+  "all_actual_expected_equal_and_PASS": true,
+  "all_150_sidecars_equal_across_optimization_levels": true,
+  "old_49_records": {
+    "sidecars_per_lane": 147,
+    "unchanged_from_previous_snapshot_run_at_both_levels": true
+  },
+  "new_counterexample": {
+    "label": "prepared-projection-invalid-binder",
+    "actual_transcript_bytes": 735,
+    "actual_transcript_sha256": "5d9a503c9a344d8b21c529a6feaa87472fcdd999f1679cab4ebc69a349ff04b5",
+    "actual_transcript_utf8": "prepare=Right\nsolverUnify-empty=Right\nsolver-graph-unchanged=True\ngroundGraft=Nothing\ngroundInstance=False\nexpanded=Right\nexpanded-root=10\ncopies=[(5,10),(6,11),(7,12)]\nfrontier=[]\nexpanded-nextId=13\nexpanded-shape=True\nstage-eligible=True\nprefix-rejected=True\nprojection=Right\nold-originals=[0,1,2,3,8,9]\nfresh-originals=[10,11,12]\nstubs=[]\nlocal-equations=[(6,2)]\nlocal-nextId=9\nlocal-shape=True\nlocal-root-binder=Just 1\nlocal-binder-contains-root=False\ncapture=Right\ncapture-roundtrip=True\nlocal-validation=Left \"a type binder must structurally contain its node\"\nlocal-unify=Left \"a type binder must structurally contain its node\"\ninstantiate=Left \"a type binder must structurally contain its node\"\nprepared-snapshot-unchanged=True\n",
+    "semantic_Left_is_expected_evidence_not_test_failure": true
+  },
+  "actual_audit": {
+    "status": "PASS_INDEPENDENT_TYPED_LOCAL_PROJECTION_COUNTEREXAMPLE_ACTUAL_ONLY",
+    "sha256": "ace7fc4b993a4c391ef97f12de033cc95e163fd23a6191874eb3676abec245cb",
+    "manifest_sha256": "5302ba7853a40c28ee3d1c39f103deccb58eaf0596892de77415b7cd449a1135",
+    "all_saved_files": 408,
+    "all_saved_bytes": 26678968,
+    "input_postcheck_cleanup_resource_limits_passed": true
+  },
+  "performance_samples": 0,
+  "interpretation": [
+    "Successful prepare and empty solverUnify do not suffice to certify every later prepared projection input as structurally valid.",
+    "Strict storage capture/reconstruction succeeds in this case but is not a binder-containment validity certificate.",
+    "This finite hand case does not prove Constraint-generated reachability, a production bug, arbitrary raw/partial equivalence, native behavior or optimization benefit.",
+    "No production validation was removed or implementation replaced."
+  ],
+  "reproduction_boundary": "The public repository-relative shell recipe was syntax-checked, not run. Actual controlled runs used matching source/flag patterns in separate fresh paths."
+}
