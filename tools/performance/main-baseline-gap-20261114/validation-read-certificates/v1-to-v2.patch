@@ -1,0 +1,89 @@
+--- v1/model_validation_certificate.py
++++ v2/model_validation_certificate.py
+@@ -25,6 +25,15 @@
+     def bound(self):
+         ids = {k[1] for k in self.cells if len(k) == 3}
+         assert len(ids) <= 256 and len(self.cells) <= 2048
++
++    def stock(self):
++        # Logical current cardinalities, not Python bytes or a peak-memory measurement.
++        assert set(self.cache) == set(self.deps)
++        edges = {(fact, dep) for fact, deps in self.deps.items() for dep in deps}
++        reverse_edges = {(fact, dep) for dep, facts in self.reverse.items() for fact in facts}
++        assert edges == reverse_edges
++        return dict(cache_facts=len(self.cache), dependency_edges=len(edges),
++                    reverse_edges=len(reverse_edges), reverse_buckets=len(self.reverse))
+ 
+     def dependency(self, dep):
+         if self.stack:
+@@ -171,6 +180,19 @@
+     c[("node", 1, "children")] = (2, 3)
+     return c
+ 
++def balanced_graph():
++    # 63-node perfect binary tree plus Gen0: 64 synthetic nodes, not a real MLF graph.
++    c = {("members",): tuple(range(64)), ("roots",): (0,)}
++    for n in range(64):
++        c[("node", n, "binder")] = None if n == 0 else 0
++        if n == 0 or n >= 32:
++            c[("node", n, "tag")] = "Gen" if n == 0 else "Leaf"
++            c[("node", n, "kind")] = "*"
++        else:
++            c[("node", n, "tag")] = "Arrow"
++            c[("node", n, "children")] = (2 * n, 2 * n + 1)
++    return c
++
+ def run_tests():
+     reports = []
+     cases = 0
+@@ -182,20 +204,34 @@
+         cold = outcome(e)
+         assert cold == "Right", (label, cold)
+         cold_counts = dict(e.count)
++        cold_stock = e.stock()
+         e.count.clear()
+         e.writes(changes)
+         transition = dict(e.count)
++        transition_stock = e.stock()
+         e.count.clear()
+         warm = outcome(e)
+-        fresh = outcome(Engine(e.cells))
++        warm_stock = e.stock()
++        fresh_engine = Engine(e.cells)
++        fresh = outcome(fresh_engine)
++        fresh_counts = dict(fresh_engine.count)
++        fresh_stock = fresh_engine.stock()
+         if mutant:
+             assert warm != fresh, (label, "mutant escaped", warm, fresh)
+         else:
+             assert warm == fresh == expected, (label, warm, fresh, expected)
+         reports.append(dict(case=label, cold=cold_counts, transition=transition,
+                             warm=dict(e.count), outcome=warm, fresh=fresh,
+-                            mutant_caught=bool(mutant)))
++                            fresh_counts=fresh_counts, cold_stock=cold_stock,
++                            transition_stock=transition_stock, warm_stock=warm_stock,
++                            fresh_stock=fresh_stock, mutant_caught=bool(mutant)))
+         return e
++
++    compare("unchanged", {}, "Right")
++    assert reports[-1]["warm"].get("computes", 0) == 0
++    assert reports[-1]["warm_stock"] == reports[-1]["cold_stock"]
++    compare("balanced-single-leaf-kind-write", {("node", 63, "kind"): "K"},
++            "Left:arrow-kind", balanced_graph())
+ 
+     compare("child-kind", {("node", 2, "kind"): "K"}, "Left:arrow-kind")
+     compare("absent-link-becomes-present",
+@@ -221,8 +257,13 @@
+     reports.append(dict(case="failed-fact-not-cached-and-repaired", counts=dict(e.count)))
+     cases += 1
+     e = compare("dependency-rebuild-alias", {("link", 2, "target"): 3}, "Right")
++    assert ("resolve", 2) in e.reverse[("fact", ("resolve", 3))]
+     e.writes({("link", 2, "target"): ABSENT})
++    assert ("resolve", 2) not in e.reverse.get(("fact", ("resolve", 3)), set())
+     assert outcome(e) == "Right"
++    assert ("fact", ("resolve", 3)) not in e.deps[("resolve", 2)]
++    assert ("resolve", 2) not in e.reverse.get(("fact", ("resolve", 3)), set())
++    e.stock()
+     e.writes({("node", 2, "kind"): "K"})
+     assert outcome(e) == "Left:arrow-kind"
+     reports.append(dict(case="dependency-rebuilt-after-redirect", counts=dict(e.count)))

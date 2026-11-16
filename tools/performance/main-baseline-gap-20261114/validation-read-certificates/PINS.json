@@ -1,0 +1,85 @@
+{
+  "actual_review": {
+    "bytes": 4774,
+    "manifest_sha256": "cb72e2acd1fb7fc026e980f98031b4fbf0c54c0f648a5c01026c185f02956aaa",
+    "sha256": "f2f82783143e6a1c276baa15b1b8e6096c11e09bcb86dc3fc08088aac8722f9f",
+    "status": "PASS_INDEPENDENT_FINITE_SYNTHETIC_MODEL_ACTUAL_ONLY"
+  },
+  "actual_stdout": {
+    "bytes": 11856,
+    "copy": "byte-exact; no JSON reserialization",
+    "export": "results.json",
+    "sha256": "e203f52bf25957df0d09818fd282681a1ef55294aaec9ec90c83a97bcfa6fe6b"
+  },
+  "baseline_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "completion_receipt": {
+    "bytes": 521,
+    "exit_zero_independently_verified": true,
+    "sha256": "e4cf4f72ecfd8dd4ead6c2f5dc50ea89061666e7c64a82dcc17cbe5319f42c3c",
+    "source_after_exact": true
+  },
+  "executed_source_version": "v2",
+  "files": [
+    {
+      "bytes": 5095,
+      "path": "DESIGN.md",
+      "sha256": "c904646a0f6a43570ce784de1566cf6823d4e0e295ee117b085783e60fc88f54"
+    },
+    {
+      "bytes": 4505,
+      "path": "EVALUATION.md",
+      "sha256": "6b4c375b62b060edcf38828866cc5fda2dba5f02994d684000ea55105fae22d0"
+    },
+    {
+      "bytes": 3566,
+      "path": "README.md",
+      "sha256": "9e4f39faf3e1e610d4b8699183e0a4872926016e61e0ee723c67077f55a35302"
+    },
+    {
+      "bytes": 12663,
+      "path": "model_validation_certificate.py",
+      "sha256": "7fbdffd1ee97c353ad434cc299222c9078eabfc47c86ff951cea6a6d3d472c29"
+    },
+    {
+      "bytes": 11856,
+      "path": "results.json",
+      "sha256": "e203f52bf25957df0d09818fd282681a1ef55294aaec9ec90c83a97bcfa6fe6b"
+    },
+    {
+      "bytes": 3950,
+      "path": "v1-to-v2.patch",
+      "sha256": "5c7c0f2f30e590fe8e7e192688085eadb3f24f34a16d78b609d6ca770fc746d5"
+    }
+  ],
+  "not_included": [
+    "Private paths and machine/session identities",
+    "Run wrapper",
+    "Real MLF graphs or binaries",
+    "Production patch or performance measurements"
+  ],
+  "references": [
+    {
+      "title": "A Consistent Semantics of Self-Adjusting Computation",
+      "url": "https://arxiv.org/abs/1106.0478"
+    },
+    {
+      "title": "Adapton: Composable, Demand-Driven Incremental Computation",
+      "url": "https://matthewhammer.org/adapton/adapton-pldi2014.pdf"
+    },
+    {
+      "title": "Incremental Computation with Names, v6",
+      "url": "https://arxiv.org/abs/1503.07792v6"
+    }
+  ],
+  "schema": "validation-read-certificates-public-pins-v1",
+  "scope": "Synthetic Python mechanism only; not a production Graph change or performance result.",
+  "self_hash_rule": "PINS.json excluded from its own files list; included in the outer archival manifest.",
+  "source_control_review": {
+    "bytes": 5207,
+    "sha256": "f8b1fe47429b240d45aa702dc8c419c1367ffa859ce505bb8c1f8e01bf93a19d",
+    "status": "PASS_STATIC_SOURCE_AND_WRAPPER_FOR_ONE_BOUNDED_SYNTHETIC_MODEL_ONLY"
+  },
+  "source_v1_sha256": "9a5df36de5f02776459a1f9482d9cdd88f5672123c6d568c6e6a7846eb63467f",
+  "source_v2_manifest_sha256": "4da12911c28637c4dc2f83687db4d6c6adad368975200c70667206c381688c53",
+  "v1_status": "Unexecuted earlier draft; exact source delta preserved."
+}
