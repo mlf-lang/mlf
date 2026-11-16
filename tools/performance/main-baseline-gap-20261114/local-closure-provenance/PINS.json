@@ -1,0 +1,138 @@
+{
+  "artifacts": {
+    "BOUNDARIES.md": {
+      "bytes": 5775,
+      "sha256": "bf98c29b34bda05b9045f83487ecebd8317d1bc92c7436f94ab6cdf16eac5cb6"
+    },
+    "FocusedMain.hs": {
+      "bytes": 8817,
+      "sha256": "91c827e64065e1a0270cc705d210554be72845dd63b3026df0c130865febaddf"
+    },
+    "Prototype/LocalProblemDigest.hs": {
+      "bytes": 7431,
+      "sha256": "ed0736197bd5674153f99ce6fc7d5108df2e563bed8dd1b86eb361c148613692"
+    },
+    "README.md": {
+      "bytes": 4965,
+      "sha256": "faa93db4777bdbfaa9d61577d96365cb87536cb083e93cdceb08021dc20babdb"
+    },
+    "analyze_provenance.py": {
+      "bytes": 8938,
+      "sha256": "6f985ce1380fc45df31171d4fefea8ee7487e3bb10cb33284b3d342b5ffd5ce5"
+    },
+    "diagnostic.patch": {
+      "bytes": 13352,
+      "sha256": "456e2149a7e158371ea211452a66d79f2a608e7f77902a085921d058c7156775"
+    },
+    "finite-results.json": {
+      "bytes": 20393,
+      "sha256": "1903edf0c2f3b788a2294916be869bb658a1f1a3c5ee30a1b8c534ac3d801311"
+    },
+    "real-results.json": {
+      "bytes": 45605,
+      "sha256": "37d386a8d1e1d72412f7644b7d5f65ca95550f7c8ae60fad9f281c34f8c7bb05"
+    }
+  },
+  "baseline_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "evidence_hashes_without_private_locations": {
+    "finite_actual_review": {
+      "bytes": 11398,
+      "sha256": "7f692a1069d3072585fe0467715d7e946d257323ea53bb6f5b1f44fab4d44100"
+    },
+    "finite_contract": {
+      "bytes": 4463,
+      "sha256": "42f12322d3130f60a76d93ede9c40ae96c539f5423130891cad6a50529352241"
+    },
+    "finite_final_seal": {
+      "bytes": 480,
+      "sha256": "f02f309a0a9173a6b8b244782c0ac253b96708931b2aff9796c9178f39802f1b"
+    },
+    "finite_raw_tsv": {
+      "bytes": 1098,
+      "sha256": "0755c8e79eca115de2de8058fcb333b22011e8ea03b20d4fe56570d4d1391f3e"
+    },
+    "finite_receipt": {
+      "bytes": 6405,
+      "sha256": "718704939bdb18a77254eb796367b8d595ba55ebc693a2d6194306cd62797141"
+    },
+    "real_actual_review": {
+      "bytes": 19163,
+      "sha256": "798362472a903da56f99ff855be6d19a361509eb57b6c2a4401467d440d30cd6"
+    },
+    "real_final_seal": {
+      "bytes": 482,
+      "sha256": "2b2731172009e989453cde6c3cd396f1915704346e1929b9de77411a8e271fb2"
+    },
+    "real_independent_arithmetic": {
+      "bytes": 31291,
+      "sha256": "4fadfd9107a32af6fde71627e60c7c7bfae527036c23f930369673b5cf01bbf4"
+    },
+    "real_raw_tsv": {
+      "bytes": 2198436,
+      "sha256": "1c4ec92f6c9bde29d786985e04e86478ed12f52700e9f8913cc6296a3a1bba3c"
+    },
+    "real_receipt": {
+      "bytes": 8506,
+      "sha256": "18dae3c1f43a65fb6a58f9e43827166aac501118658a114abfe4336fa3ff263a"
+    },
+    "reference_v4_raw_tsv": {
+      "bytes": 1416787,
+      "sha256": "e32554dd47b2757f1a72b7849ae6691a6fcd7891e8c79e89b9c112b7985f5b07"
+    },
+    "source_v1_manifest": {
+      "bytes": 1762,
+      "sha256": "c573c37f5ba6bd89da837e1f6c0e3608657b222db5b77580309319fedb27a2dc"
+    },
+    "source_v2_manifest": {
+      "bytes": 2058,
+      "sha256": "cb292c28d94cb5371e578438e8ea018c774d22587f945b5952143fdf78d16f71"
+    },
+    "source_v2_review": {
+      "bytes": 7399,
+      "sha256": "4829e096ffbba4027d7085b648691d89802a15c26e2efd7247645025cb9950d8"
+    }
+  },
+  "producers": {
+    "finite": {
+      "bytes": 3946600,
+      "sha256": "b58b37794b4cb8e097485258eacde5cf1a51bc2f7ebbcd686167c145397f433d"
+    },
+    "real": {
+      "bytes": 20371016,
+      "sha256": "90dd0fbb64ae299f7795b2ee05d004366089cf1091c204c108a3e4bd38bc6d1e"
+    }
+  },
+  "public_scope": "Diagnostic source, synthetic finite fixture and numeric results only; no binaries, real graphs or private input paths.",
+  "schema": "public-local-closure-provenance-pins-v1",
+  "self_hash": "PINS.json is covered by the external export manifest; no recursive self hash.",
+  "source_files": {
+    "FocusedMain.hs": {
+      "bytes": 8817,
+      "sha256": "91c827e64065e1a0270cc705d210554be72845dd63b3026df0c130865febaddf"
+    },
+    "Prototype/LocalProblemDigest.hs": {
+      "bytes": 7431,
+      "sha256": "ed0736197bd5674153f99ce6fc7d5108df2e563bed8dd1b86eb361c148613692"
+    },
+    "host/ghc/app/emlf/Main.hs": {
+      "baseline": {
+        "bytes": 130,
+        "sha256": "72d926eedd4e5abc40b8f0bc925a39d20995397f0d4144b4abd932ef2aaa6d79"
+      },
+      "diagnostic": {
+        "bytes": 242,
+        "sha256": "10bef3a57ffff250078bfd78f83c47a3c4ac6565aca3fe454b125d54f9a0edf1"
+      }
+    },
+    "libraries/mlf-inference/Bootstrap/Graph/Solver.hs": {
+      "baseline": {
+        "bytes": 99201,
+        "sha256": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612"
+      },
+      "diagnostic": {
+        "bytes": 110361,
+        "sha256": "796172fa0959cf446ad1fad81fe39c4892cafab6c31ea3c644b408655d274d47"
+      }
+    }
+  }
+}

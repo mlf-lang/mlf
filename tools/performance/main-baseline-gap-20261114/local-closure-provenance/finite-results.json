@@ -1,0 +1,715 @@
+{
+  "actual_review_manifest_sha256": "648da4bced524435b82a59e6f73ac4b6aae355c1eb72c6d6e5d628e6d2db0540",
+  "actual_review_sha256": "7f692a1069d3072585fe0467715d7e946d257323ea53bb6f5b1f44fab4d44100",
+  "boundaries": [
+    "O2 only",
+    "First-discovery is not necessity",
+    "No generated-pipeline reachability proof",
+    "No scope_added-positive, binding-child-positive or external-positive fixture",
+    "Fresh3 deleted/alias3->1; surviving fresh addNode not covered",
+    "hidden-stub only projection tuple, not downstream restore",
+    "Snapshots compare complete physical values, not heap identity or residency",
+    "Public routing sites statically changed; finite invokes siblings directly",
+    "Reported clock interval sums may overlap, are not exclusive CPU or performance; no precision conclusion",
+    "Source v1 never run; whole-cache/scope NO_GO unchanged"
+  ],
+  "budget": {
+    "AS_GiB": 4,
+    "all_actual_per_step_and_aggregate_caps_pass": true,
+    "compile_cap_ns": 120000000000,
+    "compile_ns": 16335813129,
+    "ghc_ns": 15518218021,
+    "meaning": "Control telemetry only. Encoding/action interval sums are nonnegative exact reported sums, not timing precision, exclusive CPU, performance or speedup.",
+    "performance_samples": 0,
+    "semantic_cap_ns": 15000000000,
+    "semantic_ns": 115568713,
+    "whole_cap_ns": 180000000000,
+    "whole_final_ns": 33333562082
+  },
+  "build": {
+    "compiler_errors": 0,
+    "compiler_warning_counts": {
+      "GHC-39567": 16,
+      "GHC-63394": 4,
+      "GHC-68441": 1
+    },
+    "fresh_o_hi": 32,
+    "home_modules": 16,
+    "link_progress": 17,
+    "producer": {
+      "bytes": 3946600,
+      "sha256": "b58b37794b4cb8e097485258eacde5cf1a51bc2f7ebbcd686167c145397f433d"
+    },
+    "runtime_files": 4,
+    "staged_files": 32
+  },
+  "definition_originally_unrun": true,
+  "fixture_contract": {
+    "accepted_events": 6,
+    "accepted_sites": [
+      "UnifyDistinct",
+      "PreparedFallback",
+      "PreparedFallback",
+      "PreparedFallback",
+      "UnifyDistinct",
+      "PreparedFallback"
+    ],
+    "capture_columns": 25,
+    "capture_counts": [
+      [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        129,
+        0,
+        0,
+        0,
+        0,
+        0,
+        129,
+        129,
+        0,
+        0,
+        0,
+        129,
+        0,
+        0,
+        129,
+        0
+      ],
+      [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    ],
+    "capture_schema": "local-problem-provenance-v1",
+    "claims": "First-discovery route, not necessity. Hand graph APIs, not generated-pipeline reachability. Original helpers remain in the same module as oracle.",
+    "eligible_metadata_node_range": [
+      129,
+      2048
+    ],
+    "file_count": 73,
+    "files": [
+      "duplicate-direct.A",
+      "duplicate-direct.C",
+      "duplicate-direct.actual",
+      "duplicate-direct.expected",
+      "duplicate-direct.result",
+      "fresh-projection.A",
+      "fresh-projection.C",
+      "fresh-projection.actual",
+      "fresh-projection.expected",
+      "fresh-projection.result",
+      "fresh-solve.A",
+      "fresh-solve.C",
+      "fresh-solve.after-old",
+      "fresh-solve.before",
+      "fresh-solve.expected",
+      "fresh-solve.result",
+      "hidden-stub.A",
+      "hidden-stub.C",
+      "hidden-stub.actual",
+      "hidden-stub.expected",
+      "hidden-stub.result",
+      "late-direct.A",
+      "late-direct.C",
+      "late-direct.actual",
+      "late-direct.expected",
+      "late-direct.result",
+      "left-metadata.A",
+      "left-metadata.C",
+      "left-metadata.actual",
+      "left-metadata.expected",
+      "left-metadata.result",
+      "local-problem-digest.tsv",
+      "metadata-128.A",
+      "metadata-128.C",
+      "metadata-128.actual",
+      "metadata-128.expected",
+      "metadata-128.result",
+      "metadata-129-success.A",
+      "metadata-129-success.C",
+      "metadata-129-success.actual",
+      "metadata-129-success.expected",
+      "metadata-129-success.result",
+      "metadata-129.A",
+      "metadata-129.C",
+      "metadata-129.actual",
+      "metadata-129.expected",
+      "metadata-129.result",
+      "metadata-2048.A",
+      "metadata-2048.C",
+      "metadata-2048.actual",
+      "metadata-2048.expected",
+      "metadata-2048.result",
+      "metadata-2049.A",
+      "metadata-2049.C",
+      "metadata-2049.actual",
+      "metadata-2049.expected",
+      "metadata-2049.result",
+      "missing-first.A",
+      "missing-first.C",
+      "missing-first.actual",
+      "missing-first.expected",
+      "missing-first.result",
+      "ordinary.A",
+      "ordinary.C",
+      "ordinary.after-old",
+      "ordinary.before",
+      "ordinary.expected",
+      "ordinary.result",
+      "reordered-direct.A",
+      "reordered-direct.C",
+      "reordered-direct.actual",
+      "reordered-direct.expected",
+      "reordered-direct.result"
+    ],
+    "header_footer_fields": 5,
+    "positive_stored_metadata_row_in_finite": true,
+    "record_count": 14,
+    "records": [
+      "late-direct",
+      "duplicate-direct",
+      "reordered-direct",
+      "missing-first",
+      "left-metadata",
+      "metadata-128",
+      "metadata-129",
+      "metadata-2048",
+      "metadata-2049",
+      "metadata-129-success",
+      "ordinary",
+      "fresh-projection",
+      "fresh-solve",
+      "hidden-stub"
+    ],
+    "scope_added_positive_case": false,
+    "stdout": "PASS finite closure provenance; first-discovery is not necessity\n",
+    "stdout_bytes": 65,
+    "success": [
+      false,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "times": "Nonnegative Word64; zero allowed; exact header/footer and per-row sums. No time threshold."
+  },
+  "historical_static_stop": {
+    "reasons": [
+      "Missing explicit-module declaration separator before appended definitions.",
+      "Metadata eligibility gate was not applied at the actual observation entry."
+    ],
+    "v1_executed": false,
+    "v2_repair": "Separator, successful-node range 129..2048 gate, four boundary/poison cases and a positive metadata record."
+  },
+  "observed": {
+    "accepted_nodes": [
+      0,
+      128,
+      2049,
+      129,
+      4,
+      3
+    ],
+    "accepted_rows": 6,
+    "all_six_input_fingerprints_independently_recomputed": true,
+    "complete_physical_success_solver_literals_independently_checked": true,
+    "file_count": 73,
+    "findings": {
+      "bounds": "128/2049 Right bypass poisoned metadata;129/2048 trigger exact Probe metadata and append no accepted row",
+      "left_metadata": "Left bypasses poisoned graph, equations and metadata",
+      "missing_first": "Exact missing node 99 Left precedes poisoned pending tail",
+      "positive129": "Synthetic identity action, full 129 Bot/no-binder raw graph,129 ordered self-equations; only eligible accepted metadata row. Not a G.unify-valid graph.",
+      "small_projections": "Direct component and projection metadata literals were tested; captured ordinary/fresh nodes4/3 are NA by selector."
+    },
+    "literal_counts_errors_poison_checks": true,
+    "only_numeric_metadata": [
+      129,
+      0,
+      0,
+      0,
+      0,
+      0,
+      129,
+      129,
+      0,
+      0,
+      0,
+      129,
+      0,
+      0,
+      129,
+      0
+    ],
+    "physical_solver_snapshot_equal_cases": 2,
+    "raw_A_C_equal_all_records": true,
+    "record_count": 14,
+    "selected_metadata_rows": 1,
+    "stderr_bytes": 0,
+    "stdout_bytes": 65,
+    "totals": {
+      "action_whnf_ns_reported_sum": 85828,
+      "encoding_ns_reported_sum": 1893945,
+      "words": 21224
+    }
+  },
+  "outer_exit_zero_and_cleanup_verified": true,
+  "output_bytes": 12351314,
+  "output_file_count": 168,
+  "retained_work_artifact_hashes_not_content": [
+    {
+      "artifact": "duplicate-direct.A",
+      "bytes": 178,
+      "sha256": "2d374290ea70c2f0df740ff5020ea2e503a612770dbdd221045cad986ae27932"
+    },
+    {
+      "artifact": "duplicate-direct.C",
+      "bytes": 178,
+      "sha256": "2d374290ea70c2f0df740ff5020ea2e503a612770dbdd221045cad986ae27932"
+    },
+    {
+      "artifact": "duplicate-direct.actual",
+      "bytes": 50,
+      "sha256": "d8132916b61cb28586c1af95ef9b611211001bee20cef29dff265232ce964c38"
+    },
+    {
+      "artifact": "duplicate-direct.expected",
+      "bytes": 50,
+      "sha256": "d8132916b61cb28586c1af95ef9b611211001bee20cef29dff265232ce964c38"
+    },
+    {
+      "artifact": "duplicate-direct.result",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "artifact": "fresh-projection.A",
+      "bytes": 325,
+      "sha256": "1682be32ab1f211113b8d7ddd947e1376899f0ab4df8344e169274e0faefb2b9"
+    },
+    {
+      "artifact": "fresh-projection.C",
+      "bytes": 325,
+      "sha256": "1682be32ab1f211113b8d7ddd947e1376899f0ab4df8344e169274e0faefb2b9"
+    },
+    {
+      "artifact": "fresh-projection.actual",
+      "bytes": 34,
+      "sha256": "af78ef63fd8dd07c265e8777574fe3db001b637278d42153763d42c3c416a113"
+    },
+    {
+      "artifact": "fresh-projection.expected",
+      "bytes": 34,
+      "sha256": "af78ef63fd8dd07c265e8777574fe3db001b637278d42153763d42c3c416a113"
+    },
+    {
+      "artifact": "fresh-projection.result",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "artifact": "fresh-solve.A",
+      "bytes": 231,
+      "sha256": "83fd22860b5c5058632d93a5e7544c312c826f7f9742f2b1be0e22ee830940d2"
+    },
+    {
+      "artifact": "fresh-solve.C",
+      "bytes": 231,
+      "sha256": "83fd22860b5c5058632d93a5e7544c312c826f7f9742f2b1be0e22ee830940d2"
+    },
+    {
+      "artifact": "fresh-solve.after-old",
+      "bytes": 220,
+      "sha256": "f1a9eeeef691d672b688ea5c80f4b881811ab55dd7f8fb082ce097a698e636a3"
+    },
+    {
+      "artifact": "fresh-solve.before",
+      "bytes": 220,
+      "sha256": "f1a9eeeef691d672b688ea5c80f4b881811ab55dd7f8fb082ce097a698e636a3"
+    },
+    {
+      "artifact": "fresh-solve.expected",
+      "bytes": 136,
+      "sha256": "9c82864a6fabbaf04e5ba8f326f0d35e6704b20ea270c0d3259284ad9df45cf5"
+    },
+    {
+      "artifact": "fresh-solve.result",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "artifact": "hidden-stub.A",
+      "bytes": 299,
+      "sha256": "d9bd3fe7c55622eafd6423eee29f6f39f9c6156879aba9c57a404ecb8b978efd"
+    },
+    {
+      "artifact": "hidden-stub.C",
+      "bytes": 299,
+      "sha256": "d9bd3fe7c55622eafd6423eee29f6f39f9c6156879aba9c57a404ecb8b978efd"
+    },
+    {
+      "artifact": "hidden-stub.actual",
+      "bytes": 34,
+      "sha256": "b2b009da0299ca6bffd3e7977fd219e5ed4e8de7d72c258ec9c643c63ab44c07"
+    },
+    {
+      "artifact": "hidden-stub.expected",
+      "bytes": 34,
+      "sha256": "b2b009da0299ca6bffd3e7977fd219e5ed4e8de7d72c258ec9c643c63ab44c07"
+    },
+    {
+      "artifact": "hidden-stub.result",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "artifact": "late-direct.A",
+      "bytes": 178,
+      "sha256": "2d374290ea70c2f0df740ff5020ea2e503a612770dbdd221045cad986ae27932"
+    },
+    {
+      "artifact": "late-direct.C",
+      "bytes": 178,
+      "sha256": "2d374290ea70c2f0df740ff5020ea2e503a612770dbdd221045cad986ae27932"
+    },
+    {
+      "artifact": "late-direct.actual",
+      "bytes": 50,
+      "sha256": "d8132916b61cb28586c1af95ef9b611211001bee20cef29dff265232ce964c38"
+    },
+    {
+      "artifact": "late-direct.expected",
+      "bytes": 50,
+      "sha256": "d8132916b61cb28586c1af95ef9b611211001bee20cef29dff265232ce964c38"
+    },
+    {
+      "artifact": "late-direct.result",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "artifact": "left-metadata.A",
+      "bytes": 14,
+      "sha256": "9b752ad251516ae1f6c8a18bacad7eb59c5aee24c3da48876894f2e600e0aae7"
+    },
+    {
+      "artifact": "left-metadata.C",
+      "bytes": 14,
+      "sha256": "9b752ad251516ae1f6c8a18bacad7eb59c5aee24c3da48876894f2e600e0aae7"
+    },
+    {
+      "artifact": "left-metadata.actual",
+      "bytes": 16,
+      "sha256": "d897f63098c17e705bc54bd97f62998e2dc985214af45f956ebc2f547385811d"
+    },
+    {
+      "artifact": "left-metadata.expected",
+      "bytes": 16,
+      "sha256": "d897f63098c17e705bc54bd97f62998e2dc985214af45f956ebc2f547385811d"
+    },
+    {
+      "artifact": "left-metadata.result",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "artifact": "local-problem-digest.tsv",
+      "bytes": 1098,
+      "sha256": "0755c8e79eca115de2de8058fcb333b22011e8ea03b20d4fe56570d4d1391f3e"
+    },
+    {
+      "artifact": "metadata-128.A",
+      "bytes": 6,
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222"
+    },
+    {
+      "artifact": "metadata-128.C",
+      "bytes": 6,
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222"
+    },
+    {
+      "artifact": "metadata-128.actual",
+      "bytes": 8,
+      "sha256": "a2a94368b2455a80342846155c6b89123b05f046a5fbab4eb73061e4bb01c860"
+    },
+    {
+      "artifact": "metadata-128.expected",
+      "bytes": 8,
+      "sha256": "a2a94368b2455a80342846155c6b89123b05f046a5fbab4eb73061e4bb01c860"
+    },
+    {
+      "artifact": "metadata-128.result",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "artifact": "metadata-129-success.A",
+      "bytes": 6,
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222"
+    },
+    {
+      "artifact": "metadata-129-success.C",
+      "bytes": 6,
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222"
+    },
+    {
+      "artifact": "metadata-129-success.actual",
+      "bytes": 8,
+      "sha256": "a2a94368b2455a80342846155c6b89123b05f046a5fbab4eb73061e4bb01c860"
+    },
+    {
+      "artifact": "metadata-129-success.expected",
+      "bytes": 8,
+      "sha256": "a2a94368b2455a80342846155c6b89123b05f046a5fbab4eb73061e4bb01c860"
+    },
+    {
+      "artifact": "metadata-129-success.result",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "artifact": "metadata-129.A",
+      "bytes": 15,
+      "sha256": "b55cff3da2d39105b794176484e7ca2a8551907084caa50c5e97f435a9a20262"
+    },
+    {
+      "artifact": "metadata-129.C",
+      "bytes": 15,
+      "sha256": "b55cff3da2d39105b794176484e7ca2a8551907084caa50c5e97f435a9a20262"
+    },
+    {
+      "artifact": "metadata-129.actual",
+      "bytes": 17,
+      "sha256": "a8f99cdce18f8ead8a5506c5f483a1f347d6abbf9ab87a409f4b36b17609dce3"
+    },
+    {
+      "artifact": "metadata-129.expected",
+      "bytes": 17,
+      "sha256": "a8f99cdce18f8ead8a5506c5f483a1f347d6abbf9ab87a409f4b36b17609dce3"
+    },
+    {
+      "artifact": "metadata-129.result",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "artifact": "metadata-2048.A",
+      "bytes": 15,
+      "sha256": "b55cff3da2d39105b794176484e7ca2a8551907084caa50c5e97f435a9a20262"
+    },
+    {
+      "artifact": "metadata-2048.C",
+      "bytes": 15,
+      "sha256": "b55cff3da2d39105b794176484e7ca2a8551907084caa50c5e97f435a9a20262"
+    },
+    {
+      "artifact": "metadata-2048.actual",
+      "bytes": 17,
+      "sha256": "a8f99cdce18f8ead8a5506c5f483a1f347d6abbf9ab87a409f4b36b17609dce3"
+    },
+    {
+      "artifact": "metadata-2048.expected",
+      "bytes": 17,
+      "sha256": "a8f99cdce18f8ead8a5506c5f483a1f347d6abbf9ab87a409f4b36b17609dce3"
+    },
+    {
+      "artifact": "metadata-2048.result",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "artifact": "metadata-2049.A",
+      "bytes": 6,
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222"
+    },
+    {
+      "artifact": "metadata-2049.C",
+      "bytes": 6,
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222"
+    },
+    {
+      "artifact": "metadata-2049.actual",
+      "bytes": 8,
+      "sha256": "a2a94368b2455a80342846155c6b89123b05f046a5fbab4eb73061e4bb01c860"
+    },
+    {
+      "artifact": "metadata-2049.expected",
+      "bytes": 8,
+      "sha256": "a2a94368b2455a80342846155c6b89123b05f046a5fbab4eb73061e4bb01c860"
+    },
+    {
+      "artifact": "metadata-2049.result",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "artifact": "missing-first.A",
+      "bytes": 27,
+      "sha256": "92d3791214bc2ec7346c4108aae3c33f3aa22714e5b788a5a8fed3ecfa76a057"
+    },
+    {
+      "artifact": "missing-first.C",
+      "bytes": 27,
+      "sha256": "92d3791214bc2ec7346c4108aae3c33f3aa22714e5b788a5a8fed3ecfa76a057"
+    },
+    {
+      "artifact": "missing-first.actual",
+      "bytes": 29,
+      "sha256": "683f136d1da73ff5950e82c3df9fe949eb41771ce4abb13586285f7623264647"
+    },
+    {
+      "artifact": "missing-first.expected",
+      "bytes": 29,
+      "sha256": "683f136d1da73ff5950e82c3df9fe949eb41771ce4abb13586285f7623264647"
+    },
+    {
+      "artifact": "missing-first.result",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "artifact": "ordinary.A",
+      "bytes": 266,
+      "sha256": "b6869cb35ed363b1d208a1f7ee908804c353f56ebab80980138e30173f6595a5"
+    },
+    {
+      "artifact": "ordinary.C",
+      "bytes": 266,
+      "sha256": "b6869cb35ed363b1d208a1f7ee908804c353f56ebab80980138e30173f6595a5"
+    },
+    {
+      "artifact": "ordinary.after-old",
+      "bytes": 329,
+      "sha256": "bf7aba0eee19b1013ac12dfe9d21a5ecf671136da8611bf71735f505df0d6cb8"
+    },
+    {
+      "artifact": "ordinary.before",
+      "bytes": 329,
+      "sha256": "bf7aba0eee19b1013ac12dfe9d21a5ecf671136da8611bf71735f505df0d6cb8"
+    },
+    {
+      "artifact": "ordinary.expected",
+      "bytes": 141,
+      "sha256": "4dd5541658e9188f1e7b5d283ceca0694ca6753b24f110d48721663d98bdc0b3"
+    },
+    {
+      "artifact": "ordinary.result",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "artifact": "reordered-direct.A",
+      "bytes": 178,
+      "sha256": "2d374290ea70c2f0df740ff5020ea2e503a612770dbdd221045cad986ae27932"
+    },
+    {
+      "artifact": "reordered-direct.C",
+      "bytes": 178,
+      "sha256": "2d374290ea70c2f0df740ff5020ea2e503a612770dbdd221045cad986ae27932"
+    },
+    {
+      "artifact": "reordered-direct.actual",
+      "bytes": 50,
+      "sha256": "d8132916b61cb28586c1af95ef9b611211001bee20cef29dff265232ce964c38"
+    },
+    {
+      "artifact": "reordered-direct.expected",
+      "bytes": 50,
+      "sha256": "d8132916b61cb28586c1af95ef9b611211001bee20cef29dff265232ce964c38"
+    },
+    {
+      "artifact": "reordered-direct.result",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    }
+  ],
+  "schema": "public-finite-closure-provenance-result-v1",
+  "scope": "One O2 finite fixture, not production or real-program equivalence.",
+  "source_version": "v2",
+  "status": "PASS_INDEPENDENT_FINITE_LOCAL_CLOSURE_PROVENANCE_ACTUAL_ONLY"
+}

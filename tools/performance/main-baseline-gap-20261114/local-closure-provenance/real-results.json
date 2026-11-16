@@ -1,0 +1,1489 @@
+{
+  "actual_review_manifest_sha256": "7c5ef06104bb431a0438b853335a97f5fbdce207ca6098522ccf4878498ba40f",
+  "actual_review_sha256": "798362472a903da56f99ff855be6d19a361509eb57b6c2a4401467d440d30cd6",
+  "build": {
+    "compiler_error_headers": 0,
+    "compiler_warning_counts": {
+      "GHC-39567": 28,
+      "GHC-53633": 8,
+      "GHC-68441": 1
+    },
+    "fresh_o_hi": 192,
+    "home_bytes": 5310274,
+    "home_modules": 96,
+    "link_progress": 97,
+    "runtime_files": 4,
+    "staged_files": 128
+  },
+  "findings": [
+    "Among the 3404 eligible events, 1218852 of 1312087 local node occurrences are connected (92.89414497666694%); fresh contributes 25433 (1.93836231896208%). These are selected-event occurrence totals, not globally unique nodes or removable work.",
+    "Six first-discovery totals are equation 7147, fresh-external 0, child 775794, binder 194603, structural-parent 241308, binding-child 0. They partition connected occurrences in the original DFS discovery order.",
+    "external_unique is 2554 despite first_fresh_external being zero. Zero first-discovery count means an earlier route found those nodes; it is not evidence that external dependencies or binding-child edges can be removed.",
+    "Event medians of local nodes/connected/scope-added/fresh/stubs are 245/223/7/3/9. Both per-event medians and weighted fractions are retained with their distinct denominators."
+  ],
+  "independent_arithmetic_sha256": "4fadfd9107a32af6fde71627e60c7c7bfae527036c23f930369673b5cf01bbf4",
+  "independent_descriptive_statistics": {
+    "all_row_conservation": true,
+    "boundaries": [
+      "First-discovery origins partition connected node occurrences per event, not globally unique nodes or necessity.",
+      "Four-part node decomposition and medians apply only to3404 selected events; other event provenance unknown.",
+      "Hashes and exact first7 string equality do not establish full Graph equality.",
+      "Event medians and weighted fractions are descriptive and use distinct denominators.",
+      "Reported action/encoding intervals can overlap and include GC/scheduling; no CPU attribution or cross-run timing comparison.",
+      "Connected dominance does not justify dropping closure, validators or a cache; no performance or production inference."
+    ],
+    "controller_mathematical_fields_match": true,
+    "eligible_inclusive": [
+      129,
+      2048
+    ],
+    "exact_original_first7": true,
+    "first7_sha256": "d04f0c1d1b3013b1adf780711f7e0fcb7ae99ef0d7ebf094ee51411aa7173675",
+    "metadata_events": 3404,
+    "other_rows_all_NA": 13334,
+    "per_site_and_total": {
+      "PreparedFallback": {
+        "all_Left": 0,
+        "all_Right": 14531,
+        "all_events": 14531,
+        "all_node_occurrences": 1350163,
+        "all_reported_intervals": {
+          "action_whnf_ns": {
+            "max": 219770697,
+            "median": {
+              "decimal": "85156",
+              "denominator": 1,
+              "numerator": 85156
+            },
+            "min": 28252,
+            "nonzero_events": 14531,
+            "sum": 6671231585
+          },
+          "encoding_ns": {
+            "max": 187150667,
+            "median": {
+              "decimal": "12658",
+              "denominator": 1,
+              "numerator": 12658
+            },
+            "min": 3044,
+            "nonzero_events": 14531,
+            "sum": 1648297813
+          }
+        },
+        "all_words": 22805322,
+        "four_part_node_decomposition": {
+          "connected": {
+            "max": 1865,
+            "median": {
+              "decimal": "227",
+              "denominator": 1,
+              "numerator": 227
+            },
+            "median_event_fraction": {
+              "decimal": "0.9074074074074074074074074074074074074074",
+              "denominator": 54,
+              "numerator": 49
+            },
+            "min": 100,
+            "nonzero_events": 2554,
+            "sum": 912159,
+            "weighted_fraction_of_selected_nodes": {
+              "decimal": "0.9229893571164038831650587999587155684806",
+              "denominator": 329422,
+              "numerator": 304053
+            }
+          },
+          "fresh_count": {
+            "max": 88,
+            "median": {
+              "decimal": "6",
+              "denominator": 1,
+              "numerator": 6
+            },
+            "median_event_fraction": {
+              "decimal": "0.02465628507295173961840628507295173961841",
+              "denominator": 28512,
+              "numerator": 703
+            },
+            "min": 1,
+            "nonzero_events": 2554,
+            "sum": 25433,
+            "weighted_fraction_of_selected_nodes": {
+              "decimal": "0.02573497418711156712868802528873805230576",
+              "denominator": 988266,
+              "numerator": 25433
+            }
+          },
+          "scope_added": {
+            "max": 48,
+            "median": {
+              "decimal": "7",
+              "denominator": 1,
+              "numerator": 7
+            },
+            "median_event_fraction": {
+              "decimal": "0.02739726027397260273972602739726027397260",
+              "denominator": 73,
+              "numerator": 2
+            },
+            "min": 0,
+            "nonzero_events": 2516,
+            "sum": 23255,
+            "weighted_fraction_of_selected_nodes": {
+              "decimal": "0.02353111409276449862688790264969147982426",
+              "denominator": 988266,
+              "numerator": 23255
+            }
+          },
+          "stub_count": {
+            "max": 52,
+            "median": {
+              "decimal": "9",
+              "denominator": 1,
+              "numerator": 9
+            },
+            "median_event_fraction": {
+              "decimal": "0.03243243243243243243243243243243243243243",
+              "denominator": 185,
+              "numerator": 6
+            },
+            "min": 1,
+            "nonzero_events": 2554,
+            "sum": 27419,
+            "weighted_fraction_of_selected_nodes": {
+              "decimal": "0.02774455460372005107936527210285489938944",
+              "denominator": 988266,
+              "numerator": 27419
+            }
+          }
+        },
+        "other_metadata": {
+          "direct_union": {
+            "max": 102,
+            "median": {
+              "decimal": "8",
+              "denominator": 1,
+              "numerator": 8
+            },
+            "min": 3,
+            "nonzero_events": 2554,
+            "sum": 32616
+          },
+          "equation_fresh_overlap": {
+            "max": 16,
+            "median": {
+              "decimal": "2",
+              "denominator": 1,
+              "numerator": 2
+            },
+            "min": 1,
+            "nonzero_events": 2554,
+            "sum": 6626
+          },
+          "equation_unique": {
+            "max": 32,
+            "median": {
+              "decimal": "4",
+              "denominator": 1,
+              "numerator": 4
+            },
+            "min": 2,
+            "nonzero_events": 2554,
+            "sum": 13809
+          },
+          "external_unique": {
+            "max": 1,
+            "median": {
+              "decimal": "1",
+              "denominator": 1,
+              "numerator": 1
+            },
+            "min": 1,
+            "nonzero_events": 2554,
+            "sum": 2554
+          },
+          "fresh_unique": {
+            "max": 88,
+            "median": {
+              "decimal": "6",
+              "denominator": 1,
+              "numerator": 6
+            },
+            "min": 1,
+            "nonzero_events": 2554,
+            "sum": 25433
+          },
+          "selected": {
+            "max": 1913,
+            "median": {
+              "decimal": "232",
+              "denominator": 1,
+              "numerator": 232
+            },
+            "min": 100,
+            "nonzero_events": 2554,
+            "sum": 935414
+          }
+        },
+        "selected_event_node_stats": {
+          "max": 1996,
+          "median": {
+            "decimal": "251",
+            "denominator": 1,
+            "numerator": 251
+          },
+          "min": 129,
+          "nonzero_events": 2554,
+          "sum": 988266
+        },
+        "selected_events": 2554,
+        "selected_metadata_field_sums": [
+          4914,
+          0,
+          588678,
+          143798,
+          174769,
+          0,
+          912159,
+          935414,
+          23255,
+          25433,
+          27419,
+          13809,
+          25433,
+          6626,
+          32616,
+          2554
+        ],
+        "selected_node_occurrences": 988266,
+        "selected_reported_intervals": {
+          "action_whnf_ns": {
+            "max": 219770697,
+            "median": {
+              "decimal": "1064757",
+              "denominator": 1,
+              "numerator": 1064757
+            },
+            "min": 390207,
+            "nonzero_events": 2554,
+            "sum": 4794645086
+          },
+          "encoding_ns": {
+            "max": 187150667,
+            "median": {
+              "decimal": "281407",
+              "denominator": 1,
+              "numerator": 281407
+            },
+            "min": 74711,
+            "nonzero_events": 2554,
+            "sum": 1319313381
+          }
+        },
+        "six_first_discovery_origins": {
+          "first_binder": {
+            "max": 261,
+            "median": {
+              "decimal": "42",
+              "denominator": 1,
+              "numerator": 42
+            },
+            "median_event_fraction_of_connected": {
+              "decimal": "0.1773297445533492458483571174648316489767",
+              "denominator": 98455,
+              "numerator": 17459
+            },
+            "min": 12,
+            "nonzero_events": 2554,
+            "sum": 143798,
+            "weighted_fraction_of_connected": {
+              "decimal": "0.1576457613201207245666599792360761665455",
+              "denominator": 912159,
+              "numerator": 143798
+            }
+          },
+          "first_binding_child": {
+            "max": 0,
+            "median": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            },
+            "median_event_fraction_of_connected": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            },
+            "min": 0,
+            "nonzero_events": 0,
+            "sum": 0,
+            "weighted_fraction_of_connected": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            }
+          },
+          "first_child": {
+            "max": 1408,
+            "median": {
+              "decimal": "126",
+              "denominator": 1,
+              "numerator": 126
+            },
+            "median_event_fraction_of_connected": {
+              "decimal": "0.5990481321839080459770114942528735632184",
+              "denominator": 11136,
+              "numerator": 6671
+            },
+            "min": 38,
+            "nonzero_events": 2554,
+            "sum": 588678,
+            "weighted_fraction_of_connected": {
+              "decimal": "0.6453677483859721824813437131026498669640",
+              "denominator": 304053,
+              "numerator": 196226
+            }
+          },
+          "first_equation": {
+            "max": 2,
+            "median": {
+              "decimal": "2",
+              "denominator": 1,
+              "numerator": 2
+            },
+            "median_event_fraction_of_connected": {
+              "decimal": "0.008230452674897119341563786008230452674897",
+              "denominator": 243,
+              "numerator": 2
+            },
+            "min": 1,
+            "nonzero_events": 2554,
+            "sum": 4914,
+            "weighted_fraction_of_connected": {
+              "decimal": "0.005387218675691409063551420311590413513434",
+              "denominator": 101351,
+              "numerator": 546
+            }
+          },
+          "first_fresh_external": {
+            "max": 0,
+            "median": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            },
+            "median_event_fraction_of_connected": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            },
+            "min": 0,
+            "nonzero_events": 0,
+            "sum": 0,
+            "weighted_fraction_of_connected": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            }
+          },
+          "first_structural_parent": {
+            "max": 411,
+            "median": {
+              "decimal": "50",
+              "denominator": 1,
+              "numerator": 50
+            },
+            "median_event_fraction_of_connected": {
+              "decimal": "0.2169387385961540635563041929977277095086",
+              "denominator": 353828,
+              "numerator": 76759
+            },
+            "min": 6,
+            "nonzero_events": 2554,
+            "sum": 174769,
+            "weighted_fraction_of_connected": {
+              "decimal": "0.1915992716182156838884448873496835529771",
+              "denominator": 912159,
+              "numerator": 174769
+            }
+          }
+        },
+        "unselected_metadata": "Not recorded, not counted as zero."
+      },
+      "UnifyDistinct": {
+        "all_Left": 0,
+        "all_Right": 2207,
+        "all_events": 2207,
+        "all_node_occurrences": 464828,
+        "all_reported_intervals": {
+          "action_whnf_ns": {
+            "max": 1279073990,
+            "median": {
+              "decimal": "409747",
+              "denominator": 1,
+              "numerator": 409747
+            },
+            "min": 33119,
+            "nonzero_events": 2207,
+            "sum": 3070762725
+          },
+          "encoding_ns": {
+            "max": 83268598,
+            "median": {
+              "decimal": "85567",
+              "denominator": 1,
+              "numerator": 85567
+            },
+            "min": 5808,
+            "nonzero_events": 2207,
+            "sum": 520597198
+          }
+        },
+        "all_words": 7691087,
+        "four_part_node_decomposition": {
+          "connected": {
+            "max": 1918,
+            "median": {
+              "decimal": "209",
+              "denominator": 1,
+              "numerator": 209
+            },
+            "median_event_fraction": {
+              "decimal": "0.9380131362889983579638752052545155993432",
+              "denominator": 2436,
+              "numerator": 2285
+            },
+            "min": 114,
+            "nonzero_events": 850,
+            "sum": 306693,
+            "weighted_fraction_of_selected_nodes": {
+              "decimal": "0.9471065804873680212216008226767257219266",
+              "denominator": 323821,
+              "numerator": 306693
+            }
+          },
+          "fresh_count": {
+            "max": 0,
+            "median": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            },
+            "median_event_fraction": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            },
+            "min": 0,
+            "nonzero_events": 0,
+            "sum": 0,
+            "weighted_fraction_of_selected_nodes": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            }
+          },
+          "scope_added": {
+            "max": 48,
+            "median": {
+              "decimal": "6",
+              "denominator": 1,
+              "numerator": 6
+            },
+            "median_event_fraction": {
+              "decimal": "0.02739726027397260273972602739726027397260",
+              "denominator": 73,
+              "numerator": 2
+            },
+            "min": 0,
+            "nonzero_events": 830,
+            "sum": 7788,
+            "weighted_fraction_of_selected_nodes": {
+              "decimal": "0.02405032409880767461035572121635100873631",
+              "denominator": 323821,
+              "numerator": 7788
+            }
+          },
+          "stub_count": {
+            "max": 52,
+            "median": {
+              "decimal": "8",
+              "denominator": 1,
+              "numerator": 8
+            },
+            "median_event_fraction": {
+              "decimal": "0.03424657534246575342465753424657534246575",
+              "denominator": 146,
+              "numerator": 5
+            },
+            "min": 1,
+            "nonzero_events": 850,
+            "sum": 9340,
+            "weighted_fraction_of_selected_nodes": {
+              "decimal": "0.02884309541382430416804345610692326933707",
+              "denominator": 323821,
+              "numerator": 9340
+            }
+          }
+        },
+        "other_metadata": {
+          "direct_union": {
+            "max": 32,
+            "median": {
+              "decimal": "4",
+              "denominator": 1,
+              "numerator": 4
+            },
+            "min": 2,
+            "nonzero_events": 850,
+            "sum": 4295
+          },
+          "equation_fresh_overlap": {
+            "max": 0,
+            "median": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            },
+            "min": 0,
+            "nonzero_events": 0,
+            "sum": 0
+          },
+          "equation_unique": {
+            "max": 32,
+            "median": {
+              "decimal": "4",
+              "denominator": 1,
+              "numerator": 4
+            },
+            "min": 2,
+            "nonzero_events": 850,
+            "sum": 4295
+          },
+          "external_unique": {
+            "max": 0,
+            "median": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            },
+            "min": 0,
+            "nonzero_events": 0,
+            "sum": 0
+          },
+          "fresh_unique": {
+            "max": 0,
+            "median": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            },
+            "min": 0,
+            "nonzero_events": 0,
+            "sum": 0
+          },
+          "selected": {
+            "max": 1960,
+            "median": {
+              "decimal": "215.5",
+              "denominator": 2,
+              "numerator": 431
+            },
+            "min": 122,
+            "nonzero_events": 850,
+            "sum": 314481
+          }
+        },
+        "selected_event_node_stats": {
+          "max": 2006,
+          "median": {
+            "decimal": "222.5",
+            "denominator": 2,
+            "numerator": 445
+          },
+          "min": 129,
+          "nonzero_events": 850,
+          "sum": 323821
+        },
+        "selected_events": 850,
+        "selected_metadata_field_sums": [
+          2233,
+          0,
+          187116,
+          50805,
+          66539,
+          0,
+          306693,
+          314481,
+          7788,
+          0,
+          9340,
+          4295,
+          0,
+          0,
+          4295,
+          0
+        ],
+        "selected_node_occurrences": 323821,
+        "selected_reported_intervals": {
+          "action_whnf_ns": {
+            "max": 42457565,
+            "median": {
+              "decimal": "961495.5",
+              "denominator": 2,
+              "numerator": 1922991
+            },
+            "min": 441654,
+            "nonzero_events": 850,
+            "sum": 1461503783
+          },
+          "encoding_ns": {
+            "max": 2581829,
+            "median": {
+              "decimal": "261496.5",
+              "denominator": 2,
+              "numerator": 522993
+            },
+            "min": 80920,
+            "nonzero_events": 850,
+            "sum": 364412054
+          }
+        },
+        "six_first_discovery_origins": {
+          "first_binder": {
+            "max": 269,
+            "median": {
+              "decimal": "42",
+              "denominator": 1,
+              "numerator": 42
+            },
+            "median_event_fraction_of_connected": {
+              "decimal": "0.1861605107159142726858185134518923848609",
+              "denominator": 8772,
+              "numerator": 1633
+            },
+            "min": 18,
+            "nonzero_events": 850,
+            "sum": 50805,
+            "weighted_fraction_of_connected": {
+              "decimal": "0.1656542536021363382926900842210288464360",
+              "denominator": 34077,
+              "numerator": 5645
+            }
+          },
+          "first_binding_child": {
+            "max": 0,
+            "median": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            },
+            "median_event_fraction_of_connected": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            },
+            "min": 0,
+            "nonzero_events": 0,
+            "sum": 0,
+            "weighted_fraction_of_connected": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            }
+          },
+          "first_child": {
+            "max": 1406,
+            "median": {
+              "decimal": "110.5",
+              "denominator": 2,
+              "numerator": 221
+            },
+            "median_event_fraction_of_connected": {
+              "decimal": "0.5853658536585365853658536585365853658537",
+              "denominator": 41,
+              "numerator": 24
+            },
+            "min": 42,
+            "nonzero_events": 850,
+            "sum": 187116,
+            "weighted_fraction_of_connected": {
+              "decimal": "0.6101084798153202061996850270465905645059",
+              "denominator": 102231,
+              "numerator": 62372
+            }
+          },
+          "first_equation": {
+            "max": 3,
+            "median": {
+              "decimal": "3",
+              "denominator": 1,
+              "numerator": 3
+            },
+            "median_event_fraction_of_connected": {
+              "decimal": "0.01098901098901098901098901098901098901099",
+              "denominator": 91,
+              "numerator": 1
+            },
+            "min": 2,
+            "nonzero_events": 850,
+            "sum": 2233,
+            "weighted_fraction_of_connected": {
+              "decimal": "0.007280896531710863958420961678290668518682",
+              "denominator": 306693,
+              "numerator": 2233
+            }
+          },
+          "first_fresh_external": {
+            "max": 0,
+            "median": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            },
+            "median_event_fraction_of_connected": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            },
+            "min": 0,
+            "nonzero_events": 0,
+            "sum": 0,
+            "weighted_fraction_of_connected": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            }
+          },
+          "first_structural_parent": {
+            "max": 424,
+            "median": {
+              "decimal": "56",
+              "denominator": 1,
+              "numerator": 56
+            },
+            "median_event_fraction_of_connected": {
+              "decimal": "0.2166814683244523386619301361752516281824",
+              "denominator": 67560,
+              "numerator": 14639
+            },
+            "min": 17,
+            "nonzero_events": 850,
+            "sum": 66539,
+            "weighted_fraction_of_connected": {
+              "decimal": "0.2169563700508325915492039270540899205394",
+              "denominator": 306693,
+              "numerator": 66539
+            }
+          }
+        },
+        "unselected_metadata": "Not recorded, not counted as zero."
+      },
+      "all": {
+        "all_Left": 0,
+        "all_Right": 16738,
+        "all_events": 16738,
+        "all_node_occurrences": 1814991,
+        "all_reported_intervals": {
+          "action_whnf_ns": {
+            "max": 1279073990,
+            "median": {
+              "decimal": "92672.5",
+              "denominator": 2,
+              "numerator": 185345
+            },
+            "min": 28252,
+            "nonzero_events": 16738,
+            "sum": 9741994310
+          },
+          "encoding_ns": {
+            "max": 187150667,
+            "median": {
+              "decimal": "16204",
+              "denominator": 1,
+              "numerator": 16204
+            },
+            "min": 3044,
+            "nonzero_events": 16738,
+            "sum": 2168895011
+          }
+        },
+        "all_words": 30496409,
+        "four_part_node_decomposition": {
+          "connected": {
+            "max": 1918,
+            "median": {
+              "decimal": "223",
+              "denominator": 1,
+              "numerator": 223
+            },
+            "median_event_fraction": {
+              "decimal": "0.9186315283495997826495851532947397019791",
+              "denominator": 239245,
+              "numerator": 219778
+            },
+            "min": 100,
+            "nonzero_events": 3404,
+            "sum": 1218852,
+            "weighted_fraction_of_selected_nodes": {
+              "decimal": "0.9289414497666694357919863545633788003387",
+              "denominator": 1312087,
+              "numerator": 1218852
+            }
+          },
+          "fresh_count": {
+            "max": 88,
+            "median": {
+              "decimal": "3",
+              "denominator": 1,
+              "numerator": 3
+            },
+            "median_event_fraction": {
+              "decimal": "0.01107011070110701107011070110701107011070",
+              "denominator": 271,
+              "numerator": 3
+            },
+            "min": 0,
+            "nonzero_events": 2554,
+            "sum": 25433,
+            "weighted_fraction_of_selected_nodes": {
+              "decimal": "0.01938362318962081020542082956389324793249",
+              "denominator": 1312087,
+              "numerator": 25433
+            }
+          },
+          "scope_added": {
+            "max": 48,
+            "median": {
+              "decimal": "7",
+              "denominator": 1,
+              "numerator": 7
+            },
+            "median_event_fraction": {
+              "decimal": "0.02739726027397260273972602739726027397260",
+              "denominator": 73,
+              "numerator": 2
+            },
+            "min": 0,
+            "nonzero_events": 3346,
+            "sum": 31043,
+            "weighted_fraction_of_selected_nodes": {
+              "decimal": "0.02365925430249670944076116903833358611129",
+              "denominator": 1312087,
+              "numerator": 31043
+            }
+          },
+          "stub_count": {
+            "max": 52,
+            "median": {
+              "decimal": "9",
+              "denominator": 1,
+              "numerator": 9
+            },
+            "median_event_fraction": {
+              "decimal": "0.03289473684210526315789473684210526315789",
+              "denominator": 152,
+              "numerator": 5
+            },
+            "min": 1,
+            "nonzero_events": 3404,
+            "sum": 36759,
+            "weighted_fraction_of_selected_nodes": {
+              "decimal": "0.02801567274121304456183164683439436561752",
+              "denominator": 1312087,
+              "numerator": 36759
+            }
+          }
+        },
+        "other_metadata": {
+          "direct_union": {
+            "max": 102,
+            "median": {
+              "decimal": "6",
+              "denominator": 1,
+              "numerator": 6
+            },
+            "min": 2,
+            "nonzero_events": 3404,
+            "sum": 36911
+          },
+          "equation_fresh_overlap": {
+            "max": 16,
+            "median": {
+              "decimal": "2",
+              "denominator": 1,
+              "numerator": 2
+            },
+            "min": 0,
+            "nonzero_events": 2554,
+            "sum": 6626
+          },
+          "equation_unique": {
+            "max": 32,
+            "median": {
+              "decimal": "4",
+              "denominator": 1,
+              "numerator": 4
+            },
+            "min": 2,
+            "nonzero_events": 3404,
+            "sum": 18104
+          },
+          "external_unique": {
+            "max": 1,
+            "median": {
+              "decimal": "1",
+              "denominator": 1,
+              "numerator": 1
+            },
+            "min": 0,
+            "nonzero_events": 2554,
+            "sum": 2554
+          },
+          "fresh_unique": {
+            "max": 88,
+            "median": {
+              "decimal": "3",
+              "denominator": 1,
+              "numerator": 3
+            },
+            "min": 0,
+            "nonzero_events": 2554,
+            "sum": 25433
+          },
+          "selected": {
+            "max": 1960,
+            "median": {
+              "decimal": "231",
+              "denominator": 1,
+              "numerator": 231
+            },
+            "min": 100,
+            "nonzero_events": 3404,
+            "sum": 1249895
+          }
+        },
+        "selected_event_node_stats": {
+          "max": 2006,
+          "median": {
+            "decimal": "245",
+            "denominator": 1,
+            "numerator": 245
+          },
+          "min": 129,
+          "nonzero_events": 3404,
+          "sum": 1312087
+        },
+        "selected_events": 3404,
+        "selected_metadata_field_sums": [
+          7147,
+          0,
+          775794,
+          194603,
+          241308,
+          0,
+          1218852,
+          1249895,
+          31043,
+          25433,
+          36759,
+          18104,
+          25433,
+          6626,
+          36911,
+          2554
+        ],
+        "selected_node_occurrences": 1312087,
+        "selected_reported_intervals": {
+          "action_whnf_ns": {
+            "max": 219770697,
+            "median": {
+              "decimal": "1029369",
+              "denominator": 1,
+              "numerator": 1029369
+            },
+            "min": 390207,
+            "nonzero_events": 3404,
+            "sum": 6256148869
+          },
+          "encoding_ns": {
+            "max": 187150667,
+            "median": {
+              "decimal": "275713.5",
+              "denominator": 2,
+              "numerator": 551427
+            },
+            "min": 74711,
+            "nonzero_events": 3404,
+            "sum": 1683725435
+          }
+        },
+        "six_first_discovery_origins": {
+          "first_binder": {
+            "max": 269,
+            "median": {
+              "decimal": "42",
+              "denominator": 1,
+              "numerator": 42
+            },
+            "median_event_fraction_of_connected": {
+              "decimal": "0.1785714285714285714285714285714285714286",
+              "denominator": 28,
+              "numerator": 5
+            },
+            "min": 12,
+            "nonzero_events": 3404,
+            "sum": 194603,
+            "weighted_fraction_of_connected": {
+              "decimal": "0.1596608940215875266234128507808987473459",
+              "denominator": 1218852,
+              "numerator": 194603
+            }
+          },
+          "first_binding_child": {
+            "max": 0,
+            "median": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            },
+            "median_event_fraction_of_connected": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            },
+            "min": 0,
+            "nonzero_events": 0,
+            "sum": 0,
+            "weighted_fraction_of_connected": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            }
+          },
+          "first_child": {
+            "max": 1408,
+            "median": {
+              "decimal": "121",
+              "denominator": 1,
+              "numerator": 121
+            },
+            "median_event_fraction_of_connected": {
+              "decimal": "0.5945945945945945945945945945945945945946",
+              "denominator": 37,
+              "numerator": 22
+            },
+            "min": 38,
+            "nonzero_events": 3404,
+            "sum": 775794,
+            "weighted_fraction_of_connected": {
+              "decimal": "0.6364956532868633763574248555197841903693",
+              "denominator": 203142,
+              "numerator": 129299
+            }
+          },
+          "first_equation": {
+            "max": 3,
+            "median": {
+              "decimal": "2",
+              "denominator": 1,
+              "numerator": 2
+            },
+            "median_event_fraction_of_connected": {
+              "decimal": "0.008810572687224669603524229074889867841410",
+              "denominator": 227,
+              "numerator": 2
+            },
+            "min": 1,
+            "nonzero_events": 3404,
+            "sum": 7147,
+            "weighted_fraction_of_connected": {
+              "decimal": "0.005863714380416982537666591185804347041314",
+              "denominator": 1218852,
+              "numerator": 7147
+            }
+          },
+          "first_fresh_external": {
+            "max": 0,
+            "median": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            },
+            "median_event_fraction_of_connected": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            },
+            "min": 0,
+            "nonzero_events": 0,
+            "sum": 0,
+            "weighted_fraction_of_connected": {
+              "decimal": "0",
+              "denominator": 1,
+              "numerator": 0
+            }
+          },
+          "first_structural_parent": {
+            "max": 424,
+            "median": {
+              "decimal": "52",
+              "denominator": 1,
+              "numerator": 52
+            },
+            "median_event_fraction_of_connected": {
+              "decimal": "0.2168552522044359136147446672004326686002",
+              "denominator": 754388,
+              "numerator": 163593
+            },
+            "min": 6,
+            "nonzero_events": 3404,
+            "sum": 241308,
+            "weighted_fraction_of_connected": {
+              "decimal": "0.1979797383111321144814957025135127152435",
+              "denominator": 33857,
+              "numerator": 6703
+            }
+          }
+        },
+        "unselected_metadata": "Not recorded, not counted as zero."
+      }
+    },
+    "raw": {
+      "bytes": 2198436,
+      "sha256": "1c4ec92f6c9bde29d786985e04e86478ed12f52700e9f8913cc6296a3a1bba3c"
+    },
+    "reference_sha256": "e32554dd47b2757f1a72b7849ae6691a6fcd7891e8c79e89b9c112b7985f5b07",
+    "status": "PASS_INDEPENDENT_EXACT_PROVENANCE_AND_EVENT_MEDIANS",
+    "totals": {
+      "Left": 0,
+      "Right": 16738,
+      "action_whnf_ns_reported_sum": 9741994310,
+      "calls": 16738,
+      "encoding_ns_reported_sum": 2168895011,
+      "nodes": 1814991,
+      "words": 30496409
+    }
+  },
+  "interpretation": "The approximately 92.9% connected share uses selected node-occurrence totals, not CPU, allocation or removable cost. NA is unknown, not zero. Zero first-discovery routes do not establish absence of edges.",
+  "next_optimization_decision": "NO_GO for production localized validation/rebinding: no sufficient clean-dependency and invalidation certificate is established. No new experiment is authorized.",
+  "producer": {
+    "bytes": 20371016,
+    "sha256": "90dd0fbb64ae299f7795b2ee05d004366089cf1091c204c108a3e4bd38bc6d1e"
+  },
+  "pure_analyzer_reproduction": {
+    "all_input_nodes_occurrences_decimal": "1814991",
+    "events": 16738,
+    "first7_sha256": "d04f0c1d1b3013b1adf780711f7e0fcb7ae99ef0d7ebf094ee51411aa7173675",
+    "first_discovery_connected_totals": {
+      "first_binder": "194603",
+      "first_binding_child": "0",
+      "first_child": "775794",
+      "first_equation": "7147",
+      "first_fresh_external": "0",
+      "first_structural_parent": "241308"
+    },
+    "interpretation": [
+      "Node occurrences across selected events, not unique nodes or allocation.",
+      "First-discovery route depends on DFS order; not incidence, necessity or avoidable work.",
+      "Direct set sizes overlap and must not be added as a partition.",
+      "Interval sums can overlap through thunk re-entry and include GC/scheduling.",
+      "No exclusive CPU, CLI phase, speedup or automatic optimization admission.",
+      "Fingerprint matches are not graph equality; numeric conservation is not an identity proof."
+    ],
+    "left": 0,
+    "node_partition": {
+      "connected": "1218852",
+      "fresh_count": "25433",
+      "scope_added": "31043",
+      "stub_count": "36759"
+    },
+    "overlapping_direct_size_totals": {
+      "direct_union": "36911",
+      "equation_fresh_overlap": "6626",
+      "equation_unique": "18104",
+      "external_unique": "2554",
+      "fresh_unique": "25433"
+    },
+    "raw_bytes": 2198436,
+    "raw_sha256": "1c4ec92f6c9bde29d786985e04e86478ed12f52700e9f8913cc6296a3a1bba3c",
+    "reference_first7": {
+      "byteexact": true,
+      "meaning": "Ordered source/route/input fingerprint qualification, not raw graph equality.",
+      "raw_sha256": "e32554dd47b2757f1a72b7849ae6691a6fcd7891e8c79e89b9c112b7985f5b07",
+      "timing_join": false
+    },
+    "reported_action_ns_sum_decimal": "9741994310",
+    "reported_encoding_ns_sum_decimal": "2168895011",
+    "right": 16738,
+    "schema": "public-local-closure-provenance-analysis-v1",
+    "selected_events": 3404,
+    "selected_node_occurrences_decimal": "1312087",
+    "selected_range": [
+      129,
+      2048
+    ],
+    "selected_reported_action_ns_sum_decimal": "6256148869",
+    "sites": {
+      "PreparedFallback": {
+        "events": 14531,
+        "left": 0,
+        "metadata": {
+          "connected": {
+            "event_max_decimal": "1865",
+            "event_median_decimal": "227",
+            "sum_decimal": "912159"
+          },
+          "direct_union": {
+            "event_max_decimal": "102",
+            "event_median_decimal": "8",
+            "sum_decimal": "32616"
+          },
+          "equation_fresh_overlap": {
+            "event_max_decimal": "16",
+            "event_median_decimal": "2",
+            "sum_decimal": "6626"
+          },
+          "equation_unique": {
+            "event_max_decimal": "32",
+            "event_median_decimal": "4",
+            "sum_decimal": "13809"
+          },
+          "external_unique": {
+            "event_max_decimal": "1",
+            "event_median_decimal": "1",
+            "sum_decimal": "2554"
+          },
+          "first_binder": {
+            "event_max_decimal": "261",
+            "event_median_decimal": "42",
+            "sum_decimal": "143798"
+          },
+          "first_binding_child": {
+            "event_max_decimal": "0",
+            "event_median_decimal": "0",
+            "sum_decimal": "0"
+          },
+          "first_child": {
+            "event_max_decimal": "1408",
+            "event_median_decimal": "126",
+            "sum_decimal": "588678"
+          },
+          "first_equation": {
+            "event_max_decimal": "2",
+            "event_median_decimal": "2",
+            "sum_decimal": "4914"
+          },
+          "first_fresh_external": {
+            "event_max_decimal": "0",
+            "event_median_decimal": "0",
+            "sum_decimal": "0"
+          },
+          "first_structural_parent": {
+            "event_max_decimal": "411",
+            "event_median_decimal": "50",
+            "sum_decimal": "174769"
+          },
+          "fresh_count": {
+            "event_max_decimal": "88",
+            "event_median_decimal": "6",
+            "sum_decimal": "25433"
+          },
+          "fresh_unique": {
+            "event_max_decimal": "88",
+            "event_median_decimal": "6",
+            "sum_decimal": "25433"
+          },
+          "scope_added": {
+            "event_max_decimal": "48",
+            "event_median_decimal": "7",
+            "sum_decimal": "23255"
+          },
+          "selected": {
+            "event_max_decimal": "1913",
+            "event_median_decimal": "232",
+            "sum_decimal": "935414"
+          },
+          "stub_count": {
+            "event_max_decimal": "52",
+            "event_median_decimal": "9",
+            "sum_decimal": "27419"
+          }
+        },
+        "right": 14531,
+        "selected_events": 2554,
+        "selected_input_nodes": {
+          "event_max_decimal": "1996",
+          "event_median_decimal": "251",
+          "sum_decimal": "988266"
+        },
+        "selected_reported_action_ns": {
+          "event_max_decimal": "219770697",
+          "event_median_decimal": "1064757",
+          "sum_decimal": "4794645086"
+        }
+      },
+      "UnifyDistinct": {
+        "events": 2207,
+        "left": 0,
+        "metadata": {
+          "connected": {
+            "event_max_decimal": "1918",
+            "event_median_decimal": "209",
+            "sum_decimal": "306693"
+          },
+          "direct_union": {
+            "event_max_decimal": "32",
+            "event_median_decimal": "4",
+            "sum_decimal": "4295"
+          },
+          "equation_fresh_overlap": {
+            "event_max_decimal": "0",
+            "event_median_decimal": "0",
+            "sum_decimal": "0"
+          },
+          "equation_unique": {
+            "event_max_decimal": "32",
+            "event_median_decimal": "4",
+            "sum_decimal": "4295"
+          },
+          "external_unique": {
+            "event_max_decimal": "0",
+            "event_median_decimal": "0",
+            "sum_decimal": "0"
+          },
+          "first_binder": {
+            "event_max_decimal": "269",
+            "event_median_decimal": "42",
+            "sum_decimal": "50805"
+          },
+          "first_binding_child": {
+            "event_max_decimal": "0",
+            "event_median_decimal": "0",
+            "sum_decimal": "0"
+          },
+          "first_child": {
+            "event_max_decimal": "1406",
+            "event_median_decimal": "110.5",
+            "sum_decimal": "187116"
+          },
+          "first_equation": {
+            "event_max_decimal": "3",
+            "event_median_decimal": "3",
+            "sum_decimal": "2233"
+          },
+          "first_fresh_external": {
+            "event_max_decimal": "0",
+            "event_median_decimal": "0",
+            "sum_decimal": "0"
+          },
+          "first_structural_parent": {
+            "event_max_decimal": "424",
+            "event_median_decimal": "56",
+            "sum_decimal": "66539"
+          },
+          "fresh_count": {
+            "event_max_decimal": "0",
+            "event_median_decimal": "0",
+            "sum_decimal": "0"
+          },
+          "fresh_unique": {
+            "event_max_decimal": "0",
+            "event_median_decimal": "0",
+            "sum_decimal": "0"
+          },
+          "scope_added": {
+            "event_max_decimal": "48",
+            "event_median_decimal": "6",
+            "sum_decimal": "7788"
+          },
+          "selected": {
+            "event_max_decimal": "1960",
+            "event_median_decimal": "215.5",
+            "sum_decimal": "314481"
+          },
+          "stub_count": {
+            "event_max_decimal": "52",
+            "event_median_decimal": "8",
+            "sum_decimal": "9340"
+          }
+        },
+        "right": 2207,
+        "selected_events": 850,
+        "selected_input_nodes": {
+          "event_max_decimal": "2006",
+          "event_median_decimal": "222.5",
+          "sum_decimal": "323821"
+        },
+        "selected_reported_action_ns": {
+          "event_max_decimal": "42457565",
+          "event_median_decimal": "961495.5",
+          "sum_decimal": "1461503783"
+        }
+      }
+    },
+    "total_words_decimal": "30496409"
+  },
+  "schema": "public-single-real-closure-provenance-result-v1",
+  "status": "PASS_INDEPENDENT_SINGLE_REAL_LOCAL_CLOSURE_PROVENANCE_DIAGNOSTIC_ONLY",
+  "supervision": {
+    "address_space_bytes": 4294967296,
+    "all_children_reaped_and_groups_clean": true,
+    "compile_limit_seconds": 240,
+    "five_children_exit_zero": true,
+    "original_leases_released_and_post_reacquired": 3,
+    "output_bytes": 72683189,
+    "output_file_count": 353,
+    "source_input_directory_unchanged": true,
+    "step_elapsed_ns_budget_telemetry_only": [
+      {
+        "elapsed_ns_decimal": "414767320",
+        "exit": 0,
+        "name": "c-host"
+      },
+      {
+        "elapsed_ns_decimal": "410519403",
+        "exit": 0,
+        "name": "c-supervisor"
+      },
+      {
+        "elapsed_ns_decimal": "122700360215",
+        "exit": 0,
+        "name": "ghc"
+      },
+      {
+        "elapsed_ns_decimal": "105680701",
+        "exit": 0,
+        "name": "ldd"
+      },
+      {
+        "elapsed_ns_decimal": "19970689276",
+        "exit": 0,
+        "name": "diagnostic"
+      }
+    ],
+    "target_CPU_and_peak_RSS_measured": false,
+    "target_limit_seconds": 90,
+    "tsv_cap_bytes": 8388608,
+    "whole_final_ns_decimal": "163054176188",
+    "whole_limit_seconds": 400
+  },
+  "workload": {
+    "argv": [
+      "<DIAGNOSTIC_ELF>",
+      "--no-prelude",
+      "-i",
+      "<FIXED_FOUNDATION_SOURCE_DIR>",
+      "--type",
+      "<FIXED_COMMON_ROOT>"
+    ],
+    "exit": 0,
+    "fixed_source_files": 16,
+    "input_paths_preserved_from_reference_run": true,
+    "kind": "Root plus Foundation --type",
+    "performance_samples": 0,
+    "stderr_bytes": 0,
+    "stdout": "Bool\n"
+  }
+}
