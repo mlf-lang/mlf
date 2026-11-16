@@ -1,0 +1,215 @@
+{
+  "status": "PASS_QUALIFIED_ASYNC_TYPE_SCREEN_WITH_ENGINEERING_STOP",
+  "decision": "STOP_NO_MATERIAL_SIGNAL",
+  "baseline_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "producer_A_sha256": "4eab562e58373f5d6dccc8a5460d8d7b909571ee6e88ea91a110f53dc5c10c71",
+  "producer_C_sha256": "857840bf61e2682fb9e5f4869b8a6cea804a6798bd089b3f8694890589c5f3d1",
+  "independent_actual_review_sha256": "3d76ce82e8c5d60e1ce5f37d08356155840bff4ba5a01cd58fbc692218972aef",
+  "independent_numeric_sha256": "8840e31cfdb9559fc1bafc0b438c22dcd599abdbd13cfb3d4d04a0b6370017fa",
+  "raw_files": 44,
+  "raw_bytes": 389945,
+  "endpoint": "ordinary MLF --no-prelude -i fixed-source-root --type AsyncWorkloadRoot.hs; source-only checking service",
+  "source_boundary": "5 real Async modules + 3 real Foundation dependencies + Bool Root; static closure9, not a dynamic loader observation",
+  "calls": [
+    {
+      "name": "A-good-qualification",
+      "endpoint": "A",
+      "performance_sample": false,
+      "exit_code": 0,
+      "wall_ns": 12956907753,
+      "user_seconds": "12.560431",
+      "system_seconds": "0.426211",
+      "maxrss_kib": 355744,
+      "stdout_sha256": "a859dd85fbba32afeae6f134097b33b6a4c03d6304aa79c32dd6beee84173dff",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "C-good-qualification",
+      "endpoint": "C",
+      "performance_sample": false,
+      "exit_code": 0,
+      "wall_ns": 11565988359,
+      "user_seconds": "11.453191",
+      "system_seconds": "0.13610899999999998",
+      "maxrss_kib": 438636,
+      "stdout_sha256": "a859dd85fbba32afeae6f134097b33b6a4c03d6304aa79c32dd6beee84173dff",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "A1",
+      "endpoint": "A",
+      "performance_sample": true,
+      "exit_code": 0,
+      "wall_ns": 12417494535,
+      "user_seconds": "12.268404",
+      "system_seconds": "0.16375399999999998",
+      "maxrss_kib": 355744,
+      "stdout_sha256": "a859dd85fbba32afeae6f134097b33b6a4c03d6304aa79c32dd6beee84173dff",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "C1",
+      "endpoint": "C",
+      "performance_sample": true,
+      "exit_code": 0,
+      "wall_ns": 13923223465,
+      "user_seconds": "13.611364",
+      "system_seconds": "0.314085",
+      "maxrss_kib": 438636,
+      "stdout_sha256": "a859dd85fbba32afeae6f134097b33b6a4c03d6304aa79c32dd6beee84173dff",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "C2",
+      "endpoint": "C",
+      "performance_sample": true,
+      "exit_code": 0,
+      "wall_ns": 12591391633,
+      "user_seconds": "12.253109",
+      "system_seconds": "0.36263399999999996",
+      "maxrss_kib": 438636,
+      "stdout_sha256": "a859dd85fbba32afeae6f134097b33b6a4c03d6304aa79c32dd6beee84173dff",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "A2",
+      "endpoint": "A",
+      "performance_sample": true,
+      "exit_code": 0,
+      "wall_ns": 13535345010,
+      "user_seconds": "13.154758",
+      "system_seconds": "0.385465",
+      "maxrss_kib": 355744,
+      "stdout_sha256": "a859dd85fbba32afeae6f134097b33b6a4c03d6304aa79c32dd6beee84173dff",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "independent_numeric": {
+    "raw_samples": {
+      "A1": {
+        "wall_ns": 12417494535,
+        "user_seconds": "12.268404",
+        "system_seconds": "0.16375399999999998",
+        "maxrss_kib": 355744
+      },
+      "C1": {
+        "wall_ns": 13923223465,
+        "user_seconds": "13.611364",
+        "system_seconds": "0.314085",
+        "maxrss_kib": 438636
+      },
+      "C2": {
+        "wall_ns": 12591391633,
+        "user_seconds": "12.253109",
+        "system_seconds": "0.36263399999999996",
+        "maxrss_kib": 438636
+      },
+      "A2": {
+        "wall_ns": 13535345010,
+        "user_seconds": "13.154758",
+        "system_seconds": "0.385465",
+        "maxrss_kib": 355744
+      }
+    },
+    "pairs": [
+      {
+        "C": "C1",
+        "A": "A1",
+        "ratio": {
+          "wall": "1.1212586746670953940548684123097139740355843047689",
+          "CPU": "1.1201151883687449936207618795847752154063065794125",
+          "user": "1.1094649312168070109200838185635230140774627245728",
+          "system": "1.9180294832492643743700286098983077506538600459601",
+          "RSS": "1.2330102545650805073311145093100656651974453539624"
+        },
+        "percent": {
+          "wall": "12.125867466709539405486841230971397403558430476890",
+          "CPU": "12.011518836874499362076187958477521540630657941250",
+          "user": "10.946493121680701092008381856352301407746272457280",
+          "system": "91.802948324926437437002860989830775065386004596010",
+          "RSS": "23.301025456508050733111450931006566519744535396240"
+        }
+      },
+      {
+        "C": "C2",
+        "A": "A2",
+        "ratio": {
+          "wall": "0.93026011702674729234700165208422714597653244451727",
+          "CPU": "0.93172342877957031874585817382771317724973953530898",
+          "user": "0.93145833621568713008631553693348064631823709717807",
+          "system": "0.94077023854305828025890807206880002075415407365130",
+          "RSS": "1.2330102545650805073311145093100656651974453539624"
+        },
+        "percent": {
+          "wall": "-6.9739882973252707652998347915772854023467555482730",
+          "CPU": "-6.8276571220429681254141826172286822750260464691020",
+          "user": "-6.8541663784312869913684463066519353681762902821930",
+          "system": "-5.9229761456941719741091927931199979245845926348700",
+          "RSS": "23.301025456508050733111450931006566519744535396240"
+        }
+      }
+    ],
+    "geometric_C_over_A": {
+      "wall": "1.0213041789364556060861558070041220609260152429921",
+      "CPU": "1.0215858084052466749707671289687835040111480662162",
+      "user": "1.0165728497854242912961313795907568188396380654640",
+      "system": "1.3432888946496316700129805609808137424561806297580",
+      "RSS": "1.2330102545650805073311145093100656651974453539624"
+    },
+    "geometric_percent": {
+      "wall": "2.1304178936455606086155807004122060926015242992100",
+      "CPU": "2.1585808405246674970767128968783504011148066216200",
+      "user": "1.6572849785424291296131379590756818839638065464000",
+      "system": "34.328889464963167001298056098081374245618062975800",
+      "RSS": "23.301025456508050733111450931006566519744535396240"
+    },
+    "mean_paired_RSS_ratio": "1.2330102545650805073311145093100656651974453539624",
+    "criteria": {
+      "both_wall_faster": false,
+      "both_CPU_faster": false,
+      "wall_geometric_at_most_0_95": false,
+      "CPU_geometric_at_most_0_95": false,
+      "RSS_paired_ratio_mean_at_most_1_05": false,
+      "each_RSS_paired_ratio_at_most_1_10": false
+    },
+    "decision": "STOP_NO_MATERIAL_SIGNAL",
+    "qualifications_excluded": [
+      "A-good-qualification",
+      "C-good-qualification"
+    ],
+    "decimal_precision": 50
+  },
+  "qualification": "All six calls exact Bool LF and empty stderr; two qualification calls excluded from performance aggregates but charged and measured.",
+  "budgets": {
+    "whole_seconds": 180,
+    "all_probes_aggregate_seconds": 120,
+    "AS_bytes": 4294967296,
+    "output_bytes": 268435456,
+    "child_CPU_seconds": 60,
+    "performance": true,
+    "samples": 4,
+    "qualification_calls": 2,
+    "all_calls_aggregate_seconds": 120,
+    "maximum_target_calls": 6
+  },
+  "thresholds": {
+    "qualification_required": true,
+    "wall_each_C_over_A_strictly_less_than": 1.0,
+    "cpu_each_C_over_A_strictly_less_than": 1.0,
+    "wall_geometric_C_over_A_at_most": 0.95,
+    "cpu_geometric_C_over_A_at_most": 0.95,
+    "RSS_arithmetic_mean_of_two_paired_C_over_A_ratios_at_most": 1.05,
+    "RSS_each_paired_C_over_A_at_most": 1.1,
+    "CPU_definition": "direct wait4 user_seconds + system_seconds",
+    "RSS_definition": "Linux direct-child OS maxrss KiB, not allocated bytes or live heap",
+    "decision": "All clauses required for exploratory CONTINUE_SIGNAL_ONLY. Otherwise STOP_NO_MATERIAL_SIGNAL. No stable/significant/general speedup claim and no automatic next workload or native/production adoption."
+  },
+  "timing_scope": "Direct target Popen through blocking wait4; Linux peak RSS KiB. Whole controller and input checks excluded from target samples. Fresh empty cwd per call, same immutable staged source path, no native/object output.",
+  "limits": [
+    "Only two descriptive pairs: not a stable regression or general compiler estimate.",
+    "Time pairs mixed; all six prespecified continuation criteria fail, especially +23.3% RSS on both pairs.",
+    "Do not pool Foundation and Async samples or select only the favorable Foundation result.",
+    "RSS is not allocation or live heap and does not establish a mechanism.",
+    "No extra samples, promotion, cross-backend adoption or native fixed-point run for this variant."
+  ]
+}

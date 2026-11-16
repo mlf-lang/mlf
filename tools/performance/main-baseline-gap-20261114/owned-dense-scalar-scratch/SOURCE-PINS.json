@@ -9,8 +9,8 @@
   "files": [
     {
       "path": "COVERAGE.md",
-      "bytes": 882,
-      "sha256": "c43a7819954fde01369bc35b25c2fcf547961e493c7c2868886bcb0ed92016a6"
+      "bytes": 1519,
+      "sha256": "57e454be0ff37d39b3f25236e2c031d2f88507f44b0ee8f78fce887d6b796a95"
     },
     {
       "path": "Prototype/OwnedDenseValidation.hs",
@@ -19,13 +19,18 @@
     },
     {
       "path": "README.md",
-      "bytes": 3727,
-      "sha256": "d014204deb4b1a1953a2483b41f5502714f186922cfb6b401755f3036c0fa0ff"
+      "bytes": 6804,
+      "sha256": "34a3b660761c3851dc847152989fb90cbeeb7529623b105de9f3ffbdeeeb19ca"
     },
     {
       "path": "candidate.patch",
       "bytes": 18828,
       "sha256": "3369d629b5704272d73f77e95dda931ed02334ce33c2b5c277ba83d94b0e9eae"
+    },
+    {
+      "path": "results/async-type-screen.json",
+      "bytes": 9159,
+      "sha256": "cf3c5db476ba5abfc8a6a65a56a11b649010818910847d3f7fe3dbf02a5905cc"
     },
     {
       "path": "results/finite-semantics.json",
@@ -36,6 +41,11 @@
       "path": "results/mechanism.json",
       "bytes": 1198,
       "sha256": "fd3832e360d912407adf52b5d85e2ec0f0da18230993789c9918596d4244faa0"
+    },
+    {
+      "path": "results/solver-integration.json",
+      "bytes": 2014,
+      "sha256": "a3010a61f487064110fb944a0666e5b714c17c4d1d8344e0c451e1281d797687"
     },
     {
       "path": "target-results.json",
@@ -58,9 +68,29 @@
       "sha256": "b6deccadbbf8807e7c7f2e1e99f92e05670a19461a8ea760da62b109165dc226"
     },
     {
+      "path": "tests/solver-integration/Main.hs",
+      "bytes": 6267,
+      "sha256": "6a470f51fe5763a5f792342941a0cf9c4fd4c622c97753ee63e463817df88c12"
+    },
+    {
+      "path": "tests/solver-integration/fixture-contract.json",
+      "bytes": 6566,
+      "sha256": "b4bfc40a9c659cc26ff7dbe4402e043afa744a9128e880cd24122c4d1a16aa2b"
+    },
+    {
+      "path": "workload/AsyncWorkloadRoot.hs",
+      "bytes": 363,
+      "sha256": "25b0ce3f3ce8ca272beb26e860a7f8f7340d0598ba500a2febbc37a316746774"
+    },
+    {
       "path": "workload/CommonFoundationRoot.hs",
       "bytes": 1022,
       "sha256": "daa4d040f8b34fd40f45ddf3aa3020fc6c0ecaafb0e6ddea2654fc695834f5df"
+    },
+    {
+      "path": "workload/async-sources.json",
+      "bytes": 3235,
+      "sha256": "9f5a1b875ef1ef191f6ba858326c8762bd6a6b2d78b359ac42ce7eb4f19a8549"
     },
     {
       "path": "workload/sources.json",
@@ -75,5 +105,10 @@
   "finite_actually_compiled_validator_sha256": "52b5f164e3cc01fce57acdd4c35ae19734977757462edc7512e00495dcd7ee95",
   "integrated_wrapper_module_sha256": "17ad10a3d6324192e36fc5031ee240f1c80f87d2103addeb69441f429f7b677b",
   "target_actual_review_sha256": "b055556ffb73c398f8f81e8802e7c16f1dcd841b93fa8439f575bf8562d66bf6",
-  "target_numeric_results_sha256": "98b558530582a03aa439feb6733ae4ec0fe94de07fd684a857a360b532c98f82"
+  "target_numeric_results_sha256": "98b558530582a03aa439feb6733ae4ec0fe94de07fd684a857a360b532c98f82",
+  "solver_integration_actual_review_sha256": "30706c4387445fc0c4beba9339f7630b0b0a8d631b07aea156e3dd9512fb0c07",
+  "async_actual_review_sha256": "3d76ce82e8c5d60e1ce5f37d08356155840bff4ba5a01cd58fbc692218972aef",
+  "async_numeric_sha256": "8840e31cfdb9559fc1bafc0b438c22dcd599abdbd13cfb3d4d04a0b6370017fa",
+  "followup_decision": "STOP_NO_MATERIAL_SIGNAL",
+  "previous_archive_commit": "02c9a51eee7c861e99a5dfbf9cec2d171ea1b1ad"
 }

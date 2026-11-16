@@ -1,0 +1,112 @@
+{
+  "baseline_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "modules": [
+    {
+      "module": "Bootstrap.IndexVec",
+      "path": "libraries/mlf-foundation/Bootstrap/IndexVec.hs",
+      "bytes": 5573,
+      "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e",
+      "imports": [
+        "MLF.Primitive"
+      ]
+    },
+    {
+      "module": "Bootstrap.Types",
+      "path": "libraries/mlf-foundation/Bootstrap/Types.hs",
+      "bytes": 12757,
+      "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.IndexVec"
+      ]
+    },
+    {
+      "module": "Bootstrap.Std",
+      "path": "libraries/mlf-foundation/Bootstrap/Std.hs",
+      "bytes": 20088,
+      "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.IndexVec"
+      ]
+    },
+    {
+      "module": "Async.Process.Internal",
+      "path": "libraries/mlf-async/Async/Process/Internal.hs",
+      "bytes": 2819,
+      "sha256": "ef551f51dcf7da4b48e49f2807e2d5efe84c009cfa911913402c493fce7a25bc",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std"
+      ]
+    },
+    {
+      "module": "Async.Process",
+      "path": "libraries/mlf-async/Async/Process.hs",
+      "bytes": 11490,
+      "sha256": "482169c6d92a16b5a3071088ec24ee7206324995f8e69f6df073cc24559fcb73",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Async.Process.Internal"
+      ]
+    },
+    {
+      "module": "Async.Task.Core",
+      "path": "libraries/mlf-async/Async/Task/Core.hs",
+      "bytes": 49853,
+      "sha256": "0a75da421779203053d535e09367bce368e245e3608b12cad23507358dedf1af",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Async.Process",
+        "Async.Process.Internal"
+      ]
+    },
+    {
+      "module": "Async.Task.Internal",
+      "path": "libraries/mlf-async/Async/Task/Internal.hs",
+      "bytes": 1019,
+      "sha256": "a87ab11e316ec7c4ff28a5f9974b61ecb58aebeeb3f3227646d02ed3e7416e00",
+      "imports": [
+        "MLF.Primitive",
+        "Async.Process",
+        "Async.Task.Core"
+      ]
+    },
+    {
+      "module": "Async.Task",
+      "path": "libraries/mlf-async/Async/Task.hs",
+      "bytes": 1335,
+      "sha256": "cce3de39e4e4fe7537944da1f6b000a8146737340bd0d05ba03fc7e3550acd3b",
+      "imports": [
+        "MLF.Primitive",
+        "Async.Task.Internal"
+      ]
+    },
+    {
+      "module": "AsyncWorkloadRoot",
+      "path": "workload/AsyncWorkloadRoot.hs",
+      "bytes": 363,
+      "sha256": "25b0ce3f3ce8ca272beb26e860a7f8f7340d0598ba500a2febbc37a316746774",
+      "imports": [
+        "MLF.Primitive",
+        "Async.Task"
+      ]
+    }
+  ],
+  "real_library_modules": 8,
+  "real_library_bytes": 104934,
+  "root_bytes": 363,
+  "total_modules": 9,
+  "total_bytes": 105297,
+  "actual_loaded_module_observation": false,
+  "builtin_modules": [
+    "MLF.Primitive"
+  ],
+  "boundary": "Statically resolved source-only --type workload; no Task/process action execution or crate artifact cache."
+}

@@ -1,0 +1,206 @@
+{
+  "status": "PROSPECTIVE_NOT_EXECUTED",
+  "records": [
+    {
+      "name": "ordinary-signed-merge",
+      "suffixes": [
+        ".before",
+        ".after-old",
+        ".actual",
+        ".expected",
+        ".result"
+      ],
+      "path_claim": "nonempty canonical equation plus existing identities reaches modified G.unify site"
+    },
+    {
+      "name": "ordinary-hidden-root-merge",
+      "suffixes": [
+        ".before",
+        ".after-old",
+        ".actual",
+        ".expected",
+        ".result"
+      ],
+      "path_claim": "nonempty canonical equation plus existing identities reaches modified G.unify site"
+    },
+    {
+      "name": "ordinary-constructor-error",
+      "suffixes": [
+        ".before",
+        ".after-old",
+        ".actual",
+        ".expected",
+        ".result"
+      ],
+      "path_claim": "nonempty canonical equation plus existing identities reaches modified G.unify site"
+    },
+    {
+      "name": "ordinary-missing-before-mismatch",
+      "suffixes": [
+        ".before",
+        ".after-old",
+        ".actual",
+        ".expected",
+        ".result"
+      ],
+      "path_claim": "preflight rejection before candidate"
+    },
+    {
+      "name": "ordinary-selected-name",
+      "suffixes": [
+        ".actual",
+        ".expected",
+        ".result"
+      ],
+      "path_claim": "demand control; exception can occur before wrapper, not an unconditional call-site hit"
+    },
+    {
+      "name": "ordinary-unused-name",
+      "suffixes": [
+        ".actual",
+        ".expected",
+        ".result"
+      ],
+      "path_claim": "demand control; exception can occur before wrapper, not an unconditional call-site hit"
+    },
+    {
+      "name": "prepared-signed-merge",
+      "suffixes": [
+        ".before",
+        ".after-old",
+        ".actual",
+        ".expected",
+        ".result"
+      ],
+      "path_claim": "nonempty canonical equation plus existing identities reaches modified G.unify site"
+    },
+    {
+      "name": "prepared-hidden-root-merge",
+      "suffixes": [
+        ".before",
+        ".after-old",
+        ".actual",
+        ".expected",
+        ".result"
+      ],
+      "path_claim": "nonempty canonical equation plus existing identities reaches modified G.unify site"
+    },
+    {
+      "name": "prepared-constructor-error",
+      "suffixes": [
+        ".before",
+        ".after-old",
+        ".actual",
+        ".expected",
+        ".result"
+      ],
+      "path_claim": "nonempty canonical equation plus existing identities reaches modified G.unify site"
+    },
+    {
+      "name": "prepared-missing-before-mismatch",
+      "suffixes": [
+        ".before",
+        ".after-old",
+        ".actual",
+        ".expected",
+        ".result"
+      ],
+      "path_claim": "preflight rejection before candidate"
+    },
+    {
+      "name": "prepared-selected-name",
+      "suffixes": [
+        ".actual",
+        ".expected",
+        ".result"
+      ],
+      "path_claim": "demand control; exception can occur before wrapper, not an unconditional call-site hit"
+    },
+    {
+      "name": "prepared-unused-name",
+      "suffixes": [
+        ".actual",
+        ".expected",
+        ".result"
+      ],
+      "path_claim": "demand control; exception can occur before wrapper, not an unconditional call-site hit"
+    },
+    {
+      "name": "prepared-fresh",
+      "suffixes": [
+        ".before",
+        ".after-old",
+        ".actual",
+        ".expected",
+        ".result"
+      ],
+      "path_claim": "nonempty prepared projection with one fresh node; fresh3 is deleted and aliased to old1; fresh-survivor publication is not covered"
+    }
+  ],
+  "file_set": [
+    "ordinary-constructor-error.actual",
+    "ordinary-constructor-error.after-old",
+    "ordinary-constructor-error.before",
+    "ordinary-constructor-error.expected",
+    "ordinary-constructor-error.result",
+    "ordinary-hidden-root-merge.actual",
+    "ordinary-hidden-root-merge.after-old",
+    "ordinary-hidden-root-merge.before",
+    "ordinary-hidden-root-merge.expected",
+    "ordinary-hidden-root-merge.result",
+    "ordinary-missing-before-mismatch.actual",
+    "ordinary-missing-before-mismatch.after-old",
+    "ordinary-missing-before-mismatch.before",
+    "ordinary-missing-before-mismatch.expected",
+    "ordinary-missing-before-mismatch.result",
+    "ordinary-selected-name.actual",
+    "ordinary-selected-name.expected",
+    "ordinary-selected-name.result",
+    "ordinary-signed-merge.actual",
+    "ordinary-signed-merge.after-old",
+    "ordinary-signed-merge.before",
+    "ordinary-signed-merge.expected",
+    "ordinary-signed-merge.result",
+    "ordinary-unused-name.actual",
+    "ordinary-unused-name.expected",
+    "ordinary-unused-name.result",
+    "prepared-constructor-error.actual",
+    "prepared-constructor-error.after-old",
+    "prepared-constructor-error.before",
+    "prepared-constructor-error.expected",
+    "prepared-constructor-error.result",
+    "prepared-fresh.actual",
+    "prepared-fresh.after-old",
+    "prepared-fresh.before",
+    "prepared-fresh.expected",
+    "prepared-fresh.result",
+    "prepared-hidden-root-merge.actual",
+    "prepared-hidden-root-merge.after-old",
+    "prepared-hidden-root-merge.before",
+    "prepared-hidden-root-merge.expected",
+    "prepared-hidden-root-merge.result",
+    "prepared-missing-before-mismatch.actual",
+    "prepared-missing-before-mismatch.after-old",
+    "prepared-missing-before-mismatch.before",
+    "prepared-missing-before-mismatch.expected",
+    "prepared-missing-before-mismatch.result",
+    "prepared-selected-name.actual",
+    "prepared-selected-name.expected",
+    "prepared-selected-name.result",
+    "prepared-signed-merge.actual",
+    "prepared-signed-merge.after-old",
+    "prepared-signed-merge.before",
+    "prepared-signed-merge.expected",
+    "prepared-signed-merge.result",
+    "prepared-unused-name.actual",
+    "prepared-unused-name.expected",
+    "prepared-unused-name.result"
+  ],
+  "count": 13,
+  "sidecars_per_lane": 57,
+  "stdout": "PASS finite owned dense Solver integration contract\n",
+  "stderr_bytes": 0,
+  "required_cross_lane_gate": "All57 files must byte-match, including complete physical graph/IntMap/IntSet/scope serialization, exact error text, old immutable snapshots and all expected/result files; local expected classification alone is insufficient.",
+  "local_result": "Every .result must be PASS newline. All old snapshots before/after equal. Success has hand-authored logical graph plus original S.finish index/scope audit.",
+  "limits": "Not a Store epoch/rollback test. No candidate or old Graph source changed."
+}

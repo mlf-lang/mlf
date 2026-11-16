@@ -1,0 +1,32 @@
+{
+  "status": "PASS_FINITE_PURE_SOLVER_INTEGRATION_A_C_O2_ONLY",
+  "reviewed_actual_pass": true,
+  "lanes": "Same Main independently built against original A15 homes and integrated C16 homes, ordinary O2.",
+  "comparison": "Full physical graph/IntMap/IntSet/index/scope, exact errors, old immutable snapshots, hand-authored logical graph and original finish audit; selected/unused synchronous Probe demand. All57 sidecar bytes must match across lanes.",
+  "two_modified_sites": {
+    "ordinary": "Distinct live canonical equation survives preflight, finite component/scope projection reaches solverUnify/unifyDistinct local unification then original guards/restore.",
+    "prepared": "Nonempty prepared pending equation with coherent original/fresh partition reaches preparedFallbackProjection then local unification and original guards/restore.",
+    "non_hit_controls": "Missing-node preflight rejection and poison controls are not unconditional call-site hit evidence."
+  },
+  "limits": [
+    "Finite cases, not universal raw/partial graph equivalence.",
+    "prepared-fresh deletes fresh3 and aliases3 to old1; it does not cover first publication of a surviving fresh node.",
+    "Pure Solver immutable snapshot observations are not mutable Store epoch or rollback tests.",
+    "Budget telemetry is not performance; no new performance result is claimed here."
+  ],
+  "budget_contract": {
+    "compile_seconds": 210,
+    "semantic_seconds": 30,
+    "whole_seconds": 300,
+    "AS_bytes": 4294967296
+  },
+  "source_manifest_sha256": "310feb86060ee8248696fbafbd9cccbf832a29a7d65830d119679bf44566fca8",
+  "independent_actual_review_sha256": "30706c4387445fc0c4beba9339f7630b0b0a8d631b07aea156e3dd9512fb0c07",
+  "actual_raw_output_files": 250,
+  "actual_raw_output_bytes": 27171644,
+  "records_per_lane": 13,
+  "sidecars_per_lane": 57,
+  "all_records_and_cross_lane_sidecars_pass": true,
+  "whole_budget_elapsed_seconds": 44.63392232,
+  "elapsed_interpretation": "Budget telemetry only, not a performance result."
+}
