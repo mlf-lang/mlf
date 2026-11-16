@@ -1,0 +1,2404 @@
+{
+  "schema": "public-local-problem-diagnostic-two-separate-runs-v1",
+  "baseline_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "performance_comparison": false,
+  "pooled_runs": false,
+  "native": false,
+  "production_qualification": false,
+  "common_target": {
+    "argv_template": [
+      "<DIAGNOSTIC_COMPILER>",
+      "--no-prelude",
+      "-i",
+      "<INPUT_ROOT>/foundation",
+      "--type",
+      "<INPUT_ROOT>/root/CommonFoundationRoot.hs"
+    ],
+    "template_is_not_original_absolute_argv": true,
+    "fixed_input_texts": 16,
+    "exit": 0,
+    "stdout": "Bool\n",
+    "stderr": ""
+  },
+  "source_v3_repeat_screen": {
+    "status": "PASS_INDEPENDENT_SINGLE_DIAGNOSTIC_ACTUAL_ONLY_STOP_FULL_GRAPH_HASH_CACHE_DIRECTION",
+    "producer": {
+      "bytes": 20303840,
+      "sha256": "312038e7e1a186c5e0c2ed6a8a53121511ed140cf78d16b5ba63a4c92b8f32fe"
+    },
+    "raw_tsv": {
+      "bytes": 1306185,
+      "sha256": "df9a60e4cd3c79632bc434b6f225c36d886a9ed8a02fb43f66eae98473549c55"
+    },
+    "independent_counts": {
+      "calls": 16738,
+      "Right": 16738,
+      "Left": 0,
+      "distinct_keys": 7944,
+      "candidate_groups": 747,
+      "excess_events": 8794,
+      "total_words": 30496409,
+      "total_node_occurrences": 1814991,
+      "excess_totals": {
+        "encoding_ns": "107259640",
+        "events": 8794,
+        "nodes": 120284,
+        "words": 1785448
+      },
+      "excess_percent": {
+        "encoding_ns": "4.94703474023774573111186393984938292",
+        "events": "52.5391325128450233002748237543314613",
+        "nodes": "6.62725049325313458854616909946109926",
+        "words": "5.85461717804217539186335020624887343"
+      },
+      "cross_site_groups": 0,
+      "max_duplicate_input_nodes": 101,
+      "max_duplicate_input_words": 1530,
+      "max_all_input_nodes": 65690,
+      "max_all_input_words": 942431,
+      "greater_than_128_node_events": 3419,
+      "greater_than_128_node_duplicate_groups": 0,
+      "encoding_ns_sum": "2168160234",
+      "weight_interpretation": "Encoded word/node/event weights, not solver CPU, allocation, safe reuse or possible savings."
+    },
+    "decision": "NO_GO_GENERIC_FULL_GRAPH_HASH_CACHE_ON_THIS_EVIDENCE",
+    "target_outer_elapsed_ns_budget_only": "22289049484"
+  },
+  "source_v4_action_whnf_diagnostic": {
+    "status": "PASS_INDEPENDENT_V4_SINGLE_DIAGNOSTIC_ACTUAL_ONLY",
+    "producer": {
+      "bytes": 20308128,
+      "sha256": "a5f6c7f11713319f3be51fd9dc3e60a177a0c6df2abcfd2c30d766f1a2175e9f"
+    },
+    "raw_tsv": {
+      "bytes": 1416787,
+      "sha256": "e32554dd47b2757f1a72b7849ae6691a6fcd7891e8c79e89b9c112b7985f5b07",
+      "schema": "local-problem-digest-v2",
+      "columns": 9
+    },
+    "counts": {
+      "Left": 0,
+      "Right": 16738,
+      "calls": 16738
+    },
+    "reported_totals": {
+      "count": 16738,
+      "nodes": 1814991,
+      "words": 30496409,
+      "action_whnf_ns_reported_sum": "10009077871",
+      "encoding_ns_sum": "2170962244",
+      "action_whnf_ns_min": "29274",
+      "action_whnf_ns_max": "1156599672",
+      "action_whnf_ns_exact_median": "93222"
+    },
+    "first_seven_fields_sequence_equal_to_v3": true,
+    "all_sites_successful_size_bins": [
+      {
+        "count": 7385,
+        "nodes": 81322,
+        "words": 1140419,
+        "action_whnf_ns_reported_sum": "436742421",
+        "encoding_ns_sum": "69202022",
+        "action_whnf_ns_min": "29274",
+        "action_whnf_ns_max": "834230",
+        "action_whnf_ns_exact_median": "50405",
+        "nodes_inclusive": [
+          0,
+          16
+        ],
+        "top10_by_reported_action": [
+          {
+            "event": 11312,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 13,
+            "words": 201,
+            "action_whnf_ns": "834230",
+            "encoding_ns": "11777"
+          },
+          {
+            "event": 7973,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 11,
+            "words": 217,
+            "action_whnf_ns": "675480",
+            "encoding_ns": "13761"
+          },
+          {
+            "event": 12508,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 16,
+            "words": 210,
+            "action_whnf_ns": "491099",
+            "encoding_ns": "11186"
+          },
+          {
+            "event": 4276,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 14,
+            "words": 191,
+            "action_whnf_ns": "470147",
+            "encoding_ns": "10245"
+          },
+          {
+            "event": 7941,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 9,
+            "words": 163,
+            "action_whnf_ns": "468393",
+            "encoding_ns": "8423"
+          },
+          {
+            "event": 7925,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 11,
+            "words": 217,
+            "action_whnf_ns": "466070",
+            "encoding_ns": "11107"
+          },
+          {
+            "event": 8301,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 13,
+            "words": 247,
+            "action_whnf_ns": "448705",
+            "encoding_ns": "12849"
+          },
+          {
+            "event": 3211,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 13,
+            "words": 161,
+            "action_whnf_ns": "447012",
+            "encoding_ns": "9454"
+          },
+          {
+            "event": 7487,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 9,
+            "words": 139,
+            "action_whnf_ns": "441494",
+            "encoding_ns": "8382"
+          },
+          {
+            "event": 11422,
+            "site": "UnifyDistinct",
+            "success": 1,
+            "nodes": 16,
+            "words": 293,
+            "action_whnf_ns": "440334",
+            "encoding_ns": "16144"
+          }
+        ]
+      },
+      {
+        "count": 3614,
+        "nodes": 104671,
+        "words": 1687577,
+        "action_whnf_ns_reported_sum": "505269987",
+        "encoding_ns_sum": "107969927",
+        "action_whnf_ns_min": "56995",
+        "action_whnf_ns_max": "2692629",
+        "action_whnf_ns_exact_median": "103183",
+        "nodes_inclusive": [
+          17,
+          64
+        ],
+        "top10_by_reported_action": [
+          {
+            "event": 7042,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 51,
+            "words": 954,
+            "action_whnf_ns": "2692629",
+            "encoding_ns": "235989"
+          },
+          {
+            "event": 1480,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 41,
+            "words": 496,
+            "action_whnf_ns": "2325860",
+            "encoding_ns": "27861"
+          },
+          {
+            "event": 1486,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 61,
+            "words": 841,
+            "action_whnf_ns": "1317214",
+            "encoding_ns": "47921"
+          },
+          {
+            "event": 11313,
+            "site": "UnifyDistinct",
+            "success": 1,
+            "nodes": 17,
+            "words": 339,
+            "action_whnf_ns": "962479",
+            "encoding_ns": "24365"
+          },
+          {
+            "event": 88,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 60,
+            "words": 1032,
+            "action_whnf_ns": "858734",
+            "encoding_ns": "58296"
+          },
+          {
+            "event": 3,
+            "site": "UnifyDistinct",
+            "success": 1,
+            "nodes": 63,
+            "words": 1214,
+            "action_whnf_ns": "793978",
+            "encoding_ns": "62222"
+          },
+          {
+            "event": 5560,
+            "site": "UnifyDistinct",
+            "success": 1,
+            "nodes": 59,
+            "words": 1083,
+            "action_whnf_ns": "571257",
+            "encoding_ns": "57295"
+          },
+          {
+            "event": 8179,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 37,
+            "words": 495,
+            "action_whnf_ns": "561312",
+            "encoding_ns": "26689"
+          },
+          {
+            "event": 3768,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 60,
+            "words": 754,
+            "action_whnf_ns": "543385",
+            "encoding_ns": "256560"
+          },
+          {
+            "event": 16554,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 59,
+            "words": 1002,
+            "action_whnf_ns": "522335",
+            "encoding_ns": "57103"
+          }
+        ]
+      },
+      {
+        "count": 2320,
+        "nodes": 216920,
+        "words": 3425407,
+        "action_whnf_ns_reported_sum": "944374402",
+        "encoding_ns_sum": "219679700",
+        "action_whnf_ns_min": "205014",
+        "action_whnf_ns_max": "3823064",
+        "action_whnf_ns_exact_median": "386838",
+        "nodes_inclusive": [
+          65,
+          128
+        ],
+        "top10_by_reported_action": [
+          {
+            "event": 4549,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 121,
+            "words": 2166,
+            "action_whnf_ns": "3823064",
+            "encoding_ns": "144925"
+          },
+          {
+            "event": 13268,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 69,
+            "words": 999,
+            "action_whnf_ns": "2383828",
+            "encoding_ns": "64815"
+          },
+          {
+            "event": 4543,
+            "site": "UnifyDistinct",
+            "success": 1,
+            "nodes": 98,
+            "words": 1763,
+            "action_whnf_ns": "2290393",
+            "encoding_ns": "97505"
+          },
+          {
+            "event": 5736,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 77,
+            "words": 1609,
+            "action_whnf_ns": "1413004",
+            "encoding_ns": "91595"
+          },
+          {
+            "event": 10086,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 128,
+            "words": 1928,
+            "action_whnf_ns": "1126709",
+            "encoding_ns": "149268"
+          },
+          {
+            "event": 9344,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 84,
+            "words": 1191,
+            "action_whnf_ns": "1027061",
+            "encoding_ns": "146447"
+          },
+          {
+            "event": 3553,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 101,
+            "words": 1362,
+            "action_whnf_ns": "1025820",
+            "encoding_ns": "69904"
+          },
+          {
+            "event": 4638,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 77,
+            "words": 1377,
+            "action_whnf_ns": "1010738",
+            "encoding_ns": "78396"
+          },
+          {
+            "event": 13275,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 117,
+            "words": 1712,
+            "action_whnf_ns": "997940",
+            "encoding_ns": "287901"
+          },
+          {
+            "event": 7545,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 108,
+            "words": 1381,
+            "action_whnf_ns": "978259",
+            "encoding_ns": "66028"
+          }
+        ]
+      },
+      {
+        "count": 2664,
+        "nodes": 629403,
+        "words": 10355123,
+        "action_whnf_ns_reported_sum": "2981011680",
+        "encoding_ns_sum": "741565785",
+        "action_whnf_ns_min": "413716",
+        "action_whnf_ns_max": "201324736",
+        "action_whnf_ns_exact_median": "896610",
+        "nodes_inclusive": [
+          129,
+          512
+        ],
+        "top10_by_reported_action": [
+          {
+            "event": 6712,
+            "site": "UnifyDistinct",
+            "success": 1,
+            "nodes": 498,
+            "words": 9666,
+            "action_whnf_ns": "201324736",
+            "encoding_ns": "803770"
+          },
+          {
+            "event": 5827,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 217,
+            "words": 3087,
+            "action_whnf_ns": "18045203",
+            "encoding_ns": "2066301"
+          },
+          {
+            "event": 6709,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 484,
+            "words": 9332,
+            "action_whnf_ns": "5461581",
+            "encoding_ns": "581661"
+          },
+          {
+            "event": 3081,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 504,
+            "words": 7284,
+            "action_whnf_ns": "5037102",
+            "encoding_ns": "574821"
+          },
+          {
+            "event": 6653,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 254,
+            "words": 4475,
+            "action_whnf_ns": "4189597",
+            "encoding_ns": "398711"
+          },
+          {
+            "event": 2331,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 415,
+            "words": 6562,
+            "action_whnf_ns": "3554315",
+            "encoding_ns": "379162"
+          },
+          {
+            "event": 586,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 366,
+            "words": 6646,
+            "action_whnf_ns": "3392513",
+            "encoding_ns": "546250"
+          },
+          {
+            "event": 10097,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 290,
+            "words": 4874,
+            "action_whnf_ns": "3087538",
+            "encoding_ns": "409720"
+          },
+          {
+            "event": 8912,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 366,
+            "words": 5911,
+            "action_whnf_ns": "3051931",
+            "encoding_ns": "376488"
+          },
+          {
+            "event": 10051,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 477,
+            "words": 8280,
+            "action_whnf_ns": "2907143",
+            "encoding_ns": "567871"
+          }
+        ]
+      },
+      {
+        "count": 740,
+        "nodes": 682684,
+        "words": 12323652,
+        "action_whnf_ns_reported_sum": "3594485046",
+        "encoding_ns_sum": "897026020",
+        "action_whnf_ns_min": "1853650",
+        "action_whnf_ns_max": "192551382",
+        "action_whnf_ns_exact_median": "3681963.5",
+        "nodes_inclusive": [
+          513,
+          2048
+        ],
+        "top10_by_reported_action": [
+          {
+            "event": 1409,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 832,
+            "words": 14878,
+            "action_whnf_ns": "192551382",
+            "encoding_ns": "1302893"
+          },
+          {
+            "event": 2207,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 1381,
+            "words": 24368,
+            "action_whnf_ns": "167906380",
+            "encoding_ns": "1782200"
+          },
+          {
+            "event": 8601,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 579,
+            "words": 10699,
+            "action_whnf_ns": "17399005",
+            "encoding_ns": "1111557"
+          },
+          {
+            "event": 2624,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 1996,
+            "words": 34371,
+            "action_whnf_ns": "15524198",
+            "encoding_ns": "2269212"
+          },
+          {
+            "event": 2623,
+            "site": "UnifyDistinct",
+            "success": 1,
+            "nodes": 1988,
+            "words": 34187,
+            "action_whnf_ns": "12827072",
+            "encoding_ns": "4986587"
+          },
+          {
+            "event": 2332,
+            "site": "UnifyDistinct",
+            "success": 1,
+            "nodes": 1859,
+            "words": 31927,
+            "action_whnf_ns": "12121077",
+            "encoding_ns": "2106160"
+          },
+          {
+            "event": 2338,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 1978,
+            "words": 33917,
+            "action_whnf_ns": "11662287",
+            "encoding_ns": "2090607"
+          },
+          {
+            "event": 2066,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 1842,
+            "words": 31539,
+            "action_whnf_ns": "11510647",
+            "encoding_ns": "2130230"
+          },
+          {
+            "event": 2333,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 1867,
+            "words": 32105,
+            "action_whnf_ns": "11139352",
+            "encoding_ns": "2193449"
+          },
+          {
+            "event": 2439,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 1260,
+            "words": 22586,
+            "action_whnf_ns": "10929742",
+            "encoding_ns": "1714630"
+          }
+        ]
+      },
+      {
+        "count": 14,
+        "nodes": 34301,
+        "words": 621800,
+        "action_whnf_ns_reported_sum": "390594663",
+        "encoding_ns_sum": "48334667",
+        "action_whnf_ns_min": "11677369",
+        "action_whnf_ns_max": "189348801",
+        "action_whnf_ns_exact_median": "15848453",
+        "nodes_inclusive": [
+          2049,
+          8192
+        ],
+        "top10_by_reported_action": [
+          {
+            "event": 2940,
+            "site": "UnifyDistinct",
+            "success": 1,
+            "nodes": 2282,
+            "words": 39193,
+            "action_whnf_ns": "189348801",
+            "encoding_ns": "3248392"
+          },
+          {
+            "event": 2941,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 3516,
+            "words": 67879,
+            "action_whnf_ns": "20330207",
+            "encoding_ns": "4553776"
+          },
+          {
+            "event": 2631,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 3226,
+            "words": 61997,
+            "action_whnf_ns": "17823423",
+            "encoding_ns": "4418455"
+          },
+          {
+            "event": 2934,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 2125,
+            "words": 36637,
+            "action_whnf_ns": "17255132",
+            "encoding_ns": "3179931"
+          },
+          {
+            "event": 2939,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 2250,
+            "words": 38673,
+            "action_whnf_ns": "16694923",
+            "encoding_ns": "2897933"
+          },
+          {
+            "event": 2628,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 2094,
+            "words": 35943,
+            "action_whnf_ns": "16296201",
+            "encoding_ns": "4663719"
+          },
+          {
+            "event": 2629,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 2114,
+            "words": 36295,
+            "action_whnf_ns": "16179028",
+            "encoding_ns": "2817654"
+          },
+          {
+            "event": 2938,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 2229,
+            "words": 38305,
+            "action_whnf_ns": "15517878",
+            "encoding_ns": "2870663"
+          },
+          {
+            "event": 2340,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 2946,
+            "words": 56339,
+            "action_whnf_ns": "15409108",
+            "encoding_ns": "3810465"
+          },
+          {
+            "event": 2068,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 2676,
+            "words": 50905,
+            "action_whnf_ns": "14419112",
+            "encoding_ns": "3610386"
+          }
+        ]
+      },
+      {
+        "count": 0,
+        "nodes": 0,
+        "words": 0,
+        "action_whnf_ns_reported_sum": "0",
+        "encoding_ns_sum": "0",
+        "action_whnf_ns_min": "None",
+        "action_whnf_ns_max": "None",
+        "action_whnf_ns_exact_median": null,
+        "nodes_inclusive": [
+          8193,
+          32768
+        ],
+        "top10_by_reported_action": []
+      },
+      {
+        "count": 1,
+        "nodes": 65690,
+        "words": 942431,
+        "action_whnf_ns_reported_sum": "1156599672",
+        "encoding_ns_sum": "87184123",
+        "action_whnf_ns_min": "1156599672",
+        "action_whnf_ns_max": "1156599672",
+        "action_whnf_ns_exact_median": "1156599672",
+        "nodes_inclusive": [
+          32769,
+          131072
+        ],
+        "top10_by_reported_action": [
+          {
+            "event": 0,
+            "site": "UnifyDistinct",
+            "success": 1,
+            "nodes": 65690,
+            "words": 942431,
+            "action_whnf_ns": "1156599672",
+            "encoding_ns": "87184123"
+          }
+        ]
+      }
+    ],
+    "all_sites_top10": [
+      {
+        "event": 0,
+        "site": "UnifyDistinct",
+        "success": 1,
+        "nodes": 65690,
+        "words": 942431,
+        "action_whnf_ns": "1156599672",
+        "encoding_ns": "87184123"
+      },
+      {
+        "event": 6712,
+        "site": "UnifyDistinct",
+        "success": 1,
+        "nodes": 498,
+        "words": 9666,
+        "action_whnf_ns": "201324736",
+        "encoding_ns": "803770"
+      },
+      {
+        "event": 1409,
+        "site": "PreparedFallback",
+        "success": 1,
+        "nodes": 832,
+        "words": 14878,
+        "action_whnf_ns": "192551382",
+        "encoding_ns": "1302893"
+      },
+      {
+        "event": 2940,
+        "site": "UnifyDistinct",
+        "success": 1,
+        "nodes": 2282,
+        "words": 39193,
+        "action_whnf_ns": "189348801",
+        "encoding_ns": "3248392"
+      },
+      {
+        "event": 2207,
+        "site": "PreparedFallback",
+        "success": 1,
+        "nodes": 1381,
+        "words": 24368,
+        "action_whnf_ns": "167906380",
+        "encoding_ns": "1782200"
+      },
+      {
+        "event": 2941,
+        "site": "PreparedFallback",
+        "success": 1,
+        "nodes": 3516,
+        "words": 67879,
+        "action_whnf_ns": "20330207",
+        "encoding_ns": "4553776"
+      },
+      {
+        "event": 5827,
+        "site": "PreparedFallback",
+        "success": 1,
+        "nodes": 217,
+        "words": 3087,
+        "action_whnf_ns": "18045203",
+        "encoding_ns": "2066301"
+      },
+      {
+        "event": 2631,
+        "site": "PreparedFallback",
+        "success": 1,
+        "nodes": 3226,
+        "words": 61997,
+        "action_whnf_ns": "17823423",
+        "encoding_ns": "4418455"
+      },
+      {
+        "event": 8601,
+        "site": "PreparedFallback",
+        "success": 1,
+        "nodes": 579,
+        "words": 10699,
+        "action_whnf_ns": "17399005",
+        "encoding_ns": "1111557"
+      },
+      {
+        "event": 2934,
+        "site": "PreparedFallback",
+        "success": 1,
+        "nodes": 2125,
+        "words": 36637,
+        "action_whnf_ns": "17255132",
+        "encoding_ns": "3179931"
+      }
+    ],
+    "per_site": {
+      "PreparedFallback": {
+        "successful": {
+          "count": 14531,
+          "nodes": 1350163,
+          "words": 22805322,
+          "action_whnf_ns_reported_sum": "6664297828",
+          "encoding_ns_sum": "1606255288",
+          "action_whnf_ns_min": "29274",
+          "action_whnf_ns_max": "192551382",
+          "action_whnf_ns_exact_median": "86068"
+        },
+        "Left_no_encoded_input_size": {
+          "count": 0,
+          "input_size": "unobserved"
+        },
+        "top10": [
+          {
+            "event": 1409,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 832,
+            "words": 14878,
+            "action_whnf_ns": "192551382",
+            "encoding_ns": "1302893"
+          },
+          {
+            "event": 2207,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 1381,
+            "words": 24368,
+            "action_whnf_ns": "167906380",
+            "encoding_ns": "1782200"
+          },
+          {
+            "event": 2941,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 3516,
+            "words": 67879,
+            "action_whnf_ns": "20330207",
+            "encoding_ns": "4553776"
+          },
+          {
+            "event": 5827,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 217,
+            "words": 3087,
+            "action_whnf_ns": "18045203",
+            "encoding_ns": "2066301"
+          },
+          {
+            "event": 2631,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 3226,
+            "words": 61997,
+            "action_whnf_ns": "17823423",
+            "encoding_ns": "4418455"
+          },
+          {
+            "event": 8601,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 579,
+            "words": 10699,
+            "action_whnf_ns": "17399005",
+            "encoding_ns": "1111557"
+          },
+          {
+            "event": 2934,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 2125,
+            "words": 36637,
+            "action_whnf_ns": "17255132",
+            "encoding_ns": "3179931"
+          },
+          {
+            "event": 2939,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 2250,
+            "words": 38673,
+            "action_whnf_ns": "16694923",
+            "encoding_ns": "2897933"
+          },
+          {
+            "event": 2628,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 2094,
+            "words": 35943,
+            "action_whnf_ns": "16296201",
+            "encoding_ns": "4663719"
+          },
+          {
+            "event": 2629,
+            "site": "PreparedFallback",
+            "success": 1,
+            "nodes": 2114,
+            "words": 36295,
+            "action_whnf_ns": "16179028",
+            "encoding_ns": "2817654"
+          }
+        ],
+        "successful_size_bins": [
+          {
+            "count": 7201,
+            "nodes": 78818,
+            "words": 1099745,
+            "action_whnf_ns_reported_sum": "423722834",
+            "encoding_ns_sum": "66525029",
+            "action_whnf_ns_min": "29274",
+            "action_whnf_ns_max": "834230",
+            "action_whnf_ns_exact_median": "50184",
+            "nodes_inclusive": [
+              0,
+              16
+            ],
+            "top10_by_reported_action": [
+              {
+                "event": 11312,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 13,
+                "words": 201,
+                "action_whnf_ns": "834230",
+                "encoding_ns": "11777"
+              },
+              {
+                "event": 7973,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 11,
+                "words": 217,
+                "action_whnf_ns": "675480",
+                "encoding_ns": "13761"
+              },
+              {
+                "event": 12508,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 16,
+                "words": 210,
+                "action_whnf_ns": "491099",
+                "encoding_ns": "11186"
+              },
+              {
+                "event": 4276,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 14,
+                "words": 191,
+                "action_whnf_ns": "470147",
+                "encoding_ns": "10245"
+              },
+              {
+                "event": 7941,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 9,
+                "words": 163,
+                "action_whnf_ns": "468393",
+                "encoding_ns": "8423"
+              },
+              {
+                "event": 7925,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 11,
+                "words": 217,
+                "action_whnf_ns": "466070",
+                "encoding_ns": "11107"
+              },
+              {
+                "event": 8301,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 13,
+                "words": 247,
+                "action_whnf_ns": "448705",
+                "encoding_ns": "12849"
+              },
+              {
+                "event": 3211,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 13,
+                "words": 161,
+                "action_whnf_ns": "447012",
+                "encoding_ns": "9454"
+              },
+              {
+                "event": 7487,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 9,
+                "words": 139,
+                "action_whnf_ns": "441494",
+                "encoding_ns": "8382"
+              },
+              {
+                "event": 8368,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 11,
+                "words": 147,
+                "action_whnf_ns": "389237",
+                "encoding_ns": "9514"
+              }
+            ]
+          },
+          {
+            "count": 2947,
+            "nodes": 88280,
+            "words": 1388288,
+            "action_whnf_ns_reported_sum": "428866561",
+            "encoding_ns_sum": "89424248",
+            "action_whnf_ns_min": "56995",
+            "action_whnf_ns_max": "2692629",
+            "action_whnf_ns_exact_median": "109430",
+            "nodes_inclusive": [
+              17,
+              64
+            ],
+            "top10_by_reported_action": [
+              {
+                "event": 7042,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 51,
+                "words": 954,
+                "action_whnf_ns": "2692629",
+                "encoding_ns": "235989"
+              },
+              {
+                "event": 1480,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 41,
+                "words": 496,
+                "action_whnf_ns": "2325860",
+                "encoding_ns": "27861"
+              },
+              {
+                "event": 1486,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 61,
+                "words": 841,
+                "action_whnf_ns": "1317214",
+                "encoding_ns": "47921"
+              },
+              {
+                "event": 88,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 60,
+                "words": 1032,
+                "action_whnf_ns": "858734",
+                "encoding_ns": "58296"
+              },
+              {
+                "event": 8179,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 37,
+                "words": 495,
+                "action_whnf_ns": "561312",
+                "encoding_ns": "26689"
+              },
+              {
+                "event": 3768,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 60,
+                "words": 754,
+                "action_whnf_ns": "543385",
+                "encoding_ns": "256560"
+              },
+              {
+                "event": 16554,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 59,
+                "words": 1002,
+                "action_whnf_ns": "522335",
+                "encoding_ns": "57103"
+              },
+              {
+                "event": 5563,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 62,
+                "words": 1124,
+                "action_whnf_ns": "484478",
+                "encoding_ns": "58967"
+              },
+              {
+                "event": 5823,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 21,
+                "words": 299,
+                "action_whnf_ns": "483696",
+                "encoding_ns": "16715"
+              },
+              {
+                "event": 13265,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 57,
+                "words": 850,
+                "action_whnf_ns": "479902",
+                "encoding_ns": "47750"
+              }
+            ]
+          },
+          {
+            "count": 1818,
+            "nodes": 167041,
+            "words": 2620168,
+            "action_whnf_ns_reported_sum": "729713302",
+            "encoding_ns_sum": "165981814",
+            "action_whnf_ns_min": "205014",
+            "action_whnf_ns_max": "3823064",
+            "action_whnf_ns_exact_median": "377447.5",
+            "nodes_inclusive": [
+              65,
+              128
+            ],
+            "top10_by_reported_action": [
+              {
+                "event": 4549,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 121,
+                "words": 2166,
+                "action_whnf_ns": "3823064",
+                "encoding_ns": "144925"
+              },
+              {
+                "event": 13268,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 69,
+                "words": 999,
+                "action_whnf_ns": "2383828",
+                "encoding_ns": "64815"
+              },
+              {
+                "event": 5736,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 77,
+                "words": 1609,
+                "action_whnf_ns": "1413004",
+                "encoding_ns": "91595"
+              },
+              {
+                "event": 10086,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 128,
+                "words": 1928,
+                "action_whnf_ns": "1126709",
+                "encoding_ns": "149268"
+              },
+              {
+                "event": 9344,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 84,
+                "words": 1191,
+                "action_whnf_ns": "1027061",
+                "encoding_ns": "146447"
+              },
+              {
+                "event": 3553,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 101,
+                "words": 1362,
+                "action_whnf_ns": "1025820",
+                "encoding_ns": "69904"
+              },
+              {
+                "event": 4638,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 77,
+                "words": 1377,
+                "action_whnf_ns": "1010738",
+                "encoding_ns": "78396"
+              },
+              {
+                "event": 13275,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 117,
+                "words": 1712,
+                "action_whnf_ns": "997940",
+                "encoding_ns": "287901"
+              },
+              {
+                "event": 7545,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 108,
+                "words": 1381,
+                "action_whnf_ns": "978259",
+                "encoding_ns": "66028"
+              },
+              {
+                "event": 5730,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 108,
+                "words": 2178,
+                "action_whnf_ns": "971940",
+                "encoding_ns": "118726"
+              }
+            ]
+          },
+          {
+            "count": 1993,
+            "nodes": 478469,
+            "words": 7899062,
+            "action_whnf_ns_reported_sum": "2133048983",
+            "encoding_ns_sum": "564231411",
+            "action_whnf_ns_min": "413716",
+            "action_whnf_ns_max": "18045203",
+            "action_whnf_ns_exact_median": "918143",
+            "nodes_inclusive": [
+              129,
+              512
+            ],
+            "top10_by_reported_action": [
+              {
+                "event": 5827,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 217,
+                "words": 3087,
+                "action_whnf_ns": "18045203",
+                "encoding_ns": "2066301"
+              },
+              {
+                "event": 6709,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 484,
+                "words": 9332,
+                "action_whnf_ns": "5461581",
+                "encoding_ns": "581661"
+              },
+              {
+                "event": 3081,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 504,
+                "words": 7284,
+                "action_whnf_ns": "5037102",
+                "encoding_ns": "574821"
+              },
+              {
+                "event": 6653,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 254,
+                "words": 4475,
+                "action_whnf_ns": "4189597",
+                "encoding_ns": "398711"
+              },
+              {
+                "event": 2331,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 415,
+                "words": 6562,
+                "action_whnf_ns": "3554315",
+                "encoding_ns": "379162"
+              },
+              {
+                "event": 586,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 366,
+                "words": 6646,
+                "action_whnf_ns": "3392513",
+                "encoding_ns": "546250"
+              },
+              {
+                "event": 10097,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 290,
+                "words": 4874,
+                "action_whnf_ns": "3087538",
+                "encoding_ns": "409720"
+              },
+              {
+                "event": 8912,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 366,
+                "words": 5911,
+                "action_whnf_ns": "3051931",
+                "encoding_ns": "376488"
+              },
+              {
+                "event": 10051,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 477,
+                "words": 8280,
+                "action_whnf_ns": "2907143",
+                "encoding_ns": "567871"
+              },
+              {
+                "event": 2622,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 445,
+                "words": 7042,
+                "action_whnf_ns": "2816912",
+                "encoding_ns": "603564"
+              }
+            ]
+          },
+          {
+            "count": 561,
+            "nodes": 509797,
+            "words": 9288682,
+            "action_whnf_ns_reported_sum": "2773707623",
+            "encoding_ns_sum": "680420622",
+            "action_whnf_ns_min": "1853650",
+            "action_whnf_ns_max": "192551382",
+            "action_whnf_ns_exact_median": "3513165",
+            "nodes_inclusive": [
+              513,
+              2048
+            ],
+            "top10_by_reported_action": [
+              {
+                "event": 1409,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 832,
+                "words": 14878,
+                "action_whnf_ns": "192551382",
+                "encoding_ns": "1302893"
+              },
+              {
+                "event": 2207,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 1381,
+                "words": 24368,
+                "action_whnf_ns": "167906380",
+                "encoding_ns": "1782200"
+              },
+              {
+                "event": 8601,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 579,
+                "words": 10699,
+                "action_whnf_ns": "17399005",
+                "encoding_ns": "1111557"
+              },
+              {
+                "event": 2624,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 1996,
+                "words": 34371,
+                "action_whnf_ns": "15524198",
+                "encoding_ns": "2269212"
+              },
+              {
+                "event": 2338,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 1978,
+                "words": 33917,
+                "action_whnf_ns": "11662287",
+                "encoding_ns": "2090607"
+              },
+              {
+                "event": 2066,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 1842,
+                "words": 31539,
+                "action_whnf_ns": "11510647",
+                "encoding_ns": "2130230"
+              },
+              {
+                "event": 2333,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 1867,
+                "words": 32105,
+                "action_whnf_ns": "11139352",
+                "encoding_ns": "2193449"
+              },
+              {
+                "event": 2439,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 1260,
+                "words": 22586,
+                "action_whnf_ns": "10929742",
+                "encoding_ns": "1714630"
+              },
+              {
+                "event": 2492,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 1528,
+                "words": 26863,
+                "action_whnf_ns": "10843705",
+                "encoding_ns": "2110246"
+              },
+              {
+                "event": 2337,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 1959,
+                "words": 33581,
+                "action_whnf_ns": "10774341",
+                "encoding_ns": "2200300"
+              }
+            ]
+          },
+          {
+            "count": 11,
+            "nodes": 27758,
+            "words": 509377,
+            "action_whnf_ns_reported_sum": "175238525",
+            "encoding_ns_sum": "39672164",
+            "action_whnf_ns_min": "12656065",
+            "action_whnf_ns_max": "20330207",
+            "action_whnf_ns_exact_median": "16179028",
+            "nodes_inclusive": [
+              2049,
+              8192
+            ],
+            "top10_by_reported_action": [
+              {
+                "event": 2941,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 3516,
+                "words": 67879,
+                "action_whnf_ns": "20330207",
+                "encoding_ns": "4553776"
+              },
+              {
+                "event": 2631,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 3226,
+                "words": 61997,
+                "action_whnf_ns": "17823423",
+                "encoding_ns": "4418455"
+              },
+              {
+                "event": 2934,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 2125,
+                "words": 36637,
+                "action_whnf_ns": "17255132",
+                "encoding_ns": "3179931"
+              },
+              {
+                "event": 2939,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 2250,
+                "words": 38673,
+                "action_whnf_ns": "16694923",
+                "encoding_ns": "2897933"
+              },
+              {
+                "event": 2628,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 2094,
+                "words": 35943,
+                "action_whnf_ns": "16296201",
+                "encoding_ns": "4663719"
+              },
+              {
+                "event": 2629,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 2114,
+                "words": 36295,
+                "action_whnf_ns": "16179028",
+                "encoding_ns": "2817654"
+              },
+              {
+                "event": 2938,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 2229,
+                "words": 38305,
+                "action_whnf_ns": "15517878",
+                "encoding_ns": "2870663"
+              },
+              {
+                "event": 2340,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 2946,
+                "words": 56339,
+                "action_whnf_ns": "15409108",
+                "encoding_ns": "3810465"
+              },
+              {
+                "event": 2068,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 2676,
+                "words": 50905,
+                "action_whnf_ns": "14419112",
+                "encoding_ns": "3610386"
+              },
+              {
+                "event": 1815,
+                "site": "PreparedFallback",
+                "success": 1,
+                "nodes": 2416,
+                "words": 45695,
+                "action_whnf_ns": "12657448",
+                "encoding_ns": "3173518"
+              }
+            ]
+          },
+          {
+            "count": 0,
+            "nodes": 0,
+            "words": 0,
+            "action_whnf_ns_reported_sum": "0",
+            "encoding_ns_sum": "0",
+            "action_whnf_ns_min": "None",
+            "action_whnf_ns_max": "None",
+            "action_whnf_ns_exact_median": null,
+            "nodes_inclusive": [
+              8193,
+              32768
+            ],
+            "top10_by_reported_action": []
+          },
+          {
+            "count": 0,
+            "nodes": 0,
+            "words": 0,
+            "action_whnf_ns_reported_sum": "0",
+            "encoding_ns_sum": "0",
+            "action_whnf_ns_min": "None",
+            "action_whnf_ns_max": "None",
+            "action_whnf_ns_exact_median": null,
+            "nodes_inclusive": [
+              32769,
+              131072
+            ],
+            "top10_by_reported_action": []
+          }
+        ]
+      },
+      "UnifyDistinct": {
+        "successful": {
+          "count": 2207,
+          "nodes": 464828,
+          "words": 7691087,
+          "action_whnf_ns_reported_sum": "3344780043",
+          "encoding_ns_sum": "564706956",
+          "action_whnf_ns_min": "33529",
+          "action_whnf_ns_max": "1156599672",
+          "action_whnf_ns_exact_median": "422378"
+        },
+        "Left_no_encoded_input_size": {
+          "count": 0,
+          "input_size": "unobserved"
+        },
+        "top10": [
+          {
+            "event": 0,
+            "site": "UnifyDistinct",
+            "success": 1,
+            "nodes": 65690,
+            "words": 942431,
+            "action_whnf_ns": "1156599672",
+            "encoding_ns": "87184123"
+          },
+          {
+            "event": 6712,
+            "site": "UnifyDistinct",
+            "success": 1,
+            "nodes": 498,
+            "words": 9666,
+            "action_whnf_ns": "201324736",
+            "encoding_ns": "803770"
+          },
+          {
+            "event": 2940,
+            "site": "UnifyDistinct",
+            "success": 1,
+            "nodes": 2282,
+            "words": 39193,
+            "action_whnf_ns": "189348801",
+            "encoding_ns": "3248392"
+          },
+          {
+            "event": 2933,
+            "site": "UnifyDistinct",
+            "success": 1,
+            "nodes": 2117,
+            "words": 36447,
+            "action_whnf_ns": "14329968",
+            "encoding_ns": "2681503"
+          },
+          {
+            "event": 2623,
+            "site": "UnifyDistinct",
+            "success": 1,
+            "nodes": 1988,
+            "words": 34187,
+            "action_whnf_ns": "12827072",
+            "encoding_ns": "4986587"
+          },
+          {
+            "event": 2332,
+            "site": "UnifyDistinct",
+            "success": 1,
+            "nodes": 1859,
+            "words": 31927,
+            "action_whnf_ns": "12121077",
+            "encoding_ns": "2106160"
+          },
+          {
+            "event": 2630,
+            "site": "UnifyDistinct",
+            "success": 1,
+            "nodes": 2144,
+            "words": 36783,
+            "action_whnf_ns": "11677369",
+            "encoding_ns": "2732608"
+          },
+          {
+            "event": 2373,
+            "site": "UnifyDistinct",
+            "success": 1,
+            "nodes": 1023,
+            "words": 18555,
+            "action_whnf_ns": "10731958",
+            "encoding_ns": "1324021"
+          },
+          {
+            "event": 2067,
+            "site": "UnifyDistinct",
+            "success": 1,
+            "nodes": 1868,
+            "words": 31963,
+            "action_whnf_ns": "10435131",
+            "encoding_ns": "2177471"
+          },
+          {
+            "event": 2339,
+            "site": "UnifyDistinct",
+            "success": 1,
+            "nodes": 2006,
+            "words": 34373,
+            "action_whnf_ns": "10003379",
+            "encoding_ns": "2229873"
+          }
+        ],
+        "successful_size_bins": [
+          {
+            "count": 184,
+            "nodes": 2504,
+            "words": 40674,
+            "action_whnf_ns_reported_sum": "13019587",
+            "encoding_ns_sum": "2676993",
+            "action_whnf_ns_min": "33529",
+            "action_whnf_ns_max": "440334",
+            "action_whnf_ns_exact_median": "59567",
+            "nodes_inclusive": [
+              0,
+              16
+            ],
+            "top10_by_reported_action": [
+              {
+                "event": 11422,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 16,
+                "words": 293,
+                "action_whnf_ns": "440334",
+                "encoding_ns": "16144"
+              },
+              {
+                "event": 13742,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 15,
+                "words": 321,
+                "action_whnf_ns": "237488",
+                "encoding_ns": "61940"
+              },
+              {
+                "event": 10738,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 16,
+                "words": 239,
+                "action_whnf_ns": "184049",
+                "encoding_ns": "12388"
+              },
+              {
+                "event": 12911,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 14,
+                "words": 209,
+                "action_whnf_ns": "181246",
+                "encoding_ns": "10054"
+              },
+              {
+                "event": 12269,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 15,
+                "words": 207,
+                "action_whnf_ns": "169829",
+                "encoding_ns": "9964"
+              },
+              {
+                "event": 12513,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 14,
+                "words": 185,
+                "action_whnf_ns": "150801",
+                "encoding_ns": "10936"
+              },
+              {
+                "event": 11120,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 15,
+                "words": 321,
+                "action_whnf_ns": "150210",
+                "encoding_ns": "14882"
+              },
+              {
+                "event": 3872,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 16,
+                "words": 178,
+                "action_whnf_ns": "141950",
+                "encoding_ns": "8132"
+              },
+              {
+                "event": 13299,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 12,
+                "words": 189,
+                "action_whnf_ns": "139535",
+                "encoding_ns": "8983"
+              },
+              {
+                "event": 13471,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 11,
+                "words": 179,
+                "action_whnf_ns": "136280",
+                "encoding_ns": "35972"
+              }
+            ]
+          },
+          {
+            "count": 667,
+            "nodes": 16391,
+            "words": 299289,
+            "action_whnf_ns_reported_sum": "76403426",
+            "encoding_ns_sum": "18545679",
+            "action_whnf_ns_min": "60168",
+            "action_whnf_ns_max": "962479",
+            "action_whnf_ns_exact_median": "73077",
+            "nodes_inclusive": [
+              17,
+              64
+            ],
+            "top10_by_reported_action": [
+              {
+                "event": 11313,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 17,
+                "words": 339,
+                "action_whnf_ns": "962479",
+                "encoding_ns": "24365"
+              },
+              {
+                "event": 3,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 63,
+                "words": 1214,
+                "action_whnf_ns": "793978",
+                "encoding_ns": "62222"
+              },
+              {
+                "event": 5560,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 59,
+                "words": 1083,
+                "action_whnf_ns": "571257",
+                "encoding_ns": "57295"
+              },
+              {
+                "event": 509,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 17,
+                "words": 339,
+                "action_whnf_ns": "400865",
+                "encoding_ns": "19849"
+              },
+              {
+                "event": 14759,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 63,
+                "words": 913,
+                "action_whnf_ns": "397021",
+                "encoding_ns": "47950"
+              },
+              {
+                "event": 9205,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 60,
+                "words": 799,
+                "action_whnf_ns": "365221",
+                "encoding_ns": "40229"
+              },
+              {
+                "event": 2985,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 50,
+                "words": 604,
+                "action_whnf_ns": "362407",
+                "encoding_ns": "31046"
+              },
+              {
+                "event": 536,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 60,
+                "words": 825,
+                "action_whnf_ns": "360565",
+                "encoding_ns": "39869"
+              },
+              {
+                "event": 12297,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 57,
+                "words": 745,
+                "action_whnf_ns": "354489",
+                "encoding_ns": "37945"
+              },
+              {
+                "event": 16373,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 62,
+                "words": 1188,
+                "action_whnf_ns": "347318",
+                "encoding_ns": "61560"
+              }
+            ]
+          },
+          {
+            "count": 502,
+            "nodes": 49879,
+            "words": 805239,
+            "action_whnf_ns_reported_sum": "214661100",
+            "encoding_ns_sum": "53697886",
+            "action_whnf_ns_min": "209150",
+            "action_whnf_ns_max": "2290393",
+            "action_whnf_ns_exact_median": "419663",
+            "nodes_inclusive": [
+              65,
+              128
+            ],
+            "top10_by_reported_action": [
+              {
+                "event": 4543,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 98,
+                "words": 1763,
+                "action_whnf_ns": "2290393",
+                "encoding_ns": "97505"
+              },
+              {
+                "event": 668,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 126,
+                "words": 1934,
+                "action_whnf_ns": "828659",
+                "encoding_ns": "92888"
+              },
+              {
+                "event": 10004,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 80,
+                "words": 1344,
+                "action_whnf_ns": "813971",
+                "encoding_ns": "220002"
+              },
+              {
+                "event": 10285,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 125,
+                "words": 1774,
+                "action_whnf_ns": "780292",
+                "encoding_ns": "288702"
+              },
+              {
+                "event": 15271,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 112,
+                "words": 1928,
+                "action_whnf_ns": "758090",
+                "encoding_ns": "143600"
+              },
+              {
+                "event": 3313,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 112,
+                "words": 1461,
+                "action_whnf_ns": "735109",
+                "encoding_ns": "75011"
+              },
+              {
+                "event": 10227,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 128,
+                "words": 2133,
+                "action_whnf_ns": "730389",
+                "encoding_ns": "102901"
+              },
+              {
+                "event": 10590,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 121,
+                "words": 2159,
+                "action_whnf_ns": "730248",
+                "encoding_ns": "142799"
+              },
+              {
+                "event": 4463,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 125,
+                "words": 1955,
+                "action_whnf_ns": "727508",
+                "encoding_ns": "101570"
+              },
+              {
+                "event": 14204,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 113,
+                "words": 1585,
+                "action_whnf_ns": "715006",
+                "encoding_ns": "113506"
+              }
+            ]
+          },
+          {
+            "count": 671,
+            "nodes": 150934,
+            "words": 2456061,
+            "action_whnf_ns_reported_sum": "847962697",
+            "encoding_ns_sum": "177334374",
+            "action_whnf_ns_min": "426704",
+            "action_whnf_ns_max": "201324736",
+            "action_whnf_ns_exact_median": "844452",
+            "nodes_inclusive": [
+              129,
+              512
+            ],
+            "top10_by_reported_action": [
+              {
+                "event": 6712,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 498,
+                "words": 9666,
+                "action_whnf_ns": "201324736",
+                "encoding_ns": "803770"
+              },
+              {
+                "event": 4794,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 391,
+                "words": 7693,
+                "action_whnf_ns": "2535546",
+                "encoding_ns": "709170"
+              },
+              {
+                "event": 3717,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 494,
+                "words": 6745,
+                "action_whnf_ns": "2474416",
+                "encoding_ns": "418970"
+              },
+              {
+                "event": 10000,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 440,
+                "words": 8015,
+                "action_whnf_ns": "2416526",
+                "encoding_ns": "931132"
+              },
+              {
+                "event": 2301,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 351,
+                "words": 5587,
+                "action_whnf_ns": "2314879",
+                "encoding_ns": "315848"
+              },
+              {
+                "event": 385,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 440,
+                "words": 7067,
+                "action_whnf_ns": "2199814",
+                "encoding_ns": "562645"
+              },
+              {
+                "event": 4063,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 411,
+                "words": 7824,
+                "action_whnf_ns": "2183995",
+                "encoding_ns": "674589"
+              },
+              {
+                "event": 511,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 457,
+                "words": 7855,
+                "action_whnf_ns": "2166254",
+                "encoding_ns": "559029"
+              },
+              {
+                "event": 14042,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 380,
+                "words": 6788,
+                "action_whnf_ns": "2113873",
+                "encoding_ns": "493362"
+              },
+              {
+                "event": 9052,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 506,
+                "words": 8097,
+                "action_whnf_ns": "2099189",
+                "encoding_ns": "501574"
+              }
+            ]
+          },
+          {
+            "count": 179,
+            "nodes": 172887,
+            "words": 3034970,
+            "action_whnf_ns_reported_sum": "820777423",
+            "encoding_ns_sum": "216605398",
+            "action_whnf_ns_min": "1985702",
+            "action_whnf_ns_max": "12827072",
+            "action_whnf_ns_exact_median": "4253801",
+            "nodes_inclusive": [
+              513,
+              2048
+            ],
+            "top10_by_reported_action": [
+              {
+                "event": 2623,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 1988,
+                "words": 34187,
+                "action_whnf_ns": "12827072",
+                "encoding_ns": "4986587"
+              },
+              {
+                "event": 2332,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 1859,
+                "words": 31927,
+                "action_whnf_ns": "12121077",
+                "encoding_ns": "2106160"
+              },
+              {
+                "event": 2373,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 1023,
+                "words": 18555,
+                "action_whnf_ns": "10731958",
+                "encoding_ns": "1324021"
+              },
+              {
+                "event": 2067,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 1868,
+                "words": 31963,
+                "action_whnf_ns": "10435131",
+                "encoding_ns": "2177471"
+              },
+              {
+                "event": 2339,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 2006,
+                "words": 34373,
+                "action_whnf_ns": "10003379",
+                "encoding_ns": "2229873"
+              },
+              {
+                "event": 2374,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 1070,
+                "words": 19217,
+                "action_whnf_ns": "9126811",
+                "encoding_ns": "2491972"
+              },
+              {
+                "event": 2060,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 1730,
+                "words": 29667,
+                "action_whnf_ns": "9040723",
+                "encoding_ns": "1946418"
+              },
+              {
+                "event": 1580,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 1592,
+                "words": 27143,
+                "action_whnf_ns": "8817812",
+                "encoding_ns": "1876985"
+              },
+              {
+                "event": 1814,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 1730,
+                "words": 29553,
+                "action_whnf_ns": "8711725",
+                "encoding_ns": "2010032"
+              },
+              {
+                "event": 6007,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 1845,
+                "words": 40182,
+                "action_whnf_ns": "8476037",
+                "encoding_ns": "2664898"
+              }
+            ]
+          },
+          {
+            "count": 3,
+            "nodes": 6543,
+            "words": 112423,
+            "action_whnf_ns_reported_sum": "215356138",
+            "encoding_ns_sum": "8662503",
+            "action_whnf_ns_min": "11677369",
+            "action_whnf_ns_max": "189348801",
+            "action_whnf_ns_exact_median": "14329968",
+            "nodes_inclusive": [
+              2049,
+              8192
+            ],
+            "top10_by_reported_action": [
+              {
+                "event": 2940,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 2282,
+                "words": 39193,
+                "action_whnf_ns": "189348801",
+                "encoding_ns": "3248392"
+              },
+              {
+                "event": 2933,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 2117,
+                "words": 36447,
+                "action_whnf_ns": "14329968",
+                "encoding_ns": "2681503"
+              },
+              {
+                "event": 2630,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 2144,
+                "words": 36783,
+                "action_whnf_ns": "11677369",
+                "encoding_ns": "2732608"
+              }
+            ]
+          },
+          {
+            "count": 0,
+            "nodes": 0,
+            "words": 0,
+            "action_whnf_ns_reported_sum": "0",
+            "encoding_ns_sum": "0",
+            "action_whnf_ns_min": "None",
+            "action_whnf_ns_max": "None",
+            "action_whnf_ns_exact_median": null,
+            "nodes_inclusive": [
+              8193,
+              32768
+            ],
+            "top10_by_reported_action": []
+          },
+          {
+            "count": 1,
+            "nodes": 65690,
+            "words": 942431,
+            "action_whnf_ns_reported_sum": "1156599672",
+            "encoding_ns_sum": "87184123",
+            "action_whnf_ns_min": "1156599672",
+            "action_whnf_ns_max": "1156599672",
+            "action_whnf_ns_exact_median": "1156599672",
+            "nodes_inclusive": [
+              32769,
+              131072
+            ],
+            "top10_by_reported_action": [
+              {
+                "event": 0,
+                "site": "UnifyDistinct",
+                "success": 1,
+                "nodes": 65690,
+                "words": 942431,
+                "action_whnf_ns": "1156599672",
+                "encoding_ns": "87184123"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "at_least_129_nodes": {
+      "count": 3419,
+      "nodes": 1412078,
+      "words": 24243006,
+      "action_whnf_ns_reported_sum": "8122691061",
+      "encoding_ns_sum": "1774110595",
+      "action_whnf_ns_min": "413716",
+      "action_whnf_ns_max": "1156599672",
+      "action_whnf_ns_exact_median": "1082104"
+    },
+    "nodes_129_through_2048": {
+      "count": 3404,
+      "reported_action_ns_sum": "6575496726"
+    },
+    "duplicate_candidates": {
+      "groups": 747,
+      "excess_events": 8794,
+      "excess_reported_action_ns_sum": "624576101",
+      "max_nodes": 101,
+      "equal_hash_is_not_equal_graph_or_safe_reuse": true,
+      "not_possible_savings": true
+    },
+    "target_outer_elapsed_ns_budget_only": "20960747446",
+    "interval_scope": "Reported action-to-Either-WHNF intervals, possibly overlapping due to re-entry/shared demand; includes in-interval GC/scheduling. Not exclusive CPU, full result work or additive CLI phase.",
+    "decision": "DESCRIPTIVE_SIZE_COST_EVIDENCE_ONLY_NO_OPTIMIZATION_SELECTED"
+  },
+  "limits": {
+    "finite_compile_seconds": 120,
+    "finite_target_seconds": 15,
+    "finite_whole_seconds": 180,
+    "real_compile_seconds": 240,
+    "real_target_seconds": 90,
+    "real_whole_seconds": 400,
+    "AS_GiB": 4,
+    "automatic_retry": false,
+    "additional_samples": 0
+  },
+  "reproducibility_boundary": "Numeric real TSVs and original input texts are not included. Raw hashes identify privately preserved evidence. Full real fingerprints cannot be recomputed from these aggregates."
+}

@@ -1,0 +1,40 @@
+--- a/libraries/mlf-inference/Bootstrap/Graph/Solver.hs
++++ b/libraries/mlf-inference/Bootstrap/Graph/Solver.hs
+@@ -10,6 +10,7 @@
+   import qualified Bootstrap.IntSet as IS;
+   import qualified Bootstrap.IntRank as Rank;
+   import qualified Bootstrap.Graph as G;
++  import qualified Prototype.LocalProblemDigest as Capture;
+   -- The incremental solver projects a component closed under both directions
+   -- of type structure and binding. Generalization scopes are retained with
+   -- their common ancestors; unused scope roots have private bottom witnesses.
+@@ -1053,7 +1054,7 @@
+                (count + L.length hiddenRoots)
+          } in
+          G.bindE
+-           (G.unify
++           (Capture.observe Capture.UnifyDistinct G.unify
+               (L.map
+                  (\entry ->
+                     case entry of {
+@@ -2144,7 +2145,7 @@
+           (:) head tail -> G.bindE
+             (preparedFallbackProjection solver current first fresh pending)
+             (\((,,,) local localEquations originals ((,,) forward scopes stubs)) ->
+-              G.bindE (G.unify localEquations local)
++              G.bindE (Capture.observe Capture.PreparedFallback G.unify localEquations local)
+                 (\solved -> G.bindE
+                   (G.mapE_ (\stub -> G.check
+                     (matchesNode (G.nodes solved) stub (G.nodeAt local stub) &&
+--- a/host/ghc/app/emlf/Main.hs
++++ b/host/ghc/app/emlf/Main.hs
+@@ -1,5 +1,8 @@
+ module Main where
+ import MLF.Host.IO (runEntry)
+ import qualified MLF.Entry.Emlf as Entry
++import qualified Prototype.LocalProblemDigest as Capture
+ main :: IO ()
+-main = runEntry Entry.main
++main = do
++  runEntry Entry.main
++  Capture.writeCapture "local-problem-digest.tsv"

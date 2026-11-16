@@ -1,0 +1,115 @@
+{
+  "schema": "public-local-problem-diagnostic-pins-v1",
+  "baseline_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "ghc_version": "9.14.1",
+  "selected_actual_GHC_flags": [
+    "-O2",
+    "-j1",
+    "-fforce-recomp",
+    "-fpedantic-bottoms",
+    "-fno-state-hack",
+    "-rtsopts=ignoreAll"
+  ],
+  "patch_targets": [
+    {
+      "repo_path": "libraries/mlf-inference/Bootstrap/Graph/Solver.hs",
+      "baseline_sha256": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612",
+      "diagnostic_sha256": "351504072033846c879a7e47a66ec054ef79247a467fe18d85ec715a9bf03046"
+    },
+    {
+      "repo_path": "host/ghc/app/emlf/Main.hs",
+      "baseline_sha256": "72d926eedd4e5abc40b8f0bc925a39d20995397f0d4144b4abd932ef2aaa6d79",
+      "diagnostic_sha256": "10bef3a57ffff250078bfd78f83c47a3c4ac6565aca3fe454b125d54f9a0edf1"
+    }
+  ],
+  "helper_source_versions": {
+    "v3": "de478aac56c6dd08ba3b22f1fe9a11ec6cd2d78f3fd57d5d3c5dac7ea630c73f",
+    "v4": "d4fd348392c879b9238f1f07ac4176976066ed48dc075abbfe7dd16cfe5d3ae2"
+  },
+  "input_identity_comparison": "The actual v4 audit verifies the same fixed16 input tree and the full non-timing seven-field event sequence against v3. No physical-cache equivalence or profile-event join is claimed.",
+  "producer_v3": {
+    "bytes": 20303840,
+    "sha256": "312038e7e1a186c5e0c2ed6a8a53121511ed140cf78d16b5ba63a4c92b8f32fe"
+  },
+  "producer_v4": {
+    "bytes": 20308128,
+    "sha256": "a5f6c7f11713319f3be51fd9dc3e60a177a0c6df2abcfd2c30d766f1a2175e9f"
+  },
+  "raw_evidence": {
+    "v3_numeric_tsv": {
+      "bytes": 1306185,
+      "sha256": "df9a60e4cd3c79632bc434b6f225c36d886a9ed8a02fb43f66eae98473549c55"
+    },
+    "v4_numeric_tsv": {
+      "bytes": 1416787,
+      "sha256": "e32554dd47b2757f1a72b7849ae6691a6fcd7891e8c79e89b9c112b7985f5b07"
+    },
+    "v3_actual_audit": {
+      "bytes": 14577,
+      "sha256": "2377336ab980921dac6061362504423f448b75d91211845b148126aa10083467"
+    },
+    "v4_actual_audit": {
+      "bytes": 15228,
+      "sha256": "4b3dfe39bc381b89fde9ebd9a9351e4f6c6758e151daf23c5963644fabfb3eba"
+    },
+    "v4_independent_arithmetic": {
+      "bytes": 84738,
+      "sha256": "3e3e27f0c4439e8b71dbc8edc3faa074abd2aa4c7801f78bedf281e5cd7d7d29"
+    },
+    "v3_finite_audit": {
+      "bytes": 7993,
+      "sha256": "2a4eefbf5a688c7cf375f2efeb293e0f03b395e3206dcf776feac6a3ed4fcaeb"
+    },
+    "v4_finite_audit": {
+      "bytes": 6854,
+      "sha256": "9bc0dc415d01b80af0091861086f8381f39ed04a0dd13a0b7bf8c65e77bff14b"
+    },
+    "v4_source_audit": {
+      "bytes": 6014,
+      "sha256": "e2379a73d3a930b9c9192eb4833770c6b74540f46780be10d6828c1de691d387"
+    }
+  },
+  "archive_files_excluding_this_self_file": [
+    {
+      "path": "BOUNDARIES.md",
+      "bytes": 3542,
+      "sha256": "ecee473e1a7d9e1953d14be3cabe1652f8f3255637e064525ba354880d487d58"
+    },
+    {
+      "path": "FocusedMain.hs",
+      "bytes": 5190,
+      "sha256": "9cb530c424d20a3478cc49d3b551c18d8add9b61f64c9525dcedbf3e9a738852"
+    },
+    {
+      "path": "Prototype/LocalProblemDigest.hs",
+      "bytes": 5106,
+      "sha256": "d4fd348392c879b9238f1f07ac4176976066ed48dc075abbfe7dd16cfe5d3ae2"
+    },
+    {
+      "path": "README.md",
+      "bytes": 2585,
+      "sha256": "f906602cc4141bca0e936cf5ba8bfc8bedf98e1b97af61ab205074783e02f73d"
+    },
+    {
+      "path": "diagnostic-results.json",
+      "bytes": 71500,
+      "sha256": "b910ec8a88c5a40c802254a8d690fa57332c3413a122df25ca6478b6148e3dea"
+    },
+    {
+      "path": "diagnostic.patch",
+      "bytes": 1721,
+      "sha256": "e642ee974ae85ce7c47aa93531e6edbcae621608deb37bdd968392be5b68b75a"
+    },
+    {
+      "path": "expected-encoding-cases.tsv",
+      "bytes": 1565,
+      "sha256": "df5e8703cd12a3351010a4473af8d4012587b9779716bb7fb8d3876714ef52b4"
+    },
+    {
+      "path": "finite-results.json",
+      "bytes": 2066,
+      "sha256": "c22933f3bb4bf9df156459e6810b3975eb864ee798c11796a067bf4ebb83743f"
+    }
+  ],
+  "redaction": "Only relative repository/archive paths and explicit argv placeholders. No binaries, real input texts, private storage/account/host identities or raw graphs included."
+}

@@ -1,0 +1,65 @@
+{
+  "schema": "public-finite-local-problem-encoding-v1",
+  "ordinary_O2_only": true,
+  "encoding_cases": 26,
+  "expected_token_stream_file": "expected-encoding-cases.tsv",
+  "expected_token_stream_identity": {
+    "bytes": 1565,
+    "sha256": "df5e8703cd12a3351010a4473af8d4012587b9779716bb7fb8d3876714ef52b4"
+  },
+  "homes_per_run": 8,
+  "staged_per_run": 24,
+  "fresh_o_hi_per_run": 16,
+  "sidecars_per_run": 2,
+  "expected_stdout": "PASS 26 exact encoding cases, Left bypass, Right force, bounded cap\n",
+  "expected_stderr": "",
+  "old_and_new_26_stream_bytes_equal": true,
+  "accepted_rows_first_seven_fields": [
+    {
+      "event": 0,
+      "site": "UnifyDistinct",
+      "success": 0,
+      "words": 0,
+      "nodes": 0,
+      "h1": "0",
+      "h2": "0"
+    },
+    {
+      "event": 1,
+      "site": "PreparedFallback",
+      "success": 1,
+      "words": 10,
+      "nodes": 1,
+      "h1": "7315885365150003742",
+      "h2": "3930716039965229128"
+    }
+  ],
+  "source_v3": {
+    "status": "PASS_INDEPENDENT_ACTUAL_FINITE_LOCAL_PROBLEM_DIGEST_ENCODING_O2_ONLY",
+    "producer": {
+      "bytes": 2254576,
+      "sha256": "0a34f74bbaf3219fe2669406b1de8f5eb26012540d71b85650e1c4ee9d9ba397"
+    },
+    "report_sha256": "2a4eefbf5a688c7cf375f2efeb293e0f03b395e3206dcf776feac6a3ed4fcaeb"
+  },
+  "source_v4": {
+    "status": "PASS_INDEPENDENT_ACTUAL_V4_FINITE_ACTION_WHNF_ENCODING_O2_ONLY",
+    "producer": {
+      "bytes": 2285280,
+      "sha256": "d102ea7127d78a193e4da3388bf1fb09bb93f0f2838f6c091c77ea7b5f1bd9ad"
+    },
+    "report_sha256": "9bc0dc415d01b80af0091861086f8381f39ed04a0dd13a0b7bf8c65e77bff14b",
+    "encoding_ns_rows": [
+      "20",
+      "621"
+    ],
+    "action_whnf_ns_rows": [
+      "60",
+      "221"
+    ],
+    "encoding_ns_sum": "641",
+    "action_whnf_ns_sum": "281",
+    "nonnegative_exact_conservation_only_not_clock_precision_or_performance": true
+  },
+  "scope": "Finite exact synthetic encoding and existing Left bypass/Right poison/cap tests. Synthetic actions, not production Solver qualification or full exception/liveness coverage."
+}
