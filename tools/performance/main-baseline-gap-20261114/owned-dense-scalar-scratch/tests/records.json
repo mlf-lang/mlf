@@ -1,0 +1,192 @@
+[
+  {
+    "name": "valid-minimal",
+    "expected": "Right ()\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "valid-negative-dense",
+    "expected": "Right ()\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "valid-max-dense",
+    "expected": "Right ()\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "valid-min-dense",
+    "expected": "Right ()\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "valid-sparse-span",
+    "expected": "Right ()\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "valid-sparse-wrapped-span",
+    "expected": "Right ()\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "valid-alias-chain",
+    "expected": "Right ()\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "valid-overlap-sparse",
+    "expected": "Right ()\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "valid-holes-cached-child",
+    "expected": "Right ()\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "valid-transitive-type-binder",
+    "expected": "Right ()\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "valid-kind-application",
+    "expected": "Right ()\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "empty",
+    "expected": "Left \"graph must have one binding root\"\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "two-roots",
+    "expected": "Left \"graph must have one binding root\"\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "non-gen-root",
+    "expected": "Left \"binding root must be a gen node\"\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "missing-binder",
+    "expected": "Left \"missing binder\"\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "binding-cycle",
+    "expected": "Left \"cyclic binding tree\"\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "structural-cycle",
+    "expected": "Left \"infinite type (occurs check)\"\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "gen-structural-child",
+    "expected": "Left \"gen nodes cannot be structural children\"\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "rigid-gen",
+    "expected": "Left \"gen nodes must be flexible\"\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "missing-structural-child",
+    "expected": "Left \"missing graph node 99\"\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "missing-alias-terminal",
+    "expected": "Left \"missing graph node 9\"\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "ill-dominated",
+    "expected": "Left \"ill-dominated type graph\"\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "type-binder-not-containing",
+    "expected": "Left \"a type binder must structurally contain its node\"\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "kind-application-arity",
+    "expected": "Left \"invalid type constructor arity: a type of kind * cannot be applied\"\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "function-kind",
+    "expected": "Left \"function types require kind * arguments\"\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "legacy-kind",
+    "expected": "Left \"legacy type constructor has a non-* argument\"\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "root-count-before-tag",
+    "expected": "Left \"graph must have one binding root\"\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "missing-binder-before-tag",
+    "expected": "Left \"missing binder\"\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "binding-cycle-before-rigid",
+    "expected": "Left \"cyclic binding tree\"\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "poison-graph",
+    "expected": "Probe graph\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "poison-nodes-before-links",
+    "expected": "Probe nodes\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "poison-links-before-node",
+    "expected": "Probe links\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "poison-node",
+    "expected": "Probe node\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "poison-binder-before-tag",
+    "expected": "Probe binder\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "poison-root-flag",
+    "expected": "Probe flag\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "lazy-next-id",
+    "expected": "Right ()\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "lazy-boxed-kind",
+    "expected": "Right ()\n",
+    "kind": "original-versus-owned-differential"
+  },
+  {
+    "name": "original-public-boundary",
+    "expected": "lazy=7|writeDemand=Probe value\n",
+    "kind": "original-public-api-control"
+  }
+]

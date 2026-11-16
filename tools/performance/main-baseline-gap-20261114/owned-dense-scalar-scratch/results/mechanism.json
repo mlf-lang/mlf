@@ -1,0 +1,16 @@
+{
+  "review_sha256": "16b0cd4223a35df10e99cee06314e11f7ac43656af763e47f39c0afe05516ee5",
+  "status": "LOCAL_MECHANISM_SUPPORTED_NOT_NET_ALLOCATION_OR_SPEED_PROOF",
+  "storage": [
+    "Four private integer scratch arrays use newByteArray# (8*n), scalar initialization and readInt64Array#/writeInt64Array#. Node, Kind and descendant arrays remain boxed.",
+    "Construction-time value demand is retained before the write action. Bounds checks, lazy index expressions and Magic.lazy state actions remain.",
+    "The boxed array slot was also eight bytes, holding a pointer; total initial 0/-1 values can be shared. This is not a halving of slot payload or one saved initial box per slot."
+  ],
+  "limits": [
+    "Some reads still rebox Int64; colour and visited comparisons consume scalars directly.",
+    "Original boxed reads can return existing boxes without allocation. Eight-byte scalar slots do not halve the old eight-byte pointer slots.",
+    "Private visibility/inlining changes confound attribution solely to storage.",
+    "Only final saved O2 Core; no separately retained O0 Core. No complete allocation/PAP/GC/error-path ledger.",
+    "No whole-program allocation or timing claim."
+  ]
+}

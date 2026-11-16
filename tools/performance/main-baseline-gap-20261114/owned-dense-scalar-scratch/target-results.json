@@ -1,0 +1,139 @@
+{
+  "direction": "C/A from same ordinary MLF --no-prelude --type fixed input; four samples/two pairs only",
+  "samples": {
+    "A1": {
+      "wall_ns": 19599692515,
+      "user_seconds": 18.790827,
+      "system_seconds": 0.814344,
+      "CPU_seconds_decimal": "19.605171",
+      "maxrss_kib": 696540
+    },
+    "C1": {
+      "wall_ns": 17096532152,
+      "user_seconds": 16.537542,
+      "system_seconds": 0.558126,
+      "CPU_seconds_decimal": "17.095668",
+      "maxrss_kib": 620844
+    },
+    "C2": {
+      "wall_ns": 16872114874,
+      "user_seconds": 16.381833,
+      "system_seconds": 0.5068819999999999,
+      "CPU_seconds_decimal": "16.8887149999999999",
+      "maxrss_kib": 620972
+    },
+    "A2": {
+      "wall_ns": 20677019387,
+      "user_seconds": 20.113985,
+      "system_seconds": 0.590579,
+      "CPU_seconds_decimal": "20.704564",
+      "maxrss_kib": 696668
+    }
+  },
+  "pairs": [
+    {
+      "A": "A1",
+      "C": "C1",
+      "C_over_A": {
+        "wall": "0.8722857329989087331352963319690120148806",
+        "CPU": "0.8719979030022232399809213599820169892933",
+        "user": "0.8800859057453937498333628424124175056265",
+        "system": "0.6853688367569479237275647637853290501311",
+        "RSS": "0.8913256955810147299509001636661211129296"
+      },
+      "delta_percent": {
+        "wall": "-12.77142670010912668647036680309879851194",
+        "CPU": "-12.80020969977767600190786400179830107067",
+        "user": "-11.99140942546062501666371575875824943735",
+        "system": "-31.46311632430520762724352362146709498689",
+        "RSS": "-10.86743044189852700490998363338788870704"
+      }
+    },
+    {
+      "A": "A2",
+      "C": "C2",
+      "C_over_A": {
+        "wall": "0.8159838977859541337576635314686422313408",
+        "CPU": "0.8157001036100059822558929519114722724903",
+        "user": "0.8144498964277839523097983815738154323969",
+        "system": "0.8582797559682953508336733950919352025724",
+        "RSS": "0.8913456624963397199239810067349153398749"
+      },
+      "delta_percent": {
+        "wall": "-18.40161022140458662423364685313577686592",
+        "CPU": "-18.42998963899940177441070480885277275097",
+        "user": "-18.55501035722160476902016184261845676031",
+        "system": "-14.17202440317046491663266049080647974276",
+        "RSS": "-10.86543375036602800760189932650846601251"
+      }
+    }
+  ],
+  "geometric_C_over_A": {
+    "wall": "0.8436652845741180682206347992645583222688",
+    "CPU": "0.8433793807217612095913716083792964271053",
+    "user": "0.8466320775767289395002035506514904548367",
+    "system": "0.7669668819186573695864431526084064358470",
+    "RSS": "0.8913356789827670727658977546820307132194"
+  },
+  "geometric_delta_percent": {
+    "wall": "-15.63347154258819317793652007354416777312",
+    "CPU": "-15.66206192782387904086283916207035728947",
+    "user": "-15.33679224232710604997964493485095451633",
+    "system": "-23.30331180813426304135568473915935641530",
+    "RSS": "-10.86643210172329272341022453179692867806"
+  },
+  "arithmetic_mean_paired_RSS_ratio": "0.891335679038677224937440585200518226402",
+  "checks": {
+    "both_wall_faster": true,
+    "both_CPU_faster": true,
+    "wall_geometric_at_most_0_95": true,
+    "CPU_geometric_at_most_0_95": true,
+    "RSS_paired_ratio_mean_at_most_1_05": true,
+    "each_RSS_paired_ratio_at_most_1_10": true
+  },
+  "decision": "CONTINUE_SIGNAL_ONLY",
+  "qualification_calls_excluded": [
+    "C-negative-unused-unexported-type-error",
+    "C-negative-syntax-error",
+    "C-negative-name-error",
+    "C-negative-missing-module",
+    "C-good-qualification"
+  ],
+  "timing_scope": "Direct child Popen through wait4; outer budget fields excluded",
+  "boundary": "Same ordinary MLF --no-prelude --type checking-service path, not compile-crate, native, all compiler workloads, cold-cache evidence or allocation measurement. Private helper visibility/fusion changes alongside storage.",
+  "actual_review_status": "PASS_INDEPENDENT_ACTUAL_OWNED_DENSE_TYPE_NINE_CALL_SCREEN",
+  "actual_review_sha256": "b055556ffb73c398f8f81e8802e7c16f1dcd841b93fa8439f575bf8562d66bf6",
+  "numeric_results_sha256": "98b558530582a03aa439feb6733ae4ec0fe94de07fd684a857a360b532c98f82",
+  "A_sha256": "4eab562e58373f5d6dccc8a5460d8d7b909571ee6e88ea91a110f53dc5c10c71",
+  "C_sha256": "857840bf61e2682fb9e5f4869b8a6cea804a6798bd089b3f8694890589c5f3d1",
+  "raw_receipt_sha256": "0c005beebede23a18e4ea27b8462b548e334abaff2e73e58941dc5ed7740d7a1",
+  "qualification": {
+    "total_calls": 9,
+    "excluded_qualification_calls": 5,
+    "four_negative_exit1_full_original_A_raw_error_and_phase_exact": true,
+    "negative_phases": [
+      "Inference",
+      "ModuleResolution",
+      "ModuleResolution",
+      "ModuleResolution"
+    ],
+    "negative_markers": [
+      "Int versus Bool",
+      "unexpected }; expected False",
+      "commonBoundaryDefinitelyMissing",
+      "CommonBoundaryMissing"
+    ],
+    "good_C_and_all_four_samples_exit0_stdout": "Bool\n",
+    "stderr_bytes": 0,
+    "error_text_here_is_summary_not_replacement_for_raw_gate": true
+  },
+  "budget": {
+    "per_call_wall_seconds": 60,
+    "all_calls_aggregate_seconds": 120,
+    "whole_seconds": 180,
+    "AS_bytes": 4294967296,
+    "actual_aggregate_outer_seconds": 109.89969584400387,
+    "actual_whole_seconds": 129.41200778900384,
+    "within_limits": true
+  }
+}

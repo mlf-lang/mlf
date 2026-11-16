@@ -1,0 +1,32 @@
+{
+  "status": "PASS_INDEPENDENT_ACTUAL_OWNED_DENSE_SCALAR_FINITE_O0_O2_ONLY",
+  "review_sha256": "03ed654117f2239b48ba5206013c330418775d72de64c8b6093425c1d42eb357",
+  "actual_gate": {
+    "home_count_per_lane": 15,
+    "home_bytes": 310107,
+    "link_progress_total": 16,
+    "fresh_o_hi_per_lane": 30,
+    "child_exits": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "literal_records_per_lane": 38,
+    "graph_differentials": 37,
+    "original_public_boundary_only": 1,
+    "sidecars_per_lane": 152,
+    "all_152_cross_O_equal": true,
+    "stdout_bytes_per_lane": 55,
+    "fixture_stderr_bytes": 0,
+    "compile_warnings_per_lane": 17,
+    "compile_errors": 0
+  },
+  "scope": "37 original-versus-private validator cases plus one original-public-API-only control, O0/O2. Not tests of integrated Solver calls.",
+  "prior_failure": "First attempt failed to compile because flag was absent from the explicit import. No fixture ran in that attempt; original failure retained. Import-only repair preceded the successful finite run.",
+  "resource_telemetry_is_not_performance": true
+}
