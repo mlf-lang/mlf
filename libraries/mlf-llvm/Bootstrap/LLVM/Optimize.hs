@@ -1585,7 +1585,63 @@ module Bootstrap.LLVM.Optimize where {
   -- This extra algebraic pass is for finite checked programs. Its rewrites
   -- introduce no binders and preserve evaluation of the single input value.
   -- Keep the raw and exact legacy-pass interfaces available independently.
-  optimizeChecked expression = optimizeOwned (simplifyIterations M.empty expression);
+  optimizeChecked expression = optimizeOwned (simplifyIterations M.empty (simplifyTranslations M.empty expression));
+  -- A translation evaluates its one Int input once and adds a constant in
+  -- the language's wrapping Int64 ring. Retain every unknown/effectful body.
+  -- Summaries follow resolved binder identities and never cross shadowing.
+  translationBody summaries parameter expression = case expression of {
+    XEVar name -> if eqName name parameter then Just 0 else Nothing;
+    XEApp (XEVar name) value -> case M.lookup compareName name summaries of {
+      Just amount -> fmap (\rest -> amount + rest) (translationBody summaries parameter value);
+      Nothing -> Nothing
+    };
+    XEApp (XEApp (XEPrimitive PAddInt) value) (XEInt amount) ->
+      fmap (\rest -> rest + amount) (translationBody summaries parameter value);
+    XEApp (XEApp (XEPrimitive PAddInt) (XEInt amount)) value ->
+      fmap (\rest -> amount + rest) (translationBody summaries parameter value);
+    XEApp (XEApp (XEPrimitive PSubInt) value) (XEInt amount) ->
+      fmap (\rest -> rest - amount) (translationBody summaries parameter value);
+    _ -> Nothing
+  };
+  translationSummary summaries expression = case expression of {
+    XEAbs parameter body -> translationBody (M.delete compareName parameter summaries) parameter body;
+    XEVar name -> M.lookup compareName name summaries;
+    _ -> Nothing
+  };
+  translated amount argument = if amount == 0 then argument
+    else XEApp (XEApp (XEPrimitive PAddInt) argument) (XEInt amount);
+  simplifyTranslations summaries expression = case expression of {
+    XEAbs name body -> let { scope = M.delete compareName name summaries } in
+      XEAbs name (case translationBody scope name body of {
+        Just amount -> translated amount (XEVar name);
+        Nothing -> simplifyTranslations scope body
+      });
+    XEApp function argument -> let {
+      value = simplifyTranslations summaries argument;
+      normalized = simplifyTranslations summaries function
+    } in case normalized of {
+      XEVar name -> case M.lookup compareName name summaries of {
+        Just amount -> translated amount value; Nothing -> XEApp normalized value
+      };
+      _ -> XEApp normalized value
+    };
+    XELet name value body -> let {
+      normalized = simplifyTranslations summaries value;
+      following = case translationSummary summaries normalized of {
+        Just amount -> M.insert compareName name amount summaries;
+        Nothing -> M.delete compareName name summaries
+      }
+    } in XELet name normalized (simplifyTranslations following body);
+    XELetRec bindings body -> let {
+      scope = L.foldl (\current entry -> M.delete compareName (L.fst entry) current) summaries bindings
+    } in XELetRec (L.map (\((,) name value) -> (,) name (simplifyTranslations scope value)) bindings)
+      (simplifyTranslations scope body);
+    XECase subject alternatives -> XECase (simplifyTranslations summaries subject)
+      (L.map (\(XErasedAlternative pattern body) -> XErasedAlternative pattern
+        (simplifyTranslations (L.foldl (\current name -> M.delete compareName name current)
+          summaries (X.patternNames pattern)) body)) alternatives);
+    _ -> expression
+  };
   optimizeOwned :: XErased -> XErased;
   optimizeOwned expression =
     case runFresh (optimizeOwnedWork expression) (L.advanceIdentity 1 (maxIdentity expression)) of {

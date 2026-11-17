@@ -427,11 +427,101 @@ module Bootstrap.LLVM.Codegen where {
                       names
                       registers)
              };
-             definition symbol (L.map pointer registers) (evaluate scope (A.functionBody f));
+             definitionBody symbol (L.map pointer registers)
+               (finishOrdinary (L.length names) scope (A.functionBody f));
              modify (withInlinePrimitives inline)
            };
       cgPure symbol
     };
+  -- Ordinary boxed workers also need a real tail transfer at O0. Values and
+  -- capture environments are heap objects; CGSlot operands load their values,
+  -- never addresses in the caller's frame. Only equal all-pointer ABIs qualify.
+  -- Keep specialized entry selection, operand demand order and outlining rules.
+  finishOrdinary :: Int -> Map XName CGBinding -> XErased -> Build ();
+  finishOrdinary arity scope expression = do {
+    prior <- gets instructions;
+    if O.remainingSize 128 expression < 0 && workerBodyLimit 4097 prior then do {
+      value <- evaluate scope expression;
+      emit ("  ret ptr " ++ value)
+    } else finishOrdinaryBody arity scope expression
+  };
+  finishOrdinaryValue :: Map XName CGBinding -> XErased -> Build ();
+  finishOrdinaryValue scope expression = do {
+    value <- evaluateBody scope expression;
+    emit ("  ret ptr " ++ value)
+  };
+  finishOrdinaryBody :: Int -> Map XName CGBinding -> XErased -> Build ();
+  finishOrdinaryBody arity scope expression = case expression of {
+    XELet n rhs body -> do {
+      fs <- gets functions;
+      if M.member O.compareName n fs then finishOrdinary arity scope body else do {
+        plans <- gets producerPlans;
+        case recipePlan n plans of {
+          Just info -> do {
+            value <- evaluateDeferredProducer info scope;
+            emit ("  ret ptr " ++ value)
+          };
+          Nothing -> do {
+            strict <- letDemanded scope n body;
+            value <- if strict then evaluate scope rhs else thunk scope rhs;
+            finishOrdinary arity (M.insert O.compareName n (CGBinding value strict) scope) body
+          }
+        }
+      }
+    };
+    XELetRec bindings body -> do {
+      recursive <- recursiveBindings scope bindings body;
+      finishOrdinary arity recursive body
+    };
+    XECase scrutinee alternatives -> do {
+      -- Preserve admitted result-worker unboxing. Its existing result join is
+      -- intentional; ordinary constructor cases can return from each branch.
+      fs <- gets functions;
+      plans <- gets resultPlans;
+      let { specialized = case O.applications scrutinee of {
+        (,) (XEVar name) args -> case M.lookup O.compareName name plans of {
+          Just info -> case M.lookup O.compareName name fs of {
+            Just f -> L.length args == L.length (A.parameters f) && resultAlternatives info alternatives;
+            Nothing -> False
+          };
+          Nothing -> False
+        };
+        _ -> False
+      } };
+      if specialized then finishOrdinaryValue scope expression
+      else finishCase (finishOrdinary arity) scope scrutinee alternatives
+    };
+    _ -> case O.applications expression of {
+      (,) (XEPrimitive PIfThenElse) [condition,yes,no] -> do {
+        value <- evaluate scope condition;
+        test <- result ("icmp eq ptr " ++ value ++ ", " ++ immediate 6);
+        finishChoice test (finishOrdinary arity scope yes) (finishOrdinary arity scope no)
+      };
+      (,) (XEPrimitive PSeq) [first,next] -> do {
+        evaluate scope first;
+        finishOrdinary arity scope next
+      };
+      (,) (XEVar name) args -> do {
+        fs <- gets functions;
+        kernels <- gets numericKernels;
+        plans <- gets producerPlans;
+        case M.lookup O.compareName name fs of {
+          Just f -> if L.length args == L.length (A.parameters f) &&
+            L.length (A.captures f) + L.length args == arity &&
+            L.not (S.member O.compareName name kernels) && L.not (M.member O.compareName name plans)
+            then do {
+              symbol <- worker name f;
+              prepared <- workerArguments scope f args;
+              value <- result ("musttail call ptr " ++ symbol ++ "(" ++
+                L.intercalate ", " (L.map pointer (L.append (L.fst prepared) (L.snd prepared))) ++ ")");
+              emit ("  ret ptr " ++ value)
+            } else finishOrdinaryValue scope expression;
+          Nothing -> finishOrdinaryValue scope expression
+        }
+      };
+      _ -> finishOrdinaryValue scope expression
+    }
+  };
   wrapper :: XName -> A.WorkerFunction -> Build String;
   wrapper name f =
     do {
@@ -1635,7 +1725,9 @@ module Bootstrap.LLVM.Codegen where {
              (:) a [] ->
                case p of {
                  PConcatStringList -> call "@mlf_concat_string_list" (args1 (pointer a));
+                 PPackStringFields -> call "@mlf_pack_string_fields" (args1 (pointer a));
                  PStringLength -> call "@mlf_string_length" (args1 (pointer a));
+                 PStringUtf8Length -> call "@mlf_string_utf8_length" (args1 (pointer a));
                  PSqrtDouble ->
                    do {
                      x <- loadAt "double" a 8;
@@ -1771,8 +1863,10 @@ module Bootstrap.LLVM.Codegen where {
   runtimeDeclarations :: [] String;
   runtimeDeclarations =
     L.append ["declare ptr @mlf_st_freeze_array(ptr)", "@mlf_ascii_string_indices = external global i64",
+      "declare ptr @mlf_string_utf8_length(ptr)",
       "declare ptr @mlf_string_length(ptr)", "declare ptr @mlf_string_code_at(ptr, ptr)",
-      "declare ptr @mlf_concat_string_list(ptr)"]
+      "declare ptr @mlf_concat_string_list(ptr)",
+      "declare ptr @mlf_pack_string_fields(ptr)"]
       runtimeBaseDeclarations;
   runtimeBaseDeclarations :: [] String;
   runtimeBaseDeclarations =

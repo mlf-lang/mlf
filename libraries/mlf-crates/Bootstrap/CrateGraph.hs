@@ -4,6 +4,7 @@
              MultiParamTypeClasses, OverloadedStrings #-}
 module Bootstrap.CrateGraph where {
   import MLF.Primitive;
+  import qualified Bootstrap.SourceEquality as E;
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
@@ -27,7 +28,7 @@ module Bootstrap.CrateGraph where {
 
   data ContractHash = ContractHash W.Value String;
   data InferenceCaches = InferenceCaches (Map String Open.Environment) (Map String Open.Fragment)
-    (Map String ((,) String ByteArray)) (Maybe ContractHash);
+    (Map String ((,) String ByteArray)) (Maybe ContractHash) (Maybe LoweredSyntax);
   data State = State G.Session Source.CheckedContracts
     InferenceCaches ([] ((,,) String Open.Fragment ([] (V.Index Declaration)))) Int Int ([] Q.GroupResult) (Maybe IntArray);
   -- This bounded memo belongs to one compilation. A template is an abstract,
@@ -55,6 +56,11 @@ module Bootstrap.CrateGraph where {
     SApp function argument -> do {
       f <- child function; a <- child argument; Right (Q.node "application" [f,a])
     };
+    SChecked ty body -> do {
+      _ <- Inference.monomorphicType ty;
+      value <- child body;
+      Right (Q.node "checked" [Q.encodeType ty,value])
+    };
     SPrimitive _ -> Right (Q.encodeExpression expression);
     SIntLit _ -> Right (Q.encodeExpression expression);
     SBoolLit _ -> Right (Q.encodeExpression expression);
@@ -62,9 +68,19 @@ module Bootstrap.CrateGraph where {
     _ -> Left "expression is outside the inference-template grammar"
   };
   inferenceTemplateKey context parameters members = case members of {
-    [(,) owner ((,,) _ Nothing body)] -> do {
-      ensure (any (\((,,) _ _ ty) -> case ty of { XForall _ _ _ -> True; _ -> False }) parameters)
-        "template needs a polymorphic dependency";
+    [(,) owner ((,,) _ annotation body)] -> do {
+      signature <- case annotation of {
+        Nothing -> do {
+          ensure (any (\((,,) _ _ ty) -> case ty of { XForall _ _ _ -> True; _ -> False }) parameters)
+            "unsigned template needs a polymorphic dependency";
+          Right Nothing
+        };
+        Just written -> do {
+          ensure (not (null parameters)) "signed template needs a dependency";
+          _ <- Inference.monomorphicAnnotation written;
+          Right (Just (Q.encodeAnnotation written))
+        }
+      };
       let { ids = map (compose V.toInt (\((,,) i _ _) -> i)) parameters;
         globals = M.fromList compareInt (zip ids (range 0 (length ids - 1)));
         names = map (\((,,) _ name _) -> name) parameters };
@@ -73,13 +89,23 @@ module Bootstrap.CrateGraph where {
       ensure (not (M.member compareInt (V.toInt owner) globals)) "template imports its own owner";
       _ <- foldM Inference.mergeExternal M.empty (map (\((,,) _ name ty) -> (,) name ty) parameters);
       source <- templateExpression globals M.empty (length parameters) body;
-      Right (Q.node "checked-inference-template-1"
-        [context,Q.list (\((,,) _ _ ty) -> Q.encodeXType (Separate.normalType ty)) parameters,source])
+      let { fields = [context,Q.list (\((,,) _ _ ty) -> Q.encodeXType (Separate.normalType ty)) parameters,source] };
+      Right (case signature of {
+        Nothing -> Q.node "checked-inference-template-1" fields;
+        Just written -> Q.node "checked-signed-inference-template-1" ((:) written fields)
+      })
     };
-    _ -> Left "template requires one unsigned nonrecursive definition"
+    _ -> Left "template requires one nonrecursive definition"
   };
   attachInferenceTemplate declarations parameters members template = case (,) members (Open.bindings template) of {
-    (,) [(,) _ ((,,) name Nothing _)] [(,) owner expected] -> do {
+    (,) [(,) _ ((,,) name annotation _)] [(,) owner expected] -> do {
+      case annotation of {
+        Nothing -> Right ();
+        Just written -> do {
+          declared <- Inference.monomorphicAnnotation written;
+          ensure (T.alphaEq declared expected) "template declaration signature mismatch"
+        }
+      };
       let { old = Open.parameters template };
       ensure (eqList (\a b -> eqString (Q.encodeDatatype a) (Q.encodeDatatype b))
         declarations (Open.declarations (Open.context template))) "template datatype environment mismatch";
@@ -260,14 +286,61 @@ module Bootstrap.CrateGraph where {
     }) wanted;
   candidateMetadata protected ((,,) role name _) = Q.node "candidate"
     [Q.encodeRole role,name,Q.boolean (elem eqString name protected)];
-  preparedValue slots prepared = let {
-    table = Q.referenceTable slots prepared; member = compose Q.encodeMember (Q.referenceMember table);
+  -- One preceding finite syntax pair, never a declaration identity or a
+  -- checked result. SourceKey retains exact encoded leaves, including double
+  -- bits, annotations, roles and spans. Current definition identities and
+  -- metadata are supplied separately for every Prepared input.
+  -- Keep one previous normalized lowered group per compilation. Original syntax
+  -- carries changing source locations and is always encoded afresh. A hit must
+  -- preserve every encoded field, including IEEE bits; declaration identities
+  -- and current authority metadata are never supplied by this memo.
+  -- Bound retained key nodes/scalars/depth and final text on each miss.
+  data LoweredSyntax = LoweredSyntax ([] ((,,) String (Maybe SAnnotation) SExpr)) String;
+  samePreparedMembers = eqList (E.eqTriple eqString (eqMaybe E.eqSAnnotation) E.eqSExprBits);
+  boundedPreparedKey depth nodes scalars key =
+    if depth > 32 || nodes <= 0 then Nothing else case key of {
+      Q.KeyText text -> let { size = stringLength text } in
+        if size > scalars then Nothing else Just ((,) (nodes - 1) (scalars - size));
+      Q.KeyFields fields -> boundedPreparedFields (depth + 1) (nodes - 1) scalars fields;
+      Q.KeyScope _ -> Nothing
+    };
+  boundedPreparedFields depth nodes scalars fields = case fields of {
+    [] -> Just ((,) nodes scalars);
+    (:) field rest -> case boundedPreparedKey depth nodes scalars field of {
+      Nothing -> Nothing;
+      Just ((,) more remaining) -> boundedPreparedFields depth more remaining rest
+    }
+  };
+  smallPreparedKey key = case boundedPreparedKey 1 256 16384 key of {
+    Nothing -> False; Just _ -> True
+  };
+  preparedSyntax previous original lowered = let {
+    first = Q.list Q.encodeMember original;
+    fresh = let {
+      second = Q.list Q.encodeMember lowered;
+      key = Q.keyList (Q.memberKey Q.inlineScopeKey) lowered;
+      cached = if smallPreparedKey key && stringLength second <= 65536
+        then Just (LoweredSyntax lowered second) else Nothing
+    } in (,,) first second cached
+  } in case previous of {
+    Just (LoweredSyntax old second) ->
+      if samePreparedMembers old lowered then (,,) first second previous else fresh;
+    Nothing -> fresh
+  };
+  preparedValue slots prepared = fst (preparedValueCached Nothing slots prepared);
+  preparedValueCached previous slots prepared = let {
+    table = Q.referenceTable slots prepared;
+    member = Q.referenceMember table;
     token = Q.referenceToken table;
     candidate protected ((,,) role n _) = Q.node "candidate"
-      [Q.encodeRole role,token n,Q.boolean (elem eqString n protected)]
-  } in W.VNode 421 [W.VText "prepared-declarations-1", A.toList A.toText (Q.referenceDefinitions table),
-    W.VText (Q.list member (Source.groupOriginal prepared)), W.VText (Q.list member (Source.groupMembers prepared)),
-    A.toList A.toText (Q.sourceGroupMetadataWith token candidate prepared)];
+      [Q.encodeRole role,token n,Q.boolean (elem eqString n protected)];
+    original = map member (Source.groupOriginal prepared);
+    lowered = map member (Source.groupMembers prepared)
+  } in case preparedSyntax previous original lowered of { (,,) first second cached ->
+    (,) (W.VNode 421 [W.VText "prepared-declarations-1", A.toList A.toText (Q.referenceDefinitions table),
+      W.VText first, W.VText second,
+      A.toList A.toText (Q.sourceGroupMetadataWith token candidate prepared)]) cached
+  };
   -- Rebuilt inputs/receipts have no disk payload. Preserve the wire planner's exact
   -- scalar, depth, work and allocation bounds, but hash their complete framed
   -- text directly instead of writing a binary envelope and CRC just to discard
@@ -357,8 +430,8 @@ module Bootstrap.CrateGraph where {
   };
   -- Retain only the preceding validated value in each of the two scope lanes.
   -- Structural equality is bounded by that admitted tree and allocates no
-  -- encoding of the new value before its bounds check. Query keys and read
-  -- edges are still recorded afresh; no inference or scope answer is reused.
+  -- encoding of the new value before its bounds check. Each provider supplies
+  -- current reads; only identical constant-scope records share a session node.
   data RebuiltHash = RebuiltHash W.Value String;
   sameRebuiltText old value = case (,) old value of {
     (,) (W.VText a) (W.VText b) -> eqString a b;
@@ -374,13 +447,36 @@ module Bootstrap.CrateGraph where {
     hashed <- hashRebuiltValue value;
     ioReturn (mapEither (\digest -> (,) digest (Just (RebuiltHash value digest))) hashed)
   };
-  recordRebuiltCached previous identity reads value session = do {
+  recordRebuiltCached = recordScopeCached False;
+  recordScopeCached shared previous identity reads value session = do {
     hashed <- hashRebuiltCached previous value;
-    ioReturn (mapEither (\((,) digest cached) ->
-      (,) (G.recordDigest identity reads Nothing digest Nothing session) cached) hashed)
+    ioReturn (mapEither (\((,) digest cached) -> let {
+      fresh = G.QueryNode identity digest reads Nothing;
+      recorded = if shared then case M.lookup compareString identity (G.currentNodes session) of {
+        Just old -> if G.sameNode old fresh then (,) old session
+          else G.recordDigest identity reads Nothing digest Nothing session;
+        Nothing -> G.recordDigest identity reads Nothing digest Nothing session
+      } else G.recordDigest identity reads Nothing digest Nothing session
+    } in (,) recorded cached) hashed)
   };
-  preparedInput slots prepared = recordRebuilt (G.inputKey (groupKey PreparedQuery slots)) []
-    (preparedValue slots prepared);
+  -- Emptiness is supplied anew by each prepared group. The shared input is a
+  -- constant authority, never a stand-in for the first declaration. A group
+  -- that acquires candidates uses its own inventory/scope keys immediately;
+  -- Prepared and Evidence retain their declaration/site identities. Reuse
+  -- also compares current reads, so an old shared scope kept live by another
+  -- group cannot hide a change to this group's authority.
+  emptyScopeInventory value = case value of { W.VNode 422 [] -> True; _ -> False };
+  emptyInventoryKey = G.inputKey (G.key "EmptyScopeInventory" "");
+  emptyScopeKey = G.key "EmptyScope" "";
+  preparedInput slots prepared session = do {
+    answer <- preparedInputCached Nothing slots prepared session;
+    ioReturn (mapEither fst answer)
+  };
+  preparedInputCached previous slots prepared session =
+    case preparedValueCached previous slots prepared of { (,) value cached -> do {
+      answer <- recordRebuilt (G.inputKey (groupKey PreparedQuery slots)) [] value session;
+      ioReturn (mapEither (\result -> (,) result cached) answer)
+    } };
   scopeInventory prepared = case Source.groupAuthority prepared of {
     Nothing -> W.VNode 422 [];
     Just (Source.RootAuthority _ _ _ candidates protected) -> W.VNode 422
@@ -456,35 +552,41 @@ module Bootstrap.CrateGraph where {
         statistics <- G.profile;
         graphStarted <- G.clock statistics;
         auditSetting <- getEnv "MLF_QUERY_SEMANTIC_AUDIT";
-        started <- G.begin (cacheDir ++ "/query-graph-v2")
+        started <- G.begin (cacheDir ++ "/query-graph-v3")
           (Separate.pack [crateId,compilerHash,Q.sourceQueryFormat,"open-fragment-checker-1/finish-receipt-1",flavor]);
         case started of { Left e -> ioReturn (Left e); Right session -> do {
           let { initial = case contracts of { Source.CheckedContracts _ indexed _ -> indexed } };
           G.elapsed statistics 0 graphStarted;
           runGroups verify (eqString auditSetting "1") crateId inventory initial ((,) Nothing Nothing) groups
-            (State session contracts (InferenceCaches M.empty M.empty M.empty Nothing) [] 0 0 [] statistics)
+            (State session contracts (InferenceCaches M.empty M.empty M.empty Nothing Nothing) [] 0 0 [] statistics)
         } }
     };
-  runGroups verify audit crateId inventory initial scopeHashes groups state = case groups of {
+  runGroups verify audit crateId = runGroupsWithOwner verify audit (Separate.compactOpenGroupName crateId);
+  runGroupsWithOwner verify audit groupName inventory initial scopeHashes groups state = case groups of {
     [] -> ioReturn (Right state);
     (:) ((,) owners prepare) rest -> case state of {
-      State session contracts (InferenceCaches contexts templates payloads contractHash) objects inferred reused reports statistics ->
+      State session contracts (InferenceCaches contexts templates payloads contractHash preparedCache) objects inferred reused reports statistics ->
         let { scope = Source.checkedScope contracts; names = map (Source.declName scope) owners } in
         case bindEither (prepare contracts) (Source.slotPrepared contracts owners) of {
           Left e -> ioReturn (Left e);
           Right ((,) slots prepared) -> do {
             let { declarations = Q.requiredDataIn inventory (Source.groupMembers prepared)
                     (append (Source.groupBindings prepared) (Source.groupCandidateBindings prepared));
-              group = Separate.openGroupName crateId names;
+              group = groupName names;
               rawKey = groupKey InferQuery slots };
             graphStarted <- G.clock statistics;
             source <- do {
               demanded <- demandInputs scope initial (append (Source.candidateIds slots) (Source.parameterIds slots)) declarations session;
               case demanded of { Left e -> ioReturn (Left e); Right current ->
-                preparedInput slots prepared current }
+                preparedInputCached preparedCache slots prepared current }
             };
-            case source of { Left e -> ioReturn (Left e); Right ((,) sourceNode first) -> do {
-              scopeInput <- recordRebuiltCached (fst scopeHashes) (G.inputKey (groupKey ScopeInventoryQuery slots)) [] (scopeInventory prepared) first;
+            case source of { Left e -> ioReturn (Left e); Right ((,) ((,) sourceNode first) nextPreparedCache) -> do {
+              let { inventoryValue = scopeInventory prepared;
+                sharedInventory = emptyScopeInventory inventoryValue;
+                sharedScope = sharedInventory && null (Source.candidateIds slots);
+                inventoryKey = if sharedInventory then emptyInventoryKey else G.inputKey (groupKey ScopeInventoryQuery slots);
+                scopeKey = if sharedScope then emptyScopeKey else groupKey ScopeQuery slots };
+              scopeInput <- recordScopeCached sharedInventory (fst scopeHashes) inventoryKey [] inventoryValue first;
               case scopeInput of { Left e -> ioReturn (Left e); Right ((,) ((,) scopeLeaf second) inventoryHash) ->
                 case do {
                   candidateNodes <- requireBindings scope (Source.candidateIds slots) second;
@@ -494,7 +596,7 @@ module Bootstrap.CrateGraph where {
                 } of {
                   Left e -> ioReturn (Left e);
                   Right ((,,) candidateNodes bindingNodes dataNodes) -> do {
-                    scoped <- recordRebuiltCached (snd scopeHashes) (groupKey ScopeQuery slots)
+                    scoped <- recordScopeCached sharedScope (snd scopeHashes) scopeKey
                       ((:) (G.edge scopeLeaf) (map G.edge candidateNodes))
                       (scopeValue prepared candidateNodes) second;
                     case scoped of { Left e -> ioReturn (Left e); Right ((,) ((,) scopeNode third) scopeHash) -> do {
@@ -507,7 +609,7 @@ module Bootstrap.CrateGraph where {
                             else Left "template needs indexed declarations";
                           references = append (map G.edge bindingNodes) (map G.edge dataNodes);
                           reads = append [G.edge sourceNode,G.edge scopeNode] references;
-                          validated = G.validate rawKey third;
+                          validated = G.validateExpected rawKey reads third;
                           previous = fst validated; active = snd validated };
                         seq previous (G.elapsed statistics 0 graphStarted);
                         loadStarted <- G.clock statistics;
@@ -595,11 +697,12 @@ module Bootstrap.CrateGraph where {
                                     (append evidenceReads bindingEdges) };
                                 content <- finishContentHashFor (verify || audit) template declarations group body final rawNode references finalRefs;
                                 supplied <- case content of { Left e -> ioReturn (Left e); Right hash ->
-                                  recordFinishCached contractHash slots group hash delta reads afterInputs };
+                                  recordCheckedFinish contractHash slots group hash body rawNode references finalRefs
+                                    evidenceReads delta reads afterInputs };
                                 case supplied of { Left e -> ioReturn (Left e); Right ((,) next nextContractHash) -> do {
                                     G.elapsed statistics 3 finishStarted;
-                                    runGroups verify audit crateId inventory initial ((,) inventoryHash scopeHash) rest
-                                      (State next (Source.publishContracts contracts delta) (InferenceCaches currentContexts nextTemplates nextPayloads nextContractHash)
+                                    runGroupsWithOwner verify audit groupName inventory initial ((,) inventoryHash scopeHash) rest
+                                      (State next (Source.publishContracts contracts delta) (InferenceCaches currentContexts nextTemplates nextPayloads nextContractHash nextPreparedCache)
                                         ((:) ((,,) group final (map fst delta)) objects)
                                         (inferred + if hit then 0 else 1) (reused + if hit then 1 else 0)
                                         ((:) (Q.GroupResult group names hit
@@ -696,6 +799,22 @@ module Bootstrap.CrateGraph where {
       }
     }
   };
+  -- A singleton, unadapted result has no separate final body to persist.
+  -- Its Binding records every dependency of the finalization provider, not
+  -- just the raw result hash. Metadata-only edits remain observable even when
+  -- they leave the raw body/result hash unchanged. All checking and content
+  -- verification above have already run; other groups retain FinishScc.
+  recordCheckedFinish previous slots group fragmentHash body rawNode rawRefs finalRefs evidence delta reads session =
+    case (,,) body delta evidence of {
+      (,,) Source.KeepRawBody [((,) i contract)] [] ->
+        if eqString fragmentHash (G.nodeHash rawNode) && eqList (eqPair eqString eqString) rawRefs finalRefs
+        then do {
+          hashed <- hashContractCached previous (contractValue contract);
+          ioReturn (mapEither (\((,) digest next) -> (,) (snd (G.recordDigest
+            (bindingKey (Source.slotScope slots) i) reads Nothing digest Nothing session)) next) hashed)
+        } else recordFinishCached previous slots group fragmentHash delta reads session;
+      _ -> recordFinishCached previous slots group fragmentHash delta reads session
+    };
   recordFinish slots group fragmentHash delta reads session = do {
     result <- recordFinishCached Nothing slots group fragmentHash delta reads session;
     ioReturn (mapEither fst result)

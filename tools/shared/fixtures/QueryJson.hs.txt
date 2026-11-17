@@ -1,0 +1,29 @@
+-- mlf:syntax shared-haskell-v1
+{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
+             KindSignatures, FlexibleContexts, FlexibleInstances,
+             MultiParamTypeClasses, OverloadedStrings #-}
+module Main where {
+  import MLF.Primitive;
+  import Bootstrap.Types;
+  import Bootstrap.Std;
+  -- INSERT_EXACT_QUERY_JSON_FUNCTIONS
+  sample mode count =
+    if mode == 0 then concatMapString (\i -> stringFromCode (i % 32)) (range 0 (count - 1))
+    else if mode == 1 then concatStringList (replicate count "a\"\\\n😀é中")
+    else if mode == 2 then concatStringList (replicate count "ordinary-AZ09_")
+    else concatMapString stringFromCode [0,31,32,34,92,127,128,255,256,2047,2048,55295,57344,65535,65536,1114111];
+  report = reportJSON "crate" "sha" (QueryReport 1 0
+    [GroupResult "id\n" ["é","\0"] False "hash" "key\\"]);
+  main = do {
+    first <- getArg 0;
+    if eqString first "report" then putStr report
+    else if eqString first "position" then putStrLn (jsonFrom (panic "value-second") (panic "position-first"))
+    else if eqString first "value" then putStrLn (jsonFrom (panic "value") 0)
+    else if eqString first "bounds" then putStrLn (jsonFrom "a" (-1))
+    else do {
+      second <- getArg 1; third <- getArg 2;
+      let { text = sample (readInt first) (readInt second); start = readInt third };
+      putStrLn (if start < 0 then jsonString text else "\"" ++ jsonFrom text start ++ "\"")
+    }
+  }
+}

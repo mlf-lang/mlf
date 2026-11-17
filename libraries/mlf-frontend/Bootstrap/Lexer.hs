@@ -7,6 +7,7 @@ module Bootstrap.Lexer where {
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Unicode as U;
+  import qualified Bootstrap.Set as Set;
   data Token = Token String Int Int Int Int;
   data Cursor = Cursor Int Int Int;
   data Scanned = Scanned ([] Token) Token;
@@ -46,28 +47,15 @@ module Bootstrap.Lexer where {
   isIdentChar :: Int -> Bool;
   isIdentChar c = (U.isAlphaNum c || ((c == 95) || (c == 39)));
   isOperator :: Int -> Bool;
-  isOperator c =
-    elem eqInt c
-      ((:) 58
-         ((:) 33
-            ((:) 35
-               ((:) 36
-                  ((:) 37
-                     ((:) 38
-                        ((:) 42
-                           ((:) 43
-                              ((:) 46
-                                 ((:) 47
-                                    ((:) 60
-                                       ((:) 61
-                                          ((:) 62
-                                             ((:) 63
-                                                ((:) 64
-                                                   ((:) 92
-                                                      ((:) 94
-                                                         ((:) 124
-                                                            ((:) 45
-                                                               ((:) 126 []))))))))))))))))))));
+  -- This finite alphabet is independent of source size. Direct dispatch avoids
+  -- repeated linear searches for each scanned character.
+  isOperator c = case c of {
+    33 -> True; 35 -> True; 36 -> True; 37 -> True; 38 -> True;
+    42 -> True; 43 -> True; 45 -> True; 46 -> True; 47 -> True;
+    58 -> True; 60 -> True; 61 -> True; 62 -> True; 63 -> True;
+    64 -> True; 92 -> True; 94 -> True; 124 -> True; 126 -> True;
+    _ -> False
+  };
   starts :: String -> Int -> Int -> Int -> Bool;
   starts source size i c = (codeAt source size i == c);
   skipLine :: String -> Int -> Cursor -> Cursor;
@@ -841,8 +829,12 @@ module Bootstrap.Lexer where {
   sharedValueOperators = (:) ("+") ((:) ("-") ((:) ("*") ((:) ("/") ((:) ("%") ((:) ("++") ((:) ("==") ((:) ("/=") ((:) ("<") ((:) ("<=") ((:) (">") ((:) (">=") ((:) ("&&") ((:) ("||") ((:) (">>=") ((:) (">>") ((:) ("<*>") ((:) ("<$") ((:) ("*>") ((:) ("<*") ([]))))))))))))))))))));
   sharedPunctuation :: [] String;
   sharedPunctuation = append ((:) "@" ((:) "~" ((:) "[" ((:) "]" ((:) ":" sharedValueOperators))))) ((:) ("::") ((:) ("->") ((:) ("<-") ((:) ("=>") ((:) ("=") ((:) ("|") ((:) (".") ((:) ("..") ((:) ("\\") ((:) ("(") ((:) (")") ((:) ("{") ((:) ("}") ((:) (";") ((:) (",") ((:) ("_") ([])))))))))))))))));
+  sharedValueOperatorSet :: Set String;
+  sharedValueOperatorSet = Set.fromList compareString sharedValueOperators;
+  sharedPunctuationSet :: Set String;
+  sharedPunctuationSet = Set.fromList compareString sharedPunctuation;
   sharedQualifiedOperator text =
-    stringLength text > 1 && stringCodeAt text 0 == 46 && elem eqString (stringSlice text 1 (stringLength text - 1)) sharedValueOperators;
+    stringLength text > 1 && stringCodeAt text 0 == 46 && Set.member compareString (stringSlice text 1 (stringLength text - 1)) sharedValueOperatorSet;
   validateSharedTokens :: String -> [] Token -> Either String ();
   validateSharedTokens file tokens =
     case tokens of {
@@ -854,7 +846,7 @@ module Bootstrap.Lexer where {
           };
           unless
             (sharedIdentifier text ||
-             (elem eqString text sharedPunctuation || sharedQualifiedOperator text ||
+             (Set.member compareString text sharedPunctuationSet || sharedQualifiedOperator text ||
               ((stringLength text > 0) &&
                (isDigit (stringCodeAt text 0) || (stringCodeAt text 0 == 34)))))
             (Left
@@ -890,5 +882,5 @@ module Bootstrap.Lexer where {
   frontendSemanticVersion :: String;
   frontendSemanticVersion = "mlf-frontend/shared-haskell-v1/8";
   builtinInterfaceVersion :: String;
-  builtinInterfaceVersion = "mlf-primitive/shared-haskell-v1/13"
+  builtinInterfaceVersion = "mlf-primitive/shared-haskell-v1/16"
 }

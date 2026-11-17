@@ -34,10 +34,10 @@ def same_group_ownership(crate, expected, actual):
         members = closed['members']
         if not members or members != opened['members'] or len(set(members)) != len(members):
             return False
-        encoded = lambda value: ''.join(str(ord(char)) + '_' for char in value)
-        legacy = 'Query_' + encoded(crate) + 'z_' + encoded(members[0])
-        owner = pack(['MLF-OPEN-GROUP-1', crate, pack(sorted(members))])
-        if closed['id'] != legacy or opened['id'] != owner or owner in seen:
+        # Uniqueness is canonical ownership, even if the two wire versions
+        # occur together. Do not admit two spellings of the same group.
+        owner = tuple(sorted(members))
+        if not Comparison.match_group_identity(crate, closed['id'], opened['id'], members) or owner in seen:
             return False
         seen.add(owner)
     return True

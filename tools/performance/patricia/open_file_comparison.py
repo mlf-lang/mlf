@@ -472,13 +472,36 @@ def compare_open_file(closed_files, open_files, dependency_interfaces,
     except Invalid as error:
         raise ComparisonError(str(error)) from error
 
+def compact_group_owner_v2(crate, members):
+    # Historical owner framing over the unchanged frozen codec/schema oracle.
+    prefix = ''.join(str(ord(char)) + '_' for char in crate) + 'z_'
+    def member(name):
+        for tag, start in [('value', 'module_' + prefix), ('type', 'Module_' + prefix)]:
+            if name.startswith(start):
+                return pack([tag, name[len(start):]])
+        return pack(['raw', name])
+    return pack(['MLF-OPEN-GROUP-2', crate, pack([member(n) for n in sorted(members)])])
+
+
+def compact_group_owner(crate, members):
+    escaped = ''.join(c if c.isascii() and c.isalnum() and c != 'z' else
+                      'zz' if c == 'z' else 'z' + format(ord(c), 'x') + 'z' for c in crate)
+    def member(name):
+        for tag, start in [('value', 'module_c1_' + escaped + '_'),
+                           ('type', 'Module_c1_' + escaped + '_')]:
+            if name.startswith(start):
+                return pack([tag, name[len(start):]])
+        return pack(['raw', name])
+    return pack(['MLF-OPEN-GROUP-3', crate, pack([member(n) for n in sorted(members)])])
+
 def match_group_identity(crate, legacy, opened, members):
     if not members or len(set(members)) != len(members):
         return False
     encoded = lambda value: ''.join(str(ord(char)) + '_' for char in value)
     expected_legacy = 'Query_' + encoded(crate) + 'z_' + encoded(members[0])
     expected_open = pack(['MLF-OPEN-GROUP-1', crate, pack(sorted(members))])
-    return legacy == expected_legacy and opened == expected_open
+    return legacy == expected_legacy and opened in (expected_open, compact_group_owner_v2(crate, members),
+                                                   compact_group_owner(crate, members))
 
 
 def fragment_equal(parameters, opened_parameters, closed, opened):

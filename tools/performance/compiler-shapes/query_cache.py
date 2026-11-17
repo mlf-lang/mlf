@@ -10,6 +10,7 @@ SHARED = Path(__file__).resolve().parents[2] / 'shared'
 sys.path.insert(0, str(SHARED))
 from query_generation import Generation, cache_directory
 from artifact_binary_reference import read_document  # noqa: E402
+from artifact_binary_open import compact_group_owner, compact_group_owner_v2  # noqa: E402
 from test_query_index import read_index  # noqa: E402
 
 GRAPH = 'query-graph-v1/'
@@ -48,7 +49,7 @@ def snapshot(query, report, destination):
     JSON wrapping also keeps these inputs in the CI receipts-only upload.
     Result bytes are already hashed by the ordinary complete file inventory.
     """
-    if not any((query / g / 'CURRENT').is_file() for g in (GRAPH, 'query-graph-v2')):
+    if not any((query / g / 'CURRENT').is_file() for g in (GRAPH, 'query-graph-v2', 'query-graph-v3')):
         return
     graph = cache_directory(query)
     files = {}
@@ -98,7 +99,8 @@ def check_graph(inventory, evidence, fresh, max_members, crate, compiler_sha):
                 record['bytes'] >= 0 and valid_hash(record.get('sha256')),
                 'finite integral query inventory bytes and SHA')
     require(not any(p.endswith('.mlfq') for p in inventory), 'mixed legacy and graph query storage')
-    graph = 'query-graph-v2/' if 'query-graph-v2/CURRENT' in inventory else GRAPH
+    graph = next((f'query-graph-v{v}/' for v in (3, 2, 1)
+                  if f'query-graph-v{v}/CURRENT' in inventory), GRAPH)
     current = graph + 'CURRENT'
     generations = [p for p in inventory if p.endswith('.mlfqg')]
     results = [p for p in inventory if p.endswith('.mlfqr')]
@@ -178,7 +180,8 @@ def check_graph(inventory, evidence, fresh, max_members, crate, compiler_sha):
         encoded = lambda value: ''.join(str(ord(c)) + '_' for c in value)
         framed_owner = pack(['MLF-OPEN-GROUP-1', crate, pack(sorted(members))])
         legacy_owner = 'Query_' + encoded(crate) + 'z_' + encoded(min(members))
-        require(identity in (framed_owner, legacy_owner),
+        require(identity in (framed_owner, legacy_owner, compact_group_owner_v2(crate, members),
+                             compact_group_owner(crate, members)),
                 'actual query group id matches crate and members')
         key = pack(['InferScc', pack(sorted(members))])
         require(key not in identities and key in nodes and valid_hash(sha) and

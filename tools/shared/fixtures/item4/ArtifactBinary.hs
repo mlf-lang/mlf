@@ -435,7 +435,10 @@ constructorTests = sequence [
   checkCase "PWriteByteFileOrError" A.toPrimitive A.fromPrimitive T.PWriteByteFileOrError (W.VNode 32 [W.VInt 130]),
   checkCase "PByteArrayDigest" A.toPrimitive A.fromPrimitive T.PByteArrayDigest (W.VNode 32 [W.VInt 131]),
   checkCase "PFreezeSTArray" A.toPrimitive A.fromPrimitive T.PFreezeSTArray (W.VNode 32 [W.VInt 132]),
-  checkCase "PSTToIO" A.toPrimitive A.fromPrimitive T.PSTToIO (W.VNode 32 [W.VInt 133])
+  checkCase "PSTToIO" A.toPrimitive A.fromPrimitive T.PSTToIO (W.VNode 32 [W.VInt 133]),
+  checkCase "PByteArrayCRC32" A.toPrimitive A.fromPrimitive T.PByteArrayCRC32 (W.VNode 32 [W.VInt 134]),
+  checkCase "PPackStringFields" A.toPrimitive A.fromPrimitive T.PPackStringFields (W.VNode 32 [W.VInt 135]),
+  checkCase "PStringUtf8Length" A.toPrimitive A.fromPrimitive T.PStringUtf8Length (W.VNode 32 [W.VInt 136])
   ]
 
 graphChecks = [
@@ -705,7 +708,10 @@ graphChecks = [
   \g root -> checkGraph "PWriteByteFileOrError" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 130]),
   \g root -> checkGraph "PByteArrayDigest" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 131]),
   \g root -> checkGraph "PFreezeSTArray" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 132]),
-  \g root -> checkGraph "PSTToIO" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 133])
+  \g root -> checkGraph "PSTToIO" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 133]),
+  \g root -> checkGraph "PByteArrayCRC32" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 134]),
+  \g root -> checkGraph "PPackStringFields" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 135]),
+  \g root -> checkGraph "PStringUtf8Length" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 136])
   ]
 
 checkGraph label encode decode graph root expected = do
@@ -745,7 +751,7 @@ semanticEdges directory = do
     need "IEEE exact signed bits; not numeric equality" (P.doubleToBits value == bits && same (A.toDouble value) (W.VBits bits))
     term <- expect "IEEE term decode" (A.fromXTerm (W.VNode 78 [W.VBits bits]))
     case term of T.XDoubleTerm d -> need "IEEE term exact" (P.doubleToBits d == bits); _ -> error "IEEE wrong constructor"
-  forM_ [-1,134,2147483647] $ \code -> do
+  forM_ [-1,137,2147483647] $ \code -> do
     let value=W.VNode 32 [W.VInt code]
     reject "unknown primitive ABI code" (A.fromPrimitive value)
     bytes <- W.encode W.defaultLimits 7 [value] >>= expect "unknown primitive is valid wire"
@@ -1173,10 +1179,10 @@ distributionSeed directory = do
     (CrateArtifact.encodeInterface builtinIface == CrateArtifact.encodeInterface (CrateArtifact.objectInterface canonicalBuiltin) &&
      CrateArtifact.encodeObject builtinObject == CrateArtifact.encodeObject canonicalBuiltin)
   need "release fixture exact builtin dependency and no entry"
-    (CrateArtifact.crateDependencies iface == [("mlf:builtin-shared-haskell-v1:13",builtinPath,CrateArtifact.semanticFingerprint builtinIface)] &&
+    (CrateArtifact.crateDependencies iface == [("mlf:builtin-shared-haskell-v1:15",builtinPath,CrateArtifact.semanticFingerprint builtinIface)] &&
      CrateArtifact.crateEntry iface == "")
   need "builtin leaf has no dependencies or entry"
-    (CrateArtifact.crateId builtinIface == "mlf:builtin-shared-haskell-v1:13" && null (CrateArtifact.crateDependencies builtinIface) && CrateArtifact.crateEntry builtinIface == "")
+    (CrateArtifact.crateId builtinIface == "mlf:builtin-shared-haskell-v1:15" && null (CrateArtifact.crateDependencies builtinIface) && CrateArtifact.crateEntry builtinIface == "")
   need "release fixture exact identity/module" (CrateArtifact.crateId iface == "binary-package/1/library" && CrateArtifact.crateModules iface == ["BinaryPackage"])
   need "actual Session keeps the open primary" (CrateArtifact.openMarked object)
   -- The explicit companion adds old-format coverage. The original Session
@@ -1220,10 +1226,10 @@ distributionSeed directory = do
   legacyMetadata <- P.fileDigest (B.literal (legacyBuiltinPrefix ++ ".mlfci"))
   legacyBody <- P.fileDigest (B.literal (legacyBuiltinPrefix ++ ".mlfco"))
   let legacyPath = Release.virtualPath (Release.pairKey legacyMetadata legacyBody)
-  portableLegacy <- expect "legacy root relocation" (Release.relocateObject [("mlf:builtin-shared-haskell-v1:13",legacyPath)] closed)
+  portableLegacy <- expect "legacy root relocation" (Release.relocateObject [("mlf:builtin-shared-haskell-v1:15",legacyPath)] closed)
   need "legacy closure exact relocated dependency"
     (CrateArtifact.crateDependencies (CrateArtifact.objectInterface portableLegacy) ==
-      [("mlf:builtin-shared-haskell-v1:13",legacyPath,CrateArtifact.semanticFingerprint builtinIface)])
+      [("mlf:builtin-shared-haskell-v1:15",legacyPath,CrateArtifact.semanticFingerprint builtinIface)])
   writeFile (directory ++ "/release-legacy-root.mlfci") (B.unpack (CrateArtifact.encodeInterface (CrateArtifact.objectInterface portableLegacy)))
   writeFile (directory ++ "/release-legacy-root.mlfco") (B.unpack (CrateArtifact.encodeObject portableLegacy))
   putStrLn "PASS actual-binary-library-and-legacy-formal"
@@ -1526,7 +1532,7 @@ releaseBuiltinBranches directory = do
       ownership label identity modules expected = case CrateArtifact.validateBuiltinOwnership (replaceIdentityModules identity modules builtin) of
         T.Left message -> need label (message == expected)
         T.Right _ -> error ("accepted ownership regression: " ++ label)
-  need "fixed current builtin authority" (current == "mlf:builtin-shared-haskell-v1:13")
+  need "fixed current builtin authority" (current == "mlf:builtin-shared-haskell-v1:15")
   need "builtin localPrefix uses canonical compiler cache"
     (Release.localPrefix "/cache" compiler (row current) == ("/cache/.queries/builtin-prelude/" P.++ compiler P.++ "/unit"))
   need "ordinary localPrefix keeps release key cache"
@@ -1557,7 +1563,7 @@ releaseForgedCurrent directory = do
   let forged = CrateArtifact.makeObject (CrateArtifact.objectInterface canonical) fragments
       iface = CrateArtifact.objectInterface forged
   need "forged control retains exact current identity and ownership"
-    (CrateArtifact.crateId iface == "mlf:builtin-shared-haskell-v1:13" &&
+    (CrateArtifact.crateId iface == "mlf:builtin-shared-haskell-v1:15" &&
      CrateArtifact.crateModules iface == CrateArtifact.crateModules (CrateArtifact.objectInterface canonical))
   _ <- expect "forged control passes complete ordinary typed linking" (CrateArtifact.linkCheckedObjects [forged] (CrateArtifact.crateId iface))
   need "forged control is genuinely noncanonical" (CrateArtifact.encodeObject forged /= CrateArtifact.encodeObject canonical)

@@ -9,6 +9,7 @@ import qualified MLF.Primitive as P
 import qualified MLF.Host.Base as B
 import qualified CandidateWire as C
 import qualified LegacyWire as L
+import qualified Bootstrap.Map as M
 
 need label ok = unless ok (fail label)
 expect label (T.Left e) = fail (label ++ ": " ++ B.unpack e)
@@ -19,6 +20,15 @@ old value = case value of
  C.VText x -> L.VText x
  C.VNode t xs -> L.VNode t (map old xs)
 bytes array = P.lengthByteArray array >>= \n -> mapM (P.readByteArray array) [0..n-1]
+sameBytes left right = do
+ n <- P.lengthByteArray left
+ m <- P.lengthByteArray right
+ let loop i | i == n = pure True
+            | otherwise = do
+                a <- P.readByteArray left i
+                b <- P.readByteArray right i
+                if a == b then loop (i+1) else pure False
+ if n == m then loop 0 else pure False
 -- Independent CRC32/ISO-HDLC vectors generated with Python zlib.crc32.
 -- The input byte at i is (37*i+seed) mod 256, with header bytes 76..79 zero.
 crcVectors :: [(P.Int,P.Int,P.Int)]
@@ -82,8 +92,60 @@ crcControls = forM_ crcVectors $ \(size,seed,wanted) -> do
  b <- observeChecksum (L.checksum array (size+7))
  need "CRC keeps frozen short-buffer failure behavior" (a==b)
 
+oldLimits (C.Limits a b c d e f g h) = L.Limits a b c d e f g h
+limitControls = do
+ let limits = [C.defaultLimits, C.Limits 79 8 16 32 32 32 8 128,
+       C.Limits 256 0 16 32 32 32 8 128,
+       C.Limits 256 1 16 32 32 32 8 128,
+       C.Limits 256 8 1 32 32 32 8 128,
+       C.Limits 256 8 4 4 32 32 8 128,
+       C.Limits 256 8 16 32 0 32 8 128,
+       C.Limits 256 8 16 32 1 32 8 128,
+       C.Limits 256 8 16 32 32 0 8 128,
+       C.Limits 256 8 16 32 32 2 1 128,
+       C.Limits 256 8 16 32 32 32 8 0,
+       C.Limits 256 8 16 32 32 32 8 7]
+     values = [[], [C.VText "α😀"], [C.VText "a",C.VText "b"],
+       replicate 8 (C.VText "α"), [C.VInt 1,C.VBits 1,C.VText "1"],
+       [C.VNode 1 [C.VText "a",C.VText "a",C.VInt 1]],
+       [C.VNode 1 [C.VNode 2 [C.VText "a"]]],
+       [C.VNode (-1) []], [C.VNode 2147483648 []]]
+ forM_ limits $ \bound -> forM_ values $ \roots -> do
+  candidate <- C.encode bound 7 roots
+  frozen <- L.encode (oldLimits bound) 7 (map old roots)
+  case (candidate,frozen) of
+   (T.Left a,T.Left b) -> need "finite limit diagnostic order" (a==b)
+   (T.Right a,T.Right b) -> sameBytes a b >>= need "finite limit accepted bytes"
+   _ -> fail "finite limit admission changed"
+
+-- Exercise indexes beyond practical fixture sizes without allocating millions
+-- of wire nodes. The frozen full-key comparator supplies independent IDs.
+indexControls = do
+ let tags = [0,1,1023,1024,65535,65536,2147483647]
+     ids = [0,1,131071,131072,4194303,4194304,2147483646]
+     children = [[]] ++ [[a] | a <- ids] ++ [[a,b] | a <- ids,b <- ids] ++
+       [[a,b,c] | a <- ids,b <- ids,c <- ids] ++ [[0,1,2,3]]
+     nodes = [C.ENode tag refs | tag <- tags,refs <- children]
+     entries = [C.EInt 0,C.EBits 0,C.EText 0,C.EInt minBound,C.EBits minBound] ++ nodes
+     legacy entry = case entry of
+       C.EInt n -> L.EInt n
+       C.EBits n -> L.EBits n
+       C.EText n -> L.EText n
+       C.ENode tag refs -> L.ENode tag refs
+     step (current,frozen,next) entry =
+       case (C.internNodeKey entry current,L.intern L.compareEntry (legacy entry) frozen) of
+        (C.ExistingNode actual,L.Found expected) -> do
+          need "exact indexed node identity" (actual==expected)
+          pure (current,frozen,next)
+        (C.MissingNode insert,L.Inserted fill) -> pure (insert next,fill next,next+1)
+        _ -> fail "indexed node equality differs from frozen structural comparison"
+ _ <- foldM step (C.emptyNodeIndex,M.empty,0) (entries ++ reverse entries ++ entries)
+ pure ()
+
 main = do
  crcControls
+ limitControls
+ indexControls
  let scalars = [C.VInt x | x <- [minBound,-129,-128,-1,0,1,63,64,127,128,maxBound]] ++
        [C.VBits x | x <- [minBound,-1,0,1,0x7ff0000000000000,0x7ff8000000000001,maxBound]] ++
        [C.VText x | x <- ["","ascii","α😀\NUL","\x7f\x80\x7ff\x800\xd7ff\xe000\x10000\x10ffff"]]
@@ -100,6 +162,18 @@ main = do
   full <- expect "independent full resource inventory" (C.graphResourceStats graph)
   work <- expect "root summary" (C.graphExpandedWork graph)
   need "summary retains expanded root charging" (work == C.resourceExpandedWork full)
+ -- Cross the bounded bulk-text allocation threshold in both ASCII bytes and
+ -- Unicode scalars. Include NUL and multibyte text; lengths are wire bytes.
+ forM_ [replicate (4194304 + delta) 'a' | delta <- [-128,128]] $ \text -> do
+  let values = [C.VText (B.literal text)]
+  current <- C.encode C.defaultLimits 7 values >>= expect "large ASCII encoder"
+  baseline <- L.encode L.defaultLimits 7 (map old values) >>= expect "frozen large ASCII encoder"
+  sameBytes current baseline >>= need "bulk/streaming ASCII boundary preserves every byte"
+ forM_ [concat (replicate (524288 + delta) "A\NULα😀") | delta <- [-16,16]] $ \text -> do
+  let values = [C.VText (B.literal text)]
+  current <- C.encode C.defaultLimits 7 values >>= expect "large Unicode encoder"
+  baseline <- L.encode L.defaultLimits 7 (map old values) >>= expect "frozen large Unicode encoder"
+  sameBytes current baseline >>= need "bulk/streaming Unicode boundary preserves every byte"
  -- Force collisions independently of the hash function, including equal
  -- prefixes and all four entry kinds. Then check the ordinary hash route too.
  let entries = [C.EInt (-1),C.EBits (-1),C.EText 0,C.ENode 0 [],C.ENode 0 [0],C.ENode 0 [0,1]] ++

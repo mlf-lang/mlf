@@ -5,6 +5,7 @@ import Prelude hiding (Int, String)
 import qualified Prelude as P
 import MLF.Host.Base
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Unsafe as BU
 import qualified Data.Array.IO as A
 import qualified Data.Array.Base as AB
 import qualified Data.Array.IO.Internals as AI
@@ -19,7 +20,7 @@ import qualified Data.Map.Lazy as M
 #endif
 import Data.IORef
 import Data.Int (Int64)
-import Data.Word (Word8)
+import Data.Word (Word8, Word32)
 import Foreign.Marshal.Alloc (mallocBytes)
 import Foreign.Marshal.Utils (copyBytes, fillBytes)
 import Foreign (alloca, peek, peekElemOff, pokeElemOff, nullPtr, free, castPtr, plusPtr)
@@ -255,7 +256,10 @@ v_lengthByteArray array = do
   ByteArray size _ <- evaluate array
   pure (fromIntegral size)
 bytesArray :: B.ByteString -> IO ByteArray
-bytesArray bytes = B.useAsCStringLen bytes $ \(pointer,size) -> copyByteArray (castPtr pointer) size
+-- The callback reads exactly size bytes and retains no source pointer. Borrow
+-- the immutable input while making the independent mutable copy; a temporary
+-- NUL-terminated copy would duplicate this work and is not needed here.
+bytesArray bytes = BU.unsafeUseAsCStringLen bytes $ \(pointer,size) -> copyByteArray (castPtr pointer) size
 copyByteArray :: Ptr Word8 -> P.Int -> IO ByteArray
 copyByteArray input size = do
   storage <- newByteStorage size
@@ -369,3 +373,14 @@ v_byteArrayDigest array = do
 {-# INLINE v_readByteArray #-}
 {-# INLINE v_writeByteArray #-}
 {-# INLINE v_lengthByteArray #-}
+
+-- Array and range arguments are forced in that order when the action runs.
+-- The pinned owner stays alive across the read-only call, including a safe-FFI GC.
+foreign import ccall safe "mlf_ghc_byte_array_crc32" c_byteArrayCRC32 :: Ptr Word8 -> CSize -> CSize -> CSize -> IO Word32
+v_byteArrayCRC32 :: ByteArray -> Int -> Int -> IO Int
+v_byteArrayCRC32 array zeroStart zeroCount = do
+  ByteArray size cells <- evaluate array
+  start <- evaluate (bounded "invalid CRC zero range" (fromIntegral size) zeroStart)
+  count <- evaluate (bounded "invalid CRC zero range" (fromIntegral (size-start)) zeroCount)
+  withByteStorage cells $ \bytes ->
+    fromIntegral <$> c_byteArrayCRC32 bytes (fromIntegral size) (fromIntegral start) (fromIntegral count)

@@ -16,6 +16,7 @@ void mlf_require_haskell_boundary_v4_abi(void);
 void mlf_require_byte_file_v2_abi(void);
 void mlf_require_freeze_st_array_abi(void);
 void mlf_require_st_to_io_abi(void);
+void mlf_require_byte_array_crc32_abi(void);
 
 typedef struct MlfValue MlfValue;
 typedef struct MlfEnv MlfEnv;
@@ -61,11 +62,13 @@ MlfValue *mlf_string(const char *bytes, uint64_t length);
  * Empty input yields an empty String; singleton input preserves the forced
  * String value. Multi-fragment output uses one checked final byte buffer. */
 MlfValue *mlf_concat_string_list(MlfValue *pieces);
+MlfValue *mlf_pack_string_fields(MlfValue *fields);
 /* Checked Unicode-scalar operations. Compact generated code may use the ASCII
  * sentinel only after evaluating operands, checking a tagged small index and
  * checking its unsigned bounds against the string's byte length. All other
  * cases, including an uninitialized index cache, use these checked helpers. */
 MlfValue *mlf_string_length(MlfValue *text);
+MlfValue *mlf_string_utf8_length(MlfValue *text);
 MlfValue *mlf_string_code_at(MlfValue *text, MlfValue *index);
 extern size_t mlf_ascii_string_indices;
 MlfValue *mlf_primitive(int64_t primitive);

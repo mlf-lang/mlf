@@ -410,7 +410,9 @@ module Bootstrap.Layout where {
              Scanned tokens finish ->
                do {
                  validateSharedTokens file tokens;
-                 arranged <- layoutTokensUsing True scanSourceTokens program file source;
+                 -- Validation and layout consume the same immutable token stream.
+                 -- Keep the scanner failure and validation order above intact.
+                 arranged <- layoutTokensUsing True (\_ _ -> Right (Scanned tokens finish)) program file source;
                  case arranged of {
                    Scanned ordered _ -> validateSharedArranged file [] Nothing ordered
                  };

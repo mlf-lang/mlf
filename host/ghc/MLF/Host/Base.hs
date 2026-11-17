@@ -14,8 +14,8 @@ module MLF.Host.Base
   , v_quotInteger, v_remInteger, v_eqInteger, v_ltInteger, v_showInteger, v_readInteger, v_integerToDouble
   , v_addDouble, v_subDouble, v_mulDouble, v_divDouble, v_sqrtDouble
   , v_eqDouble, v_ltDouble, v_intToDouble, v_doubleToBits, v_doubleFromBits
-  , v_concatString, v_concatStringList, v_eqString, v_compareString, v_stringLength, v_stringCodeAt
-  , v_stringSlice, v_stringFromCode, v_showInt, v_readInt, v_readDouble, v_formatDouble
+  , v_concatString, v_concatStringList, v_packStringFields, v_eqString, v_compareString, v_stringLength, v_stringCodeAt
+  , v_stringUtf8Length, v_stringSlice, v_stringFromCode, v_showInt, v_readInt, v_readDouble, v_formatDouble
   , v_ifThenElse, v_seq, v_panic, HostError(..), failure, bounded, stIndex, strict2
   ) where
 
@@ -304,12 +304,47 @@ v_concatStringList pieces = case pieces of
                      nextBytes = byteCount + bytes
                  in nextScalars `pseq` nextBytes `pseq`
                       collect nextScalars nextBytes (text:chunks) rest
+-- Canonical length-prefixed fields: decimal scalar length, colon, payload.
+-- Fuse framing with the fragment traversal without allocating a source list
+-- of three String wrappers per field. Validate heads before demanding tails.
+v_packStringFields :: [String] -> String
+v_packStringFields pieces = collect 0 0 [] pieces
+  where
+    collect scalarCount byteCount chunks remaining = case remaining of
+      [] -> mkSizedText scalarCount (T.concat (reverse chunks))
+      piece:rest -> piece `pseq` case piece of
+        String text count _ -> case text of
+          TI.Text _ _ bytes -> case fieldPrefix count of
+            String prefix extra _ ->
+              if extra > maxBound - scalarCount || count > maxBound - scalarCount - extra ||
+                   extra > maxBound - byteCount || bytes > maxBound - byteCount - extra
+              then failure "string too large"
+              else let nextScalars = scalarCount + extra + count
+                       nextBytes = byteCount + extra + bytes
+                   in nextScalars `pseq` nextBytes `pseq`
+                        collect nextScalars nextBytes (text:prefix:chunks) rest
+-- Keep the decimal length and colon together. The fixed lazy table bounds
+-- sharing independently of input length; larger fields use the same framing.
+fieldPrefix :: P.Int -> String
+fieldPrefix count
+  | 0 <= count, count < 1024 = smallFieldPrefixes Array.! count
+  | otherwise = mkText (T.pack (show count ++ ":"))
+smallFieldPrefixes :: Array.Array P.Int String
+smallFieldPrefixes = Array.listArray (0,1023)
+  [mkText (T.pack (show count ++ ":")) | count <- [0..1023 :: P.Int]]
 v_eqString :: String -> String -> Bool
 v_eqString = orderedStrict (\(String a _ _) (String b _ _) -> a==b)
 v_compareString :: String -> String -> Int
-v_compareString = orderedStrict (\(String a _ _) (String b _ _) -> case compare a b of { LT -> -1; EQ -> 0; GT -> 1 })
+-- Establish left-to-right demand outside the comparison, avoiding a guarded
+-- right-operand thunk on hot map comparisons.
+v_compareString left right = left `pseq` case left of
+  String a _ _ -> case right of
+    String b _ _ -> case compare a b of { LT -> -1; EQ -> 0; GT -> 1 }
 v_stringLength :: String -> Int
 v_stringLength (String _ n _) = fromIntegral n
+-- String constructors validate Unicode and retain the exact UTF-8 byte count.
+v_stringUtf8Length :: String -> Int
+v_stringUtf8Length (String (TI.Text _ _ bytes) _ _) = fromIntegral bytes
 -- All String constructors are private and preserve valid UTF-8 plus exact
 -- scalar count. Equality of byte/scalar counts proves ASCII. Bounds precede
 -- unchecked byte indexing; slice copies to avoid retaining the source buffer.
@@ -407,47 +442,9 @@ v_countLeadingZerosInt = fromIntegral . Bits.countLeadingZeros
 v_countTrailingZerosInt = fromIntegral . Bits.countTrailingZeros
 v_popCountInt = fromIntegral . Bits.popCount
 
--- pseq's lazy barrier orders possibly failing operands. A literal Int64 is
--- already a total value, so that barrier carries no ordering obligation for
--- the literal itself. Expose only these exact constants; unknown operands and
--- continuations retain the barrier. This lets GHC fold binary widths, masks
--- and rolling-checksum arithmetic without relaxing primitive error order.
+-- A boxed Int64 whose unlifted payload is available is already in normal
+-- form. Its lazy barrier has no remaining operand to order. Unknown boxed
+-- values keep pseq unchanged, including all possibly failing computations.
 {-# RULES
-"mlf/total-int/0" G.lazy (GI.I64# 0#Int64) = GI.I64# 0#Int64
-"mlf/total-int/1" G.lazy (GI.I64# 1#Int64) = GI.I64# 1#Int64
-"mlf/total-int/2" G.lazy (GI.I64# 2#Int64) = GI.I64# 2#Int64
-"mlf/total-int/3" G.lazy (GI.I64# 3#Int64) = GI.I64# 3#Int64
-"mlf/total-int/4" G.lazy (GI.I64# 4#Int64) = GI.I64# 4#Int64
-"mlf/total-int/7" G.lazy (GI.I64# 7#Int64) = GI.I64# 7#Int64
-"mlf/total-int/8" G.lazy (GI.I64# 8#Int64) = GI.I64# 8#Int64
-"mlf/total-int/15" G.lazy (GI.I64# 15#Int64) = GI.I64# 15#Int64
-"mlf/total-int/16" G.lazy (GI.I64# 16#Int64) = GI.I64# 16#Int64
-"mlf/total-int/24" G.lazy (GI.I64# 24#Int64) = GI.I64# 24#Int64
-"mlf/total-int/31" G.lazy (GI.I64# 31#Int64) = GI.I64# 31#Int64
-"mlf/total-int/32" G.lazy (GI.I64# 32#Int64) = GI.I64# 32#Int64
-"mlf/total-int/63" G.lazy (GI.I64# 63#Int64) = GI.I64# 63#Int64
-"mlf/total-int/64" G.lazy (GI.I64# 64#Int64) = GI.I64# 64#Int64
-"mlf/total-int/127" G.lazy (GI.I64# 127#Int64) = GI.I64# 127#Int64
-"mlf/total-int/128" G.lazy (GI.I64# 128#Int64) = GI.I64# 128#Int64
-"mlf/total-int/131" G.lazy (GI.I64# 131#Int64) = GI.I64# 131#Int64
-"mlf/total-int/255" G.lazy (GI.I64# 255#Int64) = GI.I64# 255#Int64
-"mlf/total-int/256" G.lazy (GI.I64# 256#Int64) = GI.I64# 256#Int64
-"mlf/total-int/512" G.lazy (GI.I64# 512#Int64) = GI.I64# 512#Int64
-"mlf/total-int/768" G.lazy (GI.I64# 768#Int64) = GI.I64# 768#Int64
-"mlf/total-int/1024" G.lazy (GI.I64# 1024#Int64) = GI.I64# 1024#Int64
-"mlf/total-int/2048" G.lazy (GI.I64# 2048#Int64) = GI.I64# 2048#Int64
-"mlf/total-int/65535" G.lazy (GI.I64# 65535#Int64) = GI.I64# 65535#Int64
-"mlf/total-int/65536" G.lazy (GI.I64# 65536#Int64) = GI.I64# 65536#Int64
-"mlf/total-int/65599" G.lazy (GI.I64# 65599#Int64) = GI.I64# 65599#Int64
-"mlf/total-int/17161" G.lazy (GI.I64# 17161#Int64) = GI.I64# 17161#Int64
-"mlf/total-int/2248091" G.lazy (GI.I64# 2248091#Int64) = GI.I64# 2248091#Int64
-"mlf/total-int/8261507" G.lazy (GI.I64# 8261507#Int64) = GI.I64# 8261507#Int64
-"mlf/total-int/294499921" G.lazy (GI.I64# 294499921#Int64) = GI.I64# 294499921#Int64
-"mlf/total-int/780718649" G.lazy (GI.I64# 780718649#Int64) = GI.I64# 780718649#Int64
-"mlf/total-int/1172642095" G.lazy (GI.I64# 1172642095#Int64) = GI.I64# 1172642095#Int64
-"mlf/total-int/2147483629" G.lazy (GI.I64# 2147483629#Int64) = GI.I64# 2147483629#Int64
-"mlf/total-int/2147483647" G.lazy (GI.I64# 2147483647#Int64) = GI.I64# 2147483647#Int64
-"mlf/total-int/2147483648" G.lazy (GI.I64# 2147483648#Int64) = GI.I64# 2147483648#Int64
-"mlf/total-int/4294967295" G.lazy (GI.I64# 4294967295#Int64) = GI.I64# 4294967295#Int64
-"mlf/total-int/1099511628211" G.lazy (GI.I64# 1099511628211#Int64) = GI.I64# 1099511628211#Int64
+"mlf/total-int/constructor" forall value. G.lazy (GI.I64# value) = GI.I64# value
 #-}

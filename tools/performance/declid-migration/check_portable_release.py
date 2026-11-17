@@ -150,7 +150,7 @@ def main():
         record["bundle_inventory"] = inventory(bundle)
         record["release_manifest"] = json.loads((bundle / "release.json").read_bytes())
         rows = record["release_manifest"]["crates"]
-        require({row["identity"] for row in rows} == {"mlf:builtin-shared-haskell-v1:13",
+        require({row["identity"] for row in rows} == {"mlf:builtin-shared-haskell-v1:14",
                 "leaf/1.0.0/library", "middle/1.0.0/library", "greeting/1.0.0/library"}, "incomplete transitive release")
         pin = digest(bundle / "release.json")
         record["release_sha256"] = pin

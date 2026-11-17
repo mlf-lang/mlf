@@ -11,7 +11,7 @@ import shutil
 
 from test_direct import CommandRunner, authenticate_build, sha
 from artifact_binary_reference import read_document
-from query_generation import Generation
+from query_generation import Generation, cache_directory
 
 ROOT = Path(__file__).resolve().parents[2]
 HEADER = ('-- mlf:syntax shared-haskell-v1\n'
@@ -118,7 +118,7 @@ def main():
     check('warm consumer reuses every group', warm['inferred_groups'] == 0 and warm['reused_groups'] == count)
     check('cold and warm artifacts agree', cold_bytes ==
           [Path(str(main_prefix) + s).read_bytes() for s in ['.mlfci', '.mlfco']])
-    graph = output / 'Main-cache/query-graph-v2'
+    graph = cache_directory(output / 'Main-cache')
     pointer = read_document((graph / 'CURRENT').read_bytes(), 6).values()
     check('one generation pointer', len(pointer) == 1 and pointer[0][0] == 'text')
     address = pointer[0][1]
@@ -151,7 +151,7 @@ def main():
     edited = compile('consumer-one-body-change', main_spec, main_prefix)
     check('one body edit infers one group', edited['inferred_groups'] == 1 and edited['reused_groups'] == count - 1)
     run('changed-consumer-value', main_prefix, '12\n')
-    current = output / 'Main-cache/query-graph-v2/CURRENT'
+    current = cache_directory(output / 'Main-cache') / 'CURRENT'
     prior = current.read_bytes()
     write_lib(result='Bool')
     compile('library-used-type-change', lib_spec, lib_prefix)

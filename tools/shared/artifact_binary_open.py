@@ -30,12 +30,45 @@ def string(value):
 def sequence(values):
     return node(1, *values)
 
+def compact_group_owner_v2(crate, members):
+    """Version 2 factors only an exact decimal-scalar crate prefix.
+
+    Tags distinguish ordinary values, types and verbatim names. Canonical order
+    is the order of complete names, before factoring. No digest replaces a name.
+    """
+    encoded = ''.join(str(ord(char)) + '_' for char in crate) + 'z_'
+    prefixes = [('value', 'module_' + encoded), ('type', 'Module_' + encoded)]
+    def member(name):
+        for tag, prefix in prefixes:
+            if name.startswith(prefix):
+                return pack([tag, name[len(prefix):]])
+        return pack(['raw', name])
+    return pack(['MLF-OPEN-GROUP-2', crate, pack([member(n) for n in sorted(members)])])
+
+
+def compact_name(value):
+    """Independent c1 identifier component: ASCII alphanumerics and z escapes."""
+    return ''.join(char if char.isascii() and char.isalnum() and char != 'z'
+                   else 'zz' if char == 'z' else 'z' + format(ord(char), 'x') + 'z'
+                   for char in value)
+
+
+def compact_group_owner(crate, members):
+    prefix = compact_name(crate) + '_'
+    def member(name):
+        for tag, start in [('value', 'module_c1_' + prefix), ('type', 'Module_c1_' + prefix)]:
+            if name.startswith(start):
+                return pack([tag, name[len(start):]])
+        return pack(['raw', name])
+    return pack(['MLF-OPEN-GROUP-3', crate, pack([member(n) for n in sorted(members)])])
+
 def companion_group_matches(crate, legacy, opened, members):
     if not members or len(set(members)) != len(members):
         return False
     encoded = lambda value: ''.join(str(ord(char)) + '_' for char in value)
     return (legacy == 'Query_' + encoded(crate) + 'z_' + encoded(sorted(members)[0]) and
-            opened == pack(['MLF-OPEN-GROUP-1', crate, pack(sorted(members))]))
+            opened in (pack(['MLF-OPEN-GROUP-1', crate, pack(sorted(members))]),
+                       compact_group_owner_v2(crate, members), compact_group_owner(crate, members)))
 
 def fingerprint(value):
     return hashlib.sha256(tree_document([value], 6)).hexdigest()

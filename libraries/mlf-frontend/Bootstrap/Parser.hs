@@ -47,6 +47,13 @@ module Bootstrap.Parser where {
                                                                ((:) "module"
                                                                   ((:) "import"
                                                                      [])))))))))))))))))))));
+  -- Resolve the fixed vocabulary once for each syntax profile. A token now
+  -- needs one membership test, rather than composing three list searches.
+  legacyReservedSet = Set.fromList compareString reservedWords;
+  sharedReservedSet = Set.fromList compareString
+    (append (filter (\word -> not (elem eqString word sharedOrdinaryLegacyWords)) reservedWords)
+      sharedReservedWords);
+  sharedOperatorSet = Set.fromList compareString sharedValueOperators;
   identifier :: Parser String;
   identifier = namedIdentifier U.isAlpha "identifier";
   upperIdentifier :: Parser String;
@@ -59,7 +66,7 @@ module Bootstrap.Parser where {
       (do {
          name <- pSatisfy (\n -> ((stringLength n > 0) && predicate (stringCodeAt n 0))) expected;
          shared <- pBySyntax (pPure True) (pPure False);
-         if ((elem eqString name reservedWords && (not shared || not (elem eqString name sharedOrdinaryLegacyWords))) || (shared && elem eqString name sharedReservedWords))
+         if Set.member compareString name (if shared then sharedReservedSet else legacyReservedSet)
          then pFail ("unexpected reserved word " ++ name)
          else if (shared && not (sharedIdentifier name))
               then pFail "shared source identifiers must be ASCII"
@@ -128,7 +135,7 @@ module Bootstrap.Parser where {
   parseModuleInPackage sourcePackage file source =
     do {
       syntax <- sourceSyntax file source;
-      parseModuleWithProfileInPackage sourcePackage syntax file source
+      parseModuleSelectedInPackage sourcePackage syntax file source
     };
   -- Artifact metadata uses legacy quantification/annotation grammar but wired
   -- canonical type names. This profile is never selected by a source marker.
@@ -163,6 +170,13 @@ module Bootstrap.Parser where {
   parseModuleWithProfileInPackage sourcePackage syntax file source =
     do {
       validateProfileSelection syntax file source;
+      parseModuleSelectedInPackage sourcePackage syntax file source
+    };
+  -- Both callers have validated this immutable source against its profile:
+  -- discovery also checks the filename and marker, explicit selection checks
+  -- agreement with the marker. Do not repeat the complete source scan here.
+  parseModuleSelectedInPackage sourcePackage syntax file source =
+    do {
       tokens <- layoutTokensWithProfile syntax True file source;
       result <- runParserWithProfileInPackage sourcePackage syntax (sourceModule file) file tokens;
       when (eqString (moduleIdentity result) "MLF.Primitive")
@@ -1734,7 +1748,7 @@ module Bootstrap.Parser where {
   -- Only this fixed operator vocabulary is supported. The bindings themselves
   -- resolve normally; these are the ordinary facade fixities, not primitives.
   operatorName :: Parser String;
-  operatorName = pSatisfy (\name -> elem eqString name sharedValueOperators) "supported value operator";
+  operatorName = pSatisfy (\name -> Set.member compareString name sharedOperatorSet) "supported value operator";
   operatorReference :: Parser String;
   operatorReference = do {
     prefixes <- pMany (pTry (pBefore upperIdentifier (pSymbolPrefix ".")));

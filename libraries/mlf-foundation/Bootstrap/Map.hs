@@ -314,23 +314,97 @@ module Bootstrap.Map where {
     } in
     seq result (Set result);
   fromList :: forall k v. (k -> k -> Int) -> [] ((,) k v) -> Map k v;
-  fromList cmp entries =
-    S.foldlStrict
-      (\tree entry ->
-         case entry of {
-           (,) k v -> insert cmp k v tree
-         })
-      empty
-      entries;
+  fromList cmp entries = fromDistinctAscList (fromListMergeRuns cmp (fromListRuns cmp entries));
+  -- Merge already ordered lists before allocating the final balanced map.
+  -- Equal keys keep the later run's key and lazy value. fromListWith remains
+  -- separate because arbitrary value combinations need not be associative.
+  fromListRuns :: forall k v. (k -> k -> Int) -> [] ((,) k v) -> [] ([] ((,) k v));
+  fromListRuns cmp entries = case entries of {
+    [] -> [];
+    (:) ((,) key value) rest -> seq key (fromListRunStart cmp key value rest)
+  };
+  fromListRunStart :: forall k v. (k -> k -> Int) -> k -> v -> [] ((,) k v) -> [] ([] ((,) k v));
+  fromListRunStart cmp key value entries = case entries of {
+    [] -> [[((,) key value)]];
+    (:) ((,) nextKey nextValue) rest -> let { order = cmp nextKey key } in
+      if order == 0 then seq nextKey (fromListRunStart cmp nextKey nextValue rest)
+      else if order > 0 then seq nextKey
+        (fromListRunAscending cmp [((,) key value)] nextKey nextValue rest)
+      else seq nextKey
+        (fromListRunDescending cmp [((,) key value)] nextKey nextValue rest)
+  };
+  fromListRunAscending :: forall k v. (k -> k -> Int) -> [] ((,) k v) -> k -> v ->
+    [] ((,) k v) -> [] ([] ((,) k v));
+  fromListRunAscending cmp reversed key value entries = case entries of {
+    [] -> [S.reverse ((:) ((,) key value) reversed)];
+    (:) ((,) nextKey nextValue) rest -> let { order = cmp nextKey key } in
+      if order < 0 then
+        (:) (S.reverse ((:) ((,) key value) reversed))
+          (fromListRuns cmp entries)
+      else if order == 0 then seq nextKey
+        (fromListRunAscending cmp reversed nextKey nextValue rest)
+      else seq nextKey
+        (fromListRunAscending cmp ((:) ((,) key value) reversed) nextKey nextValue rest)
+  };
+  fromListRunDescending :: forall k v. (k -> k -> Int) -> [] ((,) k v) -> k -> v ->
+    [] ((,) k v) -> [] ([] ((,) k v));
+  fromListRunDescending cmp reversed key value entries = case entries of {
+    [] -> [((:) ((,) key value) reversed)];
+    (:) ((,) nextKey nextValue) rest -> let { order = cmp nextKey key } in
+      if order > 0 then
+        (:) (((:) ((,) key value) reversed)) (fromListRuns cmp entries)
+      else if order == 0 then seq nextKey
+        (fromListRunDescending cmp reversed nextKey nextValue rest)
+      else seq nextKey
+        (fromListRunDescending cmp ((:) ((,) key value) reversed) nextKey nextValue rest)
+  };
+  fromListMergeRuns :: forall k v. (k -> k -> Int) -> [] ([] ((,) k v)) -> [] ((,) k v);
+  fromListMergeRuns cmp runs = case runs of {
+    [] -> [];
+    (:) only [] -> only;
+    _ -> fromListMergeRuns cmp (fromListMergePairs cmp runs)
+  };
+  fromListMergePairs :: forall k v. (k -> k -> Int) -> [] ([] ((,) k v)) -> [] ([] ((,) k v));
+  fromListMergePairs cmp runs = case runs of {
+    [] -> [];
+    (:) only [] -> [only];
+    (:) earlier ((:) later rest) -> (:) (fromListMergeEntries cmp earlier later) (fromListMergePairs cmp rest)
+  };
+  fromListMergeEntries :: forall k v. (k -> k -> Int) -> [] ((,) k v) ->
+    [] ((,) k v) -> [] ((,) k v);
+  fromListMergeEntries cmp earlier later = case earlier of {
+    [] -> later;
+    (:) first rest -> case later of {
+      [] -> earlier;
+      (:) second tail -> let { order = cmp (S.fst first) (S.fst second) } in
+        if order < 0 then (:) first (fromListMergeEntries cmp rest later)
+        else if order > 0 then (:) second (fromListMergeEntries cmp earlier tail)
+        else (:) second (fromListMergeEntries cmp rest tail)
+    }
+  };
   fromListWith :: forall k v. (k -> k -> Int) -> (v -> v -> v) -> [] ((,) k v) -> Map k v;
-  fromListWith cmp combine entries =
-    S.foldlStrict
-      (\tree entry ->
-         case entry of {
-           (,) k v -> insertWith cmp combine k v tree
-         })
-      empty
-      entries;
+  -- A sorted prefix needs one comparison per incoming key and one final node
+  -- per distinct key. Preserve the newest equivalent key representative and
+  -- the lazy combine(new,old) value. Once ordering breaks, use ordinary insert.
+  fromListWith cmp combine entries = case entries of {
+    [] -> empty;
+    (:) ((,) key value) rest -> seq key (fromListAscending cmp combine [] key value rest)
+  };
+  fromListAscending :: forall k v. (k -> k -> Int) -> (v -> v -> v) ->
+    [] ((,) k v) -> k -> v -> [] ((,) k v) -> Map k v;
+  fromListAscending cmp combine reversed key value entries = case entries of {
+    [] -> fromDistinctAscList (S.reverse ((:) ((,) key value) reversed));
+    (:) ((,) nextKey nextValue) rest -> let { order = cmp nextKey key } in
+      if order < 0 then fromListInsert cmp combine
+        (fromDistinctAscList (S.reverse ((:) ((,) key value) reversed))) entries
+      else if order == 0 then seq nextKey
+        (fromListAscending cmp combine reversed nextKey (combine nextValue value) rest)
+      else seq nextKey (fromListAscending cmp combine ((:) ((,) key value) reversed) nextKey nextValue rest)
+  };
+  fromListInsert :: forall k v. (k -> k -> Int) -> (v -> v -> v) -> Map k v ->
+    [] ((,) k v) -> Map k v;
+  fromListInsert cmp combine initial entries = S.foldlStrict
+    (\tree entry -> case entry of { (,) k v -> insertWith cmp combine k v tree }) initial entries;
   fromDistinctAscList :: forall k v. [] ((,) k v) -> Map k v;
   fromDistinctAscList entries = S.fst (buildAsc (S.length entries) entries);
   buildAsc :: forall k v. Int -> [] ((,) k v) -> (,) (Map k v) ([] ((,) k v));
@@ -350,20 +424,59 @@ module Bootstrap.Map where {
   union :: forall k v. (k -> k -> Int) -> Map k v -> Map k v -> Map k v;
   union cmp a b = unionWith cmp (\left right -> left) a b;
   unionWith :: forall k v. (k -> k -> Int) -> (v -> v -> v) -> Map k v -> Map k v -> Map k v;
-  -- Insert only the smaller input. In particular, accumulating singleton sets
-  -- must not rebuild the growing left map at every union. The right-input
-  -- worker retains the left key representative and combine argument order.
-  unionWith cmp combine a b =
-    case a of {
-      MapEmpty -> b;
-      MapNode _ _ _ _ _ -> case b of {
-        MapEmpty -> a;
-        MapNode _ _ _ _ _ ->
-          if size a <= size b
-          then foldlWithKeyStrict (\tree k v -> insertWith cmp combine k v tree) b a
-          else foldlWithKeyStrict (\tree k v -> insertRightWith cmp combine k v tree) a b
+  -- Split the right tree around each left root, then join already ordered
+  -- subtrees. Duplicate keys retain the left representative and lazy value.
+  unionWith cmp combine a b = case a of {
+    MapEmpty -> b;
+    MapNode _ key value left right -> case b of {
+      MapEmpty -> a;
+      MapNode _ other rhs MapEmpty MapEmpty -> insertRightWith cmp combine other rhs a;
+      _ -> case a of {
+        MapNode _ _ _ MapEmpty MapEmpty -> insertWith cmp combine key value b;
+        _ -> case unionSplit cmp key b of {
+          (,,) before found after -> unionJoin key
+            (case found of { Nothing -> value; Just old -> combine value old })
+            (unionWith cmp combine left before) (unionWith cmp combine right after)
+        }
       }
-    };
+    }
+  };
+  unionSplit :: forall k v. (k -> k -> Int) -> k -> Map k v ->
+    (,,) (Map k v) (Maybe v) (Map k v);
+  unionSplit cmp key tree = case tree of {
+    MapEmpty -> (,,) MapEmpty Nothing MapEmpty;
+    MapNode _ k v l r -> let { order = cmp key k } in
+      if order < 0 then case unionSplit cmp key l of {
+        (,,) before found after -> let { greater = unionJoin k v after r } in
+          seq greater ((,,) before found greater)
+      } else if order > 0 then case unionSplit cmp key r of {
+        (,,) before found after -> let { lesser = unionJoin k v l before } in
+          seq lesser ((,,) lesser found after)
+      } else (,,) l (Just v) r
+  };
+  -- Both inputs are valid maps and all left keys precede key, which precedes
+  -- all right keys. Descend the larger side before restoring the balance.
+  unionJoin :: forall k v. k -> v -> Map k v -> Map k v -> Map k v;
+  unionJoin key value left right = case left of {
+    MapEmpty -> insertLeast key value right;
+    MapNode leftSize lk lv ll lr -> case right of {
+      MapEmpty -> insertGreatest key value left;
+      MapNode rightSize rk rv rl rr ->
+        if rightSize > 3 * leftSize then balance rk rv (unionJoin key value left rl) rr
+        else if leftSize > 3 * rightSize then balance lk lv ll (unionJoin key value lr right)
+        else bin key value left right
+    }
+  };
+  insertLeast :: forall k v. k -> v -> Map k v -> Map k v;
+  insertLeast key value tree = case tree of {
+    MapEmpty -> singleton key value;
+    MapNode _ k v l r -> balance k v (insertLeast key value l) r
+  };
+  insertGreatest :: forall k v. k -> v -> Map k v -> Map k v;
+  insertGreatest key value tree = case tree of {
+    MapEmpty -> singleton key value;
+    MapNode _ k v l r -> balance k v l (insertGreatest key value r)
+  };
   insertRightWith :: forall k v. (k -> k -> Int) -> (v -> v -> v) -> k -> v -> Map k v -> Map k v;
   insertRightWith cmp combine key value tree =
     case tree of {

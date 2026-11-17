@@ -143,7 +143,10 @@ module Bootstrap.Primitive where {
       PWriteByteFileOrError -> 130;
       PByteArrayDigest -> 131;
       PFreezeSTArray -> 132;
-      PSTToIO -> 133
+      PSTToIO -> 133;
+      PByteArrayCRC32 -> 134;
+      PPackStringFields -> 135;
+      PStringUtf8Length -> 136
     };
   primitiveName :: Primitive -> String;
   primitiveName p =
@@ -281,7 +284,10 @@ module Bootstrap.Primitive where {
       PWriteByteFileOrError -> "writeByteFileOrError";
       PByteArrayDigest -> "byteArrayDigest";
       PFreezeSTArray -> "freezeSTArray";
-      PSTToIO -> "stToIO"
+      PSTToIO -> "stToIO";
+      PByteArrayCRC32 -> "byteArrayCRC32";
+      PPackStringFields -> "packStringFields";
+      PStringUtf8Length -> "stringUtf8Length"
     };
   legacyPrimitives :: [] Primitive;
   legacyPrimitives =
@@ -451,7 +457,7 @@ module Bootstrap.Primitive where {
                                                                                                                                                                                                                                                                                                 []))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))));
   allPrimitives :: [] Primitive;
   allPrimitives = S.append legacyPrimitives
-    [PTextToChars, PTextFromChars, PCharCode, PCharFromCode, PUserError, PIOError, PCatchIOError, PIOErrorString, PEmptyCallStack, PPushCallStack, PPrettyCallStack, PIOErrorWithStack, PConcatStringList, POrInt, PXorInt, PShiftLInt, PShiftRInt, PUnsignedShiftRInt, PCountLeadingZerosInt, PCountTrailingZerosInt, PPopCountInt, PIntToInteger, PIntegerToInt, PAddInteger, PSubInteger, PMulInteger, PQuotInteger, PRemInteger, PEqInteger, PLtInteger, PShowInteger, PReadInteger, PIntegerToDouble, PUnsignedLtInt, PReadByteFileOrError, PWriteByteFileOrError, PByteArrayDigest, PFreezeSTArray, PSTToIO];
+    [PTextToChars, PTextFromChars, PCharCode, PCharFromCode, PUserError, PIOError, PCatchIOError, PIOErrorString, PEmptyCallStack, PPushCallStack, PPrettyCallStack, PIOErrorWithStack, PConcatStringList, POrInt, PXorInt, PShiftLInt, PShiftRInt, PUnsignedShiftRInt, PCountLeadingZerosInt, PCountTrailingZerosInt, PPopCountInt, PIntToInteger, PIntegerToInt, PAddInteger, PSubInteger, PMulInteger, PQuotInteger, PRemInteger, PEqInteger, PLtInteger, PShowInteger, PReadInteger, PIntegerToDouble, PUnsignedLtInt, PReadByteFileOrError, PWriteByteFileOrError, PByteArrayDigest, PFreezeSTArray, PSTToIO, PByteArrayCRC32, PPackStringFields, PStringUtf8Length];
   lookupTargetPrimitive :: String -> Maybe Primitive;
   lookupTargetPrimitive name = S.find (\p -> eqString (primitiveName p) name) allPrimitives;
   lookupPrimitive :: String -> Maybe Primitive;
@@ -602,6 +608,7 @@ module Bootstrap.Primitive where {
       PAndInt ->
         (,) [] (Function (Applied "Int" []) (Function (Applied "Int" []) (Applied "Int" [])));
       PStringLength -> (,) [] (Function (Applied "String" []) (Applied "Int" []));
+      PStringUtf8Length -> (,) [] (Function (Applied "String" []) (Applied "Int" []));
       PStringCodeAt ->
         (,) []
           (Function (Applied "String" []) (Function (Applied "Int" []) (Applied "Int" [])));
@@ -627,6 +634,8 @@ module Bootstrap.Primitive where {
         (,) [] (Function (Applied "String" []) (Function (Applied "ByteArray" [])
           (Applied "IO" [Applied "String" []])));
       PByteArrayDigest -> (,) [] (Function (Applied "ByteArray" []) (Applied "IO" [Applied "String" []]));
+      PByteArrayCRC32 -> (,) [] (Function (Applied "ByteArray" [])
+        (Function (Applied "Int" []) (Function (Applied "Int" []) (Applied "IO" [Applied "Int" []]))));
       PReadFile ->
         (,) [] (Function (Applied "String" []) (Applied "IO" ((:) (Applied "String" []) [])));
       PWriteFile ->
@@ -792,6 +801,8 @@ module Bootstrap.Primitive where {
       PPrettyCallStack -> (,) [] (Function (Applied "MLFCallStack" []) charListField);
       PConcatStringList -> (,) []
         (Function (Applied "[]" ((:) (Applied "String" []) [])) (Applied "String" []));
+      PPackStringFields -> (,) []
+        (Function (Applied "[]" ((:) (Applied "String" []) [])) (Applied "String" []));
       PIOErrorWithStack -> (,) ((:) ((,) "a" Star) [])
         (Function (Applied "IOError" [])
           (Function (Applied "MLFCallStack" []) (Applied "IO" ((:) (Parameter "a") []))));
@@ -956,7 +967,10 @@ module Bootstrap.Primitive where {
       PWriteByteFileOrError -> 2;
       PByteArrayDigest -> 1;
       PFreezeSTArray -> 1;
-      PSTToIO -> 1
+      PSTToIO -> 1;
+      PByteArrayCRC32 -> 3;
+      PPackStringFields -> 1;
+      PStringUtf8Length -> 1
     };
   fieldArity :: Field -> Int;
   fieldArity field =
@@ -967,7 +981,7 @@ module Bootstrap.Primitive where {
   primitiveStrict :: Primitive -> Bool;
   primitiveStrict p =
     (((primitiveCode p >= 108) && (primitiveCode p <= 128)) || ((primitiveCode p >= 95) && (primitiveCode p <= 98)) ||
-     (primitiveCode p == 68) || (primitiveCode p == 107) ||
+     (primitiveCode p == 68) || (primitiveCode p == 107) || (primitiveCode p == 135) || (primitiveCode p == 136) ||
      S.elem eqInt (primitiveCode p)
        ((:) 6
           ((:) 7

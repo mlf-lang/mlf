@@ -179,7 +179,7 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures):
     record['open_audit_negatives']=audit_negatives
 
     distro=output/'distribution';distro.mkdir();distribution=[]
-    builtin_id='mlf:builtin-shared-haskell-v1:13';root_id='binary-package/1/library'
+    builtin_id='mlf:builtin-shared-haskell-v1:15';root_id='binary-package/1/library'
     identities=(builtin_id,root_id)
     def pair_at(prefix):return tuple(prefix.with_suffix(suffix).read_bytes() for suffix in ('.mlfci','.mlfco'))
     def interface_summary(pair,dependencies=()):

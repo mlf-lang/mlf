@@ -305,10 +305,13 @@ module Bootstrap.Crate where {
       external <- externalNamespaces (specDependencies spec) interfaces;
       owners <- moduleOwners (specIdentity spec) sources interfaces;
       let {
+        -- All names owned by a crate share this exact encoded prefix.
+        encodedOwners = M.map Separate.compactName owners;
+        encodedDefault = Separate.compactName (specIdentity spec);
         mangle =
           \entity ->
-            Artifact.definitionName
-              (M.findWithDefault compareString (specIdentity spec) (Modules.owner entity) owners)
+            Artifact.definitionNameEncoded
+              (M.findWithDefault compareString encodedDefault (Modules.owner entity) encodedOwners)
               entity
       };
       resolution <- Modules.resolveCrateDefinitions (specMode spec) external mangle sources;

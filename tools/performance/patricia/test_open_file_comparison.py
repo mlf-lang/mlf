@@ -476,6 +476,9 @@ class GroupIdentityControls(unittest.TestCase):
         expected = [{'id': legacy, 'members': members}]
         actual = [{'id': owner, 'members': members, 'cached': False}]
         self.assertTrue(F.same_group_ownership(crate, expected, actual))
+        compact = [{'id': C.compact_group_owner(crate, members), 'members': members}]
+        self.assertTrue(F.same_group_ownership(crate, expected, compact))
+        self.assertFalse(F.same_group_ownership(crate, expected + expected, actual + compact))
         for bad in [
             [{'id': owner, 'members': ['a', 'changed']}],
             [{'id': owner, 'members': list(reversed(members))}],
@@ -493,6 +496,10 @@ class GroupIdentityControls(unittest.TestCase):
         legacy = 'Query_' + encoded(crate) + 'z_' + encoded(members[0])
         owner = C.pack(['MLF-OPEN-GROUP-1', crate, C.pack(sorted(members))])
         self.assertTrue(C.match_group_identity(crate, legacy, owner, members))
+        compact = C.compact_group_owner(crate, members)
+        self.assertTrue(C.match_group_identity(crate, legacy, compact, members))
+        self.assertFalse(C.match_group_identity(crate, legacy, compact, ['a']))
+        self.assertFalse(C.match_group_identity('other', legacy, compact, members))
         self.assertFalse(C.match_group_identity('other', legacy, owner, members))
         self.assertFalse(C.match_group_identity(crate, legacy, owner, ['a']))
         self.assertFalse(C.match_group_identity(crate, legacy, owner + 'x', members))

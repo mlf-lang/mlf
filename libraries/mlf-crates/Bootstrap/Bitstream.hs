@@ -3,15 +3,15 @@
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
 module Bootstrap.Bitstream (
-  Value(..), Limits(..), Entry(..), Symbol(..), SymbolState(..), NodeState(..),
-  PlanState(..), Tables(..), EncodeTask(..), Layout(..), Cursor(..), Read(..),
+  Value(..), Limits(..), Entry(..), Symbol(..),
+  Tables(..), Layout(..), Cursor(..), Read(..),
   Header(..), Parsed(..), CanonicalTask(..),
   planRootBounded, encodeRootBounded, decodeGraphRootBounded,
   defaultLimits, maxBytes, maxSymbols, maxSymbolBytes, maxTotalSymbolBytes,
   maxNodes, maxEdges, maxDepth, maxExpandedWork, validLimits, magic,
   hasMagicPrefix, hasMagic, matchMagic, entryKind, compareIds, compareEntry,
   charge, boundedLength, boundedLengthAt, scalar, scalarBytes, utf8Size,
-  utf8SizeAt, internSymbol, entryEdges, internEntry, takeIds, plan, planTasks,
+  utf8SizeAt, entryEdges, takeIds, plan,
   zigzag, unzigzag, varBytes, referenceWidth, bytesForBits, symbolSize,
   nodeBits, layout, putBits, putVar, putScalar, putText, putSymbols,
   putReferences, putEntry, putEntries, putWords, putHeader, crcNibble,
@@ -122,7 +122,7 @@ module Bootstrap.Bitstream (
       }
     };
   data SymbolState = Symbols (Map String ((,) Int Int)) ([] Symbol) Int Int;
-  data NodeState = Nodes (Map Entry Int) ([] Entry) Int Int;
+  data NodeState = Nodes NodeIndex ([] Entry) Int Int;
   -- A hash narrows structural lookup; it never establishes equality. Exact
   -- collisions use the original balanced map, so even deliberately colliding
   -- inputs retain logarithmic bucket lookup instead of a linear chain.
@@ -150,6 +150,49 @@ module Bootstrap.Bitstream (
         Inserted fill -> MissingEntry (\value -> insert (CollidingEntries (fill value)))
       }
     };
+  -- Scalar keys and bounded shallow constructors have an exact integer
+  -- identity. Other constructors keep hash-narrowed, full-key comparison.
+  -- Packed keys use two arity bits, disjoint fixed-width tag/child fields,
+  -- and at most 63 bits. These are indexes only; wire entries are unchanged.
+  data NodeIndex = NodeIndex (IntMap Int) (IntMap Int) (IntMap Int) (IntMap Int) EntryIndex;
+  data NodeLookup = ExistingNode Int | MissingNode (Int -> NodeIndex);
+  emptyNodeIndex = NodeIndex IM.empty IM.empty IM.empty IM.empty emptyEntryIndex;
+  shortNodeKey tag children =
+    if tag < 0 || tag >= 65536 then Nothing else case children of {
+      [] -> Just (shiftLInt tag 2);
+      [a] -> if a >= 0 && a < 4194304
+        then Just (orInt 1 (orInt (shiftLInt tag 2) (shiftLInt a 18))) else Nothing;
+      [a,b] -> if a >= 0 && a < 4194304 && b >= 0 && b < 4194304
+        then Just (orInt 2 (orInt (shiftLInt tag 2) (orInt (shiftLInt a 18) (shiftLInt b 40)))) else Nothing;
+      [a,b,c] -> if tag < 1024 && a >= 0 && a < 131072 && b >= 0 && b < 131072 && c >= 0 && c < 131072
+        then Just (orInt 3 (orInt (shiftLInt tag 2)
+          (orInt (shiftLInt a 12) (orInt (shiftLInt b 29) (shiftLInt c 46))))) else Nothing;
+      _ -> Nothing
+    };
+  internNodeKey entry (NodeIndex ints bits texts short constructors) = case entry of {
+    EInt key -> case IM.lookup key ints of {
+      Just value -> ExistingNode value;
+      Nothing -> MissingNode (\value -> NodeIndex (IM.insert key value ints) bits texts short constructors)
+    };
+    EBits key -> case IM.lookup key bits of {
+      Just value -> ExistingNode value;
+      Nothing -> MissingNode (\value -> NodeIndex ints (IM.insert key value bits) texts short constructors)
+    };
+    EText key -> case IM.lookup key texts of {
+      Just value -> ExistingNode value;
+      Nothing -> MissingNode (\value -> NodeIndex ints bits (IM.insert key value texts) short constructors)
+    };
+    ENode tag children -> case shortNodeKey tag children of {
+      Just key -> case IM.lookup key short of {
+        Just value -> ExistingNode value;
+        Nothing -> MissingNode (\value -> NodeIndex ints bits texts (IM.insert key value short) constructors)
+      };
+      Nothing -> case internIndexed entry constructors of {
+        ExistingEntry value -> ExistingNode value;
+        MissingEntry following -> MissingNode (\value -> NodeIndex ints bits texts short (following value))
+      }
+    }
+  };
   data PlanState = PlanState SymbolState NodeState Int;
   data Tables = Tables ([] Symbol) ([] Entry) ([] Int) Int Int Int Int;
   data EncodeTask = EncodeValues Int ([] Value) | EncodeOne Int Value | EncodeClose Int Int;
@@ -174,7 +217,8 @@ module Bootstrap.Bitstream (
   utf8Size :: Int -> String -> Either String Int;
   utf8Size limit text =
     if stringLength text > limit then Left "binary symbol byte limit exceeded"
-    else utf8SizeAt limit text 0 0;
+    else let { bytes = stringUtf8Length text } in
+      if bytes > limit then Left "binary symbol byte limit exceeded" else Right bytes;
   utf8SizeAt :: Int -> String -> Int -> Int -> Either String Int;
   utf8SizeAt limit text position size =
     if position == stringLength text then Right size else
@@ -197,13 +241,19 @@ module Bootstrap.Bitstream (
         Found old -> Found old; Inserted fill -> Inserted (\new -> M.balance k v l (fill new))
       } else Found v
   };
-  internSymbol :: Limits -> String -> PlanState -> Either String ((,) Int PlanState);
-  internSymbol limits text (PlanState (Symbols names symbols count total) nodes work) =
+  -- A symbol and its EText node enter the plan together. Repeated text can
+  -- reuse that node directly, but every occurrence still charges its bytes.
+  -- Intern directly into the remaining explicit task stack. A successful
+  -- node needs no intermediate Either/pair for the planner to unpack.
+  planText :: Limits -> [] EncodeTask -> [] Int -> String -> PlanState ->
+    Either String ((,) ([] Int) PlanState);
+  planText limits tasks stack text (PlanState (Symbols names symbols count total)
+      nodes@(Nodes keys entries nodeCount edges) work) =
     if stringLength text > maxSymbolBytes limits then Left "binary symbol byte limit exceeded"
     else case intern compareString text names of {
-      Found ((,) index bytes) -> do {
+      Found ((,) bytes nodeId) -> do {
         next <- charge limits bytes (PlanState (Symbols names symbols count total) nodes work);
-        Right ((,) index next)
+        planTasks limits tasks ((:) nodeId stack) next
       };
       Inserted following -> do {
         ensure (count < maxSymbols limits) "binary symbol count limit exceeded";
@@ -212,20 +262,26 @@ module Bootstrap.Bitstream (
         let {
           nextCount = count + 1;
           nextTotal = total + size;
-          nextSymbols = Symbols (following ((,) count size))
+          nextSymbols = Symbols (following ((,) size nodeCount))
             ((:) (Symbol text size) symbols) nextCount nextTotal
         };
-        next <- seq nextCount (seq nextTotal (charge limits size (PlanState nextSymbols nodes work)));
-        Right ((,) count next)
+        charged <- seq nextCount (seq nextTotal (charge limits size (PlanState nextSymbols nodes work)));
+        ensure (nodeCount < maxNodes limits) "binary node count limit exceeded";
+        let { nextNodeCount = nodeCount + 1;
+          nextNodes = Nodes keys ((:) (EText count) entries) nextNodeCount edges };
+        case charged of { PlanState _ _ nextWork ->
+          seq nextNodeCount (planTasks limits tasks ((:) nodeCount stack)
+            (PlanState nextSymbols nextNodes nextWork)) }
       }
     };
   entryEdges :: Entry -> Int;
   entryEdges entry = case entry of { ENode _ children -> length children; _ -> 0 };
-  internEntry :: Limits -> Entry -> PlanState -> Either String ((,) Int PlanState);
-  internEntry limits entry (PlanState symbols (Nodes keys entries count edges) work) =
-    case intern compareEntry entry keys of {
-      Found index -> Right ((,) index (PlanState symbols (Nodes keys entries count edges) work));
-      Inserted following -> do {
+  planEntry :: Limits -> [] EncodeTask -> [] Int -> Entry -> PlanState ->
+    Either String ((,) ([] Int) PlanState);
+  planEntry limits tasks stack entry state@(PlanState symbols (Nodes keys entries count edges) work) =
+    case internNodeKey entry keys of {
+      ExistingNode index -> planTasks limits tasks ((:) index stack) state;
+      MissingNode following -> do {
         ensure (count < maxNodes limits) "binary node count limit exceeded";
         let { arity = entryEdges entry };
         ensure (arity <= maxEdges limits - edges) "binary edge count limit exceeded";
@@ -234,7 +290,8 @@ module Bootstrap.Bitstream (
           nextEdges = edges + arity;
           nextNodes = Nodes (following count) ((:) entry entries) nextCount nextEdges
         };
-        seq nextCount (seq nextEdges (Right ((,) count (PlanState symbols nextNodes work))))
+        seq nextCount (seq nextEdges (planTasks limits tasks ((:) count stack)
+          (PlanState symbols nextNodes work)))
       }
     };
   takeIds :: Int -> [] Int -> [] Int -> Either String ((,) ([] Int) ([] Int));
@@ -247,7 +304,7 @@ module Bootstrap.Bitstream (
     ensure (validLimits limits) "invalid binary codec limits";
     rootCount <- boundedLength (min (maxEdges limits) (maxExpandedWork limits)) roots;
     planned <- planTasks limits ((:) (EncodeValues 1 roots) []) []
-      (PlanState (Symbols M.empty [] 0 0) (Nodes M.empty [] 0 0) 0);
+      (PlanState (Symbols M.empty [] 0 0) (Nodes emptyNodeIndex [] 0 0) 0);
     case planned of {
       (,) stack (PlanState (Symbols _ symbols symbolCount _) (Nodes _ entries nodeCount edges) _) ->
         Right (Tables (reverse symbols) (reverse entries) (reverse stack)
@@ -264,7 +321,7 @@ module Bootstrap.Bitstream (
     ensure (validRootBudget aggregate) "invalid binary root-work budget";
     rootCount <- boundedLength (min (maxEdges limits) aggregate) roots;
     planned <- planRootsBounded limits aggregate roots []
-      (PlanState (Symbols M.empty [] 0 0) (Nodes M.empty [] 0 0) 0);
+      (PlanState (Symbols M.empty [] 0 0) (Nodes emptyNodeIndex [] 0 0) 0);
     case planned of {
       (,,) stack
         (PlanState (Symbols _ symbols symbolCount _) (Nodes _ entries nodeCount edges) _)
@@ -308,12 +365,7 @@ module Bootstrap.Bitstream (
       EncodeClose tag arity -> do {
         parts <- takeIds arity stack [];
         case parts of {
-          (,) children remaining -> do {
-            inserted <- internEntry limits (ENode tag children) state;
-            case inserted of {
-              (,) index next -> planTasks limits rest ((:) index remaining) next
-            }
-          }
+          (,) children remaining -> planEntry limits rest remaining (ENode tag children) state
         }
       };
       EncodeOne depth value -> do {
@@ -326,23 +378,9 @@ module Bootstrap.Bitstream (
             planTasks limits ((:) (EncodeValues (depth + 1) children)
               ((:) (EncodeClose tag arity) rest)) stack charged
           };
-          VText text -> do {
-            symbol <- internSymbol limits text charged;
-            case symbol of {
-              (,) symbolId withSymbol -> do {
-                inserted <- internEntry limits (EText symbolId) withSymbol;
-                case inserted of { (,) index next -> planTasks limits rest ((:) index stack) next }
-              }
-            }
-          };
-          VInt valueInt -> do {
-            inserted <- internEntry limits (EInt valueInt) charged;
-            case inserted of { (,) index next -> planTasks limits rest ((:) index stack) next }
-          };
-          VBits bits -> do {
-            inserted <- internEntry limits (EBits bits) charged;
-            case inserted of { (,) index next -> planTasks limits rest ((:) index stack) next }
-          }
+          VText text -> planText limits rest stack text charged;
+          VInt valueInt -> planEntry limits rest stack (EInt valueInt) charged;
+          VBits bits -> planEntry limits rest stack (EBits bits) charged
         }
       }
     }
@@ -618,21 +656,47 @@ module Bootstrap.Bitstream (
   -- Flush each complete byte once; public putBits keeps its read/modify/write
   -- semantics for callers writing into an existing buffer. The continuation
   -- carries byte index, occupied bits and pending byte without an IO tuple.
+  -- Planning has admitted finite field values. Force the computed byte here
+  -- so each step carries a scalar instead of a thunk capturing the bit state.
+  -- At most 56 source bits plus seven pending bits fit in a nonnegative
+  -- Int64. Merge once, then flush complete bytes without rebuilding each
+  -- byte from the original field. Wider fields retain the bounded split.
   packedBits bytes index used pending width bits next =
-    if width == 0 then next index used pending else let {
+    if width == 0 then next index used pending
+    else if width <= 56 then let {
+      mask = shiftLInt 1 width - 1;
+      field = orInt pending (shiftLInt (andInt bits mask) used)
+    } in seq field (packedField bytes index (used + width) field next)
+    else let {
       room = 8 - used;
       amount = min room width;
       mask = shiftLInt 1 amount - 1;
       byte = orInt pending (shiftLInt (andInt bits mask) used)
-    } in if width < room then next index (used + width) byte else do {
+    } in seq byte (if width < room then next index (used + width) byte else do {
       writeByteArray bytes index byte;
       packedBits bytes (index + 1) 0 0 (width - room) (unsignedShiftRInt bits room) next
+    });
+  packedField bytes index width bits next =
+    if width < 8 then next index width bits else do {
+      writeByteArray bytes index (andInt bits 255);
+      let { rest = unsignedShiftRInt bits 8 };
+      seq rest (packedField bytes (index + 1) (width - 8) rest next)
     };
-  packedVar bytes index used pending bits next = let {
-    final = unsignedLtInt bits 128;
-    byte = orInt (andInt bits 127) (if final then 0 else 128)
-  } in packedBits bytes index used pending 8 byte (\i u p ->
-    if final then next i u p else packedVar bytes i u p (unsignedShiftRInt bits 7) next);
+  -- A varint emits an already bounded byte. Across any pending-bit offset,
+  -- that byte flushes exactly one output byte and preserves the offset.
+  -- Avoid reentering the general-width writer for its remaining high bits.
+  packedByte bytes index used pending bits next = let {
+    byte = andInt (orInt pending (shiftLInt bits used)) 255;
+    following = unsignedShiftRInt bits (8 - used)
+  } in seq byte (do {
+    writeByteArray bytes index byte;
+    seq following (next (index + 1) used following)
+  });
+  -- The final varint byte can use the caller's continuation directly.
+  packedVar bytes index used pending bits next =
+    if unsignedLtInt bits 128 then packedByte bytes index used pending bits next
+    else packedByte bytes index used pending (orInt (andInt bits 127) 128)
+      (\i u p -> packedVar bytes i u p (unsignedShiftRInt bits 7) next);
   packedRefs bytes width references index used pending next = case references of {
     [] -> next index used pending;
     (:) value rest -> packedBits bytes index used pending width value
@@ -682,20 +746,67 @@ module Bootstrap.Bitstream (
     Layout total _ _ _ nodeOffset _ _ _ rootOffset _ nodeWidth symbolWidth ->
       case tables of {
         Tables symbols entries roots _ _ _ _ -> do {
-          bytes <- newByteArray total 0;
+          let { bulk = total <= 4194304 };
+          bytes <- if bulk then byteArrayFromString (concatStringList
+            ((:) (zeroText 80) (append (symbolChunks symbols) [zeroText (total - nodeOffset)])))
+            else newByteArray total 0;
           headerEnd <- putHeader bytes schema geometry;
-          symbolEnd <- putSymbols bytes 640 symbols;
+          symbolEnd <- if bulk then putOwnedSymbolSizes bytes 640 symbols
+            else putOwnedSymbols bytes 640 symbols;
           nodeEnd <- packedEntries bytes nodeWidth symbolWidth entries nodeOffset 0 0 (packedFinish bytes);
           rootEnd <- packedRefs bytes nodeWidth roots rootOffset 0 0 (packedFinish bytes);
           if headerEnd /= 640 || symbolEnd /= nodeOffset * 8 ||
              bytesForBits nodeEnd /= rootOffset || bytesForBits rootEnd /= total
           then ioReturn (Left "binary encoder internal measured-size mismatch") else do {
-            crc <- checksum bytes total;
+            -- This private plan owns an array of exactly total bytes. The raw
+            -- checksum entry still supports caller-specified prefix lengths.
+            crc <- if total >= 1024 then byteArrayCRC32 bytes 76 4 else checksum bytes total;
             end <- putBits bytes 608 32 crc;
             ioReturn (Right bytes)
           }
         }
       }
+  };
+
+  -- A completed plan owns valid scalar text and its exact UTF-8 lengths.
+  -- Encode that text in one bulk conversion, leaving zero-filled slots for
+  -- the binary header, lengths and nodes. Bound the extra temporary text to
+  -- 4 MiB; larger plans retain the streaming writer and its allocation bound.
+  zeroText count = if count == 0 then "" else if count == 1 then stringFromCode 0
+    else let { half = zeroText (count / 2); both = half ++ half }
+      in if count % 2 == 0 then both else both ++ stringFromCode 0;
+  symbolChunks symbols = case symbols of {
+    [] -> [];
+    (:) (Symbol text size) rest -> (:) (zeroText (varBytes size)) ((:) text (symbolChunks rest))
+  };
+  -- Symbol prefixes begin on a byte boundary in the completed owned layout.
+  putOwnedSymbolSizes bytes position symbols = case symbols of {
+    [] -> ioReturn position;
+    (:) (Symbol _ size) rest ->
+      packedVar bytes (position / 8) 0 0 size (\index _ _ ->
+        putOwnedSymbolSizes bytes ((index + size) * 8) rest)
+  };
+
+  -- The owned writer follows a completed finite plan. Keep its loop decisions
+  -- inside the IO action, so the host can tail-call through the state token.
+  -- The exported raw writers retain their action-construction demand behavior.
+  putOwnedText bytes byteIndex text index = ioBind (ioReturn ()) (\_ ->
+    if index == stringLength text then ioReturn (byteIndex * 8) else let {
+      code = stringCodeAt text index
+    } in if code < 128 then do {
+      writeByteArray bytes byteIndex code;
+      putOwnedText bytes (byteIndex + 1) text (index + 1)
+    } else do {
+      next <- putScalar bytes (byteIndex * 8) code;
+      putOwnedText bytes (next / 8) text (index + 1)
+    });
+  putOwnedSymbols bytes position symbols = case symbols of {
+    [] -> ioReturn position;
+    (:) (Symbol text size) rest ->
+      packedVar bytes (position / 8) 0 0 size (\index _ _ -> do {
+        more <- putOwnedText bytes index text 0;
+        putOwnedSymbols bytes more rest
+      })
   };
 
   data Cursor = Cursor ByteArray Int Int;

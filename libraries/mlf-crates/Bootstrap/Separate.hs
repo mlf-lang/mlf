@@ -66,11 +66,57 @@ module Bootstrap.Separate where {
   encodedFrom text i = concatStringList (encodedChunks text i);
   encodedChunks text i = if i >= stringLength text then []
     else (:) (showInt (stringCodeAt text i)) ((:) "_" (encodedChunks text (i + 1)));
+  -- Versioned, injective identifier components. The result has only ASCII
+  -- letters/digits; underscore separates whole components. z introduces a
+  -- lowercase scalar hex escape terminated by z; a literal z is doubled.
+  compactNameCode code =
+    (code >= 48 && code <= 57) || (code >= 65 && code <= 90) ||
+    (code >= 97 && code < 122);
+  compactNameHex code = if code < 16 then stringFromCode
+    (if code < 10 then 48 + code else 87 + code)
+    else compactNameHex (unsignedShiftRInt code 4) ++ compactNameHex (andInt code 15);
+  compactNameChunks text start position =
+    if position == stringLength text then [stringSlice text start (position - start)]
+    -- Produce a list cell after a bounded ASCII run. Native O0 evaluation
+    -- need not tail-call the scan; never traverse an arbitrary name before
+    -- giving the consuming concat loop its next finite fragment.
+    else if position - start == 256 then
+      (:) (stringSlice text start 256) (compactNameChunks text position position)
+    else let { code = stringCodeAt text position } in
+      if compactNameCode code then compactNameChunks text start (position + 1)
+      else (:) (stringSlice text start (position - start))
+        ((:) (if code == 122 then "zz" else "z" ++ compactNameHex code ++ "z")
+          (compactNameChunks text (position + 1) (position + 1)));
+  compactName text = concatStringList (compactNameChunks text 0 0);
   queryGroupName crateId members = "Query_" ++ encoded crateId ++ "z_" ++ encoded (head members);
   -- Open-fragment owners are wire text, not generated source identifiers.
   -- Frame the full canonical ownership set once instead of escaping its
   -- already escaped declaration names. The legacy unit format stays separate.
   openGroupName crateId members = pack ["MLF-OPEN-GROUP-1",crateId,pack (sortBy compareString members)];
+  -- The previous owner spelling remains available for explicit admission.
+  compactOpenGroupNameV2 crateId = let {
+    suffix = encoded crateId ++ "z_";
+    valuePrefix = "module_" ++ suffix; typePrefix = "Module_" ++ suffix;
+    begins prefix text = stringLength text >= stringLength prefix &&
+      eqString prefix (stringSlice text 0 (stringLength prefix));
+    after prefix text = stringSlice text (stringLength prefix) (stringLength text - stringLength prefix);
+    member text = if begins valuePrefix text then pack ["value",after valuePrefix text]
+      else if begins typePrefix text then pack ["type",after typePrefix text]
+      else pack ["raw",text]
+  } in \members -> pack ["MLF-OPEN-GROUP-2",crateId,pack (map member (sortBy compareString members))];
+  -- Version 3 factors the compact declaration-name prefix. The complete crate
+  -- and entity suffix remain; other names are framed verbatim. Sort before
+  -- factoring so the owner preserves the complete canonical member inventory.
+  compactOpenGroupName crateId = let {
+    suffix = compactName crateId ++ "_";
+    valuePrefix = "module_c1_" ++ suffix; typePrefix = "Module_c1_" ++ suffix;
+    begins prefix text = stringLength text >= stringLength prefix &&
+      eqString prefix (stringSlice text 0 (stringLength prefix));
+    after prefix text = stringSlice text (stringLength prefix) (stringLength text - stringLength prefix);
+    member text = if begins valuePrefix text then pack ["value",after valuePrefix text]
+      else if begins typePrefix text then pack ["type",after typePrefix text]
+      else pack ["raw",text]
+  } in \members -> pack ["MLF-OPEN-GROUP-3",crateId,pack (map member (sortBy compareString members))];
   encoded text = encodedFrom text 0;
   canonicalPreludeConstructor entity =
     (eqString (Modules.owner entity) "Prelude" &&
@@ -456,10 +502,7 @@ module Bootstrap.Separate where {
         else Left "invalid inference fragment: expected declarations ending in ()";
       _ -> Left "invalid inference fragment: expected declarations ending in ()"
     };
-  pack fields = concatStringList (packChunks fields);
-  packChunks fields = case fields of {
-    [] -> []; (:) text rest -> (:) (showInt (stringLength text)) ((:) ":" ((:) text (packChunks rest)))
-  };
+  pack fields = packStringFields fields;
   digitEnd :: String -> Int -> Int;
   digitEnd text i =
     if (i >= stringLength text)

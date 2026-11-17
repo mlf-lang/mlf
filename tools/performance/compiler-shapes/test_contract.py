@@ -5,6 +5,7 @@ These tests use synthetic receipts to prove that the analyzer refuses missing,
 duplicate, non-finite, failed, qualified-only and incompatible data, and that the
 frozen schedule stays balanced.
 """
+import copy
 import hashlib
 import json
 import re
@@ -480,6 +481,22 @@ class GraphCacheTests(unittest.TestCase):
                     ValueError, 'group id matches'):
                 self.check(inventory, evidence, max_members=2)
 
+    def test_compact_owner_matches_complete_membership(self):
+        crate = 'compiler-shapes/flat_functions-8'
+        prefix = ''.join(str(ord(c)) + '_' for c in crate) + 'z_'
+        members = ['module_' + prefix + '97_', 'Module_' + prefix + '84_', 'raw:λ']
+        inventory, evidence = self.fixture(members_per_group=[members])
+        owner = analyze.Q.compact_group_owner(crate, members)
+        change_report(evidence, lambda q: q['groups'][0].update(id=owner))
+        self.check(inventory, evidence, max_members=3)
+        for wrong_crate, wrong_members in [(crate, members[:-1]), ('other', members),
+                                           (crate, members + ['extra']), (crate, [])]:
+            changed = copy.deepcopy(evidence)
+            wrong = analyze.Q.compact_group_owner(wrong_crate, wrong_members)
+            change_report(changed, lambda q: q['groups'][0].update(id=wrong))
+            with self.assertRaisesRegex(ValueError, 'group id matches'):
+                self.check(inventory, changed, max_members=3)
+
     def test_accepts_extra_nodes_and_content_deduplication(self):
         inventory, evidence = self.fixture(groups=3)
         result = self.check(inventory, evidence, groups=3)
@@ -803,9 +820,9 @@ class GraphReaderPinTests(unittest.TestCase):
                       if isinstance(node, ast.Assign) and
                       any(isinstance(target, ast.Name) and target.id == 'inputs'
                           for target in node.targets))
-        self.assertIn('test_query_index.py',
-                      [node.value for node in ast.walk(inputs)
-                       if isinstance(node, ast.Constant)])
+        pinned = [node.value for node in ast.walk(inputs) if isinstance(node, ast.Constant)]
+        for name in ['test_query_index.py', 'artifact_binary_open.py']:
+            self.assertIn(name, pinned)
 
 
 if __name__ == '__main__':

@@ -33,6 +33,20 @@ def unpack(text):
 
 
 class ModularControls(unittest.TestCase):
+    def test_current_primitive_abi_is_append_only_and_closed(self):
+        import artifact_binary_reference as R
+        import artifact_binary_typed as T
+        self.assertEqual([code for _, code in T.CONTRACT['primitive_codes']], list(range(137)))
+        self.assertEqual(T.CONTRACT['primitive_codes'][-1], ['PStringUtf8Length', 136])
+        for code in range(137):
+            doc = R.read_document(R.tree_document([T.n(32, ('int', code))], 7), 7)
+            T.validate_type(doc, doc.roots[0], 'Primitive')
+        for value in [('int', -1), ('int', 137), ('int', 2147483647), ('bits', 136)]:
+            with self.subTest(value=value):
+                doc = R.read_document(R.tree_document([T.n(32, value)], 7), 7)
+                with self.assertRaises(R.Invalid):
+                    T.validate_type(doc, doc.roots[0], 'Primitive')
+
     @classmethod
     def setUpClass(cls):
         cls.manifest = json.loads((SOURCE / 'shared-sources.json').read_text())
@@ -60,6 +74,30 @@ class ModularControls(unittest.TestCase):
         self.assertIn('oldRoot = legacyNode "root" hashB [("leaf",hashA)] (just (W.VText hashB))', source)
         self.assertIn('decodeReject "legacy duplicate" "duplicate" (legacy [oldLeaf,oldLeaf,oldRoot])', source)
         self.assertIn('decodeReject "legacy missing" "unpublished" (legacy [oldRoot])', source)
+
+    def test_compact_owner_preserves_full_names_and_canonical_tags(self):
+        import artifact_binary_open as O
+        for crate in ('crate', 'crate/λ', '9:a\0😀'):
+            for version, encode, stem, separator in [
+                ('MLF-OPEN-GROUP-2', lambda s: ''.join(str(ord(c)) + '_' for c in s), '', 'z_'),
+                ('MLF-OPEN-GROUP-3', O.compact_name, 'c1_', '_'),
+            ]:
+                prefix = stem + encode(crate) + separator
+                members = ['module_' + prefix + 'a', 'Module_' + prefix + 'T', 'raw:λ']
+                make = O.compact_group_owner_v2 if version.endswith('2') else O.compact_group_owner
+                owner = make(crate, members)
+                actual_version, actual_crate, body = O.unpack(owner)
+                self.assertEqual((actual_version, actual_crate), (version, crate))
+                prefixes = {'raw': '', 'value': 'module_' + prefix, 'type': 'Module_' + prefix}
+                expanded = [prefixes[tag] + suffix for tag, suffix in map(O.unpack, O.unpack(body))]
+                self.assertEqual(expanded, sorted(members))
+                encoded = lambda value: ''.join(str(ord(c)) + '_' for c in value)
+                legacy = 'Query_' + encoded(crate) + 'z_' + encoded(min(members))
+                self.assertTrue(O.companion_group_matches(crate, legacy, owner, members))
+                for changed in (members[:-1], members + ['extra'], [*members, members[0]]):
+                    self.assertFalse(O.companion_group_matches(crate, legacy, owner, changed))
+                self.assertFalse(O.companion_group_matches('other', legacy, owner, members))
+                self.assertFalse(O.companion_group_matches(crate, legacy, owner + 'x', members))
 
     def test_stamp_syntax_and_semantic_mutations_remain_distinct(self):
         import artifact_binary_open as O

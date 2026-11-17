@@ -141,11 +141,16 @@ module Bootstrap.SourceEquality where {
         }
     };
   eqSExpr :: SExpr -> SExpr -> Bool;
-  eqSExpr a b =
+  eqSExpr = eqSExprWith eqDouble;
+  -- Encoding equivalence preserves IEEE payloads and the sign of zero.
+  eqSExprBits :: SExpr -> SExpr -> Bool;
+  eqSExprBits = eqSExprWith (\a b -> eqInt (doubleToBits a) (doubleToBits b));
+  eqSExprWith :: (Double -> Double -> Bool) -> SExpr -> SExpr -> Bool;
+  eqSExprWith doubles a b = let { same = eqSExprWith doubles } in
     case a of {
       SGlobal i _ -> case b of { SGlobal j _ -> V.toInt i == V.toInt j; _ -> False };
       SDeclScope slots term -> case b of {
-        SDeclScope slots2 term2 -> L.eqList (\i j -> V.toInt i == V.toInt j) slots slots2 && eqSExpr term term2;
+        SDeclScope slots2 term2 -> L.eqList (\i j -> V.toInt i == V.toInt j) slots slots2 && same term term2;
         _ -> False
       };
       SWantedRefs n candidates -> case b of {
@@ -164,27 +169,27 @@ module Bootstrap.SourceEquality where {
         };
       SLam x0 x1 x2 ->
         case b of {
-          SLam y0 y1 y2 -> (eqString x0 y0 && (L.eqMaybe eqSAnnotation x1 y1 && eqSExpr x2 y2));
+          SLam y0 y1 y2 -> (eqString x0 y0 && (L.eqMaybe eqSAnnotation x1 y1 && same x2 y2));
           _ -> False
         };
       SApp x0 x1 ->
         case b of {
-          SApp y0 y1 -> (eqSExpr x0 y0 && eqSExpr x1 y1);
+          SApp y0 y1 -> (same x0 y0 && same x1 y1);
           _ -> False
         };
       SLet x0 x1 x2 ->
         case b of {
-          SLet y0 y1 y2 -> (eqString x0 y0 && (eqSExpr x1 y1 && eqSExpr x2 y2));
+          SLet y0 y1 y2 -> (eqString x0 y0 && (same x1 y1 && same x2 y2));
           _ -> False
         };
       SAnn x0 x1 ->
         case b of {
-          SAnn y0 y1 -> (eqSExpr x0 y0 && eqSAnnotation x1 y1);
+          SAnn y0 y1 -> (same x0 y0 && eqSAnnotation x1 y1);
           _ -> False
         };
       SSignature x0 x1 ->
         case b of {
-          SSignature y0 y1 -> (eqSExpr x0 y0 && eqSAnnotation x1 y1);
+          SSignature y0 y1 -> (same x0 y0 && eqSAnnotation x1 y1);
           _ -> False
         };
       SIntLit x0 ->
@@ -194,7 +199,7 @@ module Bootstrap.SourceEquality where {
         };
       SDoubleLit x0 ->
         case b of {
-          SDoubleLit y0 -> eqDouble x0 y0;
+          SDoubleLit y0 -> doubles x0 y0;
           _ -> False
         };
       SBoolLit x0 ->
@@ -214,42 +219,42 @@ module Bootstrap.SourceEquality where {
         };
       SCase x0 x1 ->
         case b of {
-          SCase y0 y1 -> (eqSExpr x0 y0 && L.eqList eqSAlternative x1 y1);
+          SCase y0 y1 -> (same x0 y0 && L.eqList (eqSAlternativeWith same) x1 y1);
           _ -> False
         };
       SSourceDefinition body ->
         case b of {
-          SSourceDefinition body2 -> eqSExpr body body2;
+          SSourceDefinition body2 -> same body body2;
           _ -> False
         };
       SCallSite label span body ->
         case b of {
           SCallSite label2 span2 body2 ->
-            (eqString label label2 && (eqSourceSpan span span2 && eqSExpr body body2));
+            (eqString label label2 && (eqSourceSpan span span2 && same body body2));
           _ -> False
         };
       SSharedBind pattern action continuation bindMethod failure ->
         case b of {
           SSharedBind pattern2 action2 continuation2 bindMethod2 failure2 ->
-            (eqSPattern pattern pattern2 && (eqSExpr action action2 &&
-             (eqSExpr continuation continuation2 && (eqSExpr bindMethod bindMethod2 &&
-              eqSExpr failure failure2))));
+            (eqSPattern pattern pattern2 && (same action action2 &&
+             (same continuation continuation2 && (same bindMethod bindMethod2 &&
+              same failure failure2))));
           _ -> False
         };
       SDo x0 x1 ->
         case b of {
-          SDo y0 y1 -> (L.eqList eqSStatement x0 y0 && eqSExpr x1 y1);
+          SDo y0 y1 -> (L.eqList (eqSStatementWith same) x0 y0 && same x1 y1);
           _ -> False
         };
       SEquations x0 ->
         case b of {
-          SEquations y0 -> L.eqList (L.eqPair (L.eqList eqSPattern) eqSExpr) x0 y0;
+          SEquations y0 -> L.eqList (L.eqPair (L.eqList eqSPattern) same) x0 y0;
           _ -> False
         };
       SLetRec x0 x1 ->
         case b of {
           SLetRec y0 y1 ->
-            (L.eqList (eqTriple eqString eqRecursiveMode eqSExpr) x0 y0 && eqSExpr x1 y1);
+            (L.eqList (eqTriple eqString eqRecursiveMode same) x0 y0 && same x1 y1);
           _ -> False
         };
       SWanted x0 x1 ->
@@ -259,7 +264,7 @@ module Bootstrap.SourceEquality where {
         };
       SChecked x0 x1 ->
         case b of {
-          SChecked y0 y1 -> (eqSType x0 y0 && eqSExpr x1 y1);
+          SChecked y0 y1 -> (eqSType x0 y0 && same x1 y1);
           _ -> False
         }
     };
@@ -320,34 +325,38 @@ module Bootstrap.SourceEquality where {
         }
     };
   eqSAlternative :: SAlternative -> SAlternative -> Bool;
-  eqSAlternative a b =
+  eqSAlternative = eqSAlternativeWith eqSExpr;
+  eqSAlternativeWith :: (SExpr -> SExpr -> Bool) -> SAlternative -> SAlternative -> Bool;
+  eqSAlternativeWith same a b =
     case a of {
       SAlternative x0 x1 ->
         case b of {
-          SAlternative y0 y1 -> (eqSPattern x0 y0 && eqSExpr x1 y1)
+          SAlternative y0 y1 -> (eqSPattern x0 y0 && same x1 y1)
         }
     };
   eqSStatement :: SStatement -> SStatement -> Bool;
-  eqSStatement a b =
+  eqSStatement = eqSStatementWith eqSExpr;
+  eqSStatementWith :: (SExpr -> SExpr -> Bool) -> SStatement -> SStatement -> Bool;
+  eqSStatementWith same a b =
     case a of {
       SDoBind x0 x1 ->
         case b of {
-          SDoBind y0 y1 -> (eqSPattern x0 y0 && eqSExpr x1 y1);
+          SDoBind y0 y1 -> (eqSPattern x0 y0 && same x1 y1);
           _ -> False
         };
       SDoThen x0 ->
         case b of {
-          SDoThen y0 -> eqSExpr x0 y0;
+          SDoThen y0 -> same x0 y0;
           _ -> False
         };
       SDoLet x0 x1 x2 ->
         case b of {
-          SDoLet y0 y1 y2 -> (eqString x0 y0 && (L.eqMaybe eqSAnnotation x1 y1 && eqSExpr x2 y2));
+          SDoLet y0 y1 y2 -> (eqString x0 y0 && (L.eqMaybe eqSAnnotation x1 y1 && same x2 y2));
           _ -> False
         };
       SDoLetRec x0 ->
         case b of {
-          SDoLetRec y0 -> L.eqList (eqTriple eqString eqRecursiveMode eqSExpr) x0 y0;
+          SDoLetRec y0 -> L.eqList (eqTriple eqString eqRecursiveMode same) x0 y0;
           _ -> False
         }
     };

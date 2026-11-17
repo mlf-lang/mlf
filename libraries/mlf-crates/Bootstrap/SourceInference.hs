@@ -1286,6 +1286,16 @@ module Bootstrap.SourceInference where {
       null (Classes.sourceDeclaredClasses Nothing rhs);
     _ -> False
   };
+  -- Indexed file groups carry the actual SCC self-edge result. A closed,
+  -- unqualified singleton signature can use the existing signed-expression
+  -- planner without first constructing and extracting a top-level let group.
+  eligibleIndexedSourceWith selfReference members =
+    eligibleSourceWith selfReference members || case members of {
+      [(,,) _ (Just annotation@(SAnnotation [] _)) rhs] ->
+        not selfReference && not (isCopied rhs) &&
+        null (Classes.sourceDeclaredClasses (Just annotation) rhs);
+      _ -> False
+    };
   prepareGroup :: SourcePlan -> Map String SourceContract -> [] String -> Either String PreparedGroup;
   prepareGroup = prepareGroupUsing structuralContractBindings;
   -- Only the file-owned query drivers select this route, with finite parsed
@@ -1312,7 +1322,7 @@ module Bootstrap.SourceInference where {
           [] -> False
         };
         prepare checked contracts = prepareWithChecked checked (Just memberOrder) selectBindings Nothing (case ids of { [i] -> Just i; _ -> Nothing })
-          (eligibleSourceWith (any snd group)) plan contracts names
+          (eligibleIndexedSourceWith (any snd group)) plan contracts names
           (if support then [] else members) (if support then members else [])
           (contractOverloads contracts) (M.map contractProtected contracts)
       } in (,) names prepare
@@ -1501,6 +1511,23 @@ module Bootstrap.SourceInference where {
               freshPure (makePreparedUsing selectBindings original loweredMembers registry
                 ((:) ((,,) name (map (\((,,) _ cls _) -> cls) labels) protectedNow) [])
                 (Just (RootAuthority name labels protectedNow typed marked)) contracts)
+            } }
+          };
+          [(,,) name (Just annotation@(SAnnotation [] _)) rhs] -> do {
+            lowered <- (case reserved of {
+              Nothing -> Classes.lowerUnsignedRootAt
+                (\_ _ env suffix -> Classes.sourceEnvironmentNames env suffix) owner;
+              Just _ -> Classes.lowerUnsignedRootAt Classes.sourceOwnedEnvironmentNames owner
+            }) inventory overloads protected name (SSignature rhs annotation);
+            case lowered of { Classes.SourceRootLowering body labels _ protectedNow -> do {
+              freshLift (ensure (null labels) "signed source root leaked ordinary obligations");
+              case body of {
+                SSignature value translated ->
+                  freshPure (makePreparedUsing selectBindings original
+                    [(,,) name (Just translated) value] registry
+                    [(,,) name [] protectedNow] Nothing contracts);
+                _ -> freshFail "signed source root lost its explicit signature"
+              }
             } }
           };
           _ -> freshFail "invalid eligible source group"

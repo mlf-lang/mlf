@@ -81,11 +81,11 @@ module Bootstrap.CrateArtifact where {
   objectFragments (EnvelopeCrateObject _ _ fs) = fs;
   objectFragments (OpenCrateObject _ _) = panic "open crate requires explicit fragment references";
   definitionName :: String -> Modules.Entity -> String;
-  definitionName identity = definitionNameEncoded (Separate.encoded identity);
+  definitionName identity = definitionNameEncoded (Separate.compactName identity);
   ordinaryDefinitionName :: String -> Modules.Entity -> String;
-  ordinaryDefinitionName identity = ordinaryDefinitionNameEncoded (Separate.encoded identity);
+  ordinaryDefinitionName identity = ordinaryDefinitionNameEncoded (Separate.compactName identity);
   -- Partial application shares the immutable crate prefix across its exports.
-  -- The ordinary encoder and complete entity identity remain unchanged.
+  -- The versioned component codec preserves the complete crate/entity identity.
   definitionNameEncoded :: String -> Modules.Entity -> String;
   definitionNameEncoded encodedIdentity entity =
     case Separate.managedBuiltinName entity of {
@@ -101,10 +101,10 @@ module Bootstrap.CrateArtifact where {
                   Modules.Constructor _ -> True;
                   _ -> False
                 }))
-           then "Module_"
-           else "module_") ++
+           then "Module_c1_"
+           else "module_c1_") ++
           (encodedIdentity ++
-           ("z_" ++ Separate.encoded (Separate.entityEncoding entity))));
+           ("_" ++ Separate.compactName (Separate.entityEncoding entity))));
   startsWith prefix text =
     ((stringLength text >= stringLength prefix) &&
      eqString prefix (stringSlice text 0 (stringLength prefix)));
@@ -172,7 +172,7 @@ module Bootstrap.CrateArtifact where {
       exported = concatMap snd (crateExports iface)
     } in
     let {
-      publicNames = Set.fromList compareString (map (definitionNameEncoded (Separate.encoded (crateId iface))) exported)
+      publicNames = Set.fromList compareString (map (definitionNameEncoded (Separate.compactName (crateId iface))) exported)
     } in
     let {
       public = filter (\p -> Set.member compareString (fst p) publicNames) (crateBindings iface)
@@ -362,7 +362,7 @@ module Bootstrap.CrateArtifact where {
            ensure declared ("crate exports an undeclared entity: " ++ Modules.label entity)
          };
   builtinCrateIdentity :: String;
-  builtinCrateIdentity = "mlf:builtin-shared-haskell-v1:13";
+  builtinCrateIdentity = "mlf:builtin-shared-haskell-v1:15";
   validateBuiltinOwnership iface =
     if (any Modules.isBuiltinModule (crateModules iface) ||
         ((stringLength (crateId iface) >= stringLength "mlf:builtin-shared-haskell-v1:") &&
@@ -411,7 +411,7 @@ module Bootstrap.CrateArtifact where {
       traverseEither Separate.validModuleName (crateModules iface);
       traverseEither (\((,) _ modules) -> traverseEither Separate.validModuleName modules)
         (crateImports iface);
-      traverseEither (validateOwnExportNamed (definitionNameEncoded (Separate.encoded (crateId iface))) iface (exportInventory iface))
+      traverseEither (validateOwnExportNamed (definitionNameEncoded (Separate.compactName (crateId iface))) iface (exportInventory iface))
         (concatMap snd (crateExports iface));
       traverseEither
         (\((,) n ty) ->
@@ -2576,9 +2576,9 @@ module Bootstrap.CrateArtifact where {
     encodedCount <- envelopeMultiply "metadata encoded entity key" (envelopeMaxRender limits) 8
       (Storage.renderBoundScalars key);
     let { encodedKey = envelopeBounds encodedCount encodedCount };
-    -- Ordinary names use a7-character prefix plus 'z_'; stable-name and
+    -- Ordinary names use a10-character versioned prefix plus '_'; stable-name and
     -- managed-builtin branches are bounded by the same key-based allowance.
-    name <- envelopeBoundsSum limits [envelopeBounds 9 9,encodedIdentity,encodedKey];
+    name <- envelopeBoundsSum limits [envelopeBounds 11 11,encodedIdentity,encodedKey];
     envelopeBoundsSum limits [key,encodedKey,name]
   };
   envelopeInstancePrefixReservation limits encodedIdentity owner = do {
@@ -3273,14 +3273,14 @@ module Bootstrap.CrateArtifact where {
   envelopeEncodedIdentity limits budget identity = do {
     bound <- envelopeMultiply "semantic identity rendering" (envelopeMaxRender limits) 8 (stringLength identity);
     charged <- envelopeChargeRender limits 2 (envelopeBounds bound bound) budget;
-    let { encoded = Separate.encoded identity };
+    let { encoded = Separate.compactName identity };
     ensure (stringLength encoded <= bound) "crate envelope encoded identity exceeds reservation";
     Right ((,) charged encoded)
   };
   envelopePublicName limits budget encodedIdentity entity key = do {
     encodedKey <- envelopeMultiply "semantic entity name" (envelopeMaxRender limits) 8 (stringLength key);
     bound <- envelopeAdd "semantic entity name" (envelopeMaxRender limits) encodedKey (stringLength encodedIdentity + 128);
-    -- Separate.encoded(key), or the stable branch's encoded owner/spelling,
+    -- Separate.compactName(key), or the stable branch's encoded owner/spelling,
     -- is a materialized temporary in addition to the final generated name.
     reservation <- envelopeBoundsAdd limits (envelopeBounds encodedKey encodedKey) (envelopeBounds bound bound);
     charged <- envelopeChargeRender limits 2 reservation budget;
@@ -3290,7 +3290,7 @@ module Bootstrap.CrateArtifact where {
         then Separate.stableName entity
         else (if Modules.compareSpace (Modules.space entity) Modules.Types == 0 ||
           (case Modules.role entity of { Modules.Constructor _ -> True; _ -> False })
-          then "Module_" else "module_") ++ encodedIdentity ++ "z_" ++ Separate.encoded key
+          then "Module_c1_" else "module_c1_") ++ encodedIdentity ++ "_" ++ Separate.compactName key
     } };
     actual <- envelopeTextBounds limits name;
     ensure (Storage.renderBoundScalars actual <= bound && Storage.renderBoundUtf8 actual <= bound)
@@ -3881,7 +3881,10 @@ module Bootstrap.CrateArtifact where {
       -- Open owners are wire text, whereas a legacy unit name must satisfy
       -- the compiled module-name grammar. Preserve already-legacy names and
       -- translate only an exact owner of this crate and its full binding set.
-      unitName = if not (null members) && eqString name (Separate.openGroupName (crateId iface) members)
+      unitName = if not (null members) &&
+        (eqString name (Separate.openGroupName (crateId iface) members) ||
+         eqString name (Separate.compactOpenGroupName (crateId iface) members) ||
+         eqString name (Separate.compactOpenGroupNameV2 (crateId iface) members))
         then Separate.queryGroupName (crateId iface) members else name;
       metadata = Separate.UnitInterface unitName [] [] (Open.declarations (Open.context fragment)) [] []
         bindings
@@ -4003,7 +4006,9 @@ module Bootstrap.CrateArtifact where {
     }
   };
   openGroupOwnerMatches crate keys owner = not (null keys) &&
-    (eqString owner (Separate.openGroupName crate keys) ||
+    (eqString owner (Separate.compactOpenGroupName crate keys) ||
+     eqString owner (Separate.compactOpenGroupNameV2 crate keys) ||
+     eqString owner (Separate.openGroupName crate keys) ||
      eqString owner (Separate.queryGroupName crate (sortStrings keys)));
   -- Object files name declarations by stable, crate-qualified identities. Only
   -- this link owns the slots below. Never reuse a producer's resolver slot.

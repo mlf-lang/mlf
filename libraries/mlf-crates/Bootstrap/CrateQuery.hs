@@ -753,15 +753,20 @@ module Bootstrap.CrateQuery where {
               else stringFromCode code;
   jsonFrom :: String -> Int -> String;
   jsonFrom value position = concatStringList (jsonSpans value position position);
-  jsonSpans value start position =
-    let { size = stringLength value; spanText = \end -> if start == 0 && end == size then value
-          else stringSlice value start (end - start) } in
-    if position >= size then (if position == start then [] else [spanText position])
+  -- A local slice helper allocates a captured closure at each scanned character.
+  jsonSpanText value size start end = if start == 0 && end == size then value
+    else stringSlice value start (end - start);
+  -- Bound uninterrupted native evaluation even when Clang does not optimize calls.
+  jsonSpans value start position = jsonSpanUntil value start position (start + 256);
+  jsonSpanUntil value start position limit =
+    let { size = stringLength value } in
+    if position >= size then (if position == start then [] else [jsonSpanText value size start position])
+    else if position >= limit then (:) (jsonSpanText value size start position) (jsonSpans value position position)
     else let { code = stringCodeAt value position; next = position + 1 } in
       if code < 32 || code == 34 || code == 92
       then let { tail = (:) (jsonCharacter code) (jsonSpans value next next) } in
-        if start == position then tail else (:) (spanText position) tail
-      else jsonSpans value start next;
+        if start == position then tail else (:) (jsonSpanText value size start position) tail
+      else jsonSpanUntil value start next limit;
   jsonString value = ("\"" ++ (jsonFrom value 0 ++ "\""));
   jsonArray values = ("[" ++ (intercalate "," values ++ "]"));
   groupJSON (GroupResult identity names cached semantic key) =

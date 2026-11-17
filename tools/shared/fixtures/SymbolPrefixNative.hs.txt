@@ -1,0 +1,41 @@
+-- mlf:syntax shared-haskell-v1
+{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
+             KindSignatures, FlexibleContexts, FlexibleInstances,
+             MultiParamTypeClasses, OverloadedStrings #-}
+module Main where {
+  import MLF.Primitive;
+  import Bootstrap.Types;
+  import Bootstrap.Std;
+  data Symbol = Symbol String Int;
+  -- INSERT_ACTUAL_SYMBOL_WRITERS
+  copies count text = if count == 0 then "" else let {
+    half = copies (count / 2) text;
+    both = half ++ half
+  } in if count % 2 == 0 then both else both ++ text;
+  unit kind = if kind == 0 then "a" else if kind == 1 then "中"
+    else if kind == 2 then "😀" else stringFromCode 0;
+  width kind = if kind == 1 then 3 else if kind == 2 then 4 else 1;
+  prefix size = if size < 128 then 1 else if size < 16384 then 2 else 3;
+  main = do {
+    mode <- getArg 0; startText <- getArg 1;
+    kindText <- getArg 2; countText <- getArg 3;
+    otherText <- getArg 4; moreText <- getArg 5;
+    let {
+      start = readInt startText; kind = readInt kindText;
+      count = readInt countText; other = readInt otherText;
+      more = readInt moreText;
+      firstSize = count * width kind; secondSize = more * width other;
+      first = Symbol (copies count (unit kind)) firstSize;
+      second = Symbol (copies more (unit other)) secondSize;
+      values = [first, Symbol "" 0, second, first];
+      total = start + 2 * (prefix firstSize + firstSize)
+        + 1 + prefix secondSize + secondSize + 2
+    };
+    bytes <- newByteArray total 211;
+    end <- if eqString mode "sizes"
+      then putOwnedSymbolSizes bytes (start * 8) values
+      else putOwnedSymbols bytes (start * 8) values;
+    printInt end;
+    byteArrayDigest bytes >>= putStrLn
+  }
+}

@@ -33,6 +33,13 @@ BUILTIN_VERIFICATION_HELPERS = ('tools/shared/builtin_prelude_identity.py',
                                 'tools/shared/verify_builtin_prelude.py')
 
 
+def executable_link_flags(name):
+    # These hosted compilation drivers retain more old-generation headroom.
+    # The allocation area and literal user +RTS/-RTS argument handling stay
+    # unchanged; other tools and the native runtime keep their own defaults.
+    return [*LINK_FLAGS, *(['-with-rtsopts=-F4'] if name in {'emlf', 'mlfpkg'} else [])]
+
+
 def prepared_verifier():
     path = Path(__file__).resolve().with_name('verify_prepared_libraries.py')
     module = types.ModuleType('verify_prepared_libraries')
@@ -173,7 +180,7 @@ def load_manifest():
         if not re.search(r'^import qualified ' + re.escape(item['module']) + r' as Entry$', text, re.M) or not re.search(
                 r'^main = runEntry Entry\.main$', text, re.M):
             raise RuntimeError('wrapper does not select the declared shared entry: ' + item['name'])
-        if '-rtsopts=ignoreAll' not in stanza or any(flag not in stanza for flag in DEMAND_FLAGS):
+        if any(flag not in stanza for flag in [*DEMAND_FLAGS, *executable_link_flags(item['name'])]):
             raise RuntimeError('Cabal executable is missing contract flags: ' + item['name'])
     host_files = {'host/ghc/MLF/Primitive.hs', 'host/ghc/MLF/Host/Base.hs', 'host/ghc/MLF/Host/IO.hs',
                   'host/ghc/MLF/Host/Async.hs', 'host/ghc/cbits/host.c', 'runtime/mlf_process_supervisor.c'}
@@ -693,7 +700,7 @@ def main():
             destination = output / 'bin' / item['name']
             for suffix in ['.o', '.hi']:
                 (output / 'objects' / ('Main' + suffix)).unlink(missing_ok=True)
-            run([ghc, '--make', '-j1', *flags, *LINK_FLAGS, ROOT / item['wrapper'], *c_objects, '-o', destination], 'link-' + item['name'])
+            run([ghc, '--make', '-j1', *flags, *executable_link_flags(item['name']), ROOT / item['wrapper'], *c_objects, '-o', destination], 'link-' + item['name'])
             receipt['outputs'][item['name']] = identified(destination)
         emlf = output / 'bin/emlf'
         run([emlf, '--check-shared', *[ROOT / item['path'] for item in manifest['modules']]], 'shared-profile')

@@ -15,9 +15,9 @@ is checked. Large results remain live across `performGC`. Explicit `ErrorCall`
 markers check head-before-tail failure order, required later heads and list
 spines, singleton demand, unused/untaken results, and a failing join before a
 failing suffix in an enclosing binary concatenation. A nested primitive inside
-a list head checks error payloads beyond a direct panic. Eight literal metadata
-oracles check code 107, previous code 106, name, arity, strictness, signature,
-lookup, and the append-only opcode inventory.
+a list head checks error payloads beyond a direct panic. Nine literal metadata
+oracles check code 107, previous code 106, latest appended code 134, name, arity,
+strictness, signature, lookup, and the append-only opcode inventory through 134.
 
 The enclosing-concatenation cases call a separate `appendJoined` function to
 exercise worker argument demand. The GHC wrapper is explicitly `NOINLINE`.

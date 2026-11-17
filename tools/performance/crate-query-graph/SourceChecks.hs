@@ -265,7 +265,7 @@ loweredChecks root = do
 sessionTransactionChecks root = do
  let folder=root++"/session-transaction"
      source=folder++"/Tx.hs"; spec=folder++"/crate.spec"; cache=folder++"/cache"
-     pointer=cache++"/query-graph-v2/CURRENT"
+     pointer=cache++"/query-graph-v3/CURRENT"
      header="-- mlf:syntax shared-haskell-v1\n{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}\nmodule Tx where { import MLF.Primitive; "
      program value rhs=header++"ok :: Int; ok = "++value++"; bad :: Int; bad = "++rhs++" }\n"
      compile label=Session.compileSpecFile (B.literal spec) (B.literal(folder++"/"++label))
