@@ -11,6 +11,7 @@ HISTORY = 'benchmarks/history/artifact-binary-parent-manifest.json'
 OLD_TYPES = 'benchmarks/history/artifact-binary-parent-Types.hs.txt'
 TYPES = 'libraries/mlf-foundation/Bootstrap/Types.hs'
 STD = 'libraries/mlf-foundation/Bootstrap/Std.hs'
+MAP = 'libraries/mlf-foundation/Bootstrap/Map.hs'
 HISTORY_SHA = 'c5da11d57bbe021ec0e4f5b906929128df04542402c9bd01d77386658adff70f'
 OLD_TYPES_SHA = '9eb67b3a3e7f3591f051a8627bb466209a3be39436d58f48db8efc89f936fbac'
 
@@ -44,7 +45,7 @@ def load_contract(root):
     return adapter.live_contract(root / 'tools/performance')
 
 
-def validate_bridge(current_raw, historical_raw, current_types, historical_types, current_std, contract):
+def validate_bridge(current_raw, historical_raw, current_types, historical_types, current_std, current_map, contract):
     require(sha(historical_raw) == HISTORY_SHA, 'exact historical manifest SHA')
     historical = strict_json(historical_raw)
     require(historical['pinned_sha256'][TYPES] == OLD_TYPES_SHA, 'historical Types pin')
@@ -53,10 +54,13 @@ def validate_bridge(current_raw, historical_raw, current_types, historical_types
     require(projected == historical_types, 'exact historical Types reconstruction')
     require(sha(contract.restore_path(current_std, STD)) == historical['pinned_sha256'][STD],
             'exact historical Std reconstruction')
+    require(sha(current_map) == contract.value['current_files'][MAP], 'current Map pin')
+    require(sha(contract.restore_path(current_map, MAP)) == historical['pinned_sha256'][MAP],
+            'exact historical Map reconstruction')
     # Only these declared source transitions and the two evidence pins change.
     # Workloads, flags, other pins, and upstream provenance remain unchanged.
     expected = copy.deepcopy(historical)
-    for path in (TYPES, STD):
+    for path in (TYPES, STD, MAP):
         expected['pinned_sha256'][path] = contract.value['current_files'][path]
     expected['pinned_sha256'][HISTORY] = HISTORY_SHA
     expected['pinned_sha256'][OLD_TYPES] = OLD_TYPES_SHA
@@ -70,7 +74,8 @@ def validate(root=ROOT):
     contract = load_contract(root)
     validate_bridge((root / 'benchmarks/manifest.json').read_bytes(),
                     (root / HISTORY).read_bytes(), (root / TYPES).read_bytes(),
-                    (root / OLD_TYPES).read_bytes(), (root / STD).read_bytes(), contract)
+                    (root / OLD_TYPES).read_bytes(), (root / STD).read_bytes(),
+                    (root / MAP).read_bytes(), contract)
 
 
 if __name__ == '__main__':
