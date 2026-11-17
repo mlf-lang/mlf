@@ -1,0 +1,83 @@
+name: Remote Foundation15 main phase profile
+on:
+  push:
+    branches: [perf/remote-foundation-profile-20261117]
+permissions:
+  contents: read
+concurrency:
+  group: remote-foundation-screen-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  screen:
+    if: github.repository == 'mlf-lang/mlf' && github.ref == 'refs/heads/perf/remote-foundation-profile-20261117'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Exact experiment controls
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          path: controls
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Exact main baseline
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: fc300bc9fdc389b585cbef0630fc8915d53e89c5
+          path: baseline
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Install fixed official GHC, 300 second cap
+        run: python3 controls/tools/performance/remote-foundation-profile/install.py --root "$RUNNER_TEMP/remote-foundation-${{ github.run_id }}-${{ github.run_attempt }}"
+      - name: Run synthetic integrity and supervision controls
+        run: |
+          ROOT="$RUNNER_TEMP/remote-foundation-${{ github.run_id }}-${{ github.run_attempt }}"
+          timeout 20s python3 controls/tools/performance/remote-foundation-profile/preflight.py "$ROOT/artifacts/preflight" > "$ROOT/artifacts/preflight-summary.json"
+          timeout 10s python3 controls/tools/performance/remote-foundation-profile/screen.py --selftest > "$ROOT/artifacts/screen-selftest.json"
+      - name: Build exact main A, 900 second cap
+        run: python3 controls/tools/performance/remote-foundation-profile/build.py --root "$RUNNER_TEMP/remote-foundation-${{ github.run_id }}-${{ github.run_attempt }}" --a-source "$GITHUB_WORKSPACE/baseline"
+      - name: Strict Foundation15 main qualification and phase diagnostic, 600 second cap
+        run: |
+          ROOT="$RUNNER_TEMP/remote-foundation-${{ github.run_id }}-${{ github.run_attempt }}"
+          python3 - "$ROOT" <<'PY'
+          import json,pathlib,sys,os,shutil
+          root=pathlib.Path(sys.argv[1]); mem={x.split(':')[0]:int(x.split(':')[1].split()[0]) for x in pathlib.Path('/proc/meminfo').read_text().splitlines()}
+          d=dict(mem_available_KiB=mem['MemAvailable'],disk_free=shutil.disk_usage(root).free,loadavg=pathlib.Path('/proc/loadavg').read_text(),cpu_count=os.cpu_count(),machine=os.uname()._asdict() if hasattr(os.uname(),'_asdict') else list(os.uname()))
+          with(root/'artifacts/screen-resource-before.json').open('x')as f:json.dump(d,f,indent=2)
+          assert d['mem_available_KiB']>=4*1024**2 and d['disk_free']>=16*1024**3
+          PY
+          python3 controls/tools/performance/remote-foundation-profile/crc_process_supervisor.py --receipt "$ROOT/artifacts/screen-outer.json" --work-seconds 600 --cleanup-seconds 10 "$(command -v python3)" controls/tools/performance/remote-foundation-profile/screen.py --root "$ROOT" --sources "$GITHUB_WORKSPACE/baseline" --a "$ROOT/producers/A/bin/emlf"
+          python3 - "$ROOT/artifacts/screen-outer.json" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1]))
+          assert d['complete'] and d['cleanup_complete'] and d['reason']=='target exited' and d['target_exit_code']==0
+          assert not d.get('signals') and not d.get('cancel_signals') and not d.get('survivors')
+          assert all(x['status']==0 for x in d['reaped'])
+          PY
+      - name: Bound all evidence before upload
+        if: always()
+        id: bound
+        run: |
+          python3 - "$RUNNER_TEMP/remote-foundation-${{ github.run_id }}-${{ github.run_attempt }}/artifacts" <<'PY'
+          import hashlib,json,pathlib,stat,sys
+          root=pathlib.Path(sys.argv[1]);root.mkdir(parents=True,exist_ok=True);rows=[];total=0
+          for p in sorted(root.rglob('*')):
+              s=p.lstat()
+              if stat.S_ISDIR(s.st_mode):continue
+              if not stat.S_ISREG(s.st_mode):raise SystemExit('special artifact')
+              total+=s.st_size
+              if total>256*1024**2 or len(rows)>=20000:raise SystemExit('artifact cap; original evidence retained on runner')
+              rows.append(dict(path=str(p.relative_to(root)),bytes=s.st_size,sha256=hashlib.sha256(p.read_bytes()).hexdigest()))
+          with(root/'artifact-inventory.json').open('x')as f:json.dump(dict(files=rows,bytes=total),f,indent=2)
+          PY
+      - name: Preserve success and failure evidence
+        if: always() && steps.bound.outcome == 'success'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: remote-foundation-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/remote-foundation-${{ github.run_id }}-${{ github.run_attempt }}/artifacts/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 6
+          include-hidden-files: true
+
