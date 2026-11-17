@@ -102,6 +102,7 @@ def execute():
     state_path=output.parent/(output.name+'-batch-worker.json')
     state={'complete':False,'physical_commands':[],'logical_vectors':[], 'logical_indices':[], 'batch_commands':[],
            'scope':'original controls unchanged; 25 interpreter vector startups replaced by four-lane actual batch projections; not fresh-process equivalence'}
+    state['fixture_generation']='monomorphic-runtime-loop-v2'
     require(not state_path.exists(),'fresh worker receipt required')
     save(state_path,state)
     _receipt_created=True
@@ -159,8 +160,8 @@ def execute():
             require(producer is not None and set(host_outputs)==set(contract.FORWARD),'authenticated producer and complete original host observations required')
             original=raws['fixtures/utf8-length/Length.hs']; build=receipt.parent
             for direction in ('forward','reverse'):
-                raw=contract.generate(original,direction)
-                require(contract.restore(raw,direction)==original,'generated inverse')
+                raw=contract.generate_loop(original,direction)
+                require(contract.restore_loop(raw,direction)==original,'generated inverse')
                 source=self.output/('batch-'+direction+'.hs'); source.write_bytes(raw); generated[str(source)]=digest(raw)
                 obj=self.output/('batch-'+direction+'.o'); hi=self.output/('batch-'+direction+'.hi'); binary=self.output/('batch-'+direction)
                 compile_argv=list(templates['compile']); link_argv=list(templates['link'])
