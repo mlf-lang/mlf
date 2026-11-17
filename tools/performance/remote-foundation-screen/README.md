@@ -40,6 +40,8 @@ GiB free disk. The outer subreaper must establish terminal cleanup before
 success can be reported. Artifact upload is bounded at 256 MiB/20,000 files;
 failure artifacts are retained when within this bound. No Library upload.
 
-The 19 existing synthetic checker/supervisor controls and 10 screen-specific
+The 19 existing synthetic checker/supervisor controls and 12 screen-specific
 synthetic controls run before building. Final package is independently reviewed
 before publication. Any control or experiment failure remains a separate batch.
+
+Control correction v2: run 44170019977 stopped before all targets because the producer closure excludes Regex, a benchmark input. Foundation15 now has a separate exact 15-input byte inventory; the producer closure remains exactly 95 homes plus 16 support files. The selftest checks the complete input pin set before costly builds. No workload, performance gate, output equality gate, or budget is changed.

@@ -137,7 +137,7 @@ def main():
             expected_producer=build['builds'][side]['producer']; actual=pin(producers[side])
             need(str(producers[side])==expected_producer['resolved'] and all(actual[k]==expected_producer[k] for k in ['bytes','mode','sha256']),'producer differs from fresh build')
         need(build['builds']['A']['runtime']==build['builds']['C']['runtime'],'different producer runtimes'); runtime=build['builds']['A']['runtime']; need(runtime,'missing runtime evidence')
-        source_pin_path=HERE/'source-pins.json'; source_pins=json.loads(source_pin_path.read_text())['rows']
+        source_pin_path=HERE/'foundation-input-pins.json'; source_pins=json.loads(source_pin_path.read_text())['rows']
         modules=[]
         for suffix in MODULES:
             p=sources/'libraries/mlf-foundation/Bootstrap'/(suffix+'.hs'); need(p.is_file(),'missing Foundation source '+str(p))
@@ -190,6 +190,10 @@ def selftest():
     for row in fixtures: need(checks.unpack(pack(row))==row,'spec codec round-trip')
     need(len(SEQUENCE)==6 and [x[1] for x in SEQUENCE[2:]]==['A','C','C','A'],'fixed ABBA')
     need(len(MODULES)==15 and len(set(MODULES))==15,'Foundation source closure')
+    input_rows=json.loads((HERE/'foundation-input-pins.json').read_text())['rows']
+    expected=['libraries/mlf-foundation/Bootstrap/'+m+'.hs' for m in MODULES]
+    need(sorted(r['repo_path'] for r in input_rows)==sorted(expected),'exact Foundation input pin set')
+    need(all(r['A']['bytes']>0 and len(r['A']['sha256'])==64 for r in input_rows),'Foundation pin shape')
     import tempfile
     with tempfile.TemporaryDirectory(prefix='mlf-remote-screen-selftest-') as tmp:
         root=Path(tmp); p=root/'pin'; p.write_bytes(b'abc'); old=pin(p); p.write_bytes(b'abd'); need(pin(p)['sha256']!=old['sha256'],'pin sensitivity')
@@ -201,6 +205,6 @@ def selftest():
         try: pin(symlink)
         except RuntimeError: pass
         else: raise RuntimeError('pin symlink accepted')
-    print(json.dumps(dict(complete=True,compiler_executed=False,cases=10)))
+    print(json.dumps(dict(complete=True,compiler_executed=False,cases=12)))
     return 0
 if __name__=='__main__': sys.exit(main())
