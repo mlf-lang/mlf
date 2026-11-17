@@ -1,0 +1,3 @@
+UNQUALIFIED
+complete_equal=7
+demand_only_equal=4

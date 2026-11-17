@@ -1,0 +1,17 @@
+{
+  "baseline_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "Graph_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+  "Solver_sha256": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612",
+  "actual_review_sha256": "2d3c616ead0d03a2459075247d1e16563b4ffe8a98846a0fcb13a890ee46b55e",
+  "run02_receipt_sha256": "524b53f280360331f826345a8238fb35c90f6ece465a9aef879f5b6a5f5d9e4f",
+  "files": {
+    "focused/Main.hs": "2de6889af49a8a5782fc3f466d94534f0e8c8a5267e3c95f18502bd63db8a329",
+    "focused/Prototype/ClassGenTrial.hs": "97409d8b28e3e63a38b8e1d9f6c2ab744051c3087cb9d2893f672e956a9b14df",
+    "frozen-fixture-contract.json": "c3a2bfd102a0b16d9a2d76d9e059ea361bc6de4b9737385d2e8b3c31bb63e74f",
+    "summary.tsv": "ddb28f0f0c3f78ef672c818cb6a9600d8c79caec7e7b72dd89162b273ca40a1b",
+    "qualification.txt": "090b0dabb4df12a2d8ef9f13dc47c6e5f90ae1055c00f01d9624e9d5e86cdb94",
+    "layout-repair.patch": "2d7948ab47ea6ddaf114af9d4034e50d8ee4a47902f5f15e9d8b2a931e03ffe3",
+    "results.json": "12312dfa9cc2e39e8103209a7143740d214abe92af2f4f843f9a6480575e6b3d",
+    "README.md": "2c86c21670ebfde3575bf0bfcfe8df2ae73d034f853a46b52da681f861f1b53a"
+  }
+}

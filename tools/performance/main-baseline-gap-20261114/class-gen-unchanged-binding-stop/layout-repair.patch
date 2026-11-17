@@ -1,0 +1,16 @@
+--- Main.v2.hs
++++ Main.v3.hs
+@@ -140,9 +140,10 @@
+ trialOp :: Trace -> [(P.Int,P.Int)] -> T.Graph -> IO (T.Either P.String T.Graph)
+ trialOp trace equations graph=do
+   observed<-evaluate (C.trialUnify equations graph)
+-  case observed of C.TrialObservation route err result->do
+-    writeIORef trace (Just (route,err))
+-    pure result
++  case observed of
++    C.TrialObservation route err result->do
++      writeIORef trace (Just (route,err))
++      pure result
+ routeName :: C.TrialRoute -> String
+ routeName C.TrialAccepted="ACCEPT"
+ routeName C.TrialCertificateRejected="CERT_REJECT"
