@@ -1,0 +1,54 @@
+name: Independent UTF8 O0 qualification
+on:
+  push:
+    branches: [codex/pr51-utf8-o0-qualification-20261117]
+permissions:
+  contents: read
+concurrency:
+  group: independent-utf8-o0-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  utf8-o0:
+    name: Fixed-source O0 full UTF8 only
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      GHC_ENVIRONMENT: '-'
+      MLF_TEST_BUILD_JOBS: '1'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare isolated evidence parent
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/codex/pr51-utf8-o0-qualification-20261117
+          test ! -e .mlf-build/utf8-qualification
+          mkdir -p .mlf-build/utf8-qualification
+      - name: Pure and synthetic controls, with strict outer owner
+        run: |
+          python3 -B tools/shared/qualification_stage.py --phase pure --output .mlf-build/utf8-qualification/controls --supervisor tools/shared/crc_process_supervisor.py -- python3 -B tools/shared/qualification_checks.py
+      - name: Install fixed official GHC with root-owned descendant supervision
+        run: |
+          sudo --preserve-env=RUNNER_TEMP,GITHUB_PATH,CI,GITHUB_SHA python3 -B tools/shared/qualification_stage.py --phase install --output .mlf-build/utf8-qualification/install --supervisor tools/shared/crc_process_supervisor.py -- /usr/bin/bash tools/shared/qualification_install.sh
+      - name: Fresh full O0 bootstrap producer
+        run: |
+          python3 -B tools/shared/qualification_stage.py --phase build --output .mlf-build/utf8-qualification/build --supervisor tools/shared/crc_process_supervisor.py -- python3 -B tools/shared/build.py --bootstrap-only --optimization 0 --build-dir .mlf-build/shared-ghc
+      - name: Source-bound actual full UTF8 target, not entire direct suite
+        run: |
+          python3 -B tools/shared/qualification_stage.py --phase utf8 --output .mlf-build/utf8-qualification/run --supervisor tools/shared/crc_process_supervisor.py -- python3 -B tools/shared/qualification_run.py
+      - name: Preserve actual producer, target, and cleanup evidence even on failure
+        if: always()
+        timeout-minutes: 5
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: utf8-o0-${{ github.sha }}-attempt-${{ github.run_attempt }}
+          path: |
+            .mlf-build/utf8-qualification
+            .mlf-build/shared-ghc
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
