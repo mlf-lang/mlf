@@ -14,6 +14,7 @@ import shlex
 from build import DEMAND_FLAGS, EXHAUSTIVENESS_FLAGS, PACKAGES
 from test_direct import CommandRunner, authenticate_build, sha
 from test_native_string_index import local_c_closure, resolve_tool
+from header_validation_adapter import prepare as prepare_header_validation
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / 'tools/shared/fixtures/native'
@@ -105,6 +106,7 @@ def main():
                  FIXTURES / 'MaterializeImportsTests.hs',
                  FIXTURES / 'PartialMaterializeImportsTests.hs',
                  FIXTURES / 'HeaderValidationTests.hs',
+                 FIXTURES / 'HeaderNamingOracle.hs', ROOT / 'tools/shared/header_validation_adapter.py',
                  FIXTURES / 'SplitBuiltinControls.hs',
                  FIXTURES / 'native_library_runtime.c', ROOT / 'host/ghc/cbits/host.c',
                  ROOT / 'runtime/mlf_process_supervisor.c', clang, pkg_config, archive,
@@ -135,21 +137,35 @@ def main():
                        '-I' + str(ROOT / 'runtime'), '-c', source, '-o', target], timeout=120)
             transports.append(target)
         artifacts.update({str(p): sha(p) for p in transports})
+        header_dir, header_evidence = prepare_header_validation(ROOT, output)
+        record['header_adaptation'] = header_evidence
+        save()
+        artifacts.update({str(p): sha(p) for p in header_dir.iterdir() if p.is_file()})
+        header_objects = []
+        for module in ['HistoricalHeaderNames', 'HeaderNamingOracle']:
+            obj, hi = [header_dir / (module + suffix) for suffix in ['.o', '.hi']]
+            runner.run('compile-' + module, [ghc, '-c', *flags, *EXHAUSTIVENESS_FLAGS,
+                       '-i', '-i' + str(producer_dir / 'objects'), '-i' + str(header_dir),
+                       '-o', obj, '-ohi', hi, header_dir / (module + '.hs')], timeout=120)
+            header_objects.append(obj)
+            artifacts.update({str(p): sha(p) for p in [obj, hi]})
         executables = {}
         fixture_sources = {name: FIXTURES / (name + '.hs')
                            for name in ['NativeBoundaryTests', 'NativeLibraryRuntime',
                                         'NativePrivateConstructors', 'MaterializeImportsTests',
-                                        'PartialMaterializeImportsTests', 'HeaderValidationTests',
+                                        'PartialMaterializeImportsTests',
                                         'SplitBuiltinControls']}
+        fixture_sources.update({name: header_dir / (name + '.hs')
+                                for name in ['HeaderValidationHistorical', 'HeaderValidationCurrent']})
         if args.frontend_source_root is not None:
             fixture_sources['NativeFrontendControls'] = FRONTEND_FIXTURE
         for fixture, source in fixture_sources.items():
             obj, hi, executable = [output / (fixture + suffix) for suffix in ['.o', '.hi', '']]
             runner.run('compile-' + fixture, [ghc, '-c', *flags, *EXHAUSTIVENESS_FLAGS,
-                       '-i', '-i' + str(producer_dir / 'objects'), '-o', obj, '-ohi', hi,
+                       '-i', '-i' + str(producer_dir / 'objects'), '-i' + str(header_dir), '-o', obj, '-ohi', hi,
                        source], timeout=120)
             runner.run('link-' + fixture, [ghc, *flags, '-rtsopts=ignoreAll', obj,
-                       *link_objects, *transports, '-o', executable], timeout=120)
+                       *link_objects, *header_objects, *transports, '-o', executable], timeout=120)
             artifacts.update({str(p): sha(p) for p in [obj, hi, executable]})
             executables[fixture] = executable
         if args.frontend_source_root is not None:
@@ -174,9 +190,20 @@ def main():
         runner.run('partial-checked-materialization', [executables['PartialMaterializeImportsTests']],
                    expected=b'PASS partial checked composition, unused prefix pruning, binder identity, nominal weakening and independent checker oracle\n',
                    timeout=120)
-        runner.run('header-validation-equivalence', [executables['HeaderValidationTests']],
-                   expected=b'PASS header duplicate errors, entity identity, Unicode naming and forged primitive rejection\n',
-                   timeout=120)
+        for lane, fixture in [('historical', 'HeaderValidationHistorical'),
+                              ('current', 'HeaderValidationCurrent')]:
+            runner.run('header-validation-' + lane, [executables[fixture]],
+                       expected=b'PASS header duplicate errors, entity identity, Unicode naming and forged primitive rejection\n',
+                       timeout=120)
+            record.setdefault('header_lanes_passed', []).append(lane)
+            save()
+        record['header_qualification'] = {
+            'complete': True,
+            'lanes': list(record['header_lanes_passed']),
+            'adaptation_sha256': artifacts[str(header_dir / 'adaptation.json')],
+            'scope': 'historical formatter component and current production naming; all original non-naming assertions',
+        }
+        save()
         runner.run('split-builtin-selection-controls', [executables['SplitBuiltinControls']],
                    expected=b'PASS recursive SCC atomicity, polymorphic and lazy semantics, selected/full checker parity, incoming dependencies and malformed fragment rejection\n',
                    timeout=120)
