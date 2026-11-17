@@ -30,6 +30,34 @@ const frameworkArguments = (step, matrix) => {
   assert.ok(result.stdout.endsWith('\0'), 'The framework command must execute');
   return result.stdout.slice(0, -1).split('\0');
 };
+// Record each direct Python call separately, including its evidence destination.
+// A flattened argv stream would not distinguish split or merged invocations.
+const directArguments = step => {
+  const run = step.match(/^        run: \|\n([\s\S]*)$/m)?.[1];
+  assert.ok(run, 'The direct step must have an explicit shell command');
+  const script = run.replace(/^          /gm, '');
+  assert.doesNotMatch(script, /\$\{\{/, 'Direct arguments must not vary by hidden workflow interpolation');
+  const recorder = "unset MLF_CRC_TEST_EVIDENCE\npython3() { printf 'CALL\\0%s\\0%s\\0' \"$#\" \"${MLF_CRC_TEST_EVIDENCE-}\"; printf '%s\\0' \"$@\"; }\n";
+  const result = spawnSync('bash', ['-euo', 'pipefail', '-c', recorder + script],
+    {encoding: 'utf8', timeout: 5000});
+  assert.equal(result.status, 0, result.stderr || String(result.error || 'Direct dispatch failed'));
+  assert.equal(result.stderr, '', 'Direct dispatch must not emit diagnostics');
+  assert.ok(result.stdout.endsWith('\0'), 'The direct commands must execute');
+  const tokens = result.stdout.slice(0, -1).split('\0');
+  const calls = [];
+  for (let index = 0; index < tokens.length;) {
+    assert.equal(tokens[index++], 'CALL', 'Every Python invocation has its own boundary');
+    const argc = tokens[index++];
+    assert.match(argc, /^[1-9][0-9]*$/, 'Canonical decimal argc');
+    const count = Number(argc);
+    assert.ok(Number.isSafeInteger(count) && count > 0 && count <= 64, 'Bounded exact argc');
+    const evidence = tokens[index++];
+    assert.ok(index + count <= tokens.length, 'Complete invocation arguments');
+    calls.push({evidence, argv: tokens.slice(index, index + count)});
+    index += count;
+  }
+  return calls;
+};
 const validate = text => {
   const native = job(text, 'native');
   assert.match(native, /^    timeout-minutes: 120$/m, 'Every shard keeps the 120-minute outer bound');
@@ -101,7 +129,7 @@ const validate = text => {
   const direct = [
     'tools/release/test-suite-build-receipts.py',
     'tools/release/source-smoke.sh',
-    'tools/shared/test_direct.py',
+    'tools/shared/test_direct_crc_successor.py',
     'tools/shared/test_figure12_direct.py',
   ];
   // The ABI migration retains the frozen semantic algorithms behind explicit
@@ -164,6 +192,21 @@ const validate = text => {
     'Only the framework wrapper may receive the bounded suite override');
   assert.doesNotMatch(native, /\.mlf-build\/shared-ghc\/bin\/tuple-list\s*[|;]/,
     'Do not repeat the legacy TupleList run outside the exact wrapper oracle');
+  const crc = commandStep('tools/shared/test_direct_crc_successor.py');
+  assert.deepEqual(directArguments(crc), [
+    {evidence: '', argv: ['-B', 'tools/shared/test_crc_successor_entry.py']},
+    {evidence: '', argv: ['-O', '-B', 'tools/shared/test_crc_successor_entry.py']},
+    {evidence: '.mlf-build/crc-supervisor-controls/normal',
+      argv: ['-B', 'tools/shared/test_crc_process_supervisor.py']},
+    {evidence: '.mlf-build/crc-supervisor-controls/optimized',
+      argv: ['-O', '-B', 'tools/shared/test_crc_process_supervisor.py']},
+    {evidence: '', argv: ['-B', 'tools/shared/test_direct_crc_successor.py',
+      '--bin-dir', '.mlf-build/shared-ghc/bin',
+      '--build-receipt', '.mlf-build/shared-ghc/receipt.json',
+      '--output', '.mlf-build/direct-host-tests']},
+  ], 'Exactly five ordered direct calls with distinct normal/optimized evidence and the authenticated successor');
+  assert.doesNotMatch(native, /^\s*python3(?:\s+-B)?\s+tools\/shared\/test_direct\.py\b/m,
+    'The legacy direct entry must not bypass the bounded successor');
   const coverage = legs.map(leg => {
     const actual = [];
     for (const command of [...direct, ...o2Only]) {
@@ -197,6 +240,10 @@ const validate = text => {
       'Keep binary build, target, and independent-oracle evidence: ' + evidence);
   }
 
+  for (const path of ['.mlf-build/crc-supervisor-controls/', '.mlf-build/direct-host-tests/**/*.json',
+                      '.mlf-build/direct-host-tests/**/*.stdout', '.mlf-build/direct-host-tests/**/*.stderr']) {
+    assert.ok(upload.includes('            ' + path + '\n'), 'Preserve CRC cleanup and original suite evidence: ' + path);
+  }
   assert.ok(upload.includes('            .mlf-build/ghc-install-cleanup.json\n'),
     'Retain exact cleanup scope, validation and refusal receipts');
 
@@ -217,6 +264,26 @@ const validate = text => {
 
 validate(workflow);
 const controls = [
+  ["CRC calls merged without argv token loss","          python3 -B tools/shared/test_crc_successor_entry.py\n          python3 -O -B tools/shared/test_crc_successor_entry.py\n","          python3 -B tools/shared/test_crc_successor_entry.py -O -B tools/shared/test_crc_successor_entry.py\n"],
+  ["CRC call split without argv token loss","          python3 -B tools/shared/test_crc_successor_entry.py\n","          python3 -B\n          python3 tools/shared/test_crc_successor_entry.py\n"],
+  ["CRC evidence environment assigned to wrong call","          python3 -B tools/shared/test_crc_successor_entry.py\n          python3 -O -B tools/shared/test_crc_successor_entry.py\n          MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal python3 -B tools/shared/test_crc_process_supervisor.py\n","          MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal python3 -B tools/shared/test_crc_successor_entry.py\n          python3 -O -B tools/shared/test_crc_successor_entry.py\n          python3 -B tools/shared/test_crc_process_supervisor.py\n"],
+  ["CRC successor replaced by legacy bypass","python3 -B tools/shared/test_direct_crc_successor.py --bin-dir","python3 -B tools/shared/test_direct.py --bin-dir"],
+  ["CRC successor duplicated","          python3 -B tools/shared/test_direct_crc_successor.py --bin-dir","          python3 -B tools/shared/test_direct_crc_successor.py --bin-dir ignored\n          python3 -B tools/shared/test_direct_crc_successor.py --bin-dir"],
+  ["CRC old route inserted","          python3 -B tools/shared/test_direct_crc_successor.py --bin-dir","          python3 tools/shared/test_direct.py --bin-dir ignored\n          python3 -B tools/shared/test_direct_crc_successor.py --bin-dir"],
+  ["CRC normal entry controls omitted","          python3 -B tools/shared/test_crc_successor_entry.py\n",""],
+  ["CRC optimized entry controls omitted","          python3 -O -B tools/shared/test_crc_successor_entry.py\n",""],
+  ["CRC normal lifecycle controls omitted","          MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal python3 -B tools/shared/test_crc_process_supervisor.py\n",""],
+  ["CRC optimized lifecycle controls omitted","          MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/optimized python3 -O -B tools/shared/test_crc_process_supervisor.py\n",""],
+  ["CRC lifecycle optimization dropped","python3 -O -B tools/shared/test_crc_process_supervisor.py","python3 -B tools/shared/test_crc_process_supervisor.py"],
+  ["CRC evidence environment omitted","MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal ",""],
+  ["CRC evidence environment inactive","MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal ","OTHER_EVIDENCE=.mlf-build/crc-supervisor-controls/normal "],
+  ["CRC evidence directories collide","MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/optimized ","MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal "],
+  ["CRC successor producer differs","--build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/direct-host-tests","--build-receipt .mlf-build/wrong/receipt.json --output .mlf-build/direct-host-tests"],
+  ["CRC successor output differs","--output .mlf-build/direct-host-tests\n","--output .mlf-build/wrong-direct\n"],
+  ["CRC lifecycle evidence omitted","            .mlf-build/crc-supervisor-controls/\n",""],
+  ["CRC suite receipts omitted","            .mlf-build/direct-host-tests/**/*.json\n",""],
+  ["CRC suite stdout omitted","            .mlf-build/direct-host-tests/**/*.stdout\n",""],
+  ["CRC suite stderr omitted","            .mlf-build/direct-host-tests/**/*.stderr\n",""],
   ['generation compiler metadata omitted', '            .mlf-build/shared-ghc/ghc-info.txt\n', ''],
   ["producer diagnostic id omitted","        id: shared_build\n",""],
   ["generation failure condition relaxed","failure() && steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'default') || (matrix.optimization == '2' && matrix.suite == 'all'))","steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'default') || (matrix.optimization == '2' && matrix.suite == 'all'))"],
@@ -256,7 +323,7 @@ const controls = [
   ['default margin omitted by selector', "= '0:default'", "= '0:framework'"],
   ['O2 budget changed', "= '0:framework'", "= '2:all'"],
   ['all framework budgets changed', "if [ '${{ matrix.optimization }}:${{ matrix.suite }}' = '0:framework' ] || [ '${{ matrix.optimization }}:${{ matrix.suite }}' = '0:default' ]; then", 'if true; then'],
-  ['direct budget override', 'python3 tools/shared/test_direct.py --bin-dir', 'python3 tools/shared/test_direct.py --suite-timeout 5400 --bin-dir'],
+  ['direct budget override', 'python3 -B tools/shared/test_direct_crc_successor.py --bin-dir', 'python3 -B tools/shared/test_direct_crc_successor.py --suite-timeout 5400 --bin-dir'],
   ['Figure12 omitted', 'python3 tools/shared/test_figure12_direct.py', 'python3 tools/shared/omitted.py'],
   // Bind selector mutations to the named step, not the first unrelated O2 step.
   ['O2 guest omitted',
