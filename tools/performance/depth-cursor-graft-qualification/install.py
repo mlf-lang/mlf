@@ -7,10 +7,10 @@ SIZE=306812040
 def main():
     ci_only();parser=argparse.ArgumentParser();parser.add_argument('--root',required=True);args=parser.parse_args()
     root=P(args.root).resolve();need(not root.exists(),'fresh installation root required');root.mkdir()
-    art=root/'artifacts';art.mkdir();sup=Supervisor(art,300,280,phase='install');rec=dict(complete=False,errors=[],ci_identity=ci_identity(),official_url=URL,expected_sha256=SHA)
+    art=root/'artifacts';art.mkdir();sup=Supervisor(art,300,280,phase='install');rec=dict(complete=False,errors=[],ci_identity=ci_identity(),official_url=URL,expected_sha256=SHA,initial_disk_floor_bytes=12*1024**3)
     env=safe_env(root);prefix=root/'ghc';dist=root/'dist';dist.mkdir()
     try:
-        rec['resources']=resource_floor(root)
+        rec['resources']=resource_floor(root,disk_floor_GiB=12)
         archive=root/'ghc.tar.xz'
         sup.run('install-download',['curl','--fail','--location','--proto','=https','--tlsv1.2','--connect-timeout','20','--max-time','100','--retry','0','--output',archive,URL],root,105,env)
         need(archive.stat().st_size==SIZE and sha(archive,sup.check)==SHA,'official bindist identity failed')

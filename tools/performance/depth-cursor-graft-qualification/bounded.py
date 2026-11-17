@@ -35,12 +35,12 @@ def artifact_budget(root,limit=88*MIB):
         total+=s.st_size;count+=1
         need(total<=limit and count<=2048,'artifact cap exceeded')
     return total
-def resource_floor(root):
+def resource_floor(root,disk_floor_GiB=4):
     import shutil
     rows=dict((l.split(':')[0],l.split(':')[1].split()[0])for l in P('/proc/meminfo').read_text().splitlines())
-    result=dict(mem_available_KiB=int(rows['MemAvailable']),disk_bytes=shutil.disk_usage(root).free)
+    result=dict(mem_available_KiB=int(rows['MemAvailable']),disk_bytes=shutil.disk_usage(root).free,required_disk_bytes=disk_floor_GiB*1024**3)
     need(result['mem_available_KiB']>=4*1024**2,'CI less than4GiB available')
-    need(result['disk_bytes']>=4*1024**3,'CI less than4GiB free')
+    need(result['disk_bytes']>=disk_floor_GiB*1024**3,'CI disk below required phase floor')
     return result
 def limits(file_limit):
     resource.setrlimit(resource.RLIMIT_AS,(4*1024**3,)*2)
@@ -68,7 +68,7 @@ def cleanup(p):
 class Supervisor:
     def __init__(self,artifacts,whole,work,phase):
         need(phase in ['install','focused'],'unknown limit policy phase')
-        self.phase=phase;self.file_limit={'install':512*MIB,'focused':8*MIB}[phase]
+        self.phase=phase;self.file_limit={'install':1024*MIB,'focused':8*MIB}[phase]
         self.artifacts=artifacts;self.start=time.monotonic();self.whole=whole;self.work=work
         self.proc=None;self.records=[];self.clean=True;self.stopped=False
         self.oldterm=signal.getsignal(signal.SIGTERM);self.oldalarm=signal.getsignal(signal.SIGALRM)

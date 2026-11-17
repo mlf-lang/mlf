@@ -1,5 +1,5 @@
 {
-  "schema": "portable-depth-cursor-graft-ci-v2",
+  "schema": "portable-depth-cursor-graft-ci-v3",
   "files": [
     {
       "path": ".github/workflows/depth-cursor-graft-qualification.yml",
@@ -8,13 +8,13 @@
     },
     {
       "path": "tools/performance/depth-cursor-graft-qualification/README.md",
-      "bytes": 4649,
-      "sha256": "fb594439951c00682572d12d40842515fa7bfd290366e7fce284de0ce4ae1163"
+      "bytes": 6164,
+      "sha256": "c5ce093c5b50b063ce923bcfdb8abb2b79292528552a7623e966bb9770f9c470"
     },
     {
       "path": "tools/performance/depth-cursor-graft-qualification/bounded.py",
-      "bytes": 7398,
-      "sha256": "26c66ab88963faeaab2eacdc81508dff4c935e6cac5916e695ee5760e7449e4a"
+      "bytes": 7485,
+      "sha256": "f5d5bb6eefc6f5ac5c78a2a35e6269c98f4e65c195951677b7030f5dc5b89c75"
     },
     {
       "path": "tools/performance/depth-cursor-graft-qualification/contract.json",
@@ -103,13 +103,13 @@
     },
     {
       "path": "tools/performance/depth-cursor-graft-qualification/install.py",
-      "bytes": 2495,
-      "sha256": "18714353f799d8e057b87d815c419d2cd3cb01bc2f04672661ba69376c1fe7f9"
+      "bytes": 2549,
+      "sha256": "b56224676244f89c2220c240088c47570fe58471d5cc107eb5871d5131ee1520"
     },
     {
       "path": "tools/performance/depth-cursor-graft-qualification/qualify.py",
-      "bytes": 7874,
-      "sha256": "91441cdb0107897c7391311b80e91b598af7ba837ab501b677103f4acb3e0d00"
+      "bytes": 7875,
+      "sha256": "bf7fcdb750d2792cd827b918b051dfbcaa09423b95d358342c16efe438e64051"
     },
     {
       "path": "tools/performance/depth-cursor-graft-qualification/source-pins.json",
@@ -195,7 +195,7 @@
   "executed": false,
   "published": false,
   "production_changes": false,
-  "prior_v1_manifest_sha256": "156db3f3e8a0670207e251da866c27ae895ef41d464d0d71f4b1688033bd4b65",
+  "prior_v2_manifest_sha256": "744bed30df6bd3a11a65c0057241e3882041d423078702d051dd1d63dbc8d5cb",
   "changed_files": [
     "tools/performance/depth-cursor-graft-qualification/README.md",
     "tools/performance/depth-cursor-graft-qualification/bounded.py",
