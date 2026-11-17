@@ -1,0 +1,67 @@
+{
+  "actual_files": 144,
+  "archived_raw_pins": {
+    "events.tsv": {
+      "bytes": 805,
+      "sha256": "cce896f76a543488b3e3fd95b062b92011791e511fc9848c7027364f82d386ce"
+    },
+    "fixture-contract.json": {
+      "bytes": 6058,
+      "sha256": "7664e0c6ea3474ca62ba2cde4df457acf1528e4d10e317807c45dbb749cf597a"
+    },
+    "focused/Main.hs": {
+      "bytes": 9566,
+      "sha256": "a4f459c8e255a6275400bec8c405c95f7f9acd9e63c8fdab484b70453374c980"
+    },
+    "total.snapshot": {
+      "bytes": 844,
+      "sha256": "3701c19a4011e9e02a6a22d0c97246e79d95d33dda62591a403488259445ef93"
+    }
+  },
+  "baseline_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "baseline_graph_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+  "baseline_solver_sha256": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612",
+  "caps": {
+    "AS_GiB": 4,
+    "compile_seconds": 120,
+    "semantic_seconds": 15,
+    "whole_seconds": 180
+  },
+  "compiler_warnings": 17,
+  "events": 39,
+  "fixture_stderr_bytes": 0,
+  "fixture_stdout_bytes": 59,
+  "homes": 15,
+  "mismatch": {
+    "exact_error": "type constructor mismatch: TyCon \"New\" (*) versus TyCon \"Old\" (*)",
+    "first-order": "LEFT",
+    "full-call": "LEFT"
+  },
+  "native_qualified": false,
+  "optimization_qualified": false,
+  "original_backup_files": 148,
+  "performance_samples": 0,
+  "probe": {
+    "exact_error": "Probe",
+    "full-call": "PROBE",
+    "restore": "PROBE"
+  },
+  "production_qualified": false,
+  "qualified_total_control": true,
+  "review_manifest_sha256": "949d89ce64c20d609e072d94d5935964564d7102cb54897769192954b6846240",
+  "review_sha256": "832fe2fbfeaae4cb1e107cecd9d45ba034ddeedbb117a24ee26799c93349271e",
+  "sidecars": 50,
+  "source_manifest_sha256": "63949e7ed03a2fcd38f3d571774fcececd53bbfc0efc1ce3ccaa188bee15a797",
+  "source_review_sha256": "58669d85a0b5a55db36d39148ad6359e0f12181bd0d419c4408efc20fedfec46",
+  "source_v1": "Not executed; two pre-execution source-review defects preserved and corrected in v2.",
+  "status": "PASS_INDEPENDENT_ACTUAL_FINITE_INTERNAL_HOLE_DEMAND_CAPTURE_O2_ONLY",
+  "total_snapshot": {
+    "archived_copy": "total.snapshot",
+    "byte_equal": true,
+    "bytes": 844,
+    "full_call_sha256": "3701c19a4011e9e02a6a22d0c97246e79d95d33dda62591a403488259445ef93",
+    "scope": "Logical nodes/tags/binders/flags, aliases, next ID, structural-parent and binding-child indices; excludes ScopeIndex and physical IntMap shape.",
+    "staged_sha256": "3701c19a4011e9e02a6a22d0c97246e79d95d33dda62591a403488259445ef93"
+  },
+  "unchanged_baseline_homes": 14
+}

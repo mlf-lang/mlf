@@ -1,0 +1,291 @@
+{
+  "schema": "internal-hole-demand-v1",
+  "diagnostic_only": true,
+  "home_modules": [
+    "Bootstrap.Graph",
+    "Bootstrap.Graph.Solver",
+    "Bootstrap.IndexVec",
+    "Bootstrap.IntMap",
+    "Bootstrap.IntRank",
+    "Bootstrap.IntSet",
+    "Bootstrap.IntTree",
+    "Bootstrap.ST",
+    "Bootstrap.Std",
+    "Bootstrap.Types",
+    "MLF.Host.Async",
+    "MLF.Host.Base",
+    "MLF.Host.IO",
+    "MLF.Primitive",
+    "Main"
+  ],
+  "baseline_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "cases": [
+    "total",
+    "probe",
+    "mismatch"
+  ],
+  "phases": [
+    "prepare",
+    "expand",
+    "prefix",
+    "project",
+    "validate",
+    "first-order",
+    "canonicalize",
+    "rebind",
+    "post-validate",
+    "scope-check",
+    "restore",
+    "full-call",
+    "snapshot"
+  ],
+  "event_header": "case\tphase\toutcome\n",
+  "event_rows": 39,
+  "outcomes": [
+    "OK",
+    "LEFT",
+    "PROBE",
+    "OTHER",
+    "LEFT_TEXT_PROBE",
+    "LEFT_TEXT_OTHER",
+    "SKIP"
+  ],
+  "event_order": [
+    [
+      "total",
+      "prepare"
+    ],
+    [
+      "total",
+      "expand"
+    ],
+    [
+      "total",
+      "prefix"
+    ],
+    [
+      "total",
+      "project"
+    ],
+    [
+      "total",
+      "validate"
+    ],
+    [
+      "total",
+      "first-order"
+    ],
+    [
+      "total",
+      "canonicalize"
+    ],
+    [
+      "total",
+      "rebind"
+    ],
+    [
+      "total",
+      "post-validate"
+    ],
+    [
+      "total",
+      "scope-check"
+    ],
+    [
+      "total",
+      "restore"
+    ],
+    [
+      "total",
+      "full-call"
+    ],
+    [
+      "total",
+      "snapshot"
+    ],
+    [
+      "probe",
+      "prepare"
+    ],
+    [
+      "probe",
+      "expand"
+    ],
+    [
+      "probe",
+      "prefix"
+    ],
+    [
+      "probe",
+      "project"
+    ],
+    [
+      "probe",
+      "validate"
+    ],
+    [
+      "probe",
+      "first-order"
+    ],
+    [
+      "probe",
+      "canonicalize"
+    ],
+    [
+      "probe",
+      "rebind"
+    ],
+    [
+      "probe",
+      "post-validate"
+    ],
+    [
+      "probe",
+      "scope-check"
+    ],
+    [
+      "probe",
+      "restore"
+    ],
+    [
+      "probe",
+      "full-call"
+    ],
+    [
+      "probe",
+      "snapshot"
+    ],
+    [
+      "mismatch",
+      "prepare"
+    ],
+    [
+      "mismatch",
+      "expand"
+    ],
+    [
+      "mismatch",
+      "prefix"
+    ],
+    [
+      "mismatch",
+      "project"
+    ],
+    [
+      "mismatch",
+      "validate"
+    ],
+    [
+      "mismatch",
+      "first-order"
+    ],
+    [
+      "mismatch",
+      "canonicalize"
+    ],
+    [
+      "mismatch",
+      "rebind"
+    ],
+    [
+      "mismatch",
+      "post-validate"
+    ],
+    [
+      "mismatch",
+      "scope-check"
+    ],
+    [
+      "mismatch",
+      "restore"
+    ],
+    [
+      "mismatch",
+      "full-call"
+    ],
+    [
+      "mismatch",
+      "snapshot"
+    ]
+  ],
+  "files": [
+    "complete.txt",
+    "events.tsv",
+    "mismatch.canonicalize.error",
+    "mismatch.copies",
+    "mismatch.expand.error",
+    "mismatch.first-order.error",
+    "mismatch.full-call.error",
+    "mismatch.post-validate.error",
+    "mismatch.prefix.error",
+    "mismatch.prepare.error",
+    "mismatch.project.error",
+    "mismatch.rebind.error",
+    "mismatch.restore.error",
+    "mismatch.scope-check.error",
+    "mismatch.selected",
+    "mismatch.snapshot.error",
+    "mismatch.validate.error",
+    "probe.canonicalize.error",
+    "probe.copies",
+    "probe.expand.error",
+    "probe.first-order.error",
+    "probe.full-call.error",
+    "probe.post-validate.error",
+    "probe.prefix.error",
+    "probe.prepare.error",
+    "probe.project.error",
+    "probe.rebind.error",
+    "probe.restore.error",
+    "probe.scope-check.error",
+    "probe.selected",
+    "probe.snapshot.error",
+    "probe.validate.error",
+    "qualification.txt",
+    "total.canonicalize.error",
+    "total.copies",
+    "total.expand.error",
+    "total.first-order.error",
+    "total.full-call.error",
+    "total.full.snapshot",
+    "total.post-validate.error",
+    "total.prefix.error",
+    "total.prepare.error",
+    "total.project.error",
+    "total.rebind.error",
+    "total.restore.error",
+    "total.scope-check.error",
+    "total.selected",
+    "total.snapshot.error",
+    "total.staged.snapshot",
+    "total.validate.error"
+  ],
+  "file_count": 50,
+  "per_file_max_bytes": 65536,
+  "all_files_max_bytes": 3276800,
+  "stdout_literal": "COMPLETE internal-hole demand diagnostic; inspect outcomes\n",
+  "stderr_literal": "",
+  "complete_literal": "COMPLETE\n",
+  "qualification_literals": [
+    "QUALIFIED_TOTAL_CONTROL\n",
+    "UNQUALIFIED_TOTAL_CONTROL\n"
+  ],
+  "selected_literals": [
+    "node3-present\n",
+    "node3-absent\n",
+    "not_completed\n"
+  ],
+  "copies_grammar": "not_reached LF, or three lines: Haskell/Python-compatible list of signed-integer pairs (copies), list of signed-integer pairs (frontier), signed integer root. No assumed fresh-ID allocation order.",
+  "errors": "OK/SKIP have exactly empty error. LEFT preserves original rendered error text without added newline. PROBE/OTHER preserve displayException. LEFT_TEXT_PROBE/OTHER mean rendering the already-observed Left text threw: not attributed to graph stage. No errors are truncated.",
+  "skip_rule": "Within first 11 staged phases, after first non-OK all remaining are SKIP. full-call is an independent fresh prepare+original instantiateExpandedPrepared and is never SKIP. snapshot is always SKIP for probe/mismatch; total snapshot OK requires staged restore and full-call OK, otherwise SKIP or caught failure.",
+  "qualification_rule": "QUALIFIED_TOTAL_CONTROL iff total snapshot OK. This entails successful full staged chain, independent original call, and byte equality of their total graph/reverse-index snapshots. All other observations, including prepare/unify Probe or mismatch returning Right, are completed diagnostic outcomes, not invalid because hypothesis differs.",
+  "expected_probe_stage": null,
+  "expected_mismatch_error": null,
+  "not_qualified": [
+    "production",
+    "performance",
+    "native",
+    "cross-backend",
+    "direct-graft correctness"
+  ]
+}
