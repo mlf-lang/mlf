@@ -17,3 +17,8 @@ Preparation was static only. One metadata assertion initially confused original 
 
 ## V2 preparation record
 The initial v1 metadata assertion stopped after partial source copying. Before the separate-directory instruction arrived, a follow-up preparation completed v1 and documented the assertion failure. That completed v1 state remains preserved without further modification. V2 is a new copy with explicit independently checked overlay and module-renamed Graph identities; the sole module-declaration transformation was verified byte-for-byte. No source, contract, execution budget, harness or workflow changed from completed v1. This is preparation evidence, not execution success.
+
+## V3 bounded configure adjustment
+Solver CI run44121981308 stopped at install-configure after30.037724636 seconds under its30-second child bound. Stdout progressed normally through clang18 discovery, stderr was empty and owned cleanup succeeded. All11 original artifact files are retained; no focused compilation or target ran. The preceding successful Graph CI run44112484188 used the same pinned archive and required23.388921378 seconds for configure and85.048807562 seconds for make install.
+
+V3 changes only configure child allowance30 to60 seconds, reallocating capacity within the unchanged installer Supervisor300-second whole /280-second work limits. No other child limit, focused budget, source input, contract or retry policy changes. A timeout remains a failure, not an automatic retry. This package has not been executed during preparation. DELTA.diff remains the original selective graft-to-Solver difference; it is not a complete v3 reconstruction patch.

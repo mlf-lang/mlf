@@ -1,5 +1,5 @@
 {
-  "schema": "portable-depth-cursor-solver-ci-v2",
+  "schema": "portable-depth-cursor-solver-ci-v3",
   "files": [
     {
       "path": ".github/workflows/depth-cursor-solver-qualification.yml",
@@ -13,8 +13,8 @@
     },
     {
       "path": "tools/performance/depth-cursor-solver-qualification/README.md",
-      "bytes": 3514,
-      "sha256": "340101bf576113570d4de120800e8f20a189a645589394e8a042e99ed2206f8b"
+      "bytes": 4485,
+      "sha256": "2b4f85f74cb404900c23286f52f57a74ad849b27eb57cdd508bae8212b00b3fc"
     },
     {
       "path": "tools/performance/depth-cursor-solver-qualification/bounded.py",
@@ -114,7 +114,7 @@
     {
       "path": "tools/performance/depth-cursor-solver-qualification/install.py",
       "bytes": 2549,
-      "sha256": "b56224676244f89c2220c240088c47570fe58471d5cc107eb5871d5131ee1520"
+      "sha256": "910a6567593b3ff748eadd12cb2295b37add7fce0673ad73b4ab59d28f9c6a15"
     },
     {
       "path": "tools/performance/depth-cursor-solver-qualification/qualify.py",

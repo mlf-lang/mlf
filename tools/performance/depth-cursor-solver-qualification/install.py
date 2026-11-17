@@ -16,7 +16,7 @@ def main():
         need(archive.stat().st_size==SIZE and sha(archive,sup.check)==SHA,'official bindist identity failed')
         rec['archive_verified']=True
         sup.run('install-extract',['tar','-xJf',archive,'--strip-components=1','-C',dist],root,60,env)
-        sup.run('install-configure',['/bin/sh','./configure','--prefix='+str(prefix)],dist,30,env)
+        sup.run('install-configure',['/bin/sh','./configure','--prefix='+str(prefix)],dist,60,env)
         sup.run('install-make',['make','-j1','install'],dist,150,env)
         log,_=sup.run('install-version',[prefix/'bin/ghc','--numeric-version'],root,5,env)
         need(P(str(log)+'.stdout').read_bytes()==b'9.14.1\n','wrong GHC version')
