@@ -1,0 +1,53 @@
+{
+  "decision": "STOP_BEFORE_ORDINARY_SCREEN_COST_STRUCTURE_NOT_MEASURED_SLOWDOWN",
+  "finite_actual_pass": true,
+  "baseline": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "producer": {
+    "C_objects": 2,
+    "haskell_objects": 16,
+    "home_bytes": 502194,
+    "home_modules": 16,
+    "interfaces": 16,
+    "link_step": 17,
+    "optimization": "O2",
+    "ordinary_producer": false,
+    "runtime_files": 4,
+    "staged_files": 32
+  },
+  "binary": {
+    "bytes": 4182976,
+    "mode": "0o755",
+    "sha256": "9267a111348fbed040aca9b4fe5a4da2000953d0242ba2a85f0fb307aa637cbd"
+  },
+  "finite_results": {
+    "all_complete_A_C_bytes_equal": true,
+    "all_literal_expected_and_PASS_equal": true,
+    "empty_fresh_and_empty_stubs_in_projection": true,
+    "full_physical_records": 5,
+    "independent_finite_parser_hand_graphs": true,
+    "input_prepare_routes": [
+      "Dense",
+      "Dense",
+      "Sparse"
+    ],
+    "raw_control_only_original_helper": true,
+    "records": 14,
+    "sidecars": 56,
+    "stderr_bytes": 0,
+    "stdout_bytes": 68
+  },
+  "limits": [
+    "One fixed finite O2 run only; no O0 equivalence, real workload, ordinary compiler build or native qualification.",
+    "Generic raw helper unchanged; owned canonical invariant is restricted call discipline, not Haskell export encapsulation.",
+    "Projection fixture fresh=[]/stubs empty; no expanded-instantiation, fresh-survivor or nonempty hidden-stub coverage.",
+    "Finite physical renderer independent parsing is not a universal decoder or bottom/sharing proof.",
+    "No measured allocation, removal of machine descent or performance benefit follows.",
+    "External terminal was later than disk receipt/seal and independently shows release3; post lock proof used, no empty ps inference.",
+    "Authoritative prepost full inventory results retained; audit independently rehashed selected inputs and runtime only."
+  ],
+  "compiler_warnings": 18,
+  "fixture_stderr_bytes": 0,
+  "performance_samples": 0,
+  "native_AB": "PAUSED",
+  "actual_review_sha256": "47b795e025cd8474df080b5cec07975e2be70315dd568c3b536ea122b8a0a5a4"
+}

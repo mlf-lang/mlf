@@ -1,0 +1,104 @@
+--- a/libraries/mlf-inference/Bootstrap/Graph/Solver.hs
++++ b/libraries/mlf-inference/Bootstrap/Graph/Solver.hs
+@@ -7,6 +7,7 @@
+   import Bootstrap.Types;
+   import qualified Bootstrap.Std as L;
+   import qualified Bootstrap.IntMap as IM;
++  import qualified Bootstrap.IntTree as IT;
+   import qualified Bootstrap.IntSet as IS;
+   import qualified Bootstrap.IntRank as Rank;
+   import qualified Bootstrap.Graph as G;
+@@ -642,6 +643,75 @@
+                    connected
+              }
+     };
++  -- Internal owned traversal only: every reachable seen tree starts at IM.empty
++  -- and is rebuilt solely with IM.tip/link/node/wrap below. Its keys, prefixes,
++  -- counts and tree spine are total and canonical; Node payloads remain lazy.
++  -- This is not a replacement for generic raw IntMap lookup or insertion.
++  seekMissingTree :: Int -> IntMapTree Node -> Maybe (Node -> IntMapTree Node);
++  seekMissingTree key tree = case tree of {
++    IntMapNil -> Just (\value -> IM.tip key value);
++    IntMapTip previous old ->
++      if key == previous then Nothing
++      else Just (\value -> IM.link key (IM.tip key value) previous tree);
++    IntMapBin count prefix left right ->
++      if IT.nomatch key prefix
++      then Just (\value -> IM.link key (IM.tip key value) prefix tree)
++      else if IT.left key prefix
++      then case seekMissingTree key left of {
++        Nothing -> Nothing;
++        Just rebuild -> Just (\value -> IM.node prefix (rebuild value) right)
++      }
++      else case seekMissingTree key right of {
++        Nothing -> Nothing;
++        Just rebuild -> Just (\value -> IM.node prefix left (rebuild value))
++      }
++  };
++  seekMissing :: Int -> IntMap Node -> Maybe (Node -> IntMap Node);
++  seekMissing key (IntMap tree) = case seekMissingTree key tree of {
++    Nothing -> Nothing;
++    Just rebuild -> Just (\value -> IM.wrap (rebuild value))
++  };
++  -- The public/raw helper above is deliberately unchanged. Only this entry
++  -- creates the owned seen map; the worker precondition is not a raw-map API.
++  componentCanonicalNodesOwned :: Solver -> [] Int ->
++                                  Either String ((,) (IntMap Node) IntSet);
++  componentCanonicalNodesOwned solver pending =
++    componentCanonicalNodesOwnedVisit solver IM.empty IS.empty pending;
++  componentCanonicalNodesOwnedVisit :: Solver -> IntMap Node -> IntSet -> [] Int ->
++                                       Either String ((,) (IntMap Node) IntSet);
++  componentCanonicalNodesOwnedVisit solver seen scopes pending =
++    case pending of {
++      [] -> Right ((,) seen scopes);
++      (:) original rest ->
++        let { currentGraph = graph solver } in
++        let { n = original } in
++        case seekMissing n seen of {
++          Nothing -> componentCanonicalNodesOwnedVisit solver seen scopes rest;
++          Just rebuild ->
++            case IM.lookup n (G.nodes currentGraph) of {
++              Nothing -> Left ("missing graph node " ++ showInt n);
++              Just node ->
++                let { boundary = G.isGen (G.tag node) } in
++                let {
++                  connected =
++                    if boundary
++                    then rest
++                    else L.append (G.children (G.tag node))
++                           (L.append (L.maybeToList (G.binder node))
++                              (L.append
++                                 (IS.toList
++                                    (IM.findWithDefault IS.empty n (structuralParents solver)))
++                                 (L.append
++                                    (IS.toList
++                                       (IM.findWithDefault IS.empty n (bindingChildren solver)))
++                                    rest)))
++                } in
++                componentCanonicalNodesOwnedVisit solver (rebuild node)
++                  (if boundary then IS.insert n scopes else scopes)
++                  connected
++            }
++        }
++    };
+   componentVisit :: Solver -> IntSet -> [] Int -> Either String IntSet;
+   componentVisit solver seen pending =
+     G.bindE (componentScopesVisit solver seen IS.empty pending)
+@@ -973,7 +1043,7 @@
+   -- Original positions precede the fresh placeholder positions.
+   unifyDistinct equations solver =
+     G.bindE
+-      (componentCanonicalNodesVisit solver IM.empty IS.empty
++      (componentCanonicalNodesOwned solver
+          (L.map (G.resolve (graph solver)) (L.concatMap G.equationNodes equations)))
+       (\((,) connected boundaries) ->
+          let {
+@@ -2029,7 +2099,7 @@
+                                     ((,,) (Rank.MapIndex Node) (IntMap (Maybe Int)) (IntMap Int)));
+   preparedFallbackProjection solver current first fresh equations =
+     G.bindE
+-      (componentCanonicalNodesVisit solver IM.empty IS.empty
++      (componentCanonicalNodesOwned solver
+         (L.append (L.filter (\n -> n < first) (L.concatMap G.equationNodes equations))
+           (expandedOldSeeds first fresh)))
+       (\((,) connected boundaries) ->

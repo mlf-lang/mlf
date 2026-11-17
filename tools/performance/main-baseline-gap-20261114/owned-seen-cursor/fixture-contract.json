@@ -1,0 +1,151 @@
+{
+  "executed": false,
+  "full_physical_records": [
+    "component-contiguous",
+    "component-signed-gapped",
+    "component-wide-ids",
+    "unifyDistinct-success",
+    "preparedFallback-success"
+  ],
+  "gate": "A and C complete raw bytes equal; first line exact literal; .result PASS",
+  "performance_result": false,
+  "production_qualification": false,
+  "record_count": 14,
+  "records": [
+    {
+      "coverage": "complete physical seen/scopes and before/after solver",
+      "expected": "Right;keys=[0,1,2,3];scopes=[0];hand=True;snapshot=True;input-validation-route=Dense\n",
+      "label": "component-contiguous"
+    },
+    {
+      "coverage": "complete physical seen/scopes and before/after solver",
+      "expected": "Right;keys=[-7,-2,3,9];scopes=[-7];hand=True;snapshot=True;input-validation-route=Dense\n",
+      "label": "component-signed-gapped"
+    },
+    {
+      "coverage": "complete physical seen/scopes and before/after solver",
+      "expected": "Right;keys=[-1000,0,1000,9000];scopes=[-1000];hand=True;snapshot=True;input-validation-route=Sparse\n",
+      "label": "component-wide-ids"
+    },
+    {
+      "coverage": "empty owned entry; typed unused Solver poison",
+      "expected": "Right;keys=[];scopes=[]\n",
+      "label": "empty-does-not-demand-solver"
+    },
+    {
+      "coverage": "duplicate root; no Gen child/binder/indices/links/next demand",
+      "expected": "Right;keys=[0];scopes=[0]\n",
+      "label": "gen-boundary"
+    },
+    {
+      "coverage": "first missing node before later pending poison",
+      "expected": "Left missing graph node 99\n",
+      "label": "missing-before-poison"
+    },
+    {
+      "coverage": "leaf name/kind and links/next/scope remain unused",
+      "expected": "Right;keys=[0,1];scopes=[0]\n",
+      "label": "unused-node-payload"
+    },
+    {
+      "coverage": "canonical singleton payload poison; helper only",
+      "expected": "hit\n",
+      "label": "seek-hit-payload-lazy"
+    },
+    {
+      "coverage": "nil key stays unforced at Maybe constructor; demanded rebuild forces it",
+      "expected": "miss;Probe deferred-key\n",
+      "label": "seek-miss-deferred"
+    },
+    {
+      "coverage": "identical retained raw helper on malformed prefix and offpath/count/value poisons; not owned admission",
+      "expected": "Right\n",
+      "label": "raw-old-helper-only"
+    },
+    {
+      "coverage": "real caller site; complete solved solver and before/after snapshot, hand logical result",
+      "expected": "Right;hand=True;snapshot=True\n",
+      "label": "unifyDistinct-success"
+    },
+    {
+      "coverage": "real caller site missing endpoint",
+      "expected": "Left missing graph node 99\n",
+      "label": "unifyDistinct-missing"
+    },
+    {
+      "coverage": "real caller site; full tuple, unchanged G.unify/guards/restore, full physical snapshots",
+      "expected": "Right;hand=True;snapshot=True;local-unify=Right;restore=Right;final-hand=True\n",
+      "label": "preparedFallback-success"
+    },
+    {
+      "coverage": "real caller site missing before current/fresh poison",
+      "expected": "Left missing graph node 99\n",
+      "label": "preparedFallback-missing"
+    }
+  ],
+  "schema": "owned-seen-cursor-finite-v1",
+  "sidecar_count": 56,
+  "sidecars": [
+    "component-contiguous.A",
+    "component-contiguous.C",
+    "component-contiguous.expected",
+    "component-contiguous.result",
+    "component-signed-gapped.A",
+    "component-signed-gapped.C",
+    "component-signed-gapped.expected",
+    "component-signed-gapped.result",
+    "component-wide-ids.A",
+    "component-wide-ids.C",
+    "component-wide-ids.expected",
+    "component-wide-ids.result",
+    "empty-does-not-demand-solver.A",
+    "empty-does-not-demand-solver.C",
+    "empty-does-not-demand-solver.expected",
+    "empty-does-not-demand-solver.result",
+    "gen-boundary.A",
+    "gen-boundary.C",
+    "gen-boundary.expected",
+    "gen-boundary.result",
+    "missing-before-poison.A",
+    "missing-before-poison.C",
+    "missing-before-poison.expected",
+    "missing-before-poison.result",
+    "unused-node-payload.A",
+    "unused-node-payload.C",
+    "unused-node-payload.expected",
+    "unused-node-payload.result",
+    "seek-hit-payload-lazy.A",
+    "seek-hit-payload-lazy.C",
+    "seek-hit-payload-lazy.expected",
+    "seek-hit-payload-lazy.result",
+    "seek-miss-deferred.A",
+    "seek-miss-deferred.C",
+    "seek-miss-deferred.expected",
+    "seek-miss-deferred.result",
+    "raw-old-helper-only.A",
+    "raw-old-helper-only.C",
+    "raw-old-helper-only.expected",
+    "raw-old-helper-only.result",
+    "unifyDistinct-success.A",
+    "unifyDistinct-success.C",
+    "unifyDistinct-success.expected",
+    "unifyDistinct-success.result",
+    "unifyDistinct-missing.A",
+    "unifyDistinct-missing.C",
+    "unifyDistinct-missing.expected",
+    "unifyDistinct-missing.result",
+    "preparedFallback-success.A",
+    "preparedFallback-success.C",
+    "preparedFallback-success.expected",
+    "preparedFallback-success.result",
+    "preparedFallback-missing.A",
+    "preparedFallback-missing.C",
+    "preparedFallback-missing.expected",
+    "preparedFallback-missing.result"
+  ],
+  "stdout_bytes": 68,
+  "stdout_sha256": "f31a30af6021f82346ad1954fdcba2f7e678975747a888a2d24778e9b18c1429",
+  "stdout_utf8": "PASS 14 owned seen cursor finite cases; no production qualification\n",
+  "typed_probe_only": true,
+  "unknown_exceptions_fail_closed": true
+}

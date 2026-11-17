@@ -1,0 +1,182 @@
+{
+  "status": "STOP_ORDINARY_SCREEN_RECOMMENDATION_MACHINE_MECHANISM_CONFIRMED_NET_BENEFIT_UNPROVEN",
+  "machine_mechanism_confirmed": true,
+  "ordinary_screen_recommended": false,
+  "production_qualification": false,
+  "code_size": {
+    "A_text_section_bytes": 282026,
+    "C_text_section_bytes": 303834,
+    "delta_bytes": 21808,
+    "delta_percent": 7.732620396701013,
+    "old_generic_named_STT_sum": 7438,
+    "new_owned_worker_named_STT_sum": 7327,
+    "new_seek_named_STT_sum": 2559,
+    "new_entry_named_STT_size": 22,
+    "common_named_function_size_differences": [],
+    "old_missing_names": [],
+    "old_component_window": [
+      62320,
+      80210
+    ],
+    "old_component_window_byte_equal": true,
+    "limit": "ELF .text contains instructions, padding and GHC info tables. Named extents exclude some anonymous continuations. Renamed module strings and object file size are not treated as runtime code cost. Retaining the old public helper plus adding owned siblings explains duplicated functional families."
+  },
+  "business_edges": [
+    {
+      "label": "A-projection",
+      "at": "0x1be55",
+      "to": "0x131e0",
+      "bytes": "e98673ffff"
+    },
+    {
+      "label": "A-unify",
+      "at": "0x39ee5",
+      "to": "0x131e0",
+      "bytes": "e9f692fdff"
+    },
+    {
+      "label": "C-projection",
+      "at": "0x2f295",
+      "to": "0x2d900",
+      "bytes": "e966e6ffff"
+    },
+    {
+      "label": "C-unify",
+      "at": "0x3f415",
+      "to": "0x2d900",
+      "bytes": "e9e6e4feff"
+    },
+    {
+      "label": "C-worker",
+      "at": "0x2da13",
+      "to": "0x29458",
+      "bytes": "e940baffff"
+    },
+    {
+      "label": "C-special1",
+      "at": "0x2a9cb",
+      "to": "0x29458",
+      "bytes": "e988eaffff"
+    },
+    {
+      "label": "C-special2",
+      "at": "0x2b784",
+      "to": "0x29458",
+      "bytes": "e9cfdcffff"
+    },
+    {
+      "label": "C-special3",
+      "at": "0x2c84c",
+      "to": "0x29458",
+      "bytes": "e907ccffff"
+    }
+  ],
+  "observations": [
+    {
+      "finding": "Both real callers select the owned worker, not dead helper code",
+      "anchors": [
+        "C preparedFallbackProjection .text 0x2f295 -> 0x2d900",
+        "C unifyDistinct .text 0x3f415 -> 0x2d900",
+        "A corresponding 0x1be55/0x39ee5 -> old 0x131e0"
+      ],
+      "evidence": "Full named caller disassemblies plus independent E9 displacement decoding."
+    },
+    {
+      "finding": "Owned worker and its specialized variants call seekMissingTree",
+      "anchors": [
+        "0x2da13",
+        "0x2a9cb",
+        "0x2b784",
+        "0x2c84c"
+      ],
+      "target": "0x29458",
+      "evidence": "Exact machine branch bytes verified; seek generic recurses to its unboxed-key specialized worker 0x28df8."
+    },
+    {
+      "finding": "The extra Bin prefix test survives",
+      "anchors": [
+        "0x29578",
+        "0x28ea9"
+      ],
+      "relocation": "BootstrapziIntTree_zdwnomatch_info",
+      "limit": "It precedes direction selection on the Bin path, including eventual hits. A negative prefix can shorten misses. No instruction-time estimate."
+    },
+    {
+      "finding": "Miss reconstruction continuation and Just remain materialized",
+      "anchors": [
+        "0x2910b/0x29197",
+        "0x29813/0x2989f"
+      ],
+      "conditional_heap_bytes": 48,
+      "layout": "32-byte captured continuation (info plus three fields) and 16-byte Just for each traversed ancestor returning a child miss; returns Nothing bypass these stores.",
+      "limit": "Conditional object code allocation, not net allocation delta versus baseline and not live heap; the baseline still has its own insertion/rebuild allocations."
+    },
+    {
+      "finding": "Terminal miss is also allocated",
+      "nil_bytes": 32,
+      "tip_or_prefix_miss_bytes": 48,
+      "anchors": [
+        "nil 0x28e21/0x294b2",
+        "tip 0x28ef0/0x295f8; prefix 0x28f88/0x29690"
+      ],
+      "limit": "Tip hits undo the speculative 48-byte heap bump before returning static Nothing; do not count that as retained hit allocation."
+    },
+    {
+      "finding": "Tree rebuilding remains",
+      "anchors": [
+        "continuation target 0x28ca0 -> Bootstrap.IntMap.node_info",
+        "0x28d50 -> Bootstrap.IntMap.node_info",
+        "tip/prefix target helpers -> Bootstrap.IntMap.link_info"
+      ],
+      "limit": "No insertTree relocation appears in the captured new seek/owned family; old generic callback captures include insertTree. This corroborates one search removal, not disappearance of reconstruction. Public seek's map-wrapping sibling is not the hot direct worker target."
+    },
+    {
+      "finding": "Baseline is not allocation-free",
+      "anchors": [
+        "A .text 0x13728: 40-byte updateable insertion thunk; info relocation 0x1373a -> 0x12e70",
+        "A .text 0x12e9e -> Bootstrap.IntMap.insertTree_info",
+        "A .text 0x12eb8: 16-byte IntMap return wrapper"
+      ],
+      "limit": "The baseline recursive insertTree allocations have not been fully accounted for. Do not call C's 48-byte cursor/Just per miss ancestor net additional allocation or infer net regression."
+    }
+  ],
+  "decision": {
+    "recommendation": "STOP this variant before automatic ordinary compiler/screen.",
+    "reason": "The intended search fusion exists, but the hoped-for cheap cursor is a real per-level heap continuation/Maybe chain and hits retain extra prefix calls. Against only one saved logarithmic descent, these concrete costs do not justify automatically spending the next ordinary build/screen. This is an engineering prioritization judgment, not a proof of slowdown. No new candidate or rewrite is proposed. The baseline also has a visible insertion thunk and wrapper; no subtraction against zero is made.",
+    "performance_claim": "None; no target rerun, ordinary sample or net allocation measurement."
+  },
+  "capture_scope": {
+    "disassembly_commands": 26,
+    "version_commands": 1,
+    "metadata_batch_elapsed_ns_excluding_version": 127709268,
+    "limits": "Each metadata child AS 512 MiB, CPU 5 s; wall timeout 10 s for broad bounded windows or 3 s per exact range; stdout+stderr <= 1 MiB per command. No object/ELF entry execution, compiler or lease acquisition.",
+    "objects_hash_before_after_equal": true,
+    "complete_captured_regions": "Entire seek family including preceding continuation code; all four owned worker regions; old generic worker and callbacks; full named A/C business entry extents. Additional exact entry-point windows correct linear disassembly across GHC inline info-table data.",
+    "not_complete_accounting": "Not a whole-program code or full allocation ledger, and no Core was emitted/read."
+  },
+  "evidence_limitations": [
+    "Initial pure relocation listing exceeded its output budget; exact truncated original tool object is preserved as reader-3. Reader-4 narrowed it and completed, and reader-5 independently checked branch bytes and sizes.",
+    "Some broad objdump text decodes GHC inline info tables as instructions, producing (bad) and misleading nearest labels. No cost assertion relies on those bytes; precise-seek captures start at actual relocation/branch entry addresses.",
+    "Existing finite semantics were reviewed independently; this audit does not extend raw-map, fresh-survivor, native or complete partial-demand qualification."
+  ],
+  "objects": {
+    "A": {
+      "bytes": 612720,
+      "sha256": "3b93cfa801b5fda98db94f11eb82ddf4d4397260d6446034f2ceab0724e5f0ec"
+    },
+    "C": {
+      "bytes": 657576,
+      "sha256": "34ad798625ace3c86d457a8fc87b30b9eb4ca8a7f70b5432bfdf7837e30aadc0"
+    }
+  },
+  "code_review_sha256": "7f49018a99e401eac1c202a234babb026cbf51f3bacf7803240ae37365044ebf",
+  "profile_boundary": {
+    "source_profile_sha256": "dae47763eb1f2250c91dfd670385b36990460acc8e20af44b7b4f51567858d10",
+    "whole_self_ticks": 35691,
+    "lookup_self_ticks": 5354,
+    "rank_self_ticks": 1409,
+    "component_lookup_insert_node_self_ticks": 1800,
+    "component_allocated_profile_bytes": 991662896,
+    "not_removable_cost": true
+  }
+}
