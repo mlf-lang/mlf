@@ -166,7 +166,7 @@ class PR43SourceReconciliation(unittest.TestCase):
                           if current['maintenance'][p] != prior['maintenance'][p]}, {maintenance})
         self.assertEqual(current['maintenance'][maintenance][0], prior['maintenance'][maintenance][0])
         self.assertEqual(current['maintenance'][maintenance][1],
-                         hashlib.sha256((HISTORY / maintenance).read_bytes()).hexdigest())
+                         hashlib.sha256(performance_base_bytes('tools/performance/' + maintenance)).hexdigest())
         for path, row in prior['changes'].items():
             self.assertEqual(current['changes'][path][0], row[0])
             if path not in reviewed:
@@ -199,6 +199,55 @@ class PR43SourceReconciliation(unittest.TestCase):
             elif mutation == 'base': transition['predecessor'] = '0' * 40
             elif mutation == 'tree': transition['predecessor_tree'] = '0' * 40
             else: transition['predecessor_manifest_sha256'] = '0' * 64
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                module.validate_live_transition(bad, ROOT, c.core)
+
+    def test_performance_maintenance_preserves_both_historical_endpoints(self):
+        c = self.contract
+        spec = json.loads((c.directory / 'pr43-reconciliation-migration.json').read_bytes())
+        prior = base_spec()
+        name = 'patricia/test_adapters.py'
+        row = spec['performance_transition']['maintenance']
+        self.assertEqual(set(row), {name})
+        physical = performance_base_bytes('tools/performance/' + name)
+        live = (HISTORY / name).read_bytes()
+        old_sha = hashlib.sha256(physical).hexdigest()
+        new_sha = hashlib.sha256(live).hexdigest()
+        self.assertEqual(old_sha, prior['maintenance'][name][1])
+        self.assertEqual(row[name], [old_sha, new_sha])
+        self.assertNotEqual(old_sha, new_sha)
+        expected = copy.deepcopy(prior['maintenance'])
+        expected[name][1] = new_sha
+        self.assertEqual(spec['maintenance'], expected)
+        previous = (c.archived / 'tools/performance' / name).read_bytes()
+        self.assertEqual(c.restore_maintenance(live, name),
+                         c.previous.restore_maintenance(previous, name))
+        for wrong in (physical, previous, live + b' '):
+            with self.subTest(source=hashlib.sha256(wrong).hexdigest()), self.assertRaises(ValueError):
+                c.restore_maintenance(wrong, name)
+
+    def test_performance_maintenance_rejects_undeclared_or_discontinuous_edges(self):
+        c = self.contract
+        module = sys.modules[type(c).__module__]
+        spec = json.loads((c.directory / 'pr43-reconciliation-migration.json').read_bytes())
+        name = 'patricia/test_adapters.py'
+        for mutation in ('absent', 'missing', 'extra', 'wrong-path', 'old', 'new',
+                         'unchanged', 'malformed', 'historical-first', 'top-new',
+                         'other-maintenance', 'extra-field'):
+            bad = copy.deepcopy(spec)
+            edge = bad['performance_transition']['maintenance']
+            if mutation == 'absent': del bad['performance_transition']['maintenance']
+            elif mutation == 'missing': del edge[name]
+            elif mutation == 'extra': edge['patricia/run_integrated.py'] = edge[name][:]
+            elif mutation == 'wrong-path': edge['other'] = edge.pop(name)
+            elif mutation == 'old': edge[name][0] = '0' * 64
+            elif mutation == 'new': edge[name][1] = '0' * 64
+            elif mutation == 'unchanged': edge[name][1] = edge[name][0]
+            elif mutation == 'malformed': edge[name][1] = 'x' * 64
+            elif mutation == 'historical-first': bad['maintenance'][name][0] = '0' * 64
+            elif mutation == 'top-new': bad['maintenance'][name][1] = '0' * 64
+            elif mutation == 'other-maintenance': bad['maintenance']['other'] = ['0' * 64, '1' * 64]
+            else: bad['performance_transition']['extra'] = True
             with self.subTest(mutation=mutation), self.assertRaises(ValueError):
                 module.validate_live_transition(bad, ROOT, c.core)
 

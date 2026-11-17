@@ -13,7 +13,7 @@ PREDECESSOR = '4fd6730d35b6ecaf8e169ad228ac3c7a3ed56160'
 PREDECESSOR_TREE = '1c60d3daca5162bd24658d295169f601593345ef'
 PREDECESSOR_MANIFEST = '69bc6cc39ec70a0209a6011f4ce7fef0aaf5039d903fa1b8477ee4a2bc46dcd8'
 MANIFEST = 'pr43-reconciliation-migration.json'
-MANIFEST_SHA256 = '921e215d0d8aa21c4242896fc832c1b5d565fa7f17c7a0ca0496487c8c4ac736'
+MANIFEST_SHA256 = '82b9b045993ff9ac2d14a5b67dbfd35288004a79ae08303a1047f81de438d009'
 PREDECESSOR_IMPLEMENTATION = '7cacadad979f3db29da9067b5fe0ca8e1634d960dbf978ad6d5cae39ba338794'
 LIVE_PREDECESSOR = 'f9bdb40a659bfdff4cbb782d438afbb0417dd2e1'
 LIVE_PREDECESSOR_TREE = '3148203097e7622ced1b272e606bfa892fad746b'
@@ -23,6 +23,7 @@ LIVE_PREDECESSOR_SOURCE = 'eff291112f318206ce0f7ab85cb8a2e474be41489441204696630
 PERFORMANCE_BASE = 'fc300bc9fdc389b585cbef0630fc8915d53e89c5'
 PERFORMANCE_TREE = '386f0b41ab5f9b39fca273f3040f51d73df924a1'
 PERFORMANCE_BASE_MANIFEST = 'ebe5671476447cd4b256784e7d898ed6095c7c54cc9286c6869ca4909b2b708b'
+PERFORMANCE_MAINTENANCE_PATH = 'patricia/test_adapters.py'
 PERFORMANCE_PATHS = {
     'bootstrap/MLF/BuiltinPreludeData.hs',
     'bootstrap/MLF/Entry/Emlf.hs',
@@ -188,9 +189,26 @@ def validate_live_transition(spec, repository, core):
         previous = prior['changes'].get(path, [row[0], row[0]])
         require(previous[1] == row[0], 'performance predecessor endpoint ' + path)
         expected['changes'][path] = [previous[0], row[1]]
+    # This one live boundary test follows the performance source transition.
+    # Authenticate its physical intermediate endpoint, not just a mutable row.
+    maintenance = spec.get('performance_transition', {}).get('maintenance', {})
+    name = PERFORMANCE_MAINTENANCE_PATH
+    require(type(maintenance) is dict and set(maintenance) == {name},
+            'exact performance maintenance paths')
+    old = subprocess.check_output([*git, 'show', PERFORMANCE_BASE + ':tools/performance/' + name])
+    row = maintenance[name]
+    previous = prior['maintenance'][name]
+    require(len(old) <= core.MAX_SOURCE_BYTES and sha(old) == previous[1],
+            'performance predecessor maintenance source')
+    require(type(row) is list and len(row) == 2 and row[0] == sha(old) and
+            type(row[1]) is str and len(row[1]) == 64 and
+            all(c in '0123456789abcdef' for c in row[1]) and row[0] != row[1],
+            'performance maintenance transition')
+    expected['maintenance'] = {**prior['maintenance'], name: [previous[0], row[1]]}
     expected['performance_transition'] = {
         'predecessor': PERFORMANCE_BASE, 'predecessor_tree': PERFORMANCE_TREE,
         'predecessor_manifest_sha256': PERFORMANCE_BASE_MANIFEST, 'changes': changes,
+        'maintenance': maintenance,
     }
     require(spec == expected, 'only the declared performance endpoints may change')
 

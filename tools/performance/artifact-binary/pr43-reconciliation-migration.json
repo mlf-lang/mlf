@@ -217,7 +217,7 @@
   "maintenance": {
     "patricia/test_adapters.py": [
       "fe299bd576901e008a1a7473abab98377f66785c4ec239a50f7c139b553e834f",
-      "4bd92f590a69b2b0af6da401035c04d871cb14a044f8a76ae9c3be0be1d0e556"
+      "f85ece592184468fe2fcf68590939a8dd9d7586637311c4309ad5ba8992743cb"
     ]
   },
   "performance_transition": {
@@ -417,6 +417,12 @@
       "tools/shared/test_direct.py": [
         "138b387bbcff0f8bb717a3c7d7906337e9942d32f621ea963ca320d8d5ddd85e",
         "d5b7b4230d26bd59384ab39b26362d8f5f6b008a43530674aee2259cf7500517"
+      ]
+    },
+    "maintenance": {
+      "patricia/test_adapters.py": [
+        "4bd92f590a69b2b0af6da401035c04d871cb14a044f8a76ae9c3be0be1d0e556",
+        "f85ece592184468fe2fcf68590939a8dd9d7586637311c4309ad5ba8992743cb"
       ]
     },
     "predecessor": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
