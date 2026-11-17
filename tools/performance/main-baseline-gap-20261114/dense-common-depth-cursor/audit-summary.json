@@ -33,5 +33,35 @@
     "cross-workload/stable performance proof"
   ],
   "native_AB": "PAUSED",
-  "main_and_PR_unchanged": true
+  "main_and_PR_unchanged": true,
+  "new_boot_async": {
+    "status": "PASS_INDEPENDENT_NEW_BOOT_ASYNC_TWO_PAIR_SCREEN_ONLY",
+    "actual_review_pass": true,
+    "blockers": [],
+    "controller_steps": 10,
+    "semantic_executions": 8,
+    "exact_stdout": "Bool LF",
+    "semantic_stderr_bytes": 0,
+    "all_semantic_cwds_empty": true,
+    "runtime_libraries": 4,
+    "restored_pins_checked_before_after_by_controller": 929,
+    "independent_actual_recheck": "all output inventory and outer terminal; 25 inputs, two ELF and four runtime; no repeat of full 929 restored inventory",
+    "actual_output_files_including_inventory_and_seal": 36,
+    "actual_output_bytes": 334924,
+    "private_raw_checkpoint_files": 42,
+    "private_raw_checkpoint_bytes": 348737,
+    "private_library_full_readback": true,
+    "controller_cleanup": true,
+    "new_cooperative_locks_released_reacquired": 3,
+    "outer_lock_reacquire": 3,
+    "no_global_old_scope_termination_claim": true,
+    "wall_decision": "CONTINUE_SIGNAL_ONLY; mixed timing direction",
+    "current_qualification_exclusions": [
+      "O0 matrix",
+      "complete signed or sparse-dispatch qualification",
+      "full production Solver/error/demand coverage",
+      "cross-backend/native qualification",
+      "cross-workload/stable performance proof"
+    ]
+  }
 }

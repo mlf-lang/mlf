@@ -1,0 +1,105 @@
+{
+  "schema": "sanitized-new-boot-async-two-pair-screen-v1",
+  "baseline_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "endpoint": "ordinary GHC-built compiler --no-prelude --type AsyncWorkloadRoot",
+  "source_closure": {
+    "files": 9,
+    "bytes": 105297,
+    "root_sha256": "25b0ce3f3ce8ca272beb26e860a7f8f7340d0598ba500a2febbc37a316746774",
+    "builtin": "MLF.Primitive",
+    "executes_async_actions": false
+  },
+  "recovery": "Exact prior A/C ELF bytes restored; runtime four libraries byte-identical; no rebuild. All paired samples use the new machine only. Prior Foundation timing is historical and never pooled.",
+  "order": [
+    "C1",
+    "A1",
+    "A2",
+    "C2"
+  ],
+  "excluded_calls": [
+    "foundation-A",
+    "foundation-C",
+    "qual-A",
+    "qual-C"
+  ],
+  "samples": [
+    {
+      "name": "C1",
+      "wall_ns": 12612190850,
+      "rusage": {
+        "os_maxrss_KiB": 413028,
+        "scope": "exact waited direct child, not process-tree RSS",
+        "system_seconds": 0.43260899999999997,
+        "user_seconds": 12.153431
+      }
+    },
+    {
+      "name": "A1",
+      "wall_ns": 12519230173,
+      "rusage": {
+        "os_maxrss_KiB": 457136,
+        "scope": "exact waited direct child, not process-tree RSS",
+        "system_seconds": 0.643708,
+        "user_seconds": 11.861513
+      }
+    },
+    {
+      "name": "A2",
+      "wall_ns": 12624205359,
+      "rusage": {
+        "os_maxrss_KiB": 457136,
+        "scope": "exact waited direct child, not process-tree RSS",
+        "system_seconds": 0.548931,
+        "user_seconds": 12.090234
+      }
+    },
+    {
+      "name": "C2",
+      "wall_ns": 12003465056,
+      "rusage": {
+        "os_maxrss_KiB": 413028,
+        "scope": "exact waited direct child, not process-tree RSS",
+        "system_seconds": 0.45654599999999995,
+        "user_seconds": 11.556801
+      }
+    }
+  ],
+  "screen": {
+    "automatic_followup": false,
+    "decision": "CONTINUE_SIGNAL_ONLY",
+    "geomean_wall_ratio": 0.9787183833563652,
+    "pairs": [
+      {
+        "A": "A1",
+        "C": "C1",
+        "os_maxrss_ratio": 0.9035123026845403,
+        "wall_ratio": 1.0074254307745285
+      },
+      {
+        "A": "A2",
+        "C": "C2",
+        "os_maxrss_ratio": 0.9035123026845403,
+        "wall_ratio": 0.9508293563556882
+      }
+    ],
+    "performance_samples": 4,
+    "qualification_excluded": true,
+    "rss_scope": "wait4 direct-child OS maximum RSS, not tree RSS",
+    "same_cli_output": true,
+    "significance": false
+  },
+  "preregistered_gate": {
+    "each_wall_ratio_max": 1.03,
+    "geomean_wall_ratio_max": 1.0,
+    "each_os_maxrss_ratio_max": 1.05,
+    "otherwise": "STOP_NO_EXTRA_SAMPLES"
+  },
+  "limitations": [
+    "two descriptive pairs with mixed timing direction",
+    "no statistical or stable speedup claim",
+    "parent-observed wall includes polling and output-budget delay",
+    "RSS is direct waited child OS maximum, not allocation/retained heap/tree peak",
+    "checks Async source but does not execute asynchronous behavior",
+    "no native/cross-backend/complete production qualification"
+  ]
+}
