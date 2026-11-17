@@ -1,0 +1,60 @@
+name: Independent header and candidate O0 qualification
+on:
+  push:
+    branches: [codex/pr51-header-candidate-o0-qualification-20261117-run02]
+permissions:
+  contents: read
+concurrency:
+  group: independent-header-candidate-o0-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  narrow-o0:
+    name: Fixed-source O0 header and candidate only
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      GHC_ENVIRONMENT: '-'
+      MLF_TEST_BUILD_JOBS: '1'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare isolated evidence parent
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/codex/pr51-header-candidate-o0-qualification-20261117-run02
+          test ! -e .mlf-build/header-candidate-qualification
+          mkdir -p .mlf-build/header-candidate-qualification
+      - name: Pure and synthetic controls with strict outer owner
+        run: |
+          python3 -B tools/shared/qualification_stage.py --phase pure --output .mlf-build/header-candidate-qualification/controls --supervisor tools/shared/crc_process_supervisor.py -- python3 -B tools/shared/qualification_checks.py
+      - name: Install fixed official GHC with root-owned descendant supervision
+        run: |
+          sudo --preserve-env=RUNNER_TEMP,GITHUB_PATH,CI,GITHUB_SHA python3 -B tools/shared/qualification_stage.py --phase install --output .mlf-build/header-candidate-qualification/install --supervisor tools/shared/crc_process_supervisor.py -- /usr/bin/bash tools/shared/qualification_install.sh
+      - name: Fresh full O0 bootstrap producer
+        id: producer
+        run: |
+          python3 -B tools/shared/qualification_stage.py --phase build --output .mlf-build/header-candidate-qualification/build --supervisor tools/shared/crc_process_supervisor.py -- python3 -B tools/shared/build.py --bootstrap-only --optimization 0 --build-dir .mlf-build/shared-ghc
+      - name: Actual historical formatter and current header lanes
+        if: ${{ !cancelled() && steps.producer.outcome == 'success' }}
+        run: |
+          python3 -B tools/shared/qualification_stage.py --phase header --output .mlf-build/header-candidate-qualification/header-run --supervisor tools/shared/crc_process_supervisor.py -- python3 -B tools/shared/qualification_run.py header
+      - name: Actual full candidate-only managed target
+        if: ${{ !cancelled() && steps.producer.outcome == 'success' }}
+        run: |
+          python3 -B tools/shared/qualification_stage.py --phase candidate --output .mlf-build/header-candidate-qualification/candidate-run --supervisor tools/shared/crc_process_supervisor.py -- python3 -B tools/shared/qualification_run.py candidate
+      - name: Preserve actual producer targets and cleanup even on failure
+        if: always()
+        timeout-minutes: 5
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: header-candidate-o0-${{ github.sha }}-attempt-${{ github.run_attempt }}
+          path: |
+            .mlf-build/header-candidate-qualification
+            .mlf-build/shared-ghc
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
