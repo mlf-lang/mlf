@@ -1,0 +1,158 @@
+{
+  "schema": "parser23-descriptive-screen-draft-v1",
+  "status": "CONTINUE_SIGNAL_ONLY",
+  "semantic_calls": 6,
+  "metadata_calls": 2,
+  "paired_samples": 4,
+  "timing_order": [
+    "A1",
+    "C1",
+    "C2",
+    "A2"
+  ],
+  "pairs": [
+    {
+      "A": "A1",
+      "C": "C1",
+      "A_wall_ns": 47081033420,
+      "C_wall_ns": 46387380631,
+      "A_rss_KiB": 1311272,
+      "C_rss_KiB": 1305068,
+      "wall_ratio": "0.985266831702438021803303059272567683583356654",
+      "rss_ratio": "0.995268716177879189062223550872740362030150876",
+      "wall_percent_change": "-1.47331682975619781966969407274323164166433460"
+    },
+    {
+      "A": "A2",
+      "C": "C2",
+      "A_wall_ns": 47945652118,
+      "C_wall_ns": 46300146119,
+      "A_rss_KiB": 1311144,
+      "C_rss_KiB": 1305068,
+      "wall_ratio": "0.965679766020280370983523515832973240862574099",
+      "rss_ratio": "0.995365878957612588701164784341002971450885639",
+      "wall_percent_change": "-3.43202339797196290164764841670267591374259010"
+    }
+  ],
+  "geomean_wall_ratio": "0.975424135187331371677670157723037643739462282",
+  "geomean_wall_percent_change": "-2.45758648126686283223298422769623562605377180",
+  "preregistered_rule": {
+    "each_direct_child_rss_ratio_max": "1.05",
+    "each_wall_ratio_max": "1.03",
+    "geomean_wall_ratio_max": "1.00",
+    "otherwise": "STOP_NO_EXTRA_SAMPLES",
+    "pairs": [
+      [
+        "A1",
+        "C1"
+      ],
+      [
+        "A2",
+        "C2"
+      ]
+    ],
+    "timing_order": [
+      "A1",
+      "C1",
+      "C2",
+      "A2"
+    ]
+  },
+  "samples": [
+    {
+      "name": "qual-A",
+      "paired": false,
+      "wall_ns": 49362228204,
+      "peak_OS_RSS_KiB": 1311140,
+      "exit": 0,
+      "owned_group_cleanup": true,
+      "stdout": "Bool\n",
+      "stderr": "",
+      "cwd_files": []
+    },
+    {
+      "name": "qual-C",
+      "paired": false,
+      "wall_ns": 46691906208,
+      "peak_OS_RSS_KiB": 1305068,
+      "exit": 0,
+      "owned_group_cleanup": true,
+      "stdout": "Bool\n",
+      "stderr": "",
+      "cwd_files": []
+    },
+    {
+      "name": "A1",
+      "paired": true,
+      "wall_ns": 47081033420,
+      "peak_OS_RSS_KiB": 1311272,
+      "exit": 0,
+      "owned_group_cleanup": true,
+      "stdout": "Bool\n",
+      "stderr": "",
+      "cwd_files": []
+    },
+    {
+      "name": "C1",
+      "paired": true,
+      "wall_ns": 46387380631,
+      "peak_OS_RSS_KiB": 1305068,
+      "exit": 0,
+      "owned_group_cleanup": true,
+      "stdout": "Bool\n",
+      "stderr": "",
+      "cwd_files": []
+    },
+    {
+      "name": "C2",
+      "paired": true,
+      "wall_ns": 46300146119,
+      "peak_OS_RSS_KiB": 1305068,
+      "exit": 0,
+      "owned_group_cleanup": true,
+      "stdout": "Bool\n",
+      "stderr": "",
+      "cwd_files": []
+    },
+    {
+      "name": "A2",
+      "paired": true,
+      "wall_ns": 47945652118,
+      "peak_OS_RSS_KiB": 1311144,
+      "exit": 0,
+      "owned_group_cleanup": true,
+      "stdout": "Bool\n",
+      "stderr": "",
+      "cwd_files": []
+    }
+  ],
+  "workload": {
+    "imported_main_modules": 22,
+    "input_modules": 23,
+    "input_bytes": 422605,
+    "endpoint": "--no-prelude -i SOURCE --type ParserWorkloadRoot.hs",
+    "scope": "Parser import static checking, not parser execution or full frontend crate"
+  },
+  "identity": {
+    "producer_A": {
+      "bytes": 20192272,
+      "sha256": "4eab562e58373f5d6dccc8a5460d8d7b909571ee6e88ea91a110f53dc5c10c71"
+    },
+    "producer_C": {
+      "bytes": 20202784,
+      "sha256": "bd969f2ed33bcfe0be032c3e46208242a13de693ba5b5a3a3ffefc329975b05f"
+    },
+    "baseline": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+    "same_recovered_environment": true,
+    "no_historical_machine_pooling": true,
+    "no_build": true
+  },
+  "boundaries": [
+    "Two pairs only; no stable speedup, significance or production qualification.",
+    "Parent Popen-to-wait4 wall includes polling; direct-child peak OS RSS is not allocation, retained heap or tree RSS.",
+    "Cooperative locks and owned groups only, not whole-machine isolation.",
+    "Controller selected source/runtime/producer checks retained; independent output audit did not rescan external closure.",
+    "Local raw ZIP sealed/read back, not uploaded to Library."
+  ],
+  "solver_next": "17-home four-transaction O0/O2 gate pending actual terminal result; finalize before publication"
+}

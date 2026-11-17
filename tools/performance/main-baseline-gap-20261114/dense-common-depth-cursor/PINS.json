@@ -32,5 +32,52 @@
     "actual_review_sha256": "b06881b79c83b2f0c042a7d4470f53e72627c9b1b7919c6cc17a6d57204a2510",
     "admission_archive_sha256": "90f85af109b412c4bf310fb3f485d61b9fe4b59b4965f248533e27d5c73aee95",
     "raw_archive_sha256": "7d828487759ce45b6a6e4bb8b89b4a9c4e7af03e850aeac67090922aec86e9c3"
+  },
+  "parser23": {
+    "controller_sha256": "3d8885b2531ed3f9ca298416130d2e40c8f5fe3e41007c808c435a5e72640dd5",
+    "plan_sha256": "5c2485e961e6896821f73d2f1a18a302a23400149fc5b4d2eb10cc06547d52a5",
+    "actual_review_sha256": "a27905932d19f7d671f8278b6c988c4ffe6aa10fc34ef322953d4d4a3b68a7fd",
+    "receipt_sha256": "7e69cdc37fad54b07c5ec52167f87ab0a5cbe022ffbaa2ce66a2337527ea42b6",
+    "source_provenance_sha256": "618bfcbc0ebd243a0536b3f866e22cb3d37ef9bc3db0ce3a3c60af0b3d6c3a6d",
+    "local_raw_zip": {
+      "sha256": "6c4d69788843ee959efcf7a3821f0df80fc7796f054958bc5f26e1844b5b8e49",
+      "bytes": 216573,
+      "entries": 73,
+      "all_items_local_readback": true,
+      "Library_uploaded": false,
+      "status": "LOCAL_ONLY_NOT_LIBRARY"
+    },
+    "draft": true
+  },
+  "solver_finite_O0_O2": {
+    "status": "PASS_INDEPENDENT_ACTUAL_FINITE_SOLVER_CI_O0_O2_ONLY",
+    "commit": "a55a27d7262bf3ef46da1e3449be1bac9760a512",
+    "run_id": "44123639110",
+    "artifact_id": "14345868335",
+    "original_zip": {
+      "bytes": 5088367,
+      "sha256": "5e8086ba9f8ee3f3f9fe2d901b7c1930be381035646fed22c80007e0526062d8",
+      "entries": 193,
+      "uncompressed_bytes": 22354351,
+      "Library_uploaded": false
+    },
+    "actual_review_sha256": "e6c283b7bdd1a76a6a1fbf4ba6968d514da841503712c654b5e276da04dae643",
+    "review_manifest_sha256": "616cedfc86c3687cfc8f9d348a29095b8dbf678ab8e66bc9371f500535947f15",
+    "source_manifest_sha256": "3b9638045a96b331183f84755a9e334596da4e22e401919035429a2503fadbe3",
+    "source_pins_sha256": "f72869ca4b1bd8b3c16b834cb922a36c942afcf6524e83e48d0a1dace2d1e478",
+    "source_inputs": 33,
+    "homes_each": 17,
+    "cases_each": 4,
+    "sidecars_each": 32,
+    "finite_only": true,
+    "performance_evidence": false,
+    "prior_configure_timeout_preserved": true
+  },
+  "next_decision": {
+    "experimental_testing_only": true,
+    "Foundation15_whole_crate_A_reference_then_C_qualification": "NOT_STARTED",
+    "timing": false,
+    "merge": false,
+    "native": false
   }
 }
