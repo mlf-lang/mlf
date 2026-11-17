@@ -1573,7 +1573,7 @@ module Bootstrap.Graph where {
                                                                                originals)
                                                                             (\marked ->
                                                                                ST.bindE
-                                                                                 (densePlaceEntries
+                                                                                 (densePlaceEntriesOwned
                                                                                     state
                                                                                     remaining)
                                                                                  (\placed ->
@@ -1719,6 +1719,119 @@ module Bootstrap.Graph where {
                Nothing -> ST.failE "binders have no common ancestor";
                Just b -> ST.pureE b
              })
+    };
+  -- Private owned-state entry: every input has completed placement.
+  denseCommonPlaced :: forall s. DenseRebinding s -> Int -> Int -> ST s (Either String Int);
+  denseCommonPlaced state a b =
+    if (a == b) then ST.pureE a
+    else case state of {
+      DenseRebinding old skeleton low high oldNodes newNodes images classes flags parents tree depths colours grafted oldBinders raised ->
+        stBind (readDense low depths a)
+          (\da -> stBind (readDense low depths b)
+            (\db -> denseCommonDepthCursor state a b da db))
+    };
+  denseCommonDepthCursor :: forall s. DenseRebinding s -> Int -> Int -> Int -> Int -> ST s (Either String Int);
+  denseCommonDepthCursor state a b da db =
+    if (a == b) then ST.pureE a
+    else if (db < da)
+    then ST.bindE (denseParent state a)
+           (\p -> denseCommonDepthCursor state p b (da - 1) db)
+    else if (da < db)
+    then ST.bindE (denseParent state b)
+           (\q -> denseCommonDepthCursor state a q da (db - 1))
+    else ST.bindE (denseParent state a)
+           (\p -> ST.bindE (denseParent state b)
+             (\q -> denseCommonDepthCursor state p q (da - 1) (db - 1)));
+  denseCommonManyPlaced :: forall s. DenseRebinding s -> [] Int -> ST s (Either String (Maybe Int));
+  denseCommonManyPlaced state candidates =
+    case candidates of {
+      [] -> ST.pureE Nothing;
+      (:) first rest ->
+        ST.bindE (denseCommonFoldPlaced state first rest) (\parent -> ST.pureE (Just parent))
+    };
+  denseCommonFoldPlaced :: forall s. DenseRebinding s -> Int -> [] Int -> ST s (Either String Int);
+  denseCommonFoldPlaced state initial values =
+    case values of {
+      [] -> ST.pureE initial;
+      (:) value rest ->
+        ST.bindE (denseCommonPlaced state initial value) (\next -> denseCommonFoldPlaced state next rest)
+    };
+  densePlaceOwned :: forall s. DenseRebinding s -> Int -> ST s (Either String ());
+  densePlaceOwned state n =
+    case state of {
+      DenseRebinding old skeleton low high oldNodes newNodes images classes flags parents tree depths colours grafted oldBinders raised ->
+        stBind (readDense low colours n)
+          (\colour ->
+             if (colour == 1)
+             then ST.failE "cyclic structure/binding dependencies"
+             else if (colour == 2)
+                  then ST.pureE ()
+                  else stBind (writeDenseInt low colours n 1)
+                         (\active ->
+                            stBind (readDense low grafted n)
+                              (\graft ->
+                                 stBind (readDense low parents n)
+                                   (\ps ->
+                                      stBind (readDense low classes n)
+                                        (\members ->
+                                           stBind (denseCandidates state members)
+                                             (\originals ->
+                                                let {
+                                                  candidates =
+                                                    L.append originals
+                                                      (if (graft == 0) then [] else ps)
+                                                } in
+                                                ST.bindE (densePlacesOwned state candidates)
+                                                  (\placedCandidates ->
+                                                     ST.bindE (densePlacesOwned state ps)
+                                                       (\placedParents ->
+                                                          ST.bindE
+                                                            (denseCommonManyPlaced state candidates)
+                                                            (\parent ->
+                                                               stBind
+                                                                 (case parent of {
+                                                                    Nothing -> stReturn 0;
+                                                                    Just p ->
+                                                                      stBind
+                                                                        (readDense low depths p)
+                                                                        (\depth ->
+                                                                           stReturn (depth + 1))
+                                                                  })
+                                                                 (\depth ->
+                                                                    stBind
+                                                                      (writeDense low tree n parent)
+                                                                      (\bound ->
+                                                                         stBind
+                                                                           (writeDenseInt low depths
+                                                                              n
+                                                                              depth)
+                                                                           (\measured ->
+                                                                              stBind
+                                                                                (writeDenseInt low
+                                                                                   colours
+                                                                                   n
+                                                                                   2)
+                                                                                (\complete ->
+                                                                                   ST.pureE
+                                                                                     ())))))))))))))
+    };
+  densePlaceEntriesOwned :: forall s. DenseRebinding s ->
+                                 [] ((,) Int Node) -> ST s (Either String ());
+  densePlaceEntriesOwned state values =
+    case values of {
+      [] -> ST.pureE ();
+      (:) entry rest ->
+        ST.bindE
+          (case entry of {
+             (,) n v -> densePlaceOwned state n
+           })
+          (\ignored -> densePlaceEntriesOwned state rest)
+    };
+  densePlacesOwned :: forall s. DenseRebinding s -> [] Int -> ST s (Either String ());
+  densePlacesOwned state values =
+    case values of {
+      [] -> ST.pureE ();
+      (:) entry rest -> ST.bindE (densePlaceOwned state entry) (\ignored -> densePlacesOwned state rest)
     };
   denseCommon :: forall s. DenseRebinding s -> Int -> Int -> ST s (Either String Int);
   denseCommon state a b =
