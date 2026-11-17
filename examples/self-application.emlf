@@ -1,1 +1,0 @@
-\(f : forall a. a -> a) -> f f

@@ -1,0 +1,59 @@
+{
+  "status": "UNTESTED_PREPARATION_ONLY",
+  "base_commit": "db7edc6900ee70aba6c65d5eb4db69029a0c7b82",
+  "source_files_identical_at_previous_commit": "c9a8da4d5ab66cb8364adf884e42ff8644c92257",
+  "candidate_source_bytes": 104573,
+  "files": [
+    {
+      "path": "tools/performance/patricia/frozen_file_oracles.py",
+      "bytes": 5868,
+      "sha": "98dfafc97cb3a7ceec417a05c9aa5aa417d190d3"
+    },
+    {
+      "path": "tools/performance/patricia/open_file_comparison.py",
+      "bytes": 37922,
+      "sha": "fc54f53211cf27f459d35f2e8c84916b08e464a6"
+    },
+    {
+      "path": "tools/performance/patricia/test_open_file_comparison.py",
+      "bytes": 37114,
+      "sha": "babf745aecfb653ac18d2d2c3b45c8bc51878c6b"
+    },
+    {
+      "path": "tools/performance/patricia/run_open_file_controls.py",
+      "bytes": 23669,
+      "sha": "0f033e24130356c702793c93ae446a75919b1897"
+    },
+    {
+      "path": "docs/internal-preparation-extra-v12-test.txt",
+      "bytes": 3057,
+      "sha": "7b0c8074062035b9caa191324edd85e371eec7b4"
+    }
+  ],
+  "historical_oracle": {
+    "commit": "8c4556416023ac727e3fb2294070358a3dae8d9e",
+    "tree": "c20bd3d8e0cdd7e319dfca77ea0b86cfbf77554d",
+    "sha256": {
+      "artifact_binary_reference.py": "de312e3415eba178b649d30b6fa2b113fc864455de16603a5902af034d036422",
+      "artifact_binary_typed.py": "b703af43e334733c9ccb49f2a4e5a63a615f6bd065c8c464bdd3841ed54e369d",
+      "artifact_structure_contract.json": "20f1df71bc2fc1ebe01247dc986b01029b3e8e0c4a89f7dcc8cc517f756cf5a1"
+    }
+  },
+  "fixed_registry_provenance": {
+    "primitive_abi": "mlf-primitive-137-v12",
+    "introduced_commit": "d8325d909c249fd82d4ad6173d44d8818cc6f8bf",
+    "parent_commit": "63fbd13d253a3f1a54170311dcbe076f1d0718f4",
+    "registry_git_blob": "ff57ced14bc134f072422fb83c8e49576be1ed90"
+  },
+  "scope": [
+    "Retain the original 0..131 independent reader and historical dependency-only 0..133 layer, including its 134 refusal control.",
+    "Add a separate dependency-only 133-to-136 layer with exact complete inverse restoration and fixed bidirectional primitive identity checks.",
+    "Own artifacts and linked terms remain on the original 0..131 reader.",
+    "ABI identifier records source provenance, not a wire-field check."
+  ],
+  "validation": {
+    "candidate_sources": "Static review only. Not imported, executed, or tested; no passing CI/native-control claim.",
+    "extra_test_text": "Separate unexecuted, not-yet-applied test method. Must be integrated and reviewed before actual execution.",
+    "prior_diagnostic": "Actual dependency decoding diagnosed an outdated independent boundary; it did not establish complete file-control success."
+  }
+}

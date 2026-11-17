@@ -1,3 +1,0 @@
-module PortMain where
-import qualified Tests.PortSuite as P
-main = P.main

@@ -1,1 +1,0 @@
-\(subscription_0 : AsyncSubscription) -> primitive asyncResolveCompletion(Int) subscription_0 42

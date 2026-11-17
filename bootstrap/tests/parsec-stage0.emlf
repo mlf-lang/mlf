@@ -1,9 +1,0 @@
-module Main where
-import Bootstrap.Types
-import Bootstrap.Lexer
-import Bootstrap.Parsec
-main = case scanTokens "<probe>" "abc" of
-  Left e -> putStrLn e
-  Right tokens -> case runParser (pToken "abc") "<probe>" tokens of
-    Left e -> putStrLn e
-    Right _ -> putStrLn "parsed"

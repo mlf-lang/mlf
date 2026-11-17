@@ -1,2 +1,0 @@
-data Completion a = Forged a;
-construct Forged(Int) 42

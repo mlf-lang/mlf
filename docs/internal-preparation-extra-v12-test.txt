@@ -1,0 +1,48 @@
+    def test_complete_synthetic_136_dependency_closure_and_association(self):
+        # Synthetic native-helper preconditions only, not a native admission
+        # claim. Exercise the entire comparator in both retained wire families.
+        dep_fields = list(C.fields(C.decoded(self.dependency(
+            [('MLF.Primitive', [self.entity(136)])]), 3), 242, 13))
+        dep_fields[0] = S('primitive-dependency')
+        dep_fields[2] = L([S('MLF.Primitive')])
+        dep_fields[8] = L([])  # No duplicate ownership of the root's Box type.
+        dep_fields[9] = L([])  # No duplicate ownership of main/unused bindings.
+        dep_fields[10] = S('')
+        dep = N(242, *dep_fields)
+        dependency_bytes = C.tree_document([dep], 3)
+        C.current_dependency_decoded(dependency_bytes)
+        with self.assertRaisesRegex(C.Invalid, 'closed primitive ABI'):
+            C.dependency_decoded(dependency_bytes)
+        for schema in (7, 8):
+            data = fixture(schema)
+            root_fields = list(C.fields(C.decoded(data['closed_files']['.mlfci'], 3), 242, 13))
+            root_fields[1] = L([N(3, S('primitive-dependency'),
+                                     S('synthetic-dependency-receipt'), S('synthetic-source-identity'))])
+            root = N(242, *root_fields)
+            closed = list(C.fields(C.decoded(data['closed_files']['.mlfco'], 4), 243, 3))
+            closed[1] = root
+            data['closed_files'] = {'.mlfci': C.tree_document([root], 3),
+                                    '.mlfco': C.tree_document([N(243, *closed)], 4)}
+            _, package = fixture_package(data['open_files']['.mlfco'])
+            package_fields = list(C.fields(package, 430, 6))
+            package_fields[2] = S(C.pack([C.interface_association(root), C.interface_association(dep)]))
+            data['open_files'] = refresh(N(430, *package_fields), root, schema=schema)
+            data['audited_open_files'] = dict(data['open_files'])
+            data['dependency_interfaces'] = [dependency_bytes]
+            result = C.compare_open_file(**data)
+            self.assertEqual(result['open_wire_schema'], schema)
+            self.assertEqual(result['fragment_count'], 2)
+            self.assertTrue(result['interface_content_exact'])
+            self.assertTrue(result['all_original_fragment_bodies_exact'])
+            self.assertTrue(result['audited_rebuild_original_bytes_equal'])
+            missing = copy.deepcopy(data)
+            missing['dependency_interfaces'] = []
+            with self.assertRaisesRegex(C.ComparisonError, 'missing complete dependency'):
+                C.compare_open_file(**missing)
+            stale = copy.deepcopy(data)
+            package_fields[2] = S(C.pack([C.interface_association(root)]))
+            stale['open_files'] = refresh(N(430, *package_fields), root, schema=schema)
+            stale['audited_open_files'] = dict(stale['open_files'])
+            with self.assertRaisesRegex(C.ComparisonError, 'complete interface association mismatch'):
+                C.compare_open_file(**stale)
+

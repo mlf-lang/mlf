@@ -1,5 +1,0 @@
-module Main where
-import qualified MLF.Tests.Async.TaskWaitGraph as Entry
-import MLF.Host.IO (runEntry)
-main :: IO ()
-main = runEntry Entry.main

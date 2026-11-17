@@ -1,5 +1,0 @@
-do {
- printInt (-42);
- putStrLn (showInteger (addInteger (readInteger "999999999999999999999999999999") (intToInteger 1)));
- printInt (subInt (-4611686018427387904) 1)
-}

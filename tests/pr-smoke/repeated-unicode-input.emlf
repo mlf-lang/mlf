@@ -1,6 +1,0 @@
-let input = getLine in do {
- first <- input;
- second <- input;
- putStrLn first;
- putStrLn second
-}

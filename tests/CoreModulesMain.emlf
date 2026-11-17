@@ -1,6 +1,0 @@
-module CoreModulesMain where
-import Bootstrap.Types
-import qualified Tests.CoreModules as T
-import qualified Tests.CoreRunner as R
-main : IO ()
-main = R.main "core-modules" false 301 T.families

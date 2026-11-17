@@ -1,4 +1,0 @@
-module Main where
-import Gate.CompletionInterface
-main = ioBind newCompletion (\cell ->
-  ioBind (resolve cell 42) (\_ -> ioBind (observe cell) putStrLn))

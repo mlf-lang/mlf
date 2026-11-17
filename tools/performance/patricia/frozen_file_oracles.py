@@ -83,3 +83,46 @@ def dependency_oracle(directory, reference, original_sha):
         else:
             sys.modules['artifact_binary_reference'] = previous
     return destination, module
+
+
+def dependency_v12_bytes(original, legacy, original_sha):
+    """Authenticate both historical layers before one explicit ABI-v12 edge."""
+    original = verify(original, original_sha, 'artifact_binary_typed.py')
+    old = b"if typ=='PrimitiveCode': require(0 <= node.data <= 131, 'closed primitive ABI')"
+    middle = old.replace(b'<= 131', b'<= 133')
+    current = old.replace(b'<= 131', b'<= 136')
+    if original.count(old) != 1:
+        raise ValueError('one frozen dependency primitive-bound anchor')
+    if len(legacy) > 1024 * 1024 or legacy != original.replace(old, middle):
+        raise ValueError('complete historical 133 dependency adapter identity')
+    if legacy.count(middle) != 1 or legacy.replace(middle, old) != original:
+        raise ValueError('complete 133-to-131 dependency inverse')
+    adapted = legacy.replace(middle, current)
+    if adapted.count(current) != 1 or adapted.replace(current, middle) != legacy:
+        raise ValueError('complete 136-to-133 dependency inverse')
+    if adapted.replace(current, middle).replace(middle, old) != original:
+        raise ValueError('complete two-edge dependency inverse')
+    return adapted
+
+
+def dependency_v12_oracle(directory, reference, original_sha, legacy_path):
+    """A separate dependency-only reader; never replace the retained 133 layer."""
+    if legacy_path != directory / 'artifact_binary_typed_declid_dependencies.py':
+        raise ValueError('historical dependency adapter path')
+    original = (directory / 'artifact_binary_typed.py').read_bytes()
+    adapted = dependency_v12_bytes(original, legacy_path.read_bytes(), original_sha)
+    destination = directory / 'artifact_binary_typed_v12_dependencies.py'
+    destination.write_bytes(adapted)
+    name = '_c4_v12_dependency_oracle'
+    spec = importlib.util.spec_from_file_location(name, destination)
+    module = importlib.util.module_from_spec(spec)
+    previous = sys.modules.get('artifact_binary_reference')
+    try:
+        sys.modules['artifact_binary_reference'] = reference
+        spec.loader.exec_module(module)
+    finally:
+        if previous is None:
+            sys.modules.pop('artifact_binary_reference', None)
+        else:
+            sys.modules['artifact_binary_reference'] = previous
+    return destination, module

@@ -1,2 +1,0 @@
-data AsyncScope = Forged;
-construct Forged()

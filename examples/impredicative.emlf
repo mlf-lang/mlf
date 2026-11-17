@@ -1,3 +1,0 @@
-let id = \x -> x in
-let use = \(f : forall a. a -> a) -> f f in
-use id

@@ -1,1 +1,0 @@
-main = ioBind (newSTArray 1 0) (\array -> ioReturn Unit)

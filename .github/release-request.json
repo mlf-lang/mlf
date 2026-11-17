@@ -1,9 +1,0 @@
-{
-  "version": "0.3.0",
-  "attempt": 2,
-  "platforms": [
-    "linux-x64",
-    "macos-arm64",
-    "windows-x64"
-  ]
-}

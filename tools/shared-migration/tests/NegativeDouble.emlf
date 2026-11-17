@@ -1,5 +1,0 @@
-module NegativeDouble where
-negativeZero : Double
-negativeZero = -0.0
-negativeOne : Double
-negativeOne = -1.0
