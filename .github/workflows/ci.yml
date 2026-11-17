@@ -204,7 +204,9 @@ jobs:
         if: matrix.optimization == '2'
         run: |
           set -euo pipefail
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/map-balance-guard python3 -B tools/performance/patricia/run_integrated.py --suite map-balance --producer .mlf-build/shared-ghc --output .mlf-build/map-balance-controls
+          MAP_POLICY_SOURCE="$PWD" python3 -B tools/performance/map-policy/test_prepare_map_policy.py
+          MAP_POLICY_SOURCE="$PWD" python3 -O -B tools/performance/map-policy/test_prepare_map_policy.py
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/map-balance-guard python3 -B tools/performance/map-policy/run_controls.py --source "$PWD" --producer .mlf-build/shared-ghc --output .mlf-build/map-balance-controls
       - name: Check generated graph validation boundary
         if: matrix.optimization == '2'
         run: |
@@ -427,6 +429,9 @@ jobs:
             .mlf-build/map-balance-controls/**/stdout
             .mlf-build/map-balance-controls/**/stderr
             .mlf-build/map-balance-controls/**/*.hs
+            .mlf-build/map-balance-controls/**/*.c
+            .mlf-build/map-balance-controls/**/*.h
+            .mlf-build/map-balance-controls/**/*.d
             .mlf-build/map-balance-guard/
             .mlf-build/map-balance-controls/**/*.json
             .mlf-build/patricia-*/**/*.json

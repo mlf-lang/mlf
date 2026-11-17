@@ -138,7 +138,7 @@ const validate = text => {
     'tools/performance/patricia/run_integrated.py --suite p123',
     'tools/performance/patricia/run_integrated.py --suite graph',
     'tools/performance/patricia/run_fingerprint.py',
-    'tools/performance/patricia/run_integrated.py --suite map-balance',
+    'tools/performance/map-policy/run_controls.py',
     'tools/performance/patricia/run_integrated.py --suite validation',
     'tools/performance/patricia/run_integrated.py --suite builtin',
     'tools/performance/patricia/run_file_controls.py',
@@ -152,6 +152,27 @@ const validate = text => {
     assert.equal(lines.length, 1, `One guarded command for ${command}`);
     assert.match(lines[0], /resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 /);
   }
+  const mapPolicy = commandStep('tools/performance/map-policy/run_controls.py');
+  assert.match(mapPolicy, /^        if: matrix.optimization == '2'$/m);
+  assert.doesNotMatch(native, /tools\/performance\/patricia\/run_integrated\.py --suite map-balance/,
+    'No obsolete shape-equality route alongside the explicit historical/current successor');
+  const mapTest = 'tools/performance/map-policy/test_prepare_map_policy.py';
+  const mapRun = 'tools/performance/map-policy/run_controls.py';
+  const mapShell = mapPolicy.match(/^        run: \|\n([\s\S]*)$/m)?.[1].replace(/^          /gm, '').trim();
+  assert.equal(mapShell, [
+    'set -euo pipefail',
+    'MAP_POLICY_SOURCE="$PWD" python3 -B ' + mapTest,
+    'MAP_POLICY_SOURCE="$PWD" python3 -O -B ' + mapTest,
+    'python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/map-balance-guard python3 -B ' + mapRun + ' --source "$PWD" --producer .mlf-build/shared-ghc --output .mlf-build/map-balance-controls',
+  ].join('\n'), 'Exact source-bound map step, including both explicit source environments');
+  assert.deepEqual(directArguments(mapPolicy), [
+    {evidence: '', argv: ['-B', mapTest]},
+    {evidence: '', argv: ['-O', '-B', mapTest]},
+    {evidence: '', argv: ['-B', 'tools/shared/resource_watchdog.py', '--seconds', '1800',
+      '--address-space-mib', '6144', '--rss-mib', '5120', '--disk-free-mib', '4096',
+      '.mlf-build/map-balance-guard', 'python3', '-B', mapRun, '--source', process.cwd(),
+      '--producer', '.mlf-build/shared-ghc', '--output', '.mlf-build/map-balance-controls']},
+  ], 'Exactly the two pure controls and one guarded actual Map successor');
   const numeric = commandStep('tools/performance/int64/run_controls.py');
   assert.match(numeric, /for suite in host native legacy; do/);
   assert.match(numeric, /run_controls.py --suite "\$suite" --producer \.mlf-build\/shared-ghc/);
@@ -234,6 +255,10 @@ const validate = text => {
     'O0 shards must cover the complete prior O0 scope exactly once, with neither omissions nor duplicates');
   const upload = commandStep('uses: actions/upload-artifact@');
   assert.match(upload, /^        if: always\(\)$/m, 'Keep evidence for failed and timed-out shards');
+  for (const suffix of ['**/stdout', '**/stderr', '**/*.json', '**/*.hs', '**/*.c', '**/*.h', '**/*.d']) {
+    assert.ok(upload.includes('            .mlf-build/map-balance-controls/' + suffix + '\n'),
+      'Retain actual Map commands, source closure, dependency and terminal evidence: ' + suffix);
+  }
   for (const evidence of ['bounded-receipt.json', 'build.log', 'results/**/*.json',
                           'results/**/*.stdout', 'results/**/*.stderr']) {
     assert.ok(upload.includes('.mlf-build/artifact-binary-guard/' + evidence),
@@ -264,6 +289,20 @@ const validate = text => {
 
 validate(workflow);
 const controls = [
+  ['Map normal pure controls omitted', '          MAP_POLICY_SOURCE="$PWD" python3 -B tools/performance/map-policy/test_prepare_map_policy.py\n', ''],
+  ['Map optimized pure controls omitted', '          MAP_POLICY_SOURCE="$PWD" python3 -O -B tools/performance/map-policy/test_prepare_map_policy.py\n', ''],
+  ['Map source environment omitted', 'MAP_POLICY_SOURCE="$PWD" python3 -B tools/performance/map-policy/test_prepare_map_policy.py', 'python3 -B tools/performance/map-policy/test_prepare_map_policy.py'],
+  ['Map old shape route restored', 'tools/performance/map-policy/run_controls.py --source "$PWD"', 'tools/performance/patricia/run_integrated.py --suite map-balance'],
+  ['Map source basis argument omitted', 'tools/performance/map-policy/run_controls.py --source "$PWD"', 'tools/performance/map-policy/run_controls.py'],
+  ['Map wrong producer', 'tools/performance/map-policy/run_controls.py --source "$PWD" --producer .mlf-build/shared-ghc', 'tools/performance/map-policy/run_controls.py --source "$PWD" --producer .mlf-build/old-producer'],
+  ['Map wrong output', 'tools/performance/map-policy/run_controls.py --source "$PWD" --producer .mlf-build/shared-ghc --output .mlf-build/map-balance-controls', 'tools/performance/map-policy/run_controls.py --source "$PWD" --producer .mlf-build/shared-ghc --output .mlf-build/other-map'],
+  ['Map duplicate dispatch', '          MAP_POLICY_SOURCE="$PWD" python3 -B tools/performance/map-policy/test_prepare_map_policy.py\n', '          python3 -B tools/performance/map-policy/run_controls.py\n          MAP_POLICY_SOURCE="$PWD" python3 -B tools/performance/map-policy/test_prepare_map_policy.py\n'],
+  ['Map C source evidence omitted', '            .mlf-build/map-balance-controls/**/*.c\n', ''],
+  ['Map project header evidence omitted', '            .mlf-build/map-balance-controls/**/*.h\n', ''],
+  ['Map dependency evidence omitted', '            .mlf-build/map-balance-controls/**/*.d\n', ''],
+  ['Map target stdout evidence omitted', '            .mlf-build/map-balance-controls/**/stdout\n', ''],
+  ['Map target stderr evidence omitted', '            .mlf-build/map-balance-controls/**/stderr\n', ''],
+  ['Map terminal receipt evidence omitted', '            .mlf-build/map-balance-controls/**/*.json\n', ''],
   ["CRC calls merged without argv token loss","          python3 -B tools/shared/test_crc_successor_entry.py\n          python3 -O -B tools/shared/test_crc_successor_entry.py\n","          python3 -B tools/shared/test_crc_successor_entry.py -O -B tools/shared/test_crc_successor_entry.py\n"],
   ["CRC call split without argv token loss","          python3 -B tools/shared/test_crc_successor_entry.py\n","          python3 -B\n          python3 tools/shared/test_crc_successor_entry.py\n"],
   ["CRC evidence environment assigned to wrong call","          python3 -B tools/shared/test_crc_successor_entry.py\n          python3 -O -B tools/shared/test_crc_successor_entry.py\n          MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal python3 -B tools/shared/test_crc_process_supervisor.py\n","          MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal python3 -B tools/shared/test_crc_successor_entry.py\n          python3 -O -B tools/shared/test_crc_successor_entry.py\n          python3 -B tools/shared/test_crc_process_supervisor.py\n"],
