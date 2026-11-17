@@ -1,0 +1,23 @@
+# Experimental depth-cursor finite Graph qualification
+
+This isolated qualification branch changes no production source. Its frozen closure has15 Haskell modules plus16 C/header inputs. Main SHA256 is `b21c3bdc3b178e6190da8887d2c71a088670aecb060dd92333fbb85529dc3384`. Bootstrap.Graph is the retained baseline; Candidate.Graph contains the exact already-frozen depth-cursor candidate, without new algorithm changes.
+
+Twenty-one original cases are retained, plus eight public-Graph graft/identity/error cases. Each optimization requires29 A/C/expected raw comparisons and PASS LF, eight exact prerequisite-qualification files, exactly124 files, exact completion stdout and empty target stderr. Completion text alone never passes. The overlapping node/link example is an invalid two-root eligibility/first-error case, not qualification of a valid overlapping graft. Both ordinary sparse rebinding and signed/gapped dense inputs have separate proposed successful graft cases. These fixed expectations can fail; baseline rejection is not candidate coverage.
+
+## Independent CI contract
+Only pushes to `perf/depth-cursor-graft-qualification-20261117` run this workflow. Ubuntu24.04, one sequential job,12-minute job limit, contents:read and checkout without retained credentials. Official GHC9.14.1 deb12 bindist is fixed at SHA256 `60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841`,306812040 bytes. Installation is bounded300s and checked by exact version/global package DB; installed-prefix inventory is recorded and rechecked around qualification. No cache or borrowed compiler.
+
+CI has an explicit new4GiB MemAvailable floor (not the previous private6GiB qualification),4GiB free disk floor,4GiB per-child address space and240 CPU seconds. Installation-only subprocesses have512MiB per-file FSIZE, allowing the fixed306812040-byte official bindist and bounded install objects. Focused compilation/metadata/targets retain8MiB per-file FSIZE. This is an explicit phase policy, not an unbounded installer or a focused-limit increase. Focused gate180s total/work150/post165, aggregate compilation120s, target20s total/10 each. Two C objects are shared, while O0/O2 each get fresh objects/interfaces/stubs/executable/cwd. Exact15 actual compiled-module and object/interface sets are checked. Compiler warning stderr is preserved, not blanket-rejected.
+
+Source31 byte pins, experiment metadata, compiler/toolchain and named host tools, generated binaries and actual four-library runtime identities are checked before/after. Linux wait4 direct-child rusage is diagnostic only. Cleanup covers owned process groups, not all global descendants/ECHILD. Failures and partial output remain evidence. No ordinary full producer, performance samples, native bootstrap, production qualification or speed claim.
+
+Artifact scope is only logs, receipts, source/identity manifests and focused output; it excludes installed/downloaded GHC directories and credentials. Live aggregate cap88MiB reserves room for final evidence; final raw artifact hard cap96MiB. If exceeded, upload refuses rather than silently dropping data. The full frozen sources remain in this branch. No environment dump or secret transmission is requested.
+
+This bundle was prepared without executing installation, compilation, tests, workflow or publication. CI results must be independently reviewed before any further decision.
+
+Proxy and certificate configuration is inherited only through the normal dedicated variables; their values are not serialized. Checkout/upload action revisions match the verified main workflow pins. This experiment is based on main fc300bc9fdc389b585cbef0630fc8915d53e89c5; it does not claim complete main CI qualification.
+
+## V2 correction
+V1 was blocked statically because its8MiB RLIMIT_FSIZE also constrained the306812040-byte download; no v1 installation or target ran. V1 is preserved separately. V2 separates install512MiB/focused8MiB and records actual selected phase limits in every child record and final receipt. Installer logs are still subject to the artifact aggregate polling/final upload caps; an oversized artifact is refused, never silently truncated.512MiB is a bounded policy, not a claim that a full installation has already succeeded.
+
+Receipts carry only GITHUB_SHA,GITHUB_RUN_ID,GITHUB_RUN_ATTEMPT,GITHUB_REPOSITORY,GITHUB_REF. Repository/ref and identity grammar are checked, and qualification requires its installation receipt to have the same five values. Proxy/certificate variables still propagate for network access but are not serialized. Frozen31 inputs,29-case/124-file contract and workflow/action pins are unchanged.
