@@ -1,0 +1,54 @@
+--- libraries/mlf-inference/Bootstrap/Constraint.hs
++++ overlay/Bootstrap/Constraint.hs
+@@ -2,6 +2,7 @@
+ {-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
+              KindSignatures, FlexibleContexts, FlexibleInstances,
+              MultiParamTypeClasses, OverloadedStrings #-}
++{-# OPTIONS_GHC -fno-cse -fno-full-laziness #-}
+ module Bootstrap.Constraint where {
+   import MLF.Primitive;
+   import Bootstrap.Types;
+@@ -16,6 +17,7 @@
+   import qualified Bootstrap.Primitive as P;
+   import qualified Bootstrap.Graph as G;
+   import qualified Bootstrap.Graph.Solver as Solver;
++  import qualified Prototype.ProjectionIdentityCapture as Capture;
+   import qualified Bootstrap.Surface as Surface;
+   import qualified Bootstrap.Unicode as Unicode;
+   import qualified Bootstrap.Lexer as Lexer;
+@@ -1254,12 +1256,30 @@
+   -- validity-preserving transformation, then shares the finished indexes.
+   solvePrepared :: Constraints -> Either String Solver;
+   solvePrepared constraints =
+-    do {
++    Capture.withEpoch (\epoch -> do {
+       prepared <- Solver.prepare (initialGraph constraints);
+-      initial <- Solver.solverUnify (equalities constraints) prepared;
+-      solved <- evaluatePreparedSteps initial (solveSteps constraints);
+-      Solver.finishNormalized solved
+-    };
++      initial <- Capture.runStep epoch 0 Capture.Initial
++        (\token -> Solver.solverUnifyAt token (equalities constraints) prepared);
++      answer <- evaluateCapturedSteps epoch 1 initial (solveSteps constraints);
++      case answer of {
++        (,) solved nextStep -> Capture.runStep epoch nextStep Capture.Finish
++          (\token -> Solver.finishNormalized solved)
++      }
++    });
++  evaluateCapturedSteps :: Capture.Token -> Int -> Solver -> [] SolveStep ->
++    Either String ((,) Solver Int);
++  evaluateCapturedSteps epoch ordinal initial steps = case steps of {
++    [] -> Right ((,) initial ordinal);
++    (:) step rest -> do {
++      next <- Capture.runStep epoch ordinal
++        (case step of { Instantiate e -> Capture.Instantiate; ProjectCase fields -> Capture.ProjectCase })
++        (\token -> case step of {
++          Instantiate e -> Solver.instantiateClosedPreparedAt token (fromGen e) (toNode e) initial;
++          ProjectCase fields -> Solver.projectCaseFields fields initial
++        });
++      evaluateCapturedSteps epoch (ordinal + 1) next rest
++    }
++  };
+   eraseSource typed = eraseSourceWith IM.empty typed;
+   eraseSourceWith :: IntMap XTerm -> Typed -> XErased;
+   eraseSourceWith evidence typed =

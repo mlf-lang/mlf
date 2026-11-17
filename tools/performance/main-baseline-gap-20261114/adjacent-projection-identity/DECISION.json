@@ -1,0 +1,20 @@
+{
+  "decision": "NO_GO_INCREMENTAL_PROJECTION_OR_CROSS_CALL_REUSE",
+  "evidence": "bounded adjacent selected-ID prefix only",
+  "missing_proof": [
+    "complete field and external dependency/invalidation set",
+    "nonlocal closure and dense-ID stability",
+    "first-error and original payload-demand preservation",
+    "first-build and maintenance cost less than avoided work"
+  ],
+  "rejected_inferences": [
+    "ID overlap implies structural equality",
+    "few write keys imply small invalidation closure",
+    "validator Right permits omitted demand",
+    "profile share or event count predicts speedup"
+  ],
+  "automatic_resampling": false,
+  "production_changes": 0,
+  "performance_samples": 0,
+  "native_AB": "PAUSED"
+}

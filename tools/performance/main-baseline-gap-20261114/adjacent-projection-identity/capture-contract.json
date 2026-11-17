@@ -1,0 +1,60 @@
+{
+  "caps": {
+    "aggregate_bytes": 33554432,
+    "data_bytes_reserving_headers": 33550336,
+    "emitted_samples": 64,
+    "epochs": 4096,
+    "events": 65536,
+    "ids_per_vector": 2048,
+    "pairs": 32
+  },
+  "files": [
+    "projection-identity.events.tsv",
+    "projection-identity.samples.tsv",
+    "projection-identity.pairs.tsv",
+    "projection-identity.summary.json"
+  ],
+  "headers": {
+    "events": "projection-identity-v1; explicit solvePrepared chains only; no timing or reuse certificate\nseq\tepoch\toperation\tsite\tphase\n",
+    "pairs": "left_sample\tright_sample\n",
+    "samples": "id\tepoch\toperation\tsite\tresolved_pair\tlocal_count\tselected_old\tremoved\tchanged\tdeleted\talias_left\n"
+  },
+  "homes": 96,
+  "identity_grammar": "Signed Int64 lists in square brackets; resolved_pair=Nothing or Just (signed,signed). IDs are original graph-domain keys.",
+  "legal_counterresults": "Zero pairs, low overlap, high key-write footprint and truncated prefix are retained without rerun. At most first32 eligible pairs; not population coverage.",
+  "meaning": "Pairs reference two same-epoch operation-consecutive samples. Only left writes describe the transition from left input selection to right input selection. removed/changed overlap; compute union, never sum.",
+  "no_timing": true,
+  "phases": [
+    "EPOCH_BEGIN",
+    "EPOCH_RETURN_WHNF",
+    "BEGIN",
+    "LEFT_SHELL",
+    "RIGHT_SHELL",
+    "SOLVER_COMMIT",
+    "PROJECTION_COMMIT",
+    "PROJECTION_SIZE_GAP",
+    "ELIGIBLE_ID_SAMPLE N"
+  ],
+  "qualification": "diagnostic capture only, never production equivalence or optimization qualification",
+  "real_stderr": "",
+  "real_stdout": "Bool\n",
+  "sample_local_count": [
+    129,
+    2048
+  ],
+  "schema": "projection-identity-capture-v1",
+  "scope": "Only explicit Constraint.solvePrepared chain; flushGeneration and public uninstrumented Solver paths excluded. No global current owner.",
+  "self_test_argv": [
+    "--self-test"
+  ],
+  "self_test_stderr": "",
+  "self_test_stdout": "PASS projection identity diagnostic self-test\n",
+  "sites": [
+    "Initial",
+    "Instantiate",
+    "ProjectCase",
+    "Finish",
+    "UnifyDistinct",
+    "PreparedFallback"
+  ]
+}

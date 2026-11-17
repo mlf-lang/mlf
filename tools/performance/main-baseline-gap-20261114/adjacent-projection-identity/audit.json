@@ -1,0 +1,35 @@
+{
+  "status": "PASS_INDEPENDENT_SINGLE_BOUNDED_PROJECTION_IDENTITY_DIAGNOSTIC_ONLY",
+  "actual_review_pass": true,
+  "blockers": [],
+  "performance": false,
+  "production": false,
+  "reuse_qualified": false,
+  "automatic_followup": false,
+  "verified_artifacts": {
+    "output_files": 359,
+    "output_bytes": 73027724,
+    "homes": 96,
+    "staged": 128,
+    "object_interface_files": 192,
+    "runtime_files": 4,
+    "steps_exit_zero": 6,
+    "compiler_warning_occurrences": 37,
+    "compiler_stderr_bytes": 18598,
+    "target_stdout": "Bool\n",
+    "target_stderr_bytes": 0
+  },
+  "private_review_sha256": "f4a0793ab9b15e591678e53f1d6fe08bd51577e730751c0cb8c0945d35e99e85",
+  "independent_offline_capture": true,
+  "same_ELF_selftest_and_target": true,
+  "tool_exit_boundary": "The outer exit-zero observation is a transcription of the visible tool result, not a separately authenticated platform receipt. Controller receipts and process-group cleanup are preserved separately.",
+  "audit_failure_preserved": "First artifact reader completed its artifact checks then stopped on incorrect nested source_review.path selection; corrected remaining phase did not rerun targets. Oversized exploratory outputs were not treated as full audit evidence.",
+  "boundaries": [
+    "First 32 eligible pairs and 46 retained samples are an early, biased prefix in epoch 0, operations 53\u2013707, not random sampling or workload-wide eligibility. Later events are capped; largest real graphs are not represented by this sample.",
+    "5,010 selected-left and 339 write-union totals are per-pair occurrences; shared samples and recurring original IDs are counted again. They are not unique global nodes, bytes, allocation, CPU or removable work.",
+    "Same IDs and low write-key counts do not establish unchanged Node fields, alias-right behavior, transitive dependencies, binding/Euler invalidation, demand/error equivalence or safe reuse.",
+    "Only LEFT write keys describe the transition into the next sample. The metrics additionally retain overlap with the RIGHT selection, without pretending these are sufficient dependency invalidations.",
+    "Original full validation and solver behavior remain in the producer. This result is a bounded diagnostic qualification only, not an optimization, native qualification or authorization for another sample/build.",
+    "Cooperative locks coordinate participating tasks, not global machine isolation. No timing comparison or full-system isolation claim is made."
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "main": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "compiler": "GHC 9.14.1 ordinary O2 diagnostic",
+  "producer": {
+    "bytes": 20409320,
+    "mode": "0o755",
+    "sha256": "a4eccfe73797c3de7a8959f3ec1c14c37abccd9375559f3cfbbb1ab41255e3e3"
+  },
+  "source_manifest_sha256": "9fc337c7ded43f226689b98b4ce3373b0e020b9a0b41d9caae5d34c686e22159",
+  "source_closure_sha256": "71eb609864b80b69b49d4dc58b9737f06764decbb4d84e81969721e232b09245",
+  "source_review_sha256": "0c13cbb1927a344962397e6f85a8b56123715d478544b633495af498a66d9087",
+  "control_review_sha256": "f3784e8c8929928cd503b5802b0e5de1abd1e3cccc3e987e10ada3abb3e06fdc",
+  "execution_receipt_sha256": "536ed7c29d37e618c3ea1fc2cadec0bda6f7457e21fc77fb39ad4c7af3a2031d",
+  "events_tsv_sha256": "26f950dbf0ae74fc3f823bd5c5b6edf5eff15dc3cc7591f58848bfb99e2cb269",
+  "full_raw_archive_sha256": "30f0d317124605c52ebf4ffd07e16d848b518b482e10c8330778aaecb92c8bdf",
+  "raw_files_private": 364,
+  "public_contains_binary": false,
+  "native": "PAUSED",
+  "performance_samples": 0,
+  "actual_review_sha256": "f4a0793ab9b15e591678e53f1d6fe08bd51577e730751c0cb8c0945d35e99e85",
+  "actual_review_manifest_sha256": "10782da57c912914fec3722c4093fe903b9b509769b7b17399e2e1ea8339120c",
+  "private_metrics_sha256": "60ab64c1b063a9ce1235eede211ad8640a3c8e3adcc2695a4f4f0329e0db5676"
+}
