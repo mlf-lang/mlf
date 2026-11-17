@@ -66,11 +66,29 @@ def map_successor_inputs():
             old(MAP_PATH), (root / MAP_PATH).read_bytes(), tree)
 
 
+def restore_reconciliation_predecessor(raw):
+    # This test-only header edge cannot relabel any C4 or production input.
+    C.require(C.sha_bytes(raw) == '6bbc1da597cb7eaaeab16aff52e8b44e2d4dc11ff10997679a45b3405bf0be98', 'fixed adapter successor manifest')
+    value = json.loads(raw)
+    name = 'patricia/adapt_oracles.py'
+    row = ['45ce4b0fac779be59272e1a9ae377115c1c91a7e03f6acf77588c41aea40af0e', '92871acb93f9c742910b6dfb224bda86e292d2214718be50fdb172b434f65820']
+    expected = {'predecessor': '08a08aa98c01f4f07b6efb01a250a0d86f387811',
+                'predecessor_tree': 'eec52972c0028a7f1d20da0ac15f867664c2c918',
+                'predecessor_manifest_sha256': RECONCILIATION_SHA, 'maintenance': {name: row}}
+    C.require(value.pop('adapter_successor', None) == expected and value['maintenance'].get(name) == row,
+              'exact test-only adapter successor')
+    del value['maintenance'][name]
+    restored = (json.dumps(value, indent=2, sort_keys=True) + '\n').encode()
+    C.require(C.sha_bytes(restored) == RECONCILIATION_SHA, 'entire earlier reconciliation manifest preserved')
+    return restored
+
+
 def validate_map_successor(delta, current_raw, previous_raw, old_map, live_map, tree):
     """Authenticate the later Map edge without rewriting the complete C4 contract."""
     C.require(tree == PERFORMANCE_TREE, 'fixed performance predecessor tree')
     C.require(C.sha_bytes(previous_raw) == PERFORMANCE_MANIFEST_SHA,
               'fixed performance predecessor manifest')
+    current_raw = restore_reconciliation_predecessor(current_raw)
     C.require(C.sha_bytes(current_raw) == RECONCILIATION_SHA,
               'fixed current reconciliation manifest')
     previous, current = json.loads(previous_raw), json.loads(current_raw)
@@ -199,6 +217,15 @@ class StaticControls(unittest.TestCase):
                 inverse_map_balance_dependency(changed, raw)
         for bad in [raw+b' ', b'{}']:
             with self.assertRaises(ValueError): inverse_map_balance_dependency(CURRENT_MANIFEST, bad)
+
+    def test_adapter_successor_recovers_exact_prior_manifest(self):
+        raw = map_successor_inputs()[0]
+        restored = restore_reconciliation_predecessor(raw)
+        self.assertEqual(C.sha_bytes(restored), '82b9b045993ff9ac2d14a5b67dbfd35288004a79ae08303a1047f81de438d009')
+        self.assertNotIn('adapter_successor', json.loads(restored))
+        self.assertNotIn('patricia/adapt_oracles.py', json.loads(restored)['maintenance'])
+        for wrong in (restored, raw + b' '):
+            with self.assertRaises(ValueError): restore_reconciliation_predecessor(wrong)
 
     def test_map_successor_rejects_corrupt_or_discontinuous_evidence(self):
         raw = (HERE.parent / 'patricia/source-migration.json').read_bytes()

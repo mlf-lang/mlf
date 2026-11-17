@@ -1,4 +1,15 @@
 {
+  "adapter_successor": {
+    "maintenance": {
+      "patricia/adapt_oracles.py": [
+        "45ce4b0fac779be59272e1a9ae377115c1c91a7e03f6acf77588c41aea40af0e",
+        "92871acb93f9c742910b6dfb224bda86e292d2214718be50fdb172b434f65820"
+      ]
+    },
+    "predecessor": "08a08aa98c01f4f07b6efb01a250a0d86f387811",
+    "predecessor_manifest_sha256": "82b9b045993ff9ac2d14a5b67dbfd35288004a79ae08303a1047f81de438d009",
+    "predecessor_tree": "eec52972c0028a7f1d20da0ac15f867664c2c918"
+  },
   "additions": {},
   "changes": {
     "bootstrap/MLF/BuiltinPreludeData.hs": [
@@ -215,6 +226,10 @@
     "predecessor_tree": "3148203097e7622ced1b272e606bfa892fad746b"
   },
   "maintenance": {
+    "patricia/adapt_oracles.py": [
+      "45ce4b0fac779be59272e1a9ae377115c1c91a7e03f6acf77588c41aea40af0e",
+      "92871acb93f9c742910b6dfb224bda86e292d2214718be50fdb172b434f65820"
+    ],
     "patricia/test_adapters.py": [
       "fe299bd576901e008a1a7473abab98377f66785c4ec239a50f7c139b553e834f",
       "f85ece592184468fe2fcf68590939a8dd9d7586637311c4309ad5ba8992743cb"

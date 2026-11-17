@@ -218,6 +218,9 @@ class PR43SourceReconciliation(unittest.TestCase):
         self.assertNotEqual(old_sha, new_sha)
         expected = copy.deepcopy(prior['maintenance'])
         expected[name][1] = new_sha
+        # The later, independently checked adapter edge does not rewrite this
+        # formatter/performance test boundary.
+        expected['patricia/adapt_oracles.py'] = spec['adapter_successor']['maintenance']['patricia/adapt_oracles.py']
         self.assertEqual(spec['maintenance'], expected)
         previous = (c.archived / 'tools/performance' / name).read_bytes()
         self.assertEqual(c.restore_maintenance(live, name),
