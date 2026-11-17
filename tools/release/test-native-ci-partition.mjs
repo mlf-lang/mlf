@@ -294,6 +294,12 @@ const validate = text => {
   assert.ok(upload.includes('            .mlf-build/shared-ghc/ghc-info.txt\n'), 'Preserve the compiled toolchain metadata');
   assert.ok(upload.includes('            .mlf-build/shared-ghc/builtin-verification/\n'), 'Preserve the original failed builtin evidence');
   assert.ok(upload.includes('            .mlf-build/builtin-generation-guard/\n'), 'Preserve actual generator output and guards');
+  for (const directory of ['native-library', 'stdlib-default-controls']) {
+    for (const evidence of ['receipt.json', '*.stdout', '*.stderr']) {
+      assert.ok(upload.includes('            .mlf-build/' + directory + '/' + evidence + '\n'),
+        'Retain actual native-library command metadata and failure captures: ' + directory + '/' + evidence);
+    }
+  }
   const artifact = upload.match(/^          name: (.+)$/m)?.[1];
   assert.ok(artifact);
   const artifactNames = legs.map(leg => artifact.replaceAll('${{ matrix.optimization }}', leg.optimization).replaceAll('${{ matrix.suite }}', leg.suite));
@@ -308,6 +314,12 @@ const validate = text => {
 
 validate(workflow);
 const controls = [
+  ["Native failure evidence omitted: .mlf-build/native-library/receipt.json","            .mlf-build/native-library/receipt.json\n",""],
+  ["Native failure evidence omitted: .mlf-build/native-library/*.stdout","            .mlf-build/native-library/*.stdout\n",""],
+  ["Native failure evidence omitted: .mlf-build/native-library/*.stderr","            .mlf-build/native-library/*.stderr\n",""],
+  ["Native failure evidence omitted: .mlf-build/stdlib-default-controls/receipt.json","            .mlf-build/stdlib-default-controls/receipt.json\n",""],
+  ["Native failure evidence omitted: .mlf-build/stdlib-default-controls/*.stdout","            .mlf-build/stdlib-default-controls/*.stdout\n",""],
+  ["Native failure evidence omitted: .mlf-build/stdlib-default-controls/*.stderr","            .mlf-build/stdlib-default-controls/*.stderr\n",""],
   ["UTF8 synthetic evidence omitted","            .mlf-build/utf8-supervisor-controls/\n",""],
   ["UTF8 normal evidence env omitted","MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal ",""],
   ["UTF8 optimized evidence env omitted","MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/optimized ",""],

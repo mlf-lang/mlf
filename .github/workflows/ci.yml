@@ -362,6 +362,12 @@ jobs:
           retention-days: 14
           path: |
             .mlf-build/ghc-install-cleanup.json
+            .mlf-build/native-library/receipt.json
+            .mlf-build/native-library/*.stdout
+            .mlf-build/native-library/*.stderr
+            .mlf-build/stdlib-default-controls/receipt.json
+            .mlf-build/stdlib-default-controls/*.stdout
+            .mlf-build/stdlib-default-controls/*.stderr
             .mlf-build/shared-ghc/receipt.json
             .mlf-build/shared-ghc/*.log
             .mlf-build/shared-ghc/packages.txt

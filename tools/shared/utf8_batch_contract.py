@@ -218,3 +218,60 @@ def aggregate(physical_commands, logical_vectors, original_host_outputs):
     return dict(batch_complete=True, physical_command_count=4, logical_projection_count=100,
                 original_interpreter_vectors=25, scope=SCOPE,
                 original_fresh_demand_gate_complete=False, whole_utf8_complete=False)
+
+# Explicit successor to the retained expanded v1 generator. The v1 generator
+# and all of its historical shape tests remain available, not silently rewritten.
+LOOP_PARAMETERIZED = (b'  runCase :: (Int -> IO String) -> IO ();\n'
+                      b'  runCase getArg = do {\n')
+
+def loop_addition(direction):
+    cases = vectors()
+    entries = []
+    for index in order_for(direction):
+        args = cases[index]['arguments']
+        for arg in args:
+            require(re.fullmatch(r'[a-z]+|[0-9]+', arg) is not None, 'argument literal')
+        entries.append('(,) %d [%s]' % (index, ', '.join('"%s"' % arg for arg in args)))
+    template = ''';\n  batchArgument :: [] String -> Int -> IO String;
+  batchArgument args index =
+    if ltInt index 0 then panic "UTF8 batch getArg out of range"
+    else case args of {
+      [] -> panic "UTF8 batch getArg out of range";
+      (:) value rest ->
+        if eqInt index 0 then ioReturn value
+        else batchArgument rest (subInt index 1)
+    };
+  batchLoop :: [] ((,) Int ([] String)) -> IO ();
+  batchLoop entries = case entries of {
+    [] -> ioReturn ();
+    (:) ((,) index args) rest -> do {
+      printInt %d;
+      printInt index;
+      runCase (batchArgument args);
+      printInt %d;
+      batchLoop rest
+    }
+  };
+  batchCases :: [] ((,) Int ([] String));
+  batchCases = [%s];
+  main :: IO ();
+  main = batchLoop batchCases
+'''
+    return (template % (BEGIN, END, ', '.join(entries))).encode('ascii')
+
+def generate_loop(original, direction):
+    authenticate(original)
+    base = original.replace(HEADER, LOOP_PARAMETERIZED, 1)
+    generated = base[:-2] + loop_addition(direction) + b'}\n'
+    require(restore_loop(generated, direction) == original, 'loop inverse mismatch')
+    return generated
+
+def restore_loop(generated, direction):
+    require(type(generated) is bytes, 'generated loop fixture must be bytes')
+    tail = loop_addition(direction) + b'}\n'
+    require(generated.endswith(tail) and generated.count(LOOP_PARAMETERIZED) == 1,
+            'unique loop generated boundary')
+    base = generated[:-len(tail)] + b'}\n'
+    original = base.replace(LOOP_PARAMETERIZED, HEADER, 1)
+    authenticate(original)
+    return original
