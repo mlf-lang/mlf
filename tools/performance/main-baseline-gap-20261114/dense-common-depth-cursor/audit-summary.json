@@ -1,0 +1,37 @@
+{
+  "scope": "sanitized summary of independent source, control and actual audits",
+  "actual_status": "PASS_INDEPENDENT_FINITE_AND_TWO_PAIR_FOUNDATION_SCREEN_ONLY",
+  "actual_review_pass": true,
+  "blockers": [],
+  "actual_files_verified": 517,
+  "actual_bytes_verified": 85980050,
+  "private_raw_checkpoint_files": 523,
+  "private_raw_checkpoint_bytes": 86366323,
+  "focused_actual_home_modules": 15,
+  "ordinary_C_actual_home_modules": 95,
+  "focused_cases": 21,
+  "focused_files": 84,
+  "focused_condition": "Every A/C/expected byte-identical and result PASS LF; COMPLETE alone never accepted",
+  "real_qualification_and_timed_executions": 6,
+  "same_pinned_A_C_runtime_before_after": true,
+  "compiler_stderr_preserved": {
+    "focused_bytes": 9139,
+    "focused_warning_headers": 17,
+    "ordinary_C_bytes": 18487,
+    "ordinary_C_warning_headers": 37
+  },
+  "controller_and_target_stderr_bytes": 0,
+  "controller_whole_ns": 312563377790,
+  "original_cooperative_locks_released": 3,
+  "forward_reacquired_and_released": 3,
+  "cleanup": "owned process-group cleanup; no global process isolation claim",
+  "excluded": [
+    "O0 matrix",
+    "complete signed or sparse-dispatch qualification",
+    "full production Solver/error/demand coverage",
+    "cross-backend/native qualification",
+    "cross-workload/stable performance proof"
+  ],
+  "native_AB": "PAUSED",
+  "main_and_PR_unchanged": true
+}

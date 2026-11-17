@@ -1,0 +1,27 @@
+{
+  "baseline_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "toolchain": "GHC 9.14.1 Linux x86_64",
+  "producer_A": {
+    "sha256": "4eab562e58373f5d6dccc8a5460d8d7b909571ee6e88ea91a110f53dc5c10c71",
+    "bytes": 20192272
+  },
+  "producer_C": {
+    "sha256": "bd969f2ed33bcfe0be032c3e46208242a13de693ba5b5a3a3ffefc329975b05f",
+    "bytes": 20202784
+  },
+  "focused_producer": {
+    "sha256": "1d2bf8863894ea39fbd9502b9f171cfadd784f30e17cdfe856b4c66f2b9b23a6",
+    "bytes": 3930168
+  },
+  "source_sha256": {
+    "overlay/Bootstrap/Graph.hs": "8d145bd52e8c367dd9d47891754d1727b7f2ae7f68cc271535fa01f1eda0bee9",
+    "Candidate/Graph.hs": "f8f98a2324092bffa3ea3421c8b5c1b02394e532cf5884fc2a7f719a4277e7e7",
+    "fixtures/Main.hs": "dcfd9f336fed0e08f138ee09575a0430445ea6d7cd4bafcc1f375b3e4469f90b",
+    "candidate.patch": "0efd4a86fba8dcdaeb066ae03c98a03ca8ae05e00b81ea52fa967ec9e0b47abd"
+  },
+  "source_review_sha256": "18551233e9ffec54313c3b574a4114d3abfc9b5cd537c182152b0d2c4ce9e054",
+  "control_review_sha256": "d1824ae167adfa79c8873dac7e3123b993007553cd8f698aa12a8e05251ff352",
+  "actual_review_sha256": "1773c2e8843d498dd8b825b37ee3aa626c2bc43d7e5fe818b5dfef03116aa3ea",
+  "full_private_raw_archive_sha256": "7ebd4d686035ab86483a3e9d1549659e60b7a7d50c3d2627d9d13ae19d506925",
+  "source_and_controls_archive_sha256": "9389ac9231db58c287f2ab62aad154a4f7b7894b21e22b52974708c856feaa9b"
+}

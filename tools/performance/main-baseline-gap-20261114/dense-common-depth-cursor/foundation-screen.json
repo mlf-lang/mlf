@@ -1,0 +1,74 @@
+{
+  "schema": "depth-cursor-foundation-screen-v1",
+  "workload": "CommonFoundationRoot plus real Foundation15; ordinary --type checking service",
+  "order": [
+    "A1",
+    "C1",
+    "C2",
+    "A2"
+  ],
+  "samples": [
+    {
+      "label": "A1",
+      "wall_ns": 21239459188,
+      "user_seconds": 20.32512,
+      "system_seconds": 0.8651439999999999,
+      "os_maxrss_KiB": 696820,
+      "exit": 0
+    },
+    {
+      "label": "C1",
+      "wall_ns": 19627271401,
+      "user_seconds": 19.072487,
+      "system_seconds": 0.515039,
+      "os_maxrss_KiB": 575856,
+      "exit": 0
+    },
+    {
+      "label": "C2",
+      "wall_ns": 19677588483,
+      "user_seconds": 19.13915,
+      "system_seconds": 0.541822,
+      "os_maxrss_KiB": 575856,
+      "exit": 0
+    },
+    {
+      "label": "A2",
+      "wall_ns": 20872034636,
+      "user_seconds": 19.938765,
+      "system_seconds": 0.853999,
+      "os_maxrss_KiB": 696668,
+      "exit": 0
+    }
+  ],
+  "pairs": [
+    {
+      "A": "A1",
+      "C": "C1",
+      "os_maxrss_ratio": 0.8264056714790046,
+      "wall_ratio": 0.924094687499818
+    },
+    {
+      "A": "A2",
+      "C": "C2",
+      "os_maxrss_ratio": 0.8265859778258797,
+      "wall_ratio": 0.9427728933076882
+    }
+  ],
+  "geomean_wall_ratio": 0.9333870698828367,
+  "decision": "CONTINUE_SIGNAL_ONLY",
+  "preregistered_thresholds": {
+    "each_wall_ratio_max": 0.97,
+    "geomean_wall_ratio_max": 0.95,
+    "each_peak_rss_ratio_max": 1.05
+  },
+  "qualification_runs_excluded": 2,
+  "raw_result": "Bool\n",
+  "stderr_bytes": 0,
+  "cwd_outputs": [],
+  "same_finite_graph_expected_results": 21,
+  "statistics": "Only two descriptive pairs; no stability or significance claim",
+  "clock": "Parent Popen to observed wait4 completion; includes WNOHANG polling/output-budget delay",
+  "rss": "wait4 ru_maxrss KiB; not simultaneous process-tree RSS, retained heap, or allocation",
+  "causation": "whole candidate including cloned Owned DFS; no isolated depth-read causal attribution"
+}
