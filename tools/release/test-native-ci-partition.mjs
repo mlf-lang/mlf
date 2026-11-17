@@ -37,7 +37,7 @@ const directArguments = step => {
   assert.ok(run, 'The direct step must have an explicit shell command');
   const script = run.replace(/^          /gm, '');
   assert.doesNotMatch(script, /\$\{\{/, 'Direct arguments must not vary by hidden workflow interpolation');
-  const recorder = "unset MLF_CRC_TEST_EVIDENCE MLF_UTF8_TEST_EVIDENCE\npython3() { printf 'CALL\\0%s\\0%s\\0%s\\0' \"$#\" \"${MLF_CRC_TEST_EVIDENCE-}\" \"${MLF_UTF8_TEST_EVIDENCE-}\"; printf '%s\\0' \"$@\"; }\n";
+  const recorder = "unset MLF_CRC_TEST_EVIDENCE MLF_UTF8_TEST_EVIDENCE MLF_CANDIDATE_TEST_EVIDENCE\npython3() { printf 'CALL\\0%s\\0%s\\0%s\\0%s\\0' \"$#\" \"${MLF_CRC_TEST_EVIDENCE-}\" \"${MLF_UTF8_TEST_EVIDENCE-}\" \"${MLF_CANDIDATE_TEST_EVIDENCE-}\"; printf '%s\\0' \"$@\"; }\n";
   const result = spawnSync('bash', ['-euo', 'pipefail', '-c', recorder + script],
     {encoding: 'utf8', timeout: 5000});
   assert.equal(result.status, 0, result.stderr || String(result.error || 'Direct dispatch failed'));
@@ -53,8 +53,9 @@ const directArguments = step => {
     assert.ok(Number.isSafeInteger(count) && count > 0 && count <= 64, 'Bounded exact argc');
     const evidence = tokens[index++];
     const utf8Evidence = tokens[index++];
+    const candidateEvidence = tokens[index++];
     assert.ok(index + count <= tokens.length, 'Complete invocation arguments');
-    calls.push({evidence, utf8Evidence, argv: tokens.slice(index, index + count)});
+    calls.push({evidence, utf8Evidence, candidateEvidence, argv: tokens.slice(index, index + count)});
     index += count;
   }
   return calls;
@@ -130,7 +131,7 @@ const validate = text => {
   const direct = [
     'tools/release/test-suite-build-receipts.py',
     'tools/release/source-smoke.sh',
-    'tools/shared/test_direct_bounded.py',
+    'tools/shared/test_direct_candidate_successor.py',
     'tools/shared/test_figure12_direct.py',
   ];
   // The ABI migration retains the frozen semantic algorithms behind explicit
@@ -167,9 +168,9 @@ const validate = text => {
     'python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/map-balance-guard python3 -B ' + mapRun + ' --source "$PWD" --producer .mlf-build/shared-ghc --output .mlf-build/map-balance-controls',
   ].join('\n'), 'Exact source-bound map step, including both explicit source environments');
   assert.deepEqual(directArguments(mapPolicy), [
-    {utf8Evidence: '', evidence: '', argv: ['-B', mapTest]},
-    {utf8Evidence: '', evidence: '', argv: ['-O', '-B', mapTest]},
-    {utf8Evidence: '', evidence: '', argv: ['-B', 'tools/shared/resource_watchdog.py', '--seconds', '1800',
+    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-B', mapTest]},
+    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-O', '-B', mapTest]},
+    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-B', 'tools/shared/resource_watchdog.py', '--seconds', '1800',
       '--address-space-mib', '6144', '--rss-mib', '5120', '--disk-free-mib', '4096',
       '.mlf-build/map-balance-guard', 'python3', '-B', mapRun, '--source', process.cwd(),
       '--producer', '.mlf-build/shared-ghc', '--output', '.mlf-build/map-balance-controls']},
@@ -214,34 +215,46 @@ const validate = text => {
     'Only the framework wrapper may receive the bounded suite override');
   assert.doesNotMatch(native, /\.mlf-build\/shared-ghc\/bin\/tuple-list\s*[|;]/,
     'Do not repeat the legacy TupleList run outside the exact wrapper oracle');
-  const crc = commandStep('tools/shared/test_direct_bounded.py');
+  const crc = commandStep('tools/shared/test_direct_candidate_successor.py');
   assert.deepEqual(directArguments(crc), [
-    {utf8Evidence: '', evidence: '', argv: ['-B', 'tools/shared/test_crc_successor_entry.py']},
-    {utf8Evidence: '', evidence: '', argv: ['-O', '-B', 'tools/shared/test_crc_successor_entry.py']},
-    {utf8Evidence: '', evidence: '.mlf-build/crc-supervisor-controls/normal',
+    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-B', 'tools/shared/test_crc_successor_entry.py']},
+    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-O', '-B', 'tools/shared/test_crc_successor_entry.py']},
+    {candidateEvidence: '', utf8Evidence: '', evidence: '.mlf-build/crc-supervisor-controls/normal',
       argv: ['-B', 'tools/shared/test_crc_process_supervisor.py']},
-    {utf8Evidence: '', evidence: '.mlf-build/crc-supervisor-controls/optimized',
+    {candidateEvidence: '', utf8Evidence: '', evidence: '.mlf-build/crc-supervisor-controls/optimized',
       argv: ['-O', '-B', 'tools/shared/test_crc_process_supervisor.py']},
-    {utf8Evidence: '', evidence: '', argv: ['-B', 'tools/shared/test_utf8_batch_contract.py']},
-    {utf8Evidence: '', evidence: '', argv: ['-O', '-B', 'tools/shared/test_utf8_batch_contract.py']},
-    {utf8Evidence: '', evidence: '', argv: ['-B', 'tools/shared/test_utf8_batch_worker.py']},
-    {utf8Evidence: '', evidence: '', argv: ['-O', '-B', 'tools/shared/test_utf8_batch_worker.py']},
-    {utf8Evidence: '.mlf-build/utf8-supervisor-controls/normal', evidence: '', argv: ['-B', 'tools/shared/test_direct_bounded_entry.py']},
-    {utf8Evidence: '.mlf-build/utf8-supervisor-controls/optimized', evidence: '', argv: ['-O', '-B', 'tools/shared/test_direct_bounded_entry.py']},
-    {utf8Evidence: '', evidence: '', argv: ['-B', 'tools/shared/test_direct_bounded.py',
+    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-B', 'tools/shared/test_utf8_batch_contract.py']},
+    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-O', '-B', 'tools/shared/test_utf8_batch_contract.py']},
+    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-B', 'tools/shared/test_utf8_batch_worker.py']},
+    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-O', '-B', 'tools/shared/test_utf8_batch_worker.py']},
+    {candidateEvidence: '', utf8Evidence: '.mlf-build/utf8-supervisor-controls/normal', evidence: '', argv: ['-B', 'tools/shared/test_direct_bounded_entry.py']},
+    {candidateEvidence: '', utf8Evidence: '.mlf-build/utf8-supervisor-controls/optimized', evidence: '', argv: ['-O', '-B', 'tools/shared/test_direct_bounded_entry.py']},
+    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-B', 'tools/shared/test_candidate_batch_contract.py']},
+    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-O', '-B', 'tools/shared/test_candidate_batch_contract.py']},
+    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-B', 'tools/shared/test_candidate_batch_worker.py']},
+    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-O', '-B', 'tools/shared/test_candidate_batch_worker.py']},
+    {candidateEvidence: '.mlf-build/candidate-supervisor-controls/normal', utf8Evidence: '', evidence: '', argv: ['-B', 'tools/shared/test_direct_candidate_entry.py']},
+    {candidateEvidence: '.mlf-build/candidate-supervisor-controls/optimized', utf8Evidence: '', evidence: '', argv: ['-O', '-B', 'tools/shared/test_direct_candidate_entry.py']},
+    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-B', 'tools/shared/test_direct_candidate_successor.py',
       '--bin-dir', '.mlf-build/shared-ghc/bin',
       '--build-receipt', '.mlf-build/shared-ghc/receipt.json',
       '--output', '.mlf-build/direct-host-tests']},
-  ], 'Exactly eleven ordered direct calls: four retained CRC controls, six UTF8/bounded controls and the authenticated composite successor');
+  ], 'Exactly seventeen ordered direct calls: four CRC, six UTF8, six candidate controls and the authenticated composite successor');
   assert.doesNotMatch(native, /^\s*python3(?:\s+-B)?\s+tools\/shared\/test_direct\.py\b/m,
     'The legacy direct entry must not bypass the bounded successor');
   // Exact shell plus per-invocation argv checks: comments cannot replace an
   // execution, and merged/split calls or hidden shell routing cannot pass.
   const boundedShell = crc.match(/^        run: \|\n([\s\S]*)$/m)?.[1].replace(/^          /gm, '').trim();
-  assert.equal(boundedShell, "set -euo pipefail\npython3 -B tools/shared/test_crc_successor_entry.py\npython3 -O -B tools/shared/test_crc_successor_entry.py\nMLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal python3 -B tools/shared/test_crc_process_supervisor.py\nMLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/optimized python3 -O -B tools/shared/test_crc_process_supervisor.py\npython3 -B tools/shared/test_utf8_batch_contract.py\npython3 -O -B tools/shared/test_utf8_batch_contract.py\npython3 -B tools/shared/test_utf8_batch_worker.py\npython3 -O -B tools/shared/test_utf8_batch_worker.py\nMLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_direct_bounded_entry.py\nMLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_bounded_entry.py\npython3 -B tools/shared/test_direct_bounded.py --bin-dir .mlf-build/shared-ghc/bin \\\n  --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/direct-host-tests\n# The default/all framework gate executes this same no-argument\n# TupleList binary with its exact 305-observation completion oracle.",
+  assert.equal(boundedShell, "set -euo pipefail\npython3 -B tools/shared/test_crc_successor_entry.py\npython3 -O -B tools/shared/test_crc_successor_entry.py\nMLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal python3 -B tools/shared/test_crc_process_supervisor.py\nMLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/optimized python3 -O -B tools/shared/test_crc_process_supervisor.py\npython3 -B tools/shared/test_utf8_batch_contract.py\npython3 -O -B tools/shared/test_utf8_batch_contract.py\npython3 -B tools/shared/test_utf8_batch_worker.py\npython3 -O -B tools/shared/test_utf8_batch_worker.py\nMLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_direct_bounded_entry.py\nMLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_bounded_entry.py\npython3 -B tools/shared/test_candidate_batch_contract.py\npython3 -O -B tools/shared/test_candidate_batch_contract.py\npython3 -B tools/shared/test_candidate_batch_worker.py\npython3 -O -B tools/shared/test_candidate_batch_worker.py\nMLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/normal python3 -B tools/shared/test_direct_candidate_entry.py\nMLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_candidate_entry.py\npython3 -B tools/shared/test_direct_candidate_successor.py --bin-dir .mlf-build/shared-ghc/bin \\\n  --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/direct-host-tests\n# The default/all framework gate executes this same no-argument\n# TupleList binary with its exact 305-observation completion oracle.",
     'Exact bounded direct shell and unchanged budgets');
   assert.doesNotMatch(native, /^\s*python3(?:\s+-B)?\s+tools\/shared\/test_direct_crc_successor\.py\b/m,
     'The standalone CRC entry cannot bypass UTF8 batching qualification');
+  const header = commandStep('HEADER_HISTORY_SOURCE=');
+  assert.equal(header.match(/^        if: (.+)$/m)?.[1], "matrix.optimization == '2'", 'Header controls remain O2 only');
+  const headerShell = header.match(/^        run: \|\n([\s\S]*)$/m)?.[1].replace(/^          /gm, '').trim();
+  assert.equal(headerShell, "set -euo pipefail\nmkdir .mlf-build/header-adapter-controls\ngit --no-replace-objects cat-file blob dd5b4630a80803c19afdb219dba2dc4bffc3ea1b > .mlf-build/header-adapter-controls/history.hs\nexport HEADER_FIXTURE=\"$PWD/tools/shared/fixtures/native/HeaderValidationTests.hs\"\nexport HEADER_ORACLE=\"$PWD/tools/shared/fixtures/native/HeaderNamingOracle.hs\"\nexport HEADER_HISTORY_SOURCE=\"$PWD/.mlf-build/header-adapter-controls/history.hs\"\npython3 -B tools/shared/test_header_validation_adapter.py\npython3 -O -B tools/shared/test_header_validation_adapter.py\npython3 tools/shared/test_native_library.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/native-library --clang clang --gc-prefix .mlf-build/io-action-gc", 'Exact fixed-history Header environment, controls and native-library call');
+  assert.doesNotMatch(native, /^\s*python3(?:\s+-B)?\s+tools\/shared\/test_direct_bounded\.py\b/m,
+    'The old bounded entry must not bypass candidate batching');
   const coverage = legs.map(leg => {
     const actual = [];
     for (const command of [...direct, ...o2Only]) {
@@ -288,6 +301,9 @@ const validate = text => {
   }
   assert.ok(upload.includes('            .mlf-build/utf8-supervisor-controls/\n'),
     'Preserve real UTF8 synthetic lifecycle evidence separately from CRC');
+  for (const path of [".mlf-build/candidate-supervisor-controls/", ".mlf-build/header-adapter-controls/", ".mlf-build/direct-host-tests/candidate-selection/", ".mlf-build/native-library/header-validation/", ".mlf-build/stdlib-default-controls/header-validation/"]) {
+    assert.ok(upload.includes('            ' + path + '\n'), 'Preserve candidate/Header raw evidence: ' + path);
+  }
   assert.ok(upload.includes('            .mlf-build/ghc-install-cleanup.json\n'),
     'Retain exact cleanup scope, validation and refusal receipts');
 
@@ -314,6 +330,29 @@ const validate = text => {
 
 validate(workflow);
 const controls = [
+  ["test_candidate_batch_contract.py normal omitted", "          python3 -B tools/shared/test_candidate_batch_contract.py\n", ""],
+  ["test_candidate_batch_contract.py optimized omitted", "          python3 -O -B tools/shared/test_candidate_batch_contract.py\n", ""],
+  ["test_candidate_batch_worker.py normal omitted", "          python3 -B tools/shared/test_candidate_batch_worker.py\n", ""],
+  ["test_candidate_batch_worker.py optimized omitted", "          python3 -O -B tools/shared/test_candidate_batch_worker.py\n", ""],
+  ["test_direct_candidate_entry.py normal omitted", "          MLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/normal python3 -B tools/shared/test_direct_candidate_entry.py\n", ""],
+  ["test_direct_candidate_entry.py optimized omitted", "          MLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_candidate_entry.py\n", ""],
+  ["candidate/Header evidence missing .mlf-build/candidate-supervisor-controls/", "            .mlf-build/candidate-supervisor-controls/\n", ""],
+  ["candidate/Header evidence missing .mlf-build/header-adapter-controls/", "            .mlf-build/header-adapter-controls/\n", ""],
+  ["candidate/Header evidence missing .mlf-build/direct-host-tests/candidate-selection/", "            .mlf-build/direct-host-tests/candidate-selection/\n", ""],
+  ["candidate/Header evidence missing .mlf-build/native-library/header-validation/", "            .mlf-build/native-library/header-validation/\n", ""],
+  ["candidate/Header evidence missing .mlf-build/stdlib-default-controls/header-validation/", "            .mlf-build/stdlib-default-controls/header-validation/\n", ""],
+  ["candidate env wrong mode", "MLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/optimized", "MLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/normal"],
+  ["candidate env injected CRC", "          python3 -B tools/shared/test_crc_successor_entry.py", "          MLF_CANDIDATE_TEST_EVIDENCE=bad python3 -B tools/shared/test_crc_successor_entry.py"],
+  ["CRC env injected candidate", "          MLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/normal", "          MLF_CRC_TEST_EVIDENCE=bad MLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/normal"],
+  ["candidate route bypass", "python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir", "python3 -B tools/shared/test_direct_bounded.py --bin-dir"],
+  ["Header historical pin changed", "cat-file blob dd5b4630a80803c19afdb219dba2dc4bffc3ea1b", "cat-file blob HEAD"],
+  ["Header fixture env wrong", "export HEADER_FIXTURE=\"$PWD/tools/shared/fixtures/native/HeaderValidationTests.hs\"", "export HEADER_FIXTURE=wrong"],
+  ["Header oracle env wrong", "export HEADER_ORACLE=\"$PWD/tools/shared/fixtures/native/HeaderNamingOracle.hs\"", "export HEADER_ORACLE=wrong"],
+  ["Header history env wrong", "export HEADER_HISTORY_SOURCE=\"$PWD/.mlf-build/header-adapter-controls/history.hs\"", "export HEADER_HISTORY_SOURCE=wrong"],
+  ["Header normal omitted", "          python3 -B tools/shared/test_header_validation_adapter.py\n", ""],
+  ["Header optimized omitted", "          python3 -O -B tools/shared/test_header_validation_adapter.py\n", ""],
+  ["Header actual native omitted", "          python3 tools/shared/test_native_library.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/native-library --clang clang --gc-prefix .mlf-build/io-action-gc\n", ""],
+
   ["Native failure evidence omitted: .mlf-build/native-library/receipt.json","            .mlf-build/native-library/receipt.json\n",""],
   ["Native failure evidence omitted: .mlf-build/native-library/*.stdout","            .mlf-build/native-library/*.stdout\n",""],
   ["Native failure evidence omitted: .mlf-build/native-library/*.stderr","            .mlf-build/native-library/*.stderr\n",""],
@@ -345,10 +384,10 @@ const controls = [
   ["test_direct_bounded_entry.py optimized duplicates normal","          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_bounded_entry.py\n","          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_direct_bounded_entry.py\n"],
   ["test_direct_bounded_entry.py calls merged","          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_direct_bounded_entry.py\n          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_bounded_entry.py\n","          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_direct_bounded_entry.py -O -B tools/shared/test_direct_bounded_entry.py\n"],
   ["test_direct_bounded_entry.py order reversed","          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_direct_bounded_entry.py\n          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_bounded_entry.py\n","          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_bounded_entry.py\n          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_direct_bounded_entry.py\n"],
-  ["Bounded successor replaced by standalone CRC","python3 -B tools/shared/test_direct_bounded.py --bin-dir","python3 -B tools/shared/test_direct_crc_successor.py --bin-dir"],
-  ["Bounded direct extra routing token","python3 -B tools/shared/test_direct_bounded.py --bin-dir","python3 -B tools/shared/test_direct_bounded.py --worker --bin-dir"],
-  ["Bounded direct shell route injected","          python3 -B tools/shared/test_direct_bounded.py --bin-dir","          true\n          python3 -B tools/shared/test_direct_bounded.py --bin-dir"],
-  ["Bounded direct mocked by comment","          python3 -B tools/shared/test_direct_bounded.py --bin-dir","          # python3 -B tools/shared/test_direct_bounded.py --bin-dir"],
+  ["Bounded successor replaced by standalone CRC","python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir","python3 -B tools/shared/test_direct_crc_successor.py --bin-dir"],
+  ["Bounded direct extra routing token","python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir","python3 -B tools/shared/test_direct_candidate_successor.py --worker --bin-dir"],
+  ["Bounded direct shell route injected","          python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir","          true\n          python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir"],
+  ["Bounded direct mocked by comment","          python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir","          # python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir"],
   ["UTF8 evidence omitted .mlf-build/direct-host-tests/utf8-length/**/*.hs","            .mlf-build/direct-host-tests/utf8-length/**/*.hs\n",""],
   ["UTF8 evidence omitted .mlf-build/direct-host-tests/utf8-length/**/*.o","            .mlf-build/direct-host-tests/utf8-length/**/*.o\n",""],
   ["UTF8 evidence omitted .mlf-build/direct-host-tests/utf8-length/**/*.hi","            .mlf-build/direct-host-tests/utf8-length/**/*.hi\n",""],
@@ -373,9 +412,9 @@ const controls = [
   ["CRC calls merged without argv token loss","          python3 -B tools/shared/test_crc_successor_entry.py\n          python3 -O -B tools/shared/test_crc_successor_entry.py\n","          python3 -B tools/shared/test_crc_successor_entry.py -O -B tools/shared/test_crc_successor_entry.py\n"],
   ["CRC call split without argv token loss","          python3 -B tools/shared/test_crc_successor_entry.py\n","          python3 -B\n          python3 tools/shared/test_crc_successor_entry.py\n"],
   ["CRC evidence environment assigned to wrong call","          python3 -B tools/shared/test_crc_successor_entry.py\n          python3 -O -B tools/shared/test_crc_successor_entry.py\n          MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal python3 -B tools/shared/test_crc_process_supervisor.py\n","          MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal python3 -B tools/shared/test_crc_successor_entry.py\n          python3 -O -B tools/shared/test_crc_successor_entry.py\n          python3 -B tools/shared/test_crc_process_supervisor.py\n"],
-  ["CRC successor replaced by legacy bypass","python3 -B tools/shared/test_direct_bounded.py --bin-dir","python3 -B tools/shared/test_direct.py --bin-dir"],
-  ["CRC successor duplicated","          python3 -B tools/shared/test_direct_bounded.py --bin-dir","          python3 -B tools/shared/test_direct_bounded.py --bin-dir ignored\n          python3 -B tools/shared/test_direct_bounded.py --bin-dir"],
-  ["CRC old route inserted","          python3 -B tools/shared/test_direct_bounded.py --bin-dir","          python3 tools/shared/test_direct.py --bin-dir ignored\n          python3 -B tools/shared/test_direct_bounded.py --bin-dir"],
+  ["CRC successor replaced by legacy bypass","python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir","python3 -B tools/shared/test_direct.py --bin-dir"],
+  ["CRC successor duplicated","          python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir","          python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir ignored\n          python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir"],
+  ["CRC old route inserted","          python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir","          python3 tools/shared/test_direct.py --bin-dir ignored\n          python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir"],
   ["CRC normal entry controls omitted","          python3 -B tools/shared/test_crc_successor_entry.py\n",""],
   ["CRC optimized entry controls omitted","          python3 -O -B tools/shared/test_crc_successor_entry.py\n",""],
   ["CRC normal lifecycle controls omitted","          MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal python3 -B tools/shared/test_crc_process_supervisor.py\n",""],
@@ -429,7 +468,7 @@ const controls = [
   ['default margin omitted by selector', "= '0:default'", "= '0:framework'"],
   ['O2 budget changed', "= '0:framework'", "= '2:all'"],
   ['all framework budgets changed', "if [ '${{ matrix.optimization }}:${{ matrix.suite }}' = '0:framework' ] || [ '${{ matrix.optimization }}:${{ matrix.suite }}' = '0:default' ]; then", 'if true; then'],
-  ['direct budget override', 'python3 -B tools/shared/test_direct_bounded.py --bin-dir', 'python3 -B tools/shared/test_direct_bounded.py --suite-timeout 5400 --bin-dir'],
+  ['direct budget override', 'python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir', 'python3 -B tools/shared/test_direct_candidate_successor.py --suite-timeout 5400 --bin-dir'],
   ['Figure12 omitted', 'python3 tools/shared/test_figure12_direct.py', 'python3 tools/shared/omitted.py'],
   // Bind selector mutations to the named step, not the first unrelated O2 step.
   ['O2 guest omitted',
@@ -485,3 +524,4 @@ for (const [name, before, after] of controls) {
   assert.throws(() => validate(mutated), undefined, `Reject ${name}`);
 }
 console.log(`Native O0/O2 CI partition and ${controls.length} mutation controls passed.`);
+
