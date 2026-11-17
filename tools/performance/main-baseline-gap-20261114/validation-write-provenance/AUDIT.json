@@ -1,0 +1,63 @@
+{
+  "actual": {
+    "case_count": 24,
+    "complete_bytes": 714,
+    "complete_sha256": "c266f5e916c407e5f5d81c3de6e0ef8abb0586839fdbf772d23b0ef6999e44cd",
+    "mutants_caught": 4,
+    "output_bytes": 5002,
+    "output_count": 4,
+    "source_post_verified": true,
+    "stderr_bytes": 0,
+    "stdout_bytes": 3421,
+    "stdout_sha256": "0c3d99c10c4e058d5868d917320eddfe0a5ed7486dab5a90d5ab6f6ddabdaf66",
+    "total_tree_controls": 2
+  },
+  "actual_review_pass": true,
+  "blockers": [],
+  "expected_sha256": "531964de98597d549088121f2b0a5014bf53e9ec0e3cb93961f1f627601d569c",
+  "findings": [
+    "Every one of 24 raw check values matches the frozen expected.json via canonical JSON serialization preserving boolean/integer distinctions. Duplicate JSON keys and nonstandard numbers are rejected by the independent reader.",
+    "The four mutant outcomes were separately derived from source and immutable snapshot facts: omitted alias stays at 1 instead of 2; omitted global binding and endpoint-node-only reuse return Right after the parent lineage loses binder 1; same numeric ID returns Right for a new Bad kind. Raw correct equals fresh and mutant differs in all four. Fresh uses the same toy semantics, not an independent Graph implementation.",
+    "Two complete total-tree interval lists independently recomputed without model import or functions: build ancestor paths, sort them in descending-label preorder, and derive ends from descendant cardinality. All coordinates match raw and frozen literals, not merely the final Boolean.",
+    "Sibling deletion: deleting node 5 changes binder 1 interval [5,9) to [4,8), queried node 2 start 8 to 7, but relation (1,2) remains True. Nonendpoint move: parent[2] changes 1->4; relation (1,3) changes True->False although endpoint direct binders remain 0 and 2.",
+    "Source inspection confirms copy carries an existing immutable Cell token without inspecting payload; equal assignments and tombstones get new tokens; canonicalized constructors are new while leaf payload origins may be copied. Dense unchanged returns current skeleton, not old snapshot by numeric ID.",
+    "Raw poison controls report zero touches for copy/equal-assignment, leaf canonicalization and early root error. Successful child facts neither certify a new edge nor publish a failed transaction. Unknown writes, foreign epochs and unsupported mode fail closed in the tested cases."
+  ],
+  "finite_actual_admissible": true,
+  "limitations": [
+    "Finite symbolic Python model only. Not Graph.hs/Haskell execution, complete write/dependency certificate, real shadow, reusable production cache, allocation or CPU result.",
+    "Toy edge computes child kind BEFORE binder/ancestry. Real denseChild checks Gen/binder/dominance BEFORE kind; this model does not establish production error/demand order.",
+    "Total-tree controls do not refine the engine: the binding-global invalidation policy stays conservative. Relation tickets and production Euler/write capture are not implemented.",
+    "Trusted owner/write surface is conventional Python encapsulation; forged Cells/Snapshots, in-place payload mutation and concurrency are outside scope.",
+    "Poison is symbolic explicit forcing, not GHC bottom/asynchronous-exception/sharing equivalence. Raw Patricia route, nextId, full Gen/structural validation, Kind laziness and production canonicalization are not implemented."
+  ],
+  "performance_admissible": false,
+  "production_admissible": false,
+  "real_shadow_admissible": false,
+  "schema": "independent-validation-write-model-actual-review-v1",
+  "source_case_reasoning": {
+    "alias-absence-aba-is-new-version": "1 resolves 1->2->1 but erased alias absence has new token (559-569).",
+    "alias-chain-and-missing-cell": "10->11->1; old absence99 false, add99 true, old snapshot require99 Left (548-557).",
+    "canonical-leaf-rebuilds-constructor": "constructor fresh, kind/name same Cell, no Poison force (490-498).",
+    "canonical-structural-rewrite": "new constructor and children token with literal [2,2] (500-506).",
+    "copy-origin-equal-assignment": "clone keeps Cell; assign always fresh; neither examines name Poison (469-477).",
+    "dense-final-changed-control": "new binder/flag/node/global while tag copied (517-524).",
+    "dense-final-current-not-before": "unchanged controls return Bad-kind current skeleton; kind rejects (508-515).",
+    "early-root-error-masks-later-poison": "root tag leaf rejects before kind2 (584-590).",
+    "epoch-crossing-rejected": "foreign transaction ensure rejects before cache use (571-573).",
+    "failed-transaction-not-published": "child2 success then child3 Bad; no publish, later write rejected (601-608).",
+    "four-mutants": "independent recorded outcomes and lineage calculation in checks.json (647-691).",
+    "merge-winner-loser-alias": "2 becomes alias to 1, loser fields erased, winner tag assigned while kind copied (479-488).",
+    "mode-switch-fails-closed": "unsupported mode rejects (597-599).",
+    "nonowner-binder-invalidates-euler-and-edge": "node2 binder move removes ancestor1 from lineage3; global dirty, endpoint3 unchanged (535-546).",
+    "ordered-merge-high-source-low-winner": "winner2, binder7/Rigid from first operand9, payload from selected low2 (619-629).",
+    "sparse-rebuild-even-equal-controls": "explicit rebuild writes fresh controls even equal values (526-533).",
+    "success-publishes-once": "valid root/child publishes same snapshot once; subsequent write rejected (610-616).",
+    "successful-subfact-does-not-prove-new-edge": "kind4 success retained; binder1 absent from parent5 lineage; edge not cached (575-582).",
+    "two-tree-controls": "complete independently recalculated intervals in checks.json; source literals verified via AST only (631-645).",
+    "unknown-write-fails-closed": "unknown operation aborts before publish (592-595)."
+  },
+  "source_sha256": "117bbabeec02f5fda918a4ef62d1f56e92675f5065a09e4bc6bae8f766997508",
+  "status": "PASS_INDEPENDENT_ACTUAL_FINITE_SYMBOLIC_VALIDATION_WRITE_MODEL_ONLY",
+  "timing_boundary": "No performance result or full-process hard-wall/peak-memory proof. Wrapper supervision telemetry excludes final receipt/output, and the tool wall label is not a complete-process duration."
+}

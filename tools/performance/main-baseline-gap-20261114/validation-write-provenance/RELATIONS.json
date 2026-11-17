@@ -1,0 +1,149 @@
+{
+  "answer": "A conservative single-owner capability model is feasible as a finite research model. With the current whole-Euler dependency, ordinary merges usually invalidate every edge-bearing kind fact. A finer generation for a specific dominance Boolean can remain stable when Euler coordinates change. This is a non-full-invalidation opportunity, not a demonstrated profitable reuse path.",
+  "counterexample_tests_proposed_not_run": [
+    "Retain raw GBotK/GTyCon unused Kind/name poisons. Right Kind WHNF and unused nextId must not become eq/hash/seq demand.",
+    "Old absence link10 followed by insert10->1 invalidates that lookup; delete/reinsert same numeric node ID gets a new incarnation. No identity-by-number reuse.",
+    "Reuse the existing actual cached-kind-edge witness: child kind2 success cannot excuse failed later edge dominance, even if kind payload is the same Star.",
+    "Keep the existing 10-node prepared-expanded-invalid case: initial actual local validation must still return the exact containment Left before any certificate use.",
+    "Invalid new root/binder prefix plus later Kind poison must return original prefix error; a certificate walk must not force the later payload.",
+    "Branch/alias/child edits creating a cycle require transitive invalidation and original colour1 check; success tickets cannot act as graph reachability proofs.",
+    "Keep dense-to-sparse and malformed raw routing controls on unchanged original path; successful dense validation alone is not canonical-map provenance."
+  ],
+  "current_conservative_global_invalidation_unchanged": true,
+  "decision": "Proceed only with bounded relation-fact semantics/model design if desired; do not implement production/shadow reuse or weaken current global invalidation. Existing same-graph representation, scalar/scope-owner and small traversal NO_GO decisions remain.",
+  "independent_total_tree_controls": "Two total-tree cases were subsequently executed in this symbolic model and independently checked. Source-derived Graph/unify witnesses remain unexecuted; no finer relation-ticket policy is implemented.",
+  "minimal_model": {
+    "cost": "Refreshing every recorded relation costs all those array reads/comparisons and relation storage, plus reverse-dependency propagation and retained Kind payloads. No proof this is cheaper than original validation, no inferred speed from profile shares, and no change to the existing global-invalidation model.",
+    "demand": "Mint/consult metadata only behind original demanded selectors and successful prerequisite phases; metadata operations do not inspect arbitrary field values. Cached successful results retain the same opaque lazy Kind expression. Do not seq/show/hash it. Do not cache Left or exceptions. Metadata allocation/retention is observable cost and can retain old graph through a captured Kind thunk; single-owner lifetime does not prove no retention.",
+    "dependency_closure": "Successful kind facts need transitive subfact dependencies, negative lookups, ordered branch/control dependencies, binder/parent-tag/structural-child facts and applicable relation tickets. A child kind ticket never licenses skipping a parent-specific edge check. Any changed or untracked dependency forces the original computation at its original call point.",
+    "global_phase": "Both original and final root/member/binder/Euler prepasses remain complete. Member enumeration/ordering, raw map routing, dense/sparse choice and global errors stay global conservative dependencies. Reuse cannot suppress these checks or run before their original error prefix.",
+    "keys": "NodeKey=(owner,logical ID,incarnation); CellKey=(NodeKey,selector); alias keys include observed absence and every link-chain lookup; fact key includes rule and ordered parameters. Checked generation counters never wrap or collide. Unknown/raw writes invalidate conservatively; exhausted model capacity is diagnostic ineligibility, not a reusable prefix.",
+    "minimal_safe_first_step": "Model stable relation generations at the original query boundary after all original preceding gates; this alone does not skip the query. Pre-clearing an entire cached subtree by batch replay is a later separate obligation: prove all reads are total owned interval cells and cannot demand raw payload or change failure order. This review does not approve that implementation.",
+    "provenance": "Borrow an existing cell capability only at a transformation whose actual source copies that precise field/expression. Canonical mapTag preserves constructor and leaf Kind/name origins but not automatically child expressions; new GCon mapped list is conservatively dirty. Rebinding may use the existing equality-checked branch for Binder/Flag, without adding a generic equality pass. Unknown provenance gets a fresh generation.",
+    "relation_refinement": "After the final original prepass succeeds, only a fully defined private interval view may issue a relation ticket for the same denseContains rule and identical live endpoint parameters. Recompute the Boolean, compare with the old already-demanded Boolean, and retain its relation generation only on equality. Missing/replaced endpoints, unknown totality or different semantics make it dirty. Preserve false/unknown invalidation and original fallback; never answer from old true alone.",
+    "scope": "One opaque generative owner for one input-to-rebuilt transaction; no persistent cross-call cache, no public raw helper changes, no StableName, no structural payload equality."
+  },
+  "production_admissible": false,
+  "real_shadow_admissible": false,
+  "source": {
+    "Graph": "libraries/mlf-inference/Bootstrap/Graph.hs",
+    "Graph_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+    "baseline": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+    "observer_source_commit": "d9c14d396353dffe2b5cebbcfb78aeb91817a9df"
+  },
+  "source_contract": [
+    {
+      "finding": "canonicalize reconstructs every Node via mapTag(resolve)/mkNode. It forces tag constructor, Arr/TyApp/Gen identities, binder Maybe head and Flag; GCon mapped child list, constructor names, leaf Kind payloads and Just binder target remain distinct lazy boundaries. equalNode/equalTag at261-262/230-258 would force additional name/kind/list content and cannot identify unchanged cells safely.",
+      "lines": "Graph 33-54,88-106,333-355,1138-1144"
+    },
+    {
+      "finding": "A merge deletes a loser, adds an alias and can assign winner tag/binder/flag from another input. denseFinalNode returning v means identical to its already-canonicalized skeleton node, not to the original input Node. Numeric node ID or retained skeleton pointer is insufficient provenance.",
+      "lines": "Graph 1202-1241,1639-1658,1808-1821"
+    },
+    {
+      "finding": "Input validation, all-equation preflight, canonicalization/rebind and final validation retain exact order. Final denseBounds and root/binder/Euler prepass cannot be replaced by the initial success. Dense-to-sparse change falls back fully. Initial prepare Right is not a certificate for an actual expanded graph.",
+      "lines": "Graph 756-785,903-927,1255-1262"
+    },
+    {
+      "finding": "denseContains depends on binding-tree ancestry, not stable interval numbers or only endpoint Node fields. denseKind success is Either WHNF, not forced Kind. Incoming edge gates remain separate from cached kind success; colour1 occurs check must remain before any reuse. denseStructurally tests wanted equality before require/visited and has ordered short-circuit demand.",
+      "lines": "Graph 872-900,928-1019; ST22-34"
+    }
+  ],
+  "source_derived_witnesses": [
+    {
+      "after": {
+        "ancestor_interval": [
+          4,
+          8
+        ],
+        "answer": true,
+        "parent_start": 7
+      },
+      "before": {
+        "ancestor_interval": [
+          5,
+          9
+        ],
+        "answer": true,
+        "parent_start": 8
+      },
+      "before_nodes": [
+        "0:GGen6/None",
+        "1:GGen2/b0",
+        "2:GArr7 8/b1",
+        "3:GGen4/b0",
+        "4:GBot/b3",
+        "5:GBot/b3",
+        "6:GBot/b0",
+        "7:GBot/b1",
+        "8:GBot/b1"
+      ],
+      "binding_children_order": "denseAddDescendants traverses ascending entries and conses, so root children are [6,3,1], node3 children [5,4], node1 children [8,7,2].",
+      "change": "Delete isolated sibling node5 only; leave nextId9 and all other fields unchanged.",
+      "conclusion": "Both source-derived global prepasses and graphs remain valid; edge2->7 (or8) really asks denseContains(1,2). Euler integer identity changes but the same already-demanded Boolean does not. These are literal source derivations, not an executed Graph test or claim the deletion is a specific unify output.",
+      "executed": false,
+      "flags": "all Flexible",
+      "links": [],
+      "name": "unrelated-sibling-deletion-coordinate-drift",
+      "query": [
+        1,
+        2
+      ]
+    },
+    {
+      "after_answer": false,
+      "after_chain": "3->2->4->0",
+      "before_answer": true,
+      "before_chain": "3->2->1->0",
+      "change": "Only binder(2): Just1 -> Just4.",
+      "conclusion": "Both global binding prepasses still succeed; old Graph is valid but final validator reaches edge3->9 and returns exact Left ill-dominated type graph. Endpoint-only invalidation is false-clean. The intermediate ancestor edit must change the relation generation; no production reachability is asserted.",
+      "endpoint_cells_unchanged": "Node1 including binder0 and Node3 including binder2 are byte-expression unchanged.",
+      "executed": false,
+      "flags": "all Flexible",
+      "links": [],
+      "name": "non-endpoint-ancestor-move",
+      "nodes": [
+        "0:GGen8/None",
+        "1:GGen5/b0",
+        "2:GGen6/b1",
+        "3:GArr9 10/b2",
+        "4:GGen7/b0",
+        "5:GBot/b1",
+        "6:GBot/b2",
+        "7:GBot/b4",
+        "8:GBot/b0",
+        "9:GBot/b1",
+        "10:GBot/b1"
+      ],
+      "query": [
+        1,
+        3
+      ]
+    },
+    {
+      "equations": [
+        [
+          6,
+          7
+        ]
+      ],
+      "executed": false,
+      "flags": "all Flexible",
+      "limitation": "Not run. Unknown GCon/alias/parent provenance stays dirty; keeping whole-Euler generations would deliberately invalidate this opportunity.",
+      "links": [],
+      "name": "possible-clean-left-subtree-after-actual-union-shape",
+      "nodes": [
+        "0:GGen1/None",
+        "1:GArr2 3/b0",
+        "2:GArr4 5/b1",
+        "3:GArr6 7/b1",
+        "4:GBot/b2",
+        "5:GBot/b2",
+        "6:GBot/b3",
+        "7:GBot/b3"
+      ],
+      "source_expected": "Unification merges7 into6, canonical right tag3 becomes Arr6 6; left nodes2/4/5 and their field origins and dominance truth values can remain unchanged. Root/right certificates dirty, left certificates need not necessarily all dirty under a complete finer model."
+    }
+  ],
+  "status": "STATIC_CONDITIONAL_RELATION_FACT_REFINEMENT_ONLY_NO_IMPLEMENTATION_OR_EXECUTION"
+}
