@@ -242,7 +242,13 @@ jobs:
           python3 -O -B tools/shared/test_crc_successor_entry.py
           MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal python3 -B tools/shared/test_crc_process_supervisor.py
           MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/optimized python3 -O -B tools/shared/test_crc_process_supervisor.py
-          python3 -B tools/shared/test_direct_crc_successor.py --bin-dir .mlf-build/shared-ghc/bin \
+          python3 -B tools/shared/test_utf8_batch_contract.py
+          python3 -O -B tools/shared/test_utf8_batch_contract.py
+          python3 -B tools/shared/test_utf8_batch_worker.py
+          python3 -O -B tools/shared/test_utf8_batch_worker.py
+          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_direct_bounded_entry.py
+          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_bounded_entry.py
+          python3 -B tools/shared/test_direct_bounded.py --bin-dir .mlf-build/shared-ghc/bin \
             --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/direct-host-tests
           # The default/all framework gate executes this same no-argument
           # TupleList binary with its exact 305-observation completion oracle.
@@ -465,7 +471,15 @@ jobs:
             .mlf-build/direct-host-tests/**/*.stdout
             .mlf-build/direct-host-tests/**/*.stderr
             .mlf-build/direct-host-tests/*.log
+            .mlf-build/direct-host-tests/utf8-length/**/*.hs
+            .mlf-build/direct-host-tests/utf8-length/**/*.o
+            .mlf-build/direct-host-tests/utf8-length/**/*.hi
+            .mlf-build/direct-host-tests/utf8-length/**/*.d
+            .mlf-build/direct-host-tests/utf8-length/**/stdout
+            .mlf-build/direct-host-tests/utf8-length/**/stderr
+            .mlf-build/direct-host-tests/utf8-length-supervisor.json
             .mlf-build/crc-supervisor-controls/
+            .mlf-build/utf8-supervisor-controls/
             .mlf-build/framework-direct/*.json*
             .mlf-build/framework-direct/*.stdout
             .mlf-build/framework-direct/*.stderr
