@@ -1,0 +1,540 @@
+--- graft-qualification/bounded.py
++++ solver-qualification/bounded.py
+@@ -110,7 +110,7 @@
+     need(re.fullmatch(r'[0-9a-f]{40}',value['GITHUB_SHA']) is not None,'invalid CI commit identity')
+     for key in ['GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT']:need(re.fullmatch(r'[1-9][0-9]*',value[key]) is not None,'invalid CI run identity')
+     need(value['GITHUB_REPOSITORY']=='mlf-lang/mlf','only target repository admitted')
+-    need(value['GITHUB_REF']=='refs/heads/perf/depth-cursor-graft-qualification-20261117','only exact qualification branch admitted')
++    need(value['GITHUB_REF']=='refs/heads/perf/depth-cursor-solver-qualification-20261117','only exact qualification branch admitted')
+     return value
+ def ci_only():
+     need(os.environ.get('GITHUB_ACTIONS')=='true','only GitHub Actions admitted')
+--- graft-qualification/qualify.py
++++ solver-qualification/qualify.py
+@@ -1,4 +1,4 @@
+-"""Finite real Graph semantics, never a performance benchmark."""
++"""Finite real Solver transaction semantics, never a performance benchmark."""
+ import argparse,json,os,pathlib,re,shutil,sys
+ from bounded import *
+ HERE=P(__file__).resolve().parent
+@@ -9,7 +9,7 @@
+     for r in rows:
+         p=HERE/r['path'];need(p.is_file()and not p.is_symlink()and p.stat().st_size==r['bytes']and sha(p,check)==r['sha256'],'source pin '+r['path'])
+ def focused(out,contract,log):
+-    need({p.name for p in out.iterdir()}==set(contract['files']),'exact124 files')
++    need({p.name for p in out.iterdir()}==set(contract['files']),'exact32 files')
+     values={}
+     for n in contract['files']:
+         p=out/n;need(p.is_file()and not p.is_symlink()and p.stat().st_size<=contract['per_file_max_bytes'],'focused file bound');values[n]=p.read_bytes()
+@@ -18,7 +18,8 @@
+     for name in contract['cases']:
+         need(values[name+'.result']==b'PASS\n','case FAIL '+name)
+         need(values[name+'.A']==values[name+'.C']==values[name+'.expected'],'raw output/expected '+name)
+-    for name,want in contract['qualification_files'].items():need(values[name]==want.encode(),'qualification '+name)
++        snapshots=[values[name+suffix]for suffix in ['.snapshot-A-before','.snapshot-A-after','.snapshot-C-before','.snapshot-C-after']]
++        need(all(value==snapshots[0]for value in snapshots),'snapshot preservation/equality '+name)
+ def runtime(log,check):
+     text=P(str(log)+'.stdout').read_text();need(P(str(log)+'.stderr').read_bytes()==b''and'not found'not in text,'ldd error')
+     paths=sorted(set(re.findall(r'(?:=>\s+)?(/[^\s(]+)',text)))
+@@ -27,11 +28,12 @@
+ def main():
+     ci_only();parser=argparse.ArgumentParser();parser.add_argument('--root',required=True);args=parser.parse_args()
+     root=P(args.root).resolve();art=root/'artifacts';prefix=root/'ghc';out=art/'focused';need(not out.exists(),'fresh focused output required');out.mkdir()
+-    sup=Supervisor(art,180,150,phase='focused');rec=dict(complete=False,errors=[],ci_identity=ci_identity(),performance=False,native=False,compile_s=0,target_s=0,source_files=31,homes_each=15,cases_each=29)
++    sup=Supervisor(art,180,150,phase='focused');rec=dict(complete=False,errors=[],ci_identity=ci_identity(),performance=False,native=False,compile_s=0,target_s=0,source_files=33,homes_each=17,cases_each=4)
+     binaries={};runtimes={};env=safe_env(root,prefix);rows=json.loads((HERE/'source-pins.json').read_text());contract=json.loads((HERE/'contract.json').read_text());modules=sorted(r['module']for r in rows if'module'in r)
+     try:
+-        rec['resources']=resource_floor(root);metadata_before={n:identity(HERE/n,sup.check)for n in ['source-pins.json','contract.json','bounded.py','install.py','qualify.py']};write(out/'experiment-metadata-before.json',metadata_before);need(len(rows)==31 and len(modules)==15 and len(set(modules))==15,'source cardinality')
+-        need(len(contract['cases'])==29 and len(contract['files'])==124 and len(contract['qualification_files'])==8,'contract cardinality')
++        rec['resources']=resource_floor(root);metadata_before={n:identity(HERE/n,sup.check)for n in ['source-pins.json','contract.json','bounded.py','install.py','qualify.py']};write(out/'experiment-metadata-before.json',metadata_before);need(len(rows)==33 and len(modules)==17 and len(set(modules))==17,'source cardinality')
++        need(len(contract['cases'])==4 and len(set(contract['cases']))==4 and len(contract['files'])==32 and len(set(contract['files']))==32,'contract cardinality')
++        need(set(contract['files'])=={name+suffix for name in contract['cases'] for suffix in ['.A','.C','.expected','.snapshot-A-before','.snapshot-A-after','.snapshot-C-before','.snapshot-C-after','.result']},'contract suffix set')
+         install=json.loads((art/'install-receipt.json').read_text());need(install['ci_identity']==rec['ci_identity'],'installation from another CI identity');need(install['limit_policy_phase']=='install'and install['child_fsize_limit_bytes']==1024*MIB,'installation limit policy differs');need(install['complete']and install['archive_verified']and install['expected_sha256']=='60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841','installation not qualified')
+         expected=json.loads((art/'toolchain-inventory.json').read_text());need(sha(art/'toolchain-inventory.json')==install['toolchain_inventory_sha256'],'toolchain inventory receipt')
+         need(inventory(prefix,sup.check)==expected,'toolchain changed before gate');check_sources(rows,sup.check)
+@@ -54,7 +56,7 @@
+             log,elapsed=sup.run('target-'+opt,[binary],target,min(10,20-rec['target_s']),env);rec['target_s']+=elapsed
+             focused(target,contract,log);need(identity(binary,sup.check)==binaries[opt],'binary changed')
+             for path,value in runtimes[opt].items():need(identity(P(path),sup.check)==value,'runtime changed')
+-            write(out/('qualified-'+opt+'.json'),dict(cases=29,files=124,qualification_files=8,performance=False))
++            write(out/('qualified-'+opt+'.json'),dict(cases=4,files=32,snapshot_files=16,performance=False))
+         rec['complete']=True
+     except BaseException as e:rec['errors'].append(repr(e))
+     finally:
+--- graft-qualification/contract.json
++++ solver-qualification/contract.json
+@@ -1,182 +1,57 @@
+ {
+-  "schema": "depth-cursor-real-graft-focused-v1",
++  "schema": "finite-Solver-transaction-contract-draft-v1",
++  "executed": false,
+   "cases": [
+-    "unify-owned-multihop",
+-    "unify-gen-error",
+-    "unify-constructor-error",
+-    "state-normal",
+-    "state-zero",
+-    "state-depths",
+-    "state-images",
+-    "state-grafted",
+-    "state-tree",
+-    "colour-complete",
+-    "colour-cycle",
+-    "poison-parents",
+-    "cursor-siblings",
+-    "cursor-ancestor",
+-    "cursor-uneven",
+-    "cursor-signed",
+-    "cursor-forest-first-error",
+-    "cursor-initial-depth-probe",
+-    "cursor-same-id-lazy",
+-    "cursor-empty-many",
+-    "cursor-single-many",
+-    "graft-dense",
+-    "graft-signed-gapped",
+-    "graft-sparse",
+-    "graft-disjoint-alias",
+-    "overlap-dispatch-first-error",
+-    "graft-rigid-error",
+-    "graft-eager-first-error",
+-    "invalid-before-equations"
++    "solver-graft",
++    "solver-signed",
++    "solver-alias",
++    "solver-errors-and-reuse"
+   ],
+   "files": [
+-    "unify-owned-multihop.A",
+-    "unify-owned-multihop.C",
+-    "unify-owned-multihop.expected",
+-    "unify-owned-multihop.result",
+-    "unify-gen-error.A",
+-    "unify-gen-error.C",
+-    "unify-gen-error.expected",
+-    "unify-gen-error.result",
+-    "unify-constructor-error.A",
+-    "unify-constructor-error.C",
+-    "unify-constructor-error.expected",
+-    "unify-constructor-error.result",
+-    "state-normal.A",
+-    "state-normal.C",
+-    "state-normal.expected",
+-    "state-normal.result",
+-    "state-zero.A",
+-    "state-zero.C",
+-    "state-zero.expected",
+-    "state-zero.result",
+-    "state-depths.A",
+-    "state-depths.C",
+-    "state-depths.expected",
+-    "state-depths.result",
+-    "state-images.A",
+-    "state-images.C",
+-    "state-images.expected",
+-    "state-images.result",
+-    "state-grafted.A",
+-    "state-grafted.C",
+-    "state-grafted.expected",
+-    "state-grafted.result",
+-    "state-tree.A",
+-    "state-tree.C",
+-    "state-tree.expected",
+-    "state-tree.result",
+-    "colour-complete.A",
+-    "colour-complete.C",
+-    "colour-complete.expected",
+-    "colour-complete.result",
+-    "colour-cycle.A",
+-    "colour-cycle.C",
+-    "colour-cycle.expected",
+-    "colour-cycle.result",
+-    "poison-parents.A",
+-    "poison-parents.C",
+-    "poison-parents.expected",
+-    "poison-parents.result",
+-    "cursor-siblings.A",
+-    "cursor-siblings.C",
+-    "cursor-siblings.expected",
+-    "cursor-siblings.result",
+-    "cursor-ancestor.A",
+-    "cursor-ancestor.C",
+-    "cursor-ancestor.expected",
+-    "cursor-ancestor.result",
+-    "cursor-uneven.A",
+-    "cursor-uneven.C",
+-    "cursor-uneven.expected",
+-    "cursor-uneven.result",
+-    "cursor-signed.A",
+-    "cursor-signed.C",
+-    "cursor-signed.expected",
+-    "cursor-signed.result",
+-    "cursor-forest-first-error.A",
+-    "cursor-forest-first-error.C",
+-    "cursor-forest-first-error.expected",
+-    "cursor-forest-first-error.result",
+-    "cursor-initial-depth-probe.A",
+-    "cursor-initial-depth-probe.C",
+-    "cursor-initial-depth-probe.expected",
+-    "cursor-initial-depth-probe.result",
+-    "cursor-same-id-lazy.A",
+-    "cursor-same-id-lazy.C",
+-    "cursor-same-id-lazy.expected",
+-    "cursor-same-id-lazy.result",
+-    "cursor-empty-many.A",
+-    "cursor-empty-many.C",
+-    "cursor-empty-many.expected",
+-    "cursor-empty-many.result",
+-    "cursor-single-many.A",
+-    "cursor-single-many.C",
+-    "cursor-single-many.expected",
+-    "cursor-single-many.result",
+-    "graft-dense.A",
+-    "graft-dense.C",
+-    "graft-dense.expected",
+-    "graft-dense.result",
+-    "graft-dense.qualification",
+-    "graft-signed-gapped.A",
+-    "graft-signed-gapped.C",
+-    "graft-signed-gapped.expected",
+-    "graft-signed-gapped.result",
+-    "graft-signed-gapped.qualification",
+-    "graft-sparse.A",
+-    "graft-sparse.C",
+-    "graft-sparse.expected",
+-    "graft-sparse.result",
+-    "graft-sparse.qualification",
+-    "graft-disjoint-alias.A",
+-    "graft-disjoint-alias.C",
+-    "graft-disjoint-alias.expected",
+-    "graft-disjoint-alias.result",
+-    "graft-disjoint-alias.qualification",
+-    "overlap-dispatch-first-error.A",
+-    "overlap-dispatch-first-error.C",
+-    "overlap-dispatch-first-error.expected",
+-    "overlap-dispatch-first-error.result",
+-    "overlap-dispatch-first-error.qualification",
+-    "graft-rigid-error.A",
+-    "graft-rigid-error.C",
+-    "graft-rigid-error.expected",
+-    "graft-rigid-error.result",
+-    "graft-rigid-error.qualification",
+-    "graft-eager-first-error.A",
+-    "graft-eager-first-error.C",
+-    "graft-eager-first-error.expected",
+-    "graft-eager-first-error.result",
+-    "graft-eager-first-error.qualification",
+-    "invalid-before-equations.A",
+-    "invalid-before-equations.C",
+-    "invalid-before-equations.expected",
+-    "invalid-before-equations.result",
+-    "invalid-before-equations.qualification"
++    "solver-graft.A",
++    "solver-graft.C",
++    "solver-graft.expected",
++    "solver-graft.snapshot-A-before",
++    "solver-graft.snapshot-A-after",
++    "solver-graft.snapshot-C-before",
++    "solver-graft.snapshot-C-after",
++    "solver-graft.result",
++    "solver-signed.A",
++    "solver-signed.C",
++    "solver-signed.expected",
++    "solver-signed.snapshot-A-before",
++    "solver-signed.snapshot-A-after",
++    "solver-signed.snapshot-C-before",
++    "solver-signed.snapshot-C-after",
++    "solver-signed.result",
++    "solver-alias.A",
++    "solver-alias.C",
++    "solver-alias.expected",
++    "solver-alias.snapshot-A-before",
++    "solver-alias.snapshot-A-after",
++    "solver-alias.snapshot-C-before",
++    "solver-alias.snapshot-C-after",
++    "solver-alias.result",
++    "solver-errors-and-reuse.A",
++    "solver-errors-and-reuse.C",
++    "solver-errors-and-reuse.expected",
++    "solver-errors-and-reuse.snapshot-A-before",
++    "solver-errors-and-reuse.snapshot-A-after",
++    "solver-errors-and-reuse.snapshot-C-before",
++    "solver-errors-and-reuse.snapshot-C-after",
++    "solver-errors-and-reuse.result"
+   ],
+-  "file_count": 124,
+-  "stdout": "COMPLETE retained densePlace raw-contract differential\nCOMPLETE finite depth-cursor differential\nCOMPLETE finite public graft and dispatch differential\n",
+-  "stderr_bytes": 0,
+-  "encoding": "UTF-8",
++  "stdout": "COMPLETE finite Solver depth-cursor transactions\n",
++  "stderr": "",
++  "required_each_mode": "O0 and O2 separately:32 exact files; all4 PASS LF; A=C=expected bytes; each snapshot before=after and A=C; no unexpected exception; actual17home/object/interface mapping. Nonzero exit/FAIL is never success.",
+   "per_file_max_bytes": 1048576,
+   "total_max_bytes": 8388608,
+-  "result_grammar": [
+-    "PASS\n",
+-    "FAIL\n"
++  "expected_source": "Hand-written graftInput/graftExpected, fixed signed mapping and alias extension, rigid error and missing999 from previously frozen Main; never derive oracle from A/C Solver.",
++  "coverage_exclusions": [
++    "hidden-stub independent fixture",
++    "captured prepared-fallback transaction",
++    "arbitrary graph-payload laziness: snapshot is deliberately forced before operations",
++    "production/performance/native/95module compiler"
+   ],
+-  "completion_is_not_qualification": true,
+-  "qualification": "All29 A/C/expected byte-identical, all29 result PASS LF, exact8 qualification_files bytes, exact124 file set, expected stdout/empty stderr. COMPLETE alone never passes. Invalid/error cases count only their declared boundary; not successful graph coverage.",
+-  "qualification_files": {
+-    "graft-dense.qualification": "PASS\nvalidate.A=Right ()\nvalidate.C=Right ()\nvalidate.expected=Right ()\nbounds.A=Just (0,13)\nbounds.C=Just (0,13)\nbounds.expected=Just (0,13)\noutput.validate.A=Right ()\noutput.validate.C=Right ()\noutput.validate.expected=Right ()\n",
+-    "graft-signed-gapped.qualification": "PASS\nvalidate.A=Right ()\nvalidate.C=Right ()\nvalidate.expected=Right ()\nbounds.A=Just (-17,9)\nbounds.C=Just (-17,9)\nbounds.expected=Just (-17,9)\noutput.validate.A=Right ()\noutput.validate.C=Right ()\noutput.validate.expected=Right ()\n",
+-    "graft-sparse.qualification": "PASS\nvalidate.A=Right ()\nvalidate.C=Right ()\nvalidate.expected=Right ()\nbounds.A=Nothing\nbounds.C=Nothing\nbounds.expected=Nothing\noutput.validate.A=Right ()\noutput.validate.C=Right ()\noutput.validate.expected=Right ()\n",
+-    "graft-disjoint-alias.qualification": "PASS\nvalidate.A=Right ()\nvalidate.C=Right ()\nvalidate.expected=Right ()\nbounds.A=Just (0,13)\nbounds.C=Just (0,13)\nbounds.expected=Just (0,13)\noutput.validate.A=Right ()\noutput.validate.C=Right ()\noutput.validate.expected=Right ()\n",
+-    "overlap-dispatch-first-error.qualification": "PASS\nvalidate.A=Left \"graph must have one binding root\"\nvalidate.C=Left \"graph must have one binding root\"\nvalidate.expected=Left \"graph must have one binding root\"\nbounds.A=Nothing\nbounds.C=Nothing\nbounds.expected=Nothing\noutput.validate.A=NOT_APPLICABLE\noutput.validate.C=NOT_APPLICABLE\noutput.validate.expected=NOT_APPLICABLE\n",
+-    "graft-rigid-error.qualification": "PASS\nvalidate.A=Right ()\nvalidate.C=Right ()\nvalidate.expected=Right ()\nbounds.A=Just (0,13)\nbounds.C=Just (0,13)\nbounds.expected=Just (0,13)\noutput.validate.A=NOT_APPLICABLE\noutput.validate.C=NOT_APPLICABLE\noutput.validate.expected=NOT_APPLICABLE\n",
+-    "graft-eager-first-error.qualification": "PASS\nvalidate.A=Right ()\nvalidate.C=Right ()\nvalidate.expected=Right ()\nbounds.A=Just (0,13)\nbounds.C=Just (0,13)\nbounds.expected=Just (0,13)\noutput.validate.A=NOT_APPLICABLE\noutput.validate.C=NOT_APPLICABLE\noutput.validate.expected=NOT_APPLICABLE\n",
+-    "invalid-before-equations.qualification": "PASS\nvalidate.A=Left \"binding root must be a gen node\"\nvalidate.C=Left \"binding root must be a gen node\"\nvalidate.expected=Left \"binding root must be a gen node\"\nbounds.A=Just (0,0)\nbounds.C=Just (0,0)\nbounds.expected=Just (0,0)\noutput.validate.A=NOT_APPLICABLE\noutput.validate.C=NOT_APPLICABLE\noutput.validate.expected=NOT_APPLICABLE\n"
+-  }
++  "snapshot_scope": "Complete physical Graph/IntMap/IntSet/scope intervals+jumps before and after. Expected snapshot preservation and A/C equality, not hand-authored index bytes. finish additionally audits graph/index/scope invariants."
+ }
+--- graft-qualification/source-pins.json
++++ solver-qualification/source-pins.json
+@@ -1,9 +1,95 @@
+ [
++  {
++    "path": "csrc/host.c",
++    "bytes": 9739,
++    "sha256": "400d0bb9c4c0b610c7185517697be536da74dbf0dc5cffdac70dcf57462bd5a1"
++  },
++  {
++    "path": "csrc/khash.h",
++    "bytes": 21543,
++    "sha256": "4582c7fd4b98f61339ce677bb1daa7a45a53075b112a494a335525c4bda72074"
++  },
++  {
++    "path": "csrc/mlf_build_runner_hash.h",
++    "bytes": 2455,
++    "sha256": "cbbdfd06eb43324dceef594e42b21621559df3e3d4e91d62f2b73e2b04d9e778"
++  },
++  {
++    "path": "csrc/mlf_build_runner_posix.h",
++    "bytes": 265,
++    "sha256": "bc35cc65f2002b2f455a524c2a1c3bc12ea8637fc63bb88e3d49185e91448e27"
++  },
++  {
++    "path": "csrc/mlf_byte_file.h",
++    "bytes": 2472,
++    "sha256": "04e5b38198c49bd7aa3795de5f450011343cce1fd54ecdb116eda422ae210d98"
++  },
++  {
++    "path": "csrc/mlf_completion.h",
++    "bytes": 13446,
++    "sha256": "7eb127736e53948a324b58715abdea3f8df98900ca4724a94f59ca66b79388c5"
++  },
++  {
++    "path": "csrc/mlf_integer64.h",
++    "bytes": 2390,
++    "sha256": "ea826b120a1a866b912fe8df15542b638a3637dcaef000fe13ba90984b0b9608"
++  },
++  {
++    "path": "csrc/mlf_process_binding.h",
++    "bytes": 10279,
++    "sha256": "c9ef41739a3a388ec40701c5a9c778032618c9b8bf5c3d48e213840c0d242afa"
++  },
++  {
++    "path": "csrc/mlf_process_supervisor.c",
++    "bytes": 43367,
++    "sha256": "b24d362a891e966bf1a456f1983221eaf848fe6da80379850beb5067c63944e9"
++  },
++  {
++    "path": "csrc/mlf_process_supervisor.h",
++    "bytes": 6088,
++    "sha256": "808e2b68f101b03f6250d448b2e1100e1bdde2e060c669d783a0513b21d8fc05"
++  },
++  {
++    "path": "csrc/mlf_process_supervisor_posix.h",
++    "bytes": 3557,
++    "sha256": "fd0d199345e9d6310aaabe3dbab858a121a03c5cfafd28de50042d78ae0438ac"
++  },
++  {
++    "path": "csrc/mlf_runtime.h",
++    "bytes": 6197,
++    "sha256": "b778f6afeba571f38bf6ca0456352b231d830f805ee45c729d02e95b6d0fb6da"
++  },
++  {
++    "path": "csrc/mlf_system.h",
++    "bytes": 14082,
++    "sha256": "cc87aa9445c45e7e6fe66b2631a887be870baf3015f9daa6d6705d356ed37477"
++  },
++  {
++    "path": "csrc/mlf_system_windows.h",
++    "bytes": 9575,
++    "sha256": "31b4de3c8a5bd6051f7c8916624a250f8b4b305b40b4cc7923aa648894d654f3"
++  },
++  {
++    "path": "csrc/mlf_windows.h",
++    "bytes": 3423,
++    "sha256": "618fb88b0c854fcbe8dffee5b961a74025d79b89c00d7158dc540b15066e4b56"
++  },
++  {
++    "path": "csrc/mlf_windows_path.h",
++    "bytes": 5951,
++    "sha256": "e52b718c63e0603cb653a3874ae1a6130cd5a184121dde7868c4d03376c84e05"
++  },
+   {
+     "path": "src/Bootstrap/Graph.hs",
+     "bytes": 137874,
+     "sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+     "module": "Bootstrap.Graph"
++  },
++  {
++    "path": "src/Bootstrap/Graph/Solver.hs",
++    "module": "Bootstrap.Graph.Solver",
++    "bytes": 99201,
++    "sha256": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612"
+   },
+   {
+     "path": "src/Bootstrap/IndexVec.hs",
+@@ -60,6 +146,12 @@
+     "module": "Candidate.Graph"
+   },
+   {
++    "path": "src/Candidate/Graph/Solver.hs",
++    "module": "Candidate.Graph.Solver",
++    "bytes": 99201,
++    "sha256": "0f2519f110dbcd9370e8038b43f6cac5a66d6b5829f4a10bb2fb080509f1639b"
++  },
++  {
+     "path": "src/MLF/Host/Async.hs",
+     "bytes": 8881,
+     "sha256": "13e23c116edb65b36be54f78b477d080da62010651f76984c7c9cf895d03d1e5",
+@@ -85,88 +177,8 @@
+   },
+   {
+     "path": "src/Main.hs",
+-    "bytes": 14944,
+-    "sha256": "b21c3bdc3b178e6190da8887d2c71a088670aecb060dd92333fbb85529dc3384",
++    "bytes": 6891,
++    "sha256": "813dae8ca0eb99b1c11f38b5f24c892befc5ca01ecd3ae10c47619fa25cfffc4",
+     "module": "Main"
+-  },
+-  {
+-    "path": "csrc/host.c",
+-    "bytes": 9739,
+-    "sha256": "400d0bb9c4c0b610c7185517697be536da74dbf0dc5cffdac70dcf57462bd5a1"
+-  },
+-  {
+-    "path": "csrc/mlf_process_supervisor.c",
+-    "bytes": 43367,
+-    "sha256": "b24d362a891e966bf1a456f1983221eaf848fe6da80379850beb5067c63944e9"
+-  },
+-  {
+-    "path": "csrc/khash.h",
+-    "bytes": 21543,
+-    "sha256": "4582c7fd4b98f61339ce677bb1daa7a45a53075b112a494a335525c4bda72074"
+-  },
+-  {
+-    "path": "csrc/mlf_build_runner_hash.h",
+-    "bytes": 2455,
+-    "sha256": "cbbdfd06eb43324dceef594e42b21621559df3e3d4e91d62f2b73e2b04d9e778"
+-  },
+-  {
+-    "path": "csrc/mlf_build_runner_posix.h",
+-    "bytes": 265,
+-    "sha256": "bc35cc65f2002b2f455a524c2a1c3bc12ea8637fc63bb88e3d49185e91448e27"
+-  },
+-  {
+-    "path": "csrc/mlf_byte_file.h",
+-    "bytes": 2472,
+-    "sha256": "04e5b38198c49bd7aa3795de5f450011343cce1fd54ecdb116eda422ae210d98"
+-  },
+-  {
+-    "path": "csrc/mlf_completion.h",
+-    "bytes": 13446,
+-    "sha256": "7eb127736e53948a324b58715abdea3f8df98900ca4724a94f59ca66b79388c5"
+-  },
+-  {
+-    "path": "csrc/mlf_integer64.h",
+-    "bytes": 2390,
+-    "sha256": "ea826b120a1a866b912fe8df15542b638a3637dcaef000fe13ba90984b0b9608"
+-  },
+-  {
+-    "path": "csrc/mlf_process_binding.h",
+-    "bytes": 10279,
+-    "sha256": "c9ef41739a3a388ec40701c5a9c778032618c9b8bf5c3d48e213840c0d242afa"
+-  },
+-  {
+-    "path": "csrc/mlf_process_supervisor.h",
+-    "bytes": 6088,
+-    "sha256": "808e2b68f101b03f6250d448b2e1100e1bdde2e060c669d783a0513b21d8fc05"
+-  },
+-  {
+-    "path": "csrc/mlf_process_supervisor_posix.h",
+-    "bytes": 3557,
+-    "sha256": "fd0d199345e9d6310aaabe3dbab858a121a03c5cfafd28de50042d78ae0438ac"
+-  },
+-  {
+-    "path": "csrc/mlf_runtime.h",
+-    "bytes": 6197,
+-    "sha256": "b778f6afeba571f38bf6ca0456352b231d830f805ee45c729d02e95b6d0fb6da"
+-  },
+-  {
+-    "path": "csrc/mlf_system.h",
+-    "bytes": 14082,
+-    "sha256": "cc87aa9445c45e7e6fe66b2631a887be870baf3015f9daa6d6705d356ed37477"
+-  },
+-  {
+-    "path": "csrc/mlf_system_windows.h",
+-    "bytes": 9575,
+-    "sha256": "31b4de3c8a5bd6051f7c8916624a250f8b4b305b40b4cc7923aa648894d654f3"
+-  },
+-  {
+-    "path": "csrc/mlf_windows.h",
+-    "bytes": 3423,
+-    "sha256": "618fb88b0c854fcbe8dffee5b961a74025d79b89c00d7158dc540b15066e4b56"
+-  },
+-  {
+-    "path": "csrc/mlf_windows_path.h",
+-    "bytes": 5951,
+-    "sha256": "e52b718c63e0603cb653a3874ae1a6130cd5a184121dde7868c4d03376c84e05"
+   }
+ ]
+--- graft-qualification/README.md
++++ solver-qualification/README.md
+@@ -1,30 +1,16 @@
+-# Experimental depth-cursor finite Graph qualification
++# Finite Solver depth-cursor qualification
+ 
+-This isolated qualification branch changes no production source. Its frozen closure has15 Haskell modules plus16 C/header inputs. Main SHA256 is `b21c3bdc3b178e6190da8887d2c71a088670aecb060dd92333fbb85529dc3384`. Bootstrap.Graph is the retained baseline; Candidate.Graph contains the exact already-frozen depth-cursor candidate, without new algorithm changes.
++Exact push branch `perf/depth-cursor-solver-qualification-20261117`; baseline main `fc300bc9fdc389b585cbef0630fc8915d53e89c5`. One Ubuntu24.04 job,12min,read-only contents. No main/PR changes, ordinary compiler benchmark or native execution.
+ 
+-Twenty-one original cases are retained, plus eight public-Graph graft/identity/error cases. Each optimization requires29 A/C/expected raw comparisons and PASS LF, eight exact prerequisite-qualification files, exactly124 files, exact completion stdout and empty target stderr. Completion text alone never passes. The overlapping node/link example is an invalid two-root eligibility/first-error case, not qualification of a valid overlapping graft. Both ordinary sparse rebinding and signed/gapped dense inputs have separate proposed successful graft cases. These fixed expectations can fail; baseline rejection is not candidate coverage.
++33 inputs:17 Haskell homes and16 C/header files. Main SHA256 `813dae8ca0eb99b1c11f38b5f24c892befc5ca01ecd3ae10c47619fa25cfffc4`. Other30 inherited inputs remain byte-identical to the successful Graph CI v3 bundle. Baseline Solver is exact main source; candidate Solver changes only module declaration and Graph import. The inherited Candidate.Graph is the module-renamed frozen version SHA256 `f8f98a2324092bffa3ea3421c8b5c1b02394e532cf5884fc2a7f719a4277e7e7`, not the original unrenamed overlay identity. Graph algorithms are unchanged.
+ 
+-## Independent CI contract
+-Only pushes to `perf/depth-cursor-graft-qualification-20261117` run this workflow. Ubuntu24.04, one sequential job,12-minute job limit, contents:read and checkout without retained credentials. Official GHC9.14.1 deb12 bindist is fixed at SHA256 `60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841`,306812040 bytes. Installation is bounded300s and checked by exact version/global package DB; installed-prefix inventory is recorded and rechecked around qualification. No cache or borrowed compiler.
++Four groups cover graft, signed IDs, alias, errors-and-reuse. Each mode must produce exactly32 files: per group A/C/hand-written expected graph-error bytes, four complete snapshots and PASS LF. All A=C=expected; all snapshot A/C before/after bytes equal. Exact COMPLETE stdout and empty stderr. COMPLETE alone is not success. Actual compile logs and object/interface sets must show exactly17 homes per fresh O0/O2 build. Source/toolchain/runtime/binary identities are checked before/after; warnings and all failure logs retained.
+ 
+-CI has an explicit new4GiB MemAvailable floor (not the previous private6GiB qualification),12GiB initial free disk for installation and4GiB free disk for focused qualification,4GiB per-child address space and240 CPU seconds. Installation-only subprocesses have1GiB per-file FSIZE, accommodating the fixed306812040-byte official bindist and the authenticated629328882-byte largest installed file. Focused compilation/metadata/targets retain8MiB per-file FSIZE. This is an explicit phase policy, not an unbounded installer or a focused-limit increase. Focused gate180s total/work150/post165, aggregate compilation120s, target20s total/10 each. Two C objects are shared, while O0/O2 each get fresh objects/interfaces/stubs/executable/cwd. Exact15 actual compiled-module and object/interface sets are checked. Compiler warning stderr is preserved, not blanket-rejected.
++Snapshots are deliberately fully forced before operations. Arbitrary graph-payload laziness, hidden-stub independent fixtures and captured prepared-fallback transactions remain unqualified. Old29 Graph cases are not rerun. This is finite semantics only, not production/native qualification, timing or performance benefit.
+ 
+-Source31 byte pins, experiment metadata, compiler/toolchain and named host tools, generated binaries and actual four-library runtime identities are checked before/after. Linux wait4 direct-child rusage is diagnostic only. Cleanup covers owned process groups, not all global descendants/ECHILD. Failures and partial output remain evidence. No ordinary full producer, performance samples, native bootstrap, production qualification or speed claim.
++## Unchanged inherited resources
++Official GHC9.14.1 archive306812040B, SHA256 `60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841`; installation300s,1GiB per-file,initial disk12GiB. Focused180s,aggregate compile120s,target20s (10s each),AS4GiB,8MiB per-file,host available4GiB/disk4GiB. Jobs1,artifacts <=96MiB excluding toolchain prefix/archive. No retry. Normal proxy/certificate inheritance without logging values; only allowlisted GitHub identity recorded.
+ 
+-Artifact scope is only logs, receipts, source/identity manifests and focused output; it excludes installed/downloaded GHC directories and credentials. Live aggregate cap88MiB reserves room for final evidence; final raw artifact hard cap96MiB. If exceeded, upload refuses rather than silently dropping data. The full frozen sources remain in this branch. No environment dump or secret transmission is requested.
++Graph run44109098015 exact download succeeded but extraction failed SIGXFSZ under512MiB; original failure retained. Historical largest installed file629328882B and peak disk8008471877B justified the corrected installation-only1GiB/12GiB policy inherited here. No old failure is reclassified. Process-group cleanup is retained, not a global/ECHILD claim.
+ 
+-This bundle was prepared without executing installation, compilation, tests, workflow or publication. CI results must be independently reviewed before any further decision.
+-
+-Proxy and certificate configuration is inherited only through the normal dedicated variables; their values are not serialized. Checkout/upload action revisions match the verified main workflow pins. This experiment is based on main fc300bc9fdc389b585cbef0630fc8915d53e89c5; it does not claim complete main CI qualification.
+-
+-## V2 correction
+-V1 was blocked statically because its8MiB RLIMIT_FSIZE also constrained the306812040-byte download; no v1 installation or target ran. V1 is preserved separately. V2 separates install512MiB/focused8MiB and records actual selected phase limits in every child record and final receipt. Installer logs are still subject to the artifact aggregate polling/final upload caps; an oversized artifact is refused, never silently truncated.512MiB is a bounded policy, not a claim that a full installation has already succeeded.
+-
+-Receipts carry only GITHUB_SHA,GITHUB_RUN_ID,GITHUB_RUN_ATTEMPT,GITHUB_REPOSITORY,GITHUB_REF. Repository/ref and identity grammar are checked, and qualification requires its installation receipt to have the same five values. Proxy/certificate variables still propagate for network access but are not serialized. Frozen31 inputs,29-case/124-file contract and workflow/action pins are unchanged.
+-
+-## V3 actual-failure correction
+-CI run44109098015 at commit8d099bd97ab390ae2260cb0e3441ab00f5e3c579 verified the306812040-byte official archive and its fixed60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841 SHA, then tar exited-25(SIGXFSZ) under the512MiB installation file limit. Cleanup completed; configuration/compilation/semantic targets did not run. That original failure remains evidence, not a candidate semantic failure.
+-
+-An authenticated historical successful installation inventory (SHA256f7f424d1def54f6faa0ff9c4ff1eaa9214fd55852dda887ebb16ae3ff224b2e0) contains15551 entries and3793972455 regular bytes. Its largest relative file is `lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/ghc-9.14.1-da80/libHSghc-9.14.1-da80_p.a`,629328882 bytes,SHA256d95ca3a885b3992fdc4c47b379af0322d31b08f3237be4d4fd9eb87eacb3ef0d. Declared archive expansion was3794900086 bytes; historical observed peak installation occupancy was8008471877 bytes, with a successful1GiB per-file limit.
+-
+-V3 therefore changes installation-only FSIZE to1GiB and initial free-disk floor to12GiB, recording the required floor. Focused8MiB FSIZE/4GiB disk floor,4GiB address limit, every time budget, frozen31 inputs,29/124 contract and workflow remain unchanged. These historical measurements justify bounded capacity, not a promise that the new CI run succeeds. No new execution or publication was performed when preparing V3.
++Preparation was static only. One metadata assertion initially confused original unrenamed Graph overlay SHA with inherited module-renamed Candidate.Graph SHA; preparation stopped before harness completion. Corrected by checking every inherited source against its original source-pin record, with zero Graph-byte changes. No compiler, target, workflow or publication was executed during preparation.

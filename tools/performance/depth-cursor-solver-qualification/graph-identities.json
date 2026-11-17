@@ -1,0 +1,17 @@
+{
+  "schema": "separate-Graph-identities-v1",
+  "overlay": {
+    "module": "Bootstrap.Graph",
+    "bytes": 144612,
+    "sha256": "8d145bd52e8c367dd9d47891754d1727b7f2ae7f68cc271535fa01f1eda0bee9"
+  },
+  "focused_candidate": {
+    "module": "Candidate.Graph",
+    "bytes": 144612,
+    "sha256": "f8f98a2324092bffa3ea3421c8b5c1b02394e532cf5884fc2a7f719a4277e7e7"
+  },
+  "relationship": "Exactly one module declaration rename; all remaining bytes identical",
+  "solver_A_sha256": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612",
+  "solver_C_sha256": "0f2519f110dbcd9370e8038b43f6cac5a66d6b5829f4a10bb2fb080509f1639b",
+  "runtime_executed": false
+}
