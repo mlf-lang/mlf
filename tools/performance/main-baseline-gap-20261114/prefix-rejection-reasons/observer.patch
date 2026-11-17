@@ -1,0 +1,112 @@
+--- a/libraries/mlf-inference/Bootstrap/Graph/Solver.hs
++++ b/libraries/mlf-inference/Bootstrap/Graph/Solver.hs
+@@ -2,6 +2,7 @@
+ {-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
+              KindSignatures, FlexibleContexts, FlexibleInstances,
+              MultiParamTypeClasses, OverloadedStrings #-}
++{-# OPTIONS_GHC -fno-cse -fno-full-laziness #-}
+ module Bootstrap.Graph.Solver where {
+   import MLF.Primitive;
+   import Bootstrap.Types;
+@@ -10,6 +11,7 @@
+   import qualified Bootstrap.IntSet as IS;
+   import qualified Bootstrap.IntRank as Rank;
+   import qualified Bootstrap.Graph as G;
++  import qualified Prototype.PrefixReasons as Capture;
+   -- The incremental solver projects a component closed under both directions
+   -- of type structure and binding. Generalization scopes are retained with
+   -- their common ancestors; unused scope roots have private bottom witnesses.
+@@ -1948,14 +1950,14 @@
+     };
+   -- Never skip an unknown payload comparison to look for a later conflict.
+   -- This is the exact safe prefix of congruentExpansionMap, not a type matcher.
+-  fallbackPrefixRejected :: Graph -> Int -> IntMap Int -> [] ((,) Int Int) -> Bool;
+-  fallbackPrefixRejected current first images pending = case pending of {
++  fallbackPrefixRejectedOriginal :: Graph -> Int -> IntMap Int -> [] ((,) Int Int) -> Bool;
++  fallbackPrefixRejectedOriginal current first images pending = case pending of {
+     [] -> False;
+     (:) ((,) source target) rest ->
+       if source < first || target >= first then False else
+       case IM.lookup source images of {
+         Just previous -> if previous == target
+-          then fallbackPrefixRejected current first images rest else True;
++          then fallbackPrefixRejectedOriginal current first images rest else True;
+         Nothing -> case IM.lookup source (G.nodes current) of {
+           Nothing -> False;
+           Just copy -> case IM.lookup target (G.nodes current) of {
+@@ -1965,15 +1967,15 @@
+               if G.isBottom (G.tag old) && L.not (G.isBottom (G.tag copy)) then True else
+               let { next = IM.insert source target images } in
+               if G.isBottom (G.tag copy)
+-              then fallbackPrefixRejected current first next rest
++              then fallbackPrefixRejectedOriginal current first next rest
+               else case G.tag copy of {
+                 GArr a b -> case G.tag old of {
+-                  GArr c d -> fallbackPrefixRejected current first next
++                  GArr c d -> fallbackPrefixRejectedOriginal current first next
+                     ((:) ((,) a c) ((:) ((,) b d) rest));
+                   _ -> False
+                 };
+                 GTyApp a b -> case G.tag old of {
+-                  GTyApp c d -> fallbackPrefixRejected current first next
++                  GTyApp c d -> fallbackPrefixRejectedOriginal current first next
+                     ((:) ((,) a c) ((:) ((,) b d) rest));
+                   _ -> False
+                 };
+@@ -1983,6 +1985,44 @@
+         }
+       }
+   };
++  fallbackPrefixReason :: Graph -> Int -> IntMap Int -> [] ((,) Int Int) -> Int;
++  fallbackPrefixReason current first images pending = case pending of {
++    [] -> 0;
++    (:) ((,) source target) rest ->
++      if source < first || target >= first then 0 else
++      case IM.lookup source images of {
++        Just previous -> if previous == target
++          then fallbackPrefixReason current first images rest else 1;
++        Nothing -> case IM.lookup source (G.nodes current) of {
++          Nothing -> 0;
++          Just copy -> case IM.lookup target (G.nodes current) of {
++            Nothing -> 0;
++            Just old ->
++              if G.isGen (G.tag old) || G.isGen (G.tag copy) then 0 else
++              if G.isBottom (G.tag old) && L.not (G.isBottom (G.tag copy)) then 2 else
++              let { next = IM.insert source target images } in
++              if G.isBottom (G.tag copy)
++              then fallbackPrefixReason current first next rest
++              else case G.tag copy of {
++                GArr a b -> case G.tag old of {
++                  GArr c d -> fallbackPrefixReason current first next
++                    ((:) ((,) a c) ((:) ((,) b d) rest));
++                  _ -> 0
++                };
++                GTyApp a b -> case G.tag old of {
++                  GTyApp c d -> fallbackPrefixReason current first next
++                    ((:) ((,) a c) ((:) ((,) b d) rest));
++                  _ -> 0
++                };
++                _ -> 0
++              }
++          }
++        }
++      }
++  };
++  fallbackPrefixRejected :: Graph -> Int -> IntMap Int -> [] ((,) Int Int) -> Bool;
++  fallbackPrefixRejected current first images pending =
++    L.not (fallbackPrefixReason current first images pending == 0);
+   -- Every fresh node is reachable from copied root and is not a Gen boundary.
+   -- Old component entry points cover equations and all external fresh edges.
+   -- No Solver containing an expanded Graph with incomplete indexes is built.
+@@ -2173,9 +2213,9 @@
+         seq (G.strictGraph current)
+           (if fallbackStageEligible first root oldTarget frontier current
+            then seq (forceExpansionEdges fresh)
+-             (if fallbackPrefixRejected current first
++             (if L.not (Capture.observeReason (fallbackPrefixReason current first
+                    (IM.fromList (L.map (\((,) original proxy) -> (,) proxy original) frontier))
+-                   ((:) ((,) root oldTarget) [])
++                   ((:) ((,) root oldTarget) [])) == 0)
+               then unifyPreparedFallback equations solver current first fresh
+               else ordinary)
+            else ordinary));

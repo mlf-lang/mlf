@@ -1,0 +1,60 @@
+{
+  "baseline_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "finite": {
+    "O0_run": false,
+    "completed": 13,
+    "mapping_conflict": 1,
+    "old_bottom_hole": 2,
+    "original_false": 10,
+    "records": 14,
+    "review_sha256": "d6930e7f51d2e0766db72a7214c61c3faac10fc7a0f2c2501106bf6f6c3563e5",
+    "sidecars": 59,
+    "status": "PASS_INDEPENDENT_ACTUAL_FINITE_PREFIX_REJECTION_REASONS_O2_ONLY",
+    "stdout_bytes": 52
+  },
+  "limitations": [
+    "First rejection witness only, not all holes or congruence failures",
+    "Counts are not cost shares or removable work",
+    "No new graft algorithm qualification",
+    "No performance/native/production qualification"
+  ],
+  "real": {
+    "calls": 17801,
+    "compiler_warnings": 37,
+    "independent_actual_review": "PASS_INDEPENDENT_ACTUAL_BOUNDED_CHECKS",
+    "mapping_conflict": 4045,
+    "old_bottom_hole": 10486,
+    "original_false": 3270,
+    "performance_samples": 0,
+    "raw_ascii": "prefix-reasons-v1\tcalls\toriginal_false\tmapping_conflict\told_bottom_hole\ncomplete\t17801\t3270\t4045\t10486\n",
+    "raw_bytes": 103,
+    "raw_sha256": "392714625dd8d703419b840827a4ef46bd34fd27827b6df32ce85f60365f2790",
+    "review_manifest_sha256": "fa356755a94d1802579feb53989952268f89596351a6d6369c7e81a171a201c1",
+    "review_sha256": "0c23e0ec0df04c511001b87d216bcacc041b39fc4599f0183650b969c1924f40",
+    "target_stderr_bytes": 0
+  },
+  "source_pins": {
+    "archived_source_files": {
+      "Prototype/PrefixReasons.hs": {
+        "bytes": 1663,
+        "sha256": "378d7d4f915b91e1d2b54ff1f3828eb0b9fa9983c10dd4f134bf163c81b31eab"
+      },
+      "observer.patch": {
+        "bytes": 5699,
+        "sha256": "6609bff73473ac05b233490e3f9887b1388ec15c078e559959ecaf60e4c0ed68"
+      },
+      "tests/Main.hs": {
+        "bytes": 3608,
+        "sha256": "a02b6968ac0fc6c84dccd7ce1d88d627d06ed44cff6c270c514efe94610c8d77"
+      },
+      "tests/expected-files.json": {
+        "bytes": 2079,
+        "sha256": "4d98789069e51ecf711a79916401fe75da715c3dc4466f738d246240715151ba"
+      }
+    },
+    "baseline_solver_sha256": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612",
+    "overlay_solver_sha256": "2dd365fe2ab7a086ea620718040c28dbc2214b557ba490c641c170d755bc5edf",
+    "source_manifest_sha256": "d3d8f75dde8fd57b1ad071d5c31432f018346f1ac04d5bd1f52539aa595afedb"
+  },
+  "status": "PASS_BOUNDED_SINGLE_PREFIX_REJECTION_REASON_DIAGNOSTIC_ONLY"
+}
