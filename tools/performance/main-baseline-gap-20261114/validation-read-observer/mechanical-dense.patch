@@ -1,0 +1,251 @@
+--- baseline-selected-dense-functions
++++ observer-selected-dense-functions
+@@ -1,5 +1,5 @@
+-  denseValidation :: forall s. Graph -> Int -> Int -> ST s (Either String ());
+-  denseValidation graph low high =
++  denseValidation :: forall s. STArray s Int -> STArray s ([] Event) -> Graph -> Int -> Int -> ST s (Either String ());
++  denseValidation logCount logEvents graph low high =
+     let {
+       count = ((high - low) + 1)
+     } in
+@@ -23,7 +23,7 @@
+                                              kinds
+                                              starts
+                                              ends
+-                                             visited
++                                             visited logCount logEvents
+                                        } in
+                                        let {
+                                          entries = IM.toList (nodes graph)
+@@ -32,21 +32,26 @@
+                                          (\loaded -> denseValidateEntries state entries))))))));
+ 
+   denseGetNode :: forall s. DenseValidation s -> Int -> ST s (Maybe Node);
+-  denseGetNode (DenseValidation graph low high table descendants colours kinds starts ends visited) n =
+-    if ((n < low) || (high < n)) then stReturn Nothing else readDense low table n;
++  denseGetNode state@(DenseValidation graph low high table descendants colours kinds starts ends visited logCount logEvents) n =
++    stBind (if ((n < low) || (high < n)) then stReturn Nothing else readDense low table n)
++      (\answer -> case answer of {
++        Nothing -> stBind (emit state "node:absent" (Just n)) (\logged -> stReturn answer);
++        Just value -> stBind (emit state "node:present" (Just n)) (\logged -> stReturn answer)
++      });
+ 
+   denseRequire :: forall s. DenseValidation s -> Int -> ST s (Either String Node);
+   denseRequire state n =
+-    stBind (denseGetNode state n)
++    traceE state "require" (Just n)
++      (stBind (denseGetNode state n)
+       (\answer ->
+          case answer of {
+            Nothing -> ST.failE ("missing graph node " ++ showInt n);
+            Just value -> ST.pureE value
+-         });
+-
++         }));
+   denseCheckBinder :: forall s. DenseValidation s -> (,) Int Node -> ST s (Either String ());
+   denseCheckBinder state ((,) n v) =
+-    case binder v of {
++    traceE state "binder-exists" (Just n)
++      (case binder v of {
+       Nothing -> ST.pureE ();
+       Just b ->
+         stBind (denseGetNode state b)
+@@ -55,10 +60,9 @@
+                Nothing -> ST.failE "missing binder";
+                Just ignored -> ST.pureE ()
+              })
+-    };
+-
++    });
+   denseAddDescendant :: forall s. DenseValidation s -> (,) Int Node -> ST s ();
+-  denseAddDescendant (DenseValidation graph low high table descendants colours kinds starts ends visited) ((,) n v) =
++  denseAddDescendant (DenseValidation graph low high table descendants colours kinds starts ends visited logCount logEvents) ((,) n v) =
+     case binder v of {
+       Nothing -> stReturn ();
+       Just b ->
+@@ -69,7 +73,7 @@
+   denseBindingVisit :: forall s. DenseValidation s -> Int -> Int -> ST s Int;
+   denseBindingVisit state n position =
+     case state of {
+-      DenseValidation graph low high table descendants colours kinds starts ends visited ->
++      DenseValidation graph low high table descendants colours kinds starts ends visited logCount logEvents ->
+         stBind (writeDenseInt low starts n position)
+           (\ignored ->
+              stBind (readDense low descendants n)
+@@ -79,11 +83,12 @@
+     };
+ 
+   denseContains :: forall s. DenseValidation s -> Int -> Int -> ST s Bool;
+-  denseContains (DenseValidation graph low high table descendants colours kinds starts ends visited) ancestor n =
++  denseContains state@(DenseValidation graph low high table descendants colours kinds starts ends visited logCount logEvents) ancestor n =
++    stBind (emit state "dependency:global-euler" Nothing) (\logged ->
+     stBind (readDense low starts ancestor)
+       (\a ->
+          stBind (readDense low ends ancestor)
+-           (\b -> stBind (readDense low starts n) (\p -> stReturn ((a <= p) && (p < b)))));
++           (\b -> stBind (readDense low starts n) (\p -> stReturn ((a <= p) && (p < b))))));
+ 
+   denseStructurally :: forall s. DenseValidation s ->
+                                  Int -> Int -> [] Int -> ST s (Either String Bool);
+@@ -92,10 +97,8 @@
+       [] -> ST.pureE False;
+       (:) original rest ->
+         case state of {
+-          DenseValidation graph low high table descendants colours kinds starts ends visited ->
+-            let {
+-              n = resolve graph original
+-            } in
++          DenseValidation graph low high table descendants colours kinds starts ends visited logCount logEvents ->
++            stBind (resolveObserved state original) (\n ->
+             if (n == wanted)
+             then ST.pureE True
+             else ST.bindE (denseRequire state n)
+@@ -106,15 +109,17 @@
+                            then denseStructurally state wanted stamp rest
+                            else stBind (writeDenseInt low visited n stamp)
+                                   (\written ->
++                                     stBind (emit state "selector:structural-tag-children" (Just n)) (\logged ->
+                                      denseStructurally state wanted stamp
+-                                       (L.append (children (tag v)) rest))))
+-        }
++                                       (L.append (children (tag v)) rest)))))
++        )}
+     };
+ 
+   denseValidateEntries :: forall s. DenseValidation s ->
+                                     [] ((,) Int Node) -> ST s (Either String ());
+   denseValidateEntries state entries =
+-    case L.filter
++    traceE state "global-root-binding-euler" (Nothing)
++      (case L.filter
+            (\entry ->
+               case entry of {
+                 (,) n v ->
+@@ -132,23 +137,22 @@
+                   stBind (denseBindingVisit state root 0)
+                     (\count ->
+                        if (count == L.length entries)
+-                       then denseKindEntries state entries
++                       then stBind (emit state "success:global-euler" Nothing) (\logged -> denseKindEntries state entries)
+                        else ST.failE "cyclic binding tree")));
+       _ -> ST.failE "graph must have one binding root"
+-    };
+-
++    });
+   denseChild :: forall s. DenseValidation s -> Int -> Int -> ST s (Either String Kind);
+   denseChild state parent original =
+-    case state of {
+-      DenseValidation graph low high table descendants colours kinds starts ends visited ->
+-        let {
+-          n = resolve graph original
+-        } in
++    traceE state "edge-gates" (Nothing)
++      (case state of {
++      DenseValidation graph low high table descendants colours kinds starts ends visited logCount logEvents ->
++        stBind (resolveObserved state original) (\n ->
+         ST.bindE (denseRequire state n)
+           (\v ->
++             stBind (emit state "selector:child-tag" (Just n)) (\logged ->
+              if isGen (tag v)
+              then ST.failE "gen nodes cannot be structural children"
+-             else case binder v of {
++             else stBind (emit state "selector:child-binder" (Just n)) (\binderRead -> case binder v of {
+                     Nothing -> ST.failE "structural child has no binder";
+                     Just b ->
+                       stBind (denseContains state b parent)
+@@ -156,41 +160,43 @@
+                            if dominated
+                            then denseKind state n v
+                            else ST.failE "ill-dominated type graph")
+-                  })
+-    };
+-
++                  })))
++    )});
+   denseKindBinder :: forall s. DenseValidation s -> Int -> Node -> ST s (Either String ());
+   denseKindBinder state n v =
+-    case binder v of {
+-      Nothing -> ST.check (isGen (tag v)) "binding root must be a gen node";
++    traceE state "node-binder" (Just n)
++      (case binder v of {
++      Nothing -> stBind (emit state "selector:root-tag" (Just n)) (\logged -> ST.check (isGen (tag v)) "binding root must be a gen node");
+       Just b ->
+         ST.bindE (denseRequire state b)
+           (\parent ->
++             stBind (emit state "selector:parent-tag" (Just b)) (\logged ->
+              if isGen (tag parent)
+              then ST.pureE ()
+              else case state of {
+-                    DenseValidation graph low high table descendants colours kinds starts ends visited ->
+-                      if L.any (\child -> (resolve graph child == n)) (children (tag parent))
++                    DenseValidation graph low high table descendants colours kinds starts ends visited logCount logEvents ->
++                      stBind (directChildObserved state n (children (tag parent)))
++                      (\direct -> if direct
+                       then ST.pureE ()
+                       else stBind (readDense low starts n)
+                              (\stamp ->
+                                 ST.bindE (denseStructurally state n stamp ((:) b []))
+                                   (\found ->
+                                      ST.check found
+-                                       "a type binder must structurally contain its node"))
+-                  })
+-    };
+-
++                                       "a type binder must structurally contain its node")))
++                  }))
++    });
+   denseKind :: forall s. DenseValidation s -> Int -> Node -> ST s (Either String Kind);
+   denseKind state n v =
+-    case state of {
+-      DenseValidation graph low high table descendants colours kinds starts ends visited ->
++    traceE state "kind-fact" (Just n)
++      (case state of {
++      DenseValidation graph low high table descendants colours kinds starts ends visited logCount logEvents ->
+         stBind (readDense low colours n)
+           (\colour ->
+              if (colour == 1)
+              then ST.failE "infinite type (occurs check)"
+              else if (colour == 2)
+-                  then ST.liftE (readDense low kinds n)
++                  then stBind (emit state "cache:kind-hit" (Just n)) (\logged -> ST.liftE (readDense low kinds n))
+                   else stBind (writeDenseInt low colours n 1)
+                          (\active ->
+                             ST.bindE (denseKindBinder state n v)
+@@ -201,19 +207,19 @@
+                                         (\stored ->
+                                            stBind (writeDenseInt low colours n 2)
+                                              (\complete -> ST.pureE kind))))))
+-    };
+-
++    });
+   denseTagKind :: forall s. DenseValidation s -> Int -> Node -> ST s (Either String Kind);
+   denseTagKind state n v =
+-    case tag v of {
++    traceE state "tag-kind" (Just n)
++      (case tag v of {
+       GBot -> ST.pureE Star;
+-      GBotK kind -> ST.pureE kind;
+-      GTyCon name kind -> ST.pureE kind;
+-      GSkolem identity kind -> ST.pureE kind;
++      GBotK kind -> stBind (emit state "selector:kind-payload-not-forced" (Just n)) (\logged -> ST.pureE kind);
++      GTyCon name kind -> stBind (emit state "selector:kind-payload-not-forced" (Just n)) (\logged -> ST.pureE kind);
++      GSkolem identity kind -> stBind (emit state "selector:kind-payload-not-forced" (Just n)) (\logged -> ST.pureE kind);
+       GGen child ->
+-        if equalFlag (flag v) Flexible
++        stBind (emit state "selector:gen-flag" (Just n)) (\logged -> if equalFlag (flag v) Flexible
+         then denseChild state n child
+-        else ST.failE "gen nodes must be flexible";
++        else ST.failE "gen nodes must be flexible");
+       GArr a b ->
+         ST.bindE (denseChild state n a)
+           (\ka ->
+@@ -231,8 +237,7 @@
+       GTyApp function argument ->
+         ST.bindE (denseChild state n function)
+           (\kf -> ST.bindE (denseChild state n argument) (\ka -> stReturn (applyKind kf ka)))
+-    };
+-
++    });
+   denseLoadValidation :: forall s. Int ->
+                                    STArray s (Maybe Node) -> [] ((,) Int Node) -> ST s ();
+   denseLoadValidation low table values =

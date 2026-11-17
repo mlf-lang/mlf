@@ -1,0 +1,582 @@
+{
+  "O0_equivalence": false,
+  "actual_review_pass": true,
+  "automatic_next_experiment": false,
+  "build": {
+    "GHC_version": "9.14.1",
+    "five_recorded_steps_exit_zero": true,
+    "fixture_elf": {
+      "bytes": 3499984,
+      "role": "Finite fixture only, not ordinary compiler producer.",
+      "sha256": "5fc7d6c92226779603460750698b08072f8c57c923796d0c5fb9366452c2ef5a"
+    },
+    "fresh_C_objects": 2,
+    "fresh_objects_and_interfaces": 32,
+    "home_modules": 16,
+    "home_source_bytes": 327082,
+    "optimization": "O2",
+    "staged_files": 32,
+    "warnings": {
+      "GHC-39567": 16,
+      "GHC-68441": 1
+    }
+  },
+  "case_count": 14,
+  "cases": [
+    {
+      "A_C_literal_equal": true,
+      "event_lines": 38,
+      "label": "valid",
+      "outcome": "Right"
+    },
+    {
+      "A_C_literal_equal": true,
+      "event_lines": 89,
+      "label": "cached-kind-edge",
+      "outcome": "Left ill-dominated type graph"
+    },
+    {
+      "A_C_literal_equal": true,
+      "event_lines": 51,
+      "label": "gen-before-poison",
+      "outcome": "Left gen nodes cannot be structural children"
+    },
+    {
+      "A_C_literal_equal": true,
+      "event_lines": 39,
+      "label": "unused-kind",
+      "outcome": "Right"
+    },
+    {
+      "A_C_literal_equal": true,
+      "event_lines": 39,
+      "label": "unused-name",
+      "outcome": "Right"
+    },
+    {
+      "A_C_literal_equal": true,
+      "event_lines": 38,
+      "label": "unused-next",
+      "outcome": "Right"
+    },
+    {
+      "A_C_literal_equal": true,
+      "event_lines": 1,
+      "label": "forced-kind",
+      "outcome": "Probe forced-kind"
+    },
+    {
+      "A_C_literal_equal": true,
+      "event_lines": 2,
+      "label": "root-before-parent-poison",
+      "outcome": "Left graph must have one binding root"
+    },
+    {
+      "A_C_literal_equal": true,
+      "event_lines": 7,
+      "label": "missing-binder-before-kind",
+      "outcome": "Left missing binder"
+    },
+    {
+      "A_C_literal_equal": true,
+      "event_lines": 39,
+      "label": "alias-chain",
+      "outcome": "Right"
+    },
+    {
+      "A_C_literal_equal": true,
+      "event_lines": 22,
+      "label": "missing-child",
+      "outcome": "Left missing graph node 99"
+    },
+    {
+      "A_C_literal_equal": true,
+      "event_lines": 49,
+      "label": "occurs",
+      "outcome": "Left infinite type (occurs check)"
+    },
+    {
+      "A_C_literal_equal": true,
+      "event_lines": 102,
+      "label": "containment",
+      "outcome": "Left a type binder must structurally contain its node"
+    },
+    {
+      "A_C_literal_equal": true,
+      "event_lines": 1,
+      "label": "sparse-unobserved",
+      "outcome": "Right"
+    }
+  ],
+  "complete_dependency_certificate": false,
+  "evidence_boundary": "All sidecar text is exact and reversibly encoded in JSON; other summaries are selected from the pinned independent actual audit. Raw compiler logs are not exported because they contain private paths. Their hashes are in PINS.json. No executable, runtime copy, control wrapper, real Graph input, host/session/tool identity or timing sample is exported.",
+  "fixture_stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  "fixture_stdout": {
+    "bytes": 67,
+    "sha256": "f74f991610832c86edd933450573c7a8985e1de8e1efd5fc9ebdb9375dc90137",
+    "utf8": "PASS 14 finite validator read-observer cases; no certificate reuse\n"
+  },
+  "independently_verified_trace": {
+    "alias_present_before_absent": true,
+    "first_edge_failure_line_1based": 80,
+    "kind2_success_line_1based": 54,
+    "mutant": "Right\n",
+    "root_tag_hits": {
+      "alias-chain": 1,
+      "cached-kind-edge": 1,
+      "containment": 1,
+      "gen-before-poison": 1,
+      "missing-child": 1,
+      "occurs": 1,
+      "unused-kind": 1,
+      "unused-name": 1,
+      "unused-next": 1,
+      "valid": 1
+    },
+    "structural_tag_children_hits": {
+      "containment": [
+        "selector:structural-tag-children\t1",
+        "selector:structural-tag-children\t2"
+      ]
+    }
+  },
+  "schema": "public-finite-validation-read-observer-actual-v1",
+  "scope": "One same-binary O2 finite original Graph/observer experiment only; no O0, certificate reuse, production or performance claim.",
+  "sidecar_bytes": 11444,
+  "sidecar_count": 71,
+  "sidecars": [
+    {
+      "bytes": 6,
+      "name": "alias-chain.A",
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222",
+      "utf8": "Right\n"
+    },
+    {
+      "bytes": 6,
+      "name": "alias-chain.C",
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222",
+      "utf8": "Right\n"
+    },
+    {
+      "bytes": 790,
+      "name": "alias-chain.events",
+      "sha256": "c6c99cf270a0e5cc27c059c52426f7cac54bf2640b5d53d032827513bcd4c01c",
+      "utf8": "entry:global-root-binding-euler\t-\nentry:binder-exists\t0\nsuccess:binder-exists\t0\nentry:binder-exists\t1\nnode:present\t0\nsuccess:binder-exists\t1\nsuccess:global-euler\t-\nentry:kind-fact\t0\nentry:node-binder\t0\nselector:root-tag\t0\nsuccess:node-binder\t0\nentry:tag-kind\t0\nselector:gen-flag\t0\nentry:edge-gates\t-\nalias:present\t10\nalias:absent\t1\nentry:require\t1\nnode:present\t1\nsuccess:require\t1\nselector:child-tag\t1\nselector:child-binder\t1\ndependency:global-euler\t-\nentry:kind-fact\t1\nentry:node-binder\t1\nentry:require\t0\nnode:present\t0\nsuccess:require\t0\nselector:parent-tag\t0\nsuccess:node-binder\t1\nentry:tag-kind\t1\nsuccess:tag-kind\t1\nsuccess:kind-fact\t1\nsuccess:edge-gates\t-\nsuccess:tag-kind\t0\nsuccess:kind-fact\t0\nentry:kind-fact\t1\ncache:kind-hit\t1\nsuccess:kind-fact\t1\nsuccess:global-root-binding-euler\t-\n"
+    },
+    {
+      "bytes": 6,
+      "name": "alias-chain.expected",
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222",
+      "utf8": "Right\n"
+    },
+    {
+      "bytes": 5,
+      "name": "alias-chain.result",
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431",
+      "utf8": "PASS\n"
+    },
+    {
+      "bytes": 30,
+      "name": "cached-kind-edge.A",
+      "sha256": "65d0d88f1442c24e20fb2e29ff2f56e40aa0bfaababc378107c5e75fc4721a59",
+      "utf8": "Left ill-dominated type graph\n"
+    },
+    {
+      "bytes": 30,
+      "name": "cached-kind-edge.C",
+      "sha256": "65d0d88f1442c24e20fb2e29ff2f56e40aa0bfaababc378107c5e75fc4721a59",
+      "utf8": "Left ill-dominated type graph\n"
+    },
+    {
+      "bytes": 1754,
+      "name": "cached-kind-edge.events",
+      "sha256": "3f7a612a321f480cdc0d6a6386e9b940817d82270542daffdb46dfe3c0243704",
+      "utf8": "entry:global-root-binding-euler\t-\nentry:binder-exists\t0\nsuccess:binder-exists\t0\nentry:binder-exists\t1\nnode:present\t0\nsuccess:binder-exists\t1\nentry:binder-exists\t2\nnode:present\t1\nsuccess:binder-exists\t2\nentry:binder-exists\t3\nnode:present\t0\nsuccess:binder-exists\t3\nsuccess:global-euler\t-\nentry:kind-fact\t0\nentry:node-binder\t0\nselector:root-tag\t0\nsuccess:node-binder\t0\nentry:tag-kind\t0\nselector:gen-flag\t0\nentry:edge-gates\t-\nalias:absent\t1\nentry:require\t1\nnode:present\t1\nsuccess:require\t1\nselector:child-tag\t1\nselector:child-binder\t1\ndependency:global-euler\t-\nentry:kind-fact\t1\nentry:node-binder\t1\nentry:require\t0\nnode:present\t0\nsuccess:require\t0\nselector:parent-tag\t0\nsuccess:node-binder\t1\nentry:tag-kind\t1\nentry:edge-gates\t-\nalias:absent\t2\nentry:require\t2\nnode:present\t2\nsuccess:require\t2\nselector:child-tag\t2\nselector:child-binder\t2\ndependency:global-euler\t-\nentry:kind-fact\t2\nentry:node-binder\t2\nentry:require\t1\nnode:present\t1\nsuccess:require\t1\nselector:parent-tag\t1\nalias:absent\t2\nsuccess:node-binder\t2\nentry:tag-kind\t2\nsuccess:tag-kind\t2\nsuccess:kind-fact\t2\nsuccess:edge-gates\t-\nentry:edge-gates\t-\nalias:absent\t3\nentry:require\t3\nnode:present\t3\nsuccess:require\t3\nselector:child-tag\t3\nselector:child-binder\t3\ndependency:global-euler\t-\nentry:kind-fact\t3\nentry:node-binder\t3\nentry:require\t0\nnode:present\t0\nsuccess:require\t0\nselector:parent-tag\t0\nsuccess:node-binder\t3\nentry:tag-kind\t3\nentry:edge-gates\t-\nalias:absent\t2\nentry:require\t2\nnode:present\t2\nsuccess:require\t2\nselector:child-tag\t2\nselector:child-binder\t2\ndependency:global-euler\t-\nfailure:edge-gates\t-\nfailure:tag-kind\t3\nfailure:kind-fact\t3\nfailure:edge-gates\t-\nfailure:tag-kind\t1\nfailure:kind-fact\t1\nfailure:edge-gates\t-\nfailure:tag-kind\t0\nfailure:kind-fact\t0\nfailure:global-root-binding-euler\t-\n"
+    },
+    {
+      "bytes": 30,
+      "name": "cached-kind-edge.expected",
+      "sha256": "65d0d88f1442c24e20fb2e29ff2f56e40aa0bfaababc378107c5e75fc4721a59",
+      "utf8": "Left ill-dominated type graph\n"
+    },
+    {
+      "bytes": 6,
+      "name": "cached-kind-edge.mutant",
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222",
+      "utf8": "Right\n"
+    },
+    {
+      "bytes": 5,
+      "name": "cached-kind-edge.result",
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431",
+      "utf8": "PASS\n"
+    },
+    {
+      "bytes": 54,
+      "name": "containment.A",
+      "sha256": "6d535b486fece0049510dfab042dfcc796756d1060ade70dce112fc24d526d79",
+      "utf8": "Left a type binder must structurally contain its node\n"
+    },
+    {
+      "bytes": 54,
+      "name": "containment.C",
+      "sha256": "6d535b486fece0049510dfab042dfcc796756d1060ade70dce112fc24d526d79",
+      "utf8": "Left a type binder must structurally contain its node\n"
+    },
+    {
+      "bytes": 1985,
+      "name": "containment.events",
+      "sha256": "ea803b3a66819f32b54cfe947fad5429c5fd4e63090a6064fa5fc4d9d3ee90f5",
+      "utf8": "entry:global-root-binding-euler\t-\nentry:binder-exists\t0\nsuccess:binder-exists\t0\nentry:binder-exists\t1\nnode:present\t0\nsuccess:binder-exists\t1\nentry:binder-exists\t2\nnode:present\t0\nsuccess:binder-exists\t2\nentry:binder-exists\t3\nnode:present\t1\nsuccess:binder-exists\t3\nsuccess:global-euler\t-\nentry:kind-fact\t0\nentry:node-binder\t0\nselector:root-tag\t0\nsuccess:node-binder\t0\nentry:tag-kind\t0\nselector:gen-flag\t0\nentry:edge-gates\t-\nalias:absent\t1\nentry:require\t1\nnode:present\t1\nsuccess:require\t1\nselector:child-tag\t1\nselector:child-binder\t1\ndependency:global-euler\t-\nentry:kind-fact\t1\nentry:node-binder\t1\nentry:require\t0\nnode:present\t0\nsuccess:require\t0\nselector:parent-tag\t0\nsuccess:node-binder\t1\nentry:tag-kind\t1\nentry:edge-gates\t-\nalias:absent\t2\nentry:require\t2\nnode:present\t2\nsuccess:require\t2\nselector:child-tag\t2\nselector:child-binder\t2\ndependency:global-euler\t-\nentry:kind-fact\t2\nentry:node-binder\t2\nentry:require\t0\nnode:present\t0\nsuccess:require\t0\nselector:parent-tag\t0\nsuccess:node-binder\t2\nentry:tag-kind\t2\nsuccess:tag-kind\t2\nsuccess:kind-fact\t2\nsuccess:edge-gates\t-\nentry:edge-gates\t-\nalias:absent\t2\nentry:require\t2\nnode:present\t2\nsuccess:require\t2\nselector:child-tag\t2\nselector:child-binder\t2\ndependency:global-euler\t-\nentry:kind-fact\t2\ncache:kind-hit\t2\nsuccess:kind-fact\t2\nsuccess:edge-gates\t-\nsuccess:tag-kind\t1\nsuccess:kind-fact\t1\nsuccess:edge-gates\t-\nsuccess:tag-kind\t0\nsuccess:kind-fact\t0\nentry:kind-fact\t1\ncache:kind-hit\t1\nsuccess:kind-fact\t1\nentry:kind-fact\t2\ncache:kind-hit\t2\nsuccess:kind-fact\t2\nentry:kind-fact\t3\nentry:node-binder\t3\nentry:require\t1\nnode:present\t1\nsuccess:require\t1\nselector:parent-tag\t1\nalias:absent\t2\nalias:absent\t2\nalias:absent\t1\nentry:require\t1\nnode:present\t1\nsuccess:require\t1\nselector:structural-tag-children\t1\nalias:absent\t2\nentry:require\t2\nnode:present\t2\nsuccess:require\t2\nselector:structural-tag-children\t2\nalias:absent\t2\nentry:require\t2\nnode:present\t2\nsuccess:require\t2\nfailure:node-binder\t3\nfailure:kind-fact\t3\nfailure:global-root-binding-euler\t-\n"
+    },
+    {
+      "bytes": 54,
+      "name": "containment.expected",
+      "sha256": "6d535b486fece0049510dfab042dfcc796756d1060ade70dce112fc24d526d79",
+      "utf8": "Left a type binder must structurally contain its node\n"
+    },
+    {
+      "bytes": 5,
+      "name": "containment.result",
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431",
+      "utf8": "PASS\n"
+    },
+    {
+      "bytes": 18,
+      "name": "forced-kind.A",
+      "sha256": "1481d7ebea4c9e6dd0e2dabb5430707d78c3393691ed322e25cd698ef01fe86d",
+      "utf8": "Probe forced-kind\n"
+    },
+    {
+      "bytes": 18,
+      "name": "forced-kind.C",
+      "sha256": "1481d7ebea4c9e6dd0e2dabb5430707d78c3393691ed322e25cd698ef01fe86d",
+      "utf8": "Probe forced-kind\n"
+    },
+    {
+      "bytes": 23,
+      "name": "forced-kind.events",
+      "sha256": "c3ac403ad04b808f9e267fa79d1bb8ab01c4201b6a7a40d7737b4aafb3d09ac9",
+      "utf8": "<unavailable-on-Probe>\n"
+    },
+    {
+      "bytes": 18,
+      "name": "forced-kind.expected",
+      "sha256": "1481d7ebea4c9e6dd0e2dabb5430707d78c3393691ed322e25cd698ef01fe86d",
+      "utf8": "Probe forced-kind\n"
+    },
+    {
+      "bytes": 5,
+      "name": "forced-kind.result",
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431",
+      "utf8": "PASS\n"
+    },
+    {
+      "bytes": 45,
+      "name": "gen-before-poison.A",
+      "sha256": "685f2d2c455a4855fcea2338ab3f08fbf6aa9e34e27e91d43af969df7b0e77de",
+      "utf8": "Left gen nodes cannot be structural children\n"
+    },
+    {
+      "bytes": 45,
+      "name": "gen-before-poison.C",
+      "sha256": "685f2d2c455a4855fcea2338ab3f08fbf6aa9e34e27e91d43af969df7b0e77de",
+      "utf8": "Left gen nodes cannot be structural children\n"
+    },
+    {
+      "bytes": 1026,
+      "name": "gen-before-poison.events",
+      "sha256": "58520fc05e637a34f32bccf533dbdb948c4d3421b16cd92992a5d80e99fb408d",
+      "utf8": "entry:global-root-binding-euler\t-\nentry:binder-exists\t0\nsuccess:binder-exists\t0\nentry:binder-exists\t1\nnode:present\t0\nsuccess:binder-exists\t1\nentry:binder-exists\t2\nnode:present\t0\nsuccess:binder-exists\t2\nentry:binder-exists\t3\nnode:present\t0\nsuccess:binder-exists\t3\nentry:binder-exists\t4\nnode:present\t2\nsuccess:binder-exists\t4\nsuccess:global-euler\t-\nentry:kind-fact\t0\nentry:node-binder\t0\nselector:root-tag\t0\nsuccess:node-binder\t0\nentry:tag-kind\t0\nselector:gen-flag\t0\nentry:edge-gates\t-\nalias:absent\t1\nentry:require\t1\nnode:present\t1\nsuccess:require\t1\nselector:child-tag\t1\nselector:child-binder\t1\ndependency:global-euler\t-\nentry:kind-fact\t1\nentry:node-binder\t1\nentry:require\t0\nnode:present\t0\nsuccess:require\t0\nselector:parent-tag\t0\nsuccess:node-binder\t1\nentry:tag-kind\t1\nentry:edge-gates\t-\nalias:absent\t2\nentry:require\t2\nnode:present\t2\nsuccess:require\t2\nselector:child-tag\t2\nfailure:edge-gates\t-\nfailure:tag-kind\t1\nfailure:kind-fact\t1\nfailure:edge-gates\t-\nfailure:tag-kind\t0\nfailure:kind-fact\t0\nfailure:global-root-binding-euler\t-\n"
+    },
+    {
+      "bytes": 45,
+      "name": "gen-before-poison.expected",
+      "sha256": "685f2d2c455a4855fcea2338ab3f08fbf6aa9e34e27e91d43af969df7b0e77de",
+      "utf8": "Left gen nodes cannot be structural children\n"
+    },
+    {
+      "bytes": 5,
+      "name": "gen-before-poison.result",
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431",
+      "utf8": "PASS\n"
+    },
+    {
+      "bytes": 20,
+      "name": "missing-binder-before-kind.A",
+      "sha256": "16f84528fca75f1e41bb2e627533428c1576d10ed016c682cbdad84f090b188e",
+      "utf8": "Left missing binder\n"
+    },
+    {
+      "bytes": 20,
+      "name": "missing-binder-before-kind.C",
+      "sha256": "16f84528fca75f1e41bb2e627533428c1576d10ed016c682cbdad84f090b188e",
+      "utf8": "Left missing binder\n"
+    },
+    {
+      "bytes": 177,
+      "name": "missing-binder-before-kind.events",
+      "sha256": "ede47b82632a00bbf15396af22f64aa75802aee9bd27da293c77772589f201d3",
+      "utf8": "entry:global-root-binding-euler\t-\nentry:binder-exists\t0\nsuccess:binder-exists\t0\nentry:binder-exists\t1\nnode:absent\t99\nfailure:binder-exists\t1\nfailure:global-root-binding-euler\t-\n"
+    },
+    {
+      "bytes": 20,
+      "name": "missing-binder-before-kind.expected",
+      "sha256": "16f84528fca75f1e41bb2e627533428c1576d10ed016c682cbdad84f090b188e",
+      "utf8": "Left missing binder\n"
+    },
+    {
+      "bytes": 5,
+      "name": "missing-binder-before-kind.result",
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431",
+      "utf8": "PASS\n"
+    },
+    {
+      "bytes": 27,
+      "name": "missing-child.A",
+      "sha256": "92d3791214bc2ec7346c4108aae3c33f3aa22714e5b788a5a8fed3ecfa76a057",
+      "utf8": "Left missing graph node 99\n"
+    },
+    {
+      "bytes": 27,
+      "name": "missing-child.C",
+      "sha256": "92d3791214bc2ec7346c4108aae3c33f3aa22714e5b788a5a8fed3ecfa76a057",
+      "utf8": "Left missing graph node 99\n"
+    },
+    {
+      "bytes": 463,
+      "name": "missing-child.events",
+      "sha256": "c076da04ffc05a149e1bb43a9ee303b14101ffd9e00016b6ca519dc056ad1de0",
+      "utf8": "entry:global-root-binding-euler\t-\nentry:binder-exists\t0\nsuccess:binder-exists\t0\nentry:binder-exists\t1\nnode:present\t0\nsuccess:binder-exists\t1\nsuccess:global-euler\t-\nentry:kind-fact\t0\nentry:node-binder\t0\nselector:root-tag\t0\nsuccess:node-binder\t0\nentry:tag-kind\t0\nselector:gen-flag\t0\nentry:edge-gates\t-\nalias:absent\t99\nentry:require\t99\nnode:absent\t99\nfailure:require\t99\nfailure:edge-gates\t-\nfailure:tag-kind\t0\nfailure:kind-fact\t0\nfailure:global-root-binding-euler\t-\n"
+    },
+    {
+      "bytes": 27,
+      "name": "missing-child.expected",
+      "sha256": "92d3791214bc2ec7346c4108aae3c33f3aa22714e5b788a5a8fed3ecfa76a057",
+      "utf8": "Left missing graph node 99\n"
+    },
+    {
+      "bytes": 5,
+      "name": "missing-child.result",
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431",
+      "utf8": "PASS\n"
+    },
+    {
+      "bytes": 34,
+      "name": "occurs.A",
+      "sha256": "c97e9f2b1a7f45303f255ab0446b0cde100da95d8d41c4b33b366a712b0f311f",
+      "utf8": "Left infinite type (occurs check)\n"
+    },
+    {
+      "bytes": 34,
+      "name": "occurs.C",
+      "sha256": "c97e9f2b1a7f45303f255ab0446b0cde100da95d8d41c4b33b366a712b0f311f",
+      "utf8": "Left infinite type (occurs check)\n"
+    },
+    {
+      "bytes": 992,
+      "name": "occurs.events",
+      "sha256": "dd5e6ea9b27aba2a7bb2d4a8d689356b326c198cb64dfe70f523fa2f45a5b6e6",
+      "utf8": "entry:global-root-binding-euler\t-\nentry:binder-exists\t0\nsuccess:binder-exists\t0\nentry:binder-exists\t1\nnode:present\t0\nsuccess:binder-exists\t1\nentry:binder-exists\t2\nnode:present\t0\nsuccess:binder-exists\t2\nsuccess:global-euler\t-\nentry:kind-fact\t0\nentry:node-binder\t0\nselector:root-tag\t0\nsuccess:node-binder\t0\nentry:tag-kind\t0\nselector:gen-flag\t0\nentry:edge-gates\t-\nalias:absent\t1\nentry:require\t1\nnode:present\t1\nsuccess:require\t1\nselector:child-tag\t1\nselector:child-binder\t1\ndependency:global-euler\t-\nentry:kind-fact\t1\nentry:node-binder\t1\nentry:require\t0\nnode:present\t0\nsuccess:require\t0\nselector:parent-tag\t0\nsuccess:node-binder\t1\nentry:tag-kind\t1\nentry:edge-gates\t-\nalias:absent\t1\nentry:require\t1\nnode:present\t1\nsuccess:require\t1\nselector:child-tag\t1\nselector:child-binder\t1\ndependency:global-euler\t-\nentry:kind-fact\t1\nfailure:kind-fact\t1\nfailure:edge-gates\t-\nfailure:tag-kind\t1\nfailure:kind-fact\t1\nfailure:edge-gates\t-\nfailure:tag-kind\t0\nfailure:kind-fact\t0\nfailure:global-root-binding-euler\t-\n"
+    },
+    {
+      "bytes": 34,
+      "name": "occurs.expected",
+      "sha256": "c97e9f2b1a7f45303f255ab0446b0cde100da95d8d41c4b33b366a712b0f311f",
+      "utf8": "Left infinite type (occurs check)\n"
+    },
+    {
+      "bytes": 5,
+      "name": "occurs.result",
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431",
+      "utf8": "PASS\n"
+    },
+    {
+      "bytes": 38,
+      "name": "root-before-parent-poison.A",
+      "sha256": "94b5cc34e8f1a5e6c7a0ac2a004a1c1fec99dd2f547a46fb52579d9fd57a0e3b",
+      "utf8": "Left graph must have one binding root\n"
+    },
+    {
+      "bytes": 38,
+      "name": "root-before-parent-poison.C",
+      "sha256": "94b5cc34e8f1a5e6c7a0ac2a004a1c1fec99dd2f547a46fb52579d9fd57a0e3b",
+      "utf8": "Left graph must have one binding root\n"
+    },
+    {
+      "bytes": 70,
+      "name": "root-before-parent-poison.events",
+      "sha256": "8662bfb7a59667e5c8ab7a1c5175003b629b4eafac8c771ca8a6ebefa20f16ca",
+      "utf8": "entry:global-root-binding-euler\t-\nfailure:global-root-binding-euler\t-\n"
+    },
+    {
+      "bytes": 38,
+      "name": "root-before-parent-poison.expected",
+      "sha256": "94b5cc34e8f1a5e6c7a0ac2a004a1c1fec99dd2f547a46fb52579d9fd57a0e3b",
+      "utf8": "Left graph must have one binding root\n"
+    },
+    {
+      "bytes": 5,
+      "name": "root-before-parent-poison.result",
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431",
+      "utf8": "PASS\n"
+    },
+    {
+      "bytes": 6,
+      "name": "sparse-unobserved.A",
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222",
+      "utf8": "Right\n"
+    },
+    {
+      "bytes": 6,
+      "name": "sparse-unobserved.C",
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222",
+      "utf8": "Right\n"
+    },
+    {
+      "bytes": 20,
+      "name": "sparse-unobserved.events",
+      "sha256": "983df30029695161a7791764e8a689a0f68cb9deccc77f87eefd1e0c5f2baa46",
+      "utf8": "sparse:unobserved\t-\n"
+    },
+    {
+      "bytes": 6,
+      "name": "sparse-unobserved.expected",
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222",
+      "utf8": "Right\n"
+    },
+    {
+      "bytes": 5,
+      "name": "sparse-unobserved.result",
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431",
+      "utf8": "PASS\n"
+    },
+    {
+      "bytes": 6,
+      "name": "unused-kind.A",
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222",
+      "utf8": "Right\n"
+    },
+    {
+      "bytes": 6,
+      "name": "unused-kind.C",
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222",
+      "utf8": "Right\n"
+    },
+    {
+      "bytes": 808,
+      "name": "unused-kind.events",
+      "sha256": "c7ee4fc021c58df90f38d18a9a9b80198b674ce00c81c2ad2b275755938813da",
+      "utf8": "entry:global-root-binding-euler\t-\nentry:binder-exists\t0\nsuccess:binder-exists\t0\nentry:binder-exists\t1\nnode:present\t0\nsuccess:binder-exists\t1\nsuccess:global-euler\t-\nentry:kind-fact\t0\nentry:node-binder\t0\nselector:root-tag\t0\nsuccess:node-binder\t0\nentry:tag-kind\t0\nselector:gen-flag\t0\nentry:edge-gates\t-\nalias:absent\t1\nentry:require\t1\nnode:present\t1\nsuccess:require\t1\nselector:child-tag\t1\nselector:child-binder\t1\ndependency:global-euler\t-\nentry:kind-fact\t1\nentry:node-binder\t1\nentry:require\t0\nnode:present\t0\nsuccess:require\t0\nselector:parent-tag\t0\nsuccess:node-binder\t1\nentry:tag-kind\t1\nselector:kind-payload-not-forced\t1\nsuccess:tag-kind\t1\nsuccess:kind-fact\t1\nsuccess:edge-gates\t-\nsuccess:tag-kind\t0\nsuccess:kind-fact\t0\nentry:kind-fact\t1\ncache:kind-hit\t1\nsuccess:kind-fact\t1\nsuccess:global-root-binding-euler\t-\n"
+    },
+    {
+      "bytes": 6,
+      "name": "unused-kind.expected",
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222",
+      "utf8": "Right\n"
+    },
+    {
+      "bytes": 5,
+      "name": "unused-kind.result",
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431",
+      "utf8": "PASS\n"
+    },
+    {
+      "bytes": 6,
+      "name": "unused-name.A",
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222",
+      "utf8": "Right\n"
+    },
+    {
+      "bytes": 6,
+      "name": "unused-name.C",
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222",
+      "utf8": "Right\n"
+    },
+    {
+      "bytes": 808,
+      "name": "unused-name.events",
+      "sha256": "c7ee4fc021c58df90f38d18a9a9b80198b674ce00c81c2ad2b275755938813da",
+      "utf8": "entry:global-root-binding-euler\t-\nentry:binder-exists\t0\nsuccess:binder-exists\t0\nentry:binder-exists\t1\nnode:present\t0\nsuccess:binder-exists\t1\nsuccess:global-euler\t-\nentry:kind-fact\t0\nentry:node-binder\t0\nselector:root-tag\t0\nsuccess:node-binder\t0\nentry:tag-kind\t0\nselector:gen-flag\t0\nentry:edge-gates\t-\nalias:absent\t1\nentry:require\t1\nnode:present\t1\nsuccess:require\t1\nselector:child-tag\t1\nselector:child-binder\t1\ndependency:global-euler\t-\nentry:kind-fact\t1\nentry:node-binder\t1\nentry:require\t0\nnode:present\t0\nsuccess:require\t0\nselector:parent-tag\t0\nsuccess:node-binder\t1\nentry:tag-kind\t1\nselector:kind-payload-not-forced\t1\nsuccess:tag-kind\t1\nsuccess:kind-fact\t1\nsuccess:edge-gates\t-\nsuccess:tag-kind\t0\nsuccess:kind-fact\t0\nentry:kind-fact\t1\ncache:kind-hit\t1\nsuccess:kind-fact\t1\nsuccess:global-root-binding-euler\t-\n"
+    },
+    {
+      "bytes": 6,
+      "name": "unused-name.expected",
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222",
+      "utf8": "Right\n"
+    },
+    {
+      "bytes": 5,
+      "name": "unused-name.result",
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431",
+      "utf8": "PASS\n"
+    },
+    {
+      "bytes": 6,
+      "name": "unused-next.A",
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222",
+      "utf8": "Right\n"
+    },
+    {
+      "bytes": 6,
+      "name": "unused-next.C",
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222",
+      "utf8": "Right\n"
+    },
+    {
+      "bytes": 773,
+      "name": "unused-next.events",
+      "sha256": "17fb5ad1df1225e90db91fddcaeea269dfa02c9e62d15e443453b29f9727fc9c",
+      "utf8": "entry:global-root-binding-euler\t-\nentry:binder-exists\t0\nsuccess:binder-exists\t0\nentry:binder-exists\t1\nnode:present\t0\nsuccess:binder-exists\t1\nsuccess:global-euler\t-\nentry:kind-fact\t0\nentry:node-binder\t0\nselector:root-tag\t0\nsuccess:node-binder\t0\nentry:tag-kind\t0\nselector:gen-flag\t0\nentry:edge-gates\t-\nalias:absent\t1\nentry:require\t1\nnode:present\t1\nsuccess:require\t1\nselector:child-tag\t1\nselector:child-binder\t1\ndependency:global-euler\t-\nentry:kind-fact\t1\nentry:node-binder\t1\nentry:require\t0\nnode:present\t0\nsuccess:require\t0\nselector:parent-tag\t0\nsuccess:node-binder\t1\nentry:tag-kind\t1\nsuccess:tag-kind\t1\nsuccess:kind-fact\t1\nsuccess:edge-gates\t-\nsuccess:tag-kind\t0\nsuccess:kind-fact\t0\nentry:kind-fact\t1\ncache:kind-hit\t1\nsuccess:kind-fact\t1\nsuccess:global-root-binding-euler\t-\n"
+    },
+    {
+      "bytes": 6,
+      "name": "unused-next.expected",
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222",
+      "utf8": "Right\n"
+    },
+    {
+      "bytes": 5,
+      "name": "unused-next.result",
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431",
+      "utf8": "PASS\n"
+    },
+    {
+      "bytes": 6,
+      "name": "valid.A",
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222",
+      "utf8": "Right\n"
+    },
+    {
+      "bytes": 6,
+      "name": "valid.C",
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222",
+      "utf8": "Right\n"
+    },
+    {
+      "bytes": 773,
+      "name": "valid.events",
+      "sha256": "17fb5ad1df1225e90db91fddcaeea269dfa02c9e62d15e443453b29f9727fc9c",
+      "utf8": "entry:global-root-binding-euler\t-\nentry:binder-exists\t0\nsuccess:binder-exists\t0\nentry:binder-exists\t1\nnode:present\t0\nsuccess:binder-exists\t1\nsuccess:global-euler\t-\nentry:kind-fact\t0\nentry:node-binder\t0\nselector:root-tag\t0\nsuccess:node-binder\t0\nentry:tag-kind\t0\nselector:gen-flag\t0\nentry:edge-gates\t-\nalias:absent\t1\nentry:require\t1\nnode:present\t1\nsuccess:require\t1\nselector:child-tag\t1\nselector:child-binder\t1\ndependency:global-euler\t-\nentry:kind-fact\t1\nentry:node-binder\t1\nentry:require\t0\nnode:present\t0\nsuccess:require\t0\nselector:parent-tag\t0\nsuccess:node-binder\t1\nentry:tag-kind\t1\nsuccess:tag-kind\t1\nsuccess:kind-fact\t1\nsuccess:edge-gates\t-\nsuccess:tag-kind\t0\nsuccess:kind-fact\t0\nentry:kind-fact\t1\ncache:kind-hit\t1\nsuccess:kind-fact\t1\nsuccess:global-root-binding-euler\t-\n"
+    },
+    {
+      "bytes": 6,
+      "name": "valid.expected",
+      "sha256": "9edcf734254da7128ab99cfbf8176600115b64e7a57b37b8840962ecb8db3222",
+      "utf8": "Right\n"
+    },
+    {
+      "bytes": 5,
+      "name": "valid.result",
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431",
+      "utf8": "PASS\n"
+    }
+  ],
+  "source_version": "v2",
+  "status": "PASS_INDEPENDENT_ACTUAL_FINITE_VALIDATION_READ_OBSERVER_O2_ONLY",
+  "timing_or_benefit_claim": false
+}

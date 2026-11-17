@@ -1,0 +1,22 @@
+--- v1/observer
++++ v2/observer
+@@ -174,8 +174,9 @@
+                            then denseStructurally state wanted stamp rest
+                            else stBind (writeDenseInt low visited n stamp)
+                                   (\written ->
++                                     stBind (emit state "selector:structural-tag-children" (Just n)) (\logged ->
+                                      denseStructurally state wanted stamp
+-                                       (L.append (children (tag v)) rest))))
++                                       (L.append (children (tag v)) rest)))))
+         )}
+     };
+ 
+@@ -233,7 +234,7 @@
+   denseKindBinder state n v =
+     traceE state "node-binder" (Just n)
+       (case binder v of {
+-      Nothing -> ST.check (isGen (tag v)) "binding root must be a gen node";
++      Nothing -> stBind (emit state "selector:root-tag" (Just n)) (\logged -> ST.check (isGen (tag v)) "binding root must be a gen node");
+       Just b ->
+         ST.bindE (denseRequire state b)
+           (\parent ->

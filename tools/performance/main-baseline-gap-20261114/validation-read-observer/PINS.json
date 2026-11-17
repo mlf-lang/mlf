@@ -1,0 +1,180 @@
+{
+  "actual_inventory_sha256": "a3456d18baa60344e7ecd67093fb92be0ccb5e05889756ffde60ff142696d874",
+  "actual_receipt_sha256": "34a245aac19679383a106a610dda436a7d0a0bd29087957e8f488c8b756296bc",
+  "actual_review": {
+    "bytes": 10624,
+    "manifest_sha256": "e697785561dd2756c3b6bf1def09e014a00e51213ce0cec24cd3aca16df4386b",
+    "sha256": "9d755cedf33a65ebb47e74938c2848cb6064f725038285aec4776e912d2d64b8",
+    "status": "PASS_INDEPENDENT_ACTUAL_FINITE_VALIDATION_READ_OBSERVER_O2_ONLY"
+  },
+  "actual_seal_sha256": "47b8679394f8a62e43166fbf05b8466b3e69f27d4ee83b6f7402fc329ec174a9",
+  "baseline_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "control_review": {
+    "bytes": 4266,
+    "sha256": "6fe42d309bfbcc203b15ee970dae78e50166d4bb32b051116434b63dd3e48c1a"
+  },
+  "files": [
+    {
+      "bytes": 5607,
+      "path": "Main.hs",
+      "sha256": "32eb17142f68db21fc788edab721c47bf174cf03bace515452ac45636f24baed"
+    },
+    {
+      "bytes": 17400,
+      "path": "Prototype/ValidationReadObserver.hs",
+      "sha256": "8cbfdd9f1f628656f416302d9b21d83255a413d9c88f3554a75843c75b2ff790"
+    },
+    {
+      "bytes": 17540,
+      "path": "Prototype/ValidationReadObserverMutant.hs",
+      "sha256": "fe3d18a250a3957daf3d01c0f480e31ae1b186415d3f2367a826407dbeaa95ac"
+    },
+    {
+      "bytes": 5741,
+      "path": "README.md",
+      "sha256": "b3be078ba42dbbc922da4a94191135db5c758c0f218c414e1ee8b2e8eb821b7b"
+    },
+    {
+      "bytes": 3529,
+      "path": "fixture-contract.json",
+      "sha256": "2889deefb5060ccfd16bc00cac424c8f5f955d949722c69c623df0f9888fd76d"
+    },
+    {
+      "bytes": 12167,
+      "path": "mechanical-dense.patch",
+      "sha256": "1b291f7083f5dccb527f67607399d0398717f39e1b519de53e3d736cffbc49aa"
+    },
+    {
+      "bytes": 29089,
+      "path": "results.json",
+      "sha256": "f04e6da4d2d83a376e8013e383556251a4451c25c6190bd54cc1553261ccb810"
+    },
+    {
+      "bytes": 1037,
+      "path": "v1-to-v2.patch",
+      "sha256": "78c65eba134bec090c80d8420042f35cdd98e60842c99c570cf3778976301b2c"
+    }
+  ],
+  "fixture_elf": {
+    "bytes": 3499984,
+    "not_an_ordinary_compiler_or_query_identity": true,
+    "not_exported": true,
+    "sha256": "5fc7d6c92226779603460750698b08072f8c57c923796d0c5fb9366452c2ef5a"
+  },
+  "home_source_closure": [
+    {
+      "bytes": 137874,
+      "module": "Bootstrap.Graph",
+      "sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f"
+    },
+    {
+      "bytes": 5573,
+      "module": "Bootstrap.IndexVec",
+      "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e"
+    },
+    {
+      "bytes": 21811,
+      "module": "Bootstrap.IntMap",
+      "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e"
+    },
+    {
+      "bytes": 6684,
+      "module": "Bootstrap.IntRank",
+      "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
+    },
+    {
+      "bytes": 17405,
+      "module": "Bootstrap.IntSet",
+      "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe"
+    },
+    {
+      "bytes": 3727,
+      "module": "Bootstrap.IntTree",
+      "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49"
+    },
+    {
+      "bytes": 2539,
+      "module": "Bootstrap.ST",
+      "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2"
+    },
+    {
+      "bytes": 20088,
+      "module": "Bootstrap.Std",
+      "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca"
+    },
+    {
+      "bytes": 12757,
+      "module": "Bootstrap.Types",
+      "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596"
+    },
+    {
+      "bytes": 8881,
+      "module": "MLF.Host.Async",
+      "sha256": "13e23c116edb65b36be54f78b477d080da62010651f76984c7c9cf895d03d1e5"
+    },
+    {
+      "bytes": 19364,
+      "module": "MLF.Host.Base",
+      "sha256": "b324805ea2d62b3aaccf3c49e973b7839f952b164bcbe4cc37bf483b07518116"
+    },
+    {
+      "bytes": 15420,
+      "module": "MLF.Host.IO",
+      "sha256": "042164a571c9b60c9fc1abe984ccc687400a01602b3a980cff61342941bfe22a"
+    },
+    {
+      "bytes": 14412,
+      "module": "MLF.Primitive",
+      "sha256": "d5a66475293578650a975172ae14d5a6e5506668859fd559d1a18eb08d2160cb"
+    },
+    {
+      "bytes": 5607,
+      "module": "Main",
+      "sha256": "32eb17142f68db21fc788edab721c47bf174cf03bace515452ac45636f24baed"
+    },
+    {
+      "bytes": 17400,
+      "module": "Prototype.ValidationReadObserver",
+      "sha256": "8cbfdd9f1f628656f416302d9b21d83255a413d9c88f3554a75843c75b2ff790"
+    },
+    {
+      "bytes": 17540,
+      "module": "Prototype.ValidationReadObserverMutant",
+      "sha256": "fe3d18a250a3957daf3d01c0f480e31ae1b186415d3f2367a826407dbeaa95ac"
+    }
+  ],
+  "original_Graph_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+  "original_raw_log_hashes": [
+    {
+      "bytes": 5591,
+      "logical_name": "steps/02-ghc.stdout",
+      "sha256": "7319f8e4c0a18fa9ef9e8efe43051f1694dd54e12856384258ac002c606e0d9d"
+    },
+    {
+      "bytes": 9326,
+      "logical_name": "steps/02-ghc.stderr",
+      "sha256": "952d3b2613eccf4853b8d8cbc37e2446ae12424df9e441a459ba746c0cb7d4f9"
+    },
+    {
+      "bytes": 67,
+      "logical_name": "steps/04-fixture.stdout",
+      "sha256": "f74f991610832c86edd933450573c7a8985e1de8e1efd5fc9ebdb9375dc90137"
+    },
+    {
+      "bytes": 0,
+      "logical_name": "steps/04-fixture.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "redaction": "Only public repository module names, synthetic nodes and content digests retained. No absolute workspace/system paths, private account/machine/session/Library/tool identifiers, binaries or control wrappers.",
+  "schema": "public-validation-read-observer-pins-v1",
+  "self_hash_rule": "PINS.json excludes itself; the outer archive manifest binds all nine public files.",
+  "source_closure_sha256": "129c387c184c2cb4ebebdadf40c7de858fb8cfc52ea0e7180bb4a628629131d2",
+  "source_manifest_sha256": "b2a4d003d430e0cc2167029e03b01e1b9e39421981af7c0381e74475e224289e",
+  "source_review": {
+    "bytes": 6100,
+    "sha256": "c276252b605993c7ceaa12066b01217c4677e3d88e21224d6c302877b69d34cb"
+  },
+  "source_version": "v2",
+  "v1_status": "Unexecuted source draft; two selector-token coverage sites repaired in v2 before the only finite execution."
+}

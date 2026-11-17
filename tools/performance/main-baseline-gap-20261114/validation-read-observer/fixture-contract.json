@@ -1,0 +1,142 @@
+{
+  "endpoint": "full outcome text plus returned trace; typed Probe only",
+  "event_cap_per_call": 8192,
+  "executed": false,
+  "mutant_expected": "Right\n",
+  "not_complete_certificate": true,
+  "not_performance": true,
+  "record_count": 14,
+  "records": [
+    {
+      "expected": "Right\n",
+      "label": "valid"
+    },
+    {
+      "expected": "Left ill-dominated type graph\n",
+      "label": "cached-kind-edge"
+    },
+    {
+      "expected": "Left gen nodes cannot be structural children\n",
+      "label": "gen-before-poison"
+    },
+    {
+      "expected": "Right\n",
+      "label": "unused-kind"
+    },
+    {
+      "expected": "Right\n",
+      "label": "unused-name"
+    },
+    {
+      "expected": "Right\n",
+      "label": "unused-next"
+    },
+    {
+      "expected": "Probe forced-kind\n",
+      "label": "forced-kind"
+    },
+    {
+      "expected": "Left graph must have one binding root\n",
+      "label": "root-before-parent-poison"
+    },
+    {
+      "expected": "Left missing binder\n",
+      "label": "missing-binder-before-kind"
+    },
+    {
+      "expected": "Right\n",
+      "label": "alias-chain"
+    },
+    {
+      "expected": "Left missing graph node 99\n",
+      "label": "missing-child"
+    },
+    {
+      "expected": "Left infinite type (occurs check)\n",
+      "label": "occurs"
+    },
+    {
+      "expected": "Left a type binder must structurally contain its node\n",
+      "label": "containment"
+    },
+    {
+      "expected": "Right\n",
+      "label": "sparse-unobserved"
+    }
+  ],
+  "schema": "finite-validation-read-observer-v1",
+  "sidecar_count": 71,
+  "sidecars": [
+    "valid.A",
+    "valid.C",
+    "valid.events",
+    "valid.expected",
+    "valid.result",
+    "cached-kind-edge.A",
+    "cached-kind-edge.C",
+    "cached-kind-edge.events",
+    "cached-kind-edge.expected",
+    "cached-kind-edge.result",
+    "gen-before-poison.A",
+    "gen-before-poison.C",
+    "gen-before-poison.events",
+    "gen-before-poison.expected",
+    "gen-before-poison.result",
+    "unused-kind.A",
+    "unused-kind.C",
+    "unused-kind.events",
+    "unused-kind.expected",
+    "unused-kind.result",
+    "unused-name.A",
+    "unused-name.C",
+    "unused-name.events",
+    "unused-name.expected",
+    "unused-name.result",
+    "unused-next.A",
+    "unused-next.C",
+    "unused-next.events",
+    "unused-next.expected",
+    "unused-next.result",
+    "forced-kind.A",
+    "forced-kind.C",
+    "forced-kind.events",
+    "forced-kind.expected",
+    "forced-kind.result",
+    "root-before-parent-poison.A",
+    "root-before-parent-poison.C",
+    "root-before-parent-poison.events",
+    "root-before-parent-poison.expected",
+    "root-before-parent-poison.result",
+    "missing-binder-before-kind.A",
+    "missing-binder-before-kind.C",
+    "missing-binder-before-kind.events",
+    "missing-binder-before-kind.expected",
+    "missing-binder-before-kind.result",
+    "alias-chain.A",
+    "alias-chain.C",
+    "alias-chain.events",
+    "alias-chain.expected",
+    "alias-chain.result",
+    "missing-child.A",
+    "missing-child.C",
+    "missing-child.events",
+    "missing-child.expected",
+    "missing-child.result",
+    "occurs.A",
+    "occurs.C",
+    "occurs.events",
+    "occurs.expected",
+    "occurs.result",
+    "containment.A",
+    "containment.C",
+    "containment.events",
+    "containment.expected",
+    "containment.result",
+    "sparse-unobserved.A",
+    "sparse-unobserved.C",
+    "sparse-unobserved.events",
+    "sparse-unobserved.expected",
+    "sparse-unobserved.result",
+    "cached-kind-edge.mutant"
+  ]
+}
