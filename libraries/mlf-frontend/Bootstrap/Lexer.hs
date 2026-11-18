@@ -897,6 +897,18 @@ module Bootstrap.Lexer where {
   sharedPunctuationSet = Set.fromList compareString sharedPunctuation;
   sharedQualifiedOperator text =
     stringLength text > 1 && stringCodeAt text 0 == 46 && Set.member compareString (stringSlice text 1 (stringLength text - 1)) sharedValueOperatorSet;
+  -- The finite punctuation vocabulary is also the source of the ASCII
+  -- dispatch table. Boundary checks and their diagnostics still use token spans.
+  simpleSharedToken :: V.IndexVec Int Bool;
+  simpleSharedToken = V.fromList (map (\c -> sharedIdentifierFirst c || isDigit c || c == 34 ||
+    Set.member compareString (stringFromCode c) sharedPunctuationSet) (range 0 127));
+  sharedTokenAllowed :: String -> Int -> Int -> Bool;
+  sharedTokenAllowed text size first =
+    if size == 0 then False else if size == 1 && first >= 0 && first < 128
+    then V.at simpleSharedToken (V.fromInt first)
+    else if isDigit first || first == 34 then True
+    else if sharedIdentifierFirst first then sharedIdentifier text
+    else Set.member compareString text sharedPunctuationSet || sharedQualifiedOperator text;
   validateSharedTokens :: String -> [] Token -> Either String ();
   validateSharedTokens file tokens =
     case tokens of {
@@ -904,13 +916,11 @@ module Bootstrap.Lexer where {
       (:) token rest ->
         do {
           let {
-            text = tokenText token
+            text = tokenText token;
+            size = stringLength text;
+            first = if size > 0 then stringCodeAt text 0 else (0 - 1)
           };
-          unless
-            (sharedIdentifier text ||
-             (Set.member compareString text sharedPunctuationSet || sharedQualifiedOperator text ||
-              ((stringLength text > 0) &&
-               (isDigit (stringCodeAt text 0) || (stringCodeAt text 0 == 34)))))
+          unless (sharedTokenAllowed text size first)
             (Left
                (file ++
                 (":" ++
@@ -920,7 +930,7 @@ module Bootstrap.Lexer where {
                     (": token is outside shared-haskell-v1: " ++ text)))))));
           case rest of {
             (:) next following -> do {
-              when (stringLength text > 0 && stringCodeAt text 0 >= 65 && stringCodeAt text 0 <= 90 && (eqString (tokenText next) "." || sharedQualifiedOperator (tokenText next))) (do {
+              when (first >= 65 && first <= 90 && (eqString (tokenText next) "." || sharedQualifiedOperator (tokenText next))) (do {
                 unless (tokenEndLine token == tokenLine next && tokenEndColumn token == tokenColumn next) (Left (file ++ ": qualified names must not contain whitespace before the dot"));
                 when (eqString (tokenText next) ".") (case following of {
                   (:) final _ -> unless (tokenEndLine next == tokenLine final && tokenEndColumn next == tokenColumn final) (Left (file ++ ": qualified names must not contain whitespace after the dot"));
@@ -928,11 +938,10 @@ module Bootstrap.Lexer where {
                 })
               });
               when
-                ((stringLength text > 0) &&
-                 (isDigit (stringCodeAt text 0) &&
+                (isDigit first &&
                   ((tokenEndLine token == tokenLine next) &&
                    ((tokenEndColumn token == tokenColumn next) &&
-                    (sharedIdentifier (tokenText next) || eqString (tokenText next) ".")))))
+                    (sharedIdentifier (tokenText next) || eqString (tokenText next) "."))))
                 (Left (file ++ ": malformed numeric token boundary"))
               };
             _ -> Right ()
