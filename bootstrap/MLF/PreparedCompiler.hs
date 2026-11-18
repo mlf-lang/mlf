@@ -361,7 +361,7 @@ module MLF.PreparedCompiler
                 Right ((,) header body) -> do {
                   first <- exactImageProfiled profile metadata header;
                   second <- if first then exactImageProfiled profile (Artifact.objectPath metadata) body else ioReturn False;
-                  ioReturn (first && second && Artifact.sameInterface iface (Context.interface witness))
+                  ioReturn (first && second && Artifact.sameAdmittedInterface iface (Context.interface witness))
                 }
               });
               if not exact then Artifact.linkCheckedFileProfiled profile path else do {
@@ -409,7 +409,7 @@ module MLF.PreparedCompiler
             Right ((,) header body) -> do {
               first <- exactImage metadata header;
               second <- if first then exactImage (Artifact.objectPath metadata) body else ioReturn False;
-              ioReturn (first && second && Artifact.sameInterface builtin (Context.interface witness))
+              ioReturn (first && second && Artifact.sameAdmittedInterface builtin (Context.interface witness))
             }
           };
           if not exact then ordinary () else do {

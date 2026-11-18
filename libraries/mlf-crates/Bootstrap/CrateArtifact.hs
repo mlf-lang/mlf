@@ -241,6 +241,27 @@ module Bootstrap.CrateArtifact where {
   -- fields. Comparing the canonical fields is therefore exactly equivalent
   -- to comparing encodeInterface, without two whole-interface fingerprints.
   sameInterface a b = eqList eqString (interfaceFields a) (interfaceFields b);
+  -- Both inputs at the prepared linker are already admitted. Exact typed
+  -- equality implies equality of every canonical field. A representational
+  -- difference still uses the ordinary sorted and normalized comparison.
+  sameAdmittedInterface a b = let {
+    pairs = eqPair eqString;
+    entities = eqList (\x y -> Modules.compareEntity x y == 0);
+    strings = eqList eqString;
+    identical = eqString (crateId a) (crateId b) &&
+      eqList (Equality.eqTriple eqString eqString eqString) (crateDependencies a) (crateDependencies b) &&
+      strings (crateModules a) (crateModules b) &&
+      eqList (pairs entities) (crateExports a) (crateExports b) &&
+      eqList (pairs strings) (crateImports a) (crateImports b) &&
+      eqList Equality.eqDataDecl (crateData a) (crateData b) &&
+      eqList Equality.eqSClassDecl (crateClasses a) (crateClasses b) &&
+      eqList (pairs Equality.eqSInstanceDecl) (crateInstances a) (crateInstances b) &&
+      eqList Equality.eqDataDecl (crateLoweredData a) (crateLoweredData b) &&
+      eqList (pairs Structure.sameEncodedXType) (crateBindings a) (crateBindings b) &&
+      eqString (crateEntry a) (crateEntry b) &&
+      eqString (crateObjectFingerprint a) (crateObjectFingerprint b) &&
+      eqList (pairs Equality.eqBool) (crateProtection a) (crateProtection b)
+  } in identical || sameInterface a b;
   decodeDependency text =
     do {
       fields <- Separate.unpack text;
