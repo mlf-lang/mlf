@@ -1,6 +1,7 @@
 """Authenticate PR43 reconciliation before reversible historical source projection."""
 from functools import lru_cache
 import hashlib
+import json
 import os
 import stat
 from pathlib import Path
@@ -13,7 +14,9 @@ PREDECESSOR = '4fd6730d35b6ecaf8e169ad228ac3c7a3ed56160'
 PREDECESSOR_TREE = '1c60d3daca5162bd24658d295169f601593345ef'
 PREDECESSOR_MANIFEST = '69bc6cc39ec70a0209a6011f4ce7fef0aaf5039d903fa1b8477ee4a2bc46dcd8'
 MANIFEST = 'pr43-reconciliation-migration.json'
-MANIFEST_SHA256 = '54430734be3891d6bc672a5cc3e227fce77d03b63cb66c7a7ac36be08922bff2'
+MANIFEST_SHA256 = 'f611478915e5da8a47ee1d065f17ab26152029efb847418e0d6e0580b23cca74'
+ADAPTER_MANIFEST_SHA256 = '6bbc1da597cb7eaaeab16aff52e8b44e2d4dc11ff10997679a45b3405bf0be98'
+CHAIN_EDGE_SHA256 = '5acc941d400b8b194ca97ca6a3c3ad6322e199279191bbf7b2d5816dab59841c'
 PREDECESSOR_IMPLEMENTATION = '7cacadad979f3db29da9067b5fe0ca8e1634d960dbf978ad6d5cae39ba338794'
 LIVE_PREDECESSOR = 'f9bdb40a659bfdff4cbb782d438afbb0417dd2e1'
 LIVE_PREDECESSOR_TREE = '3148203097e7622ced1b272e606bfa892fad746b'
@@ -23,6 +26,14 @@ LIVE_PREDECESSOR_SOURCE = 'eff291112f318206ce0f7ab85cb8a2e474be41489441204696630
 PERFORMANCE_BASE = 'fc300bc9fdc389b585cbef0630fc8915d53e89c5'
 PERFORMANCE_TREE = '386f0b41ab5f9b39fca273f3040f51d73df924a1'
 PERFORMANCE_BASE_MANIFEST = 'ebe5671476447cd4b256784e7d898ed6095c7c54cc9286c6869ca4909b2b708b'
+PERFORMANCE_MAINTENANCE_PATH = 'patricia/test_adapters.py'
+ADAPTER_BASE = '08a08aa98c01f4f07b6efb01a250a0d86f387811'
+ADAPTER_TREE = 'eec52972c0028a7f1d20da0ac15f867664c2c918'
+ADAPTER_BASE_MANIFEST = '82b9b045993ff9ac2d14a5b67dbfd35288004a79ae08303a1047f81de438d009'
+ADAPTER_PATH = 'patricia/adapt_oracles.py'
+ADAPTER_OLD_SHA = '45ce4b0fac779be59272e1a9ae377115c1c91a7e03f6acf77588c41aea40af0e'
+ADAPTER_OLD_DECLARATION = b"LIVE_SESSION_HEADER = 'module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, compileSpecFileWithVerification, compileSpecFileUsingInstaller) where {'"
+ADAPTER_NEW_DECLARATION = b"LIVE_SESSION_HEADER = 'module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, compileSpecFileWithVerification, compileSpecFileUsingInstaller,\\n    CompiledCrate, compiledObject, compiledInterfaces, compileSpecFileRetainedUsingInstaller) where {'"
 PERFORMANCE_PATHS = {
     'bootstrap/MLF/BuiltinPreludeData.hs',
     'bootstrap/MLF/Entry/Emlf.hs',
@@ -55,7 +66,6 @@ PERFORMANCE_PATHS = {
     'libraries/mlf-frontend/Bootstrap/Module.hs',
     'libraries/mlf-frontend/Bootstrap/Parsec.hs',
     'libraries/mlf-frontend/Bootstrap/Parser.hs',
-    'libraries/mlf-frontend/Bootstrap/Surface.hs',
     'libraries/mlf-inference/Bootstrap/Classes.hs',
     'libraries/mlf-interpreter/Bootstrap/Runtime.hs',
     'libraries/mlf-language-core/Bootstrap/Primitive.hs',
@@ -166,7 +176,7 @@ def validate_macos_transition(spec, repository, core):
     require(spec == expected, 'only the declared live build endpoint may change')
 
 
-def validate_live_transition(spec, repository, core):
+def validate_performance_transition(spec, repository, core):
     """Pin the performance follow-on while retaining the earlier exact transition."""
     git = ['git', '--no-replace-objects', '-C', str(repository)]
     tree = subprocess.check_output([*git, 'rev-parse', PERFORMANCE_BASE + '^{tree}'], text=True).strip()
@@ -189,11 +199,120 @@ def validate_live_transition(spec, repository, core):
         previous = prior['changes'].get(path, [row[0], row[0]])
         require(previous[1] == row[0], 'performance predecessor endpoint ' + path)
         expected['changes'][path] = [previous[0], row[1]]
+    # This one live boundary test follows the performance source transition.
+    # Authenticate its physical intermediate endpoint, not just a mutable row.
+    maintenance = spec.get('performance_transition', {}).get('maintenance', {})
+    name = PERFORMANCE_MAINTENANCE_PATH
+    require(type(maintenance) is dict and set(maintenance) == {name},
+            'exact performance maintenance paths')
+    old = subprocess.check_output([*git, 'show', PERFORMANCE_BASE + ':tools/performance/' + name])
+    row = maintenance[name]
+    previous = prior['maintenance'][name]
+    require(len(old) <= core.MAX_SOURCE_BYTES and sha(old) == previous[1],
+            'performance predecessor maintenance source')
+    require(type(row) is list and len(row) == 2 and row[0] == sha(old) and
+            type(row[1]) is str and len(row[1]) == 64 and
+            all(c in '0123456789abcdef' for c in row[1]) and row[0] != row[1],
+            'performance maintenance transition')
+    expected['maintenance'] = {**prior['maintenance'], name: [previous[0], row[1]]}
     expected['performance_transition'] = {
         'predecessor': PERFORMANCE_BASE, 'predecessor_tree': PERFORMANCE_TREE,
         'predecessor_manifest_sha256': PERFORMANCE_BASE_MANIFEST, 'changes': changes,
+        'maintenance': maintenance,
     }
     require(spec == expected, 'only the declared performance endpoints may change')
+
+
+def validate_adapter_successor(spec, prior_raw, old_source, current_source, tree, core):
+    """One reversible test-header edit, after an immutable complete predecessor."""
+    require(tree == ADAPTER_TREE, 'fixed adapter predecessor tree')
+    require(sha(prior_raw) == ADAPTER_BASE_MANIFEST, 'fixed adapter predecessor manifest')
+    require(sha(old_source) == ADAPTER_OLD_SHA, 'fixed adapter predecessor source')
+    require(old_source.count(ADAPTER_OLD_DECLARATION) == 1 and
+            ADAPTER_NEW_DECLARATION not in old_source, 'unique previous adapter declaration')
+    expected_source = old_source.replace(ADAPTER_OLD_DECLARATION, ADAPTER_NEW_DECLARATION)
+    require(current_source == expected_source and current_source.count(ADAPTER_NEW_DECLARATION) == 1 and
+            current_source.replace(ADAPTER_NEW_DECLARATION, ADAPTER_OLD_DECLARATION) == old_source,
+            'exact reversible adapter header change')
+    prior = core.strict_json(prior_raw)
+    require(ADAPTER_PATH not in prior['maintenance'], 'unchanged adapter at predecessor')
+    row = [ADAPTER_OLD_SHA, sha(current_source)]
+    expected = {**prior, 'maintenance': {**prior['maintenance'], ADAPTER_PATH: row},
+        'adapter_successor': {'predecessor': ADAPTER_BASE, 'predecessor_tree': ADAPTER_TREE,
+            'predecessor_manifest_sha256': ADAPTER_BASE_MANIFEST, 'maintenance': {ADAPTER_PATH: row}}}
+    require(spec == expected, 'only declared adapter successor may change')
+    return prior
+
+
+def validate_adapter_transition(spec, repository, core, history_root=None):
+    git = ['git', '--no-replace-objects', '-C', str(repository)]
+    tree = subprocess.check_output([*git, 'rev-parse', ADAPTER_BASE + '^{tree}'], text=True).strip()
+    prior_raw = subprocess.check_output([*git, 'show', ADAPTER_BASE + ':tools/performance/artifact-binary/' + MANIFEST])
+    old_source = subprocess.check_output([*git, 'show', ADAPTER_BASE + ':tools/performance/' + ADAPTER_PATH])
+    require(len(prior_raw) <= core.MAX_METADATA_BYTES and len(old_source) <= core.MAX_SOURCE_BYTES,
+            'adapter predecessor byte bounds')
+    current = core.read_file(Path(history_root) if history_root is not None else Path(repository) / 'tools/performance', ADAPTER_PATH)
+    prior = validate_adapter_successor(spec, prior_raw, old_source, current, tree, core)
+    validate_performance_transition(prior, repository, core)
+
+
+def canonical_manifest(value):
+    return (json.dumps(value, indent=2, sort_keys=True) + '\n').encode()
+
+
+def adapter_endpoint(spec):
+    """Recover the exact adapter manifest without requiring a checkout."""
+    prior = dict(spec)
+    edge = prior.pop('inferred_chain_transition', None)
+    require(sha(canonical_manifest(edge)) == CHAIN_EDGE_SHA256, 'fixed inferred-chain transition')
+    changes = dict(prior['changes'])
+    for path, (old, new) in edge['changes'].items():
+        row = changes.get(path)
+        require(type(row) is list and len(row) == 2 and row[1] == new,
+                'inferred-chain endpoint: ' + path)
+        if row[0] == old:
+            del changes[path]
+        else:
+            changes[path] = [row[0], old]
+    prior['changes'] = changes
+    require(sha(canonical_manifest(prior)) == ADAPTER_MANIFEST_SHA256, 'entire adapter endpoint')
+    return prior
+
+
+def validate_live_transition(spec, repository, core, history_root=None):
+    """Join the published adapter history to the measured compiler source tree."""
+    prior = adapter_endpoint(spec)
+    validate_adapter_transition(prior, repository, core, history_root)
+    edge = spec['inferred_chain_transition']
+    git = ['git', '--no-replace-objects', '-C', str(repository)]
+
+    def at(commit, path, limit):
+        data = subprocess.check_output([*git, 'show', commit + ':' + path])
+        require(len(data) <= limit, 'inferred-chain byte bound: ' + path)
+        return data
+
+    base, measured = edge['predecessor'], edge['measured']
+    manifest_path = 'tools/performance/artifact-binary/' + MANIFEST
+    for role, commit in [('predecessor', base), ('measured', measured)]:
+        tree = subprocess.check_output([*git, 'rev-parse', commit + '^{tree}'], text=True).strip()
+        require(tree == edge[role + '_tree'], 'inferred-chain ' + role + ' tree')
+    base_raw = at(base, manifest_path, core.MAX_METADATA_BYTES)
+    measured_raw = at(measured, manifest_path, core.MAX_METADATA_BYTES)
+    require(sha(base_raw) == edge['predecessor_manifest_sha256'] == ADAPTER_MANIFEST_SHA256 and
+            core.strict_json(base_raw) == prior, 'complete inferred-chain predecessor')
+    require(sha(measured_raw) == edge['measured_manifest_sha256'], 'measured source manifest')
+    before = prior['changes']
+    after = core.strict_json(measured_raw)['changes']
+    require(before.keys() <= after.keys(), 'inferred-chain source removed')
+    changed = {path for path in after if before.get(path) != after[path]}
+    require(changed == set(edge['changes']), 'exact inferred-chain source paths')
+    for path in changed:
+        old = sha(at(base, path, core.MAX_SOURCE_BYTES))
+        new = sha(at(measured, path, core.MAX_SOURCE_BYTES))
+        first, last = before.get(path, [old, old])
+        require(last == old and old != new and edge['changes'][path] == [old, new] and
+                after[path] == [first, new], 'inferred-chain source transition: ' + path)
+    require(after == spec['changes'], 'exact measured compiler source endpoints')
 
 
 class Contract:
@@ -227,10 +346,10 @@ class Contract:
         raw = self.core.read_file(self.directory, MANIFEST, self.core.MAX_METADATA_BYTES)
         require(sha(raw) == manifest_sha256, 'successor manifest SHA')
         spec = self.core.strict_json(raw)
-        require(set(spec) == {'format', 'predecessor', 'changes', 'additions', 'maintenance', 'live_transition', 'performance_transition'} and
+        require(set(spec) == {'format', 'predecessor', 'changes', 'additions', 'maintenance', 'live_transition', 'performance_transition', 'adapter_successor', 'inferred_chain_transition'} and
                 spec['format'] == 'pr43-reconciliation-source-migration-v1' and spec['predecessor'] == PREDECESSOR,
                 'successor manifest schema')
-        validate_live_transition(spec, location, self.core)
+        validate_live_transition(spec, location, self.core, history_root)
         self.changes = spec['changes']
         self.maintenance = spec['maintenance']
         files = dict(self.previous.value['current_files'])

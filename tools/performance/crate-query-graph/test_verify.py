@@ -8,6 +8,9 @@ import re
 import tempfile
 import unittest
 
+from test_template_receipts import TemplateReceiptTests
+from test_finish_receipts_latest import LatestReceiptTests
+
 import verify as v
 from artifact_binary_reference import Invalid, read_document, tree_document
 from test_query_index import read_index, fields, node, text, integer, listing, row, index
@@ -16,6 +19,23 @@ H1, H2, H3 = 'a' * 64, 'b' * 64, 'c' * 64
 
 
 class VerifierTests(unittest.TestCase):
+    def test_resume_requires_complete_current_verifier_input_identity(self):
+        inputs = v.verifier_inputs()
+        self.assertIn('tools/performance/crate-query-graph/template_receipts.py', inputs)
+        self.assertIn('tools/shared/artifact_structure_contract.json', inputs)
+        original = dict(complete=False, binary_sha256=H1, verifier_inputs=inputs,
+                        recovery=['body', 'protection'])
+        v.require_current_run(original, H1, inputs)
+        variants = [dict(original, verifier_inputs={}),
+                    {k: value for k, value in original.items() if k != 'verifier_inputs'},
+                    dict(original, verifier_inputs={**inputs, 'tools/shared/artifact_binary_open.py': H2})]
+        for record in variants:
+            with self.assertRaisesRegex(Invalid, 'resume verifier inputs changed'):
+                v.require_current_run(record, H1, inputs)
+        for record in [dict(original, binary_sha256=H2), dict(original, complete=True)]:
+            with self.assertRaisesRegex(Invalid, 'same unfinished compiler run'):
+                v.require_current_run(record, H1, inputs)
+
     def setUp(self):
         self.records = {
             'leaf/α😀': {'sha': H1, 'reads': [], 'payload': None},
@@ -275,8 +295,8 @@ class VerifierTests(unittest.TestCase):
     def test_main_case_and_failpoint_inventory_preserved(self):
         self.assertEqual(list(v.CASES),
                          ['body', 'type', 'protection', 'datatype', 'constructor-owner',
-                          'scc', 'scope', 'scope-order', 'recursive-dictionary'])
-        self.assertEqual([len(states) for states in v.CASES.values()], [2, 2, 2, 2, 2, 3, 3, 2, 2])
+                          'scc', 'scope', 'scope-order', 'recursive-dictionary', 'finish-receipts', 'signed-template-rebind', 'template-rebind'])
+        self.assertEqual([len(states) for states in v.CASES.values()], [2, 2, 2, 2, 2, 3, 3, 2, 2, 1, 3, 3])
         source = inspect.getsource(v.main)
         constants = [n.value for n in ast.walk(ast.parse(source)) if isinstance(n, ast.Constant)]
         # Generation.rows deliberately normalizes all three wire formats to

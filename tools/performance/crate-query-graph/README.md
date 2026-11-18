@@ -85,13 +85,63 @@ admission/literal generation.
 
 ## Correctness controls
 
-`verify.py` runs 20 source states through the actual crate CLI. They cover body,
+`verify.py` runs 27 source states through the actual crate CLI. They cover body,
 type, protection, datatype field, constructor ownership, evidence insertion,
 removal and order, recursive dictionaries, and recursive SCC split/merge changes. Each state compares
 incremental and clean raw SHA values and byte-identical final interfaces/objects;
 warm, ICH and semantic-audit runs must agree. It independently reads the wire
 format, verifies the graph and payload SHA values, and checks dependency closure
 and acyclicity. Formal objects are linked with the query cache removed.
+
+The independent final-provider inspector supports explicit FinishScc receipts
+and singleton direct Binding providers, and distinguishes concrete raw records from
+canonical inference-template records. An unchanged template commits to the
+original canonical payload SHA, not a newly serialized concrete-owner body.
+The inspector hashes the original canonical bytes and derives the complete
+ID-preserving reattachment from the raw query's ordered dependency edges and
+sole member, never from the final fragment's own claimed parameter names.
+Rewritten templates instead commit to their concrete final body. Ordinary raw
+owner checks remain strict. The Python fixtures cover both commitments and
+wrong owners, identities, references, types, bodies, uses, and digests. Signed
+templates require a closed monomorphic annotation matching the exported type;
+checked-expression keys must also contain a closed monotype. Both historical
+unsigned and current signed template keys are validated explicitly.
+
+A direct Binding is admitted only for a singleton with exact retained raw content,
+unchanged references, no evidence, and the complete ordered provider reads. Shared
+EmptyScope nodes must have exactly the independently reconstructed empty scope
+and inventory hashes/edges. The inspector does not claim to reconstruct a direct
+Binding contract hash from its interface: explicit overload metadata is not fully
+exported there. Current-source compiler controls establish that contract and its
+metadata-only invalidation. Separate multi-member SCC fixtures retain explicit
+FinishScc coverage; checksum-consistent direct Binding hash/read attacks target
+an unconsumed provider and must be rebuilt without re-inferring raw bodies.
+
+This inspection does not claim to independently prove the source-to-MLF
+inference judgment or the renamed fragment's pretty-text stamp. Template source
+keys are checked against current source by the actual compiler; foreign schemes
+not exported by the current interface are not inferred from self-attested keys.
+Each of the three `template-rebind` and three `signed-template-rebind` states
+requires actual payload sharing, unchanged
+payloads after owner renaming, and invalidation after a dependency-scheme edit.
+Checksum-consistent wrong owner/member/source-key/scheme-key generations (and
+a wrong declared signature for signed templates) must
+be repaired back to the exact original graph and outputs. Every template state
+also repins an object with a wrong content stamp: both normal and semantic-audit
+links, with the query cache absent, must reject it for the content-stamp error.
+These real-reader controls are distinct from the lightweight Python tests:
+
+```sh
+python3 -B tools/performance/crate-query-graph/test_verify.py
+python3 -O -B tools/performance/crate-query-graph/test_verify.py
+python3 -B tools/performance/crate-query-graph/verify.py "$query_candidate" "$protection_output" --case protection
+python3 -B tools/performance/crate-query-graph/verify.py "$query_candidate" "$template_output" --case template-rebind
+python3 -B tools/performance/crate-query-graph/verify.py "$query_candidate" "$signed_template_output" --case signed-template-rebind
+```
+
+The v3 column format has no independent payload address to swap: its malformed
+payload control uses an out-of-range payload row. Historical formats retain the
+wrong-address fixture; the runner records which variant actually ran.
 
 Recovery controls cover missing/corrupt raw and shared results, checksum-correct
 dangling graph edges, source failure, output failure, five publication failpoints,

@@ -22,6 +22,8 @@ MACOS_BASE_SOURCE = 'eff291112f318206ce0f7ab85cb8a2e474be41489441204696630a395f4
 
 
 PERFORMANCE_BASE = 'fc300bc9fdc389b585cbef0630fc8915d53e89c5'
+ADAPTER_ENDPOINT = '798282547f3169d6d729d17c088f5cc29ac3eab0'
+CHAIN_ENDPOINT = 'ee495d5783fca3c26a3c0e659ebeac1bab76a37d'
 
 def performance_base_bytes(path):
     return subprocess.check_output(['git', '--no-replace-objects', '-C', str(ROOT),
@@ -166,7 +168,7 @@ class PR43SourceReconciliation(unittest.TestCase):
                           if current['maintenance'][p] != prior['maintenance'][p]}, {maintenance})
         self.assertEqual(current['maintenance'][maintenance][0], prior['maintenance'][maintenance][0])
         self.assertEqual(current['maintenance'][maintenance][1],
-                         hashlib.sha256((HISTORY / maintenance).read_bytes()).hexdigest())
+                         hashlib.sha256(performance_base_bytes('tools/performance/' + maintenance)).hexdigest())
         for path, row in prior['changes'].items():
             self.assertEqual(current['changes'][path][0], row[0])
             if path not in reviewed:
@@ -179,11 +181,19 @@ class PR43SourceReconciliation(unittest.TestCase):
         baseline = base_files(c)
         changes = spec['performance_transition']['changes']
         self.assertEqual(set(changes), module.PERFORMANCE_PATHS)
-        self.assertEqual({p for p in baseline if baseline[p] != c.value['current_files'][p]}, set(changes))
+        frozen_spec = json.loads(subprocess.check_output(['git', '--no-replace-objects', '-C', str(ROOT),
+            'show', ADAPTER_ENDPOINT + ':tools/performance/artifact-binary/pr43-reconciliation-migration.json']))
+        endpoint = {**c.previous.value['current_files'],
+                    **{p: row[1] for p, row in frozen_spec['changes'].items()}, **frozen_spec['additions']}
+        self.assertEqual(baseline.keys(), endpoint.keys())
+        self.assertEqual({p for p in baseline if baseline[p] != endpoint[p]}, set(changes))
         for path, (old, new) in changes.items():
             self.assertEqual(old, hashlib.sha256(performance_base_bytes(path)).hexdigest())
             self.assertEqual(old, baseline[path])
-            self.assertEqual(new, hashlib.sha256((ROOT / path).read_bytes()).hexdigest())
+            frozen = subprocess.check_output(['git', '--no-replace-objects', '-C', str(ROOT),
+                                               'show', ADAPTER_ENDPOINT + ':' + path])
+            self.assertEqual(new, hashlib.sha256(frozen).hexdigest())
+            self.assertEqual(new, endpoint[path])
             with self.subTest(path=path), self.assertRaises(ValueError):
                 c.restore_path((ROOT / path).read_bytes() + b' ', path)
             with self.subTest(previous=path), self.assertRaises(ValueError):
@@ -202,6 +212,58 @@ class PR43SourceReconciliation(unittest.TestCase):
             with self.subTest(mutation=mutation), self.assertRaises(ValueError):
                 module.validate_live_transition(bad, ROOT, c.core)
 
+    def test_performance_maintenance_preserves_both_historical_endpoints(self):
+        c = self.contract
+        spec = json.loads((c.directory / 'pr43-reconciliation-migration.json').read_bytes())
+        prior = base_spec()
+        name = 'patricia/test_adapters.py'
+        row = spec['performance_transition']['maintenance']
+        self.assertEqual(set(row), {name})
+        physical = performance_base_bytes('tools/performance/' + name)
+        live = (HISTORY / name).read_bytes()
+        old_sha = hashlib.sha256(physical).hexdigest()
+        new_sha = hashlib.sha256(live).hexdigest()
+        self.assertEqual(old_sha, prior['maintenance'][name][1])
+        self.assertEqual(row[name], [old_sha, new_sha])
+        self.assertNotEqual(old_sha, new_sha)
+        expected = copy.deepcopy(prior['maintenance'])
+        expected[name][1] = new_sha
+        # The later, independently checked adapter edge does not rewrite this
+        # formatter/performance test boundary.
+        expected['patricia/adapt_oracles.py'] = spec['adapter_successor']['maintenance']['patricia/adapt_oracles.py']
+        self.assertEqual(spec['maintenance'], expected)
+        previous = (c.archived / 'tools/performance' / name).read_bytes()
+        self.assertEqual(c.restore_maintenance(live, name),
+                         c.previous.restore_maintenance(previous, name))
+        for wrong in (physical, previous, live + b' '):
+            with self.subTest(source=hashlib.sha256(wrong).hexdigest()), self.assertRaises(ValueError):
+                c.restore_maintenance(wrong, name)
+
+    def test_performance_maintenance_rejects_undeclared_or_discontinuous_edges(self):
+        c = self.contract
+        module = sys.modules[type(c).__module__]
+        spec = json.loads((c.directory / 'pr43-reconciliation-migration.json').read_bytes())
+        name = 'patricia/test_adapters.py'
+        for mutation in ('absent', 'missing', 'extra', 'wrong-path', 'old', 'new',
+                         'unchanged', 'malformed', 'historical-first', 'top-new',
+                         'other-maintenance', 'extra-field'):
+            bad = copy.deepcopy(spec)
+            edge = bad['performance_transition']['maintenance']
+            if mutation == 'absent': del bad['performance_transition']['maintenance']
+            elif mutation == 'missing': del edge[name]
+            elif mutation == 'extra': edge['patricia/run_integrated.py'] = edge[name][:]
+            elif mutation == 'wrong-path': edge['other'] = edge.pop(name)
+            elif mutation == 'old': edge[name][0] = '0' * 64
+            elif mutation == 'new': edge[name][1] = '0' * 64
+            elif mutation == 'unchanged': edge[name][1] = edge[name][0]
+            elif mutation == 'malformed': edge[name][1] = 'x' * 64
+            elif mutation == 'historical-first': bad['maintenance'][name][0] = '0' * 64
+            elif mutation == 'top-new': bad['maintenance'][name][1] = '0' * 64
+            elif mutation == 'other-maintenance': bad['maintenance']['other'] = ['0' * 64, '1' * 64]
+            else: bad['performance_transition']['extra'] = True
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                module.validate_live_transition(bad, ROOT, c.core)
+
     def test_complete_tree_projections_recover_exact_predecessor_and_live_inputs(self):
         c = self.contract
         raw = {p: (ROOT / p).read_bytes() for p in c.value['current_files']}
@@ -216,6 +278,41 @@ class PR43SourceReconciliation(unittest.TestCase):
                 c.project_tree_bytes(bad)
         with self.assertRaises(ValueError):
             c.advance_tree_bytes(ancestor, {})
+
+    def test_inferred_chain_accounts_for_every_live_source_after_the_adapter(self):
+        c = self.contract
+        git = ['git', '--no-replace-objects', '-C', str(ROOT)]
+        manifest = json.loads((c.directory / 'pr43-reconciliation-migration.json').read_bytes())
+        edge = manifest['inferred_chain_transition']
+        self.assertEqual((edge['predecessor'], edge['measured']), (ADAPTER_ENDPOINT, CHAIN_ENDPOINT))
+        inventory = c.live_source_inventory(ROOT)
+        paths = subprocess.check_output([*git, 'diff', '--name-only', ADAPTER_ENDPOINT, CHAIN_ENDPOINT],
+                                        text=True).splitlines()
+        self.assertEqual(set(paths) & set(inventory), set(edge['changes']))
+        for path, row in edge['changes'].items():
+            old, measured = (subprocess.check_output([*git, 'show', rev + ':' + path])
+                             for rev in (ADAPTER_ENDPOINT, CHAIN_ENDPOINT))
+            self.assertEqual(row, [hashlib.sha256(old).hexdigest(), hashlib.sha256(measured).hexdigest()])
+            self.assertEqual(measured, (ROOT / path).read_bytes())
+            self.assertEqual(inventory[path], row[1])
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                c.restore_path(old, path)
+
+    def test_direct_runner_extends_the_frozen_controls_only_with_metadata(self):
+        path = 'tools/shared/test_direct.py'
+        original = subprocess.check_output(['git', '--no-replace-objects', '-C', str(ROOT),
+                                             'show', ADAPTER_ENDPOINT + ':' + path])
+        live = (ROOT / path).read_bytes()
+        additions = [
+            b"                   ROOT / 'tools/shared/test_metadata_receipt.py',\n"
+            b"                   ROOT / 'tools/shared/fixtures/MetadataReceiptControls.hs',\n",
+            b"        runner.run('metadata-receipt', [sys.executable, '-B', ROOT / 'tools/shared/test_metadata_receipt.py',\n"
+            b"                   '--build-receipt', build_receipt, '--output', output / 'metadata-receipt'], timeout=300)\n",
+        ]
+        for insertion in additions:
+            self.assertEqual(live.count(insertion), 1)
+            live = live.replace(insertion, b'')
+        self.assertEqual(live, original)
 
     def test_current_registry_host_and_runtime_round_trips(self):
         c = self.contract
@@ -269,9 +366,9 @@ class PR43SourceReconciliation(unittest.TestCase):
         with tempfile.TemporaryDirectory() as name:
             directory = Path(name)
             for path in c.metadata_paths:
-                copy = directory / path
-                copy.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(c.directory / path, copy)
+                target = directory / path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(c.directory / path, target)
             manifest = directory / 'pr43-reconciliation-migration.json'
             original = manifest.read_bytes()
             variants = [
@@ -287,6 +384,15 @@ class PR43SourceReconciliation(unittest.TestCase):
                 self.assertNotEqual(wrong, c.manifest_sha256)
                 for digest in (c.manifest_sha256, wrong):
                     with self.subTest(label=label, digest=digest), self.assertRaises(ValueError):
+                        type(c)(directory, digest, HISTORY, source_root=ROOT)
+            spec = json.loads(original)
+            for field in ('predecessor', 'measured', 'measured_tree', 'changes'):
+                bad = copy.deepcopy(spec)
+                bad['inferred_chain_transition'][field] = {} if field == 'changes' else '0' * 40
+                raw = (json.dumps(bad, indent=2, sort_keys=True) + '\n').encode()
+                manifest.write_bytes(raw)
+                for digest in (c.manifest_sha256, hashlib.sha256(raw).hexdigest()):
+                    with self.subTest(field=field, digest=digest), self.assertRaises(ValueError):
                         type(c)(directory, digest, HISTORY, source_root=ROOT)
 
     def test_rejected_manifest_does_not_materialize_a_predecessor(self):

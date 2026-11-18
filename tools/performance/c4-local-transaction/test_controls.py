@@ -7,6 +7,8 @@ import hashlib
 import os
 from pathlib import Path
 import re
+import subprocess
+from functools import lru_cache
 import tempfile
 import unittest
 
@@ -40,6 +42,83 @@ def inverse_map_balance_dependency(manifest, raw):
 # All existing source-basis tests continue checking the complete unaltered C4
 # contract. The new tests below check its exact candidate dependency extension.
 MANIFEST = inverse_map_balance_dependency(CURRENT_MANIFEST, (HERE/'source-dependency-balance.json').read_bytes())
+
+
+# These are published immutable source checkpoints, not replacement C4 inputs.
+MAP_PATH = 'libraries/mlf-foundation/Bootstrap/Map.hs'
+PERFORMANCE_BASE = 'fc300bc9fdc389b585cbef0630fc8915d53e89c5'
+PERFORMANCE_TREE = '386f0b41ab5f9b39fca273f3040f51d73df924a1'
+PERFORMANCE_MANIFEST_SHA = 'ebe5671476447cd4b256784e7d898ed6095c7c54cc9286c6869ca4909b2b708b'
+RECONCILIATION_SHA = '82b9b045993ff9ac2d14a5b67dbfd35288004a79ae08303a1047f81de438d009'
+RECONCILIATION_PATH = 'tools/performance/artifact-binary/pr43-reconciliation-migration.json'
+
+
+@lru_cache(maxsize=1)
+def map_successor_inputs():
+    # The inferred-chain commit leaves Map at the published adapter endpoint.
+    # Check its live row before replaying the three fixed blobs, without a compiler.
+    root = HERE.parents[2]
+    git = ['git', '--no-replace-objects', '-C', str(root)]
+    tree = subprocess.check_output([*git, 'rev-parse', PERFORMANCE_BASE + '^{tree}'],
+                                   text=True, timeout=30).strip()
+    def old(path):
+        return subprocess.check_output([*git, 'show', PERFORMANCE_BASE + ':' + path], timeout=30)
+    adapter = subprocess.check_output([*git, 'show',
+        '798282547f3169d6d729d17c088f5cc29ac3eab0:' + RECONCILIATION_PATH], timeout=30)
+    live = (root / RECONCILIATION_PATH).read_bytes()
+    C.require(C.sha_bytes(live) == 'f611478915e5da8a47ee1d065f17ab26152029efb847418e0d6e0580b23cca74',
+              'fixed inferred-chain successor manifest')
+    spec = json.loads(live)
+    C.require(MAP_PATH not in spec['inferred_chain_transition']['changes'] and
+              spec['changes'][MAP_PATH] == json.loads(adapter)['changes'][MAP_PATH],
+              'continuous Map endpoint after inferred-chain changes')
+    return (adapter, old(RECONCILIATION_PATH), old(MAP_PATH), (root / MAP_PATH).read_bytes(), tree)
+
+
+def restore_reconciliation_predecessor(raw):
+    # This test-only header edge cannot relabel any C4 or production input.
+    C.require(C.sha_bytes(raw) == '6bbc1da597cb7eaaeab16aff52e8b44e2d4dc11ff10997679a45b3405bf0be98', 'fixed adapter successor manifest')
+    value = json.loads(raw)
+    name = 'patricia/adapt_oracles.py'
+    row = ['45ce4b0fac779be59272e1a9ae377115c1c91a7e03f6acf77588c41aea40af0e', '92871acb93f9c742910b6dfb224bda86e292d2214718be50fdb172b434f65820']
+    expected = {'predecessor': '08a08aa98c01f4f07b6efb01a250a0d86f387811',
+                'predecessor_tree': 'eec52972c0028a7f1d20da0ac15f867664c2c918',
+                'predecessor_manifest_sha256': RECONCILIATION_SHA, 'maintenance': {name: row}}
+    C.require(value.pop('adapter_successor', None) == expected and value['maintenance'].get(name) == row,
+              'exact test-only adapter successor')
+    del value['maintenance'][name]
+    restored = (json.dumps(value, indent=2, sort_keys=True) + '\n').encode()
+    C.require(C.sha_bytes(restored) == RECONCILIATION_SHA, 'entire earlier reconciliation manifest preserved')
+    return restored
+
+
+def validate_map_successor(delta, current_raw, previous_raw, old_map, live_map, tree):
+    """Authenticate the later Map edge without rewriting the complete C4 contract."""
+    C.require(tree == PERFORMANCE_TREE, 'fixed performance predecessor tree')
+    C.require(C.sha_bytes(previous_raw) == PERFORMANCE_MANIFEST_SHA,
+              'fixed performance predecessor manifest')
+    current_raw = restore_reconciliation_predecessor(current_raw)
+    C.require(C.sha_bytes(current_raw) == RECONCILIATION_SHA,
+              'fixed current reconciliation manifest')
+    previous, current = json.loads(previous_raw), json.loads(current_raw)
+    edge = current['performance_transition']
+    C.require(edge['predecessor'] == PERFORMANCE_BASE and
+              edge['predecessor_tree'] == PERFORMANCE_TREE and
+              edge['predecessor_manifest_sha256'] == PERFORMANCE_MANIFEST_SHA,
+              'exact performance source checkpoint')
+    row = edge['changes'][MAP_PATH]
+    old_sha = C.sha_bytes(old_map)
+    # Map was unchanged throughout the formatter checkpoint: it must not be
+    # silently attributed to an unrecorded earlier reconciliation change.
+    C.require(MAP_PATH not in previous['changes'] and MAP_PATH not in previous['additions'],
+              'Map unchanged at performance predecessor')
+    C.require(delta['old'] == CURRENT_MANIFEST['candidate_algorithm_sha256'][MAP_PATH] and
+              bool(delta['reviewed_change']) and delta['new'] == old_sha == row[0],
+              'continuous C4 Int64 performance Map endpoints')
+    C.require(row[0] != row[1] and C.sha_bytes(live_map) == row[1],
+              'exact live performance Map endpoint')
+    C.require(current['changes'][MAP_PATH] == [delta['new'], row[1]],
+              'exact composed reconciliation Map endpoints')
 
 
 def inverse_darwin_source_basis(manifest, raw):
@@ -134,7 +213,9 @@ class StaticControls(unittest.TestCase):
         delta = json.loads(raw)['changed_sources']['Bootstrap.Map']
         self.assertEqual(delta['old'], CURRENT_MANIFEST['candidate_algorithm_sha256'][path])
         self.assertTrue(delta['reviewed_change'])
-        self.assertEqual(C.sha_bytes((HERE.parents[2]/path).read_bytes()), delta['new'])
+        # The historical Int64 endpoint remains fixed; authenticate the later
+        # performance edge and its physical predecessor separately.
+        validate_map_successor(delta, *map_successor_inputs())
 
     def test_map_dependency_refuses_stale_and_unrelated_mutations(self):
         raw = (HERE/'source-dependency-balance.json').read_bytes()
@@ -145,6 +226,33 @@ class StaticControls(unittest.TestCase):
                 inverse_map_balance_dependency(changed, raw)
         for bad in [raw+b' ', b'{}']:
             with self.assertRaises(ValueError): inverse_map_balance_dependency(CURRENT_MANIFEST, bad)
+
+    def test_adapter_successor_recovers_exact_prior_manifest(self):
+        raw = map_successor_inputs()[0]
+        restored = restore_reconciliation_predecessor(raw)
+        self.assertEqual(C.sha_bytes(restored), '82b9b045993ff9ac2d14a5b67dbfd35288004a79ae08303a1047f81de438d009')
+        self.assertNotIn('adapter_successor', json.loads(restored))
+        self.assertNotIn('patricia/adapt_oracles.py', json.loads(restored)['maintenance'])
+        for wrong in (restored, raw + b' '):
+            with self.assertRaises(ValueError): restore_reconciliation_predecessor(wrong)
+
+    def test_map_successor_rejects_corrupt_or_discontinuous_evidence(self):
+        raw = (HERE.parent / 'patricia/source-migration.json').read_bytes()
+        self.assertEqual(C.sha_bytes(raw), '35feca71afa2d2c392df2d920b890f61a5dce84fd85c8c61909f5da32d31fea6')
+        delta = json.loads(raw)['changed_sources']['Bootstrap.Map']
+        inputs = map_successor_inputs()
+        for index, label in enumerate(('current manifest', 'previous manifest', 'physical old Map', 'live Map', 'tree')):
+            changed = list(inputs)
+            changed[index] += 'x' if index == 4 else b' '
+            with self.subTest(label=label), self.assertRaises(ValueError):
+                validate_map_successor(delta, *changed)
+        changed = list(inputs); changed[3] = inputs[2]
+        with self.assertRaisesRegex(ValueError, 'exact live performance Map endpoint'):
+            validate_map_successor(delta, *changed)
+        for field in ('old', 'new', 'reviewed_change'):
+            wrong = dict(delta); wrong[field] = '' if field == 'reviewed_change' else '0' * 64
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, 'continuous C4 Int64 performance Map endpoints'):
+                validate_map_successor(wrong, *inputs)
 
     def test_exact_darwin_source_basis(self):
         previous = inverse_darwin_source_basis(MANIFEST, (HERE/'source-basis-darwin.json').read_bytes())

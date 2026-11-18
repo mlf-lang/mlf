@@ -514,5 +514,192 @@ class GroupIdentityControls(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(C.ComparisonError):
                 C.fragment_equal([(X(3, 'input'), TY)], [X(0, 'input')], old, bad)
 
+
+class CurrentDependencyV12Controls(unittest.TestCase):
+    expected = {132: ('Prelude', 'freezeSTArray'), 133: ('Prelude', 'stToIO'),
+                134: ('Prelude', 'byteArrayCRC32'), 135: ('Prelude', 'packStringFields'),
+                136: ('Prelude', 'stringUtf8Length')}
+
+    def entity(self, code, owner=None, spelling=None, role=None):
+        correct = self.expected.get(code, ('Prelude', 'unknown'))
+        return N(189, S(correct[0] if owner is None else owner),
+                 S(correct[1] if spelling is None else spelling),
+                 N(186, N(32, I(code))) if role is None else role)
+
+    def dependency(self, rows):
+        fs = list(C.fields(iface('metadata'), 242, 13))
+        fs[3] = L([N(2, S(module), L(entities)) for module, entities in rows])
+        return C.tree_document([N(242, *fs)], 3)
+
+    def test_exact_literal_registry_and_legal_reexports(self):
+        self.assertEqual(C.CURRENT_DEPENDENCY_PRIMITIVES, self.expected)
+        entities = [self.entity(code) for code in self.expected]
+        raw = self.dependency([('Prelude', entities), ('MLF.Primitive', entities)])
+        self.assertEqual(C.tree_document([C.current_dependency_decoded(raw)], 3), raw)
+        for code in self.expected:
+            C.current_dependency_decoded(self.dependency([('Some.Reexport', [self.entity(code)])]))
+        # Do not conflate legitimate type/constructor namespaces with the five
+        # newly admitted primitive identities.
+        same_spelling = [N(189, S('User'), S('Box'), N(181)),
+                         N(189, S('User'), S('Box'), N(183, S('Box')))]
+        C.current_dependency_decoded(self.dependency([('User', same_spelling)]))
+
+    def test_historical_dependency_layer_and_own_domains_unchanged(self):
+        for code in self.expected:
+            raw = self.dependency([('MLF.Primitive', [self.entity(code)])])
+            if code <= 133:
+                C.dependency_decoded(raw)
+            else:
+                with self.assertRaisesRegex(C.Invalid, 'closed primitive ABI'):
+                    C.dependency_decoded(raw)
+            with self.assertRaisesRegex(C.Invalid, 'closed primitive ABI'):
+                C.decoded(raw, 3, 'CrateInterfaceFields')
+            interface = C.decoded(raw, 3)
+            own_object = C.tree_document([N(243, N(6), interface, L([]))], 4)
+            with self.assertRaisesRegex(C.Invalid, 'closed primitive ABI'):
+                C.decoded(own_object, 4, 'CrateObjectFields')
+            term = C.tree_document([N(81, N(32, I(code)), L([]))], 6)
+            with self.assertRaisesRegex(C.Invalid, 'closed primitive ABI'):
+                C.decoded(term, 6, 'XTerm')
+
+    def test_negative_unknown_and_huge_codes_remain_closed(self):
+        for code in (-1, 137, 2147483647):
+            with self.subTest(code=code), self.assertRaisesRegex(C.Invalid, 'closed primitive ABI'):
+                C.current_dependency_decoded(self.dependency([('MLF.Primitive', [self.entity(code)])]))
+
+    def test_137_is_rejected_by_every_layer(self):
+        raw = self.dependency([('MLF.Primitive', [self.entity(137)])])
+        for decoder in (C.dependency_decoded, C.current_dependency_decoded):
+            with self.assertRaisesRegex(C.Invalid, 'closed primitive ABI'):
+                decoder(raw)
+        with self.assertRaisesRegex(C.Invalid, 'closed primitive ABI'):
+            C.decoded(raw, 3, 'CrateInterfaceFields')
+        root = C.decoded(raw, 3)
+        with self.assertRaisesRegex(C.Invalid, 'closed primitive ABI'):
+            C.decoded(C.tree_document([N(243, N(6), root, L([]))], 4), 4, 'CrateObjectFields')
+        with self.assertRaisesRegex(C.Invalid, 'closed primitive ABI'):
+            C.decoded(C.tree_document([N(81, N(32, I(137)), L([]))], 6), 6, 'XTerm')
+
+    def test_every_forward_identity_owner_name_and_code_swap(self):
+        for code in self.expected:
+            wrong = [self.entity(code, owner='Other'), self.entity(code, spelling='other')]
+            other = 132 if code != 132 else 136
+            wrong.append(self.entity(code, spelling=self.expected[other][1]))
+            for entity in wrong:
+                with self.subTest(code=code, entity=entity), self.assertRaisesRegex(C.ComparisonError, 'primitive identity'):
+                    C.current_dependency_decoded(self.dependency([('MLF.Primitive', [entity])]))
+
+    def test_reverse_identity_cannot_bind_old_code_or_nonprimitive_role(self):
+        for code, (owner, spelling) in self.expected.items():
+            for bad in (self.entity(131, owner=owner, spelling=spelling),
+                        self.entity(code, role=N(180)),
+                        self.entity(code, role=N(185))):
+                with self.subTest(code=code, bad=bad), self.assertRaisesRegex(C.ComparisonError, 'identity rebound'):
+                    C.current_dependency_decoded(self.dependency([('MLF.Primitive', [bad])]))
+
+    def test_same_container_duplicate_and_split_row_rebinding(self):
+        for code in self.expected:
+            entity = self.entity(code)
+            cases = [[('MLF.Primitive', [entity, entity])],
+                     [('MLF.Primitive', [entity]), ('MLF.Primitive', [entity])],
+                     [('MLF.Primitive', [entity]),
+                      ('MLF.Primitive', [self.entity(131, spelling=self.expected[code][1])])],
+                     [('MLF.Primitive', [entity]),
+                      ('MLF.Primitive', [self.entity(code, role=N(180))])]]
+            for rows in cases:
+                with self.subTest(code=code, rows=rows), self.assertRaises(C.ComparisonError):
+                    C.current_dependency_decoded(self.dependency(rows))
+
+    def test_frozen_triple_and_two_complete_source_inverses(self):
+        import frozen_file_oracles as F
+        for name, digest in C.ORACLE_PINS.items():
+            self.assertEqual(hashlib.sha256((C.ORACLE_DIRECTORY / name).read_bytes()).hexdigest(), digest)
+        original = (C.ORACLE_DIRECTORY / 'artifact_binary_typed.py').read_bytes()
+        legacy = C.DEPENDENCY_ORACLE_PATH.read_bytes()
+        current = C.CURRENT_DEPENDENCY_ORACLE_PATH.read_bytes()
+        sha = C.ORACLE_PINS['artifact_binary_typed.py']
+        self.assertEqual(F.dependency_v12_bytes(original, legacy, sha), current)
+        self.assertEqual(current.replace(b'0 <= node.data <= 136', b'0 <= node.data <= 133'), legacy)
+        self.assertEqual(legacy.replace(b'0 <= node.data <= 133', b'0 <= node.data <= 131'), original)
+        for changed in (legacy+b'\n', legacy.replace(b'<= 133', b'<= 134'),
+                        legacy.replace(b'closed primitive ABI', b'other diagnostic'),
+                        legacy + b"# if typ=='PrimitiveCode': require(0 <= node.data <= 133, 'closed primitive ABI')\n"):
+            with self.subTest(changed=changed[-120:]), self.assertRaises(ValueError):
+                F.dependency_v12_bytes(original, changed, sha)
+        with self.assertRaises(ValueError):
+            F.dependency_v12_bytes(original+b'\n', legacy, sha)
+        with self.assertRaises(ValueError):
+            F.dependency_v12_bytes(original, legacy, '0'*64)
+
+    def test_root_family_arity_and_trailing_bytes_stay_strict(self):
+        raw = self.dependency([('MLF.Primitive', [self.entity(136)])])
+        root = C.decoded(raw, 3)
+        cases = [raw+b'x', C.tree_document([root], 4),
+                 C.tree_document([root, root], 3),
+                 C.tree_document([N(242, *C.fields(root)[:-1])], 3),
+                 C.tree_document([N(243, *C.fields(root))], 3)]
+        for changed in cases:
+            with self.subTest(size=len(changed)), self.assertRaises((C.Invalid, C.ComparisonError)):
+                C.current_dependency_decoded(changed)
+
+    def test_actual_compare_dispatches_only_dependencies_to_current_layer(self):
+        from unittest import mock
+        data = fixture()
+        data['dependency_interfaces'] = [self.dependency([('MLF.Primitive', [self.entity(136)])])]
+        with mock.patch.object(C, 'current_dependency_decoded', side_effect=C.ComparisonError('current dependency route')) as current:
+            with mock.patch.object(C, 'dependency_decoded', side_effect=AssertionError('historical route called')):
+                with self.assertRaisesRegex(C.ComparisonError, 'current dependency route'):
+                    C.compare_open_file(**data)
+        current.assert_called_once_with(data['dependency_interfaces'][0])
+
+    def test_complete_synthetic_136_dependency_closure_and_association(self):
+        # Synthetic native-helper preconditions only, not a native admission
+        # claim. Exercise the entire comparator in both retained wire families.
+        dep_fields = list(C.fields(C.decoded(self.dependency(
+            [('MLF.Primitive', [self.entity(136)])]), 3), 242, 13))
+        dep_fields[0] = S('primitive-dependency')
+        dep_fields[2] = L([S('MLF.Primitive')])
+        dep_fields[8] = L([])  # No duplicate ownership of the root's Box type.
+        dep_fields[9] = L([])  # No duplicate ownership of main/unused bindings.
+        dep_fields[10] = S('')
+        dep = N(242, *dep_fields)
+        dependency_bytes = C.tree_document([dep], 3)
+        C.current_dependency_decoded(dependency_bytes)
+        with self.assertRaisesRegex(C.Invalid, 'closed primitive ABI'):
+            C.dependency_decoded(dependency_bytes)
+        for schema in (7, 8):
+            data = fixture(schema)
+            root_fields = list(C.fields(C.decoded(data['closed_files']['.mlfci'], 3), 242, 13))
+            root_fields[1] = L([N(3, S('primitive-dependency'),
+                                     S('synthetic-dependency-receipt'), S('synthetic-source-identity'))])
+            root = N(242, *root_fields)
+            closed = list(C.fields(C.decoded(data['closed_files']['.mlfco'], 4), 243, 3))
+            closed[1] = root
+            data['closed_files'] = {'.mlfci': C.tree_document([root], 3),
+                                    '.mlfco': C.tree_document([N(243, *closed)], 4)}
+            _, package = fixture_package(data['open_files']['.mlfco'])
+            package_fields = list(C.fields(package, 430, 6))
+            package_fields[2] = S(C.pack([C.interface_association(root), C.interface_association(dep)]))
+            data['open_files'] = refresh(N(430, *package_fields), root, schema=schema)
+            data['audited_open_files'] = dict(data['open_files'])
+            data['dependency_interfaces'] = [dependency_bytes]
+            result = C.compare_open_file(**data)
+            self.assertEqual(result['open_wire_schema'], schema)
+            self.assertEqual(result['fragment_count'], 2)
+            self.assertTrue(result['interface_content_exact'])
+            self.assertTrue(result['all_original_fragment_bodies_exact'])
+            self.assertTrue(result['audited_rebuild_original_bytes_equal'])
+            missing = copy.deepcopy(data)
+            missing['dependency_interfaces'] = []
+            with self.assertRaisesRegex(C.ComparisonError, 'missing complete dependency'):
+                C.compare_open_file(**missing)
+            stale = copy.deepcopy(data)
+            package_fields[2] = S(C.pack([C.interface_association(root)]))
+            stale['open_files'] = refresh(N(430, *package_fields), root, schema=schema)
+            stale['audited_open_files'] = dict(stale['open_files'])
+            with self.assertRaisesRegex(C.ComparisonError, 'complete interface association mismatch'):
+                C.compare_open_file(**stale)
+
+
 if __name__=='__main__':
     unittest.main()
