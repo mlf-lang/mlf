@@ -14,7 +14,7 @@
   "changes": {
     "bootstrap/MLF/BuiltinPreludeData.hs": [
       "91b2dee48f06af0432c7d2e81372d3a51d223c0e91ff22eab6e132559b4e3211",
-      "8bd4fb4ee54228d39856b6a8a82d0ace63fcae5635bc0c0eecad2643f4238f60"
+      "fd8d3aa881bcfd71d468c40587d1b93c253c604eef0af4f712c0ea1d82835729"
     ],
     "bootstrap/MLF/Entry/Emlf.hs": [
       "171273f182ff3b4b2b65f1eb03bb8db002ee07a5b57b77cee96e5a8c5f6ba480",
@@ -154,7 +154,7 @@
     ],
     "libraries/mlf-inference/Bootstrap/Classes.hs": [
       "d39189aa3fbac77083d9eed274f8595c5b6cb59967499c99ea8b579ea88a869b",
-      "0011a08a63e355f4fa58facfe7d7dfa0599fb5cbec9ba91b0a327a8aeb667eee"
+      "2f9e10de7c3ed60cbd1f30b4ef61b0c6d97769fcc20157fcef6f28aaf798dc8e"
     ],
     "libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs": [
       "df2a050309ad10b4770cae1defcc87f1d56bedca87e1d4c5d4feb21b975f93b2",
@@ -214,7 +214,7 @@
     ],
     "mlf.lock": [
       "5f7f58dece7a251711a3da2b78ba42502bd25554672bbbeaf8bf95abbc469077",
-      "8e8e8f73ce47f7414ce913e4db75ee49a91737ffbafe2382b3017a4318ddf3fc"
+      "def7365d47edc025af749f3059bb0021c927ab694016c7e59588cfd2a26b107e"
     ],
     "runtime/mlf_build_runner_hash.h": [
       "cbbdfd06eb43324dceef594e42b21621559df3e3d4e91d62f2b73e2b04d9e778",
@@ -946,6 +946,25 @@
       "predecessor": "dab2476f2f838ef11ead3533b6e2fd962ff650a4",
       "predecessor_manifest_sha256": "7696053f7312277fa4e37dcec9cc51eca0885fa3f0499c5bc8f31bf6284f4ae3",
       "predecessor_tree": "5a82e5690aa145617ab3635ff3a9aec871c31ee0"
+    },
+    {
+      "changes": {
+        "bootstrap/MLF/BuiltinPreludeData.hs": [
+          "8bd4fb4ee54228d39856b6a8a82d0ace63fcae5635bc0c0eecad2643f4238f60",
+          "fd8d3aa881bcfd71d468c40587d1b93c253c604eef0af4f712c0ea1d82835729"
+        ],
+        "libraries/mlf-inference/Bootstrap/Classes.hs": [
+          "0011a08a63e355f4fa58facfe7d7dfa0599fb5cbec9ba91b0a327a8aeb667eee",
+          "2f9e10de7c3ed60cbd1f30b4ef61b0c6d97769fcc20157fcef6f28aaf798dc8e"
+        ],
+        "mlf.lock": [
+          "8e8e8f73ce47f7414ce913e4db75ee49a91737ffbafe2382b3017a4318ddf3fc",
+          "def7365d47edc025af749f3059bb0021c927ab694016c7e59588cfd2a26b107e"
+        ]
+      },
+      "predecessor": "edf62cca31c9eb2daaf0e81348e90d2a60c1a525",
+      "predecessor_manifest_sha256": "36b2057f324045f0d276dbe7ed82bbf99ee2fdac84ff9ef53f8e19a3727b87cc",
+      "predecessor_tree": "0f15ffb35084ed7b8197a0f7473bc107ec4c4bbe"
     }
   ],
   "format": "pr43-reconciliation-source-migration-v1",

@@ -803,7 +803,7 @@ module Bootstrap.Classes where {
         (,) expression wants ->
           do {
             let {
-              result = closeWantsIn infos (wantedScope valueScopes globalCandidates) wants expression
+              result = closePlannedWants infos (wantedScope valueScopes globalCandidates) wants expression
             };
             let {
               inner = if null localBindings then result else let {
@@ -2165,7 +2165,7 @@ module Bootstrap.Classes where {
             parameters <- qualifiedParameters plan source;
             result <- renderQualified plan infos (qualifiedParameterMap parameters) source;
             freshPure (SChecked ty (foldr (\n b -> SLam n Nothing b)
-              (closeWantsIn infos candidates (qualifiedWants parameters) result) names))
+              (closePlannedWants infos candidates (qualifiedWants parameters) result) names))
           };
           QualifiedRec slots definitions body -> do {
             lowered <- mapM (\((,,) name mode rhs) -> do {
@@ -2376,13 +2376,19 @@ module Bootstrap.Classes where {
         (,) body wants ->
           do {
             let {
-              closed = closeWantsIn infos (wantedScope valueScopes local) wants body
+              closed = closePlannedWants infos (wantedScope valueScopes local) wants body
             };
             freshPure (SChecked translated (foldr (\n b -> SLam n Nothing b) closed names))
           }
       }
     }
     };
+  -- These wants come from qualifiedParameters after its fresh-name traversal.
+  -- An empty plan substitutes no lexical variables and preserves the source.
+  closePlannedWants infos candidates wants expression = case wants of {
+    [] -> expression;
+    _ -> closeWantsIn infos candidates wants expression
+  };
   closeWants :: Map String Info ->
                 [] ((,) EvidenceRole String) -> [] ((,) String String) -> SExpr -> SExpr;
   closeWants infos candidates = closeWantsIn infos (NamedEvidence candidates);
