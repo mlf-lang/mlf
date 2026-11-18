@@ -1,0 +1,57 @@
+{
+  "run": 44232815745,
+  "commit": "6d6d09d314f3557e44984f08fb98359d6462f440",
+  "zip_sha256": "f7b4eb27a1a935e5e164c96f55ae226df7525815f104ae6d10b0a1b2a49a878d",
+  "inventory_files": 34,
+  "finite": {
+    "complete": false,
+    "errors": [
+      "GateError('child failed/cleanup incomplete O0-ghc')"
+    ],
+    "production": false,
+    "performance_claim": false,
+    "resources": {
+      "mem_available_KiB": 15320280,
+      "disk_bytes": 83320193024,
+      "required_disk_bytes": 8589934592
+    },
+    "limit_policy_phase": "build",
+    "child_fsize_limit_bytes": 268435456,
+    "cleanup": true,
+    "whole_s": 10.040911604000001,
+    "within_whole": true,
+    "process_group_scope_only": true,
+    "global_descendants_or_ECHILD_claim": false
+  },
+  "outer": {
+    "complete": false,
+    "phase": "terminal",
+    "command": [
+      "/usr/bin/python3",
+      "controls/tools/performance/prepared-expansion-bulk-20261118/finite.py",
+      "/home/runner/work/_temp/edge-44232815745-1",
+      "/home/runner/work/mlf/mlf/baseline"
+    ],
+    "work_seconds": 420.0,
+    "cleanup_seconds": 10.0,
+    "cleanup_complete": true,
+    "reaped": [
+      {
+        "pid": 73575,
+        "status": 1
+      }
+    ],
+    "signals": [],
+    "scope": "owned descendants via Linux subreaper and direct-child pidfds; supervisor SIGKILL not contained",
+    "initial_discovery": {
+      "mode": "task-children"
+    },
+    "root_pid": 73575,
+    "reason": "target exited",
+    "target_exit_code": 1,
+    "survivors": [],
+    "cancel_signals": []
+  },
+  "failure": "Main.hs:112 GHC-25037 case/unless layout",
+  "semantic_test_executed": false
+}

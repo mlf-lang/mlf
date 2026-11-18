@@ -1,0 +1,16 @@
+{
+  "status": "FIXTURE_LAYOUT_CORRECTED_NOT_COMPILED",
+  "failure_run": 44232815745,
+  "failure_zip_sha256": "f7b4eb27a1a935e5e164c96f55ae226df7525815f104ae6d10b0a1b2a49a878d",
+  "verified_inventory_files": 34,
+  "actual_failure": "O0 Main.hs112 case continuation layout GHC25037",
+  "fixture_executed": false,
+  "cleanup_verified": true,
+  "original_main_sha256": "c908cee106ae22f3d8174d62d0081d0b01c8712adf0b48de0bb882da56dca9ea",
+  "corrected_main_sha256": "6638b90ca1b313e98e2fa88e539a0bc11f76a941327a59f9cec7abb42a74a8c7",
+  "correction": "Only layout braces/separators: multiline case at112 and two if/do bodies",
+  "nonlayout_token_equality": true,
+  "remaining_layout_review": "Inline cases end on their own line; multiline cases in classify and observe have deeper alternatives; let fullExpected alternatives deeper than let declaration; both if/do branches now explicitly braced. Source inspection only.",
+  "candidate_solver_change": false,
+  "performance_claim": false
+}

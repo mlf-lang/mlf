@@ -1,0 +1,36 @@
+--- a/Main.hs
++++ b/Main.hs
+@@ -109,8 +109,8 @@
+   a<-left;b<-right
+   writeObservation name phase "A" a;writeObservation name phase "C" b
+   unless (a==b) (ioError (userError (name++"/"++phase++": A/C mismatch")))
+-  case expected of Nothing->pure ();Just status->unless (fst a==status)
+-    (ioError (userError (name++"/"++phase++": literal status failed")))
++  case expected of { Nothing->pure (); Just status->unless (fst a==status)
++    (ioError (userError (name++"/"++phase++": literal status failed"))) }
+   unless (not ("OTHER:" `isInfixOf` fst a)) (ioError (userError "unexpected exception"))
+ 
+ runCase :: Spec -> IO ()
+@@ -129,16 +129,16 @@
+   checkPair name "expand-whnf" (Just (if exhausted then "IDENTITY_EXHAUSTED" else "OK"))
+     (observe aExpand whnfExpanded) (observe cExpand whnfExpanded)
+   checkPair name "full-whnf" fullExpected (observe aFull whnfSolver) (observe cFull whnfSolver)
+-  if variant==Mismatch && not exhausted then do
+-    actual<-observe aFull whnfSolver
++  if variant==Mismatch && not exhausted then do {
++    actual<-observe aFull whnfSolver;
+     unless (snd actual=="type constructor mismatch: TyCon \"New\" (*) versus TyCon \"Old\" (*)")
+       (ioError (userError "mismatch literal error failed"))
+-    else pure ()
++    } else pure ()
+   -- Deep snapshots are separate observations, total successful controls only.
+-  if variant==Total && not exhausted then do
+-    checkPair name "expanded-snapshot" (Just "OK") (observe aExpand expandedSnap) (observe cExpand expandedSnap)
++  if variant==Total && not exhausted then do {
++    checkPair name "expanded-snapshot" (Just "OK") (observe aExpand expandedSnap) (observe cExpand expandedSnap);
+     checkPair name "solver-snapshot" (Just "OK") (observe aFull (pure . solverSnap)) (observe cFull (pure . solverSnap))
+-    else pure ()
++    } else pure ()
+ 
+ specs :: [Spec]
+ specs=[Spec "total" Total 0 1 False False
