@@ -241,7 +241,39 @@ module Bootstrap.Lexer where {
   scanMoreWith :: (String -> String -> Int -> Cursor -> Either String Cursor) ->
                   String -> String -> Int -> Cursor -> Either String Scanned;
   scanMoreWith quoted file source size = collectTokens quoted file source size IM.empty [];
-  collectTokens quoted file source size known seen cursor =
+  -- Plain ASCII tokens and whitespace remain on the same indexed input.
+  -- Fall back at comments, quoted forms, numeric prefixes or a Unicode
+  -- continuation, where the full lexer owns the decision and diagnostic.
+  collectTokens quoted file source size table tokens (Cursor start row col) = let {
+    letter c = (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95 || c == 39;
+    identEnd i = if i >= size then i else let { c = stringCodeAt source i } in
+      if letter c || isDigit c then identEnd (i + 1) else i;
+    digitsEnd i = if i < size && isDigit (stringCodeAt source i) then digitsEnd (i + 1) else i;
+    loop i line column known seen = if i >= size then Right (Scanned (reverse seen) (Token "" line column line column))
+      else let {
+        c = stringCodeAt source i;
+        next = i + 1;
+        slow = collectFullToken quoted file source size known seen (Cursor i line column);
+        emit end names spelling = let {
+          lastColumn = column + (end - i);
+          token = Token spelling line column line lastColumn
+        } in seq lastColumn (loop end line lastColumn names ((:) token seen));
+        found end = case sharedSpelling source i end c known of { (,) spelling names -> emit end names spelling };
+        decimal = let { end = digitsEnd next; after = codeAt source size end } in
+          if after == 46 || after == 69 || after == 101 ||
+            (c == 48 && end == next && (after == 88 || after == 120 || after == 79 || after == 111))
+          then slow else found end;
+        single = c == 40 || c == 41 || c == 44 || c == 59 || c == 91 || c == 93 || c == 125 ||
+          (c == 123 && codeAt source size next /= 45)
+      } in if c == 32 then let { colNext = column + 1 } in seq colNext (loop next line colNext known seen)
+        else if c == 10 then let { rowNext = line + 1 } in seq rowNext (loop next rowNext 1 known seen)
+        else if letter c then let { end = identEnd next } in
+          if end < size && stringCodeAt source end >= 128 then slow else found end
+        else if isDigit c then decimal
+        else if single then emit next known (V.at singleAsciiTokens (V.fromInt c))
+        else slow
+  } in loop start row col table tokens;
+  collectFullToken quoted file source size known seen cursor =
     case skipWhite file source size cursor of {
       Left e -> Left e;
       Right begin ->
