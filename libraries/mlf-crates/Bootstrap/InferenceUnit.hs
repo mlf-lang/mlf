@@ -318,7 +318,12 @@ module Bootstrap.InferenceUnit where {
       lowered <- Classes.lowerSeparateClasses externals [] (SProgram datatypes body);
       Right ((,) externalTypes lowered)
   };
-  compileOpenGroupIndexed name parameters datatypes members = do {
+  compileOpenGroupIndexed name parameters datatypes members =
+    case signedApplicationGroup parameters datatypes members of {
+      Right fragment -> Right fragment;
+      Left _ -> compileElaboratedGroup parameters datatypes members
+    };
+  compileElaboratedGroup parameters datatypes members = do {
     (,) externalTypes lowered <- prepareIndexedGroup parameters datatypes members;
     case monomorphicIndexed parameters members lowered of {
       Right fragment -> Right fragment;
@@ -330,6 +335,94 @@ module Bootstrap.InferenceUnit where {
         }
       }
     }
+  };
+  -- In a signed first-order body, applications introduce neither a type
+  -- annotation nor a binder. Build the resolved term once and let the
+  -- independent checker establish every intermediate type in its environment.
+  signedApplicationGroup parameters declarations members = case members of {
+    [(,) owner ((,,) exported (Just annotation) expression)] -> do {
+      expected <- monomorphicAnnotation annotation;
+      let { numbered = zip parameters (range 0 (length parameters - 1));
+        bindings = map (\((,) ((,,) _ hint ty) number) -> (,) (XName number hint) ty) numbered;
+        globals = M.fromList compareInt (zipWith (\((,,) id _ _) binding ->
+          (,) (V.toInt id) (XVarTerm (fst binding))) parameters bindings);
+        names = M.fromList compareString (map (\((,) name _) ->
+          (,) (X.nameHint name) (XVarTerm name)) bindings);
+        count = length parameters; identity = V.toInt owner };
+      ensure (M.size globals == count && M.size names == count && not (M.member compareInt identity globals)
+        && not (M.member compareString exported names) && all (compose monomorphicTarget snd) bindings)
+        "signed application needs distinct monomorphic parameters";
+      result <- signedApplicationSpine identity globals names (advanceIdentity count 1) expected expression;
+      env <- Open.environment declarations;
+      fragment <- Open.check env bindings (XLet (XName count exported) result (XConstructor "()" []));
+      ensure (case Open.bindings fragment of {
+        [(,) actual ty] -> eqString (X.nameHint actual) exported && T.alphaEq ty expected; _ -> False
+      }) "signed application result type mismatch";
+      Right fragment
+    };
+    _ -> Left "signed application needs one signature"
+  };
+  signedApplicationSpine owner globals names serial expected expression = let {
+    annotated written body = do {
+      actual <- monomorphicAnnotation written;
+      ensure (T.alphaEq expected actual) "signed application annotation mismatch";
+      again body
+    };
+    again = signedApplicationSpine owner globals names serial expected;
+    lambda slot name written body = case expected of {
+      XArrow domain result -> do {
+        case written of {
+          Just ty -> do { actual <- monomorphicAnnotation ty;
+            ensure (T.alphaEq domain actual) "signed application binder annotation mismatch" };
+          Nothing -> Right ()
+        };
+        let { binder = XName serial name; variable = XVarTerm binder };
+        scope <- case slot of {
+          Nothing -> Right globals;
+          Just i -> do {
+            ensure (i /= owner && not (M.member compareInt i globals)) "signed application binder identity collision";
+            Right (M.insert compareInt i variable globals)
+          }
+        };
+        value <- signedApplicationSpine owner scope (M.insert compareString name variable names)
+          (advanceIdentity serial 1) result body;
+        Right (XAbs binder domain value)
+      };
+      _ -> Left "signed application binder requires an arrow"
+    }
+  } in case expression of {
+    SDeclScope [i] (SLam name ty body) -> lambda (Just (V.toInt i)) name ty body;
+    SLam name ty body -> lambda Nothing name ty body;
+    SChecked ty body -> annotated (SAnnotation [] ty) body;
+    SSignature body ty -> annotated ty body;
+    SAnn body ty -> annotated ty body;
+    SCallSite _ _ body -> again body;
+    SSourceDefinition body -> again body;
+    _ -> signedApplicationBody globals names expression
+  };
+  signedApplicationBody globals names expression = let {
+    sub = signedApplicationBody globals names;
+    variable binding = case binding of { Just term -> Right term; Nothing -> Left "unknown signed application variable" }
+  } in case expression of {
+    SApp f a -> do { x <- sub f; y <- sub a; Right (XApp x y) };
+    SGlobal i _ -> variable (M.lookup compareInt (V.toInt i) globals);
+    SVar name -> if eqString name "$MLF.Stack.callStack" then Left "managed call stack requires evidence"
+      else variable (M.lookup compareString name names);
+    SPrimitive p -> case Primitive.primitiveSignature p of {
+      (,) [] signature -> do {
+        ty <- T.instantiateField M.empty signature;
+        ensure (monomorphicTarget ty) "nonmonomorphic primitive";
+        Right (XPrimitive p [])
+      };
+      _ -> Left "primitive needs type arguments"
+    };
+    SIntLit n -> Right (XIntTerm n);
+    SBoolLit b -> Right (XBoolTerm b);
+    SDoubleLit n -> Right (XDoubleTerm n);
+    SStringLit text -> Right (XStringTerm text);
+    SCallSite _ _ body -> sub body;
+    SSourceDefinition body -> sub body;
+    _ -> Left "ordinary elaboration required"
   };
   -- A signed monotype can specialize imported schemes without building a
   -- generalization graph. Every temporary variable, including every imported
