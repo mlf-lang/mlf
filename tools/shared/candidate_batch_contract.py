@@ -3,7 +3,11 @@ import ast
 import hashlib
 
 SCRIPT_BLOB = 'c2a16944fe4e19c1f8de0ac24ff06d95d94c031c'
-CLASSES_BLOB = 'bbcc794dc1ce447ccfc1450378e951df1b427819'
+CLASSES_BLOBS = (
+    'bbcc794dc1ce447ccfc1450378e951df1b427819',
+    'b4a2ce4772e168f2013a77d0113298103557d955',
+)
+ORIGINAL_FIXTURE_SHA256 = '0d61d38552efcbfca9c8709257454233c3699775a106e368900da7dbe3f3fc66'
 SOURCE_BASIS = '8d80e0fb1dbf4e6d40c53de35b727674b5c74817'
 BEGIN, END = 812350001, 812350002
 FORWARD = tuple(range(24))
@@ -28,7 +32,7 @@ def blob(raw): return hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).he
 def original_fixture(script, classes):
     """Parse literal syntax only; never execute an unauthenticated generator."""
     require(type(script)is bytes and blob(script)==SCRIPT_BLOB, 'frozen candidate script')
-    require(type(classes)is bytes and blob(classes)==CLASSES_BLOB, 'fixed Classes source')
+    require(type(classes)is bytes and blob(classes) in CLASSES_BLOBS, 'fixed Classes source')
     tree=ast.parse(script)
     calls=[n for n in ast.walk(tree) if isinstance(n,ast.Call) and
            isinstance(n.func,ast.Attribute) and isinstance(n.func.value,ast.Name) and
@@ -48,7 +52,9 @@ def original_fixture(script, classes):
     require(begin<end,'ordered selector body')
     body=text[begin:end]
     require(body.count('  selectCandidateOrdinals ordinal names indices supers =')==1,'selector body contract')
-    return (node.left.left.value+body+node.right.value).encode('utf-8')
+    fixture = (node.left.left.value+body+node.right.value).encode('utf-8')
+    require(digest(fixture) == ORIGINAL_FIXTURE_SHA256, 'historical candidate fixture changed')
+    return fixture
 
 def cases():
     # Independent literal-sized inventory of the original first twelve vectors.

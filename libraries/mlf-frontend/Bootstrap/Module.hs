@@ -1219,7 +1219,8 @@ module Bootstrap.Module where {
     SIntPattern n -> Right (R.IntPattern n); SStringPattern s -> Right (R.StringPattern s);
     SBoolPattern b -> Right (R.BoolPattern b)
   };
-  resolveExpr bindings env expression = resolveBound bindings env Set.empty (Desugar.desugarDo expression);
+  resolveExpr bindings env expression = resolveBound bindings env Set.empty
+    (if Surface.surfaceCore expression then expression else Desugar.desugarDo expression);
   entryExpr crate entry = let {
     source = resolvedSource entry; bindings = resolvedCrateBindings crate
   } in case resolvedBody (resolvedContents entry) of {

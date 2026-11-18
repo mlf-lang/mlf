@@ -7,6 +7,8 @@ module MLF.Tests.SharedFrontend where {
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Parser as P;
+  import qualified Bootstrap.Parsec as Parsing;
+  import qualified Bootstrap.Lexer as Lexer;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.CrateArtifact as Artifact;
   import qualified Bootstrap.CrateQuery as Query;
@@ -2039,10 +2041,97 @@ module MLF.Tests.SharedFrontend where {
       (duplicate (Modules.locals (moduleFor ["method"] []
         [SClassDecl "Class" [] [] [(,) "method" (STVar "a")]])))
   };
+  -- Reference precedence grammar before the delimiter shortcut. The operators,
+  -- associativity and non-associative comparison diagnostic are tested together.
+  precedenceParserChecks :: IO ();
+  precedenceParserChecks = let {
+    at choices = P.sharedOperatorParser choices;
+    product = Parsing.pChainl P.operand (at ["*","/","%"]);
+    sum = Parsing.pChainl product (at ["+","-"]);
+    concatOp = Parsing.pChoice (Parsing.pMap (\_ -> P.sourceConsExpression) (Parsing.pToken ":")) (at ["++"]);
+    joined = Parsing.pChainr sum concatOp;
+    level4 = do {
+      first <- joined;
+      rest <- Parsing.pMany (do { op <- P.sharedInfix P.sharedLevel4Operators; value <- joined; Parsing.pPure ((,) op value) });
+      when (length rest > 1 && any (\entry -> elem eqString (P.referenceLeaf (fst entry)) P.sharedComparisons) rest)
+        (Parsing.pFail "ambiguous use of a non-associative comparison operator");
+      Parsing.pPure (foldl (\left entry -> P.namedOperator (fst entry) left (snd entry)) first rest)
+    };
+    conjunction = Parsing.pChainr level4 (at ["&&"]);
+    disjunction = Parsing.pChainr conjunction (at ["||"]);
+    reference = Parsing.pChainl disjunction (at [">>=",">>"]);
+    remaining = \(Parsing.ParseState _ tokens _ _ _ _) -> map Lexer.tokenText tokens;
+    sameState = \a b -> Parsing.stateOffset a == Parsing.stateOffset b && eqList eqString (remaining a) (remaining b);
+    agrees = \spellings -> let {
+      tokens = zipWith (\index word -> Lexer.Token word 3 (index * 5) 3 (index * 5 + stringLength word))
+        (range 1 (length spellings)) spellings;
+      start = Parsing.ParseState "Prec.hs" tokens (Lexer.Token "" 4 1 4 1) SharedHaskellV1 "Prec" "pkg"
+    } in case (,) (Parsing.pRun reference start) (Parsing.pRun P.sharedBindExpr start) of {
+      (,) (Parsing.PSuccess a end used) (Parsing.PSuccess b next more) -> used == more && sameState end next && SourceEquality.eqSExpr a b;
+      (,) (Parsing.PFailure a end used) (Parsing.PFailure b next more) -> used == more && sameState end next && eqString a b;
+      _ -> False
+    };
+    operators = append [":"] Lexer.sharedValueOperators;
+    combinations = concatMap (\a -> map (\b -> ["x",a,"y",b,"z",")"]) operators) operators;
+    examples = [[],["x"],["x","M",".","+","y"],["x","M","."],["M",".","x","+","y"],["x","+"],
+      ["x","<","y","==","z"],["(","x","+","y",")","*","z"],["(",")"],["(","-","1",")"],
+      ["(","+",")","x"],["(",",",")"],["1.5",";"],["f","[","x",",","y","]"],["(","let"],["1","(","x"]]
+  } in check "shared infix precedence, associativity, spans, residual tokens and errors"
+         (all agrees (append examples combinations));
+  applicationParserChecks :: IO ();
+  applicationParserChecks = let {
+    reference = Parsing.pBind P.atom (\first -> Parsing.pMap (foldl SApp first) (Parsing.pMany P.atom));
+    remaining = \(Parsing.ParseState _ tokens _ _ _ _) -> map Lexer.tokenText tokens;
+    sameState = \a b -> Parsing.stateOffset a == Parsing.stateOffset b &&
+      eqList eqString (remaining a) (remaining b);
+    agrees expected actual syntax spellings = let {
+      tokens = zipWith (\col spelling -> Lexer.Token spelling 3 col 3 (col + stringLength spelling))
+        (range 1 (length spellings)) spellings;
+      state = Parsing.ParseState "App.hs" tokens (Lexer.Token "" 4 1 4 1) syntax "App" "pkg"
+    } in case (,) (Parsing.pRun expected state) (Parsing.pRun actual state) of {
+      (,) (Parsing.PSuccess a end used) (Parsing.PSuccess b next more) ->
+        used == more && sameState end next && SourceEquality.eqSExpr a b;
+      (,) (Parsing.PFailure a end used) (Parsing.PFailure b next more) ->
+        used == more && sameState end next && eqString a b;
+      _ -> False
+    };
+    examples = append (map (\stop -> ["f","x",stop,"y"]) [")",",",";","}","]"])
+      [[],[")"],["f"],["f","(","g","x",")","y"],["f","(",")"],
+       ["f","("],["f","[","x",","],["f","then"],["f","M",".","g"]];
+    equations = append examples [
+      ["f","(","g","(","x",")",")","x",";","next"],["if","x","then","y","else","z"],
+      ["f","(","x",",","y",")"],["x","::","Int"],["x","+",")"],["x","}"],
+      ["f","0xff","3.25","9e-2"],["x","(","let","{","x","=","1","}","in","x",")"],
+      ["M",".","f","x"],["x",":::", "y"],["f","(","(","g","x",")",")","x",")"]];
+    profiles = [SharedHaskellV1,LegacyEmlfV1,MetadataSyntax]
+  } in do {
+    check "application tree, residual tokens and committed failures"
+      (all (\syntax -> all (agrees reference P.application syntax) examples) profiles);
+    check "equation RHS tree, coordinates, remaining tokens and committed failures"
+      (all (\syntax -> all (agrees P.expr P.equationExpression syntax) equations) profiles)
+  };
+  finalGeometryChecks :: IO ();
+  finalGeometryChecks = do {
+    let { texts = \glyph -> Wire.VNode 8 (replicate 40 (Wire.VText
+              (concatStringList (replicate 65536 glyph))));
+      ascii = texts "a"; multibyte = texts (stringFromCode 128512) };
+    check "source geometry charges UTF-8 bytes independently of node count" (case
+      (,) (Source.smallFinalValue ascii) (Source.smallFinalValue multibyte) of {
+        (,) (Just False) Nothing -> True; _ -> False });
+    check "full graph admits the shared ASCII and multibyte trees"
+      (all (\raw -> isRight (Wire.planGraph Wire.defaultLimits [raw])) [ascii,multibyte]);
+    check "legacy task-list geometry preserves its four-unit scalar budget"
+      (case (,) (Source.smallFinalTasks [(,,) 1 False [Wire.VText "x"]] 5 1 False)
+                (Source.smallFinalTasks [(,,) 1 False [Wire.VText "x"]] 4 1 False) of {
+        (,) (Just False) Nothing -> True; _ -> False })
+  };
   frontendChecks :: IO ();
   frontendChecks =
     do {
       declarationInventoryChecks;
+      applicationParserChecks;
+      precedenceParserChecks;
+      finalGeometryChecks;
       formatterChecks;
       monomorphicGroupChecks;
       groundGroupChecks;

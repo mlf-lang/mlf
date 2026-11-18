@@ -505,7 +505,10 @@ module Bootstrap.CrateQuery where {
       SForall Flexible n (SBottomKind _) body -> (:) n (leadingTypes body);
       _ -> []
     };
-  ordinalToken i = "ref:" ++ showInt (V.toInt i);
+  smallOrdinalTokens :: V.IndexVec Declaration String;
+  smallOrdinalTokens = V.fromList (map (\i -> "ref:" ++ showInt i) (range 0 255));
+  ordinalToken i = let { slot = V.toInt i } in if slot >= 0 && slot < 256
+    then V.at smallOrdinalTokens i else "ref:" ++ showInt slot;
   canonicalTermRef rank env ref = case ref of {
     LexicalRef n -> canonicalReference env n;
     DeclRef i _ -> ordinalToken (rank i)
@@ -680,7 +683,12 @@ module Bootstrap.CrateQuery where {
       (append (Source.groupOriginal prepared) (Source.groupMembers prepared));
     ids = append (Source.memberIds slots) (append (Source.parameterIds slots)
       (append (Source.candidateIds slots) observed));
-    definitions = M.toList (M.fromList compareString (map (\i -> (,) (Source.declStable scope i) i) ids));
+    -- Retain the last occurrence of each ID, including the old last-wins
+    -- ordering for two distinct IDs whose caller-supplied stable key agrees.
+    keep ((,) seen kept) i = let { index = V.toInt i } in
+      if IS.member index seen then (,) seen kept else (,) (IS.insert index seen) ((:) i kept);
+    unique = snd (foldlStrict keep ((,) IS.empty []) (reverse ids));
+    definitions = M.toList (M.fromList compareString (map (\i -> (,) (Source.declStable scope i) i) unique));
     ranks = zipWith (\ordinal ((,) _ i) -> (,) i (V.fromInt ordinal))
       (range 0 (length definitions - 1)) definitions;
     names = map (\((,) i rank) -> (,) (Source.declName scope i) (ordinalToken rank)) ranks

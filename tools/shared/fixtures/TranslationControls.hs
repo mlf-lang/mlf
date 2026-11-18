@@ -21,8 +21,86 @@ chain count amount op input = foldr definition (T.XEApp (v count) input) [1..cou
 lastBody (T.XELet _ _ b) = lastBody b
 lastBody b = b
 
+checkIntSums env = do
+ let add a b = prim T.PAddInt [a,b]
+     mul a b = prim T.PMulInt [a,b]
+     lit = T.XEInt
+     x = v 1
+     eval t = R.integer (R.evaluate env (R.REnv M.empty) t)
+     run input t = eval (T.XELet (n 1) (lit input) t)
+     poison msg = prim T.PPanic [T.XEString msg]
+ forM_ [(1,1), (-1,1), (minBound,minBound), (maxBound,2), (7,-11)] $ \(a,b) ->
+  forM_ [(0,0), (maxBound,1), (minBound,-1), (-19,8)] $ \(c,d) -> do
+   let left = add (mul x (lit a)) (lit c)
+       right = add (lit d) (mul x (lit b))
+   reduced <- case C.combineIntSummands left right of
+    T.Just result -> pure result
+    T.Nothing -> fail "summands with the same binding were missed"
+   forM_ [minBound,maxBound,-1,0,7] $ \input -> do
+    let expected = (a*input+c)+(b*input+d)
+    forM_ [add left right,reduced] $ \term -> case run input term of
+     T.Right value -> need "sum wraps like independent machine Int arithmetic" (value==expected)
+     T.Left err -> fail (B.unpack err)
+ let reject a b = case C.combineIntSummands a b of T.Nothing -> True; _ -> False
+ need "distinct binding identities with identical names stay distinct" (reject x (v 2))
+ need "a division or an effectful operand is never moved"
+   (reject (prim T.PQuotInt [x,lit 2]) x && reject x (poison "right"))
+ let canceled = T.XELet (n 1) (poison "canceled input") (add x (mul x (lit (-1))))
+     leftFirst = T.XELet (n 1) (poison "left") (T.XELet (n 2) (poison "right") (add x (v 2)))
+     letBody = T.XELet (n 8) (poison "bound value") (v 8)
+ forM_ [(canceled,"canceled input"),(leftFirst,"left"),(letBody,"bound value")] $ \(term,msg) ->
+  forM_ [term,C.optimizeChecked term] $ \version -> case eval version of
+   T.Left err -> need "first demanded error is preserved" (err==msg)
+   T.Right _ -> fail "demanded error was lost"
+ let lazy = prim T.PIfThenElse [T.XEBool False,canceled,lit 42]
+ need "unselected canceled sum stays lazy" (case eval (C.optimizeChecked lazy) of T.Right 42 -> True; _ -> False)
+ need "a let returning its binder disappears" (X.equalErased (C.optimizeChecked letBody) (poison "bound value"))
+ putStrLn "PASS 100 wrapped sum cases, binder identity, let result and demand controls"
+
+checkUnaryConstructors = do
+ let builder tag parameter = T.XEAbs parameter (T.XEApp (T.XEConstructor tag) (T.XEVar parameter))
+     selector tag parameter = T.XEAbs parameter (T.XECase (T.XEVar parameter)
+       [T.XErasedAlternative (T.XConstructorPattern tag [T.Just (n 30)]) (v 30)])
+     wrap f g body = T.XELet (n 1) f (T.XELet (n 2) g body)
+     call x = T.XEApp (v 2) (T.XEApp (v 1) x)
+     pair = wrap (builder "A" (n 10)) (selector "A" (n 20))
+     poison = prim T.PPanic [T.XEString "field demanded"]
+     declared = [T.DataDecl "Choice" ["a"] [T.ConstructorDecl c [T.Parameter "a"] | c <- ["A","B"]]]
+ env <- case D.validateDeclarations declared of T.Right e -> pure e; T.Left e -> fail (B.unpack e)
+ let result term = case R.integer (R.evaluate env (R.REnv M.empty) term) of
+       T.Left message -> Left (B.unpack message)
+       T.Right value -> Right value
+     agree term = result term == result (C.optimizeChecked term)
+     early term = fst (C.runFresh (C.checkedIdentities M.empty term) 1000)
+     unmatched = wrap (builder "A" (n 10)) (selector "B" (n 20)) (call (T.XEInt 9))
+     capture = T.XEAbs (n 10) (T.XEApp (T.XEConstructor "A") (v 11))
+     wrongSubject = T.XEAbs (n 20) (T.XECase (v 21)
+       [T.XErasedAlternative (T.XConstructorPattern "A" [T.Just (n 30)]) (v 30)])
+     wrongField = T.XEAbs (n 20) (T.XECase (v 20)
+       [T.XErasedAlternative (T.XConstructorPattern "A" [T.Just (n 30)]) (v 20)])
+     wrongArity = T.XEAbs (n 20) (T.XECase (v 20)
+       [T.XErasedAlternative (T.XConstructorPattern "A" [T.Just (n 30),T.Nothing]) (v 30)])
+     defaultCase = T.XEAbs (n 20) (T.XECase (v 20)
+       [T.XErasedAlternative (T.XDefaultPattern (T.Just (n 30))) (v 30)])
+ forM_ [minBound,-1,0,9,maxBound] $ \value -> do
+   let term = pair (call (T.XEInt value))
+   need "matching constructor and selector cancel early" (X.equalErased (lastBody (early term)) (T.XEInt value))
+   need "constructor-field result matches independent evaluator" (agree term && result term==Right value)
+ forM_ [capture,wrongSubject,wrongField,wrongArity,defaultCase] $ \term ->
+   need "capture, altered result, default and wrong arity stay ordinary" (case C.unaryConstructorUse term of T.Nothing -> True; _ -> False)
+ need "mismatched constructor still fails" (agree unmatched && case result unmatched of Left _ -> True; _ -> False)
+ let demanded = pair (call poison)
+     unused = pair (prim T.PIfThenElse [T.XEBool False,call poison,T.XEInt 42])
+     shadowed = pair (T.XELet (n 2) (T.XEAbs (n 40) (T.XEInt 8)) (call poison))
+ need "demanded field keeps its error" (agree demanded && result demanded==Left "field demanded")
+ need "unselected field stays lazy" (agree unused && result unused==Right 42)
+ need "shadowed selector with the same numeric id is handled after freshening" (agree shadowed && result shadowed==Right 8)
+ putStrLn "PASS unary constructor and selector, binding scopes, mismatches and field demand"
+
 main = do
  env <- case D.validateDeclarations [] of T.Right e -> pure e; T.Left e -> fail (B.unpack e)
+ checkIntSums env
+ checkUnaryConstructors
  let eval = R.evaluate env (R.REnv M.empty)
      integer t = case R.integer (eval t) of T.Right x -> pure x; T.Left e -> fail (B.unpack e)
  forM_ [1,2,17] $ \count -> forM_ [minBound,maxBound,-3,0,1] $ \amount ->

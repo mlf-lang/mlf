@@ -29,7 +29,7 @@ module Bootstrap.Dependency where {
   emptyObservation = Observation [] [] [] [];
   merge (Observation a b c d) (Observation w x y z) =
     Observation (append a w) (append b x) (append c y) (append d z);
-  mergeMany observations = foldlStrict merge emptyObservation observations;
+  mergeMany observations = foldr merge emptyObservation observations;
   canonical names = S.toList (S.fromList compareString names);
   normalize (Observation a b c d) =
     Observation (S.toList (S.fromList compareRead a)) (canonical b) (canonical c) (canonical d);
@@ -97,15 +97,26 @@ module Bootstrap.Dependency where {
   -- enclosed occurrences. Dependency selection uses only free references.
   querySyntaxRefs expression = valueRefs (observeSyntax True True expression);
   observeSyntax includeCandidates inventory expression =
-    let { child = observeSyntax includeCandidates inventory } in
-    case expression of {
-      SSourceDefinition body -> child body;
-      SCallSite _ _ body -> child body;
+    observeBefore includeCandidates inventory expression emptyObservation;
+  -- Application subtrees contribute ordered occurrences to four independent lists.
+  observeBefore includeCandidates inventory expression rest = let {
+    visit = observeBefore includeCandidates inventory
+  } in case expression of {
+    SSourceDefinition body -> visit body rest;
+    SCallSite _ _ body -> visit body rest;
+    SApp f a -> visit f (visit a rest);
+    SGlobal i n -> case rest of { Observation vs ts cs ks -> Observation ((:) (DeclRef i n) vs) ts cs ks };
+    SVar n -> case rest of { Observation vs ts cs ks -> Observation ((:) (LexicalRef (lexicalValueName n)) vs) ts cs ks };
+    SConstructor n -> case rest of { Observation vs ts cs ks -> Observation vs ts ((:) n cs) ks };
+    SPrimitive _ -> rest; SIntLit _ -> rest; SBoolLit _ -> rest; SStringLit _ -> rest; SDoubleLit _ -> rest;
+    _ -> merge (observeScoped includeCandidates inventory expression) rest
+  };
+  observeScoped includeCandidates inventory expression =
+    let { child = observeSyntax includeCandidates inventory } in case expression of {
       SSharedBind pattern action body binding failure ->
         merge (observePattern pattern)
           (merge (bindObservation (S.fromList compareString (Desugar.patternVariables pattern)) (child body))
             (mergeMany (map child ((:) action ((:) binding ((:) failure []))))));
-      SGlobal i n -> Observation [DeclRef i n] [] [] [];
       SDeclScope ids group -> let {
         bound result = if inventory then result else bindDeclObservation ids result;
         owners names result = if inventory then merge (Observation (zipWith DeclRef ids names) [] [] []) result else result
@@ -116,11 +127,8 @@ module Bootstrap.Dependency where {
           (mergeMany (map (\((,,) _ mode rhs) -> merge (observeRecursiveMode mode) (child rhs)) defs))));
         _ -> child group
       };
-      SVar n -> Observation [LexicalRef (lexicalValueName n)] [] [] [];
-      SConstructor n -> Observation [] [] ((:) n []) [];
       SLam n a b ->
         merge (observeOptional a) (bindObservation (S.singleton n) (child b));
-      SApp a b -> merge (child a) (child b);
       SLet n a b ->
         merge (child a) (bindObservation (S.singleton n) (child b));
       SAnn a t -> merge (child a) (observeAnnotation t);

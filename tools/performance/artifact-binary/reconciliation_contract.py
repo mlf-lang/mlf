@@ -14,9 +14,12 @@ PREDECESSOR = '4fd6730d35b6ecaf8e169ad228ac3c7a3ed56160'
 PREDECESSOR_TREE = '1c60d3daca5162bd24658d295169f601593345ef'
 PREDECESSOR_MANIFEST = '69bc6cc39ec70a0209a6011f4ce7fef0aaf5039d903fa1b8477ee4a2bc46dcd8'
 MANIFEST = 'pr43-reconciliation-migration.json'
-MANIFEST_SHA256 = 'bc5d94dd067567b07541f6806b8fca4a9b3a84fb5e8689d6c29186f3393789a0'
+MANIFEST_SHA256 = '0438f3c4b0ed20f0596a073170314506c317278a47e65f183228daafadd1fc27'
 INFERRED_CHAIN_MANIFEST_SHA256 = 'f611478915e5da8a47ee1d065f17ab26152029efb847418e0d6e0580b23cca74'
-COMPILER_SOURCE_EDGES = ['119554684dde21433b8068a044ca7155a9a9fe7b42c6f484025730deaefbaf23']
+COMPILER_SOURCE_EDGES = [
+    '119554684dde21433b8068a044ca7155a9a9fe7b42c6f484025730deaefbaf23',
+    '8ea021f075aebc58394ac3e317e11a504f46efe5fbea432ccc30fb72dd2b5874',
+]
 ADAPTER_MANIFEST_SHA256 = '6bbc1da597cb7eaaeab16aff52e8b44e2d4dc11ff10997679a45b3405bf0be98'
 CHAIN_EDGE_SHA256 = '5acc941d400b8b194ca97ca6a3c3ad6322e199279191bbf7b2d5816dab59841c'
 PREDECESSOR_IMPLEMENTATION = '7cacadad979f3db29da9067b5fe0ca8e1634d960dbf978ad6d5cae39ba338794'
@@ -285,6 +288,8 @@ def compiler_history(spec):
         edge = edges[index]
         current = history[-1]
         prior = {**current, 'changes': rewind_sources(current['changes'], edge['changes'])}
+        if 'maintenance' in edge:
+            prior['maintenance'] = rewind_sources(current['maintenance'], edge['maintenance'])
         if index:
             prior['compiler_source_transitions'] = edges[:index]
         else:
@@ -329,6 +334,10 @@ def validate_live_transition(spec, repository, core, history_root=None):
                 'archived compiler source manifest')
         for path, (old, _) in delta['changes'].items():
             require(sha(at(commit, path, core.MAX_SOURCE_BYTES)) == old, 'archived compiler source: ' + path)
+        for name, (old, _) in delta.get('maintenance', {}).items():
+            require(name == PERFORMANCE_MAINTENANCE_PATH and
+                    sha(at(commit, 'tools/performance/' + name, core.MAX_SOURCE_BYTES)) == old,
+                    'archived compiler maintenance source: ' + name)
 
     spec = history[-1]
     prior = chain_predecessor(spec)

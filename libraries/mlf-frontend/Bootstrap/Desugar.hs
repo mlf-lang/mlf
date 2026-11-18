@@ -31,43 +31,42 @@ module Bootstrap.Desugar where {
       _ -> []
     };
   allNames :: SExpr -> [] String;
-  allNames expression =
-    case expression of {
-      SSourceDefinition body -> allNames body;
-      SCallSite _ _ body -> allNames body;
-      SSharedBind pattern action body binding failure ->
-        append (patternVariables pattern) (concatMap allNames ((:) action ((:) body ((:) binding ((:) failure [])))));
-      SVar name -> (:) name [];
-      SGlobal _ name -> [name];
-      SDeclScope _ body -> allNames body;
-      SWantedRefs n candidates -> (:) n (map (compose termRefName snd) candidates);
-      SConstructor name -> (:) name [];
-      SLam name _ body -> (:) name (allNames body);
-      SApp f a -> append (allNames f) (allNames a);
-      SLet name a b -> (:) name (append (allNames a) (allNames b));
-      SAnn a _ -> allNames a;
-      SSignature a _ -> allNames a;
-      SCase a alternatives ->
-        append (allNames a)
-          (concatMap (\(SAlternative p b) -> append (patternVariables p) (allNames b))
-             alternatives);
-      SEquations rows ->
-        concatMap (\((,) ps b) -> append (concatMap patternVariables ps) (allNames b)) rows;
-      SLetRec definitions body ->
-        append (concatMap (\((,,) n _ e) -> (:) n (allNames e)) definitions) (allNames body);
-      SDo statements result -> append (concatMap statementNames statements) (allNames result);
-      SChecked _ a -> allNames a;
-      SWanted n candidates -> (:) n (map snd candidates);
-      _ -> []
-    };
+  allNames expression = namesBefore expression [];
+  -- Thread the following occurrences through each subtree in source order.
+  namesBefore expression rest = case expression of {
+    SSourceDefinition body -> namesBefore body rest;
+    SCallSite _ _ body -> namesBefore body rest;
+    SSharedBind pattern action body binding failure -> append (patternVariables pattern)
+      (namesBefore action (namesBefore body (namesBefore binding (namesBefore failure rest))));
+    SVar n -> (:) n rest;
+    SGlobal _ n -> (:) n rest;
+    SDeclScope _ body -> namesBefore body rest;
+    SWantedRefs n candidates -> (:) n (foldr (\candidate more -> (:) (termRefName (snd candidate)) more) rest candidates);
+    SConstructor n -> (:) n rest;
+    SLam n _ body -> (:) n (namesBefore body rest);
+    SApp f a -> namesBefore f (namesBefore a rest);
+    SLet n rhs body -> (:) n (namesBefore rhs (namesBefore body rest));
+    SAnn body _ -> namesBefore body rest;
+    SSignature body _ -> namesBefore body rest;
+    SCase body arms -> namesBefore body (foldr (\(SAlternative pat rhs) more ->
+      append (patternVariables pat) (namesBefore rhs more)) rest arms);
+    SEquations rows -> foldr (\((,) ps rhs) more ->
+      foldr (\pat tail -> append (patternVariables pat) tail) (namesBefore rhs more) ps) rest rows;
+    SLetRec definitions body -> foldr definitionNamesBefore (namesBefore body rest) definitions;
+    SDo statements body -> foldr statementNamesBefore (namesBefore body rest) statements;
+    SChecked _ body -> namesBefore body rest;
+    SWanted n candidates -> (:) n (foldr (\candidate more -> (:) (snd candidate) more) rest candidates);
+    _ -> rest
+  };
+  definitionNamesBefore ((,,) n _ expr) rest = (:) n (namesBefore expr rest);
   statementNames :: SStatement -> [] String;
-  statementNames statement =
-    case statement of {
-      SDoBind p e -> append (patternVariables p) (allNames e);
-      SDoThen e -> allNames e;
-      SDoLet n _ e -> (:) n (allNames e);
-      SDoLetRec ds -> concatMap (\((,,) n _ e) -> (:) n (allNames e)) ds
-    };
+  statementNames statement = statementNamesBefore statement [];
+  statementNamesBefore statement rest = case statement of {
+    SDoBind pat e -> append (patternVariables pat) (namesBefore e rest);
+    SDoThen e -> namesBefore e rest;
+    SDoLet n _ e -> (:) n (namesBefore e rest);
+    SDoLetRec ds -> foldr definitionNamesBefore rest ds
+  };
   -- Refutability is a property of resolved datatype families, not constructor
   -- spelling or how many constructors happen to be imported into scope.
   patternCannotFail :: DataEnv -> SPattern -> Either String Bool;

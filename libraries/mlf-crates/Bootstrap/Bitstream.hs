@@ -38,7 +38,7 @@
 -- OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
 -- DAMAGE.
 module Bootstrap.Bitstream (
-  Value(..), Limits(..), Entry(..), Symbol(..),
+  Value(..), AtomShapes(..), encodeAtoms, encodeRootsWithAtoms, Limits(..), Entry(..), Symbol(..),
   Tables(..), Layout(..), Cursor(..), Read(..),
   Header(..), Parsed(..), CanonicalTask(..),
   planRootBounded, encodeRootBounded, decodeGraphRootBounded,
@@ -158,7 +158,43 @@ module Bootstrap.Bitstream (
       }
     };
   data SymbolState = Symbols (Map String ((,) Int Int)) ([] Symbol) Int Int;
-  data NodeState = Nodes NodeIndex ([] Entry) Int Int;
+  data NodeState = Nodes NodeIndex ([] Entry) Int Int AtomIds (KeyIndex (V.IndexVec Int Entry));
+  -- A node with newest child c cannot have appeared before ordinal c+1.
+  -- If it appears at c+1, that exact entry is its index; all other parents
+  -- still use the ordinary full-key index. The page directory contains the
+  -- same admitted entries used for emission, in reverse order within a page.
+  pushNode keys entry entries nextCount edges saved pages = let {
+    next = (:) entry entries;
+    completePage = andInt nextCount 63 == 0;
+    block = shiftRInt (nextCount - 1) 6;
+    following = if completePage then keyInsert block (V.fromList (take 64 next)) pages else pages
+  } in seq following (Nodes keys next nextCount edges saved following);
+  plannedEntry ordinal count entries pages = let {
+    block = shiftRInt ordinal 6;
+    active = shiftRInt (count - 1) 6;
+    fromTail list offset = case list of {
+      (:) first more -> if offset == 0 then first else fromTail more (offset - 1);
+      [] -> panic "missing ordinal in writer tail"
+    }
+  } in if block == active then fromTail entries (count - 1 - ordinal)
+    else case keyLookup block pages of {
+      Just page -> V.at page (V.fromInt (63 - andInt ordinal 63));
+      Nothing -> panic "missing ordinal in writer directory"
+    };
+  internPlanned entry keys count entries pages = let {
+    child = case entry of { ENode _ [a] -> a; ENode _ [a,b] -> max a b; _ -> (-1) };
+    ordinal = child + 1
+  } in if child < 0 then internNodeKey entry keys else
+    if ordinal == count then MissingNode (\_ -> keys)
+    else if compareEntry (plannedEntry ordinal count entries pages) entry == 0 then ExistingNode ordinal
+    else internNodeKey entry keys;
+  -- The caller describes two generated shapes: a unary name containing an
+  -- integer and text, and a primitive containing an integer and an empty list.
+  -- A mistaken descriptor can only miss reuse. The complete shape and scalar
+  -- payloads are compared against values already admitted in this plan.
+  data AtomShapes = AtomShapes Int Int Int Int Int;
+  data AtomIds = NoAtomIds | AtomIds AtomShapes (Maybe ((,) Int Int)) (IntMap ((,,) String Int Int));
+  emptyAtomIds shapes = AtomIds shapes Nothing IM.empty;
   -- A hash narrows structural lookup; it never establishes equality. Exact
   -- collisions use the original balanced map, so even deliberately colliding
   -- inputs retain logarithmic bucket lookup instead of a linear chain.
@@ -259,7 +295,7 @@ module Bootstrap.Bitstream (
   };
   data PlanState = PlanState SymbolState NodeState Int;
   data Tables = Tables ([] Symbol) ([] Entry) ([] Int) Int Int Int Int;
-  data EncodeTask = EncodeValues Int ([] Value) | EncodeOne Int Value | EncodeClose Int Int;
+  data EncodeTask = EncodeValues Int ([] Value) | EncodeOne Int Value | EncodeClose Int Int | EncodeRemember Int ([] Value);
   charge :: Limits -> Int -> PlanState -> Either String PlanState;
   charge limits amount (PlanState symbols nodes work) =
     if amount < 0 || amount > maxExpandedWork limits - work
@@ -312,7 +348,7 @@ module Bootstrap.Bitstream (
   planText :: Limits -> [] EncodeTask -> [] Int -> String -> PlanState ->
     Either String ((,) ([] Int) PlanState);
   planText limits tasks stack text (PlanState (Symbols names symbols count total)
-      nodes@(Nodes keys entries nodeCount edges) work) =
+      nodes@(Nodes keys entries nodeCount edges saved pages) work) =
     if stringLength text > maxSymbolBytes limits then Left "binary symbol byte limit exceeded"
     else case intern compareString text names of {
       Found ((,) bytes nodeId) -> do {
@@ -332,7 +368,7 @@ module Bootstrap.Bitstream (
         charged <- seq nextCount (seq nextTotal (charge limits size (PlanState nextSymbols nodes work)));
         ensure (nodeCount < maxNodes limits) "binary node count limit exceeded";
         let { nextNodeCount = nodeCount + 1;
-          nextNodes = Nodes keys ((:) (EText count) entries) nextNodeCount edges };
+          nextNodes = pushNode keys (EText count) entries nextNodeCount edges saved pages };
         case charged of { PlanState _ _ nextWork ->
           seq nextNodeCount (planTasks limits tasks ((:) nodeCount stack)
             (PlanState nextSymbols nextNodes nextWork)) }
@@ -342,8 +378,8 @@ module Bootstrap.Bitstream (
   entryEdges entry = case entry of { ENode _ children -> length children; _ -> 0 };
   planEntry :: Limits -> [] EncodeTask -> [] Int -> Entry -> PlanState ->
     Either String ((,) ([] Int) PlanState);
-  planEntry limits tasks stack entry state@(PlanState symbols (Nodes keys entries count edges) work) =
-    case internNodeKey entry keys of {
+  planEntry limits tasks stack entry state@(PlanState symbols (Nodes keys entries count edges saved pages) work) =
+    case internPlanned entry keys count entries pages of {
       ExistingNode index -> planTasks limits tasks ((:) index stack) state;
       MissingNode following -> do {
         ensure (count < maxNodes limits) "binary node count limit exceeded";
@@ -352,7 +388,7 @@ module Bootstrap.Bitstream (
         let {
           nextCount = count + 1;
           nextEdges = edges + arity;
-          nextNodes = Nodes (following count) ((:) entry entries) nextCount nextEdges
+          nextNodes = pushNode (following count) entry entries nextCount nextEdges saved pages
         };
         seq nextCount (seq nextEdges (planTasks limits tasks ((:) count stack)
           (PlanState symbols nextNodes work)))
@@ -364,13 +400,14 @@ module Bootstrap.Bitstream (
     (:) index rest -> takeIds (count - 1) rest ((:) index acc)
   };
   plan :: Limits -> [] Value -> Either String Tables;
-  plan limits roots = do {
+  plan = planWith NoAtomIds;
+  planWith initial limits roots = do {
     ensure (validLimits limits) "invalid binary codec limits";
     rootCount <- boundedLength (min (maxEdges limits) (maxExpandedWork limits)) roots;
     planned <- planTasks limits ((:) (EncodeValues 1 roots) []) []
-      (PlanState (Symbols M.empty [] 0 0) (Nodes emptyNodeIndex [] 0 0) 0);
+      (PlanState (Symbols M.empty [] 0 0) (Nodes emptyNodeIndex [] 0 0 initial KeyEmpty) 0);
     case planned of {
-      (,) stack (PlanState (Symbols _ symbols symbolCount _) (Nodes _ entries nodeCount edges) _) ->
+      (,) stack (PlanState (Symbols _ symbols symbolCount _) (Nodes _ entries nodeCount edges _ _) _) ->
         Right (Tables (reverse symbols) (reverse entries) (reverse stack)
           symbolCount nodeCount rootCount edges)
     }
@@ -380,15 +417,16 @@ module Bootstrap.Bitstream (
   -- The second result is exact expanded work, including every repeated root,
   -- child and text occurrence. This does not materialize an auxiliary Graph.
   planRootBounded :: Limits -> Int -> [] Value -> Either String ((,) Tables Int);
-  planRootBounded limits aggregate roots = do {
+  planRootBounded = planRootsWith NoAtomIds;
+  planRootsWith initial limits aggregate roots = do {
     ensure (validLimits limits) "invalid binary codec limits";
     ensure (validRootBudget aggregate) "invalid binary root-work budget";
     rootCount <- boundedLength (min (maxEdges limits) aggregate) roots;
     planned <- planRootsBounded limits aggregate roots []
-      (PlanState (Symbols M.empty [] 0 0) (Nodes emptyNodeIndex [] 0 0) 0);
+      (PlanState (Symbols M.empty [] 0 0) (Nodes emptyNodeIndex [] 0 0 initial KeyEmpty) 0);
     case planned of {
       (,,) stack
-        (PlanState (Symbols _ symbols symbolCount _) (Nodes _ entries nodeCount edges) _)
+        (PlanState (Symbols _ symbols symbolCount _) (Nodes _ entries nodeCount edges _ _) _)
         remaining ->
           let { used = aggregate - remaining } in
           seq used (Right ((,)
@@ -415,16 +453,105 @@ module Bootstrap.Bitstream (
         }
       }
     };
+  rememberAtom tag children index saved = case saved of {
+    NoAtomIds -> saved;
+    AtomIds shape@(AtomShapes nameTag namePair primTag opcodeTag emptyTag) prim names ->
+      if tag == primTag then case children of {
+        [VNode inner [VInt code],VNode tailTag []] -> if inner == opcodeTag && tailTag == emptyTag
+          then AtomIds shape (Just ((,) code index)) names else saved;
+        _ -> saved
+      } else if tag == nameTag then case children of {
+        [VNode inner [VInt binding,VText hint]] -> if inner /= namePair || binding < 0 || binding >= 64 then saved
+          else AtomIds shape prim (IM.insert binding ((,,) hint (stringUtf8Length hint) index) names);
+        _ -> saved
+      } else saved
+  };
+  -- A miss follows ordinary planning. Keeping the shape tests separate also
+  -- preserves its demand order on an ill-formed nested value: check the tag,
+  -- then the complete field spine, then the fields from left to right.
+  atomInteger tag node = case node of {
+    VNode actual args -> if actual /= tag then Nothing else case args of {
+      [field] -> case field of { VInt code -> Just code; _ -> Nothing };
+      _ -> Nothing
+    };
+    _ -> Nothing
+  };
+  atomEmpty tag node = case node of {
+    VNode actual fields -> actual == tag && null fields;
+    _ -> False
+  };
+  atomNameFields tag node = case node of {
+    VNode actual args -> if actual /= tag then Nothing else case args of {
+      [left,right] -> case left of { VInt binding -> Just ((,) binding right); _ -> Nothing };
+      _ -> Nothing
+    };
+    _ -> Nothing
+  };
+  tryAtom limits depth tag children stack rest state@(PlanState _ (Nodes _ _ count edges saved _) work) ordinary =
+    case saved of {
+      NoAtomIds -> ordinary rest;
+      AtomIds (AtomShapes nameTag namePair primitiveTag opcodeTag emptyTag) primitive names -> let {
+        available = maxExpandedWork limits - work;
+        -- Even a miss must be able to admit three descendants, four distinct
+        -- nodes (including the root), and three edges before speculating.
+        enoughRoom = maxDepth limits >= 2 && depth <= maxDepth limits - 2 && available >= 3 &&
+          maxNodes limits - count >= 4 && maxEdges limits - edges >= 3;
+        remember = ordinary ((:) (EncodeRemember tag children) rest);
+        reuse amount index = do {
+          next <- charge limits amount state;
+          planTasks limits rest ((:) index stack) next
+        };
+        usePrimitive first second = case primitive of {
+          Nothing -> remember;
+          Just ((,) expected index) -> case atomInteger opcodeTag first of {
+            Just code -> if code == expected && atomEmpty emptyTag second then reuse 3 index else remember;
+            Nothing -> remember
+          }
+        };
+        useName first = case atomNameFields namePair first of {
+          Nothing -> remember;
+          Just ((,) binding text) -> case IM.lookup binding names of {
+            Nothing -> remember;
+            Just ((,,) expected bytes index) -> if bytes > available - 3 then ordinary rest else case text of {
+              VText hint -> if eqString expected hint then reuse (3 + bytes) index else remember;
+              _ -> remember
+            }
+          }
+        }
+      } in if (tag /= primitiveTag && tag /= nameTag) || not enoughRoom then ordinary rest else do {
+        let { cap = min (maxEdges limits) (maxExpandedWork limits - 1) };
+        arity <- boundedLength cap children;
+        if tag == primitiveTag && arity == 2 then case children of {
+          [first,second] -> usePrimitive first second; _ -> ordinary rest
+        } else if tag == nameTag && arity == 1 then case children of {
+          [first] -> useName first; _ -> ordinary rest
+        } else ordinary rest
+      }
+    };
   -- Explicit tasks keep valid deep ASTs off the language call stack. Work
   -- is charged on every input occurrence, including repeated subgraphs.
   planTasks :: Limits -> [] EncodeTask -> [] Int -> PlanState -> Either String ((,) ([] Int) PlanState);
   planTasks limits tasks stack state = case tasks of {
     [] -> Right ((,) stack state);
     (:) task rest -> case task of {
+      EncodeRemember tag children -> case (,) stack state of {
+        (,) ((:) index _) (PlanState symbols (Nodes keys entries count edges saved pages) work) -> let {
+          atoms = rememberAtom tag children index saved
+        } in seq atoms (planTasks limits rest stack (PlanState symbols (Nodes keys entries count edges atoms pages) work));
+        _ -> Left "binary reference stack underflow"
+      };
       EncodeValues depth values -> case values of {
         [] -> planTasks limits rest stack state;
         (:) value more -> planTasks limits
           ((:) (EncodeOne depth value) ((:) (EncodeValues depth more) rest)) stack state
+      };
+      EncodeClose tag 1 -> case stack of {
+        (:) child restStack -> planEntry limits rest restStack (ENode tag [child]) state;
+        [] -> Left "binary encoder internal reference stack underflow"
+      };
+      EncodeClose tag 2 -> case stack of {
+        (:) right ((:) left restStack) -> planEntry limits rest restStack (ENode tag [left,right]) state;
+        _ -> Left "binary encoder internal reference stack underflow"
       };
       EncodeClose tag arity -> do {
         parts <- takeIds arity stack [];
@@ -438,9 +565,21 @@ module Bootstrap.Bitstream (
         case value of {
           VNode tag children -> do {
             ensure (tag >= 0 && tag <= 2147483647) "binary constructor tag out of range";
-            arity <- boundedLength (min (maxEdges limits) (maxExpandedWork limits - 1)) children;
-            planTasks limits ((:) (EncodeValues (depth + 1) children)
-              ((:) (EncodeClose tag arity) rest)) stack charged
+            let { childrenWith following = let {
+              cap = min (maxEdges limits) (maxExpandedWork limits - 1);
+              walk arity = planTasks limits ((:) (EncodeValues (depth + 1) children)
+                ((:) (EncodeClose tag arity) following)) stack charged;
+              child = EncodeOne (depth + 1)
+            } in if cap < 2 then do { arity <- boundedLength cap children; walk arity }
+              else case children of {
+                [] -> planEntry limits following stack (ENode tag []) charged;
+                [a] -> planTasks limits ((:) (child a) ((:) (EncodeClose tag 1) following)) stack charged;
+                [a,b] -> planTasks limits ((:) (child a) ((:) (child b)
+                  ((:) (EncodeClose tag 2) following))) stack charged;
+                (:) _ ((:) _ ((:) _ more)) -> if cap == 2 then Left "binary list count limit exceeded"
+                  else do { arity <- boundedLengthAt cap 3 more; walk arity }
+              }
+            } in tryAtom limits depth tag children stack rest charged childrenWith
           };
           VText text -> planText limits rest stack text charged;
           VInt valueInt -> planEntry limits rest stack (EInt valueInt) charged;
@@ -690,16 +829,21 @@ module Bootstrap.Bitstream (
       seq next (checksumAt bytes size (position + 1) next)
     };
   encode :: Limits -> Int -> [] Value -> IO (Either String ByteArray);
-  encode limits schema roots = catchIOError (encodeChecked limits schema roots)
+  encode = encodeUsing NoAtomIds;
+  encodeAtoms shapes = encodeUsing (emptyAtomIds shapes);
+  encodeUsing initial limits schema roots = catchIOError (encodeCheckedWith initial limits schema roots)
     (\error -> ioReturn (Left ("binary encode IO failure: " ++ textFromChars (ioeGetErrorString error))));
   encodeRootBounded :: Limits -> Int -> Int -> [] Value -> IO (Either String ByteArray);
-  encodeRootBounded limits aggregate schema roots = catchIOError
-    (encodeRootBoundedChecked limits aggregate schema roots)
+  encodeRootBounded = encodeRootsUsing NoAtomIds;
+  encodeRootsWithAtoms shapes = encodeRootsUsing (emptyAtomIds shapes);
+  encodeRootsUsing initial limits aggregate schema roots = catchIOError
+    (encodeRootCheckedWith initial limits aggregate schema roots)
     (\error -> ioReturn (Left ("binary encode IO failure: " ++ textFromChars (ioeGetErrorString error))));
   encodeRootBoundedChecked :: Limits -> Int -> Int -> [] Value -> IO (Either String ByteArray);
-  encodeRootBoundedChecked limits aggregate schema roots =
+  encodeRootBoundedChecked = encodeRootCheckedWith NoAtomIds;
+  encodeRootCheckedWith initial limits aggregate schema roots =
     if schema < 0 || schema > 2147483647 then ioReturn (Left "binary schema ID out of range")
-    else case planRootBounded limits aggregate roots of {
+    else case planRootsWith initial limits aggregate roots of {
       Left message -> ioReturn (Left message);
       Right ((,) tables _) -> case layout limits tables of {
         Left message -> ioReturn (Left message);
@@ -707,9 +851,10 @@ module Bootstrap.Bitstream (
       }
     };
   encodeChecked :: Limits -> Int -> [] Value -> IO (Either String ByteArray);
-  encodeChecked limits schema roots =
+  encodeChecked = encodeCheckedWith NoAtomIds;
+  encodeCheckedWith initial limits schema roots =
     if schema < 0 || schema > 2147483647 then ioReturn (Left "binary schema ID out of range")
-    else case plan limits roots of {
+    else case planWith initial limits roots of {
       Left message -> ioReturn (Left message);
       Right tables -> case layout limits tables of {
         Left message -> ioReturn (Left message);

@@ -14,7 +14,12 @@ import qualified Bootstrap.CrateArtifact as Artifact
 import qualified Bootstrap.CrateQuery as CQ
 import qualified Bootstrap.Data as Data
 import qualified Bootstrap.Dependency as D
+import qualified Bootstrap.Desugar as Desugar
+import qualified Bootstrap.Fresh as Fresh
+import qualified Bootstrap.Layout as Layout
+import qualified Bootstrap.Lexer as Lexer
 import qualified Bootstrap.Resolved as R
+import qualified Bootstrap.SourceEquality as Equality
 import qualified Bootstrap.SourceInference as Source
 import qualified Bootstrap.Surface as Surface
 import qualified Bootstrap.QueryGraph as Q
@@ -623,6 +628,178 @@ importConventionChecks = do
   check "managed call stack can follow an ordinary hidden slot" ["B","MLFHasCallStack"]
     (observe (T.XForall a (T.XArrow (T.XCon "MLFStackEvidence" []) int) (prefix "DB" (T.XVar a))))
 
+orderedSyntaxChecks = do
+  let i = V.fromInt 4
+      ref (T.LexicalRef n) = (Nothing,H.unpack n)
+      ref (T.DeclRef j n) = (Just (V.toInt j),H.unpack n)
+      inspect candidates inventory expr = case D.observeSyntax candidates inventory expr of
+        D.Observation vs ts cs ks -> (map ref vs,map H.unpack ts,map H.unpack cs,map H.unpack ks)
+      ann = T.SAnnotation [] (T.SQualified [T.SPredicate "Class" [T.SCon "Arg" []]] (T.SCon "Result" []))
+      span0 = T.SourceSpan "pkg" "M" "M.hs" 1 1 1 2
+      value = T.SApp (T.SVar "$MLF.Infix.+") (T.SConstructor "Box")
+      scoped = T.SDeclScope [i] (T.SLam "x" (T.Just ann) (T.SGlobal i "hint"))
+      wanted = T.SWantedRefs "Dict" [(T.GivenEvidence,T.LexicalRef "dict"),(T.InstanceEvidence,T.DeclRef i "impl")]
+      blocks = [value,T.SCallSite "site" span0 scoped,T.SSourceDefinition wanted]
+      chain = foldl1 T.SApp; pairs [x] = x
+      pairs xs = pairs (combine xs) where
+        combine (a:b:rs) = T.SApp a b : combine rs
+        combine end = end
+      count = 1024::Int
+  forM_ [False,True] $ \candidates -> forM_ [False,True] $ \inventory -> do
+    let vs = [(Nothing,"+")] ++ (if inventory then [(Just 4,"x"),(Just 4,"hint")] else [])
+              ++ (if candidates then [(Nothing,"dict"),(Just 4,"impl")] else [])
+        expected = (concat (replicate count vs),concat (replicate count ["Arg","Result","Dict"]),
+                    replicate count "Box",replicate count "Class")
+        trees = concat (replicate count blocks)
+    check "dependency occurrence order on an application spine" expected (inspect candidates inventory (chain trees))
+    check "dependency occurrence order on a balanced tree" expected (inspect candidates inventory (pairs trees))
+  let vars = ["$MLF.Infix.+","Box","x","hint","Dict","dict","impl"]
+  forM_ [chain,pairs] $ \build ->
+    check "all names preserve binder and occurrence order" (concat (replicate count vars))
+      (map H.unpack (Desugar.allNames (build (concat (replicate count blocks)))))
+  let p = T.SAsPattern "outer" (T.SConstructorPattern "C" [T.Just "field",T.Nothing])
+      body = T.SDo [T.SDoBind p value,T.SDoThen scoped,T.SDoLet "local" T.Nothing wanted,
+               T.SDoLetRec [("rec",T.InferRecursive,T.SVar "rec")]]
+             (T.SCase (T.SVar "s") [T.SAlternative p (T.SVar "z")])
+  check "names in patterns, statements and recursive definitions"
+    ["outer","field","$MLF.Infix.+","Box","x","hint","local","Dict","dict","impl","rec","rec","s","outer","field","z"]
+    (map H.unpack (Desugar.allNames body))
+  let symbols = D.symbolsWithKeys [("a","key",False),("b","key",False),("root","owner",False)]
+      scope = Source.declarationScope symbols (map V.fromInt [0,1,2]) [] []
+      slots = Source.GroupSlots scope [V.fromInt 2] [] []
+      refs ids = chain [T.SGlobal (V.fromInt n) "label" | n <- ids]
+      table ids = let member = [("root",T.Nothing,refs ids)]
+                      group = Source.PreparedGroup member [] [] M.empty [] T.Nothing []
+                  in case CQ.referenceTable slots group of
+                       CQ.ReferenceTable _ _ ranks -> map (V.toInt . fst) (M.toList ranks)
+  check "last ID wins a stable-key collision" [0,2] (table [0,1,0])
+  check "reversing the last ID changes the representative" [1,2] (table [1,0,1])
+
+layoutTokenChecks = do
+  let token col text = Lexer.Token text 3 col 3 (col + H.v_stringLength text)
+      view (Lexer.Token t sl sc el ec) = (H.unpack t,sl,sc,el,ec)
+      end = Lexer.Token "" 5 1 5 1
+      follow = [token 6 "of",token 9 "{",token 10 "y",token 11 "}",token 12 ")"]
+  forM_ ["(","[","{"] $ \delimiter -> forM_ [[],[Layout.Layout Layout.LayoutBlock 3],[Layout.Marker Layout.LetMark 1]] $ \outer ->
+    forM_ ([H.literal [toEnum i] | i <- [0..127]] ++ ["界","😀","then","else","do","in",":+"]) $ \text -> do
+      let frames = Layout.Explicit delimiter:outer
+          t = token 3 text
+          previous = T.Just (Lexer.Token "first" 2 1 2 6)
+      forM_ [True,False] $ \shared ->
+        check "one-token layout agrees with the ordinary frame rules"
+          (map view (Layout.normalLayout shared frames previous t follow end))
+          (map view (Layout.normal shared frames previous t follow end))
+  forM_ ([0..127] ++ [955,30028,128512]) $ \cp -> do
+    let text = H.literal ['α',toEnum cp,'z']
+    check "one-scalar spelling, including UTF8" (H.unpack (H.v_stringSlice text 1 1)) (H.unpack (Lexer.tokenSpelling text 1 2 (fromIntegral cp)))
+  let text = H.literal "α123"
+  check "multi-scalar spelling" "123" (H.unpack (Lexer.tokenSpelling text 1 4 49))
+
+loweringChecks = do
+  let x = T.SVar "x"
+      def = T.SDefaultPattern T.Nothing
+      bind = T.SDefaultPattern (T.Just "x")
+      ann = T.SAnnotation [] (T.SCon "Int" [])
+      choose arms = T.SCase x [T.SAlternative p e | (p,e) <- arms]
+      simple = choose [(T.SConstructorPattern "Box" [T.Just "x"],x),(def,T.SIntLit 4)]
+      statements = T.SDo [T.SDoLet "x" T.Nothing x] x
+      cases = [(True, simple),(True, choose []),(True, choose [(bind,simple)]),
+               (False, choose [(T.SLazyPattern bind,x)]),(False,choose [(T.SAnnotatedPattern "x" ann,x)]),
+               (False, choose [(T.SNestedPattern "Box" [bind],x)]),(False,choose [(T.SBoolPattern True,x)]),
+               (False,choose [(def,statements)]),(False,T.SCase statements [T.SAlternative def x]),
+               (False,T.SEquations [])]
+      env = Data.emptyDataEnv
+      ordinary e = case Desugar.lowerSharedDo env e of
+        T.Left err -> T.Left err
+        T.Right shared -> Fresh.runFresh (Desugar.allNames shared) (Surface.lower env shared)
+      result (T.Left err) = Left (H.unpack err)
+      result (T.Right e) = Right (H.unpack (CQ.encodeExpression e))
+  forM_ cases $ \(eligible,e) -> do
+    check "surface-core admission" eligible (Surface.surfaceCore e)
+    check "surface lowering agrees with the fresh-name traversal" (result (ordinary e))
+      (result (Surface.lowerExpressionWithData env e))
+
+lexicalRunChecks = do
+  let cursor (Lexer.Cursor i l c) = (i,l,c)
+      token (Lexer.Token t sl sc el ec) = (H.unpack t,sl,sc,el,ec)
+      scanned result = case result of
+        T.Left e -> Left (H.unpack e)
+        T.Right (Lexer.Scanned ts eof) -> Right (map token (ts++[eof]))
+      spellings = ["able","axon","able","a界on","able","Alpha","Amber","Alpha","name'","name2",
+                   replicate 32 'a',replicate 33 'a',"\x10400","=>","++","0xA7","1.5e-2"]
+      source = "start\t" ++ unwords spellings ++ "\n{- one {- two -} -}\nend"
+      pos (l,c) '\n' = (l+1,1)
+      pos (l,c) '\t' = (l,c+8-(c-1) `mod` 8)
+      pos (l,c) _ = (l,c+1)
+      range spelling start = let finish = foldl pos start spelling
+                             in (spelling,fst start,snd start,fst finish,snd finish)
+      wantedTokens names point = case names of
+        [] -> []
+        x:xs -> let item@(_,_,_,l,c) = range x point in item:wantedTokens xs (l,c+1)
+      expected = [range "start" (1,1)] ++ wantedTokens spellings (1,9) ++
+                 [range "end" (3,1),range "" (3,4)]
+      corpus = H.literal ("0x8e☺\n \t" ++ source ++ concatMap (:[]) ['\0'..'\127'])
+      size = H.v_stringLength corpus
+  forM_ [Lexer.scanTokens,Lexer.scanSourceTokens] $ \scan ->
+    check "cached spelling collisions preserve all token extents" (Right expected) (scanned (scan "lex" (H.literal source)))
+  forM_ [Lexer.isDigit,Lexer.isHexDigit,Lexer.isIdentChar,Lexer.isOperator] $ \predicate ->
+    forM_ [0..size] $ \i -> do
+      let before = Lexer.Cursor i 12 19
+      check "single-line runs retain the reference scanner coordinates"
+        (cursor (Lexer.consumeWhile predicate corpus size before))
+        (cursor (Lexer.consumeRun predicate corpus size before))
+  forM_ [0,1,254,255,256,257,511,512,513] $ \n ->
+    forM_ ["a","λ","a界😀"] $ \alphabet -> do
+      let scalars = take n (cycle alphabet)
+          t = H.literal scalars
+          indices = filter (\i -> 0 <= i && i < n) [0,1,253,254,255,256,n-2,n-1]
+      check "UTF8 byte length agrees with scalar widths" (fromIntegral (sum (map width scalars))) (H.v_stringUtf8Length t)
+      forM_ indices $ \i -> do
+        check "scalar offset in a shared or indexed block"
+          (fromIntegral (fromEnum (scalars!!i))) (H.v_stringCodeAt t (fromIntegral i))
+        forM_ [0,1,min 3 (n-i),n-i] $ \k ->
+          check "exact slice across scalar blocks" (take k (drop i scalars))
+            (H.unpack (H.v_stringSlice t (fromIntegral i) (fromIntegral k)))
+  where
+    width ch | fromEnum ch < 128 = 1 :: Int
+             | fromEnum ch < 2048 = 2
+             | fromEnum ch < 65536 = 3
+             | otherwise = 4
+
+projectedBindingChecks = do
+  let base = D.symbolsWithKeys [("same","external",False),("same","local",False),("use","consumer",False),("unused","unused",False)]
+      changed = D.symbols [("other",False),("local",False),("owner",False),("unused",False)]
+      [external,local,owner,_] = V.indices (D.symbolNodes base)
+      term = R.Lam "same" T.Nothing (R.App (R.Global external) (R.Global local))
+      bound i rhs = D.Bound i T.Nothing rhs
+      rows expr = [bound owner expr, bound local (R.IntLit 17)]
+      scope symbols = D.indexedScopes symbols [(local,I.empty),(owner,I.empty)]
+  forM_ [base,changed] $ \symbols -> do
+    let bindings = D.BoundValues base (rows term)
+    (plan,_) <- right (Source.prepareResolvedSourcePlan bindings M.empty [] [] [] [] (scope symbols) [])
+    case plan of
+      T.Just p -> case Source.planGraph p of
+        Source.IndexedPlan target table ids [] _ -> do
+          forM_ (zip ids (map snd3 (rows term))) $ \(i,raw) -> do
+            let display = D.symbolName target
+                rename _ = "different display"
+                get f = let (_,(_,_,rhs)) = f table i in rhs
+                shared = case V.at table i of { Source.ProjectedSource {} -> True; _ -> False }
+            check "cache restricted to the original display prefix" (D.symbolName base external == display external) shared
+            check "authentic indexed view" True (Equality.eqSExprBits (get (Source.planIndexedBinding target)) (R.indexedExpr display raw))
+            check "arbitrary display projection" True (Equality.eqSExprBits (get (Source.indexedBindingWith rename)) (R.indexedExpr rename raw))
+            check "legacy named projection" True (Equality.eqSExprBits (get (Source.projectBinding rename)) (R.namedExpr rename raw))
+          check "projection source ordinal order" (map V.toInt [owner,local]) (map V.toInt ids)
+          let views = [rhs | (_,_,rhs) <- Source.planSourceInputs p]
+          check "source plan inputs preserve indexed globals" True (and (zipWith Equality.eqSExprBits views (map (R.indexedExpr (D.symbolName target) . snd3) (rows term))))
+        _ -> fail "indexed graph expected"
+      _ -> fail "source plan expected"
+  where
+    right (T.Right v) = pure v
+    right (T.Left e) = fail (H.unpack e)
+    snd3 (D.Bound _ _ rhs) = rhs
+
+
 main = do
   let chain = [("v" ++ show i,["v" ++ show (i+1)]) | i <- [0..24 :: Int]]
       wide = [("top",map fst chain)] ++ chain
@@ -640,8 +817,13 @@ main = do
   packageChecks
   queryChecks
   datatypeChecks
+  orderedSyntaxChecks
+  lexicalRunChecks
+  layoutTokenChecks
+  loweringChecks
   resolverChecks
   protectionChecks
+  projectedBindingChecks
   importConventionChecks
   typedClassChecks
   putStrLn "1032 ordered SCC and reach comparisons, query DAG and package controls passed"

@@ -11,6 +11,7 @@ module Bootstrap.Surface where {
   import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.Resolved as R;
   import qualified Bootstrap.IndexVec as V;
+  import qualified Bootstrap.ST as ST;
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as Set;
@@ -187,16 +188,20 @@ module Bootstrap.Surface where {
   indexedValue symbols (Dependency.Bound i annotation rhs) =
     (,,) (Dependency.symbolName symbols i) annotation (R.indexedExpr (Dependency.symbolName symbols) rhs);
   bindIndexed = bindResolvedWith indexedValue SDeclScope;
-  bindResolvedWith project scoped values@(Dependency.BoundValues symbols bindings) body = case bindings of {
+  -- Build each active declaration's projection once. The SCC validation runs
+  -- before the table is demanded, including for sparse or malformed inputs.
+  projectedBindings project (Dependency.BoundValues symbols bindings) = runST
+    (stBind (V.filled (V.count (Dependency.symbolNodes symbols)) (panic "unbound declaration ID")) (\table ->
+      stBind (ST.map_ (\binding -> V.set table (Dependency.boundId binding) (project symbols binding)) bindings)
+        (\_ -> V.freeze table)));
+  bindResolvedWith project scoped values = bindResolvedRows scoped values
+    (V.at (projectedBindings project values));
+  bindResolvedRows scoped values@(Dependency.BoundValues _ bindings) member body = case bindings of {
     [] -> Right body;
     (:) _ _ -> do {
       (,) _ groups <- Dependency.resolvedGroups values [] M.empty M.empty;
-      let { table = Dependency.boundTable values;
-            member ((,) i _) = case V.at table i of {
-              Just binding -> project symbols binding; Nothing -> panic "unbound declaration ID"
-            };
-            wrap continuation group = mapEither (scoped (map fst group))
-              (wrapValueGroup (map member group) (length group > 1 || any snd group) continuation)
+      let { wrap continuation group = let { ids = map fst group } in mapEither (scoped ids)
+              (wrapValueGroup (map member ids) (length group > 1 || any snd group) continuation)
       } in foldM wrap body (reverse groups)
     }
   };
@@ -290,7 +295,8 @@ module Bootstrap.Surface where {
     };
   -- These forms need no pattern compilation or fresh names. Preserve the
   -- existing tree, including its declaration IDs, name hints and source spans.
-  -- A case, equation or do block takes the ordinary lowering path.
+  -- Flat cases already have their lowered shape. Other patterns, equations
+  -- and do blocks enter the ordinary lowering path.
   surfaceCore :: SExpr -> Bool;
   surfaceCore expression = case expression of {
     SDeclScope _ body -> surfaceCore body;
@@ -303,7 +309,8 @@ module Bootstrap.Surface where {
     SSignature body _ -> surfaceCore body;
     SChecked _ body -> surfaceCore body;
     SLetRec ds body -> all (\((,,) _ _ rhs) -> surfaceCore rhs) ds && surfaceCore body;
-    SCase _ _ -> False;
+    SCase scrutinee alternatives -> surfaceCore scrutinee &&
+      all (\(SAlternative pattern body) -> flatPattern pattern && surfaceCore body) alternatives;
     SEquations _ -> False;
     SDo _ _ -> False;
     SSharedBind _ _ _ _ _ -> False;

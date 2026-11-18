@@ -193,7 +193,23 @@ module Bootstrap.Layout where {
       _ -> False
     };
   normal :: Bool -> [] Frame -> Maybe Token -> Token -> [] Token -> Token -> [] Token;
-  normal shared stack previous token rest finish =
+  normal shared stack previous token rest finish = case stack of {
+    (:) (Explicit delimiter) outer -> let {
+      text = tokenText token;
+      continue frames = (:) token (arrange shared frames Nothing (Just token) rest finish);
+      close expected = continue (if eqString delimiter expected then outer else stack)
+    } in if stringLength text /= 1 then normalLayout shared stack previous token rest finish
+      else case stringCodeAt text 0 of {
+        40 -> continue ((:) (Explicit text) stack);
+        91 -> continue ((:) (Explicit text) stack);
+        123 -> continue ((:) (Explicit text) stack);
+        41 -> close "("; 93 -> close "["; 125 -> close "{";
+        44 -> normalLayout shared stack previous token rest finish;
+        _ -> continue stack
+      };
+    _ -> normalLayout shared stack previous token rest finish
+  };
+  normalLayout shared stack previous token rest finish =
     let {
       text = tokenText token
     } in

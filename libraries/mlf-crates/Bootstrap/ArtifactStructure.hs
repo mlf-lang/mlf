@@ -208,6 +208,9 @@ module Bootstrap.ArtifactStructure where {
   fromXComputation :: W.Value -> Either String XComputation;
   fromXComputation value = S.bindEither (decodeValue ShapeXComputation value) expectXComputation;
 
+  -- Matches the generated XVarTerm/name and unapplied XPrimitive/code/list
+  -- encodings below. Writers still compare each tagged value before reuse.
+  termAtomShapes = W.AtomShapes 70 31 81 32 1;
   toXTerm :: XTerm -> W.Value;
   toXTerm value = case value of {
     XVarTerm x0 -> W.VNode 70 [toXName x0];

@@ -70,4 +70,24 @@ main = do
  need "duplicate dependency name rejected" (bad (C.inferenceTemplateKey "context" (ps ++ [(V.fromInt 4,"previous",ty)]) first))
  need "multi-member recursive SCC is not a template" (bad (C.inferenceTemplateKey "context" ps (first ++ member 3 20 21 "other" 1)))
  need "independent unsigned roots keep ordinary admission" (bad (C.inferenceTemplateKey "context" [] [(V.fromInt 10,("root",T.Nothing,T.SIntLit 1))]))
+ let deep 0 leaf = leaf
+     deep count leaf = T.SApp (T.SGlobal (V.fromInt 3) "previous") (deep (count-1) leaf)
+     row leaf = [(V.fromInt 10, ("deep", T.Nothing, leaf))]
+     smallBody = deep (127 :: Int) (T.SIntLit 3)
+     largeBody = deep (128 :: Int) (T.SIntLit 3)
+     large = row largeBody
+ _ <- right "255-node template stays eligible" (C.retainedTemplateKey "context" ps (row smallBody))
+ need "257-node template uses ordinary checked inference" (bad (C.retainedTemplateKey "context" ps large))
+ _ <- right "unrestricted structural identity for larger definitions" (C.inferenceTemplateKey "context" ps large)
+ need "single long UTF-8 source field exceeds the retained key budget"
+   (bad (C.retainedTemplateKey "context" ps (row (T.SStringLit (B.literal (replicate 65536 'x'))))))
+ (uncached, after) <- right "oversized definition still typechecks"
+    (C.compileIndexedMemoWithKey (C.retainedTemplateKey "context" ps large) M.empty "deep" ps [] large)
+ directLarge <- right "ordinary independent inference for oversized definition" (I.compileOpenGroupIndexed "deep" ps [] large)
+ verified <- right "audit uncached proof" (O.audit uncached)
+ need "oversized results retain no template and have the direct checked erasure"
+   (M.size after==0 && X.equalErased (X.erase (O.closedTerm verified)) (X.erase (O.closedTerm directLarge)))
+ let invalid = row (deep 128 (T.SBoolLit True))
+ need "oversized ill-typed expression is still rejected"
+   (bad (C.compileIndexedMemoWithKey (C.retainedTemplateKey "context" ps invalid) M.empty "deep" ps [] invalid))
  putStrLn "PASS inferred template reuse, independent types and erasure, scheme changes and admission rejection"

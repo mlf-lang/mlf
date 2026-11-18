@@ -1675,7 +1675,7 @@ module Bootstrap.Classes where {
                      | QualifiedRec ([] (V.Index Declaration)) ([] ((,,) String RecursiveMode QualifiedExpr)) QualifiedExpr;
   data QualifiedBuild = QualifiedBuild ([] Q.Frame) ([] Q.Seed) ([] Q.Use)
                                       ([] ((,) Int Q.Demand));
-  data QualifiedResult = QualifiedResult QualifiedExpr QualifiedBuild;
+  data QualifiedResult = QualifiedResult QualifiedExpr QualifiedBuild | PlainResult Int SExpr;
   qualifiedEmpty :: QualifiedBuild;
   qualifiedEmpty = QualifiedBuild [] [] [] [];
   qualifiedMerge :: QualifiedBuild -> QualifiedBuild -> QualifiedBuild;
@@ -1686,9 +1686,15 @@ module Bootstrap.Classes where {
   qualifiedNode :: QualifiedExpr -> Int;
   qualifiedNode (QualifiedExpr n _) = n;
   qualifiedExpression :: QualifiedResult -> QualifiedExpr;
-  qualifiedExpression (QualifiedResult expression _) = expression;
+  qualifiedExpression result = case result of {
+    QualifiedResult expression _ -> expression;
+    PlainResult node source -> QualifiedExpr node (QualifiedPlain source)
+  };
   qualifiedBuild :: QualifiedResult -> QualifiedBuild;
-  qualifiedBuild (QualifiedResult _ build) = build;
+  qualifiedBuild result = case result of {
+    QualifiedResult _ build -> build;
+    PlainResult node _ -> QualifiedBuild [] [] [] [(,) node Q.Empty]
+  };
   qualifiedId :: Fresh Int;
   qualifiedId = Fresh (\count used -> Right ((,,) count (count + 1) used));
   qualifiedFinish :: Int -> Maybe Int -> QualifiedBuild -> Fresh QualifiedBuild;
@@ -1707,6 +1713,20 @@ module Bootstrap.Classes where {
             (QualifiedBuild frames seeds uses ((:) ((,) node demand) nodes)))
       }
     };
+  -- A plain subtree carries its lowered source and one fresh empty demand.
+  -- Materialize that root only if an enclosing graph needs to refer to it.
+  -- Application of two plain subtrees keeps the original fresh supply and
+  -- introduces no frame, seed, use or lookup of a descendant.
+  qualifiedPlain :: SExpr -> Fresh QualifiedResult;
+  qualifiedPlain source = do {
+    node <- qualifiedId;
+    freshPure (PlainResult node source)
+  };
+  qualifiedApplication :: QualifiedResult -> QualifiedResult -> Fresh QualifiedResult;
+  qualifiedApplication left right = case (,) left right of {
+    (,) (PlainResult _ f) (PlainResult _ x) -> qualifiedPlain (SApp f x);
+    _ -> qualifiedJoin (QualifiedApply (qualifiedExpression left) (qualifiedExpression right)) [left,right]
+  };
   qualifiedJoin :: QualifiedForm -> [] QualifiedResult -> Fresh QualifiedResult;
   qualifiedJoin form results =
     qualifiedMake form (Q.UnionNodes (map (\result -> qualifiedNode (qualifiedExpression result)) results))
@@ -1755,10 +1775,10 @@ module Bootstrap.Classes where {
       -- Preserve the identity supply used by subsequent generated binders.
       -- An empty evidence context renders exactly its plain variable.
       discarded <- qualifiedId;
-      qualifiedMake (QualifiedPlain (referenceExpr name)) Q.Empty qualifiedEmpty
+      qualifiedPlain (referenceExpr name)
     };
     _ -> do {
-      source <- qualifiedMake (QualifiedPlain (referenceExpr name)) Q.Empty qualifiedEmpty;
+      source <- qualifiedPlain (referenceExpr name);
       qualifiedEvidence site owner env hint source classes
     }
   };
@@ -1805,7 +1825,7 @@ module Bootstrap.Classes where {
         if eqString x "$MLF.Stack.callStack"
         then do {
           stack <- currentCallStack (qualifiedManagedScope env);
-          qualifiedMake (QualifiedPlain stack) Q.Empty qualifiedEmpty
+          qualifiedPlain stack
         }
         else
         planReference site owner env (LexicalRef x);
@@ -1813,8 +1833,7 @@ module Bootstrap.Classes where {
         do {
           left <- planQualifiedFunction site (Dependency.nestedScopes valueScopes) ds infos owner env candidates a;
           right <- planQualified site (Dependency.nestedScopes valueScopes) ds infos owner env candidates b;
-          qualifiedJoin (QualifiedApply (qualifiedExpression left) (qualifiedExpression right))
-            ((:) left ((:) right []))
+          qualifiedApplication left right
         };
       SLam x annotation body ->
         do {
@@ -1910,10 +1929,10 @@ module Bootstrap.Classes where {
       SEquations _ -> freshFail "surface equations escaped lowering";
       SWanted _ _ -> freshFail "dictionary holes are reserved for dictionary translation";
       SChecked _ _ -> freshFail "checked source forms are reserved for dictionary translation";
-      _ -> qualifiedMake (QualifiedPlain expression) Q.Empty qualifiedEmpty
+      _ -> qualifiedPlain expression
     };
   planReference site owner env ref = case lookupQualified ref env of {
-    Nothing -> qualifiedMake (QualifiedPlain (referenceExpr ref)) Q.Empty qualifiedEmpty;
+    Nothing -> qualifiedPlain (referenceExpr ref);
     Just (QualifiedKnown name classes) -> qualifiedKnown site owner env (termRefName ref) name classes;
     Just (QualifiedRecursive name source) ->
       qualifiedMake (QualifiedVariable name Nothing) (Q.RefNode source) qualifiedEmpty;

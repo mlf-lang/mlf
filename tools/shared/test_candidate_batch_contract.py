@@ -27,7 +27,8 @@ class ContractControls(unittest.TestCase):
         return physical,projections
     def test_fixed_full_sources_and_selector_body(self):
         self.assertEqual(C.blob(self.script),C.SCRIPT_BLOB)
-        self.assertEqual(C.blob(self.classes),C.CLASSES_BLOB)
+        self.assertIn(C.blob(self.classes), C.CLASSES_BLOBS)
+        self.assertEqual(C.digest(self.original), C.ORIGINAL_FIXTURE_SHA256)
         body=self.classes[self.classes.index(b'  selectCandidates ::'):self.classes.index(b'  methodBindings ::')]
         self.assertEqual(self.original.count(body),1)
         for a,b in ((self.script+b'\n',self.classes),(self.script,self.classes+b'\n')):

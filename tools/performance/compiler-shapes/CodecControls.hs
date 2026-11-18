@@ -142,7 +142,74 @@ indexControls = do
  _ <- foldM step (C.emptyNodeIndex,M.empty,0) (entries ++ reverse entries ++ entries)
  pure ()
 
+atomControls = do
+ let hints = C.AtomShapes 70 31 81 32 1
+     prim n = C.VNode 81 [C.VNode 32 [C.VInt n],C.VNode 1 []]
+     name n t = C.VNode 70 [C.VNode 31 [C.VInt n,C.VText t]]
+     x = name 0 "a"
+     y = name 3 "同😀"
+     varied = [x,y,prim 8,x,name 0 "other",prim 9,y,name 65 "a",name (-1) "a",prim 8,x]
+     malformed = [C.VNode 70 [],C.VNode 70 [C.VNode 32 [C.VInt 0,C.VText "a"]],
+       C.VNode 81 [C.VNode 32 [C.VInt 8],C.VNode 0 []],
+       C.VNode 81 [C.VNode 32 [C.VInt 8],C.VNode 1 [C.VInt 0]],
+       C.VNode 70 [C.VNode 31 [C.VBits 0,C.VText "a"]], C.VNode 70 [C.VNode 31 [C.VInt 0,C.VInt 5]],
+       C.VNode 81 [C.VNode (-1) [],C.VInt 8],C.VNode 81 [C.VNode 32 [C.VInt 8],C.VNode 2147483648 []]]
+     operator a b = C.VNode 72 [a,b]
+     sets = [[],varied,[foldl1 operator (concat (replicate 8 varied))]] ++
+       [[x,prim 8,y,t,prim 8,x] | t <- malformed] ++
+       [[name i (B.literal (show i)) | i <- [0..80]]]
+     ordinalRoots width = let leaves = [C.VInt (fromIntegral (2000+i)) | i <- [0..width-1::Int]]
+                              wrap tag v = C.VNode tag [v]
+                          in concat [[wrap 42 leaf,leaf,operator (wrap 42 leaf) x] | leaf <- leaves] ++
+                             concat [[wrap 42 leaf,wrap 43 leaf,operator y (wrap 42 leaf)] | leaf <- reverse leaves]
+     limits = [C.defaultLimits] ++ [C.Limits 65536 128 256 4096 1024 2048 1000 n | n <- [0..31]++[72,128,256,640]] ++
+       [C.Limits 65536 128 256 4096 n m d 10240 | (n,m,d) <- [(1,128,12),(4,128,12),(11,128,12),(50,0,12),(50,2,12),(50,6,12),(50,128,1),(50,128,2),(50,128,3),(50,128,4)]] ++
+       [C.Limits b sy word total 1024 2048 1000 10240 | (b,sy,word,total) <- [(79,128,256,4096),(128,128,256,4096),(65536,0,256,4096),(65536,1,256,4096),(65536,128,1,4096),(65536,128,256,4)]]
+     compareWire l r = do
+       a <- l; b <- r
+       case (a,b) of
+         (T.Left e,T.Left f) -> need "atom admission gives the frozen diagnostic" (e==f)
+         (T.Right u,T.Right v) -> sameBytes u v >>= need "atom replay reproduces canonical bytes"
+         _ -> fail "atom admission changed an outcome"
+     currentStats result = case result of
+       T.Left why -> Left (B.unpack why)
+       T.Right (C.Tables _ _ roots symbols nodes count edges,work) -> Right (roots,symbols,nodes,count,edges,work)
+     oldStats result = case result of
+       T.Left why -> Left (B.unpack why)
+       T.Right (L.Tables _ _ roots symbols nodes count edges,work) -> Right (roots,symbols,nodes,count,edges,work)
+ forM_ [hints,C.AtomShapes 99 31 81 0 1] $ \layout -> forM_ limits $ \bound -> forM_ sets $ \roots -> do
+   let fixed = map old roots
+   compareWire (C.encodeAtoms layout bound 7 roots) (L.encode (oldLimits bound) 7 fixed)
+   forM_ [12,512] $ \aggregate -> do
+     let a = currentStats (C.planRootsWith (C.emptyAtomIds layout) bound aggregate roots)
+         b = oldStats (L.planRootBounded (oldLimits bound) aggregate fixed)
+     need "exact aggregate occurrence charges, roots, edges and symbols" (a==b)
+   compareWire (C.encodeRootsWithAtoms layout bound 512 8 roots) (L.encodeRootBounded (oldLimits bound) 512 8 fixed)
+ forM_ [0,1,31,32,63,64,65,127,128,129,257,1025] $ \width -> do
+   let roots = ordinalRoots width
+       fixed = map old roots
+   compareWire (C.encodeAtoms hints C.defaultLimits 7 roots) (L.encode L.defaultLimits 7 fixed)
+   compareWire (C.encodeRootsWithAtoms hints C.defaultLimits 1000000 8 roots)
+     (L.encodeRootBounded L.defaultLimits 1000000 8 fixed)
+ let failure action = do
+       v <- E.try (E.evaluate action) :: IO (Either E.SomeException String)
+       pure (either E.displayException id v)
+     report (T.Left e) = B.unpack e
+     report (T.Right _) = "success"
+     bomb = errorWithoutStackTrace "unexpected node forced"
+     bad = [C.VNode 81 (bomb : errorWithoutStackTrace "input spine failure"),
+       C.VNode 81 [C.VNode (-1) bomb,bomb],C.VNode 70 [C.VNode (-1) bomb],
+       C.VNode 70 [C.VNode 31 [C.VInt 0,C.VText bomb]],
+       C.VNode 81 [C.VNode 32 [C.VInt bomb],bomb],
+       C.VNode 81 [C.VNode 32 [C.VInt 8],C.VNode (-1) bomb]]
+ forM_ limits $ \bound -> forM_ bad $ \t -> do
+   let roots = [x,prim 8,t]
+   a <- failure (report (C.planWith (C.emptyAtomIds hints) bound roots))
+   b <- failure (report (L.plan (oldLimits bound) (map old roots)))
+   need ("atom fallback changes demand order: "++a++" / "++b) (a==b)
+
 main = do
+ atomControls
  crcControls
  limitControls
  indexControls

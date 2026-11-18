@@ -1755,7 +1755,8 @@ class BinarySourceBoundaryTests(unittest.TestCase):
                          & set(binary.changes), {layout})
         raw = (binary.directory / 'pr43-reconciliation-migration.json').read_bytes()
         self.assertEqual(hashlib.sha256(raw).hexdigest(), binary.manifest_sha256)
-        transition = json.loads(raw)['performance_transition']
+        manifest = json.loads(raw)
+        transition = manifest['performance_transition']
         git = ['git', '--no-replace-objects', '-C', str(ROOT)]
         previous_manifest = subprocess.check_output([*git, 'show', transition['predecessor'] +
             ':tools/performance/artifact-binary/pr43-reconciliation-migration.json'])
@@ -1774,7 +1775,16 @@ class BinarySourceBoundaryTests(unittest.TestCase):
         previous_source = subprocess.check_output([*git, 'show', transition['predecessor'] + ':' + layout])
         self.assertEqual(hashlib.sha256(previous_source).hexdigest(), performance[0])
         self.assertEqual(formatter[1], performance[0])
-        self.assertEqual(binary.changes[layout], [formatter[0], performance[1]])
+        current_layout = performance[1]
+        for edge in manifest['compiler_source_transitions']:
+            if layout in edge['changes']:
+                old, new = edge['changes'][layout]
+                previous_layout = subprocess.check_output([*git, 'show', edge['predecessor'] + ':' + layout])
+                self.assertEqual(hashlib.sha256(previous_layout).hexdigest(), old)
+                self.assertEqual(current_layout, old)
+                current_layout = new
+        self.assertEqual(hashlib.sha256((ROOT / layout).read_bytes()).hexdigest(), current_layout)
+        self.assertEqual(binary.changes[layout], [formatter[0], current_layout])
         for module in names:
             path = binary.value['module_paths'][module]
             live = (ROOT / path).read_bytes()

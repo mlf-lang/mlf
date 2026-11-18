@@ -552,29 +552,45 @@ module Bootstrap.SourceInference where {
   smallFinalValue :: Wire.Value -> Maybe Bool;
   smallFinalValue raw = let {
     limits = Wire.defaultLimits;
-    count = min (Wire.maxSymbols limits) (min (Wire.maxSymbolBytes limits)
-      (min (Wire.maxTotalSymbolBytes limits) (min (Wire.maxNodes limits / 4)
-        (min (Wire.maxEdges limits / 4) (Wire.maxExpandedWork limits / 4)))));
-    -- At most 32 bytes per expanded node/edge/text byte, even with maximal
-    -- varints. Header, root reference and final padding fit in 96 bytes.
-    allowance = min 1048576 (min count ((Wire.maxBytes limits - 96) / 32))
-  } in smallFinalTasks [(,,) 1 False [raw]] allowance (min 256 (Wire.maxDepth limits)) False;
-  smallFinalTasks pending remaining maxDepth nested = case pending of {
-    [] -> Just nested;
-    (:) ((,,) depth parentThen values) rest -> case values of {
-      [] -> smallFinalTasks rest remaining maxDepth nested;
-      (:) value more -> if remaining <= 0 || depth > maxDepth then Nothing else let {
-        tail = (:) ((,,) depth parentThen more) rest; next = remaining - 1
-      } in case value of {
-        Wire.VText text -> let { count = stringLength text } in
-          if count > next / 4 then Nothing else smallFinalTasks tail (next - 4 * count) maxDepth nested;
-        Wire.VNode tag children -> if tag < 0 || tag > 2147483647 then Nothing else let { changed = nested || (parentThen && tag == 58) } in
-          seq changed (smallFinalTasks ((:) ((,,) (depth + 1) (tag == 58) children) tail)
-            next maxDepth changed);
-        _ -> smallFinalTasks tail next maxDepth nested
+    -- Bound expanded nodes independently of text bytes. A symbol can occupy
+    -- many bytes while contributing only one node and one symbol.
+    nodes = min 1048576 (min (Wire.maxSymbols limits)
+      (min (Wire.maxNodes limits / 4) (Wire.maxEdges limits / 4)));
+    -- One unit per node and per UTF-8 byte covers at most 32 encoded bytes
+    -- including entry tags and references. Keep the header/padding reserve.
+    work = min (Wire.maxTotalSymbolBytes limits)
+      (min (Wire.maxExpandedWork limits / 4) ((Wire.maxBytes limits - 96) / 32));
+    -- A single large text still goes through the full planner.
+    scalars = min ((nodes - 1) / 4) (Wire.maxSymbolBytes limits / 4);
+    chargeText = \text available -> let { bytes = stringUtf8Length text } in
+        if stringLength text > scalars || bytes > available then Nothing else Just (available - bytes)
+  } in finalGeometryTasks chargeText (min 256 (Wire.maxDepth limits)) [(,,) 1 False [raw]] nodes work False;
+  -- Preserve the scalar-weighted budget of the existing task-list entry point.
+  smallFinalTasks pending remaining maxDepth nested = let {
+    chargeText = \text available -> let { count = stringLength text } in
+      if count > available / 4 then Nothing else Just (available - 4 * count)
+  } in finalGeometryTasks chargeText maxDepth pending remaining remaining nested;
+  finalGeometryTasks :: (String -> Int -> Maybe Int) -> Int ->
+    [] ((,,) Int Bool ([] Wire.Value)) -> Int -> Int -> Bool -> Maybe Bool;
+  finalGeometryTasks chargeText maxDepth = let {
+    visit pending nodes work nested = case pending of {
+      [] -> Just nested;
+      (:) ((,,) depth parentThen values) rest -> case values of {
+        [] -> visit rest nodes work nested;
+        (:) value more -> if nodes <= 0 || work <= 0 || depth > maxDepth then Nothing else let {
+          tail = (:) ((,,) depth parentThen more) rest; left = nodes - 1; next = work - 1
+        } in case value of {
+          Wire.VText text -> case chargeText text next of {
+            Nothing -> Nothing; Just available -> visit tail left available nested
+          };
+          Wire.VNode tag children -> if tag < 0 || tag > 2147483647 then Nothing else let {
+            changed = nested || (parentThen && tag == 58)
+          } in seq changed (visit ((:) ((,,) (depth + 1) (tag == 58) children) tail) left next changed);
+          _ -> visit tail left next nested
+        }
       }
     }
-  };
+  } in visit;
   -- On the certified small domain the only rewriting operation is still the
   -- same depth-aware XThen forest. Atom heights and child identities are local
   -- to each computation; header, datatype and unrelated term nodes cannot
@@ -939,7 +955,8 @@ module Bootstrap.SourceInference where {
   -- fallback or compatibility diagnostics, never to prepare source queries.
   data PlanInput = NamedInput ([] ((,,) String (Maybe SAnnotation) SExpr)) | ResolvedInput Dependency.BoundValues;
   data PlannedBinding = PlannedSource Int (Maybe SAnnotation) (R.Expr Declaration) |
-    PlannedSupport Int (Maybe SAnnotation) SExpr;
+    PlannedSupport Int (Maybe SAnnotation) SExpr |
+    ProjectedSource Int (Maybe SAnnotation) (R.Expr Declaration) SExpr;
   data PlanGraph = NamedPlan ([] ((,,) String (Maybe SAnnotation) SExpr))
     ([] ((,,) String (Maybe SAnnotation) SExpr)) ([] ([] String)) |
     IndexedPlan Dependency.Symbols (V.IndexVec Declaration PlannedBinding)
@@ -952,14 +969,26 @@ module Bootstrap.SourceInference where {
   -- The inventory and persisted query envelopes consume named syntax. Select
   -- by ID first, projecting only the rows demanded by that consumer.
   namedBinding symbols = projectBinding (Dependency.symbolName symbols);
-  projectBinding name rows i = case V.at rows i of {
-    PlannedSource ordinal annotation rhs -> (,) ordinal ((,,) (name i) annotation (R.namedExpr name rhs));
+  projectBinding = projectBindingWith R.namedExpr;
+  indexedBinding symbols = indexedBindingWith (Dependency.symbolName symbols);
+  indexedBindingWith = projectBindingWith R.indexedExpr;
+  projectBindingWith project name rows i = let {
+    source ordinal annotation rhs = (,) ordinal ((,,) (name i) annotation (project name rhs))
+  } in case V.at rows i of {
+    PlannedSource ordinal annotation rhs -> source ordinal annotation rhs;
+    ProjectedSource ordinal annotation rhs _ -> source ordinal annotation rhs;
     PlannedSupport ordinal annotation rhs -> (,) ordinal ((,,) (name i) annotation rhs)
   };
-  indexedBinding symbols = indexedBindingWith (Dependency.symbolName symbols);
-  indexedBindingWith name rows i = case V.at rows i of {
-    PlannedSource ordinal annotation rhs -> (,) ordinal ((,,) (name i) annotation (R.indexedExpr name rhs));
-    PlannedSupport ordinal annotation rhs -> (,) ordinal ((,,) (name i) annotation rhs)
+  -- Reuse the inventory view only for its verified symbol-name prefix.
+  -- Explicit display projections still select names from the resolved term.
+  planIndexedBinding symbols rows i = case V.at rows i of {
+    ProjectedSource ordinal annotation _ rhs -> (,) ordinal ((,,) (Dependency.symbolName symbols i) annotation rhs);
+    _ -> indexedBinding symbols rows i
+  };
+  plannedReferences row = case row of {
+    PlannedSource _ _ rhs -> Just (R.references rhs);
+    ProjectedSource _ _ rhs _ -> Just (R.references rhs);
+    PlannedSupport _ _ _ -> Nothing
   };
   planSources plan = case planGraph plan of {
     NamedPlan sources _ _ -> sources;
@@ -967,7 +996,7 @@ module Bootstrap.SourceInference where {
   };
   planSourceInputs plan = case planGraph plan of {
     NamedPlan sources _ _ -> sources;
-    IndexedPlan symbols rows ids _ _ -> map (compose snd (indexedBinding symbols rows)) ids
+    IndexedPlan symbols rows ids _ _ -> map (compose snd (planIndexedBinding symbols rows)) ids
   };
   planSupports plan = case planGraph plan of {
     NamedPlan _ supports _ -> supports;
@@ -1004,10 +1033,29 @@ module Bootstrap.SourceInference where {
   prepareResolvedSourcePlanWithImports conventions bindings = sourcePlanUsing conventions (ResolvedInput bindings);
   sourcePlanWith = sourcePlanUsing M.empty;
   sourcePlanUsing conventions input externals datatypes classes instances closedInstances valueScopes instanceScopes = do {
-    body <- case input of {
-      NamedInput members -> Surface.bindValues members (SConstructor "()");
-      ResolvedInput bindings -> Surface.bindIndexed bindings (SConstructor "()")
+    let {
+      entry = SConstructor "()";
+      parts = case input of {
+        NamedInput members -> (,) (Surface.bindValues members entry)
+          (\_ supports methods targets -> namedPlan members supports methods (Dependency.namedScopes targets));
+        ResolvedInput bindings@(Dependency.BoundValues base _) -> let {
+          indexed = Surface.projectedBindings Surface.indexedValue bindings;
+          row ordinal (Dependency.Bound i annotation rhs) = (,) i
+            (ProjectedSource ordinal annotation rhs (sourceRhs (V.at indexed i)));
+          graph inventory supports _ _ = case Classes.inventoryDeclarations inventory of {
+            Nothing -> Left "resolved source inventory lacks generated declaration slots";
+            Just generation -> let {
+              target = Dependency.generatedSymbols generation;
+              original = Dependency.symbolNodes base;
+              compatible = V.count original <= V.count (Dependency.symbolNodes target) &&
+                all (\i -> eqString (V.at original i) (Dependency.symbolName target i)) (V.indices original);
+              build = if compatible then indexedPlanUsing row else indexedPlanWith
+            } in build bindings generation supports (\i -> map snd (Classes.inventoryCandidateIds inventory i))
+          }
+        } in (,) (Surface.bindResolvedRows SDeclScope bindings (V.at indexed) entry) graph
+      }
     };
+    body <- fst parts;
     prepared <- Classes.withClassScopesAndImports conventions externals (map fst closedInstances)
       valueScopes instanceScopes
       (SClassProgram datatypes classes (map snd closedInstances) body)
@@ -1017,14 +1065,7 @@ module Bootstrap.SourceInference where {
       graph <- case inventory of { Classes.ClassInventory _ _ _ scopes _ methods definitions _ _ ->
         let { supports = map (\((,,) name annotation rhs) -> (,,) name (Just annotation) rhs) (Classes.supportDefinitions definitions);
               targets = Dependency.mapScopes (map snd) scopes
-        } in case input of {
-          NamedInput members -> namedPlan members supports methods (Dependency.namedScopes targets);
-          ResolvedInput bindings -> case Classes.inventoryDeclarations inventory of {
-            Nothing -> Left "resolved source inventory lacks generated declaration slots";
-            Just generation -> indexedPlanWith bindings generation supports
-              (\i -> map snd (Classes.inventoryCandidateIds inventory i))
-          }
-        }
+        } in snd parts inventory supports methods targets
       };
       Right ((,) (mapOptional (\g -> SourcePlan inventory g count used externals legacy instances M.empty) graph) legacy)
     } }
@@ -1056,7 +1097,9 @@ module Bootstrap.SourceInference where {
               Dependency.IndexedScopes _ _ _ _ _ -> Dependency.scopeAt scopes i
             }))
     } in indexedPlanWith bindings generation supports targets;
-  indexedPlanWith bindings@(Dependency.BoundValues base members) generation supports targets = do {
+  indexedPlanWith = indexedPlanUsing (\ordinal (Dependency.Bound i annotation rhs) ->
+    (,) i (PlannedSource ordinal annotation rhs));
+  indexedPlanUsing sourceRow bindings@(Dependency.BoundValues base members) generation supports targets = do {
     (,) symbols groups <- Dependency.resolvedGroupsWith bindings generation (Dependency.declarationEdges supports) targets;
     let { baseCount = V.count (Dependency.symbolNodes base); count = V.count (Dependency.symbolNodes symbols);
           sources = map Dependency.boundId members; generated = Dependency.generatedSlots generation;
@@ -1064,7 +1107,6 @@ module Bootstrap.SourceInference where {
           -- Groups are in lexical SCC order. Each input's ordinal recovers
           -- its original declaration order when preparing a multi-member SCC.
           mixed group = any (compose source fst) group && any (compose (compose not source) fst) group;
-          sourceRow ordinal (Dependency.Bound i annotation rhs) = (,) i (PlannedSource ordinal annotation rhs);
           supportRow i ((,,) _ annotation rhs) = (,) i (PlannedSupport (V.toInt i - baseCount) annotation rhs);
           entries = append (mapIndexed sourceRow members) (zipWith supportRow generated supports);
           rows = runST (stBind (V.filled count (panic "inactive source plan slot")) (\table ->
@@ -1078,14 +1120,13 @@ module Bootstrap.SourceInference where {
     R.Ann b _ -> copiedSource b; R.Signature b _ -> copiedSource b; _ -> False
   };
   initializeProtection :: SourcePlan -> Map String Bool -> Either String SourcePlan;
-  initializeProtection plan@(SourcePlan inventory graph count used externals legacy instances _) imported = do {
+  initializeProtection plan = initializeProtectionWithInputs (planSourceInputs plan) plan;
+  initializeProtectionWithInputs inputs (SourcePlan inventory graph count used externals legacy instances _) imported = do {
     let { sourceRefs = case graph of {
       NamedPlan _ _ _ -> Nothing;
-      IndexedPlan _ rows _ _ _ -> Just (\i -> case V.at rows i of {
-        PlannedSource _ _ rhs -> R.references rhs; PlannedSupport _ _ _ -> []
-      })
+      IndexedPlan _ rows _ _ _ -> Just (\i -> fromMaybe [] (plannedReferences (V.at rows i)))
     } };
-    flags <- Classes.inventoryProtectionWith sourceRefs inventory imported instances (planSourceInputs plan);
+    flags <- Classes.inventoryProtectionWith sourceRefs inventory imported instances inputs;
     Right (SourcePlan inventory graph count used externals legacy instances flags)
   };
   initialContracts :: SourcePlan -> Map String XType -> Map String Bool ->
@@ -1306,13 +1347,16 @@ module Bootstrap.SourceInference where {
   -- printable names belong to the query key and the named inference boundary.
   planSteps plan = map (\((,) names prepare) -> (,) names (prepare Nothing))
     (planStepsUsing selectedContractBindings Dependency.symbolName plan);
-  planStepsUsing selectBindings projection plan = case planGraph plan of {
+  planStepsUsing selectBindings projection = planStepsWithRows selectBindings projection
+    (\symbols -> indexedBindingWith (projection symbols));
+  planStepsWithRows selectBindings projection selectRows plan = case planGraph plan of {
     NamedPlan _ _ groups -> map (\names -> (,) names (\_ contracts -> prepareGroupUsing selectBindings plan contracts names)) groups;
     IndexedPlan symbols rows _ _ groups -> let {
+      row = selectRows symbols rows;
       step group = let {
         ids = map fst group; name = projection symbols; names = map name ids;
         entries = sortBy (\a b -> compareInt (fst (snd a)) (fst (snd b)))
-          (map (\i -> (,) i (indexedBindingWith name rows i)) ids);
+          (map (\i -> (,) i (row i)) ids);
         memberOrder = map fst entries; members = map (compose snd snd) entries;
         support = case ids of {
           (:) i _ -> case V.at rows i of {
@@ -1330,13 +1374,41 @@ module Bootstrap.SourceInference where {
   };
   -- Executable query plans select members from the resolver's IDs. Only the
   -- compatibility named plan needs to admit its requested group by spelling.
-  querySteps plan scope = let {
-    steps = planStepsUsing (\_ _ -> []) (\_ -> declName scope) plan;
+  querySteps plan scope = queryStepsFrom plan scope
+    (planStepsUsing (\_ _ -> []) (\_ -> declName scope) plan);
+  queryStepsFrom plan scope steps = let {
     typed prepare checked = prepare (Just checked) (checkedNamed checked)
   } in case planGraph plan of {
     IndexedPlan _ _ _ _ groups -> Right (zipWith (\group step -> (,) (map fst group) (typed (snd step))) groups steps);
     NamedPlan _ _ _ -> traverseEither (\((,) names prepare) ->
       mapEither (\ids -> (,) ids (typed prepare)) (traverseEither (requireDecl scope) names)) steps
+  };
+  -- Protection uses the resolver's display names. The query scope created
+  -- below extends the same symbol table. With no ambiguous display names,
+  -- every source and pattern projects identically in both consumers.
+  protectedQueryPlan original imported = let {
+    open contracts plan cached = let { scope = planScope plan (M.keys contracts) } in do {
+      checked <- installContracts scope contracts;
+      steps <- case (,) cached scope of {
+        (,) (Just rows) (DeclScope _ _ _ ambiguous _) -> if Set.size ambiguous == 0
+          then queryStepsFrom plan scope (planStepsWithRows (\_ _ -> []) (\_ -> declName scope)
+            (\_ _ -> V.at rows) plan) else querySteps plan scope;
+        _ -> querySteps plan scope
+      };
+      Right ((,) checked steps)
+    }
+  } in case planGraph original of {
+    NamedPlan _ _ _ -> do {
+      plan <- initializeProtection original imported;
+      Right ((,) plan (\contracts -> open contracts plan Nothing))
+    };
+    IndexedPlan symbols bindings ids _ _ -> let {
+      rows = V.fromList (map (planIndexedBinding symbols bindings) (V.indices bindings));
+      inputs = map (compose snd (V.at rows)) ids
+    } in do {
+      plan <- initializeProtectionWithInputs inputs original imported;
+      Right ((,) plan (\contracts -> open contracts plan (Just rows)))
+    }
   };
   -- This context belongs to one finite parsed file and its checked predecessor
   -- map. Ordinals retain declaration order independently of SCC name order.
@@ -1455,9 +1527,9 @@ module Bootstrap.SourceInference where {
           };
           eligibleMember = case (,) knownOwner owner of {
             (,) Nothing (Just i) -> case graph of {
-              IndexedPlan _ rows _ _ _ -> case V.at rows i of {
-                PlannedSource _ _ rhs -> eligibleSourceWith (any (\ref -> V.toInt ref == V.toInt i) (R.references rhs));
-                PlannedSupport _ _ _ -> eligible
+              IndexedPlan _ rows _ _ _ -> case plannedReferences (V.at rows i) of {
+                Just refs -> eligibleSourceWith (any (\ref -> V.toInt ref == V.toInt i) refs);
+                Nothing -> eligible
               };
               _ -> eligible
             };
@@ -1659,12 +1731,12 @@ module Bootstrap.SourceInference where {
       }
     }
   };
-  canonicalOpen object = case smallFinalValue (Structure.toXTerm (Open.body object)) of {
+  canonicalOpen object = case smallFinalValue (Open.bodyValue object) of {
     Just False -> Right object;
     _ -> canonicalOpenPlanned object
   };
   canonicalOpenPlanned object = do {
-    plan <- Wire.prepareGraphPlan Wire.defaultLimits [Structure.toXTerm (Open.body object)];
+    plan <- Wire.prepareGraphPlan Wire.defaultLimits [Open.bodyValue object];
     graph <- Wire.realizeGraphPlan plan;
     identity <- case Wire.graphRoots graph of { [root] -> Right root; _ -> Left "open raw root count" };
     normalized <- finalSyntaxRun graph [FinalVisit identity (FinalTerm (Open.body object))] []

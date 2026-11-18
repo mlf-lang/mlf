@@ -338,13 +338,55 @@ module Bootstrap.LLVM.Optimize where {
   identities expression =
     do {
       normalized <- children identities expression;
-      case normalized of {
-        XEApp (XEAbs n (XEVar other)) argument ->
-          if eqName n other then freshPure argument else freshPure normalized;
-        XELet n (XEVar a) b -> copy (M.singleton n (XEVar a)) b;
-        _ -> freshPure normalized
-      }
+      reduceIdentity normalized
     };
+  reduceIdentity normalized = case normalized of {
+    XEApp (XEAbs n (XEVar other)) argument ->
+      if eqName n other then freshPure argument else freshPure normalized;
+    XELet n (XEVar a) b -> copy (M.singleton n (XEVar a)) b;
+    _ -> freshPure normalized
+  };
+  -- Only closed unary constructors and their exact field selectors qualify.
+  -- The declaration spine has already been freshened. These identities remain
+  -- distinct underneath nested lambdas, patterns and recursive definitions.
+  data UnaryConstructorUse = BuildsField String | SelectsField String;
+  unaryConstructorUse term = case term of {
+    XEAbs name (XEApp (XEConstructor constructor) (XEVar field)) ->
+      if eqName name field then Just (BuildsField constructor) else Nothing;
+    XEAbs name (XECase (XEVar subject)
+        [XErasedAlternative (XConstructorPattern constructor [Just field]) (XEVar result)]) ->
+      if eqName name subject && eqName field result then Just (SelectsField constructor) else Nothing;
+    _ -> Nothing
+  };
+  checkedIdentities known expression = case expression of {
+    XELet name value body -> do {
+      rhs <- constructorIdentities known value;
+      let { following = case unaryConstructorUse rhs of {
+        Just role -> M.insert compareName name role known; Nothing -> known
+      } };
+      result <- checkedIdentities following body;
+      reduceIdentity (XELet name rhs result)
+    };
+    _ -> constructorIdentities known expression
+  };
+  constructorIdentities known expression = if M.null known
+    then identities expression else constructorApplications known expression;
+  constructorApplications known expression = do {
+    term <- children (constructorApplications known) expression;
+    case term of {
+      XEApp (XEVar select) (XEApp (XEVar build) field) ->
+        case M.lookup compareName select known of {
+          Just (SelectsField wanted) -> case M.lookup compareName build known of {
+            Just (BuildsField actual) -> freshPure (if eqString wanted actual then field else term);
+            _ -> freshPure term
+          };
+          _ -> freshPure term
+        };
+      XEApp (XEApp (XEPrimitive PAddInt) left) right ->
+        freshPure (L.fromMaybe term (combineIntSummands left right));
+      _ -> reduceIdentity term
+    }
+  };
   fixedPoints :: XErased -> Fresh XErased;
   fixedPoints expression =
     case expression of {
@@ -995,6 +1037,32 @@ module Bootstrap.LLVM.Optimize where {
                       };
                     _ -> freshPure tree
                   };
+  -- Collect two integer summands which depend on the very same binder.
+  -- Signed machine Int addition and multiplication wrap. Retain the operand
+  -- even for a zero coefficient so that forcing a failing binder still fails.
+  intSummand :: XErased -> Maybe ((,,) XName Int Int);
+  intSummand term = let {
+    withOffset value offset = case value of {
+      XEVar name -> Just ((,,) name 1 offset);
+      XEApp (XEApp (XEPrimitive PMulInt) (XEVar name)) (XEInt factor) -> Just ((,,) name factor offset);
+      _ -> Nothing
+    }
+  } in case term of {
+    XEApp (XEApp (XEPrimitive PAddInt) value) (XEInt offset) -> withOffset value offset;
+    XEApp (XEApp (XEPrimitive PAddInt) (XEInt offset)) value -> withOffset value offset;
+    _ -> withOffset term 0
+  };
+  combineIntSummands :: XErased -> XErased -> Maybe XErased;
+  combineIntSummands left right = case intSummand left of {
+    Just ((,,) name factor offset) -> case intSummand right of {
+      Just ((,,) other otherFactor otherOffset) -> if eqName name other then let {
+        scale = factor + otherFactor;
+        value = if scale == 1 then XEVar name else XEApp (XEApp (XEPrimitive PMulInt) (XEVar name)) (XEInt scale)
+      } in Just (translated (offset + otherOffset) value) else Nothing;
+      Nothing -> Nothing
+    };
+    Nothing -> Nothing
+  };
   rewriteUsed :: UseTree -> Fresh UseTree;
   rewriteUsed tree =
     case useChildren tree of {
@@ -1003,13 +1071,23 @@ module Bootstrap.LLVM.Optimize where {
           UseAbs name body -> freshPure (useLet name argument body);
           UseLet name value body -> freshPure (useLet name value (useApp body argument));
           UseRec bindings body -> freshPure (useRec bindings (useApp body argument));
+          UseApp operator left -> case useTerm operator of {
+            XEPrimitive PAddInt -> case combineIntSummands (useTerm left) (useTerm argument) of {
+              Just reduced -> freshPure (indexUses reduced);
+              Nothing -> freshPure tree
+            };
+            _ -> freshPure tree
+          };
           _ -> freshPure tree
         };
-      UseLet name value body -> do {
-        shared <- specializeSharedValue name value body;
-        case shared of {
-          Just result -> freshPure result;
-          Nothing -> rewriteOrdinaryLet tree name value body
+      UseLet name value body -> case useTerm body of {
+        XEVar result -> freshPure (if eqName name result then value else body);
+        _ -> do {
+          shared <- specializeSharedValue name value body;
+          case shared of {
+            Just result -> freshPure result;
+            Nothing -> rewriteOrdinaryLet tree name value body
+          }
         }
       };
       UseRec bindings body ->
@@ -1507,10 +1585,11 @@ module Bootstrap.LLVM.Optimize where {
     _ -> (,) expression (free expression)
   };
   optimizeOwnedWork :: XErased -> Fresh XErased;
-  optimizeOwnedWork expression =
+  optimizeOwnedWork = optimizeOwnedUsing identities;
+  optimizeOwnedUsing cleanInput expression =
     do {
       unique <- copy M.empty (L.fst (liveDeclarationSpine expression));
-      clean <- identities unique;
+      clean <- cleanInput unique;
       recursive <- fixedPoints clean;
       let {
         arities = constructorArities recursive
@@ -1603,7 +1682,8 @@ module Bootstrap.LLVM.Optimize where {
   -- This extra algebraic pass is for finite checked programs. Its rewrites
   -- introduce no binders and preserve evaluation of the single input value.
   -- Keep the raw and exact legacy-pass interfaces available independently.
-  optimizeChecked expression = optimizeOwned (simplifyIterations M.empty (simplifyTranslations M.empty expression));
+  optimizeChecked expression = optimizeOwnedWith (optimizeOwnedUsing (checkedIdentities M.empty))
+    (simplifyIterations M.empty (simplifyTranslations M.empty expression));
   -- A translation evaluates its one Int input once and adds a constant in
   -- the language's wrapping Int64 ring. Retain every unknown/effectful body.
   -- Summaries follow resolved binder identities and never cross shadowing.
@@ -1661,8 +1741,9 @@ module Bootstrap.LLVM.Optimize where {
     _ -> expression
   };
   optimizeOwned :: XErased -> XErased;
-  optimizeOwned expression =
-    case runFresh (optimizeOwnedWork expression) (L.advanceIdentity 1 (maxIdentity expression)) of {
+  optimizeOwned = optimizeOwnedWith optimizeOwnedWork;
+  optimizeOwnedWith work expression =
+    case runFresh (work expression) (L.advanceIdentity 1 (maxIdentity expression)) of {
       (,) normalized seed ->
         case runFresh (copy M.empty normalized) 0 of {
           (,) result next -> result

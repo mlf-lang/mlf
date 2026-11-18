@@ -13,11 +13,13 @@ import traceback
 import types
 
 HERE = Path(__file__).resolve().parent
+CLASSES_PATH = '../../libraries/mlf-inference/Bootstrap/Classes.hs'
+CLASSES_SUCCESSOR = 'b4a2ce4772e168f2013a77d0113298103557d955'
 PINS = {
  'test_direct.py':'a46bd66949e81c5761dff3446201640837ec8f68',
  'test_candidate_selection.py':'c2a16944fe4e19c1f8de0ac24ff06d95d94c031c',
  'fixtures/CandidateSelectionControls.hs':'928d4511289a780af1685dcc4ea28d0ae0c404d2',
- '../../libraries/mlf-inference/Bootstrap/Classes.hs':'bbcc794dc1ce447ccfc1450378e951df1b427819',
+ CLASSES_PATH:'bbcc794dc1ce447ccfc1450378e951df1b427819',
  'default_stdlib.py':'33f84ec682f78c064322de8e9d303b76b6040871',
  'crc_process_supervisor.py':'620e88b557139a6b19ca63097decaa9148bdd819',
  'test_direct_crc_successor.py':'789dc7e641fdbd8aace2f9395914d786c18eadb1',
@@ -37,7 +39,10 @@ def digest(raw): return hashlib.sha256(raw).hexdigest()
 def blob(raw): return hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
 def snapshot(here=HERE):
     raws = {name: (here/name).read_bytes() for name in (*PINS, *HELPERS)}
-    for name, pin in PINS.items(): require(blob(raws[name]) == pin, 'frozen input changed: '+name)
+    for name, pin in PINS.items():
+        actual = blob(raws[name])
+        require(actual == pin or (name == CLASSES_PATH and actual == CLASSES_SUCCESSOR),
+                'frozen input changed: '+name)
     return raws, {name:digest(raw) for name,raw in raws.items()}
 def load(raw, name, path):
     module=types.ModuleType(name); module.__file__=str(path)

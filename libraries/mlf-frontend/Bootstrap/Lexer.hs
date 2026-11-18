@@ -6,6 +6,8 @@ module Bootstrap.Lexer where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
+  import qualified Bootstrap.IndexVec as V;
+  import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.Unicode as U;
   import qualified Bootstrap.Set as Set;
   data Token = Token String Int Int Int Int;
@@ -163,6 +165,12 @@ module Bootstrap.Lexer where {
   advanceSourceTo source end cursor =
     if cursorIndex cursor >= end then cursor
     else advanceSourceTo source end (advance (stringCodeAt source (cursorIndex cursor)) cursor);
+  -- Identifier, number and operator characters always advance one source
+  -- column. Keep only the scalar index while scanning an uninterrupted run.
+  consumeRun predicate source size (Cursor start line column) = let {
+    endAt i = if i < size && predicate (stringCodeAt source i) then endAt (i + 1) else i;
+    end = endAt start; lastColumn = column + (end - start)
+  } in seq end (seq lastColumn (Cursor end line lastColumn));
   scanNumber :: String -> Int -> Cursor -> Cursor;
   scanNumber source size cursor =
     let {
@@ -170,14 +178,14 @@ module Bootstrap.Lexer where {
     } in
     if (starts source size i 48 &&
         (starts source size (i + 1) 120 || starts source size (i + 1) 88))
-    then consumeWhile isHexDigit source size
+    then consumeRun isHexDigit source size
            (advance (codeAt source size (i + 1)) (advance 48 cursor))
     else if (starts source size i 48 &&
              (starts source size (i + 1) 111 || starts source size (i + 1) 79))
-         then consumeWhile (\c -> ((c >= 48) && (c <= 55))) source size
+         then consumeRun (\c -> ((c >= 48) && (c <= 55))) source size
                 (advance (codeAt source size (i + 1)) (advance 48 cursor))
          else let {
-                digits = consumeWhile isDigit source size cursor
+                digits = consumeRun isDigit source size cursor
               } in
               let {
                 j = cursorIndex digits
@@ -185,7 +193,7 @@ module Bootstrap.Lexer where {
               let {
                 fraction =
                   if (starts source size j 46 && isDigit (codeAt source size (j + 1)))
-                  then consumeWhile isDigit source size (advance 46 digits)
+                  then consumeRun isDigit source size (advance 46 digits)
                   else digits
               } in
               let {
@@ -205,25 +213,42 @@ module Bootstrap.Lexer where {
                        else exponent
                    } in
                    if isDigit (codeAt source size (cursorIndex signed))
-                   then consumeWhile isDigit source size signed
+                   then consumeRun isDigit source size signed
                    else fraction
               else fraction;
+  -- Every one-scalar ASCII token can share its immutable spelling.
+  singleAsciiTokens :: V.IndexVec Int String;
+  singleAsciiTokens = V.fromList (map stringFromCode (range 0 127));
+  tokenSpelling source i end code = if end - i == 1 && code >= 0 && code < 128
+    then V.at singleAsciiTokens (V.fromInt code) else stringSlice source i (end - i);
   scanTokens :: String -> String -> Either String Scanned;
   scanTokens file source = scanMore file source (stringLength source) (Cursor 0 1 1);
   scanSourceTokens :: String -> String -> Either String Scanned;
   scanSourceTokens file source = scanMoreWith scanSourceQuoted file source (stringLength source) (Cursor 0 1 1);
   scanMore :: String -> String -> Int -> Cursor -> Either String Scanned;
   scanMore = scanMoreWith scanQuoted;
+  sharedSpelling source start end first known = let {
+    width = end - start;
+    matches name position = if position >= width then True else
+      stringCodeAt name position == stringCodeAt source (start + position) && matches name (position + 1);
+    key = (width - 2) * 128 + first;
+    fresh = tokenSpelling source start end first;
+    store = seq fresh ((,) fresh (IM.insert key fresh known))
+  } in if width < 2 || width > 32 || first < 65 || first > 122 then (,) fresh known
+    else case IM.lookup key known of {
+      Just name -> if matches name 0 then (,) name known else store; Nothing -> store
+    };
   scanMoreWith :: (String -> String -> Int -> Cursor -> Either String Cursor) ->
                   String -> String -> Int -> Cursor -> Either String Scanned;
-  scanMoreWith quoted file source size cursor =
+  scanMoreWith quoted file source size = collectTokens quoted file source size IM.empty [];
+  collectTokens quoted file source size known seen cursor =
     case skipWhite file source size cursor of {
       Left e -> Left e;
       Right begin ->
         case begin of {
           Cursor i line column ->
             if (i >= size)
-            then Right (Scanned [] (Token "" line column line column))
+            then Right (Scanned (reverse seen) (Token "" line column line column))
             else let {
                    c = codeAt source size i
                  } in
@@ -233,11 +258,11 @@ module Bootstrap.Lexer where {
                      then quoted file source size (advance c begin)
                      else Right
                             (if (U.isAlpha c || ((c == 95) || (c == 39)))
-                             then consumeWhile isIdentChar source size begin
+                             then consumeRun isIdentChar source size begin
                              else if isDigit c
                                   then scanNumber source size begin
                                   else if isOperator c
-                                       then consumeWhile isOperator source size begin
+                                       then consumeRun isOperator source size begin
                                        else advance c begin)
                  } in
                  case next of {
@@ -245,17 +270,9 @@ module Bootstrap.Lexer where {
                    Right end ->
                      case end of {
                        Cursor j lastLine lastColumn ->
-                         case scanMoreWith quoted file source size end of {
-                           Left e -> Left e;
-                           Right (Scanned rest finish) ->
-                             Right
-                               (Scanned
-                                  ((:)
-                                     (Token (stringSlice source i (j - i)) line column lastLine
-                                        lastColumn)
-                                     rest)
-                                  finish)
-                         }
+                         case sharedSpelling source i j c known of { (,) spelling nextKnown -> let {
+                           token = Token spelling line column lastLine lastColumn
+                         } in collectTokens quoted file source size nextKnown ((:) token seen) end }
                      }
                  }
         }

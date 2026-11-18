@@ -4,7 +4,7 @@
              MultiParamTypeClasses, OverloadedStrings #-}
 module Bootstrap.OpenFragment
   (Environment, environment, declarations, dataEnvironment, Fragment, check, fromChecked,
-   parameters, body, bindings, usedParameters, context, fingerprint,
+   parameters, body, bodyValue, bindings, usedParameters, context, fingerprint,
    normalize, withNameHints, encodeBody, decodeTrusted, decodeTrustedIds, audit, closedTerm, fresh,
    Package, makePackage, readPackage, readPackageProfiled, packageFragments, packageBytes,
    packageHash, packageMetadata, packageFamily, declarationValue, compatibilityIdentity,
@@ -56,20 +56,25 @@ module Bootstrap.OpenFragment
   declarationValue declaration = Structure.toDataDecl (canonicalDeclaration declaration);
   declarations (Environment ds _) = ds;
   dataEnvironment (Environment _ ds) = ds;
+  -- Derive the wire tree once from the exact immutable checked term. The
+  -- bytes for each envelope still go through their own ordinary writer.
   data Fragment = Fragment Environment ([] ((,) XName XType)) XTerm
-    ([] ((,) XName XType)) ([] XName) String;
-  context (Fragment env _ _ _ _ _) = env;
-  parameters (Fragment _ ps _ _ _ _) = ps;
-  body (Fragment _ _ term _ _ _) = term;
-  bindings (Fragment _ _ _ bs _ _) = bs;
-  usedParameters (Fragment _ _ _ _ used _) = used;
-  fingerprint (Fragment _ _ _ _ _ stamp) = stamp;
+    ([] ((,) XName XType)) ([] XName) String W.Value;
+  fragmentWith env ps term bs used saved =
+    Fragment env ps term bs used saved (Structure.toXTerm term);
+  context (Fragment env _ _ _ _ _ _) = env;
+  parameters (Fragment _ ps _ _ _ _ _) = ps;
+  body (Fragment _ _ term _ _ _ _) = term;
+  bodyValue (Fragment _ _ _ _ _ _ value) = value;
+  bindings (Fragment _ _ _ bs _ _ _) = bs;
+  usedParameters (Fragment _ _ _ _ used _ _) = used;
+  fingerprint (Fragment _ _ _ _ _ stamp _) = stamp;
   stamp env ps term bs = Separate.fingerprint (Separate.pack
     [Separate.pack (map (compose D.prettyDeclaration canonicalDeclaration) (declarations env)),
      Separate.pack (map (\((,) n ty) -> Separate.pack [showInt (X.nameId n), X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) ps),
      Pretty.prettyTerm term,
      Separate.pack (map (\((,) n ty) -> Separate.pack [X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) bs)]);
-  make env ps term bs = Fragment env ps term bs
+  make env ps term bs = fragmentWith env ps term bs
     (Boundary.nubNames (Boundary.freeNames term)) (stamp env ps term bs);
   -- Hints are labels, never binder identities. This transformation starts from
   -- an opaque checked fragment and changes every occurrence consistently. It
@@ -81,7 +86,7 @@ module Bootstrap.OpenFragment
     term = Separate.mapTerm rename (\v -> v) (body fragment);
     bs = map (\((,) n ty) -> (,) (rename n) ty) (bindings fragment);
     env = context fragment
-  } in Fragment env ps term bs (map rename (usedParameters fragment)) (stamp env ps term bs);
+  } in fragmentWith env ps term bs (map rename (usedParameters fragment)) (stamp env ps term bs);
   check :: Environment -> [] ((,) XName XType) -> XTerm -> Either String Fragment;
   check env@(Environment _ ds) ps term = do {
     let { names = map fst ps };
@@ -122,7 +127,7 @@ module Bootstrap.OpenFragment
     ps = map (\((,) n ty) -> (,) (name n) ty) (parameters fragment);
     term = Separate.mapTerm name variable (body fragment);
     bs = map (\((,) n ty) -> (,) (name n) (Separate.normalType ty)) (bindings fragment);
-    renamed = Fragment (context fragment) ps term bs
+    renamed = fragmentWith (context fragment) ps term bs
       (map name (usedParameters fragment)) (stamp (context fragment) ps term bs)
   } in (,) (advanceIdentity serial (length ids)) renamed;
   -- The environment and external types are supplied from verified shared
@@ -131,7 +136,7 @@ module Bootstrap.OpenFragment
     [W.VText stage, W.VText name, W.VText (fingerprint fragment),
      Structure.toList (Structure.toPair Structure.toXName (\p -> W.VText p))
        (map (\((,) n _) -> (,) n (X.nameHint n)) (parameters fragment)),
-     Structure.toXTerm (body fragment),
+     bodyValue fragment,
      Structure.toList (Structure.toPair Structure.toXName Structure.toXType) (bindings fragment),
      Structure.toList Structure.toXName (usedParameters fragment)];
   -- A reader cannot attach a claimed type to an AST. It must acquire the
@@ -196,7 +201,7 @@ module Bootstrap.OpenFragment
                 usedValues <- decodedList Structure.ShapeXName graph uses;
                 used <- traverseEither Structure.expectXName usedValues;
                 validateBinders typed owned used;
-                let { result = Fragment env typed term owned used savedStamp };
+                let { result = fragmentWith env typed term owned used savedStamp };
                 -- ICH verification is serialization/fingerprint verification,
                 -- independent of the explicit semantic-audit operation.
                 Right result
@@ -291,7 +296,7 @@ module Bootstrap.OpenFragment
   encodeFinal ((,) name fragment) = W.VNode 401
     [Structure.toText name, Structure.toText (fingerprint fragment),
      Structure.toList Structure.toText (map D.datatypeName (declarations (context fragment))),
-     Structure.toList bindingReference (parameters fragment), Structure.toXTerm (body fragment),
+     Structure.toList bindingReference (parameters fragment), bodyValue fragment,
      Structure.toList bindingReference (bindings fragment),
      Structure.toList Structure.toXName (usedParameters fragment)];
   hashSyntax value = do {
@@ -585,7 +590,7 @@ module Bootstrap.OpenFragment
             "open crate fragment fingerprint mismatch";
           next <- restoreFinals8 rest more;
           Right ((:) ((,) name
-            (Fragment env params source owned used savedStamp)) next)
+            (fragmentWith env params source owned used savedStamp)) next)
         }
       }
   };
@@ -625,7 +630,7 @@ module Bootstrap.OpenFragment
                      W.VInt count];
                   roots = (:) header (map encodeFinal fragments)
                 };
-                encoded <- W.encodeRootBounded W.defaultLimits remaining 8 roots;
+                encoded <- W.encodeRootsWithAtoms Structure.termAtomShapes W.defaultLimits remaining 8 roots;
                 case encoded of {
                   Left message -> ioReturn (Left message);
                   Right bytes -> do {
@@ -742,7 +747,7 @@ module Bootstrap.OpenFragment
           -- Final objects retain the checked fingerprint of their own ordered
           -- parameter list. The public interface only describes all exports.
           ensure (eqString savedStamp (stamp env params source owned)) "open crate fragment fingerprint mismatch";
-          let { fragment = Fragment env params source owned used savedStamp };
+          let { fragment = fragmentWith env params source owned used savedStamp };
           next <- decodeFinals graph types declarations (M.insert compareString identity env contexts) rest;
           Right ((:) ((,) name fragment) next)
         };

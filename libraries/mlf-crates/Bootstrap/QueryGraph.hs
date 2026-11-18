@@ -40,7 +40,7 @@ module Bootstrap.QueryGraph where {
       (append ["1800","","",""] actual))
   };
   encodeHashed value = do {
-    result <- Storage.encode 6 [value];
+    result <- W.encodeAtoms A.termAtomShapes W.defaultLimits 6 [value];
     case result of { Left e -> ioReturn (Left e); Right bytes -> do {
       digest <- byteArrayDigest bytes;
       ioReturn (if validHash digest then Right ((,) digest bytes) else Left "query result SHA failed")

@@ -221,12 +221,22 @@ class PR43SourceReconciliation(unittest.TestCase):
         row = spec['performance_transition']['maintenance']
         self.assertEqual(set(row), {name})
         physical = performance_base_bytes('tools/performance/' + name)
+        git = ['git', '--no-replace-objects', '-C', str(ROOT), 'show']
+        performance_source = subprocess.check_output([*git, ADAPTER_ENDPOINT + ':tools/performance/' + name])
         live = (HISTORY / name).read_bytes()
         old_sha = hashlib.sha256(physical).hexdigest()
-        new_sha = hashlib.sha256(live).hexdigest()
+        new_sha = hashlib.sha256(performance_source).hexdigest()
         self.assertEqual(old_sha, prior['maintenance'][name][1])
         self.assertEqual(row[name], [old_sha, new_sha])
         self.assertNotEqual(old_sha, new_sha)
+        for edge in spec['compiler_source_transitions']:
+            if name in edge.get('maintenance', {}):
+                before, after = edge['maintenance'][name]
+                archived = subprocess.check_output([*git, edge['predecessor'] + ':tools/performance/' + name])
+                self.assertEqual(hashlib.sha256(archived).hexdigest(), before)
+                self.assertEqual(new_sha, before)
+                new_sha = after
+        self.assertEqual(hashlib.sha256(live).hexdigest(), new_sha)
         expected = copy.deepcopy(prior['maintenance'])
         expected[name][1] = new_sha
         # The later, independently checked adapter edge does not rewrite this

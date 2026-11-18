@@ -23,6 +23,7 @@ module Bootstrap.CrateGraph where {
   import qualified Bootstrap.Evidence as Evidence;
   import qualified Bootstrap.EvidenceBoundary as Boundary;
   import qualified Bootstrap.Dependency as Dependency;
+  import qualified Bootstrap.Primitive as Primitive;
   import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.Surface as Surface;
 
@@ -158,10 +159,30 @@ module Bootstrap.CrateGraph where {
     ([] ((,) (V.Index Declaration) ((,,) String (Maybe SAnnotation) SExpr)))
     ([] ((,,) (V.Index Declaration) String XType))
     ([] ((,) (V.Index Declaration) ((,,) String (Maybe SAnnotation) SExpr)));
-  templateInfo context slots prepared = do {
-    members <- Source.indexedMembers slots prepared;
-    let { parameters = Source.expectedParameters slots prepared };
+  -- Limit speculative template construction per declaration. A larger body
+  -- still goes through ordinary checked inference and its own raw query.
+  templateNodesLeft remaining expression =
+    if remaining <= 0 then 0 else let { next = remaining - 1 } in case expression of {
+      SApp f a -> templateNodesLeft (templateNodesLeft next f) a;
+      SDeclScope _ body -> templateNodesLeft next body;
+      SLam _ _ body -> templateNodesLeft next body;
+      SChecked _ body -> templateNodesLeft next body;
+      _ -> next
+    };
+  retainedTemplateKey context parameters members = do {
+    case members of {
+      [(,) _ ((,,) _ _ body)] -> ensure (templateNodesLeft 257 body > 0) "inference template exceeds the retained node budget";
+      _ -> Left "template requires one nonrecursive definition"
+    };
     identity <- inferenceTemplateKey context parameters members;
+    ensure (stringUtf8Length identity <= 65536) "inference template exceeds the retained key budget";
+    Right identity
+  };
+  templateInfo context slots prepared = templateInfoFor context (Source.indexedMembers slots prepared)
+    (Source.expectedParameters slots prepared);
+  templateInfoFor context indexed parameters = do {
+    members <- indexed;
+    identity <- retainedTemplateKey context parameters members;
     let { canonicalParameters = zipWith (\index ((,,) i _ ty) ->
             (,,) i ("templateParameter" ++ showInt index) (Separate.normalType ty))
           (range 0 (length parameters - 1)) parameters };
@@ -313,6 +334,55 @@ module Bootstrap.CrateGraph where {
   smallPreparedKey key = case boundedPreparedKey 1 256 16384 key of {
     Nothing -> False; Just _ -> True
   };
+  preparedLocation fuel body = if fuel <= 0 then Nothing else case body of {
+    SCallSite _ span _ -> Just span;
+    SLam _ _ e -> preparedLocation (fuel - 1) e;
+    SApp f _ -> preparedLocation (fuel - 1) f;
+    SDeclScope _ e -> preparedLocation (fuel - 1) e;
+    SChecked _ e -> preparedLocation (fuel - 1) e;
+    _ -> Nothing
+  };
+  -- A large application tree can repeat one file origin at every reference.
+  -- P3 writes a preorder tree with delta coordinates and a bounded spelling
+  -- table. An x leaf carries the ordinary encoding of all other syntax.
+  -- Debit the old wire size as we go. For each admitted subtree its child's
+  -- decimal length and colon fit in nine bytes. An oversized original still
+  -- enters the ordinary planner and receives the same limit diagnostic.
+  compactOrigin original fallback lowered names metadata = case original of {
+    [(,,) name annotation body] -> if templateNodesLeft 257 body > 0 then fallback
+      else case preparedLocation 64 body of {
+        Nothing -> fallback;
+        Just span@(SourceSpan pkg mod file _ _ _ _) -> let {
+          limit = preparedFieldLimit;
+          annotated = Q.optional Q.encodeAnnotation annotation;
+          originBytes = stringUtf8Length (Q.node "source-span" [pkg,mod,file]);
+          prefix = Separate.pack [pkg,mod,file,name,annotated];
+          restFits = compactPreparedLimits &&
+            fitsPreparedFields 250 (limit - stringUtf8Length preparedVersion) ((:) lowered (append names metadata));
+          start = limit - 18 - stringUtf8Length (Q.node "member" [name,annotated])
+        } in if restFits then case packedOrigin span originBytes start body prefix of {
+          Nothing -> fallback;
+          Just text -> if stringUtf8Length text <= limit then text else fallback
+        } else fallback
+      };
+    _ -> fallback
+  };
+  -- Both fields can use a compact spelling only when their ordinary form
+  -- is within the public writer's resource limits.
+  preparedFieldLimit :: Int;
+  preparedFieldLimit = 16777216;
+  compactPreparedLimits = let { limits = W.defaultLimits } in
+    smallRebuiltLimits limits && W.maxBytes limits >= 67108864 &&
+    W.maxSymbolBytes limits >= preparedFieldLimit && W.maxTotalSymbolBytes limits >= 33554432 &&
+    W.maxExpandedWork limits >= 33554688;
+  remainingPreparedBytes slots budget fields = if budget < 0 then Nothing else case fields of {
+    [] -> Just budget;
+    (:) field rest -> if slots <= 0 then Nothing else
+      remainingPreparedBytes (slots - 1) (budget - stringUtf8Length field) rest
+  };
+  fitsPreparedFields slots budget fields = case remainingPreparedBytes slots budget fields of {
+    Just _ -> True; Nothing -> False
+  };
   preparedSyntax previous original lowered = let {
     first = Q.list Q.encodeMember original;
     fresh = let {
@@ -332,6 +402,118 @@ module Bootstrap.CrateGraph where {
   preparedVersion = "prepared-declarations-1";
   preparedTree names original lowered metadata = W.VNode 421
     [W.VText preparedVersion,A.toList A.toText names,W.VText original,W.VText lowered,A.toList A.toText metadata];
+  -- A lowered field can be reconstructed from a single original by dropping
+  -- call sites in applications and lambdas, and optionally restoring one
+  -- checked type. All other leaves keep their complete ordinary encoding.
+  matchedLower original lowered = case original of {
+    SCallSite _ _ body -> matchedLower body lowered;
+    SApp a b -> case lowered of { SApp c d -> matchedLower a c && matchedLower b d; _ -> False };
+    SLam name ann body -> case lowered of { SLam other annotation inner ->
+      eqString name other && eqMaybe E.eqSAnnotation ann annotation && matchedLower body inner; _ -> False };
+    _ -> E.eqSExprBits original lowered
+  };
+  -- Signed coordinates wrap in the same 64-bit domain as SourceSpan. The
+  -- low six bits of each ASCII code are data; bit six marks a following group.
+  -- For the common same-line span just two small differences are emitted.
+  coordinateAlphabet :: V.IndexVec Int String;
+  coordinateAlphabet = V.fromList (map stringFromCode (range 0 127));
+  coordinateChunks number chunks = let {
+    unsigned value rest = let { next = unsignedShiftRInt value 6;
+      digit = andInt value 63;
+      char i = V.at coordinateAlphabet (V.fromInt i)
+    } in if next == 0 then (:) (char digit) rest
+      else unsigned next ((:) (char (orInt digit 64)) rest)
+  } in unsigned (xorInt (shiftLInt number 1) (shiftRInt number 63)) chunks;
+  -- Charge an upper bound on the ordinary framed decimal coordinate.
+  positionBytes :: Int -> Int;
+  positionBytes n = if n < 0 then 23 else if n < 10 then 3 else if n < 100 then 4
+    else if n < 1000 then 5 else if n < 10000 then 6 else if n < 100000 then 7
+    else if n < 1000000 then 8 else 23;
+  -- The first 64 spellings are defined by a length-framed literal, in order
+  -- of first use. Later uses occupy one ASCII scalar. After the table fills,
+  -- every unregistered spelling remains a literal. Retain the ordinary framed
+  -- byte length alongside the code for admission of the original field.
+  positionSymbol spelling names = case M.lookup compareString spelling names of {
+    Just ((,) code bytes) -> (,,) code bytes names;
+    Nothing -> let {
+      framed = Separate.pack [spelling]; bytes = stringUtf8Length framed;
+      literal = V.at coordinateAlphabet (V.fromInt 127) ++ framed;
+      count = M.size names;
+      table = if count < 64 then M.insert compareString spelling
+        ((,) (V.at coordinateAlphabet (V.fromInt count)) bytes) names else names
+    } in (,,) literal bytes table
+  };
+  packedOrigin origin originBytes initialBudget tree header = let {
+    -- Joining bounded pages releases framed source locations as soon as their
+    -- ordinary byte costs have been charged. Keep the initial fields lazy
+    -- until all nodes have been admitted.
+    pageNodes :: Int;
+    pageNodes = 128;
+    collect budget pending chunks pages slots line column names = if budget < 0 then Nothing else case pending of {
+      [] -> let {
+        finalPages = case chunks of { [] -> pages; _ -> (:) (concatStringList (reverse chunks)) pages }
+      } in Just (concatStringList ((:) "P3" ((:) header (reverse finalPages))));
+      (:) expr rest -> if slots == 0 then let {
+          page = concatStringList (reverse chunks)
+        } in seq page (collect budget pending [] ((:) page pages) pageNodes line column names) else let {
+        next cost fields items = collect (budget - cost) items fields pages (slots - 1) line column names;
+        named tag spelling overhead = case positionSymbol spelling names of { (,,) code bytes table ->
+          collect (budget - overhead - bytes) rest ((:) code ((:) tag chunks)) pages (slots - 1) line column table
+        };
+        scalar tag fields overhead = next (overhead + stringUtf8Length fields) ((:) fields ((:) tag chunks)) rest
+      } in case expr of {
+        SApp f a -> next 25 ((:) "a" chunks) ((:) f ((:) a rest));
+        SLam n ann b -> let { fields = Separate.pack [n,Q.optional Q.encodeAnnotation ann] } in
+          next (17 + stringUtf8Length fields) ((:) fields ((:) "l" chunks)) ((:) b rest);
+        SCallSite label span@(SourceSpan pkg mod file sl sc el ec) body -> case origin of {
+          SourceSpan p m f _ _ _ _ -> if eqString pkg p && eqString mod m && eqString file f then case positionSymbol label names of { (,,) code nameBytes table -> let {
+            short = line == sl && sl == el;
+            location = (:) code ((:) (if short then "d" else "D") chunks);
+            fromLine = if short then location else coordinateChunks (sl - line) location;
+            fromColumn = coordinateChunks (sc - column) fromLine;
+            withEndLine = if short then fromColumn else coordinateChunks (el - sl) fromColumn;
+            complete = coordinateChunks (ec - sc) withEndLine;
+            cost = 29 + originBytes + nameBytes +
+              positionBytes sl + positionBytes sc + positionBytes el + positionBytes ec
+          } in collect (budget - cost) ((:) body rest) complete pages (slots - 1) sl sc table }
+            else let { fields = Separate.pack [label,Q.encodeSourceSpan span] } in
+              next (20 + stringUtf8Length fields) ((:) fields ((:) "S" chunks)) ((:) body rest)
+        };
+        SVar n -> named "v" n 10;
+        SPrimitive p -> named "p" (Primitive.primitiveName p) 11;
+        SIntLit n -> scalar "i" (Separate.pack [showInt n]) 9;
+        _ -> let { value = Q.encodeExpression expr } in
+          next (stringUtf8Length value) ((:) (Separate.pack [value]) ((:) "x" chunks)) rest
+      }
+    }
+  } in collect initialBudget [tree] [] [] pageNodes 0 0 M.empty;
+  relativePrepared original lowered names metadata = case (,) original lowered of {
+    (,) [(,,) name annotation body] [(,,) nextName nextAnnotation candidate] ->
+      if templateNodesLeft 257 body > 0 || not (eqString name nextName && eqMaybe E.eqSAnnotation annotation nextAnnotation)
+      then Nothing else case preparedLocation 64 body of {
+        Nothing -> Nothing;
+        Just span@(SourceSpan pkg mod file _ _ _ _) -> let {
+          checked = case candidate of { SChecked ty inner -> (,) ("D1c" ++ Separate.pack [Q.encodeType ty]) inner; _ -> (,) "D1i" candidate };
+          descriptor = fst checked; normalized = snd checked; caption = Q.optional Q.encodeAnnotation annotation;
+          maxField = preparedFieldLimit;
+          preamble = Separate.pack [pkg,mod,file,name,caption];
+          originBytes = stringUtf8Length (Q.node "source-span" [pkg,mod,file]);
+          -- Removing wrappers only shortens scalar length prefixes. Reserve
+          -- the checked wrapper's own tag and field and the maximum prefix
+          -- growth in its surrounding member and member-list.
+          budget = maxField - 82 - stringUtf8Length descriptor - stringUtf8Length preparedVersion -
+            stringUtf8Length (Q.node "member" [name,caption])
+        } in if not compactPreparedLimits then Nothing else case remainingPreparedBytes 249 budget (append names metadata) of {
+          Nothing -> Nothing;
+          Just available -> if not (matchedLower body normalized) then Nothing else
+            case packedOrigin span originBytes available body preamble of {
+              Just text -> if stringUtf8Length text <= maxField then Just ((,) text descriptor) else Nothing;
+              Nothing -> Nothing
+            }
+        }
+      };
+    _ -> Nothing
+  };
   preparedWith create previous slots prepared = let {
     table = Q.referenceTable slots prepared;
     member = Q.referenceMember table;
@@ -339,10 +521,17 @@ module Bootstrap.CrateGraph where {
     candidate protected ((,,) role n _) = Q.node "candidate"
       [Q.encodeRole role,token n,Q.boolean (elem eqString n protected)];
     original = map member (Source.groupOriginal prepared);
-    lowered = map member (Source.groupMembers prepared)
-  } in case preparedSyntax previous original lowered of { (,,) first second cached ->
-    (,) (create (Q.referenceDefinitions table) first second
-      (Q.sourceGroupMetadataWith token candidate prepared)) cached
+    lowered = map member (Source.groupMembers prepared);
+    names = Q.referenceDefinitions table;
+    metadata = Q.sourceGroupMetadataWith token candidate prepared
+  } in case relativePrepared original lowered names metadata of {
+    -- A relative pair has at least 257 syntax nodes on the original
+    -- application/lambda spine. Dropping a location wrapper preserves its
+    -- subtree; the lowered key therefore exceeds the 256-node retention limit.
+    Just ((,) source relative) -> (,) (create names source relative metadata) Nothing;
+    Nothing -> case preparedSyntax previous original lowered of { (,,) first second cached ->
+      (,) (create names (compactOrigin original first second names metadata) second metadata) cached
+    }
   };
   -- Rebuilt inputs/receipts have no disk payload. Preserve the wire planner's exact
   -- scalar, depth, work and allocation bounds, but hash their complete framed
@@ -515,13 +704,11 @@ module Bootstrap.CrateGraph where {
     [A.toList (A.toPair A.toText A.toText) references,Open.encodeBody "raw" group fragment];
   compile verify crateId compilerHash cacheDir imports protected originalPlan =
     case do {
-      plan <- Source.initializeProtection originalPlan protected;
+      (,) plan open <- Source.protectedQueryPlan originalPlan protected;
       inventory <- Q.prepareData (Source.planData plan);
       types <- foldM Inference.mergeExternal M.empty (concatMap Separate.unitBindings imports);
       contracts <- Source.initialContracts plan types protected;
-      let { scope = Source.planScope plan (M.keys contracts) };
-      checked <- Source.installContracts scope contracts;
-      steps <- Source.querySteps plan scope;
+      (,) checked steps <- open contracts;
       Right ((,,,) plan inventory checked steps)
     } of {
       Left e -> ioReturn (Left e);
@@ -632,7 +819,9 @@ module Bootstrap.CrateGraph where {
                           Just env -> Right env; Nothing -> Open.environment declarations } };
                       case environment of { Left e -> ioReturn (Left e); Right env -> do {
                         let { currentContexts = M.insert compareString dataIdentity env contexts;
-                          template = if Source.usesIndexedTerms scope then templateInfo dataIdentity slots prepared
+                          indexed = Source.indexedMembers slots prepared;
+                          currentParameters = Source.expectedParameters slots prepared;
+                          template = if Source.usesIndexedTerms scope then templateInfoFor dataIdentity indexed currentParameters
                             else Left "template needs indexed declarations";
                           references = append (map G.edge bindingNodes) (map G.edge dataNodes);
                           reads = append [G.edge sourceNode,G.edge scopeNode] references;
@@ -678,9 +867,9 @@ module Bootstrap.CrateGraph where {
                                 -- parameters and their complete structural key above.
                                 Right (TemplateInfo identity parameters members _ _) ->
                                   compileIndexedMemoWithKey (Right identity) templates group parameters declarations members;
-                                Left _ -> do {
-                                  members <- Source.indexedMembers slots prepared;
-                                  compileIndexedMemo dataIdentity templates group (Source.expectedParameters slots prepared) declarations members
+                                Left reason -> do {
+                                  members <- indexed;
+                                  compileIndexedMemoWithKey (Left reason) templates group currentParameters declarations members
                                 }
                               } else mapEither (\fragment -> (,) fragment templates) (Inference.compileOpenGroup group
                                 [Q.dependencyInterface (Source.groupBindings prepared)] declarations (Source.groupMembers prepared));
