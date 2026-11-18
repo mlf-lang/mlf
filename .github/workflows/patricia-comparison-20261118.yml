@@ -55,13 +55,17 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           import hashlib,json,pathlib,shutil,subprocess,sys
-          ghc=pathlib.Path(shutil.which('ghc')).resolve()
-          pkg=ghc.with_name('ghc-pkg')
-          if not pkg.exists():pkg=pathlib.Path(shutil.which('ghc-pkg')).resolve()
-          dump=subprocess.check_output([pkg,'dump','--global','--no-user-package-db'],text=True)
-          digest=hashlib.sha256(dump.encode()).hexdigest()
-          ghc_sha=hashlib.file_digest(ghc.open('rb'),'sha256').hexdigest()
-          records={'ghc_sha256':ghc_sha,'package_database_sha256':digest,'accepted':ghc_sha=='38115f3ce136434725893c3e009f1c1c510f3f48ac32a293befbb79bbec34697' and digest=='7c5c88d13d3d9843cd868e849c9dcadea1ebd194020a789da5cd9a9d6b93e0e3'}
+          records={'accepted':False}
+          try:
+              ghc=pathlib.Path(shutil.which('ghc')).resolve()
+              pkg=ghc.with_name('ghc-pkg')
+              if not pkg.exists():pkg=pathlib.Path(shutil.which('ghc-pkg')).resolve()
+              dump=subprocess.check_output([pkg,'dump','--global','--no-user-package-db'],text=True)
+              digest=hashlib.sha256(dump.encode()).hexdigest()
+              ghc_sha=hashlib.file_digest(ghc.open('rb'),'sha256').hexdigest()
+              records={'ghc_sha256':ghc_sha,'package_database_sha256':digest,'accepted':ghc_sha=='38115f3ce136434725893c3e009f1c1c510f3f48ac32a293befbb79bbec34697' and digest=='7c5c88d13d3d9843cd868e849c9dcadea1ebd194020a789da5cd9a9d6b93e0e3'}
+          except Exception as error:
+              records={'accepted':False,'error_type':type(error).__name__,'error':str(error)[:400]}
           pathlib.Path('evidence/toolchain-admission.json').write_text(json.dumps(records,indent=2)+'\n')
           if not records['accepted']: sys.exit('STOP: GHC or global package dump mismatch')
           PY
@@ -76,6 +80,13 @@ jobs:
           done
       - name: Guarded 6 and 5.5 GiB address-space controls
         run: python3 -B tools/shared/crc_process_supervisor.py --receipt evidence/comparison-supervisor.json --work-seconds 1800 --cleanup-seconds 10 "$(command -v python3)" -B tools/research/patricia-comparison-20261118.py
+      - name: Restore early admission evidence even after a failed checkout
+        if: always()
+        run: |
+          mkdir -p evidence
+          if test -f "$RUNNER_TEMP/patricia-admission/image-admission.json"; then
+            cp "$RUNNER_TEMP/patricia-admission/image-admission.json" evidence/image-admission.json
+          fi
       - name: Preserve all diagnostic evidence
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
