@@ -1,0 +1,1894 @@
+{
+  "rows": [
+    {
+      "module": "Bootstrap.ArtifactStorage",
+      "repo_path": "libraries/mlf-crates/Bootstrap/ArtifactStorage.hs",
+      "C_stage": "src-C/Bootstrap/ArtifactStorage.hs",
+      "A": {
+        "bytes": 55963,
+        "sha256": "9333997ad7146a32bf99e4dfce79826ed5b68b622492f212b7895f68f7d9b7d7",
+        "blob": "2bb41983eb3c6aebc879dc0ca246e971c7d42005",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 55963,
+        "sha256": "9333997ad7146a32bf99e4dfce79826ed5b68b622492f212b7895f68f7d9b7d7",
+        "blob": "2bb41983eb3c6aebc879dc0ca246e971c7d42005",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.ArtifactStructure",
+      "repo_path": "libraries/mlf-crates/Bootstrap/ArtifactStructure.hs",
+      "C_stage": "src-C/Bootstrap/ArtifactStructure.hs",
+      "A": {
+        "bytes": 141700,
+        "sha256": "2b4a215dad741f09fa9e9026d15ad44f96fa1a2f0c260c9f030d7c0a2cc5ac23",
+        "blob": "2b300eaba0848c366f23c992f3ec794c61391bf2",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 141700,
+        "sha256": "2b4a215dad741f09fa9e9026d15ad44f96fa1a2f0c260c9f030d7c0a2cc5ac23",
+        "blob": "2b300eaba0848c366f23c992f3ec794c61391bf2",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Bitstream",
+      "repo_path": "libraries/mlf-crates/Bootstrap/Bitstream.hs",
+      "C_stage": "src-C/Bootstrap/Bitstream.hs",
+      "A": {
+        "bytes": 82558,
+        "sha256": "f25fe195b5a287fd0c365286acb31839118edac2227f463ea5cc85eb26daedb8",
+        "blob": "699f1c5d354e0077869b6955f00a7299c0eca4df",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 82558,
+        "sha256": "f25fe195b5a287fd0c365286acb31839118edac2227f463ea5cc85eb26daedb8",
+        "blob": "699f1c5d354e0077869b6955f00a7299c0eca4df",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.BuiltinPreludeContext",
+      "repo_path": "libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs",
+      "C_stage": "src-C/Bootstrap/BuiltinPreludeContext.hs",
+      "A": {
+        "bytes": 15899,
+        "sha256": "e8f69d41475c332991f122c765f79cc11cddf708044db859846818dc26ade920",
+        "blob": "1b5a859d39499ede7c86b23019879fe8315248a3",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 15899,
+        "sha256": "e8f69d41475c332991f122c765f79cc11cddf708044db859846818dc26ade920",
+        "blob": "1b5a859d39499ede7c86b23019879fe8315248a3",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.BuiltinPreludeLiteral",
+      "repo_path": "libraries/mlf-crates/Bootstrap/BuiltinPreludeLiteral.hs",
+      "C_stage": "src-C/Bootstrap/BuiltinPreludeLiteral.hs",
+      "A": {
+        "bytes": 29528,
+        "sha256": "f3bad10172df0e35b36fc5926cbbfe688e2c6e6603761823d96baee5769e6357",
+        "blob": "1d91eb3ffe6129fb29c34780fc732e4027bf4d49",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 29528,
+        "sha256": "f3bad10172df0e35b36fc5926cbbfe688e2c6e6603761823d96baee5769e6357",
+        "blob": "1d91eb3ffe6129fb29c34780fc732e4027bf4d49",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.ClassDemand",
+      "repo_path": "libraries/mlf-inference/Bootstrap/ClassDemand.hs",
+      "C_stage": "src-C/Bootstrap/ClassDemand.hs",
+      "A": {
+        "bytes": 17441,
+        "sha256": "ca2aa895dcea3310d931e204975d55409a4d6a6a06b23e1dd8f6888f1e413379",
+        "blob": "3e5c20e47928ef9f7676d85ab01f40b33ccd1b13",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 17441,
+        "sha256": "ca2aa895dcea3310d931e204975d55409a4d6a6a06b23e1dd8f6888f1e413379",
+        "blob": "3e5c20e47928ef9f7676d85ab01f40b33ccd1b13",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Classes",
+      "repo_path": "libraries/mlf-inference/Bootstrap/Classes.hs",
+      "C_stage": "src-C/Bootstrap/Classes.hs",
+      "A": {
+        "bytes": 120915,
+        "sha256": "d39189aa3fbac77083d9eed274f8595c5b6cb59967499c99ea8b579ea88a869b",
+        "blob": "058b4f99aeffb530b137cd5d4dde8a467bbdac29",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 120915,
+        "sha256": "d39189aa3fbac77083d9eed274f8595c5b6cb59967499c99ea8b579ea88a869b",
+        "blob": "058b4f99aeffb530b137cd5d4dde8a467bbdac29",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Compiler",
+      "repo_path": "libraries/mlf-inference/Bootstrap/Compiler.hs",
+      "C_stage": "src-C/Bootstrap/Compiler.hs",
+      "A": {
+        "bytes": 7821,
+        "sha256": "ac6683d3b2148bfd1de17b1d39e0bcb4184278f92bdfd139c52f062df024315e",
+        "blob": "d574585297477863c7937dc7c8a0bd17745a7b5d",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 7821,
+        "sha256": "ac6683d3b2148bfd1de17b1d39e0bcb4184278f92bdfd139c52f062df024315e",
+        "blob": "d574585297477863c7937dc7c8a0bd17745a7b5d",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.CompilerCore",
+      "repo_path": "libraries/mlf-inference/Bootstrap/CompilerCore.hs",
+      "C_stage": "src-C/Bootstrap/CompilerCore.hs",
+      "A": {
+        "bytes": 3354,
+        "sha256": "00b0274c05dc10f65e5fd2c1df13acdf0382d352c2dd07aa74e79f7c2cdcb8e2",
+        "blob": "6dd62637f41c31531457b85d09feb9e0e08f85d3",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 3354,
+        "sha256": "00b0274c05dc10f65e5fd2c1df13acdf0382d352c2dd07aa74e79f7c2cdcb8e2",
+        "blob": "6dd62637f41c31531457b85d09feb9e0e08f85d3",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Constraint",
+      "repo_path": "libraries/mlf-inference/Bootstrap/Constraint.hs",
+      "C_stage": "src-C/Bootstrap/Constraint.hs",
+      "A": {
+        "bytes": 53972,
+        "sha256": "eb54d03e146e30a8f2aea53de92357155bb448dacee4161df19aab9648477c0c",
+        "blob": "822b735e243dce00ab301cb348d89d93d5b9c3d9",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 53972,
+        "sha256": "eb54d03e146e30a8f2aea53de92357155bb448dacee4161df19aab9648477c0c",
+        "blob": "822b735e243dce00ab301cb348d89d93d5b9c3d9",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Crate",
+      "repo_path": "libraries/mlf-crates/Bootstrap/Crate.hs",
+      "C_stage": "src-C/Bootstrap/Crate.hs",
+      "A": {
+        "bytes": 36306,
+        "sha256": "169a65e03680313755c0bcfe25b462cc96c9b260e077891771785a43a3d7c063",
+        "blob": "1fee448bd69ed550d84e77805c25250e8052ef7b",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 36306,
+        "sha256": "169a65e03680313755c0bcfe25b462cc96c9b260e077891771785a43a3d7c063",
+        "blob": "1fee448bd69ed550d84e77805c25250e8052ef7b",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.CrateArtifact",
+      "repo_path": "libraries/mlf-crates/Bootstrap/CrateArtifact.hs",
+      "C_stage": "src-C/Bootstrap/CrateArtifact.hs",
+      "A": {
+        "bytes": 219831,
+        "sha256": "da416111adcfafa18eb473ae611379fc1ef521c84d1dab3d2d5a4dc3eb51c6f0",
+        "blob": "dd5b4630a80803c19afdb219dba2dc4bffc3ea1b",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 219831,
+        "sha256": "da416111adcfafa18eb473ae611379fc1ef521c84d1dab3d2d5a4dc3eb51c6f0",
+        "blob": "dd5b4630a80803c19afdb219dba2dc4bffc3ea1b",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.CrateCodegen",
+      "repo_path": "libraries/mlf-crates/Bootstrap/CrateCodegen.hs",
+      "C_stage": "src-C/Bootstrap/CrateCodegen.hs",
+      "A": {
+        "bytes": 13380,
+        "sha256": "3b965481dec681849dbc2fb5172a31fc2b703609a7d379195a2c3338e92011ad",
+        "blob": "5a9dbd711f4e3bcb5e13cb82a8f4169797b98426",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 13380,
+        "sha256": "3b965481dec681849dbc2fb5172a31fc2b703609a7d379195a2c3338e92011ad",
+        "blob": "5a9dbd711f4e3bcb5e13cb82a8f4169797b98426",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.CrateGraph",
+      "repo_path": "libraries/mlf-crates/Bootstrap/CrateGraph.hs",
+      "C_stage": "src-C/Bootstrap/CrateGraph.hs",
+      "A": {
+        "bytes": 28172,
+        "sha256": "52b0fcf312aec770515980f78d0ee44e1f29e248c496468536f44f20495880ee",
+        "blob": "db084f70334b641e459dcad0662f35a62f34aa57",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 28172,
+        "sha256": "52b0fcf312aec770515980f78d0ee44e1f29e248c496468536f44f20495880ee",
+        "blob": "db084f70334b641e459dcad0662f35a62f34aa57",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.CrateQuery",
+      "repo_path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+      "C_stage": "src-C/Bootstrap/CrateQuery.hs",
+      "A": {
+        "bytes": 130545,
+        "sha256": "504c1da39204fa87c67c2ba1c9ab8e0914b3c41f81f170b85dd7076e0ead9748",
+        "blob": "b7982194b2a992f744fbc4ae369a1289478e8792",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 130545,
+        "sha256": "504c1da39204fa87c67c2ba1c9ab8e0914b3c41f81f170b85dd7076e0ead9748",
+        "blob": "b7982194b2a992f744fbc4ae369a1289478e8792",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.CrateSession",
+      "repo_path": "libraries/mlf-crates/Bootstrap/CrateSession.hs",
+      "C_stage": "src-C/Bootstrap/CrateSession.hs",
+      "A": {
+        "bytes": 83407,
+        "sha256": "a13c01632001643b683e54c10775eb9a262faf0d6766c52209a3ec0704fd9bdd",
+        "blob": "748f128ec01f9a80787f90a5bc5ca0f377da3b2a",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 83407,
+        "sha256": "a13c01632001643b683e54c10775eb9a262faf0d6766c52209a3ec0704fd9bdd",
+        "blob": "748f128ec01f9a80787f90a5bc5ca0f377da3b2a",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Data",
+      "repo_path": "libraries/mlf-language-core/Bootstrap/Data.hs",
+      "C_stage": "src-C/Bootstrap/Data.hs",
+      "A": {
+        "bytes": 18847,
+        "sha256": "80545c6378de8e846d3a13df8b5418b8fd7854d011346f12dbfd4c99c47c7558",
+        "blob": "5a56d522e503d05051466be1ffbb0d99300a2dca",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 18847,
+        "sha256": "80545c6378de8e846d3a13df8b5418b8fd7854d011346f12dbfd4c99c47c7558",
+        "blob": "5a56d522e503d05051466be1ffbb0d99300a2dca",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Dependency",
+      "repo_path": "libraries/mlf-frontend/Bootstrap/Dependency.hs",
+      "C_stage": "src-C/Bootstrap/Dependency.hs",
+      "A": {
+        "bytes": 32565,
+        "sha256": "c525a88ad424e0e79c30209f646a0f270f54cc7109d3096cf6953a5d9b93baa2",
+        "blob": "164df39c54551e2a53e2d2b2de3b23f61220dcd3",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 32565,
+        "sha256": "c525a88ad424e0e79c30209f646a0f270f54cc7109d3096cf6953a5d9b93baa2",
+        "blob": "164df39c54551e2a53e2d2b2de3b23f61220dcd3",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Desugar",
+      "repo_path": "libraries/mlf-frontend/Bootstrap/Desugar.hs",
+      "C_stage": "src-C/Bootstrap/Desugar.hs",
+      "A": {
+        "bytes": 10638,
+        "sha256": "6ea33b5a1c642f984bc8c22be951be774863fe5bb4ea44d5066a8df59e073a37",
+        "blob": "900c5752cf9d0847143cf783dbcac18aec60e301",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 10638,
+        "sha256": "6ea33b5a1c642f984bc8c22be951be774863fe5bb4ea44d5066a8df59e073a37",
+        "blob": "900c5752cf9d0847143cf783dbcac18aec60e301",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Elaborate",
+      "repo_path": "libraries/mlf-inference/Bootstrap/Elaborate.hs",
+      "C_stage": "src-C/Bootstrap/Elaborate.hs",
+      "A": {
+        "bytes": 31616,
+        "sha256": "c061b8a6ff668acd5f362c180d8c6ad24c9bb54c219108ea793d968ee4f43c58",
+        "blob": "7ef47685e1fe5cf22c3d8a883d06866605bcbc3f",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 31616,
+        "sha256": "c061b8a6ff668acd5f362c180d8c6ad24c9bb54c219108ea793d968ee4f43c58",
+        "blob": "7ef47685e1fe5cf22c3d8a883d06866605bcbc3f",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Evidence",
+      "repo_path": "libraries/mlf-inference/Bootstrap/Evidence.hs",
+      "C_stage": "src-C/Bootstrap/Evidence.hs",
+      "A": {
+        "bytes": 14164,
+        "sha256": "c533ce20b23c9580f2bddf7e340cb3e8fb813a197e46cc4ea173f705177a9bcd",
+        "blob": "9cd87f1aacccdc047a188313277d2697c4d15a59",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 14164,
+        "sha256": "c533ce20b23c9580f2bddf7e340cb3e8fb813a197e46cc4ea173f705177a9bcd",
+        "blob": "9cd87f1aacccdc047a188313277d2697c4d15a59",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.EvidenceBoundary",
+      "repo_path": "libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs",
+      "C_stage": "src-C/Bootstrap/EvidenceBoundary.hs",
+      "A": {
+        "bytes": 20210,
+        "sha256": "df2a050309ad10b4770cae1defcc87f1d56bedca87e1d4c5d4feb21b975f93b2",
+        "blob": "a74a2cdb9ec6972030368c04045cc47dd365fc17",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 20210,
+        "sha256": "df2a050309ad10b4770cae1defcc87f1d56bedca87e1d4c5d4feb21b975f93b2",
+        "blob": "a74a2cdb9ec6972030368c04045cc47dd365fc17",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Fresh",
+      "repo_path": "libraries/mlf-foundation/Bootstrap/Fresh.hs",
+      "C_stage": "src-C/Bootstrap/Fresh.hs",
+      "A": {
+        "bytes": 2592,
+        "sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d",
+        "blob": "fd476cc986c7b4cfaf5eec3548cb8f8e13c8b323",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 2592,
+        "sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d",
+        "blob": "fd476cc986c7b4cfaf5eec3548cb8f8e13c8b323",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Graph",
+      "repo_path": "libraries/mlf-inference/Bootstrap/Graph.hs",
+      "C_stage": "src-C/Bootstrap/Graph.hs",
+      "A": {
+        "bytes": 137874,
+        "sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+        "blob": "380d29e7b951da022b49517237d74df2ecd3ee3a",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 144612,
+        "sha256": "8d145bd52e8c367dd9d47891754d1727b7f2ae7f68cc271535fa01f1eda0bee9",
+        "blob": "47a033849bf9e0984a19407157f46b3819fcd9f4",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Graph.IndexStore",
+      "repo_path": "libraries/mlf-inference/Bootstrap/Graph/IndexStore.hs",
+      "C_stage": "src-C/Bootstrap/Graph/IndexStore.hs",
+      "A": {
+        "bytes": 8741,
+        "sha256": "34bd191f60df38d6bd0229d360d6afbba5e32652f5a43de58b7ec912d5c3be41",
+        "blob": "29bc685de0a6cbd210cb2b475c5fa5ebd694e743",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 8741,
+        "sha256": "34bd191f60df38d6bd0229d360d6afbba5e32652f5a43de58b7ec912d5c3be41",
+        "blob": "29bc685de0a6cbd210cb2b475c5fa5ebd694e743",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Graph.Solver",
+      "repo_path": "libraries/mlf-inference/Bootstrap/Graph/Solver.hs",
+      "C_stage": "src-C/Bootstrap/Graph/Solver.hs",
+      "A": {
+        "bytes": 99201,
+        "sha256": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612",
+        "blob": "ac4807fa23c0763ba83a0f9c52c1c734cc059720",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 99201,
+        "sha256": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612",
+        "blob": "ac4807fa23c0763ba83a0f9c52c1c734cc059720",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Host",
+      "repo_path": "libraries/mlf-foundation/Bootstrap/Host.hs",
+      "C_stage": "src-C/Bootstrap/Host.hs",
+      "A": {
+        "bytes": 3246,
+        "sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5",
+        "blob": "88e81372802f51c5388dbe1da2ba78b59a9d3c5a",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 3246,
+        "sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5",
+        "blob": "88e81372802f51c5388dbe1da2ba78b59a9d3c5a",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.ImportParameters",
+      "repo_path": "libraries/mlf-crates/Bootstrap/ImportParameters.hs",
+      "C_stage": "src-C/Bootstrap/ImportParameters.hs",
+      "A": {
+        "bytes": 5206,
+        "sha256": "e6f840d764e3f07f74fa532b151f8cfb890b7ddb0d1035e062cac299da460954",
+        "blob": "4b0511f7768f80bad4cdb81dff16d11d73636e4e",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 5206,
+        "sha256": "e6f840d764e3f07f74fa532b151f8cfb890b7ddb0d1035e062cac299da460954",
+        "blob": "4b0511f7768f80bad4cdb81dff16d11d73636e4e",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.ImportedRoot",
+      "repo_path": "libraries/mlf-crates/Bootstrap/ImportedRoot.hs",
+      "C_stage": "src-C/Bootstrap/ImportedRoot.hs",
+      "A": {
+        "bytes": 16178,
+        "sha256": "101b25c1acd5a6af94081b1364b16f2461bbd19b50f9df90d6fb9f50c9140dd1",
+        "blob": "2656ee5341ca2f11ff04af579ce496bbc382364f",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 16178,
+        "sha256": "101b25c1acd5a6af94081b1364b16f2461bbd19b50f9df90d6fb9f50c9140dd1",
+        "blob": "2656ee5341ca2f11ff04af579ce496bbc382364f",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.IndexVec",
+      "repo_path": "libraries/mlf-foundation/Bootstrap/IndexVec.hs",
+      "C_stage": "src-C/Bootstrap/IndexVec.hs",
+      "A": {
+        "bytes": 5573,
+        "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e",
+        "blob": "33a339e71ad7dede8c866a1903bf85bad1034d13",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 5573,
+        "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e",
+        "blob": "33a339e71ad7dede8c866a1903bf85bad1034d13",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.InferenceUnit",
+      "repo_path": "libraries/mlf-crates/Bootstrap/InferenceUnit.hs",
+      "C_stage": "src-C/Bootstrap/InferenceUnit.hs",
+      "A": {
+        "bytes": 19341,
+        "sha256": "ab3bf4aa00ac0c2eea90b4bfc7d35b5430b1ac959187f3e2d99850f1bd35e46e",
+        "blob": "e1da0d348dfa52b2df2516182d5dddebb89a9cd7",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 19341,
+        "sha256": "ab3bf4aa00ac0c2eea90b4bfc7d35b5430b1ac959187f3e2d99850f1bd35e46e",
+        "blob": "e1da0d348dfa52b2df2516182d5dddebb89a9cd7",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.IntMap",
+      "repo_path": "libraries/mlf-foundation/Bootstrap/IntMap.hs",
+      "C_stage": "src-C/Bootstrap/IntMap.hs",
+      "A": {
+        "bytes": 21811,
+        "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e",
+        "blob": "c8eca50ec22c4bbc7fb71111d60a2091ec74bb2e",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 21811,
+        "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e",
+        "blob": "c8eca50ec22c4bbc7fb71111d60a2091ec74bb2e",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.IntRank",
+      "repo_path": "libraries/mlf-foundation/Bootstrap/IntRank.hs",
+      "C_stage": "src-C/Bootstrap/IntRank.hs",
+      "A": {
+        "bytes": 6684,
+        "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725",
+        "blob": "7828fd523cc6ebb5b15f38a1004a07053dcd5381",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 6684,
+        "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725",
+        "blob": "7828fd523cc6ebb5b15f38a1004a07053dcd5381",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.IntSet",
+      "repo_path": "libraries/mlf-foundation/Bootstrap/IntSet.hs",
+      "C_stage": "src-C/Bootstrap/IntSet.hs",
+      "A": {
+        "bytes": 17405,
+        "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe",
+        "blob": "41b09cdd43193899ec46e15df57906012b3f3098",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 17405,
+        "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe",
+        "blob": "41b09cdd43193899ec46e15df57906012b3f3098",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.IntTree",
+      "repo_path": "libraries/mlf-foundation/Bootstrap/IntTree.hs",
+      "C_stage": "src-C/Bootstrap/IntTree.hs",
+      "A": {
+        "bytes": 3727,
+        "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49",
+        "blob": "6f2f11050e974bf23578e4aa0a4762013d29074e",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 3727,
+        "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49",
+        "blob": "6f2f11050e974bf23578e4aa0a4762013d29074e",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Kind",
+      "repo_path": "libraries/mlf-language-core/Bootstrap/Kind.hs",
+      "C_stage": "src-C/Bootstrap/Kind.hs",
+      "A": {
+        "bytes": 1161,
+        "sha256": "453aebe46c80250d50a32ae84b9f5d1bb56f2effbe94018d0e67742fbffb4f3b",
+        "blob": "dbbd46ca5ae674adc78b49cae098455be65e626a",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 1161,
+        "sha256": "453aebe46c80250d50a32ae84b9f5d1bb56f2effbe94018d0e67742fbffb4f3b",
+        "blob": "dbbd46ca5ae674adc78b49cae098455be65e626a",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Kinding",
+      "repo_path": "libraries/mlf-language-core/Bootstrap/Kinding.hs",
+      "C_stage": "src-C/Bootstrap/Kinding.hs",
+      "A": {
+        "bytes": 1950,
+        "sha256": "c0188208294013e2c2645e01bc1dedf6a8dcf10f4a35b1a128b82bb485cc960c",
+        "blob": "0b6be55b725ca9f363f5c3beb446327ce2b11dbd",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 1950,
+        "sha256": "c0188208294013e2c2645e01bc1dedf6a8dcf10f4a35b1a128b82bb485cc960c",
+        "blob": "0b6be55b725ca9f363f5c3beb446327ce2b11dbd",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.LLVM",
+      "repo_path": "libraries/mlf-llvm/Bootstrap/LLVM.hs",
+      "C_stage": "src-C/Bootstrap/LLVM.hs",
+      "A": {
+        "bytes": 16828,
+        "sha256": "4ca4c87e0a32932b4d2227b9ff55bd73d34e4f1c5570f027b7e7677fc86d2750",
+        "blob": "c7ade21d26d9b5730bd24d4fe5443e88a945bc2d",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 16828,
+        "sha256": "4ca4c87e0a32932b4d2227b9ff55bd73d34e4f1c5570f027b7e7677fc86d2750",
+        "blob": "c7ade21d26d9b5730bd24d4fe5443e88a945bc2d",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.LLVM.Analysis",
+      "repo_path": "libraries/mlf-llvm/Bootstrap/LLVM/Analysis.hs",
+      "C_stage": "src-C/Bootstrap/LLVM/Analysis.hs",
+      "A": {
+        "bytes": 12318,
+        "sha256": "b10dbe9ea529646a375f50144ffb4dbac5b2c3ac5453e02170334f78fd57e65e",
+        "blob": "5f8a686dc5254ee60e1122eb78ee9ce89f4a5e8e",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 12318,
+        "sha256": "b10dbe9ea529646a375f50144ffb4dbac5b2c3ac5453e02170334f78fd57e65e",
+        "blob": "5f8a686dc5254ee60e1122eb78ee9ce89f4a5e8e",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.LLVM.Argument",
+      "repo_path": "libraries/mlf-llvm/Bootstrap/LLVM/Argument.hs",
+      "C_stage": "src-C/Bootstrap/LLVM/Argument.hs",
+      "A": {
+        "bytes": 19376,
+        "sha256": "8d8a897eb4019ad40fe5cb756a30fd8c789e4c745205e654254bbf702d12710b",
+        "blob": "7eafb7a504277d701bf41dc592b28d9c3e27ce90",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 19376,
+        "sha256": "8d8a897eb4019ad40fe5cb756a30fd8c789e4c745205e654254bbf702d12710b",
+        "blob": "7eafb7a504277d701bf41dc592b28d9c3e27ce90",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.LLVM.Build",
+      "repo_path": "libraries/mlf-llvm/Bootstrap/LLVM/Build.hs",
+      "C_stage": "src-C/Bootstrap/LLVM/Build.hs",
+      "A": {
+        "bytes": 36754,
+        "sha256": "e78bf81269ae16b493f3170d91cd2c451891479aca184a2fa302194b95679e86",
+        "blob": "524afb328b7ab4648cae2de6c32ecc2f4b821154",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 36754,
+        "sha256": "e78bf81269ae16b493f3170d91cd2c451891479aca184a2fa302194b95679e86",
+        "blob": "524afb328b7ab4648cae2de6c32ecc2f4b821154",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.LLVM.Codegen",
+      "repo_path": "libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs",
+      "C_stage": "src-C/Bootstrap/LLVM/Codegen.hs",
+      "A": {
+        "bytes": 106307,
+        "sha256": "d4c94567ae188538e107306e6730206547261aa8c461e87fdb564bcdad7e11db",
+        "blob": "189894a88b1a3d8537f84f388c252151e0844345",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 106307,
+        "sha256": "d4c94567ae188538e107306e6730206547261aa8c461e87fdb564bcdad7e11db",
+        "blob": "189894a88b1a3d8537f84f388c252151e0844345",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.LLVM.Kernel",
+      "repo_path": "libraries/mlf-llvm/Bootstrap/LLVM/Kernel.hs",
+      "C_stage": "src-C/Bootstrap/LLVM/Kernel.hs",
+      "A": {
+        "bytes": 11404,
+        "sha256": "46ae5be45d9c6f58a61a1c52856bd11befeb3b6fa4ed7c7b09118a9226948642",
+        "blob": "9d2db3404ea9f365c9c2dbd768f129941787368d",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 11404,
+        "sha256": "46ae5be45d9c6f58a61a1c52856bd11befeb3b6fa4ed7c7b09118a9226948642",
+        "blob": "9d2db3404ea9f365c9c2dbd768f129941787368d",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.LLVM.LazyProducer",
+      "repo_path": "libraries/mlf-llvm/Bootstrap/LLVM/LazyProducer.hs",
+      "C_stage": "src-C/Bootstrap/LLVM/LazyProducer.hs",
+      "A": {
+        "bytes": 17714,
+        "sha256": "88d750f0671a228da67403a555a43b71054dee8307da88e5070752474e1cf7c8",
+        "blob": "2a0905178a5a93cc74fde1d5b2c63f542fc58f40",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 17714,
+        "sha256": "88d750f0671a228da67403a555a43b71054dee8307da88e5070752474e1cf7c8",
+        "blob": "2a0905178a5a93cc74fde1d5b2c63f542fc58f40",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.LLVM.Library",
+      "repo_path": "libraries/mlf-llvm/Bootstrap/LLVM/Library.hs",
+      "C_stage": "src-C/Bootstrap/LLVM/Library.hs",
+      "A": {
+        "bytes": 20910,
+        "sha256": "03eac45b9fd31cf625e37cf0e7d245429ca500c19d5717db1eb01b93cadf293d",
+        "blob": "78a21286a6a2b09bb02e96c010afc824fb3cbffe",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 20910,
+        "sha256": "03eac45b9fd31cf625e37cf0e7d245429ca500c19d5717db1eb01b93cadf293d",
+        "blob": "78a21286a6a2b09bb02e96c010afc824fb3cbffe",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.LLVM.Native",
+      "repo_path": "libraries/mlf-llvm/Bootstrap/LLVM/Native.hs",
+      "C_stage": "src-C/Bootstrap/LLVM/Native.hs",
+      "A": {
+        "bytes": 55931,
+        "sha256": "dd5c283b74aa407a7555ad7c5c1793d5b1e8e72bf7bdc61bb946c96aef0ac242",
+        "blob": "9dc73908036c0662c9f239a67852ef9f7bcc43eb",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 55931,
+        "sha256": "dd5c283b74aa407a7555ad7c5c1793d5b1e8e72bf7bdc61bb946c96aef0ac242",
+        "blob": "9dc73908036c0662c9f239a67852ef9f7bcc43eb",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.LLVM.Optimize",
+      "repo_path": "libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs",
+      "C_stage": "src-C/Bootstrap/LLVM/Optimize.hs",
+      "A": {
+        "bytes": 58442,
+        "sha256": "4cc34c817a9e12dd77e2f27ebae98aa4d977c5247d741668bad1a86b898bba1f",
+        "blob": "c2a9db3cae7630106090af48aaf95a40b354c8f7",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 58442,
+        "sha256": "4cc34c817a9e12dd77e2f27ebae98aa4d977c5247d741668bad1a86b898bba1f",
+        "blob": "c2a9db3cae7630106090af48aaf95a40b354c8f7",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.LLVM.Result",
+      "repo_path": "libraries/mlf-llvm/Bootstrap/LLVM/Result.hs",
+      "C_stage": "src-C/Bootstrap/LLVM/Result.hs",
+      "A": {
+        "bytes": 12136,
+        "sha256": "792da71fe323dee4b2497b552c090e38e98f6f51d6997ee9da07286420f1396e",
+        "blob": "4f1404ce623b77eb43b242cf6d0b619781d31d8d",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 12136,
+        "sha256": "792da71fe323dee4b2497b552c090e38e98f6f51d6997ee9da07286420f1396e",
+        "blob": "4f1404ce623b77eb43b242cf6d0b619781d31d8d",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.LLVM.StrictFields",
+      "repo_path": "libraries/mlf-llvm/Bootstrap/LLVM/StrictFields.hs",
+      "C_stage": "src-C/Bootstrap/LLVM/StrictFields.hs",
+      "A": {
+        "bytes": 9374,
+        "sha256": "50c76597138b9fe9c7a4eeba22976f096b513038450c830f4e204059c2a91d9e",
+        "blob": "ac44c78c18246ccc42b4ec0a77e6cc8ca627bdf6",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 9374,
+        "sha256": "50c76597138b9fe9c7a4eeba22976f096b513038450c830f4e204059c2a91d9e",
+        "blob": "ac44c78c18246ccc42b4ec0a77e6cc8ca627bdf6",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.LLVM.StrictWrappers",
+      "repo_path": "libraries/mlf-llvm/Bootstrap/LLVM/StrictWrappers.hs",
+      "C_stage": "src-C/Bootstrap/LLVM/StrictWrappers.hs",
+      "A": {
+        "bytes": 3918,
+        "sha256": "b8e09c8fe3af9f14c7e7b6f6deae008ada04fc84923a41fa5c29d1e16857ed13",
+        "blob": "9440cce5ef942e2b7e9d8f841dc6198d81c0209c",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 3918,
+        "sha256": "b8e09c8fe3af9f14c7e7b6f6deae008ada04fc84923a41fa5c29d1e16857ed13",
+        "blob": "9440cce5ef942e2b7e9d8f841dc6198d81c0209c",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Layout",
+      "repo_path": "libraries/mlf-frontend/Bootstrap/Layout.hs",
+      "C_stage": "src-C/Bootstrap/Layout.hs",
+      "A": {
+        "bytes": 20056,
+        "sha256": "b64c7f09bdf23a9652baa1fbd74729287dac243fd5a3801fbbc83e6abe5f58c8",
+        "blob": "e57405d9a43eca043a9b578b40f020d3625a60f5",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 20056,
+        "sha256": "b64c7f09bdf23a9652baa1fbd74729287dac243fd5a3801fbbc83e6abe5f58c8",
+        "blob": "e57405d9a43eca043a9b578b40f020d3625a60f5",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Lexer",
+      "repo_path": "libraries/mlf-frontend/Bootstrap/Lexer.hs",
+      "C_stage": "src-C/Bootstrap/Lexer.hs",
+      "A": {
+        "bytes": 44635,
+        "sha256": "d053db12391324d4305a78ac5dad24b3fe81c449007e318e14183c4e464adb43",
+        "blob": "15b0ecd64ca74e34eb612abfdc41c016ee22909d",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 44635,
+        "sha256": "d053db12391324d4305a78ac5dad24b3fe81c449007e318e14183c4e464adb43",
+        "blob": "15b0ecd64ca74e34eb612abfdc41c016ee22909d",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Map",
+      "repo_path": "libraries/mlf-foundation/Bootstrap/Map.hs",
+      "C_stage": "src-C/Bootstrap/Map.hs",
+      "A": {
+        "bytes": 17218,
+        "sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0",
+        "blob": "7a96f912d4a5bbd7e8291c0df4042bd56a9c8c65",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 17218,
+        "sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0",
+        "blob": "7a96f912d4a5bbd7e8291c0df4042bd56a9c8c65",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Module",
+      "repo_path": "libraries/mlf-frontend/Bootstrap/Module.hs",
+      "C_stage": "src-C/Bootstrap/Module.hs",
+      "A": {
+        "bytes": 79471,
+        "sha256": "1f7ea629418456d898ad30227abd9aab444494199425b489d4330319ca9b42ca",
+        "blob": "503f1dcbb3ba8cabe70e601daa472d291947b61e",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 79471,
+        "sha256": "1f7ea629418456d898ad30227abd9aab444494199425b489d4330319ca9b42ca",
+        "blob": "503f1dcbb3ba8cabe70e601daa472d291947b61e",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.OpenFragment",
+      "repo_path": "libraries/mlf-crates/Bootstrap/OpenFragment.hs",
+      "C_stage": "src-C/Bootstrap/OpenFragment.hs",
+      "A": {
+        "bytes": 35625,
+        "sha256": "e392aae043afc2c13cda16e00caa6a3562dc5180d78dce27f699da7046c57c8b",
+        "blob": "137b9dd2e14e6035d1a7c86e809dfa01cc052d82",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 35625,
+        "sha256": "e392aae043afc2c13cda16e00caa6a3562dc5180d78dce27f699da7046c57c8b",
+        "blob": "137b9dd2e14e6035d1a7c86e809dfa01cc052d82",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Parsec",
+      "repo_path": "libraries/mlf-frontend/Bootstrap/Parsec.hs",
+      "C_stage": "src-C/Bootstrap/Parsec.hs",
+      "A": {
+        "bytes": 11604,
+        "sha256": "38cce5767b935e27292b0c0fb35f1750e3d02ff5ef5ef111c615b04001ebce90",
+        "blob": "3d7a1defa4d8cc4dfbc88800a9465935fef6617c",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 11604,
+        "sha256": "38cce5767b935e27292b0c0fb35f1750e3d02ff5ef5ef111c615b04001ebce90",
+        "blob": "3d7a1defa4d8cc4dfbc88800a9465935fef6617c",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Parser",
+      "repo_path": "libraries/mlf-frontend/Bootstrap/Parser.hs",
+      "C_stage": "src-C/Bootstrap/Parser.hs",
+      "A": {
+        "bytes": 70221,
+        "sha256": "02e9eecfdf3460bdb3b0fdd83a7f96963202c1c58052c220f238ccb73779e16c",
+        "blob": "a00451dddd0e1404397ed23c5a2771c423d1c866",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 70221,
+        "sha256": "02e9eecfdf3460bdb3b0fdd83a7f96963202c1c58052c220f238ccb73779e16c",
+        "blob": "a00451dddd0e1404397ed23c5a2771c423d1c866",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Prelude",
+      "repo_path": "libraries/mlf-frontend/Bootstrap/Prelude.hs",
+      "C_stage": "src-C/Bootstrap/Prelude.hs",
+      "A": {
+        "bytes": 29247,
+        "sha256": "aa15cd106e481e569545d0a224ad9baf7cb03c69b5493b002e03edb2626fbed2",
+        "blob": "84ea0e7dc521657ddc8e4e9b94f95bf6ee841f8c",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 29247,
+        "sha256": "aa15cd106e481e569545d0a224ad9baf7cb03c69b5493b002e03edb2626fbed2",
+        "blob": "84ea0e7dc521657ddc8e4e9b94f95bf6ee841f8c",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.PreparedLibraries",
+      "repo_path": "libraries/mlf-crates/Bootstrap/PreparedLibraries.hs",
+      "C_stage": "src-C/Bootstrap/PreparedLibraries.hs",
+      "A": {
+        "bytes": 39331,
+        "sha256": "0b158d893dab7ac0e5037c1b4ead43fa80f03207c597fc1bf5a4498fec249ada",
+        "blob": "d98001ab074863b866830dff2b889ecd7f6023a5",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 39331,
+        "sha256": "0b158d893dab7ac0e5037c1b4ead43fa80f03207c597fc1bf5a4498fec249ada",
+        "blob": "d98001ab074863b866830dff2b889ecd7f6023a5",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Primitive",
+      "repo_path": "libraries/mlf-language-core/Bootstrap/Primitive.hs",
+      "C_stage": "src-C/Bootstrap/Primitive.hs",
+      "A": {
+        "bytes": 64524,
+        "sha256": "53a7d3b4c605cd15071a528185ab7252099027feb8c40db23d5dd40ac42e2726",
+        "blob": "7f755d9dc50091f67ac6251ec91d7144c1e9df9e",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 64524,
+        "sha256": "53a7d3b4c605cd15071a528185ab7252099027feb8c40db23d5dd40ac42e2726",
+        "blob": "7f755d9dc50091f67ac6251ec91d7144c1e9df9e",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.ProcessHost",
+      "repo_path": "libraries/mlf-interpreter/Bootstrap/ProcessHost.hs",
+      "C_stage": "src-C/Bootstrap/ProcessHost.hs",
+      "A": {
+        "bytes": 2142,
+        "sha256": "2fcd44e92c3b0a889e7ed16316ed68209f940f357fdb68b049c596f6d3a3dc24",
+        "blob": "9b879884c0170b7352dc6d03f9c40f434cb02ec8",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 2142,
+        "sha256": "2fcd44e92c3b0a889e7ed16316ed68209f940f357fdb68b049c596f6d3a3dc24",
+        "blob": "9b879884c0170b7352dc6d03f9c40f434cb02ec8",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.QueryGraph",
+      "repo_path": "libraries/mlf-crates/Bootstrap/QueryGraph.hs",
+      "C_stage": "src-C/Bootstrap/QueryGraph.hs",
+      "A": {
+        "bytes": 44928,
+        "sha256": "f66d6ff37a13558ec54e4aa3d5243dde63a75ad77d0fd5f614b93195632cdd71",
+        "blob": "50b3ca8130c0a3ef73725139a925afcc6feff8ba",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 44928,
+        "sha256": "f66d6ff37a13558ec54e4aa3d5243dde63a75ad77d0fd5f614b93195632cdd71",
+        "blob": "50b3ca8130c0a3ef73725139a925afcc6feff8ba",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Resolved",
+      "repo_path": "libraries/mlf-frontend/Bootstrap/Resolved.hs",
+      "C_stage": "src-C/Bootstrap/Resolved.hs",
+      "A": {
+        "bytes": 5990,
+        "sha256": "1ebcc702cfb7ade22dad92d870dda79d57788420ef60627acb6522d54a509052",
+        "blob": "965b6587d00ea709111fb93969c9db940d1c90be",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 5990,
+        "sha256": "1ebcc702cfb7ade22dad92d870dda79d57788420ef60627acb6522d54a509052",
+        "blob": "965b6587d00ea709111fb93969c9db940d1c90be",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Runtime",
+      "repo_path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+      "C_stage": "src-C/Bootstrap/Runtime.hs",
+      "A": {
+        "bytes": 88290,
+        "sha256": "a764518838cc7ca32b58a5b13901e542d30b269b50cdcd67bf4a23f5ac4d11f6",
+        "blob": "01430d1db9003e6e036efe08c68d77f2856f1177",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 88290,
+        "sha256": "a764518838cc7ca32b58a5b13901e542d30b269b50cdcd67bf4a23f5ac4d11f6",
+        "blob": "01430d1db9003e6e036efe08c68d77f2856f1177",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.ST",
+      "repo_path": "libraries/mlf-foundation/Bootstrap/ST.hs",
+      "C_stage": "src-C/Bootstrap/ST.hs",
+      "A": {
+        "bytes": 2539,
+        "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2",
+        "blob": "b43fae22feb61da83bf75b487a06583f3c190822",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 2539,
+        "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2",
+        "blob": "b43fae22feb61da83bf75b487a06583f3c190822",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Separate",
+      "repo_path": "libraries/mlf-crates/Bootstrap/Separate.hs",
+      "C_stage": "src-C/Bootstrap/Separate.hs",
+      "A": {
+        "bytes": 68595,
+        "sha256": "1b3d1d917d86ffa5fc9e8de8cfe9becb1a6faa7e115842b0b2286cc2907343ba",
+        "blob": "06b31f175b6335ca3b0b03dba013002de34bc878",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 68595,
+        "sha256": "1b3d1d917d86ffa5fc9e8de8cfe9becb1a6faa7e115842b0b2286cc2907343ba",
+        "blob": "06b31f175b6335ca3b0b03dba013002de34bc878",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Set",
+      "repo_path": "libraries/mlf-foundation/Bootstrap/Set.hs",
+      "C_stage": "src-C/Bootstrap/Set.hs",
+      "A": {
+        "bytes": 4093,
+        "sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f",
+        "blob": "72ffaf8f5c3f47468cb3365f4e31734c0390e1f4",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 4093,
+        "sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f",
+        "blob": "72ffaf8f5c3f47468cb3365f4e31734c0390e1f4",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.SourceEquality",
+      "repo_path": "libraries/mlf-crates/Bootstrap/SourceEquality.hs",
+      "C_stage": "src-C/Bootstrap/SourceEquality.hs",
+      "A": {
+        "bytes": 16511,
+        "sha256": "806297f22ce1d35a02b6db393ecc18771e571a08f13665f981e509358525c6f8",
+        "blob": "df47fc4920a57519cdea83018ca595e365b5f3dd",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 16511,
+        "sha256": "806297f22ce1d35a02b6db393ecc18771e571a08f13665f981e509358525c6f8",
+        "blob": "df47fc4920a57519cdea83018ca595e365b5f3dd",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.SourceInference",
+      "repo_path": "libraries/mlf-crates/Bootstrap/SourceInference.hs",
+      "C_stage": "src-C/Bootstrap/SourceInference.hs",
+      "A": {
+        "bytes": 97416,
+        "sha256": "f62f60fdee8d63541f326572d791b7d2c0cb492603bacefd8cd61d4e5b437f3b",
+        "blob": "1d8998d59ccc0452d7744e91e77f24ee77f3f561",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 97416,
+        "sha256": "f62f60fdee8d63541f326572d791b7d2c0cb492603bacefd8cd61d4e5b437f3b",
+        "blob": "1d8998d59ccc0452d7744e91e77f24ee77f3f561",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.SourceUnit",
+      "repo_path": "libraries/mlf-crates/Bootstrap/SourceUnit.hs",
+      "C_stage": "src-C/Bootstrap/SourceUnit.hs",
+      "A": {
+        "bytes": 2690,
+        "sha256": "0986afe240f8e8624e9f289cf65a0b18a90676fc58819d362faef97bc1cac82f",
+        "blob": "f3f606438f55b9fc3ee64f1f2b5280a9d81be38d",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 2690,
+        "sha256": "0986afe240f8e8624e9f289cf65a0b18a90676fc58819d362faef97bc1cac82f",
+        "blob": "f3f606438f55b9fc3ee64f1f2b5280a9d81be38d",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Standalone",
+      "repo_path": "libraries/mlf-frontend/Bootstrap/Standalone.hs",
+      "C_stage": "src-C/Bootstrap/Standalone.hs",
+      "A": {
+        "bytes": 30989,
+        "sha256": "31ee00d6ba44ca91b613176f20cc1726b8ff4348b9ac3a101c2e81e96af8e9f5",
+        "blob": "d4bbdc398b1b455ed0e5707b1a4590ff4679f7d0",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 30989,
+        "sha256": "31ee00d6ba44ca91b613176f20cc1726b8ff4348b9ac3a101c2e81e96af8e9f5",
+        "blob": "d4bbdc398b1b455ed0e5707b1a4590ff4679f7d0",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Std",
+      "repo_path": "libraries/mlf-foundation/Bootstrap/Std.hs",
+      "C_stage": "src-C/Bootstrap/Std.hs",
+      "A": {
+        "bytes": 20088,
+        "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca",
+        "blob": "8e7a513d336815f313ab63be975ce4af3303554c",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 20088,
+        "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca",
+        "blob": "8e7a513d336815f313ab63be975ce4af3303554c",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Surface",
+      "repo_path": "libraries/mlf-frontend/Bootstrap/Surface.hs",
+      "C_stage": "src-C/Bootstrap/Surface.hs",
+      "A": {
+        "bytes": 36496,
+        "sha256": "eac10f8d5981fe36b9b5f8b141b1efdf0da2512dc717b1c588451a6aa9b980aa",
+        "blob": "3e8082684587d25915d7f209bbf74d32e7c3dcc7",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 36496,
+        "sha256": "eac10f8d5981fe36b9b5f8b141b1efdf0da2512dc717b1c588451a6aa9b980aa",
+        "blob": "3e8082684587d25915d7f209bbf74d32e7c3dcc7",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Types",
+      "repo_path": "libraries/mlf-foundation/Bootstrap/Types.hs",
+      "C_stage": "src-C/Bootstrap/Types.hs",
+      "A": {
+        "bytes": 12757,
+        "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596",
+        "blob": "4acbd097fe227d6f01f9d8b728fd5cc22cce6500",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 12757,
+        "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596",
+        "blob": "4acbd097fe227d6f01f9d8b728fd5cc22cce6500",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Unicode",
+      "repo_path": "libraries/mlf-foundation/Bootstrap/Unicode.hs",
+      "C_stage": "src-C/Bootstrap/Unicode.hs",
+      "A": {
+        "bytes": 55534,
+        "sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077",
+        "blob": "cc8cc7591f54f41204728ede66d5700d3907a3bc",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 55534,
+        "sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077",
+        "blob": "cc8cc7591f54f41204728ede66d5700d3907a3bc",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.Version",
+      "repo_path": "libraries/mlf-foundation/Bootstrap/Version.hs",
+      "C_stage": "src-C/Bootstrap/Version.hs",
+      "A": {
+        "bytes": 327,
+        "sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479",
+        "blob": "31f40d68b05d57e6be08cbca26eef6ceae98d492",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 327,
+        "sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479",
+        "blob": "31f40d68b05d57e6be08cbca26eef6ceae98d492",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.X.Check",
+      "repo_path": "libraries/mlf-xmlf/Bootstrap/X/Check.hs",
+      "C_stage": "src-C/Bootstrap/X/Check.hs",
+      "A": {
+        "bytes": 17179,
+        "sha256": "5c299a3617d07a9d7fe89f88039134491630eee256dbdd57ebe8270e41f78f1c",
+        "blob": "2082ce9c7424191854d3ce17e7aecfdff1f2a94e",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 17179,
+        "sha256": "5c299a3617d07a9d7fe89f88039134491630eee256dbdd57ebe8270e41f78f1c",
+        "blob": "2082ce9c7424191854d3ce17e7aecfdff1f2a94e",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.X.Checked",
+      "repo_path": "libraries/mlf-xmlf/Bootstrap/X/Checked.hs",
+      "C_stage": "src-C/Bootstrap/X/Checked.hs",
+      "A": {
+        "bytes": 26092,
+        "sha256": "825ce97070f081c11ff316979004eb8dfcffa3ac0e885f25c7cff2381082ab7a",
+        "blob": "5c1d50962268e852020e0a7490b9982a885fd72e",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 26092,
+        "sha256": "825ce97070f081c11ff316979004eb8dfcffa3ac0e885f25c7cff2381082ab7a",
+        "blob": "5c1d50962268e852020e0a7490b9982a885fd72e",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.X.Parser",
+      "repo_path": "libraries/mlf-xmlf/Bootstrap/X/Parser.hs",
+      "C_stage": "src-C/Bootstrap/X/Parser.hs",
+      "A": {
+        "bytes": 16487,
+        "sha256": "094d226d36b65d09a75b6f7feeee2997c49de792dd81242fba9db0b87c829209",
+        "blob": "b5f4eef9f956b23f015937b809e2e4314246bfd6",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 16487,
+        "sha256": "094d226d36b65d09a75b6f7feeee2997c49de792dd81242fba9db0b87c829209",
+        "blob": "b5f4eef9f956b23f015937b809e2e4314246bfd6",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.X.Pretty",
+      "repo_path": "libraries/mlf-xmlf/Bootstrap/X/Pretty.hs",
+      "C_stage": "src-C/Bootstrap/X/Pretty.hs",
+      "A": {
+        "bytes": 12549,
+        "sha256": "77a96c4912188d23b00fa95315038878b9a40ea683c5d9d4ed8baa893fa32d3f",
+        "blob": "afeed293d0a8d0f4683daf7189a2c024149b173c",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 12549,
+        "sha256": "77a96c4912188d23b00fa95315038878b9a40ea683c5d9d4ed8baa893fa32d3f",
+        "blob": "afeed293d0a8d0f4683daf7189a2c024149b173c",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.X.Syntax",
+      "repo_path": "libraries/mlf-xmlf/Bootstrap/X/Syntax.hs",
+      "C_stage": "src-C/Bootstrap/X/Syntax.hs",
+      "A": {
+        "bytes": 4813,
+        "sha256": "654d43b2739219704757cd3a3ee0e9f8106ae07ec931eb1a399dd004af1c0a9d",
+        "blob": "855324dc13d9ab46511a89b7f7460da07948ecac",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 4813,
+        "sha256": "654d43b2739219704757cd3a3ee0e9f8106ae07ec931eb1a399dd004af1c0a9d",
+        "blob": "855324dc13d9ab46511a89b7f7460da07948ecac",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Bootstrap.X.Type",
+      "repo_path": "libraries/mlf-xmlf/Bootstrap/X/Type.hs",
+      "C_stage": "src-C/Bootstrap/X/Type.hs",
+      "A": {
+        "bytes": 9309,
+        "sha256": "5ae7191adc5df556b83901682ee17e3de889a99e9fe35e97d7370ec2443d0d3d",
+        "blob": "4147d9e8c3db9ca42459fa9c46ace1c9a1660d04",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 9309,
+        "sha256": "5ae7191adc5df556b83901682ee17e3de889a99e9fe35e97d7370ec2443d0d3d",
+        "blob": "4147d9e8c3db9ca42459fa9c46ace1c9a1660d04",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "MLF.BuiltinPreludeData",
+      "repo_path": "bootstrap/MLF/BuiltinPreludeData.hs",
+      "C_stage": "src-C/MLF/BuiltinPreludeData.hs",
+      "A": {
+        "bytes": 2220407,
+        "sha256": "4b9d52fa6fa2108cc3dc1a6d04e06f18486abff4f2e682f633bddeb674c03692",
+        "blob": "cc19e39bcc2faa6e82cee77bfafb3591c69d79ac",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 2220407,
+        "sha256": "4b9d52fa6fa2108cc3dc1a6d04e06f18486abff4f2e682f633bddeb674c03692",
+        "blob": "cc19e39bcc2faa6e82cee77bfafb3591c69d79ac",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "repo_path": "bootstrap/MLF/Entry/Emlf.hs",
+      "C_stage": "src-C/MLF/Entry/Emlf.hs",
+      "A": {
+        "bytes": 58175,
+        "sha256": "171273f182ff3b4b2b65f1eb03bb8db002ee07a5b57b77cee96e5a8c5f6ba480",
+        "blob": "175c1321cf6ff2c435fc3a7cacfbf2474d92dd23",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 58175,
+        "sha256": "171273f182ff3b4b2b65f1eb03bb8db002ee07a5b57b77cee96e5a8c5f6ba480",
+        "blob": "175c1321cf6ff2c435fc3a7cacfbf2474d92dd23",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "MLF.Host.Async",
+      "repo_path": "host/ghc/MLF/Host/Async.hs",
+      "C_stage": "src-C/MLF/Host/Async.hs",
+      "A": {
+        "bytes": 8881,
+        "sha256": "13e23c116edb65b36be54f78b477d080da62010651f76984c7c9cf895d03d1e5",
+        "blob": "601bb2e08f7be500646d9cae520b068c83640686",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 8881,
+        "sha256": "13e23c116edb65b36be54f78b477d080da62010651f76984c7c9cf895d03d1e5",
+        "blob": "601bb2e08f7be500646d9cae520b068c83640686",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "MLF.Host.Base",
+      "repo_path": "host/ghc/MLF/Host/Base.hs",
+      "C_stage": "src-C/MLF/Host/Base.hs",
+      "A": {
+        "bytes": 19364,
+        "sha256": "b324805ea2d62b3aaccf3c49e973b7839f952b164bcbe4cc37bf483b07518116",
+        "blob": "09e0873d0ecf95c7b393ca1e33e160d6b0e3454f",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 19364,
+        "sha256": "b324805ea2d62b3aaccf3c49e973b7839f952b164bcbe4cc37bf483b07518116",
+        "blob": "09e0873d0ecf95c7b393ca1e33e160d6b0e3454f",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "MLF.Host.IO",
+      "repo_path": "host/ghc/MLF/Host/IO.hs",
+      "C_stage": "src-C/MLF/Host/IO.hs",
+      "A": {
+        "bytes": 15420,
+        "sha256": "042164a571c9b60c9fc1abe984ccc687400a01602b3a980cff61342941bfe22a",
+        "blob": "79aab068e3d323b6b4192834d33cb4177eeadc4d",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 15420,
+        "sha256": "042164a571c9b60c9fc1abe984ccc687400a01602b3a980cff61342941bfe22a",
+        "blob": "79aab068e3d323b6b4192834d33cb4177eeadc4d",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "MLF.NativeBuild",
+      "repo_path": "bootstrap/MLF/NativeBuild.hs",
+      "C_stage": "src-C/MLF/NativeBuild.hs",
+      "A": {
+        "bytes": 12556,
+        "sha256": "33a8f7b6e141ee318a0fb0b4d3979873c53301a2b0916bd2fdee7f1d21840143",
+        "blob": "30d0a9d84367fa0732e97f4b537de38c54c9fdae",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 12556,
+        "sha256": "33a8f7b6e141ee318a0fb0b4d3979873c53301a2b0916bd2fdee7f1d21840143",
+        "blob": "30d0a9d84367fa0732e97f4b537de38c54c9fdae",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "MLF.PreparedCompiler",
+      "repo_path": "bootstrap/MLF/PreparedCompiler.hs",
+      "C_stage": "src-C/MLF/PreparedCompiler.hs",
+      "A": {
+        "bytes": 26327,
+        "sha256": "2812caad746141ddb82c21a5dfdc779f1c33ae383ccd08aaa496ebecf8046a51",
+        "blob": "d926b26e120715a531b1c943216100508ed50e8f",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 26327,
+        "sha256": "2812caad746141ddb82c21a5dfdc779f1c33ae383ccd08aaa496ebecf8046a51",
+        "blob": "d926b26e120715a531b1c943216100508ed50e8f",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "MLF.PreparedLibraryData",
+      "repo_path": "bootstrap/MLF/PreparedLibraryData.hs",
+      "C_stage": "src-C/MLF/PreparedLibraryData.hs",
+      "A": {
+        "bytes": 921,
+        "sha256": "eececfa9f5b0ef2901e749b4a1798ac2cf78bea3378d9e33fcbc0a0ded94c6b1",
+        "blob": "cc2d0b45639060ff9750d026e1a69cfed011f494",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 921,
+        "sha256": "eececfa9f5b0ef2901e749b4a1798ac2cf78bea3378d9e33fcbc0a0ded94c6b1",
+        "blob": "cc2d0b45639060ff9750d026e1a69cfed011f494",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "MLF.PreparedNativeData",
+      "repo_path": "bootstrap/MLF/PreparedNativeData.hs",
+      "C_stage": "src-C/MLF/PreparedNativeData.hs",
+      "A": {
+        "bytes": 1077,
+        "sha256": "908d33b2f9a5c74067684be01b0aecfb1a3ab802bfeda18b8f02608d0dc7de33",
+        "blob": "dda9b3f1fae8200f150d76df522542f7799ac0ac",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 1077,
+        "sha256": "908d33b2f9a5c74067684be01b0aecfb1a3ab802bfeda18b8f02608d0dc7de33",
+        "blob": "dda9b3f1fae8200f150d76df522542f7799ac0ac",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "MLF.Primitive",
+      "repo_path": "host/ghc/MLF/Primitive.hs",
+      "C_stage": "src-C/MLF/Primitive.hs",
+      "A": {
+        "bytes": 14412,
+        "sha256": "d5a66475293578650a975172ae14d5a6e5506668859fd559d1a18eb08d2160cb",
+        "blob": "1cf4ac81319bf8fa0491e6fd8614055fc67cca95",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 14412,
+        "sha256": "d5a66475293578650a975172ae14d5a6e5506668859fd559d1a18eb08d2160cb",
+        "blob": "1cf4ac81319bf8fa0491e6fd8614055fc67cca95",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Main",
+      "repo_path": "host/ghc/app/emlf/Main.hs",
+      "C_stage": "src-C/Main.hs",
+      "A": {
+        "bytes": 130,
+        "sha256": "72d926eedd4e5abc40b8f0bc925a39d20995397f0d4144b4abd932ef2aaa6d79",
+        "blob": "bd9ace7b82bfca927f0ae4ac8ca481cb03bbbd78",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 130,
+        "sha256": "72d926eedd4e5abc40b8f0bc925a39d20995397f0d4144b4abd932ef2aaa6d79",
+        "blob": "bd9ace7b82bfca927f0ae4ac8ca481cb03bbbd78",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Package.Json",
+      "repo_path": "libraries/mlf-package-core/Package/Json.hs",
+      "C_stage": "src-C/Package/Json.hs",
+      "A": {
+        "bytes": 15270,
+        "sha256": "90c6e3ad566b92c01bf58106c27a5d467a52f11586ddad9fa1e44c2a62165604",
+        "blob": "c5714998dda6208dc2a92939c84cd8602d96c5e7",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 15270,
+        "sha256": "90c6e3ad566b92c01bf58106c27a5d467a52f11586ddad9fa1e44c2a62165604",
+        "blob": "c5714998dda6208dc2a92939c84cd8602d96c5e7",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": "Package.OS",
+      "repo_path": "libraries/mlf-package-core/Package/OS.hs",
+      "C_stage": "src-C/Package/OS.hs",
+      "A": {
+        "bytes": 9951,
+        "sha256": "ff025ef05b6cb63c5591b756a78b898f50497cc5349bdc5d19812f47a6dadda2",
+        "blob": "6779458f6b15591554c11273f56152a26b33aaa6",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 9951,
+        "sha256": "ff025ef05b6cb63c5591b756a78b898f50497cc5349bdc5d19812f47a6dadda2",
+        "blob": "6779458f6b15591554c11273f56152a26b33aaa6",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": null,
+      "repo_path": "host/ghc/cbits/host.c",
+      "C_stage": "csrc/host.c",
+      "A": {
+        "bytes": 9739,
+        "sha256": "400d0bb9c4c0b610c7185517697be536da74dbf0dc5cffdac70dcf57462bd5a1",
+        "blob": "c2cad3a33820fb5ce9ffbeb502b83dd04b95f5cc",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 9739,
+        "sha256": "400d0bb9c4c0b610c7185517697be536da74dbf0dc5cffdac70dcf57462bd5a1",
+        "blob": "c2cad3a33820fb5ce9ffbeb502b83dd04b95f5cc",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": null,
+      "repo_path": "runtime/mlf_process_supervisor.c",
+      "C_stage": "csrc/mlf_process_supervisor.c",
+      "A": {
+        "bytes": 43367,
+        "sha256": "b24d362a891e966bf1a456f1983221eaf848fe6da80379850beb5067c63944e9",
+        "blob": "7efde0ab6d2d5542f30c44422bf90f95885918e3",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 43367,
+        "sha256": "b24d362a891e966bf1a456f1983221eaf848fe6da80379850beb5067c63944e9",
+        "blob": "7efde0ab6d2d5542f30c44422bf90f95885918e3",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": null,
+      "repo_path": "runtime/khash.h",
+      "C_stage": "csrc/khash.h",
+      "A": {
+        "bytes": 21543,
+        "sha256": "4582c7fd4b98f61339ce677bb1daa7a45a53075b112a494a335525c4bda72074",
+        "blob": "f75f3474c157dc07781c3d7f67e4be759ea74feb",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 21543,
+        "sha256": "4582c7fd4b98f61339ce677bb1daa7a45a53075b112a494a335525c4bda72074",
+        "blob": "f75f3474c157dc07781c3d7f67e4be759ea74feb",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": null,
+      "repo_path": "runtime/mlf_build_runner_hash.h",
+      "C_stage": "csrc/mlf_build_runner_hash.h",
+      "A": {
+        "bytes": 2455,
+        "sha256": "cbbdfd06eb43324dceef594e42b21621559df3e3d4e91d62f2b73e2b04d9e778",
+        "blob": "ba81947c685a155810da43f33ab9569d0bd5bfff",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 2455,
+        "sha256": "cbbdfd06eb43324dceef594e42b21621559df3e3d4e91d62f2b73e2b04d9e778",
+        "blob": "ba81947c685a155810da43f33ab9569d0bd5bfff",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": null,
+      "repo_path": "runtime/mlf_build_runner_posix.h",
+      "C_stage": "csrc/mlf_build_runner_posix.h",
+      "A": {
+        "bytes": 265,
+        "sha256": "bc35cc65f2002b2f455a524c2a1c3bc12ea8637fc63bb88e3d49185e91448e27",
+        "blob": "41b1b0139d3c0f6fcb0ab60a1bccba2c88ce94d7",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 265,
+        "sha256": "bc35cc65f2002b2f455a524c2a1c3bc12ea8637fc63bb88e3d49185e91448e27",
+        "blob": "41b1b0139d3c0f6fcb0ab60a1bccba2c88ce94d7",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": null,
+      "repo_path": "runtime/mlf_byte_file.h",
+      "C_stage": "csrc/mlf_byte_file.h",
+      "A": {
+        "bytes": 2472,
+        "sha256": "04e5b38198c49bd7aa3795de5f450011343cce1fd54ecdb116eda422ae210d98",
+        "blob": "b07a62af37d6dff4211070897246e29ec9e8f0a2",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 2472,
+        "sha256": "04e5b38198c49bd7aa3795de5f450011343cce1fd54ecdb116eda422ae210d98",
+        "blob": "b07a62af37d6dff4211070897246e29ec9e8f0a2",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": null,
+      "repo_path": "runtime/mlf_completion.h",
+      "C_stage": "csrc/mlf_completion.h",
+      "A": {
+        "bytes": 13446,
+        "sha256": "7eb127736e53948a324b58715abdea3f8df98900ca4724a94f59ca66b79388c5",
+        "blob": "102c28892e59ea19c2cb8080717af1b3b6968c57",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 13446,
+        "sha256": "7eb127736e53948a324b58715abdea3f8df98900ca4724a94f59ca66b79388c5",
+        "blob": "102c28892e59ea19c2cb8080717af1b3b6968c57",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": null,
+      "repo_path": "runtime/mlf_integer64.h",
+      "C_stage": "csrc/mlf_integer64.h",
+      "A": {
+        "bytes": 2390,
+        "sha256": "ea826b120a1a866b912fe8df15542b638a3637dcaef000fe13ba90984b0b9608",
+        "blob": "99c28269cb14cc5af059d4ed78acdfc78768336b",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 2390,
+        "sha256": "ea826b120a1a866b912fe8df15542b638a3637dcaef000fe13ba90984b0b9608",
+        "blob": "99c28269cb14cc5af059d4ed78acdfc78768336b",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": null,
+      "repo_path": "runtime/mlf_process_binding.h",
+      "C_stage": "csrc/mlf_process_binding.h",
+      "A": {
+        "bytes": 10279,
+        "sha256": "c9ef41739a3a388ec40701c5a9c778032618c9b8bf5c3d48e213840c0d242afa",
+        "blob": "0c685af2677aa71a47471eb3978bb94742b523c6",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 10279,
+        "sha256": "c9ef41739a3a388ec40701c5a9c778032618c9b8bf5c3d48e213840c0d242afa",
+        "blob": "0c685af2677aa71a47471eb3978bb94742b523c6",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": null,
+      "repo_path": "runtime/mlf_process_supervisor.h",
+      "C_stage": "csrc/mlf_process_supervisor.h",
+      "A": {
+        "bytes": 6088,
+        "sha256": "808e2b68f101b03f6250d448b2e1100e1bdde2e060c669d783a0513b21d8fc05",
+        "blob": "dd5b4300c178423497727e0de9f6bc56beeadf59",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 6088,
+        "sha256": "808e2b68f101b03f6250d448b2e1100e1bdde2e060c669d783a0513b21d8fc05",
+        "blob": "dd5b4300c178423497727e0de9f6bc56beeadf59",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": null,
+      "repo_path": "runtime/mlf_process_supervisor_posix.h",
+      "C_stage": "csrc/mlf_process_supervisor_posix.h",
+      "A": {
+        "bytes": 3557,
+        "sha256": "fd0d199345e9d6310aaabe3dbab858a121a03c5cfafd28de50042d78ae0438ac",
+        "blob": "4ab02a329811f04172ffed9413cb2f8165bce060",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 3557,
+        "sha256": "fd0d199345e9d6310aaabe3dbab858a121a03c5cfafd28de50042d78ae0438ac",
+        "blob": "4ab02a329811f04172ffed9413cb2f8165bce060",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": null,
+      "repo_path": "runtime/mlf_runtime.h",
+      "C_stage": "csrc/mlf_runtime.h",
+      "A": {
+        "bytes": 6197,
+        "sha256": "b778f6afeba571f38bf6ca0456352b231d830f805ee45c729d02e95b6d0fb6da",
+        "blob": "c60e8e1e00a763736e4a779eb8ce51f266d864f6",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 6197,
+        "sha256": "b778f6afeba571f38bf6ca0456352b231d830f805ee45c729d02e95b6d0fb6da",
+        "blob": "c60e8e1e00a763736e4a779eb8ce51f266d864f6",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": null,
+      "repo_path": "runtime/mlf_system.h",
+      "C_stage": "csrc/mlf_system.h",
+      "A": {
+        "bytes": 14082,
+        "sha256": "cc87aa9445c45e7e6fe66b2631a887be870baf3015f9daa6d6705d356ed37477",
+        "blob": "b7212f33d646729bcd10842ade489f54da125349",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 14082,
+        "sha256": "cc87aa9445c45e7e6fe66b2631a887be870baf3015f9daa6d6705d356ed37477",
+        "blob": "b7212f33d646729bcd10842ade489f54da125349",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": null,
+      "repo_path": "runtime/mlf_system_windows.h",
+      "C_stage": "csrc/mlf_system_windows.h",
+      "A": {
+        "bytes": 9575,
+        "sha256": "31b4de3c8a5bd6051f7c8916624a250f8b4b305b40b4cc7923aa648894d654f3",
+        "blob": "da1d174365ef245ad701949058f1c060552eb1b1",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 9575,
+        "sha256": "31b4de3c8a5bd6051f7c8916624a250f8b4b305b40b4cc7923aa648894d654f3",
+        "blob": "da1d174365ef245ad701949058f1c060552eb1b1",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": null,
+      "repo_path": "runtime/mlf_windows.h",
+      "C_stage": "csrc/mlf_windows.h",
+      "A": {
+        "bytes": 3423,
+        "sha256": "618fb88b0c854fcbe8dffee5b961a74025d79b89c00d7158dc540b15066e4b56",
+        "blob": "3b35be83f13ee4d31a879a801e94250538e2a61a",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 3423,
+        "sha256": "618fb88b0c854fcbe8dffee5b961a74025d79b89c00d7158dc540b15066e4b56",
+        "blob": "3b35be83f13ee4d31a879a801e94250538e2a61a",
+        "mode": "100644"
+      }
+    },
+    {
+      "module": null,
+      "repo_path": "runtime/mlf_windows_path.h",
+      "C_stage": "csrc/mlf_windows_path.h",
+      "A": {
+        "bytes": 5951,
+        "sha256": "e52b718c63e0603cb653a3874ae1a6130cd5a184121dde7868c4d03376c84e05",
+        "blob": "d93a6d2c98da5d0e976b2eb746cb0e2fc1c9412d",
+        "mode": "100644"
+      },
+      "C": {
+        "bytes": 5951,
+        "sha256": "e52b718c63e0603cb653a3874ae1a6130cd5a184121dde7868c4d03376c84e05",
+        "blob": "d93a6d2c98da5d0e976b2eb746cb0e2fc1c9412d",
+        "mode": "100644"
+      }
+    }
+  ]
+}
+
+
+
