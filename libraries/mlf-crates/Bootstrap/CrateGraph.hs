@@ -457,48 +457,56 @@ module Bootstrap.CrateGraph where {
     -- until all nodes have been admitted.
     pageNodes :: Int;
     pageNodes = 128;
+    -- A page holds at most 128 syntax nodes. Append its fields in logical
+    -- order so producing a page never allocates another reversed list.
+    coordinate number tail = let {
+      bytes value = let { rest = unsignedShiftRInt value 6; digit = andInt value 63 } in
+        if rest == 0 then (:) (V.at coordinateAlphabet (V.fromInt digit)) tail
+        else (:) (V.at coordinateAlphabet (V.fromInt (orInt digit 64))) (bytes rest)
+    } in bytes (xorInt (shiftLInt number 1) (shiftRInt number 63));
     scan scope outer = let {
       collect budget pending chunks pages slots line column names locations = if budget < 0 then Nothing else case pending of {
       [] -> case outer of {
         (:) ((,) previous items) more -> scan previous more budget items chunks pages slots line column names locations;
         [] -> let {
-          finalPages = case chunks of { [] -> pages; _ -> (:) (concatStringList (reverse chunks)) pages }
+          finalPages = if slots == pageNodes then pages else (:) (concatStringList (chunks [])) pages
         } in Just (concatStringList ((:) "P3" ((:) header (reverse finalPages))))
       };
       (:) expr rest -> if slots == 0 then let {
-          page = concatStringList (reverse chunks)
-        } in seq page (collect budget pending [] ((:) page pages) pageNodes line column names locations) else let {
-        next cost fields items = collect (budget - cost) items fields pages (slots - 1) line column names locations;
+          page = concatStringList (chunks [])
+        } in seq page (collect budget pending id ((:) page pages) pageNodes line column names locations) else let {
+        next cost emit items = collect (budget - cost) items (compose chunks emit) pages (slots - 1) line column names locations;
         named tag spelling overhead = case positionSymbol spelling names of { (,,) code bytes table ->
-          collect (budget - overhead - bytes) rest ((:) code ((:) tag chunks)) pages (slots - 1) line column table locations
+          collect (budget - overhead - bytes) rest (\tail -> chunks ((:) tag ((:) code tail))) pages (slots - 1) line column table locations
         };
-        scalar tag fields overhead = next (overhead + stringUtf8Length fields) ((:) fields ((:) tag chunks)) rest;
+        scalar tag fields overhead = next (overhead + stringUtf8Length fields) (\tail -> (:) tag ((:) fields tail)) rest;
         enter nested = scan nested (case rest of { [] -> outer; _ -> (:) ((,) scope rest) outer });
         ordinary value = let { text = Q.encodeExpression value } in
-          next (stringUtf8Length text) ((:) (Separate.pack [text]) ((:) "x" chunks)) rest
+          next (stringUtf8Length text) (\tail -> (:) "x" ((:) (Separate.pack [text]) tail)) rest
       } in case expr of {
-        SApp f a -> next 25 ((:) "a" chunks) ((:) f ((:) a rest));
+        SApp f a -> next 25 ((:) "a") ((:) f ((:) a rest));
         SLam n ann b -> case scope of {
           WrittenOrigin -> let { fields = Separate.pack [n,Q.optional Q.encodeAnnotation ann] } in
-            next (17 + stringUtf8Length fields) ((:) fields ((:) "l" chunks)) ((:) b rest);
+            next (17 + stringUtf8Length fields) (\tail -> (:) "l" ((:) fields tail)) ((:) b rest);
           SourceOrigin rank env depth types typeDepth -> let {
             local = "local:" ++ showInt depth;
             fields = Separate.pack [local,Q.optional Q.encodeAnnotation (Separate.mapMaybeValue (Q.canonicalAnnotation types typeDepth) ann)];
             child = SourceOrigin rank (M.insert compareString n local env) (depth + 1) types typeDepth
-          } in enter child (budget - 17 - stringUtf8Length fields) [b] ((:) fields ((:) "l" chunks))
+          } in enter child (budget - 17 - stringUtf8Length fields) [b] (\tail -> chunks ((:) "l" ((:) fields tail)))
             pages (slots - 1) line column names locations
         };
         SCallSite label span@(SourceSpan pkg mod file sl sc el ec) body -> case origin of {
           SourceSpan p m f _ _ _ _ -> if eqString pkg p && eqString mod m && eqString file f then case positionSymbol label names of { (,,) code nameBytes table -> let {
             short = line == sl && sl == el;
-            location = (:) code ((:) (if short then "d" else "D") chunks);
-            fromLine = if short then location else coordinateChunks (sl - line) location;
-            fromColumn = coordinateChunks (sc - column) fromLine;
-            withEndLine = if short then fromColumn else coordinateChunks (el - sl) fromColumn;
-            complete = coordinateChunks (ec - sc) withEndLine;
+            complete tail = let {
+              width = coordinate (ec - sc) tail;
+              endLine = if short then width else coordinate (el - sl) width;
+              startColumn = coordinate (sc - column) endLine;
+              startLine = if short then startColumn else coordinate (sl - line) startColumn
+            } in (:) (if short then "d" else "D") ((:) code startLine);
             cost = 29 + originBytes + nameBytes +
               positionBytes sl + positionBytes sc + positionBytes el + positionBytes ec;
-            next fields known = collect (budget - cost) ((:) body rest) fields pages (slots - 1) sl sc table known;
+            next emit known = collect (budget - cost) ((:) body rest) (compose chunks emit) pages (slots - 1) sl sc table known;
             offset = sc - column; width = ec - sc;
             -- Only back-references have a one-scalar spelling. Definitions
             -- include their framed text and always go through the general path.
@@ -506,14 +514,13 @@ module Bootstrap.CrateGraph where {
               stringLength code == 1;
             key = (stringCodeAt code 0 * 128 + offset + 64) * 128 + width + 64
           } in if not small then next complete locations else case IM.lookup key locations of {
-            Just fragment -> next ((:) fragment chunks) locations;
+            Just fragment -> next ((:) fragment) locations;
             Nothing -> if IM.size locations >= 256 then next complete locations else let {
-              fragment = concatStringList (reverse (coordinateChunks width
-                (coordinateChunks offset [code,"d"])))
-            } in next ((:) fragment chunks) (IM.insert key fragment locations)
+              fragment = concatStringList (complete [])
+            } in next ((:) fragment) (IM.insert key fragment locations)
           } }
             else let { fields = Separate.pack [label,Q.encodeSourceSpan span] } in
-              next (20 + stringUtf8Length fields) ((:) fields ((:) "S" chunks)) ((:) body rest)
+              next (20 + stringUtf8Length fields) (\tail -> (:) "S" ((:) fields tail)) ((:) body rest)
         };
         SVar n -> named "v" (case scope of {
           WrittenOrigin -> n; SourceOrigin _ env _ _ _ -> Q.canonicalReference env n
@@ -533,7 +540,7 @@ module Bootstrap.CrateGraph where {
       }
       }
     } in collect
-  } in scan initialScope [] initialBudget [tree] [] [] pageNodes 0 0 M.empty IM.empty;
+  } in scan initialScope [] initialBudget [tree] id [] pageNodes 0 0 M.empty IM.empty;
   matchingSourceMembers original lowered = case (,) original lowered of {
     (,) [(,,) name annotation body] [(,,) other next candidate] ->
       templateNodesLeft 257 body <= 0 && eqString name other && eqMaybe E.eqSAnnotation annotation next &&
