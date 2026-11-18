@@ -503,7 +503,7 @@ module Bootstrap.CrateGraph where {
   } in collect initialBudget [tree] [] [] pageNodes 0 0 M.empty IM.empty;
   matchingSourceMembers original lowered = case (,) original lowered of {
     (,) [(,,) name annotation body] [(,,) other next candidate] ->
-      eqString name other && eqMaybe E.eqSAnnotation annotation next &&
+      templateNodesLeft 257 body <= 0 && eqString name other && eqMaybe E.eqSAnnotation annotation next &&
         (case candidate of {
           SChecked ty inner -> null (Q.leadingTypes ty) && matchedLower body inner;
           _ -> matchedLower body candidate
@@ -539,16 +539,21 @@ module Bootstrap.CrateGraph where {
     _ -> Nothing
   };
   preparedWith create previous slots prepared = let {
-    table = Q.referenceTable slots prepared;
+    source = Source.groupOriginal prepared;
+    checked = Source.groupMembers prepared;
+    sameSource = matchingSourceMembers source checked;
+    -- The two projections have identical ordered value references when the
+    -- lowered body just erases location wrappers. The final occurrence
+    -- already comes from the lowered member.
+    table = Q.referenceTableUsing slots prepared (if sameSource then checked else append source checked);
     member = Q.referenceMember table;
     token = Q.referenceToken table;
     candidate protected ((,,) role n _) = Q.node "candidate"
       [Q.encodeRole role,token n,Q.boolean (elem eqString n protected)];
-    original = map member (Source.groupOriginal prepared);
-    lowered = map member (Source.groupMembers prepared);
+    original = map member source;
+    lowered = map member checked;
     names = Q.referenceDefinitions table;
-    metadata = Q.sourceGroupMetadataWith token candidate prepared;
-    sameSource = matchingSourceMembers (Source.groupOriginal prepared) (Source.groupMembers prepared)
+    metadata = Q.sourceGroupMetadataWith token candidate prepared
   } in case relativePreparedWith sameSource original lowered names metadata of {
     -- A relative pair has at least 257 syntax nodes on the original
     -- application/lambda spine. Dropping a location wrapper preserves its

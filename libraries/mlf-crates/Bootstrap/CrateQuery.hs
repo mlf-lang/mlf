@@ -677,10 +677,12 @@ module Bootstrap.CrateQuery where {
   referenceToken (ReferenceTable _ names _) name = M.findWithDefault compareString name name names;
   referenceMember table@(ReferenceTable _ names ranks) =
     canonicalMemberIn (\i -> M.get Source.compareDecl i ranks) names (referenceToken table);
-  referenceTable slots prepared = let {
+  referenceTable slots prepared = referenceTableUsing slots prepared
+    (append (Source.groupOriginal prepared) (Source.groupMembers prepared));
+  referenceTableUsing slots prepared members = let {
     scope = Source.slotScope slots;
     observed = concatMap (compose (Source.declarationRefs scope) (compose Dependency.querySyntaxRefs Source.sourceRhs))
-      (append (Source.groupOriginal prepared) (Source.groupMembers prepared));
+      members;
     ids = append (Source.memberIds slots) (append (Source.parameterIds slots)
       (append (Source.candidateIds slots) observed));
     -- Retain the last occurrence of each ID, including the old last-wins
