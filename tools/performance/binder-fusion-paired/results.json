@@ -1,0 +1,809 @@
+{
+  "missing_archive_files": [],
+  "archive_complete": true,
+  "verified_inventory_files": 10159,
+  "run": 44219723394,
+  "commit": "773797dab9e685da522a3e0fde02dce2e573a148",
+  "zip_sha256": "7bd060a9fb7c2287dafcfdd378dd02b2f23144cb5cd9402d81f20ee0141c9be0",
+  "inventory_files": 10159,
+  "raw_artifact_files_equal_per_call": 1656,
+  "scope": "same-main Foundation15 compiler A/C screening, not GHC parity or native fixed point",
+  "receipts": {
+    "install-receipt.json": {
+      "complete": true,
+      "errors": [],
+      "ci_identity": {
+        "GITHUB_SHA": "773797dab9e685da522a3e0fde02dce2e573a148",
+        "GITHUB_RUN_ID": "44219723394",
+        "GITHUB_RUN_ATTEMPT": "1",
+        "GITHUB_REPOSITORY": "mlf-lang/mlf",
+        "GITHUB_REF": "refs/heads/perf/binder-fusion-paired-20261118"
+      },
+      "official_url": "https://downloads.haskell.org/~ghc/9.14.1/ghc-9.14.1-x86_64-deb12-linux.tar.xz",
+      "expected_sha256": "60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841",
+      "initial_disk_floor_bytes": 12884901888,
+      "resources": {
+        "mem_available_KiB": 15032364,
+        "disk_bytes": 94729097216,
+        "required_disk_bytes": 12884901888
+      },
+      "archive_verified": true,
+      "toolchain_inventory_sha256": "ed0dd65dba94c9de7f37f97a0a7aa4342a7bda39d0b682705f5916353c5b983e",
+      "toolchain_files": 15551,
+      "limit_policy_phase": "install",
+      "child_fsize_limit_bytes": 1073741824,
+      "cleanup": true,
+      "whole_s": 115.80983123000004,
+      "within_whole": true,
+      "process_group_scope_only": true,
+      "global_descendants_or_ECHILD_claim": false
+    },
+    "build-receipt.json": {
+      "complete": true,
+      "errors": [],
+      "ci_identity": {
+        "GITHUB_SHA": "773797dab9e685da522a3e0fde02dce2e573a148",
+        "GITHUB_RUN_ID": "44219723394",
+        "GITHUB_RUN_ATTEMPT": "1",
+        "GITHUB_REPOSITORY": "mlf-lang/mlf",
+        "GITHUB_REF": "refs/heads/perf/binder-fusion-paired-20261118"
+      },
+      "sources": {
+        "A": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+        "C": "fc300bc9fdc389b585cbef0630fc8915d53e89c5"
+      },
+      "builds": {
+        "A": {
+          "producer": {
+            "bytes": 20210576,
+            "mode": 493,
+            "sha256": "feaf28d5572627d687909c62efa3eb7cfa784d454518bb42dc7272eabf6ed51f",
+            "resolved": "/home/runner/work/_temp/remote-foundation-44219723394-1/producers/A/bin/emlf"
+          },
+          "runtime": [
+            {
+              "reported_path": "/lib/x86_64-linux-gnu/libm.so.6",
+              "bytes": 952616,
+              "mode": 420,
+              "sha256": "fce00b6f25f459cf4ae0b7fae4257909a1a8a86f9149e7c029a5d617baf1ccd0",
+              "resolved": "/usr/lib/x86_64-linux-gnu/libm.so.6"
+            },
+            {
+              "reported_path": "/lib/x86_64-linux-gnu/libgmp.so.10",
+              "bytes": 534896,
+              "mode": 420,
+              "sha256": "0ccdfb6d6f5c039465f6d002cf7e4c072d48ac6a2cffc8dd6c748dec31592804",
+              "resolved": "/usr/lib/x86_64-linux-gnu/libgmp.so.10.5.0"
+            },
+            {
+              "reported_path": "/lib/x86_64-linux-gnu/libc.so.6",
+              "bytes": 2129424,
+              "mode": 493,
+              "sha256": "3a15d66867d83762c7f2f1e37359cb8f6c5743edb369c65285cb0b1c4f7498bf",
+              "resolved": "/usr/lib/x86_64-linux-gnu/libc.so.6"
+            },
+            {
+              "reported_path": "/lib64/ld-linux-x86-64.so.2",
+              "bytes": 236616,
+              "mode": 493,
+              "sha256": "c20a2dc8917c755f02b94049356320fe1f62ac7d9f8994731f807d9df39302da",
+              "resolved": "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"
+            }
+          ],
+          "home_modules": [
+            "MLF.Host.Base",
+            "MLF.Host.Async",
+            "MLF.Host.IO",
+            "MLF.Primitive",
+            "Bootstrap.Version",
+            "Bootstrap.Unicode",
+            "Bootstrap.IndexVec",
+            "Bootstrap.Types",
+            "MLF.PreparedNativeData",
+            "Bootstrap.ST",
+            "Bootstrap.ProcessHost",
+            "Bootstrap.Kind",
+            "Bootstrap.IntTree",
+            "Bootstrap.IntRank",
+            "Bootstrap.Std",
+            "Bootstrap.Primitive",
+            "Bootstrap.X.Syntax",
+            "Bootstrap.Map",
+            "Bootstrap.Set",
+            "Bootstrap.Lexer",
+            "Bootstrap.Parsec",
+            "Bootstrap.Layout",
+            "Bootstrap.LLVM.Optimize",
+            "Bootstrap.LLVM.Analysis",
+            "Bootstrap.LLVM.StrictFields",
+            "Bootstrap.LLVM.StrictWrappers",
+            "Bootstrap.LLVM.Result",
+            "Bootstrap.LLVM.Kernel",
+            "Bootstrap.LLVM.Argument",
+            "Bootstrap.LLVM.LazyProducer",
+            "Bootstrap.LLVM.Build",
+            "Bootstrap.LLVM.Native",
+            "Bootstrap.LLVM.Codegen",
+            "Bootstrap.IntSet",
+            "Bootstrap.IntMap",
+            "Bootstrap.SourceEquality",
+            "Bootstrap.Resolved",
+            "Bootstrap.Host",
+            "Bootstrap.Graph.IndexStore",
+            "Bootstrap.Graph",
+            "Bootstrap.Graph.Solver",
+            "Bootstrap.Fresh",
+            "Bootstrap.Data",
+            "Bootstrap.X.Type",
+            "Bootstrap.X.Parser",
+            "Bootstrap.X.Pretty",
+            "Bootstrap.X.Check",
+            "Bootstrap.X.Checked",
+            "Bootstrap.Evidence",
+            "Bootstrap.Runtime",
+            "Bootstrap.LLVM",
+            "Bootstrap.LLVM.Library",
+            "Bootstrap.Kinding",
+            "Bootstrap.EvidenceBoundary",
+            "Bootstrap.Desugar",
+            "Bootstrap.Dependency",
+            "Bootstrap.Surface",
+            "Bootstrap.Prelude",
+            "Bootstrap.Parser",
+            "Bootstrap.Module",
+            "Bootstrap.Standalone",
+            "Bootstrap.Constraint",
+            "Bootstrap.Elaborate",
+            "Bootstrap.ClassDemand",
+            "Bootstrap.Classes",
+            "Bootstrap.Separate",
+            "Bootstrap.ImportParameters",
+            "Bootstrap.CompilerCore",
+            "Bootstrap.ImportedRoot",
+            "Bootstrap.Compiler",
+            "Bootstrap.Bitstream",
+            "Bootstrap.ArtifactStructure",
+            "Bootstrap.ArtifactStorage",
+            "Bootstrap.SourceUnit",
+            "Bootstrap.QueryGraph",
+            "Bootstrap.OpenFragment",
+            "Bootstrap.InferenceUnit",
+            "Bootstrap.SourceInference",
+            "Bootstrap.CrateQuery",
+            "Bootstrap.CrateGraph",
+            "Bootstrap.CrateArtifact",
+            "Bootstrap.PreparedLibraries",
+            "MLF.PreparedLibraryData",
+            "Bootstrap.CrateCodegen",
+            "Bootstrap.BuiltinPreludeContext",
+            "MLF.BuiltinPreludeData",
+            "Bootstrap.BuiltinPreludeLiteral",
+            "Bootstrap.Crate",
+            "Bootstrap.CrateSession",
+            "Package.OS",
+            "Package.Json",
+            "MLF.PreparedCompiler",
+            "MLF.NativeBuild",
+            "MLF.Entry.Emlf",
+            "Main"
+          ],
+          "build_wall_s": 75.60556409900005
+        },
+        "C": {
+          "producer": {
+            "bytes": 20215520,
+            "mode": 493,
+            "sha256": "65dfd907bb0e4420c2e131660decd2ad183c965642c6f8ceba0a7971db70bf5a",
+            "resolved": "/home/runner/work/_temp/remote-foundation-44219723394-1/producers/C/bin/emlf"
+          },
+          "runtime": [
+            {
+              "reported_path": "/lib/x86_64-linux-gnu/libm.so.6",
+              "bytes": 952616,
+              "mode": 420,
+              "sha256": "fce00b6f25f459cf4ae0b7fae4257909a1a8a86f9149e7c029a5d617baf1ccd0",
+              "resolved": "/usr/lib/x86_64-linux-gnu/libm.so.6"
+            },
+            {
+              "reported_path": "/lib/x86_64-linux-gnu/libgmp.so.10",
+              "bytes": 534896,
+              "mode": 420,
+              "sha256": "0ccdfb6d6f5c039465f6d002cf7e4c072d48ac6a2cffc8dd6c748dec31592804",
+              "resolved": "/usr/lib/x86_64-linux-gnu/libgmp.so.10.5.0"
+            },
+            {
+              "reported_path": "/lib/x86_64-linux-gnu/libc.so.6",
+              "bytes": 2129424,
+              "mode": 493,
+              "sha256": "3a15d66867d83762c7f2f1e37359cb8f6c5743edb369c65285cb0b1c4f7498bf",
+              "resolved": "/usr/lib/x86_64-linux-gnu/libc.so.6"
+            },
+            {
+              "reported_path": "/lib64/ld-linux-x86-64.so.2",
+              "bytes": 236616,
+              "mode": 493,
+              "sha256": "c20a2dc8917c755f02b94049356320fe1f62ac7d9f8994731f807d9df39302da",
+              "resolved": "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"
+            }
+          ],
+          "home_modules": [
+            "MLF.Host.Base",
+            "MLF.Host.Async",
+            "MLF.Host.IO",
+            "MLF.Primitive",
+            "Bootstrap.Version",
+            "Bootstrap.Unicode",
+            "Bootstrap.IndexVec",
+            "Bootstrap.Types",
+            "MLF.PreparedNativeData",
+            "Bootstrap.ST",
+            "Bootstrap.ProcessHost",
+            "Bootstrap.Kind",
+            "Bootstrap.IntTree",
+            "Bootstrap.IntRank",
+            "Bootstrap.Std",
+            "Bootstrap.Primitive",
+            "Bootstrap.X.Syntax",
+            "Bootstrap.Map",
+            "Bootstrap.Set",
+            "Bootstrap.Lexer",
+            "Bootstrap.Parsec",
+            "Bootstrap.Layout",
+            "Bootstrap.LLVM.Optimize",
+            "Bootstrap.LLVM.Analysis",
+            "Bootstrap.LLVM.StrictFields",
+            "Bootstrap.LLVM.StrictWrappers",
+            "Bootstrap.LLVM.Result",
+            "Bootstrap.LLVM.Kernel",
+            "Bootstrap.LLVM.Argument",
+            "Bootstrap.LLVM.LazyProducer",
+            "Bootstrap.LLVM.Build",
+            "Bootstrap.LLVM.Native",
+            "Bootstrap.LLVM.Codegen",
+            "Bootstrap.IntSet",
+            "Bootstrap.IntMap",
+            "Bootstrap.SourceEquality",
+            "Bootstrap.Resolved",
+            "Bootstrap.Host",
+            "Bootstrap.Graph.IndexStore",
+            "Bootstrap.Graph",
+            "Bootstrap.Graph.Solver",
+            "Bootstrap.Fresh",
+            "Bootstrap.Data",
+            "Bootstrap.X.Type",
+            "Bootstrap.X.Parser",
+            "Bootstrap.X.Pretty",
+            "Bootstrap.X.Check",
+            "Bootstrap.X.Checked",
+            "Bootstrap.Evidence",
+            "Bootstrap.Runtime",
+            "Bootstrap.LLVM",
+            "Bootstrap.LLVM.Library",
+            "Bootstrap.Kinding",
+            "Bootstrap.EvidenceBoundary",
+            "Bootstrap.Desugar",
+            "Bootstrap.Dependency",
+            "Bootstrap.Surface",
+            "Bootstrap.Prelude",
+            "Bootstrap.Parser",
+            "Bootstrap.Module",
+            "Bootstrap.Standalone",
+            "Bootstrap.Constraint",
+            "Bootstrap.Elaborate",
+            "Bootstrap.ClassDemand",
+            "Bootstrap.Classes",
+            "Bootstrap.Separate",
+            "Bootstrap.ImportParameters",
+            "Bootstrap.CompilerCore",
+            "Bootstrap.ImportedRoot",
+            "Bootstrap.Compiler",
+            "Bootstrap.Bitstream",
+            "Bootstrap.ArtifactStructure",
+            "Bootstrap.ArtifactStorage",
+            "Bootstrap.SourceUnit",
+            "Bootstrap.QueryGraph",
+            "Bootstrap.OpenFragment",
+            "Bootstrap.InferenceUnit",
+            "Bootstrap.SourceInference",
+            "Bootstrap.CrateQuery",
+            "Bootstrap.CrateGraph",
+            "Bootstrap.CrateArtifact",
+            "Bootstrap.PreparedLibraries",
+            "MLF.PreparedLibraryData",
+            "Bootstrap.CrateCodegen",
+            "Bootstrap.BuiltinPreludeContext",
+            "MLF.BuiltinPreludeData",
+            "Bootstrap.BuiltinPreludeLiteral",
+            "Bootstrap.Crate",
+            "Bootstrap.CrateSession",
+            "Package.OS",
+            "Package.Json",
+            "MLF.PreparedCompiler",
+            "MLF.NativeBuild",
+            "MLF.Entry.Emlf",
+            "Main"
+          ],
+          "build_wall_s": 75.26939705099994
+        }
+      },
+      "native": false,
+      "resources": {
+        "mem_available_KiB": 14975356,
+        "disk_bytes": 86758477824,
+        "required_disk_bytes": 8589934592
+      },
+      "gcc_before": {
+        "bytes": 1023032,
+        "mode": 493,
+        "sha256": "1b99826121ae6682a634e5efe09bd3e3df58ce58e0b28f849114ab5b89139c26",
+        "resolved": "/usr/bin/x86_64-linux-gnu-gcc-13"
+      },
+      "ghc_full_inventory_pre_post_equal": true,
+      "gcc_after": {
+        "bytes": 1023032,
+        "mode": 493,
+        "sha256": "1b99826121ae6682a634e5efe09bd3e3df58ce58e0b28f849114ab5b89139c26",
+        "resolved": "/usr/bin/x86_64-linux-gnu-gcc-13"
+      },
+      "limit_policy_phase": "build",
+      "child_fsize_limit_bytes": 268435456,
+      "cleanup": true,
+      "whole_s": 159.90001390999998,
+      "within_whole": true,
+      "process_group_scope_only": true,
+      "global_descendants_or_ECHILD_claim": false
+    },
+    "screen-outer.json": {
+      "complete": true,
+      "phase": "terminal",
+      "command": [
+        "/usr/bin/python3",
+        "controls/tools/performance/binder-fusion-paired/screen.py",
+        "--root",
+        "/home/runner/work/_temp/remote-foundation-44219723394-1",
+        "--sources",
+        "/home/runner/work/mlf/mlf/baseline",
+        "--a",
+        "/home/runner/work/_temp/remote-foundation-44219723394-1/producers/A/bin/emlf",
+        "--c",
+        "/home/runner/work/_temp/remote-foundation-44219723394-1/producers/C/bin/emlf"
+      ],
+      "work_seconds": 600.0,
+      "cleanup_seconds": 10.0,
+      "cleanup_complete": true,
+      "reaped": [
+        {
+          "pid": 73849,
+          "status": 0
+        }
+      ],
+      "signals": [],
+      "scope": "owned descendants via Linux subreaper and direct-child pidfds; supervisor SIGKILL not contained",
+      "initial_discovery": {
+        "mode": "task-children"
+      },
+      "root_pid": 73849,
+      "reason": "target exited",
+      "target_exit_code": 0,
+      "survivors": [],
+      "cancel_signals": []
+    },
+    "screen/screen-receipt.json": {
+      "complete": true,
+      "native": false,
+      "new_runner": true,
+      "ci": {
+        "GITHUB_SHA": "773797dab9e685da522a3e0fde02dce2e573a148",
+        "GITHUB_RUN_ID": "44219723394",
+        "GITHUB_RUN_ATTEMPT": "1",
+        "GITHUB_REPOSITORY": "mlf-lang/mlf",
+        "GITHUB_REF": "refs/heads/perf/binder-fusion-paired-20261118"
+      },
+      "errors": [],
+      "descriptive_only": true,
+      "builtin": {
+        "interface": {
+          "format": "MLFBIN-v1",
+          "schema": 3,
+          "bytes": 40417,
+          "nodes": 2114,
+          "roots": 1,
+          "crc32_verified": true
+        },
+        "object": {
+          "format": "MLFBIN-v1",
+          "schema": 4,
+          "bytes": 190840,
+          "nodes": 27425,
+          "roots": 1,
+          "crc32_verified": true
+        },
+        "modules": [
+          "MLF.Primitive",
+          "Prelude"
+        ]
+      },
+      "pairs": [
+        {
+          "A": "A1",
+          "C": "C1",
+          "wall_C_over_A": 0.9951372000089164,
+          "RSS_C_over_A": 0.9856624531835206
+        },
+        {
+          "A": "A2",
+          "C": "C2",
+          "wall_C_over_A": 0.9899358935755708,
+          "RSS_C_over_A": 0.9868463453932913
+        }
+      ],
+      "geometric_wall_C_over_A": 0.9925331396588822,
+      "decision": "CONTINUE",
+      "output_budget": {
+        "files": 10090,
+        "bytes": 59629208
+      },
+      "postchecks": true,
+      "elapsed_seconds": 139.21131926199996,
+      "owned_quiescent": true,
+      "targets": [
+        {
+          "name": "seed",
+          "measurement": {
+            "complete": true,
+            "pid": 73852,
+            "raw_wait_status": 0,
+            "exit_code": 0,
+            "wall_ns": 291508416,
+            "user_seconds": 0.26634199999999997,
+            "system_seconds": 0.025429999999999998,
+            "maxrss_KiB": 37168,
+            "boundary": "fork/exec through exact child wait4; Linux process peak, not tree RSS sum"
+          },
+          "supervisor": {
+            "complete": true,
+            "phase": "terminal",
+            "command": [
+              "/usr/bin/python3",
+              "-B",
+              "/home/runner/work/mlf/mlf/controls/tools/performance/binder-fusion-paired/measure.py",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/artifacts/screen/steps/seed/measurement.json",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/producers/A/bin/emlf",
+              "--compile-crate",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/artifacts/screen/seed.spec",
+              "-o",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/artifacts/screen/seed/unit"
+            ],
+            "work_seconds": 60.0,
+            "cleanup_seconds": 10.0,
+            "cleanup_complete": true,
+            "reaped": [
+              {
+                "pid": 73851,
+                "status": 0
+              }
+            ],
+            "signals": [],
+            "scope": "owned descendants via Linux subreaper and direct-child pidfds; supervisor SIGKILL not contained",
+            "initial_discovery": {
+              "mode": "task-children"
+            },
+            "root_pid": 73851,
+            "reason": "target exited",
+            "target_exit_code": 0,
+            "survivors": [],
+            "cancel_signals": []
+          },
+          "qualification": false,
+          "sample": false
+        },
+        {
+          "name": "qual-A",
+          "measurement": {
+            "complete": true,
+            "pid": 73867,
+            "raw_wait_status": 0,
+            "exit_code": 0,
+            "wall_ns": 19858531863,
+            "user_seconds": 19.666724,
+            "system_seconds": 0.22858799999999999,
+            "maxrss_KiB": 136748,
+            "boundary": "fork/exec through exact child wait4; Linux process peak, not tree RSS sum"
+          },
+          "supervisor": {
+            "complete": true,
+            "phase": "terminal",
+            "command": [
+              "/usr/bin/python3",
+              "-B",
+              "/home/runner/work/mlf/mlf/controls/tools/performance/binder-fusion-paired/measure.py",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/artifacts/screen/steps/qual-A/measurement.json",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/producers/A/bin/emlf",
+              "--compile-crate",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/artifacts/screen/foundation.spec",
+              "-o",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/artifacts/screen/work/unit"
+            ],
+            "work_seconds": 60.0,
+            "cleanup_seconds": 10.0,
+            "cleanup_complete": true,
+            "reaped": [
+              {
+                "pid": 73866,
+                "status": 0
+              }
+            ],
+            "signals": [],
+            "scope": "owned descendants via Linux subreaper and direct-child pidfds; supervisor SIGKILL not contained",
+            "initial_discovery": {
+              "mode": "task-children"
+            },
+            "root_pid": 73866,
+            "reason": "target exited",
+            "target_exit_code": 0,
+            "survivors": [],
+            "cancel_signals": []
+          },
+          "qualification": true,
+          "sample": false,
+          "side": "A"
+        },
+        {
+          "name": "qual-C",
+          "measurement": {
+            "complete": true,
+            "pid": 73920,
+            "raw_wait_status": 0,
+            "exit_code": 0,
+            "wall_ns": 19893077816,
+            "user_seconds": 19.683526,
+            "system_seconds": 0.24733,
+            "maxrss_KiB": 134712,
+            "boundary": "fork/exec through exact child wait4; Linux process peak, not tree RSS sum"
+          },
+          "supervisor": {
+            "complete": true,
+            "phase": "terminal",
+            "command": [
+              "/usr/bin/python3",
+              "-B",
+              "/home/runner/work/mlf/mlf/controls/tools/performance/binder-fusion-paired/measure.py",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/artifacts/screen/steps/qual-C/measurement.json",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/producers/C/bin/emlf",
+              "--compile-crate",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/artifacts/screen/foundation.spec",
+              "-o",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/artifacts/screen/work/unit"
+            ],
+            "work_seconds": 60.0,
+            "cleanup_seconds": 10.0,
+            "cleanup_complete": true,
+            "reaped": [
+              {
+                "pid": 73919,
+                "status": 0
+              }
+            ],
+            "signals": [],
+            "scope": "owned descendants via Linux subreaper and direct-child pidfds; supervisor SIGKILL not contained",
+            "initial_discovery": {
+              "mode": "task-children"
+            },
+            "root_pid": 73919,
+            "reason": "target exited",
+            "target_exit_code": 0,
+            "survivors": [],
+            "cancel_signals": []
+          },
+          "qualification": true,
+          "sample": false,
+          "side": "C"
+        },
+        {
+          "name": "A1",
+          "measurement": {
+            "complete": true,
+            "pid": 73972,
+            "raw_wait_status": 0,
+            "exit_code": 0,
+            "wall_ns": 19835141313,
+            "user_seconds": 19.628828,
+            "system_seconds": 0.241482,
+            "maxrss_KiB": 136704,
+            "boundary": "fork/exec through exact child wait4; Linux process peak, not tree RSS sum"
+          },
+          "supervisor": {
+            "complete": true,
+            "phase": "terminal",
+            "command": [
+              "/usr/bin/python3",
+              "-B",
+              "/home/runner/work/mlf/mlf/controls/tools/performance/binder-fusion-paired/measure.py",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/artifacts/screen/steps/A1/measurement.json",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/producers/A/bin/emlf",
+              "--compile-crate",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/artifacts/screen/foundation.spec",
+              "-o",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/artifacts/screen/work/unit"
+            ],
+            "work_seconds": 60.0,
+            "cleanup_seconds": 10.0,
+            "cleanup_complete": true,
+            "reaped": [
+              {
+                "pid": 73971,
+                "status": 0
+              }
+            ],
+            "signals": [],
+            "scope": "owned descendants via Linux subreaper and direct-child pidfds; supervisor SIGKILL not contained",
+            "initial_discovery": {
+              "mode": "task-children"
+            },
+            "root_pid": 73971,
+            "reason": "target exited",
+            "target_exit_code": 0,
+            "survivors": [],
+            "cancel_signals": []
+          },
+          "qualification": false,
+          "sample": true,
+          "side": "A"
+        },
+        {
+          "name": "C1",
+          "measurement": {
+            "complete": true,
+            "pid": 74024,
+            "raw_wait_status": 0,
+            "exit_code": 0,
+            "wall_ns": 19738686988,
+            "user_seconds": 19.530912999999998,
+            "system_seconds": 0.243553,
+            "maxrss_KiB": 134744,
+            "boundary": "fork/exec through exact child wait4; Linux process peak, not tree RSS sum"
+          },
+          "supervisor": {
+            "complete": true,
+            "phase": "terminal",
+            "command": [
+              "/usr/bin/python3",
+              "-B",
+              "/home/runner/work/mlf/mlf/controls/tools/performance/binder-fusion-paired/measure.py",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/artifacts/screen/steps/C1/measurement.json",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/producers/C/bin/emlf",
+              "--compile-crate",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/artifacts/screen/foundation.spec",
+              "-o",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/artifacts/screen/work/unit"
+            ],
+            "work_seconds": 60.0,
+            "cleanup_seconds": 10.0,
+            "cleanup_complete": true,
+            "reaped": [
+              {
+                "pid": 74023,
+                "status": 0
+              }
+            ],
+            "signals": [],
+            "scope": "owned descendants via Linux subreaper and direct-child pidfds; supervisor SIGKILL not contained",
+            "initial_discovery": {
+              "mode": "task-children"
+            },
+            "root_pid": 74023,
+            "reason": "target exited",
+            "target_exit_code": 0,
+            "survivors": [],
+            "cancel_signals": []
+          },
+          "qualification": false,
+          "sample": true,
+          "side": "C"
+        },
+        {
+          "name": "C2",
+          "measurement": {
+            "complete": true,
+            "pid": 74078,
+            "raw_wait_status": 0,
+            "exit_code": 0,
+            "wall_ns": 19655606811,
+            "user_seconds": 19.455505,
+            "system_seconds": 0.236903,
+            "maxrss_KiB": 134744,
+            "boundary": "fork/exec through exact child wait4; Linux process peak, not tree RSS sum"
+          },
+          "supervisor": {
+            "complete": true,
+            "phase": "terminal",
+            "command": [
+              "/usr/bin/python3",
+              "-B",
+              "/home/runner/work/mlf/mlf/controls/tools/performance/binder-fusion-paired/measure.py",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/artifacts/screen/steps/C2/measurement.json",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/producers/C/bin/emlf",
+              "--compile-crate",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/artifacts/screen/foundation.spec",
+              "-o",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/artifacts/screen/work/unit"
+            ],
+            "work_seconds": 60.0,
+            "cleanup_seconds": 10.0,
+            "cleanup_complete": true,
+            "reaped": [
+              {
+                "pid": 74077,
+                "status": 0
+              }
+            ],
+            "signals": [],
+            "scope": "owned descendants via Linux subreaper and direct-child pidfds; supervisor SIGKILL not contained",
+            "initial_discovery": {
+              "mode": "task-children"
+            },
+            "root_pid": 74077,
+            "reason": "target exited",
+            "target_exit_code": 0,
+            "survivors": [],
+            "cancel_signals": []
+          },
+          "qualification": false,
+          "sample": true,
+          "side": "C"
+        },
+        {
+          "name": "A2",
+          "measurement": {
+            "complete": true,
+            "pid": 74129,
+            "raw_wait_status": 0,
+            "exit_code": 0,
+            "wall_ns": 19855434012,
+            "user_seconds": 19.65103,
+            "system_seconds": 0.240357,
+            "maxrss_KiB": 136540,
+            "boundary": "fork/exec through exact child wait4; Linux process peak, not tree RSS sum"
+          },
+          "supervisor": {
+            "complete": true,
+            "phase": "terminal",
+            "command": [
+              "/usr/bin/python3",
+              "-B",
+              "/home/runner/work/mlf/mlf/controls/tools/performance/binder-fusion-paired/measure.py",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/artifacts/screen/steps/A2/measurement.json",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/producers/A/bin/emlf",
+              "--compile-crate",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/artifacts/screen/foundation.spec",
+              "-o",
+              "/home/runner/work/_temp/remote-foundation-44219723394-1/artifacts/screen/work/unit"
+            ],
+            "work_seconds": 60.0,
+            "cleanup_seconds": 10.0,
+            "cleanup_complete": true,
+            "reaped": [
+              {
+                "pid": 74128,
+                "status": 0
+              }
+            ],
+            "signals": [],
+            "scope": "owned descendants via Linux subreaper and direct-child pidfds; supervisor SIGKILL not contained",
+            "initial_discovery": {
+              "mode": "task-children"
+            },
+            "root_pid": 74128,
+            "reason": "target exited",
+            "target_exit_code": 0,
+            "survivors": [],
+            "cancel_signals": []
+          },
+          "qualification": false,
+          "sample": true,
+          "side": "A"
+        }
+      ]
+    }
+  }
+}
