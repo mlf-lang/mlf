@@ -240,15 +240,18 @@ module Bootstrap.OpenFragment
   encodeBody stage name fragment = bodyRecord 400 stage name fragment (bodyValue fragment);
   encodeRaw references stage name fragment = let {
     envelope record = W.VNode 425 [references,record];
-    ordinary = envelope (encodeBody stage name fragment)
-  } in case storageValue fragment of {
-    Nothing -> ordinary;
-    Just term -> let { packed = envelope (bodyRecord 440 stage name fragment term) } in
-      case bindEither (W.planGraph W.defaultLimits [packed])
-        (\graph -> Structure.admitPatterns graph (W.maxExpandedWork W.defaultLimits)) of {
-        Right _ -> packed; Left _ -> ordinary
-      }
-  };
+    ordinary = encodeBody stage name fragment;
+    choose = case storageValue fragment of {
+      Nothing -> ordinary;
+      Just term -> let { record = bodyRecord 440 stage name fragment term } in
+        case bindEither (W.planGraph W.defaultLimits [envelope record])
+          (\graph -> Structure.admitPatterns graph (W.maxExpandedWork W.defaultLimits)) of {
+          Right _ -> record; Left _ -> ordinary
+        }
+    }
+    -- The ordinary record writes its header and logical fingerprint before
+    -- its term. Inspect literal runs only after those earlier fields succeed.
+  } in envelope (seq stage (seq name (seq (fingerprint fragment) choose)));
   bodyRecord tag stage name fragment term = W.VNode tag
     [W.VText stage, W.VText name, W.VText (fingerprint fragment),
      Structure.toList (Structure.toPair Structure.toXName (\p -> W.VText p))

@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
+import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (forM_, unless)
 import Data.Bits (testBit)
 import Data.List (nub, sort)
@@ -843,6 +844,24 @@ applicationPatternChecks = do
     restored <- right (Structure.storedTerm graph body)
     unless (H.unpack (Pretty.prettyTerm restored) == H.unpack (Pretty.prettyTerm source)) (fail "stored checked application term")
     unless (rejected (Structure.fromGraphXTerm graph body)) (fail "unversioned term reader accepted application pattern")
+  -- The compact coder must visit references and the raw header before it
+  -- probes the literal stream. The ordinary frame fixes the error order.
+  let rawRefs = W.VNode 1 []
+      diskError root = do
+        outcome <- try (evaluate (case W.planGraph W.defaultLimits [root] of
+          T.Left message -> error (H.unpack message)
+          T.Right graph -> length (W.graphRoots graph))) :: IO (Either ErrorCall Int)
+        pure (either (Just . takeWhile (/= '\n') . displayException) (const Nothing) outcome)
+      badValues = error "first literal" : error "later literal" : replicate 16 0
+      body = T.XLet result (tree (map T.XIntTerm badValues)) (T.XConstructor "()" [])
+  checked <- right (Open.check env [] body)
+  forM_ [(rawRefs,"raw","unit","first literal"),(W.VText (error "references"),error "stage","unit","references"),
+         (rawRefs,error "stage",error "name","stage"),(rawRefs,"raw",error "name","name")] $
+    \(refs,stage,name,expected) -> do
+      old <- diskError (W.VNode 425 [refs,Open.encodeBody stage name checked])
+      compact <- diskError (Open.encodeRaw refs stage name checked)
+      check "ordinary open-body error" (Just expected) old
+      check "ordered compact-body error" old compact
   let hole = W.VNode 87 []
       join i j = W.VNode 88 [W.VInt i,W.VInt j]
       run n = W.VNode 89 [W.VInt maxBound,W.VInt 1,W.VInt n]
