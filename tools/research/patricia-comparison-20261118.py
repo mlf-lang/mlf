@@ -7,6 +7,8 @@ pins={'old':'d8325d909c249fd82d4ad6173d44d8818cc6f8bf','new':'ee495d5783fca3c26a
 BASE={'old':'old','new':'new','old_swap':'old','new_swap':'new'}
 DONOR={'old_swap':'new','new_swap':'old'}
 surface='libraries/mlf-frontend/Bootstrap/Surface.hs'
+literal='bootstrap/MLF/BuiltinPreludeData.hs'
+expected_identity={'old_swap':'builtin-source-v1:b43c5ddf9224142d296b984833de88528272e318f53fa6203614cd9576c7abae','new_swap':'builtin-source-v1:3e12091e64154a07bfd2e0423383cdcedcd509f980c656ca5352a7b481faaa21'}
 surf_blobs={'old':'3e8082684587d25915d7f209bbf74d32e7c3dcc7','new':'a11262a585792e391d02e379e11e233af627fff0'}
 roots={k:(ROOT/k).resolve() for k in BASE}
 def git(root,*args):return subprocess.check_output(['git','-C',str(root),*args],text=True).strip()
@@ -20,13 +22,22 @@ for label,root in roots.items():
     head=git(root,'rev-parse','HEAD');base=pins[BASE[label]]
     if label in DONOR:
         assert git(root,'show','-s','--format=%P',head)==base
-        assert git(root,'diff','--name-only',base,head).splitlines()==[surface]
+        assert git(root,'diff','--name-only',base,head).splitlines()==sorted([surface,literal])
         assert git(root,'rev-parse','HEAD:'+surface)==surf_blobs[DONOR[label]]
     else:assert head==base and git(root,'rev-parse','HEAD:'+surface)==surf_blobs[label]
     assert git(root,'status','--porcelain','--untracked-files=no')==''
     assert not git(root,'diff','--name-only','HEAD')
     producer=root/'.mlf-build/shared-ghc'
     H.authenticate(producer,root)
+    if label in DONOR:
+        fresh=OUT/(label+'-generated-literal.hs')
+        gr=json.loads((OUT/(label+'-generation-receipt.json')).read_text())
+        vr=json.loads((producer/'builtin-verification'/'receipt.json').read_text())
+        assert gr['complete'] and gr['generation_succeeded'] and gr['immutable_inputs_verified_after']
+        assert gr['source_identity']==vr['source_identity']==expected_identity[label]
+        assert vr['complete'] and vr['exact_regeneration'] and vr['candidate_verified']
+        assert fresh.read_bytes()==(root/literal).read_bytes() and gr['commands'][0]['stdout']['sha256']==sha(fresh)
+        assert vr['canonical']['sha256']==vr['commands'][1]['stdout']['sha256']==sha(fresh)
     text,wanted,_,_=load(root/'tools/performance/patricia/run_native.py').fixture('rank-views')
     if fixture is None: fixture=text
     assert fixture==text
@@ -75,6 +86,7 @@ for l,r in roots.items():
         for k in ['resolved_modules','shared_inputs','configuration_inputs','resolved_host_modules','host_inputs','flags','ghc','cc','installed_dependencies','toolchain']:
             bx=normalized(baseline[k],roots[base]);vx=normalized(receipt[k],r)
             if k in ('resolved_modules','shared_inputs'):
+                bx['MLF.BuiltinPreludeData']['sha256']=sha(r/literal)
                 bx['Bootstrap.Surface']=normalized(donor_receipt[k]['Bootstrap.Surface'],roots[donor])
             if bx!=vx:raise RuntimeError('hybrid admitted inputs mismatch '+l+' '+k)
         if set(receipt['object_inputs'])!=set(baseline['object_inputs']):raise RuntimeError('object membership mismatch')
@@ -97,7 +109,7 @@ record['epoch_manifest_sha256']=frozen;save()
 helper=roots['new']/'tools/performance/a1-private-index/helper.py'
 assert subprocess.check_output(['git','hash-object',str(helper)],text=True).strip()=='1feffe5d9f360a8fbb9f27868985d4a1a97ab010'
 
-record['scope']='Independent ordinary 6GiB reciprocal historical Surface module swaps. Binary cohort is not historical ELF. No compiler probes or RSS/time speed conclusions.'
+record['scope']='Independent ordinary 6GiB reciprocal historical Surface + necessary freshly generated canonical literal swaps. Binary cohort is not historical ELF. No compiler probes or RSS/time speed conclusions.'
 record['schedule']=['old','new','new_swap','old_swap']
 smoke=OUT/'SurfaceSmoke.hs';smoke.write_text('''-- mlf:syntax shared-haskell-v1
 {-# LANGUAGE NoImplicitPrelude #-}
