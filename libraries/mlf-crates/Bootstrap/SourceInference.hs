@@ -1261,8 +1261,20 @@ module Bootstrap.SourceInference where {
   }) refs;
   expressionDeclarations scope body = declarationRefs scope (Dependency.valueRefs (Dependency.observeExpression body));
   selectedContractIds scope owners members = let {
-    ordered = M.fromList compareString (concatMap (\member ->
-      map (\i -> (,) (declName scope i) i) (expressionDeclarations scope (sourceRhs member))) members)
+    -- Only the current winner for each spelling can be ignored on a repeat.
+    -- A distinct slot may shadow it, then the original slot may appear again.
+    select state@((,) current names) i = let { slot = V.toInt i } in
+      if IS.member slot current then state else let {
+        name = declName scope i;
+        replaced = case M.lookup compareString name names of {
+          Nothing -> current; Just previous -> IS.delete (V.toInt previous) current
+        };
+        next = IS.insert slot replaced;
+        entries = M.insert compareString name i names
+      } in seq name (seq next (seq entries ((,) next entries)));
+    selectMember state member =
+      foldlStrict select state (expressionDeclarations scope (sourceRhs member));
+    ordered = snd (foldlStrict selectMember ((,) IS.empty M.empty) members)
   } in filter (\i -> not (elem (\a b -> compareDecl a b == 0) i owners)) (M.elems ordered);
   slotPrepared checked owners (SlotPrepared _ named) = slotPrepared checked owners named;
   slotPrepared checked owners (PreparedGroup original members _ registry specs authority _) = do {
