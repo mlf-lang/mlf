@@ -85,7 +85,8 @@ module Bootstrap.OpenFragment
     else if count == 1 || diff == step then seq diff (seq following (LiteralStream next following first value diff tail))
     else LiteralStream next 1 value value 0 (finishRun count first last step tail));
   data PatternTask = PatternTerm Int XTerm | PatternApp;
-  expressionPattern value = let {
+  expressionPattern = expressionPatternWith False;
+  expressionPatternWith demand value = let {
     run tasks results table@(PatternTable count entries pairs names primitives) stream fuel =
       if fuel < 0 then Nothing else case tasks of {
         [] -> case (,) results stream of {
@@ -117,16 +118,22 @@ module Bootstrap.OpenFragment
           } in case term of {
             XApp left right -> run ((:) (PatternTerm (depth + 1) left)
               ((:) (PatternTerm (depth + 1) right) ((:) PatternApp rest))) results table stream nextFuel;
-            XIntTerm integer -> let { next = addLiteral integer stream } in seq next (atom 0 table next);
+            XIntTerm integer -> let { next = addLiteral integer stream; following = seq next (atom 0 table next) } in
+              if demand then seq integer following else following;
             XVarTerm (XName i hint) -> let { key = (,) i hint } in
-              case M.lookup (comparePair compareInt compareString) key names of {
+              let { following = case M.lookup (comparePair compareInt compareString) key names of {
                 Just index -> atom index table stream;
                 Nothing -> save (Structure.toXTerm term) pairs (M.insert (comparePair compareInt compareString) key count names) primitives
-              };
-            XPrimitive p [] -> let { code = Structure.primitiveCode p } in case IM.lookup code primitives of {
-              Just index -> atom index table stream;
-              Nothing -> save (Structure.toXTerm term) pairs names (IM.insert code count primitives)
-            };
+              } } in if demand then seq hint (seq i following) else following;
+            XPrimitive p args -> let {
+              result = case args of {
+                [] -> let { code = Structure.primitiveCode p } in case IM.lookup code primitives of {
+                  Just index -> atom index table stream;
+                  Nothing -> save (Structure.toXTerm term) pairs names (IM.insert code count primitives)
+                };
+                _ -> Nothing
+              }
+            } in if demand then seq p result else result;
             _ -> Nothing
           }
         }
@@ -185,13 +192,106 @@ module Bootstrap.OpenFragment
         else consume rest [] 128 total x y)))
     }
   } in consume (Pretty.termChunks 0 term []) [] 128 0 0 0;
-  stamp env ps term bs = Separate.encodingFingerprint (Separate.encodingPack
+  -- Between two literal slots each scalar is fixed by the application table.
+  -- Summarize these strings once, including the parentheses on right children.
+  data StampText = StampText Separate.FingerprintEncoding |
+    StampSlots Separate.FingerprintEncoding StampHoles Separate.FingerprintEncoding;
+  data StampHoles = StampHole | StampJoin StampHoles Separate.FingerprintEncoding StampHoles;
+  stampJoin left right = case (,) left right of {
+    (,) (StampText a) (StampText b) -> StampText (Separate.encodingAppend a b);
+    (,) (StampText a) (StampSlots p xs q) -> StampSlots (Separate.encodingAppend a p) xs q;
+    (,) (StampSlots p xs q) (StampText b) -> StampSlots p xs (Separate.encodingAppend q b);
+    (,) (StampSlots p xs q) (StampSlots s ys t) -> StampSlots p (StampJoin xs (Separate.encodingAppend q s) ys) t
+  };
+  stampSyntax value = StampText (Separate.encodingText value);
+  stampTable entries = let {
+    build index table rest = case rest of {
+      [] -> Just table;
+      (:) entry more -> let {
+        add plain arg = build (index + 1) (IM.insert index ((,) plain arg) table) more;
+        leaf text = let { plan = stampSyntax text } in add plan plan
+      } in case entry of {
+        W.VNode 87 [] -> let { hole = StampSlots Separate.encodingEmpty StampHole Separate.encodingEmpty } in add hole hole;
+        W.VNode 70 [W.VNode 31 [W.VInt i,W.VText hint]] -> leaf (Pretty.name (XName i hint));
+        W.VNode 81 [p,W.VNode 1 []] -> case Structure.fromPrimitive p of {
+          Right primitive -> leaf (Pretty.prettyTerm (XPrimitive primitive [])); Left _ -> Nothing
+        };
+        W.VNode 88 [W.VInt l,W.VInt r] -> case (,) (IM.lookup l table) (IM.lookup r table) of {
+          (,) (Just ((,) f _)) (Just ((,) _ a)) -> let {
+            plain = stampJoin f (stampJoin (stampSyntax " ") a);
+            arg = stampJoin (stampSyntax "(") (stampJoin plain (stampSyntax ")"))
+          } in add plain arg;
+          _ -> Nothing
+        };
+        _ -> Nothing
+      }
+    }
+  } in build 0 IM.empty entries;
+  stampLiterals runs = let {
+    more raw = case raw of {
+      [] -> [];
+      (:) row rest -> case row of {
+        W.VInt n -> (:) n (more rest);
+        W.VNode 89 [W.VInt start,W.VInt step,W.VInt size] -> rangeRun start step size rest;
+        _ -> []
+      }
+    };
+    rangeRun start step size rest = if size <= 0 then more rest else (:) start (rangeRun (start + step) step (size - 1) rest)
+  } in more runs;
+  data StampState = StampState Int Int Int ([] Int);
+  stampFixed piece (StampState count a b literals) = let { total = count + Separate.encodingLength piece } in
+    case Separate.encodingState ((,) a b) piece of { (,) x y -> seq total (seq x (seq y (StampState total x y literals))) };
+  stampHoles holes state = case holes of {
+    StampHole -> case state of {
+      StampState count a b ((:) value rest) -> let { digits = showInt value; n = stringLength digits; total = count + n } in
+        case Separate.canonicalFingerprintText digits 0 n a b of {
+          (,) x y -> seq total (seq x (seq y (Just (StampState total x y rest))))
+        };
+      _ -> Nothing
+    };
+    StampJoin left piece right -> case stampHoles left state of {
+      Nothing -> Nothing; Just next -> stampHoles right (stampFixed piece next)
+    }
+  };
+  patternEncoding entries runs root = case stampTable entries of {
+    Nothing -> Nothing;
+    Just table -> case IM.lookup root table of {
+      Just ((,) (StampSlots prefix holes suffix) _) -> case stampHoles holes
+        (stampFixed prefix (StampState 0 0 0 (stampLiterals runs))) of {
+        Nothing -> Nothing;
+        Just next -> case stampFixed suffix next of {
+          StampState count a b [] -> Just (Separate.FingerprintEncoding count
+            (Separate.fingerprintPower 65599 count 2147483647) (Separate.fingerprintPower 131 count 2147483629) a b);
+          _ -> Nothing
+        }
+      };
+      _ -> Nothing
+    }
+  };
+  stampThen first next = case first of {
+    Separate.FingerprintEncoding n pa pb a b -> seq n (seq a (seq b (Separate.encodingAppend first next)))
+  };
+  orderedTermEncoding term = case term of {
+    XLet name rhs body -> stampThen (Separate.encodingText ("let " ++ Pretty.name name ++ " = "))
+      (stampThen (orderedTermEncoding rhs) (stampThen (Separate.encodingText " in ") (orderedTermEncoding body)));
+    XAbs name ty body -> stampThen
+      (Separate.encodingText ("\\(" ++ Pretty.name name ++ " : " ++ Pretty.prettyType ty ++ ") -> "))
+      (orderedTermEncoding body);
+    XApp _ _ -> case expressionPatternWith True term of {
+      Just (W.VNode 86 [W.VNode 1 rows,W.VNode 1 runs,W.VInt root]) ->
+        fromMaybe (termEncoding term) (patternEncoding rows runs root);
+      _ -> termEncoding term
+    };
+    _ -> termEncoding term
+  };
+  stamp env ps term bs = stampEncoding env ps (termEncoding term) bs;
+  stampEncoding env ps summary bs = Separate.encodingFingerprint (Separate.encodingPack
     [Separate.encodingText (Separate.pack (map (compose D.prettyDeclaration canonicalDeclaration) (declarations env))),
      Separate.encodingText (Separate.pack (map (\((,) n ty) -> Separate.pack [showInt (X.nameId n), X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) ps)),
-     termEncoding term,
+     summary,
      Separate.encodingText (Separate.pack (map (\((,) n ty) -> Separate.pack [X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) bs))]);
   make env ps term bs = fragmentWith env ps term bs
-    (Boundary.nubNames (Boundary.freeNames term)) (stamp env ps term bs);
+    (Boundary.nubNames (Boundary.freeNames term)) (stampEncoding env ps (orderedTermEncoding term) bs);
   -- Hints are labels, never binder identities. This transformation starts from
   -- an opaque checked fragment and changes every occurrence consistently. It
   -- preserves the environment, all IDs, types, evidence and free-use inventory;
@@ -202,7 +302,7 @@ module Bootstrap.OpenFragment
     term = Separate.mapTerm rename (\v -> v) (body fragment);
     bs = map (\((,) n ty) -> (,) (rename n) ty) (bindings fragment);
     env = context fragment
-  } in fragmentWith env ps term bs (map rename (usedParameters fragment)) (stamp env ps term bs);
+  } in fragmentWith env ps term bs (map rename (usedParameters fragment)) (stampEncoding env ps (orderedTermEncoding term) bs);
   check :: Environment -> [] ((,) XName XType) -> XTerm -> Either String Fragment;
   check env@(Environment _ ds) ps term = do {
     let { names = map fst ps };
@@ -244,7 +344,7 @@ module Bootstrap.OpenFragment
     term = Separate.mapTerm name variable (body fragment);
     bs = map (\((,) n ty) -> (,) (name n) (Separate.normalType ty)) (bindings fragment);
     renamed = fragmentWith (context fragment) ps term bs
-      (map name (usedParameters fragment)) (stamp (context fragment) ps term bs)
+      (map name (usedParameters fragment)) (stampEncoding (context fragment) ps (orderedTermEncoding term) bs)
   } in (,) (advanceIdentity serial (length ids)) renamed;
   -- The environment and external types are supplied from verified shared
   -- dependency nodes. This record contains their local identities, not copies.
