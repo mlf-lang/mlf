@@ -7,7 +7,7 @@ pins={'old':'d8325d909c249fd82d4ad6173d44d8818cc6f8bf','new':'ee495d5783fca3c26a
 roots={k:(ROOT/k).resolve() for k in pins}
 H=load(roots['new']/'tools/performance/a1-private-index/helper.py')
 limits=dict(address_space_per_process_bytes=6*1024**3,disk_free_floor_bytes=5*1024**3,host_available_floor_bytes=3*1024**3,process_tree_rss_bytes=5*1024**3,max_work_bytes=2*1024**3,wall_seconds=600)
-record={'complete':False,'scope':'emit-only bounded same-runner diagnosis; not semantic or speed qualification','pins':pins,'limits':limits,'legs':[],'host':H.host()}
+record={'complete':False,'scope':'type-only bounded same-runner diagnosis; not semantic or speed qualification','pins':pins,'limits':limits,'legs':[],'host':H.host()}
 def save(): (OUT/'comparison.json').write_text(json.dumps(record,indent=2)+'\n')
 save()
 fixture=None
@@ -21,9 +21,9 @@ for label,root in roots.items():
     record[label]={'binary_sha256':sha(producer/'bin/emlf'),'receipt_sha256':sha(producer/'receipt.json')}
 entry=OUT/'Main.hs';entry.write_text(fixture);record['fixture_sha256']=sha(entry);save()
 failures={k:0 for k in pins}
-for index,label in enumerate(['old','new','new','old']):
+for index,label in enumerate(['old','new']):
     root=roots[label];dest=OUT/('leg-'+str(index)+'-'+label)
-    argv=[root/'.mlf-build/shared-ghc/bin/emlf','-i',root/'libraries/mlf-foundation','--emit-llvm',entry]
+    argv=[root/'.mlf-build/shared-ghc/bin/emlf','-i',root/'libraries/mlf-foundation','--type',entry]
     try: H.Runner(OUT,limits).run(argv,root,dest,expected_exit=0)
     except RuntimeError as error:
         record['last_error']=repr(error);save()
@@ -36,6 +36,6 @@ for index,label in enumerate(['old','new','new','old']):
     if receipt.get('terminal_live_descendants') or receipt.get('reason'):
         record['stop_reason']='guard or descendant safety stop';break
     if failures[label]>=2: record['stop_reason']='repeated failure';break
-record['completed_schedule']=len(record['legs'])==4
+record['completed_schedule']=len(record['legs'])==2
 record['all_legs_success']=all(x['complete'] for x in record['legs']) and record['completed_schedule']
 record['complete']=record['all_legs_success'];save()
