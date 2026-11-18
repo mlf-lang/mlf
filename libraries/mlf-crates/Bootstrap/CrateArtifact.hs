@@ -662,10 +662,10 @@ module Bootstrap.CrateArtifact where {
   } in case source of {
     XVarTerm name -> one name;
     XAbs _ _ body -> child body;
-    XApp a b -> join [child a, child b];
+    XApp a b -> Set.union X.compareName (child a) (child b);
     XTypeAbs _ _ body -> child body;
     XTypeApp body _ -> child body;
-    XLet _ rhs body -> join [child rhs, child body];
+    XLet _ rhs body -> Set.union X.compareName (child rhs) (child body);
     XLetRec definitions body -> join ((:) (child body)
       (map (\((,,) _ _ rhs) -> child rhs) definitions));
     XCase subject _ alternatives -> join ((:) (child subject)
