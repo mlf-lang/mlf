@@ -85,8 +85,7 @@ module Bootstrap.OpenFragment
     else if count == 1 || diff == step then seq diff (seq following (LiteralStream next following first value diff tail))
     else LiteralStream next 1 value value 0 (finishRun count first last step tail));
   data PatternTask = PatternTerm Int XTerm | PatternApp;
-  expressionPattern = expressionPatternWith False;
-  expressionPatternWith demand value = let {
+  expressionPattern value = let {
     run tasks results table@(PatternTable count entries pairs names primitives) stream fuel =
       if fuel < 0 then Nothing else case tasks of {
         [] -> case (,) results stream of {
@@ -118,32 +117,26 @@ module Bootstrap.OpenFragment
           } in case term of {
             XApp left right -> run ((:) (PatternTerm (depth + 1) left)
               ((:) (PatternTerm (depth + 1) right) ((:) PatternApp rest))) results table stream nextFuel;
-            XIntTerm integer -> let { next = addLiteral integer stream; following = seq next (atom 0 table next) } in
-              if demand then seq integer following else following;
+            XIntTerm integer -> let { next = addLiteral integer stream } in seq next (atom 0 table next);
             XVarTerm (XName i hint) -> let { key = (,) i hint } in
-              let { following = case M.lookup (comparePair compareInt compareString) key names of {
+              case M.lookup (comparePair compareInt compareString) key names of {
                 Just index -> atom index table stream;
                 Nothing -> save (Structure.toXTerm term) pairs (M.insert (comparePair compareInt compareString) key count names) primitives
-              } } in if demand then seq hint (seq i following) else following;
-            XPrimitive p args -> let {
-              result = case args of {
+              };
+            XPrimitive p args -> case args of {
                 [] -> let { code = Structure.primitiveCode p } in case IM.lookup code primitives of {
                   Just index -> atom index table stream;
                   Nothing -> save (Structure.toXTerm term) pairs names (IM.insert code count primitives)
                 };
                 _ -> Nothing
-              }
-            } in if demand then seq p result else result;
+              };
             _ -> Nothing
           }
         }
       }
   } in run [PatternTerm 1 value] [] (PatternTable 1 [W.VNode 87 []] IM.empty M.empty IM.empty)
     (LiteralStream 0 0 0 0 0 []) 1048576;
-  compactTerm term = let {
-    still value = (,) value Nothing;
-    child value = (,) (Structure.toXTerm value) (compactTerm value);
-    node tag fields = let {
+  compactNode tag fields = let {
       replace rest = case rest of {
         [] -> Nothing;
         (:) ((,) raw changed) tail -> case changed of {
@@ -152,6 +145,10 @@ module Bootstrap.OpenFragment
         }
       }
     } in mapOptional (W.VNode tag) (replace fields);
+  compactTerm term = let {
+    still value = (,) value Nothing;
+    child value = (,) (Structure.toXTerm value) (compactTerm value);
+    node = compactNode;
     binding row@((,,) name ty body) = (,) (Structure.toTriple Structure.toXName Structure.toXType Structure.toXTerm row)
       (node 3 [still (Structure.toXName name),still (Structure.toXType ty),child body]);
     alternative row@(XAlternative pat body) = (,) (Structure.toXAlternative row)
@@ -271,27 +268,58 @@ module Bootstrap.OpenFragment
   stampThen first next = case first of {
     Separate.FingerprintEncoding n pa pb a b -> seq n (seq a (seq b (Separate.encodingAppend first next)))
   };
-  orderedTermEncoding term = case term of {
-    XLet name rhs body -> stampThen (Separate.encodingText ("let " ++ Pretty.name name ++ " = "))
-      (stampThen (orderedTermEncoding rhs) (stampThen (Separate.encodingText " in ") (orderedTermEncoding body)));
-    XAbs name ty body -> stampThen
-      (Separate.encodingText ("\\(" ++ Pretty.name name ++ " : " ++ Pretty.prettyType ty ++ ") -> "))
-      (orderedTermEncoding body);
-    XApp _ _ -> case expressionPatternWith True term of {
-      Just (W.VNode 86 [W.VNode 1 rows,W.VNode 1 runs,W.VInt root]) ->
-        fromMaybe (termEncoding term) (patternEncoding rows runs root);
-      _ -> termEncoding term
+  -- The compact writer may inspect literal differences to select runs. Before
+  -- using that table for a fingerprint, force leaf spellings in the same order
+  -- as the logical pretty printer. A non-application leaf outside this grammar
+  -- returns directly to that printer, including its original demand order.
+  orderedPatternLeaves depth remaining term = if depth > 128 || remaining <= 0 then 0 else
+    let { next = remaining - 1 } in case term of {
+      XApp f a -> let { fuel = orderedPatternLeaves (depth + 1) next f } in
+        if fuel <= 0 then 0 else orderedPatternLeaves (depth + 1) fuel a;
+      XIntTerm value -> seq value next;
+      XVarTerm (XName i hint) -> seq hint (seq i next);
+      XPrimitive p args -> seq p (case args of { [] -> next; _ -> 0 });
+      _ -> 0
     };
-    _ -> termEncoding term
+  -- Reuse the exact physical table at every root whose fingerprint uses the
+  -- same typed application grammar. Either view can be requested first.
+  termViews term = case term of {
+    XLet name rhs body -> let {
+      left = termViews rhs; right = termViews body;
+      stored = compactNode 75 [(,) (Structure.toXName name) Nothing,
+        (,) (Structure.toXTerm rhs) (fst left),(,) (Structure.toXTerm body) (fst right)];
+      summary = stampThen (Separate.encodingText ("let " ++ Pretty.name name ++ " = "))
+        (stampThen (snd left) (stampThen (Separate.encodingText " in ") (snd right)))
+    } in (,) stored summary;
+    XAbs name ty body -> let {
+      nested = termViews body;
+      stored = compactNode 71 [(,) (Structure.toXName name) Nothing,(,) (Structure.toXType ty) Nothing,
+        (,) (Structure.toXTerm body) (fst nested)];
+      summary = stampThen (Separate.encodingText ("\\(" ++ Pretty.name name ++ " : " ++ Pretty.prettyType ty ++ ") -> "))
+        (snd nested)
+    } in (,) stored summary;
+    XApp _ _ -> let {
+      stored = expressionPattern term;
+      plain = termEncoding term;
+      summary = if orderedPatternLeaves 1 1048577 term > 0 then case stored of {
+        Just (W.VNode 86 [W.VNode 1 rows,W.VNode 1 runs,W.VInt root]) ->
+          fromMaybe plain (patternEncoding rows runs root);
+        _ -> plain
+      } else plain
+    } in (,) stored summary;
+    _ -> (,) (compactTerm term) (termEncoding term)
   };
+  checkedFragment env ps term bs used = let {
+    views = termViews term;
+    saved = stampEncoding env ps (snd views) bs
+  } in Fragment env ps term bs used saved (Structure.toXTerm term) (fst views);
   stamp env ps term bs = stampEncoding env ps (termEncoding term) bs;
   stampEncoding env ps summary bs = Separate.encodingFingerprint (Separate.encodingPack
     [Separate.encodingText (Separate.pack (map (compose D.prettyDeclaration canonicalDeclaration) (declarations env))),
      Separate.encodingText (Separate.pack (map (\((,) n ty) -> Separate.pack [showInt (X.nameId n), X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) ps)),
      summary,
      Separate.encodingText (Separate.pack (map (\((,) n ty) -> Separate.pack [X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) bs))]);
-  make env ps term bs = fragmentWith env ps term bs
-    (Boundary.nubNames (Boundary.freeNames term)) (stampEncoding env ps (orderedTermEncoding term) bs);
+  make env ps term bs = checkedFragment env ps term bs (Boundary.nubNames (Boundary.freeNames term));
   -- Hints are labels, never binder identities. This transformation starts from
   -- an opaque checked fragment and changes every occurrence consistently. It
   -- preserves the environment, all IDs, types, evidence and free-use inventory;
@@ -302,7 +330,7 @@ module Bootstrap.OpenFragment
     term = Separate.mapTerm rename (\v -> v) (body fragment);
     bs = map (\((,) n ty) -> (,) (rename n) ty) (bindings fragment);
     env = context fragment
-  } in fragmentWith env ps term bs (map rename (usedParameters fragment)) (stampEncoding env ps (orderedTermEncoding term) bs);
+  } in checkedFragment env ps term bs (map rename (usedParameters fragment));
   check :: Environment -> [] ((,) XName XType) -> XTerm -> Either String Fragment;
   check env@(Environment _ ds) ps term = do {
     let { names = map fst ps };
@@ -343,8 +371,7 @@ module Bootstrap.OpenFragment
     ps = map (\((,) n ty) -> (,) (name n) ty) (parameters fragment);
     term = Separate.mapTerm name variable (body fragment);
     bs = map (\((,) n ty) -> (,) (name n) (Separate.normalType ty)) (bindings fragment);
-    renamed = fragmentWith (context fragment) ps term bs
-      (map name (usedParameters fragment)) (stampEncoding (context fragment) ps (orderedTermEncoding term) bs)
+    renamed = checkedFragment (context fragment) ps term bs (map name (usedParameters fragment))
   } in (,) (advanceIdentity serial (length ids)) renamed;
   -- The environment and external types are supplied from verified shared
   -- dependency nodes. This record contains their local identities, not copies.
