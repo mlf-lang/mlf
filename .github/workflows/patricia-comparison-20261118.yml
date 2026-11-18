@@ -1,7 +1,7 @@
 name: Bounded Patricia comparison
 on:
   push:
-    branches: [perf/patricia-paired-20261118]
+    branches: [perf/patricia-paired-r2-20261118]
 permissions:
   contents: read
 concurrency:
@@ -9,7 +9,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   compare:
-    if: github.repository == 'mlf-lang/mlf' && github.ref == 'refs/heads/perf/patricia-paired-20261118'
+    if: github.repository == 'mlf-lang/mlf' && github.ref == 'refs/heads/perf/patricia-paired-r2-20261118'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -40,10 +40,10 @@ jobs:
           set -euo pipefail
           mkdir -p evidence
           for source in old new; do
-            (cd "$source" && python3 -B tools/shared/crc_process_supervisor.py --receipt ../evidence/"$source-build-supervisor.json" --work-seconds 1800 --cleanup-seconds 10 python3 -B tools/shared/resource_watchdog.py --seconds 1740 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 ../evidence/"$source-build-guard" python3 tools/shared/build.py --bootstrap-only --optimization 2 --build-dir .mlf-build/shared-ghc) > "evidence/$source-build.log" 2>&1
+            (cd "$source" && python3 -B tools/shared/crc_process_supervisor.py --receipt ../evidence/"$source-build-supervisor.json" --work-seconds 1800 --cleanup-seconds 10 "$(command -v python3)" -B tools/shared/resource_watchdog.py --seconds 1740 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 ../evidence/"$source-build-guard" python3 tools/shared/build.py --bootstrap-only --optimization 2 --build-dir .mlf-build/shared-ghc) > "evidence/$source-build.log" 2>&1
           done
       - name: At most two order-balanced emit pairs
-        run: python3 -B new/tools/shared/crc_process_supervisor.py --receipt evidence/comparison-supervisor.json --work-seconds 1800 --cleanup-seconds 10 python3 -B tools/research/patricia-comparison-20261118.py
+        run: python3 -B new/tools/shared/crc_process_supervisor.py --receipt evidence/comparison-supervisor.json --work-seconds 1800 --cleanup-seconds 10 "$(command -v python3)" -B tools/research/patricia-comparison-20261118.py
       - name: Preserve all diagnostic evidence
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
