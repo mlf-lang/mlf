@@ -1,0 +1,41 @@
+{
+  "run": 44223992527,
+  "commit": "48b1cc65d702ef1ffd34c55561365b69a695cd2f",
+  "archive_sha256": "589dd1ef089675c7b83ce06772f3bb13b54c3f4523b4905295efa9e5eb0798cb",
+  "inventory_verified": 12461,
+  "raw_equal_call_count": 14,
+  "raw_compiler_outputs_per_call": 869,
+  "result_files_per_call": 866,
+  "calls": [
+    "qual-A",
+    "qual-C",
+    "A1",
+    "C1",
+    "C2",
+    "A2",
+    "A3",
+    "C3",
+    "C4",
+    "A4",
+    "A5",
+    "C5",
+    "C6",
+    "A6"
+  ],
+  "geometric_C_over_A": 0.9933547452523009,
+  "percent_faster": 0.6645254747699059,
+  "pair_ratios": [
+    1.0053431038557201,
+    0.9840949957860387,
+    0.9998640693771707,
+    1.00564133544599,
+    0.9750843051167551,
+    0.9904867119501621
+  ],
+  "cleanup_verified": true,
+  "qualification_recomputed_each_call": true,
+  "inferred_groups": 244,
+  "reused_groups": 0,
+  "coverage_witness_modules": 7,
+  "interpretation": "Weak sub-1% mixed-direction CONTINUE only, not stable benefit, merge qualification or GHC parity. Raw equality covers CI/CO/queries and all result blobs, NOT query graph generation metadata: CURRENT/generation bytes differ across producer sides."
+}
