@@ -8,6 +8,7 @@ module Bootstrap.X.Check where {
   import Bootstrap.Kind;
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.Data as D;
   import qualified Bootstrap.Primitive as P;
@@ -148,6 +149,19 @@ module Bootstrap.X.Check where {
       L.mapM (termType ds (typeEnv env)) (M.elems (termEnv env));
       inferIn ds env body
     };
+  -- With no type arguments a primitive's result depends only on its ABI
+  -- identity. Share that instantiation across checks in every term scope.
+  instantiateClosedPrimitive :: Primitive -> Either String XType;
+  instantiateClosedPrimitive p = case P.primitiveSignature p of {
+    (,) [] field -> T.instantiateField M.empty field;
+    _ -> Left "primitive type argument arity mismatch"
+  };
+  closedPrimitiveTypes :: IntMap (Either String XType);
+  closedPrimitiveTypes = IM.fromList (L.map (\p ->
+    (,) (P.primitiveCode p) (instantiateClosedPrimitive p)) P.allPrimitives);
+  closedPrimitiveType :: Primitive -> Either String XType;
+  closedPrimitiveType p = IM.findWithDefault (instantiateClosedPrimitive p)
+    (P.primitiveCode p) closedPrimitiveTypes;
   inferIn :: DataEnv -> XEnv -> XTerm -> Either String XType;
   inferIn ds env term =
     case term of {
@@ -211,8 +225,9 @@ module Bootstrap.X.Check where {
         };
       XPrimitive p arguments ->
         case P.primitiveSignature p of {
-          (,) parameters signature ->
-            do {
+          (,) parameters signature -> case arguments of {
+            [] -> closedPrimitiveType p;
+            _ -> do {
               ensure (L.length arguments == L.length parameters)
                 "primitive type argument arity mismatch";
               actualKinds <- L.mapM (T.kindOf ds (typeEnv env)) arguments;
@@ -222,6 +237,7 @@ module Bootstrap.X.Check where {
                 (M.fromList compareString (L.zip (L.map L.fst parameters) arguments))
                 signature
             }
+          }
         };
       XConstructor c arguments ->
         do {
