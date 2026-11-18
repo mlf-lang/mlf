@@ -545,9 +545,19 @@ module Bootstrap.Dependency where {
           duplicate = if null generated then "duplicate value declaration" else "duplicate source/support binding";
           orderedIds = case symbols of { Symbols _ indices _ _ -> filter presentId indices }
     };
+    -- Edges depend on the referenced declaration ID. Check every occurrence
+    -- in source order, sharing the first occurrence of each ID with row construction.
     let { valid i = V.toInt i >= 0 && V.toInt i < V.count (symbolNodes base);
-          referencesInRange (Bound i _ rhs) = valid i && all valid (R.references rhs) };
-    ensure (all referencesInRange bound) "declaration slot out of bounds";
+          checked seen kept refs = case refs of {
+            [] -> Just (reverse kept);
+            (:) i rest -> if not (valid i) then Nothing else let { key = V.toInt i } in
+              if IS.member key seen then checked seen kept rest
+              else checked (IS.insert key seen) ((:) i kept) rest
+          };
+          sourceIds (Bound i _ rhs) =
+            (,) i (if valid i then checked IS.empty [] (R.references rhs) else Nothing);
+          references = map sourceIds bound };
+    ensure (all (compose isJust snd) references) "declaration slot out of bounds";
     ensure (IS.size active == length present && uniqueSlots nodes orderedIds) duplicate;
     let { order = V.fromList orderedIds;
           direct = runST (stBind (V.filled (V.count nodes) Nothing) (\slots ->
@@ -556,12 +566,12 @@ module Bootstrap.Dependency where {
           sourceRank i = rank (fromMaybe i (selectorId generation i));
           edgeRow targets = V.fromList (map (\r -> V.at order (V.fromInt r))
             (IS.toAscList (IS.fromList (map V.toInt targets))));
-          sourceRow (Bound i _ rhs) = (,) i (edgeRow (append (mapMaybe sourceRank (R.references rhs))
+          sourceRow ((,) i ids) = (,) i (edgeRow (append (mapMaybe sourceRank (fromMaybe [] ids))
             (mapMaybe rank (targets i))));
           generatedRow i entry = (,) i (edgeRow (mapMaybe rank (mapMaybe (generatedNameId generation) (snd entry))));
           rows = runST (stBind (V.filled (V.count nodes) (V.fromList [])) (\slots ->
             stBind (ST.map_ (\((,) i row) -> V.set slots i row)
-              (append (map sourceRow bound) (zipWith generatedRow generatedIds generated))) (\_ ->
+              (append (map sourceRow references) (zipWith generatedRow generatedIds generated))) (\_ ->
                 stBind (V.freeze slots) (\table -> stReturn (Rows table)))));
           member i = (,) i (any (\j -> V.toInt i == V.toInt j) (neighbors rows i));
           ordered group = map member (sortBy (\i j -> compareString (V.at nodes i) (V.at nodes j)) group)
