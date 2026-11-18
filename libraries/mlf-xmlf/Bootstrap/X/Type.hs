@@ -160,10 +160,15 @@ module Bootstrap.X.Type where {
   bottomKind k = XBotKind k;
   kindOf :: DataEnv -> Map XTyVar XType -> XType -> Either String Kind;
   kindOf ds bounds ty =
-    do {
-      -- Set traversal supplies each free variable once, in environment key order.
-      kinds <- L.mapM (kindBinding ds bounds S.empty) (S.toList (freeVars ty));
-      kindIn ds (M.fromDistinctAscList kinds) ty
+    case ty of {
+      XVar a -> seq a (visitKind ds bounds S.empty a);
+      XBot -> Right Star;
+      XBotKind k -> Right k;
+      XCon name [] -> Right (D.constructorKind ds name 0);
+      _ -> do {
+        kinds <- L.mapM (kindBinding ds bounds S.empty) (S.toList (freeVars ty));
+        kindIn ds (M.fromDistinctAscList kinds) ty
+      }
     };
   kindBinding :: DataEnv ->
                  Map XTyVar XType -> Set XTyVar -> XTyVar -> Either String ((,) XTyVar Kind);
@@ -178,13 +183,17 @@ module Bootstrap.X.Type where {
     then Left "cyclic type environment"
     else case M.lookup compareTyVar a bounds of {
            Nothing -> Left ("unbound type variable " ++ showInt (tyVarId a));
-           Just b ->
-             do {
+           Just b -> case b of {
+             XBot -> Right Star;
+             XBotKind k -> Right k;
+             XCon name [] -> Right (D.constructorKind ds name 0);
+             _ -> do {
                kinds <-
                  L.mapM (kindBinding ds bounds (S.insert compareTyVar a seen))
                    (S.toList (freeVars b));
                kindIn ds (M.fromDistinctAscList kinds) b
              }
+           }
          };
   kindIn :: DataEnv -> Map XTyVar Kind -> XType -> Either String Kind;
   kindIn ds env ty =
