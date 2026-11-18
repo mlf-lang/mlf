@@ -1244,6 +1244,35 @@ module Bootstrap.Module where {
     SQualified predicates body -> any (\(SPredicate name _) -> eqString name "MLFHasCallStack") predicates || managedAnnotationType body;
     _ -> False
   };
+  -- Application operands share a lexical environment. Keep the resolved
+  -- values of repeated variable spellings until a binder starts a new region.
+  -- Resolve each first occurrence through the ordinary variable policy.
+  resolveApplication child function argument = let {
+    term cache value = case value of {
+      SApp f a -> both cache f a;
+      SCallSite display loc b -> do {
+        (,) body next <- term cache b;
+        Right ((,) (resolvedCallSite display loc body) next)
+      };
+      SVar n -> case M.lookup compareString n cache of {
+        Just resolved -> Right ((,) resolved cache);
+        Nothing -> do {
+          resolved <- child value;
+          let { next = if M.size cache < 64 then M.insert compareString n resolved cache else cache };
+          Right ((,) resolved next)
+        }
+      };
+      _ -> mapEither (\resolved -> (,) resolved cache) (child value)
+    };
+    both cache f a = do {
+      (,) left afterFunction <- term cache f;
+      (,) right afterArgument <- term afterFunction a;
+      Right ((,) (R.App left right) afterArgument)
+    }
+  } in mapEither fst (both M.empty function argument);
+  resolvedCallSite display loc value =
+    if eqString display "an expression type signature" && not (managedResolved value)
+    then value else R.CallSite display loc value;
   resolveBound :: Bindings -> Interface -> Set String -> SExpr -> Either String (R.Expr Declaration);
   resolveBound bindings env bound expression = let {
     walk = resolveBound bindings env; child = walk bound; pat = resolvePattern bindings env;
@@ -1271,7 +1300,7 @@ module Bootstrap.Module where {
       ty <- resolveOptionalAnnotation bindings env a;
       mapEither (R.Lam n ty) (walk (Set.insert compareString n bound) b)
     };
-    SApp a b -> do { f <- child a; mapEither (R.App f) (child b) };
+    SApp a b -> resolveApplication child a b;
     SLet n a b -> do { v <- child a; mapEither (R.Let n v) (walk (Set.insert compareString n bound) b) };
     SAnn a t -> do { v <- child a; mapEither (R.Ann v) (resolveAnnotation bindings env t) };
     SSignature a t -> do { v <- child a; mapEither (R.Signature v) (resolveAnnotation bindings env t) };
@@ -1298,10 +1327,7 @@ module Bootstrap.Module where {
       Right (R.SharedBind q x y z f)
     };
     SSourceDefinition b -> mapEither R.SourceDefinition (child b);
-    SCallSite display loc b -> do {
-      v <- child b; Right (if eqString display "an expression type signature" && not (managedResolved v)
-        then v else R.CallSite display loc v)
-    };
+    SCallSite display loc b -> mapEither (resolvedCallSite display loc) (child b);
     SDo _ _ -> child (Desugar.desugarDo expression);
     SChecked _ _ -> Left "checked source forms are reserved for dictionary translation";
     SGlobal _ _ -> Left "resolved global cannot enter source name resolution";
