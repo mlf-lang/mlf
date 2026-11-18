@@ -47,7 +47,7 @@ def map_shape(body,cap):
         if lo!=HINT+total or not valid:break
         spans.append([cols[1],hi-lo]);total+=hi-lo
     want=(int(cap*0.666)//MIB)*MIB
-    return {'hint_exact':started,'predicted_bytes':want,'observed_bytes':total,'extent_count':len(spans),'rw_bytes':sum(b for a,b in spans if a=='rw-p'),'none_bytes':sum(b for a,b in spans if a=='---p'),'match':bool(spans and total in (want,want+MIB))}
+    return {'hint_exact':started,'predicted_bytes':want,'observed_bytes':total,'extent_count':len(spans),'normalized_spans':spans,'rw_bytes':sum(b for a,b in spans if a=='rw-p'),'none_bytes':sum(b for a,b in spans if a=='---p'),'match':bool(spans and total in (want,want+MIB))}
 def map_once(pid,fields,exe,cap):
     box=pathlib.Path('/proc')/str(pid)
     def stamp():
@@ -64,6 +64,7 @@ record['scope']='RLIMIT_AS-only ordinary binary comparison; exact-hint anonymous
 record['schedule']=['old-6','new-6','new-5.5','old-5.5']
 record['observer_rows']=['elapsed_since_first_poll_s','minflt','majflt','utime_ticks','stime_ticks','vsize_bytes','rss_bytes']
 page_size=os.sysconf('SC_PAGE_SIZE')
+record['page_size_bytes']=page_size;record['clock_ticks_per_second']=os.sysconf('SC_CLK_TCK')
 for i,(label,cap) in enumerate([('old',6<<30),('new',6<<30),('new',11<<29),('old',11<<29)]):
     rows=[];start=None;next_sample=0.0;maps=None;root=roots[label];exe=root/'.mlf-build/shared-ghc/bin/emlf';dest=OUT/('leg-'+str(i)+'-'+label)
     def capture(group,fields):
