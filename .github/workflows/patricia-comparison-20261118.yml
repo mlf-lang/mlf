@@ -1,7 +1,7 @@
 name: Bounded Patricia comparison
 on:
   push:
-    branches: [perf/patricia-surface-live-20261118]
+    branches: [perf/patricia-surface-smoke2-20261118]
 permissions:
   contents: read
 concurrency:
@@ -9,7 +9,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   compare:
-    if: github.repository == 'mlf-lang/mlf' && github.ref == 'refs/heads/perf/patricia-surface-live-20261118'
+    if: github.repository == 'mlf-lang/mlf' && github.ref == 'refs/heads/perf/patricia-surface-smoke2-20261118'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:

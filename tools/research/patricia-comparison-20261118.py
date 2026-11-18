@@ -170,26 +170,26 @@ assert subprocess.check_output(['git','hash-object',str(helper)],text=True).stri
 record['scope']='Independent ordinary 6GiB reciprocal historical Surface + necessary freshly generated canonical literal swaps. Binary cohort is not historical ELF. No compiler probes or RSS/time speed conclusions.'
 record['schedule']=['old','new','new_swap','old_swap']
 smoke=OUT/'SurfaceSmoke.hs';smoke.write_text('''-- mlf:syntax shared-haskell-v1
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}
 module Main (main) where {
 import MLF.Primitive;
-identityInt :: Int -> Int; identityInt x = x;
-choose :: Bool -> Int; choose flag = case flag of { True -> identityInt 7; False -> identityInt 0 };
-main :: IO (); main = printInt (choose True)
+identityInt x = x;
+choose flag = case flag of { True -> identityInt 7; False -> identityInt 0 };
+main = do { printInt (choose True); printInt (choose False) };
 }
 ''');record['smoke_fixture_sha256']=sha(smoke);record['smoke']=[]
 for i,label in enumerate(record['schedule']):
     verify_frozen(label);r=roots[label];dest=OUT/('leg-'+str(i)+'-'+label)
-    if label in DONOR:
+    if label in BASE:
         sd=OUT/('smoke-'+label)
         try:H.Runner(OUT,dict(limits,wall_seconds=45)).run([r/'.mlf-build/shared-ghc/bin/emlf','--run',smoke],r,sd,expected_exit=0)
         except RuntimeError as err:record['last_runner_exception']=repr(err)
         verify_frozen(label);rec=sd/'command.json'
         ok_smoke=False
         if rec.exists():
-            v=json.loads(rec.read_text());ok_smoke=bool(v.get('complete') and v.get('exit_code')==0 and v.get('reason') is None and v.get('terminal_live_descendants')==[] and (sd/'stdout').read_bytes()==b'7\n' and not (sd/'stderr').read_bytes())
+            v=json.loads(rec.read_text());ok_smoke=bool(v.get('complete') and v.get('exit_code')==0 and v.get('reason') is None and v.get('terminal_live_descendants')==[] and (sd/'stdout').read_bytes()==b'7\n0\n' and not (sd/'stderr').read_bytes())
         record['smoke'].append({'label':label,'passed':ok_smoke});save()
-        if not ok_smoke:record['stop_reason']='hybrid semantic smoke failed';save();break
+        if not ok_smoke:record['stop_reason']='same-cohort semantic smoke failed';save();break
     expected=251 if BASE[label]=='new' else 0
     try:H.Runner(OUT,limits).run([r/'.mlf-build/shared-ghc/bin/emlf','-i',r/'libraries/mlf-foundation','--type',entry],r,dest,expected_exit=expected)
     except RuntimeError as err:record['last_runner_exception']=repr(err)
