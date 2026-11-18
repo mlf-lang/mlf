@@ -444,16 +444,27 @@ module Bootstrap.CrateGraph where {
         ((,) (V.at coordinateAlphabet (V.fromInt count)) bytes) names else names
     } in (,,) literal bytes table
   };
-  packedOrigin origin originBytes initialBudget tree header = let {
+  -- The same preorder writer accepts raw declarations or canonical syntax.
+  -- Application children and source wrappers stay in their parent's scope.
+  -- Save a continuation only where the projection changes, at binders or
+  -- forms delegated to the general canonicalizer.
+  data OriginScope = WrittenOrigin | SourceOrigin
+    (V.Index Declaration -> V.Index Declaration) (Map String String) Int (Map String String) Int;
+  packedOrigin = packedOriginIn WrittenOrigin;
+  packedOriginIn initialScope origin originBytes initialBudget tree header = let {
     -- Joining bounded pages releases framed source locations as soon as their
     -- ordinary byte costs have been charged. Keep the initial fields lazy
     -- until all nodes have been admitted.
     pageNodes :: Int;
     pageNodes = 128;
-    collect budget pending chunks pages slots line column names locations = if budget < 0 then Nothing else case pending of {
-      [] -> let {
-        finalPages = case chunks of { [] -> pages; _ -> (:) (concatStringList (reverse chunks)) pages }
-      } in Just (concatStringList ((:) "P3" ((:) header (reverse finalPages))));
+    scan scope outer = let {
+      collect budget pending chunks pages slots line column names locations = if budget < 0 then Nothing else case pending of {
+      [] -> case outer of {
+        (:) ((,) previous items) more -> scan previous more budget items chunks pages slots line column names locations;
+        [] -> let {
+          finalPages = case chunks of { [] -> pages; _ -> (:) (concatStringList (reverse chunks)) pages }
+        } in Just (concatStringList ((:) "P3" ((:) header (reverse finalPages))))
+      };
       (:) expr rest -> if slots == 0 then let {
           page = concatStringList (reverse chunks)
         } in seq page (collect budget pending [] ((:) page pages) pageNodes line column names locations) else let {
@@ -461,11 +472,22 @@ module Bootstrap.CrateGraph where {
         named tag spelling overhead = case positionSymbol spelling names of { (,,) code bytes table ->
           collect (budget - overhead - bytes) rest ((:) code ((:) tag chunks)) pages (slots - 1) line column table locations
         };
-        scalar tag fields overhead = next (overhead + stringUtf8Length fields) ((:) fields ((:) tag chunks)) rest
+        scalar tag fields overhead = next (overhead + stringUtf8Length fields) ((:) fields ((:) tag chunks)) rest;
+        enter nested = scan nested (case rest of { [] -> outer; _ -> (:) ((,) scope rest) outer });
+        ordinary value = let { text = Q.encodeExpression value } in
+          next (stringUtf8Length text) ((:) (Separate.pack [text]) ((:) "x" chunks)) rest
       } in case expr of {
         SApp f a -> next 25 ((:) "a" chunks) ((:) f ((:) a rest));
-        SLam n ann b -> let { fields = Separate.pack [n,Q.optional Q.encodeAnnotation ann] } in
-          next (17 + stringUtf8Length fields) ((:) fields ((:) "l" chunks)) ((:) b rest);
+        SLam n ann b -> case scope of {
+          WrittenOrigin -> let { fields = Separate.pack [n,Q.optional Q.encodeAnnotation ann] } in
+            next (17 + stringUtf8Length fields) ((:) fields ((:) "l" chunks)) ((:) b rest);
+          SourceOrigin rank env depth types typeDepth -> let {
+            local = "local:" ++ showInt depth;
+            fields = Separate.pack [local,Q.optional Q.encodeAnnotation (Separate.mapMaybeValue (Q.canonicalAnnotation types typeDepth) ann)];
+            child = SourceOrigin rank (M.insert compareString n local env) (depth + 1) types typeDepth
+          } in enter child (budget - 17 - stringUtf8Length fields) [b] ((:) fields ((:) "l" chunks))
+            pages (slots - 1) line column names locations
+        };
         SCallSite label span@(SourceSpan pkg mod file sl sc el ec) body -> case origin of {
           SourceSpan p m f _ _ _ _ -> if eqString pkg p && eqString mod m && eqString file f then case positionSymbol label names of { (,,) code nameBytes table -> let {
             short = line == sl && sl == el;
@@ -493,14 +515,25 @@ module Bootstrap.CrateGraph where {
             else let { fields = Separate.pack [label,Q.encodeSourceSpan span] } in
               next (20 + stringUtf8Length fields) ((:) fields ((:) "S" chunks)) ((:) body rest)
         };
-        SVar n -> named "v" n 10;
+        SVar n -> named "v" (case scope of {
+          WrittenOrigin -> n; SourceOrigin _ env _ _ _ -> Q.canonicalReference env n
+        }) 10;
+        SGlobal i _ -> case scope of {
+          SourceOrigin rank _ _ _ _ -> named "v" (Q.ordinalToken (rank i)) 10;
+          WrittenOrigin -> ordinary expr
+        };
         SPrimitive p -> named "p" (Primitive.primitiveName p) 11;
         SIntLit n -> scalar "i" (Separate.pack [showInt n]) 9;
-        _ -> let { value = Q.encodeExpression expr } in
-          next (stringUtf8Length value) ((:) (Separate.pack [value]) ((:) "x" chunks)) rest
+        _ -> case scope of {
+          WrittenOrigin -> ordinary expr;
+          SourceOrigin rank env depth types typeDepth ->
+            enter WrittenOrigin budget [Q.canonicalExpressionWith rank env depth types typeDepth expr]
+              chunks pages slots line column names locations
+        }
       }
-    }
-  } in collect initialBudget [tree] [] [] pageNodes 0 0 M.empty IM.empty;
+      }
+    } in collect
+  } in scan initialScope [] initialBudget [tree] [] [] pageNodes 0 0 M.empty IM.empty;
   matchingSourceMembers original lowered = case (,) original lowered of {
     (,) [(,,) name annotation body] [(,,) other next candidate] ->
       templateNodesLeft 257 body <= 0 && eqString name other && eqMaybe E.eqSAnnotation annotation next &&
@@ -511,7 +544,8 @@ module Bootstrap.CrateGraph where {
     _ -> False
   };
   relativePrepared original lowered names metadata = relativePreparedWith False original lowered names metadata;
-  relativePreparedWith matched original lowered names metadata = case (,) original lowered of {
+  relativePreparedWith = relativePreparedUsing packedOrigin;
+  relativePreparedUsing pack matched original lowered names metadata = case (,) original lowered of {
     (,) [(,,) name annotation body] [(,,) nextName nextAnnotation candidate] ->
       if templateNodesLeft 257 body > 0 || not (eqString name nextName && eqMaybe E.eqSAnnotation annotation nextAnnotation)
       then Nothing else case preparedLocation 64 body of {
@@ -530,7 +564,7 @@ module Bootstrap.CrateGraph where {
         } in if not compactPreparedLimits then Nothing else case remainingPreparedBytes 249 budget (append names metadata) of {
           Nothing -> Nothing;
           Just available -> if not (matched || matchedLower body normalized) then Nothing else
-            case packedOrigin span originBytes available body preamble of {
+            case pack span originBytes available body preamble of {
               Just text -> if stringUtf8Length text <= maxField then Just ((,) text descriptor) else Nothing;
               Nothing -> Nothing
             }
@@ -553,8 +587,16 @@ module Bootstrap.CrateGraph where {
     original = map member source;
     lowered = map member checked;
     names = Q.referenceDefinitions table;
-    metadata = Q.sourceGroupMetadataWith token candidate prepared
-  } in case relativePreparedWith sameSource original lowered names metadata of {
+    metadata = Q.sourceGroupMetadataWith token candidate prepared;
+    pack = case source of {
+      [(,,) _ annotation raw] -> case table of { Q.ReferenceTable _ globals ranks ->
+        Q.memberTypeScope annotation (\types typeDepth ->
+          let { scope = SourceOrigin (\i -> M.get Source.compareDecl i ranks) globals 0 types typeDepth } in
+          \origin bytes budget _ header -> packedOriginIn scope origin bytes budget raw header)
+      };
+      _ -> packedOrigin
+    }
+  } in case relativePreparedUsing pack sameSource original lowered names metadata of {
     -- A relative pair has at least 257 syntax nodes on the original
     -- application/lambda spine. Dropping a location wrapper preserves its
     -- subtree; the lowered key therefore exceeds the 256-node retention limit.

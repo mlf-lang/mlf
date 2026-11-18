@@ -660,15 +660,16 @@ module Bootstrap.CrateQuery where {
              body)
     };
   canonicalMember = canonicalMemberIn (\i -> i) M.empty (\n -> n);
+  memberTypeScope annotation visit = let {
+    names = case annotation of {
+      Just (SAnnotation [] ty) -> leadingTypes ty;
+      _ -> []
+    }
+  } in visit (canonicalScope "type:" M.empty 0 names) (length names);
   canonicalMemberIn rank globals owner ((,,) n annotation body) =
-    let {
-      names = case annotation of {
-        Just (SAnnotation [] ty) -> leadingTypes ty;
-        _ -> []
-      }
-    } in
     (,,) (owner n) (Separate.mapMaybeValue (canonicalAnnotation M.empty 0) annotation)
-      (canonicalExpressionWith rank globals 0 (canonicalScope "type:" M.empty 0 names) (length names) body);
+      (memberTypeScope annotation (\types typeDepth ->
+        canonicalExpressionWith rank globals 0 types typeDepth body));
   -- The table is ordered by defining identity. Its ordinals belong only
   -- to this Prepared value, independently of resolver slot order or crate.
   data ReferenceTable = ReferenceTable ([] String) (Map String String)
