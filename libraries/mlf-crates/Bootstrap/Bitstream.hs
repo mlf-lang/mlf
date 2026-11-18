@@ -929,7 +929,30 @@ module Bootstrap.Bitstream (
   -- An owned node's kind, tag varint and arity are contiguous little-endian
   -- fields. When the tag takes one or two bytes and arity takes one, append
   -- the entire header before emitting the children.
-  packedEntry bytes nodeWidth symbolWidth entry index used pending next = case entry of {
+  -- Most constructor entries fit in one machine field, including their
+  -- references. Put their complete little-endian field through one flush.
+  -- Wider entries use the same split header and reference writer.
+  packedEntry bytes nodeWidth symbolWidth entry index used pending next = let {
+    field width value = packedBits bytes index used pending width value next;
+    old = packedEntryFields bytes nodeWidth symbolWidth entry index used pending next;
+    var x = orInt (orInt (andInt x 127) 128) (shiftLInt (unsignedShiftRInt x 7) 8);
+    node tag arity = orInt 3 (orInt (shiftLInt tag 2) (shiftLInt arity 10))
+  } in case entry of {
+    ENode tag children -> if unsignedLtInt tag 128 then case children of {
+      [a,b] -> if nodeWidth <= 19 then let {
+        mask = shiftLInt 1 nodeWidth - 1;
+        refs = orInt (andInt a mask) (shiftLInt b nodeWidth)
+      } in field (18 + nodeWidth + nodeWidth)
+        (orInt (node tag 2) (shiftLInt refs 18)) else old;
+      [a] -> if nodeWidth <= 38 then field (18 + nodeWidth) (orInt (node tag 1) (shiftLInt a 18)) else old;
+      _ -> old
+    } else old;
+    EInt value -> let { x = zigzag value } in if unsignedLtInt x 128 then field 10 (shiftLInt x 2)
+      else if unsignedLtInt x 16384 then field 18 (shiftLInt (var x) 2) else old;
+    EText symbol -> field (2 + symbolWidth) (orInt 2 (shiftLInt symbol 2));
+    EBits _ -> old
+  };
+  packedEntryFields bytes nodeWidth symbolWidth entry index used pending next = case entry of {
     ENode tag children -> let {
       arity = length children;
       refs = \i u p -> packedRefs bytes nodeWidth children i u p next
