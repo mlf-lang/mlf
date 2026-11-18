@@ -34,10 +34,12 @@ BUILTIN_VERIFICATION_HELPERS = ('tools/shared/builtin_prelude_identity.py',
 
 
 def executable_link_flags(name):
-    # These hosted compilation drivers retain more old-generation headroom.
-    # The allocation area and literal user +RTS/-RTS argument handling stay
-    # unchanged; other tools and the native runtime keep their own defaults.
-    return [*LINK_FLAGS, *(['-with-rtsopts=-F4'] if name in {'emlf', 'mlfpkg'} else [])]
+    # The compiler's larger nursery reduces copying of short-lived syntax trees.
+    if name == 'emlf':
+        return [*LINK_FLAGS, '-with-rtsopts=-F4 -A16m']
+    if name == 'mlfpkg':
+        return [*LINK_FLAGS, '-with-rtsopts=-F4']
+    return list(LINK_FLAGS)
 
 
 def prepared_verifier():
