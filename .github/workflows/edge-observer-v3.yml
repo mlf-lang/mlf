@@ -1,0 +1,62 @@
+name: Finite validation edge metadata v3
+on:
+  push:
+    branches: [perf/edge-observer-v3-20261118]
+permissions:
+  contents: read
+concurrency:
+  group: finite-edge-observer-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  finite:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          path: controls
+          persist-credentials: false
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: fc300bc9fdc389b585cbef0630fc8915d53e89c5
+          path: baseline
+          persist-credentials: false
+      - name: Install fixed verified official GHC
+        run: python3 controls/tools/performance/edge-observer-v3/install.py --root "$RUNNER_TEMP/edge-${{ github.run_id }}-${{ github.run_attempt }}"
+      - name: Finite O0 O2 semantic and ordered error gate
+        run: |
+          ROOT="$RUNNER_TEMP/edge-${{ github.run_id }}-${{ github.run_attempt }}"
+          python3 controls/tools/performance/edge-observer-v3/crc_process_supervisor.py --receipt "$ROOT/artifacts/outer.json" --work-seconds 420 --cleanup-seconds 10 "$(command -v python3)" controls/tools/performance/edge-observer-v3/finite.py "$ROOT" "$GITHUB_WORKSPACE/baseline"
+          python3 - "$ROOT/artifacts/outer.json" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1]))
+          assert d['complete'] and d['cleanup_complete'] and d['reason']=='target exited' and d['target_exit_code']==0
+          assert not d.get('signals') and not d.get('cancel_signals') and not d.get('survivors')
+          assert all(x['status']==0 for x in d['reaped'])
+          PY
+      - name: Bound evidence
+        if: always()
+        id: bound
+        run: |
+          python3 - "$RUNNER_TEMP/edge-${{ github.run_id }}-${{ github.run_attempt }}/artifacts" <<'PY'
+          import hashlib,json,pathlib,stat,sys
+          root=pathlib.Path(sys.argv[1]);root.mkdir(parents=True,exist_ok=True);rows=[];total=0
+          for p in sorted(root.rglob('*')):
+              s=p.lstat()
+              if stat.S_ISDIR(s.st_mode):continue
+              if not stat.S_ISREG(s.st_mode):raise SystemExit('special artifact')
+              total+=s.st_size
+              if total>128*1024**2 or len(rows)>2048:raise SystemExit('artifact cap')
+              rows.append(dict(path=str(p.relative_to(root)),bytes=s.st_size,sha256=hashlib.sha256(p.read_bytes()).hexdigest()))
+          with(root/'artifact-inventory.json').open('x')as f:json.dump(dict(files=rows,bytes=total),f,indent=2)
+          PY
+      - name: Preserve evidence
+        if: always() && steps.bound.outcome == 'success'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: edge-observer-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/edge-${{ github.run_id }}-${{ github.run_attempt }}/artifacts/
+          if-no-files-found: error
+          retention-days: 14
+          include-hidden-files: true
