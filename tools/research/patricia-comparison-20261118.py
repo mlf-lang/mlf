@@ -12,13 +12,13 @@ def save(): (OUT/'comparison.json').write_text(json.dumps(record,indent=2)+'\n')
 save()
 fixture=None
 for label,root in roots.items():
-    assert subprocess.check_output(['git','-C',str(root),'rev-parse','HEAD'],text=True).strip()==pins[label]
+    assert subprocess.check_output(['git','-C',str(root),'rev-parse','HEAD^'],text=True).strip()==pins[label]
     producer=root/'.mlf-build/shared-ghc'
     H.authenticate(producer,root)
     text,wanted,_,_=load(root/'tools/performance/patricia/run_native.py').fixture('rank-views')
     if fixture is None: fixture=text
     assert fixture==text
-    record[label]={'binary_sha256':sha(producer/'bin/emlf'),'receipt_sha256':sha(producer/'receipt.json')}
+    record[label]={'instrumented_commit':subprocess.check_output(['git','-C',str(root),'rev-parse','HEAD'],text=True).strip(),'binary_sha256':sha(producer/'bin/emlf'),'receipt_sha256':sha(producer/'receipt.json')}
 entry=OUT/'Main.hs';entry.write_text(fixture);record['fixture_sha256']=sha(entry);save()
 failures={k:0 for k in pins}
 for index,label in enumerate(['old','new']):

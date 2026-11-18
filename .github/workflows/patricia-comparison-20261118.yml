@@ -1,7 +1,7 @@
 name: Bounded Patricia comparison
 on:
   push:
-    branches: [perf/patricia-type-route-20261118]
+    branches: [perf/patricia-type-boundary-20261118]
 permissions:
   contents: read
 concurrency:
@@ -9,7 +9,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   compare:
-    if: github.repository == 'mlf-lang/mlf' && github.ref == 'refs/heads/perf/patricia-type-route-20261118'
+    if: github.repository == 'mlf-lang/mlf' && github.ref == 'refs/heads/perf/patricia-type-boundary-20261118'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -21,6 +21,12 @@ jobs:
         run: |
           git worktree add --detach old d8325d909c249fd82d4ad6173d44d8818cc6f8bf
           git worktree add --detach new ee495d5783fca3c26a3c0e659ebeac1bab76a37d
+          python3 -B tools/research/patricia-type-markers.py old
+          python3 -B tools/research/patricia-type-markers.py new
+          mkdir -p evidence
+          git -C old diff HEAD^ HEAD > evidence/old-markers.patch
+          git -C new diff HEAD^ HEAD > evidence/new-markers.patch
+          cmp evidence/old-markers.patch evidence/new-markers.patch
       - name: Official pinned GHC
         timeout-minutes: 20
         run: |
