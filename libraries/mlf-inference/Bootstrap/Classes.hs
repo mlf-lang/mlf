@@ -1782,6 +1782,44 @@ module Bootstrap.Classes where {
       qualifiedEvidence site owner env hint source classes
     }
   };
+  -- A class-free application allocates one empty demand for its result,
+  -- and one or two identities per leaf. Preserve the same root and next
+  -- identity, while reserving them together for a complete lambda body.
+  plainLambdaApplication env body fallback = let {
+    ref name = case lookupQualified name env of {
+      Nothing -> Just ((,) (referenceExpr name) 1);
+      Just (QualifiedKnown known []) -> Just ((,) (referenceExpr known) 2);
+      _ -> Nothing
+    };
+    plain function expr = case expr of {
+      SApp f a -> case plain True f of {
+        Nothing -> Nothing;
+        Just ((,) left n) -> case plain False a of {
+          Nothing -> Nothing; Just ((,) right m) -> let { total = n + m + 1 } in
+            seq total (Just ((,) (SApp left right) total))
+        }
+      };
+      SCallSite label _ inner -> if function then plain True inner
+        else if eqString label "an expression type signature" && managedAnnotation inner
+        then Nothing else plain False inner;
+      SGlobal i hint -> ref (DeclRef i hint);
+      SVar n -> if eqString n "$MLF.Stack.callStack" then Nothing else ref (LexicalRef n);
+      SIntLit _ -> Just ((,) expr 1);
+      SDoubleLit _ -> Just ((,) expr 1);
+      SStringLit _ -> Just ((,) expr 1);
+      SBoolLit _ -> Just ((,) expr 1);
+      SPrimitive _ -> Just ((,) expr 1);
+      SConstructor _ -> Just ((,) expr 1);
+      _ -> Nothing
+    }
+  } in case body of {
+    SApp _ _ -> case plain False body of {
+      Just ((,) lowered count) -> Fresh (\first used -> let { next = first + count } in
+        Right ((,,) (PlainResult (next - 1) lowered) next used));
+      Nothing -> fallback
+    };
+    _ -> fallback
+  };
   planQualifiedFunction :: Maybe ((,) String SourceSpan) ->
     Dependency.ValueScopes ([] ((,) EvidenceRole String)) -> DataEnv -> Map String Info -> Int ->
     QualifiedEnv -> [] ((,) EvidenceRole String) -> SExpr -> Fresh QualifiedResult;
@@ -1849,8 +1887,9 @@ module Bootstrap.Classes where {
           let { classes = case annotation of {
             Nothing -> []; Just (SAnnotation _ ty) -> qualifiedClasses ty
           } };
-          result <- planQualified site (Dependency.nestedScopes valueScopes) ds infos owner
-            (putQualified (scopedBinder slots x) (QualifiedKnown (scopedBinder slots x) classes) env) candidates body;
+          let { scope = putQualified (scopedBinder slots x) (QualifiedKnown (scopedBinder slots x) classes) env };
+          result <- plainLambdaApplication scope body
+            (planQualified site (Dependency.nestedScopes valueScopes) ds infos owner scope candidates body);
           qualifiedJoin (QualifiedLambda (scopedBinder slots x) translated (qualifiedExpression result)) ((:) result [])
         };
       SLet x (SSignature rhs (SAnnotation [] ty)) body ->
