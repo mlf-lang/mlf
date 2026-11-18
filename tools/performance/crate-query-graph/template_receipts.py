@@ -135,8 +135,7 @@ def rebind_template(references, original, raw_refs, members, types):
     require(len({x for x, _ in datatypes}) == len(datatypes), 'template duplicate datatype edge')
     require(unpack(context) == [h for _, h in datatypes], 'template datatype context')
     schemes = [type_key(x) for x in unpack(scheme_keys)]
-    require(len(schemes) == len(bindings) and (bool(bindings) if signature is not None
-                                                     else any(x[1] == 46 for x in schemes)),
+    require(len(schemes) == len(bindings) and bool(bindings),
             'template dependency scheme inventory')
     expression_key(expression, len(bindings))
     for (hint, _), scheme in zip(bindings, schemes):

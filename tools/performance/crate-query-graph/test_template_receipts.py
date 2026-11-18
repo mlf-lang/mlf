@@ -161,6 +161,45 @@ class TemplateReceiptTests(unittest.TestCase):
         f['mode'] = 'concrete'
         self.reject(f, 'finish receipt commitment')
 
+    def unsigned_monomorphic_fixture(self):
+        f = signed_fixture()
+        signed = unpack(f['references'][2][0][2][1][1])
+        f['references'] = l(n(2, s('checked-inference-template-1'), s(pack([
+            'checked-inference-template-1', *signed[2:]]))))
+        return f
+
+    def test_unsigned_template_accepts_nonempty_monomorphic_dependencies(self):
+        # The producer admits any nonempty dependency inventory, not only forall.
+        f = self.unsigned_monomorphic_fixture()
+        self.assertEqual(self.check(f), dict(retained=1, rewritten=0, template_groups=[f['group']]))
+        f['mode'] = 'concrete'
+        self.reject(f, 'finish receipt commitment')
+
+    def test_unsigned_template_rejects_empty_dependency_inventory(self):
+        f = self.unsigned_monomorphic_fixture()
+        key = unpack(f['references'][2][0][2][1][1]); key[2] = ''
+        f['raw_refs'] = []
+        f['references'] = l(n(2, s('checked-inference-template-1'), s(pack(key))))
+        with self.assertRaisesRegex(Invalid, 'template dependency scheme inventory'):
+            rebind_template(f['references'], f['original'], [], [f['owner']], f['types'])
+
+    def test_unsigned_template_rejects_missing_and_extra_dependency_schemes(self):
+        for count in (1, 3):
+            f = self.unsigned_monomorphic_fixture()
+            key = unpack(f['references'][2][0][2][1][1])
+            schemes = unpack(key[2]); key[2] = pack((schemes * 2)[:count])
+            f['references'] = l(n(2, s('checked-inference-template-1'), s(pack(key))))
+            self.reject(f, 'template dependency scheme inventory')
+
+    def test_unsigned_monomorphic_template_keeps_scheme_and_expression_checks(self):
+        f = self.unsigned_monomorphic_fixture()
+        f['types']['App.left'] = n(44, s('Bool'), l())
+        self.reject(f, 'template dependency scheme mismatch')
+        f = self.unsigned_monomorphic_fixture()
+        key = unpack(f['references'][2][0][2][1][1]); key[3] = pack(['variable', '2'])
+        f['references'] = l(n(2, s('checked-inference-template-1'), s(pack(key))))
+        self.reject(f, 'template variable slot')
+
     def test_signed_signature_must_match_owned_type(self):
         f = signed_fixture()
         key = unpack(f['references'][2][0][2][1][1])
