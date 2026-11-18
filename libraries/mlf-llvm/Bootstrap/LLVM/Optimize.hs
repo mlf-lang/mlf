@@ -1488,10 +1488,28 @@ module Bootstrap.LLVM.Optimize where {
            then freshPure expression
            else iterationsOwned arities (count - 1) next
          };
+  -- Find references still needed by the entry before copying its declaration
+  -- spine. A nonrecursive RHS is in the outer scope. A recursive group binds
+  -- its names in every RHS and in the continuation.
+  liveDeclarationSpine :: XErased -> (,) XErased (Set XName);
+  liveDeclarationSpine expression = case expression of {
+    XELet name rhs rest -> case liveDeclarationSpine rest of {
+      (,) body live -> if S.member compareName name live
+        then (,) (XELet name rhs body) (S.union compareName (free rhs) (S.delete compareName name live))
+        else (,) body live
+    };
+    XELetRec bindings rest -> case liveDeclarationSpine rest of {
+      (,) body live -> let {
+        used = L.foldl (\names entry -> S.union compareName names (free (L.snd entry))) live bindings;
+        bound = S.fromList compareName (L.map L.fst bindings)
+      } in (,) (XELetRec bindings body) (S.difference compareName used bound)
+    };
+    _ -> (,) expression (free expression)
+  };
   optimizeOwnedWork :: XErased -> Fresh XErased;
   optimizeOwnedWork expression =
     do {
-      unique <- copy M.empty expression;
+      unique <- copy M.empty (L.fst (liveDeclarationSpine expression));
       clean <- identities unique;
       recursive <- fixedPoints clean;
       let {

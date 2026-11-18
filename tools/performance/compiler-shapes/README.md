@@ -67,6 +67,26 @@ for package/cache regressions and a fresh paired growth comparison.
 
 ## Running it
 
+For growth experiments, `--interleave-pairs` visits every selected size once
+per round in seeded random order. Each MLF/GHC pair stays adjacent and the
+first compiler alternates. This spreads each size throughout the experiment.
+Large cohorts can set `--cohort-output-gib` to budget disk space for the
+retained build products. The default is 8 GiB.
+
+To fit the growth of one family, use an environment with NumPy and a completed
+cohort containing `baseline-0` and at least three positive sizes for that family.
+
+```sh
+python3 tools/performance/compiler-shapes/fit_growth.py COHORT_DIRECTORY --family inferred_chain
+```
+
+The command validates the cohort, reports the per-size medians, the OLS and
+endpoint slopes in milliseconds per function, and fits `a + b*(n/nmax)^p` to
+complete-build seconds. For each of 2,000 bootstrap samples it resamples adjacent
+MLF/GHC pairs within each size. The reported exponent describes the measured
+size range. The descriptive `bench.py analyze` output is also available without
+NumPy.
+
 ```sh
 # What would run? Prints endpoint, matrix, families and the cell/compile counts.
 python3 -B tools/performance/compiler-shapes/bench.py list
@@ -245,10 +265,10 @@ the index mapping or closure and must be re-measured, not retroactively filled i
 
 ## CI
 
-- Every ordinary PR runs `test_contract.py` (82 contract tests: defaults, refusals, graph evidence, schedule
-  balance and matrix shape; no compiler needed) and
-  the `smoke` matrix — 3 cells, 18 timed compilations — inside the existing
-  GHC O2 job, uploading its results and raw receipts even on failure.
+- Every ordinary PR runs `test_contract.py` to check defaults, rejected inputs,
+  graph evidence, schedule balance and matrix shape without invoking a compiler.
+  The GHC O2 job also runs the three-cell `smoke` matrix and uploads its results
+  and raw receipts for the 18 timed compilations, including on failure.
 - The complete matrix is manual: `.github/workflows/compiler-shapes.yml`
   (`workflow_dispatch`) takes family, size, repeat and cohort inputs, runs the
   full default matrix by default, and always uploads plan, receipt, per-leg

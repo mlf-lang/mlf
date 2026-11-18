@@ -184,7 +184,9 @@ module Bootstrap.Parser where {
       if isSharedSyntax syntax
       then do {
              when (eqString (moduleIdentity result) "Prelude") (Left "Prelude is reserved for the legacy guest builtin; shared source uses MLF.Primitive");
-             validateSharedModule result;
+             -- groupValues has checked names and shared annotations have empty
+             -- existential binder lists, so every dependency group is bindable.
+             validateSharedModuleSyntax result;
              Right result
            }
       else Right result
@@ -1049,7 +1051,19 @@ module Bootstrap.Parser where {
   atom :: Parser SExpr;
   atom = sourceOrMetadata sharedAtom legacyAtom;
   sharedAtom :: Parser SExpr;
-  sharedAtom =
+  -- An ordinary lower-case identifier can only succeed as a reference.
+  -- Keep the full alternative ordering for reserved words and failed parses.
+  sharedAtom = Parser (\state -> case state of {
+    ParseState _ ((:) token _) _ _ _ _ -> let {
+      text = tokenText token; first = stringCodeAt text 0
+    } in if stringLength text > 0 && first >= 97 && first <= 122
+      then case pRun locatedLowerReference state of {
+        success@(PSuccess _ _ _) -> success;
+        _ -> pRun sharedAtomChoices state
+      } else pRun sharedAtomChoices state;
+    _ -> pRun sharedAtomChoices state
+  });
+  sharedAtomChoices =
     pChoices
       ((:)
          (pParens
@@ -1501,7 +1515,18 @@ module Bootstrap.Parser where {
       _ -> Left "bottom types are outside shared-haskell-v1"
     };
   validateSharedModule :: SourceModule -> Either String ();
-  validateSharedModule (SourceModule file name exports imports datatypes classes instances values body _) =
+  validateSharedModule source =
+    do {
+      validateSharedModuleSyntax source;
+      case source of {
+        SourceModule _ _ _ _ _ _ _ values _ _ -> do {
+          Surface.bindValues values (SConstructor "()");
+          Right ()
+        }
+      }
+    };
+  validateSharedModuleSyntax :: SourceModule -> Either String ();
+  validateSharedModuleSyntax (SourceModule file name exports imports datatypes classes instances values body _) =
     do {
       unless (isJust name && not (isJust body))
         (Left (file ++ ": shared source requires a named declaration-only module"));
@@ -1540,9 +1565,7 @@ module Bootstrap.Parser where {
              mapM_ validateSharedMonotype head;
              mapM_ (\((,) _ expression) -> validateSharedExpression expression) methods
            })
-        instances;
-      Surface.bindValues values (SConstructor "()");
-      Right ()
+        instances
     };
   validateSharedImportItem :: Export -> Either String ();
   validateSharedImportItem _ = Right ();

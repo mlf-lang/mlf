@@ -654,11 +654,13 @@ module Bootstrap.CrateArtifact where {
   -- Prelude has one shared crate identity even when several independent leaf
   -- crates use it. Its bootstrap object is translated once; user crates still
   -- compile their own declarations through the ordinary SCC query pipeline.
-  declarationVariableReads source = let {
-    child = declarationVariableReads;
+  declarationVariableReads = variableReadsWith Set.singleton;
+  variableReadsWith :: (XName -> Set XName) -> XTerm -> Set XName;
+  variableReadsWith one source = let {
+    child = variableReadsWith one;
     join = Set.unions X.compareName
   } in case source of {
-    XVarTerm name -> Set.singleton name;
+    XVarTerm name -> one name;
     XAbs _ _ body -> child body;
     XApp a b -> join [child a, child b];
     XTypeAbs _ _ body -> child body;
@@ -3894,15 +3896,15 @@ module Bootstrap.CrateArtifact where {
   };
   -- Physical metadata paths are relocatable. The exact semantic interface,
   -- including contracts and ownership, is bound independently of those paths.
-  openMetadataValue iface = Structure.toCrateInterfaceFields
-    (binaryInterfaceFields (case iface of {
+  openMetadataFields iface = binaryInterfaceFields (case iface of {
       CrateInterface n deps ms es is ds cs ins layouts bs entry _ protected ->
         CrateInterface n (map (\((,,) key _ semantic) -> (,,) key "" semantic) deps)
           ms es is ds cs ins layouts bs entry "open-object" protected
-    }));
+    });
+  openMetadataValue iface = Structure.toCrateInterfaceFields (openMetadataFields iface);
   openMetadata iface = QueryGraph.hashValue (openMetadataValue iface);
   openPackageMetadataReceipt iface dependencies = do {
-    own <- Open.makeMetadataReceipt (openMetadataValue iface);
+    own <- Open.makeMetadataReceipt (openMetadataFields iface);
     imported <- mapM openMetadata (sortBy (\a b -> compareString (crateId a) (crateId b)) dependencies);
     ioReturn (do { root <- own; closure <- sequenceEither imported;
       Right ((,) (Separate.pack ((:) (Open.metadataReceiptHash root) closure)) root) })
@@ -3925,7 +3927,7 @@ module Bootstrap.CrateArtifact where {
     } }
   };
   writeOpenObject prefix iface package = do {
-    actual <- case Open.cachedMetadata (openMetadataValue iface) package of {
+    actual <- case Open.cachedMetadata (openMetadataFields iface) package of {
       Just digest -> ioReturn (Right digest);
       Nothing -> openMetadata iface
     };
@@ -4021,10 +4023,11 @@ module Bootstrap.CrateArtifact where {
     Just slot -> Right slot; Nothing -> Left ("unresolved crate symbol: " ++ name)
   };
   openIndex interfaces objects = do {
-    let { definitions = concatMap crateBindings interfaces; keys = map fst definitions };
-    uniqueNames "crate symbol" keys;
-    let { ids = M.fromList compareString (zip keys (map V.fromInt (range 0 (length keys - 1))));
-          byName = interfaceMap interfaces;
+    let { keys = concatMap (compose (map fst) crateBindings) interfaces;
+          count = length keys;
+          ids = M.fromList compareString (zip keys (map V.fromInt (range 0 (count - 1)))) };
+    ensure (M.size ids == count) "duplicate crate crate symbol";
+    let { byName = interfaceMap interfaces;
           collect object = case object of {
             OpenCrateObject iface package -> do {
               validateInterface iface;

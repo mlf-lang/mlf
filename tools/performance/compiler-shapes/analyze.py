@@ -33,6 +33,7 @@ def compatibility(plan):
     benchmark=plan['benchmark'];toolchain=plan['toolchain']
     builtin={k:v for k,v in toolchain['builtin'].items() if k.endswith(('.mlfci','.mlfco'))}
     return {'endpoint':benchmark['endpoint']['id'],'suite':benchmark['suite'],'suite_version':benchmark['suite_version'],
+            'order':benchmark.get('order'),'order_seed':benchmark.get('order_seed'),
             'repeats':benchmark['repeats'],'ghc_version':toolchain['ghc']['version'],
             'ghc_path':toolchain['ghc']['path'],'clang_version':toolchain['clang']['version'],
             'producer_receipt_sha256':toolchain['producer']['receipt_sha256'],

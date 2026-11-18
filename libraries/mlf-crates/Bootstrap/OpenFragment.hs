@@ -230,14 +230,18 @@ module Bootstrap.OpenFragment
     value <- W.lookupGraphNode graph index;
     case value of { W.GText text -> Right text; _ -> Left "expected open fragment text" }
   };
-  -- This private receipt records the exact value admitted by the canonical
-  -- schema-6 encoder. It cannot be made from a caller-supplied digest.
-  data MetadataReceipt = MetadataReceipt W.Value String;
-  makeMetadataReceipt value = do {
-    hashed <- QueryGraph.encodeHashed value;
-    ioReturn (mapEither (\((,) digest _) -> MetadataReceipt value digest) hashed)
+  -- Only successful canonical schema-6 encoding can create this receipt.
+  -- Retain its generic metadata fields and compact binding types separately;
+  -- the expanded type encoding can be collected after hashing. Method bodies
+  -- are excluded by the ordinary interface encoder, not retained as syntax.
+  data MetadataReceipt = MetadataReceipt ([] W.Value) ([] ((,) String XType)) ([] W.Value) String;
+  makeMetadataReceipt fields = case Structure.crateMetadataParts fields of {
+    (,,,) value before bindings after -> do {
+      hashed <- QueryGraph.encodeHashed value;
+      ioReturn (mapEither (\((,) digest _) -> MetadataReceipt before bindings after digest) hashed)
+    }
   };
-  metadataReceiptHash (MetadataReceipt _ digest) = digest;
+  metadataReceiptHash (MetadataReceipt _ _ _ digest) = digest;
   data Package = Package String ([] ((,) String Fragment)) ByteArray String (Maybe MetadataReceipt);
   packageMetadata (Package metadata _ _ _ _) = metadata;
   packageFragments (Package _ fragments _ _ _) = fragments;
@@ -250,8 +254,13 @@ module Bootstrap.OpenFragment
     }) "open object metadata receipt mismatch";
     Right (Package metadata fragments bytes digest (Just receipt))
   };
-  cachedMetadata value (Package _ _ _ _ receipt) = case receipt of {
-    Just (MetadataReceipt original digest) -> if sameSyntax original value then Just digest else Nothing;
+  cachedMetadata fields (Package _ _ _ _ receipt) = case receipt of {
+    Just (MetadataReceipt before bindings after digest) -> case Structure.crateMetadataParts fields of {
+      (,,,) _ before2 bindings2 after2 ->
+        if eqList sameSyntax before before2 &&
+          eqList (eqPair eqString Structure.sameEncodedXType) bindings bindings2 &&
+          eqList sameSyntax after after2 then Just digest else Nothing
+    };
     Nothing -> Nothing
   };
   packageFormat :: String;
@@ -583,9 +592,7 @@ module Bootstrap.OpenFragment
 
   -- Keep the last lazy value, matching Map.fromList, for repeated references.
   referenceTable :: forall a. [] ((,) String a) -> Map String a;
-  referenceTable entries = foldlStrict (\table ((,) key value) ->
-    if M.member compareString key table then table
-    else M.insert compareString key value table) M.empty (reverse entries);
+  referenceTable entries = M.fromList compareString entries;
   makePackage compiler metadata fragments = do {
     let {
       ps = M.toList (referenceTable (concatMap

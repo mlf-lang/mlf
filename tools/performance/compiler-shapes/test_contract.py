@@ -8,6 +8,7 @@ frozen schedule stays balanced.
 import copy
 import hashlib
 import json
+import random
 import re
 import subprocess
 import sys
@@ -97,6 +98,26 @@ def edit(folder, mutate):
 
 
 class ScheduleTests(unittest.TestCase):
+    def test_interleaving_visits_each_cell_once_per_round_and_keeps_pairs(self):
+        cases = ['baseline', 'small', 'medium', 'large']
+        repeats = 7
+        grouped = [{'case': case, 'position': pos, 'lane': lane}
+                   for index, case in enumerate(cases)
+                   for pos, lane in enumerate(runner.lanes_for(index, repeats))]
+        schedule = runner.interleave_pairs(grouped, repeats, random.Random(41))
+        self.assertEqual(schedule, runner.interleave_pairs(grouped, repeats, random.Random(41)))
+        self.assertNotEqual(schedule, runner.interleave_pairs(grouped, repeats, random.Random(42)))
+        self.assertCountEqual(schedule, grouped)
+        for rep in range(repeats):
+            start = rep * 2 * len(cases)
+            subset = schedule[start:start + 2 * len(cases)]
+            self.assertCountEqual([row['case'] for row in subset[::2]], cases)
+            for first, second in zip(subset[::2], subset[1::2]):
+                self.assertEqual(first['case'], second['case'])
+                self.assertEqual((first['position'], second['position']), (2*rep, 2*rep+1))
+                self.assertEqual({first['lane'], second['lane']}, {'mlf', 'ghc'})
+
+
     def test_explicit_large_sizes_preserve_default_matrix(self):
         self.assertEqual(bench.resolve('default', None, None)[2], [8, 32, 128])
         self.assertEqual(bench.resolve('default', ['inferred_poly_chain'], [8192])[2], [8192])
@@ -112,11 +133,13 @@ class ScheduleTests(unittest.TestCase):
             setup.write_text('{}')
             args = argparse.Namespace(workdir=root / 'other', setup=setup,
                 cohort='explicit', matrix='smoke', family=None, size=None,
-                repeats=3, endpoint='crate-bootstrap-v1')
+                repeats=3, endpoint='crate-bootstrap-v1', interleave_pairs=True, cohort_output_gib=32)
             with mock.patch.object(bench, 'run') as run_command:
                 bench.command_run(args)
             argv = run_command.call_args.args[0]
             self.assertEqual(argv[argv.index('--setup') + 1], setup.resolve())
+            self.assertIn('--interleave-pairs', argv)
+            self.assertEqual(argv[argv.index('--cohort-output-gib') + 1], 32)
 
     def test_all_build_entry_parsers_default_to_fused_and_allow_two_stage(self):
         # Exercise the real CLI parsers, stopping before any build or filesystem

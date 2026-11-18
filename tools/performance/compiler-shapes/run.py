@@ -53,6 +53,20 @@ def lanes_for(index,repeats):
     return lanes
 
 
+def interleave_pairs(schedule, repeats, rng):
+    """Visit every cell once per round, keeping each compiler pair adjacent."""
+    rounds = [[] for _ in range(repeats)]
+    for index in range(0, len(schedule), 2):
+        pair = schedule[index:index + 2]
+        rounds[pair[0]['position'] // 2].append(pair)
+    interleaved = []
+    for pairs in rounds:
+        rng.shuffle(pairs)
+        for pair in pairs:
+            interleaved.extend(pair)
+    return interleaved
+
+
 def main():
     data=registry()
     parser=argparse.ArgumentParser(description=__doc__)
@@ -63,8 +77,15 @@ def main():
     parser.add_argument('--size',action='append',type=int)
     parser.add_argument('--repeats',type=int,default=data['repeats'])
     parser.add_argument('--cohort')
+    parser.add_argument('--interleave-pairs',action='store_true',
+                        help='visit each case once per paired round in seeded random order')
+    parser.add_argument('--cohort-output-gib',type=int,default=8,
+                        help='aggregate retained evidence budget in GiB (default 8)')
     parser.add_argument('--endpoint',default=data['default_endpoint'],choices=sorted(data['endpoints']))
-    args=parser.parse_args(); out=args.output.resolve(); out.mkdir(parents=True,exist_ok=False)
+    args=parser.parse_args()
+    if args.cohort_output_gib <= 0:
+        parser.error('--cohort-output-gib must be positive')
+    out=args.output.resolve(); out.mkdir(parents=True,exist_ok=False)
     hp=ROOT/'tools/performance/a1-private-index/helper.py'
     H=types.ModuleType('unchanged_resource_helper');H.__file__=str(hp);exec(compile(hp.read_bytes(),str(hp),'exec'),H.__dict__)
     setup=H.load(args.setup.resolve()); H.require(setup['complete'],'qualified fixed dependencies')
@@ -83,6 +104,8 @@ def main():
         lanes=['ghc','mlf'] if args.pilot else lanes_for(index,repeats)
         for position,lane in enumerate(lanes):
             schedule.append({'case':case['id'],'position':position,'lane':lane})
+    if args.interleave_pairs:
+        schedule=interleave_pairs(schedule,repeats,rng)
     inputs={str(p.resolve()):H.sha(p) for p in [args.setup,hp,HERE/'run.py',HERE/'worker.py',HERE/'generate.py',
         HERE/'matrix.json',HERE/'query_cache.py',Q.SHARED/'artifact_binary_reference.py',
         Q.SHARED/'test_query_index.py',Q.SHARED/'artifact_binary_open.py',
@@ -96,7 +119,7 @@ def main():
     # objects for 31 cells). It is a bound, not a target: a 31-cell cohort uses
     # about 2.6 GiB, and the earlier 2 GiB carry-over stopped a run at leg 149.
     limits={**setup['limits'],'wall_seconds':90,'max_work_bytes':512*1024**2,
-            'aggregate_cohort_bytes':8*1024**3}
+            'aggregate_cohort_bytes':args.cohort_output_gib*1024**3}
     identity=source_identity(out)
     cohort=args.cohort or out.name
     plan={'purpose':'generator/transport qualification' if args.pilot else 'fixed measured shape matrix; descriptive medians only',
@@ -104,7 +127,8 @@ def main():
             'endpoint':{'id':args.endpoint,**endpoint},'repeats':repeats,
             'families':sorted({c['family'] for c in cases}),'sizes':sorted({c['size'] for c in cases}),
             'cells':len(cases),'timed_compilations':0 if args.pilot else len(schedule),
-            'order':'seeded shuffle of cells; each cell runs paired rounds and alternates which compiler starts',
+            'order':('one pair per cell each round in seeded random order' if args.interleave_pairs else
+                     'seeded shuffle of cells; each cell runs paired rounds and alternates which compiler starts'),
             'order_seed':seed,'parallel_compilers':1,'claim_limits':data['claim_limits']},
         'source_commit':identity['commit'],'source':identity,
         'toolchain':{'ghc':{'path':setup['ghc'],'version':auth['ghc']['version']},

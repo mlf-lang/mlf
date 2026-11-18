@@ -51,8 +51,13 @@ module Bootstrap.BuiltinPreludeContext
     ensure (count >= 0) "prepared link lost its initial spine";
     body <- foldEither (\rest declarations -> Separate.graft declarations rest) entry
       (take count (Artifact.fragmentBodies state));
+    -- checkCompilerPrelude established that every Prelude binder is below
+    -- this serial. Higher identities in the user continuation cannot select
+    -- a declaration from the prepared spine.
+    let { serial = Artifact.fragmentSerial initial;
+      preludeRead name = if X.nameId name < serial then S.singleton name else S.empty };
     selected <- foldEither (\rest declarations -> do {
-      chosen <- selectPreludeSpine (Artifact.declarationVariableReads rest) declarations;
+      chosen <- selectPreludeSpine (Artifact.variableReadsWith preludeRead rest) declarations;
       Separate.graft (snd chosen) rest
     }) body (Artifact.fragmentBodies initial);
     Checked.check (XWithData (Artifact.fragmentData state) selected)

@@ -13,7 +13,7 @@ PREDECESSOR = '4fd6730d35b6ecaf8e169ad228ac3c7a3ed56160'
 PREDECESSOR_TREE = '1c60d3daca5162bd24658d295169f601593345ef'
 PREDECESSOR_MANIFEST = '69bc6cc39ec70a0209a6011f4ce7fef0aaf5039d903fa1b8477ee4a2bc46dcd8'
 MANIFEST = 'pr43-reconciliation-migration.json'
-MANIFEST_SHA256 = '921e215d0d8aa21c4242896fc832c1b5d565fa7f17c7a0ca0496487c8c4ac736'
+MANIFEST_SHA256 = '54430734be3891d6bc672a5cc3e227fce77d03b63cb66c7a7ac36be08922bff2'
 PREDECESSOR_IMPLEMENTATION = '7cacadad979f3db29da9067b5fe0ca8e1634d960dbf978ad6d5cae39ba338794'
 LIVE_PREDECESSOR = 'f9bdb40a659bfdff4cbb782d438afbb0417dd2e1'
 LIVE_PREDECESSOR_TREE = '3148203097e7622ced1b272e606bfa892fad746b'
@@ -55,6 +55,7 @@ PERFORMANCE_PATHS = {
     'libraries/mlf-frontend/Bootstrap/Module.hs',
     'libraries/mlf-frontend/Bootstrap/Parsec.hs',
     'libraries/mlf-frontend/Bootstrap/Parser.hs',
+    'libraries/mlf-frontend/Bootstrap/Surface.hs',
     'libraries/mlf-inference/Bootstrap/Classes.hs',
     'libraries/mlf-interpreter/Bootstrap/Runtime.hs',
     'libraries/mlf-language-core/Bootstrap/Primitive.hs',

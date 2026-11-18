@@ -2,6 +2,41 @@
 {-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
+-- The private KeyIndex lookup/insertion below is adapted from Bootstrap.IntMap.
+-- Adapted from containers-0.8.1 Data.IntMap.Internal (lazy values).
+-- Copyright (c) Daan Leijen 2002; Andriy Palamarchuk 2008; wren romano 2016.
+-- BSD-3-Clause; see tools/release/licenses/containers-0.8.1.txt.
+-- The Glasgow Haskell Compiler License
+--
+-- Copyright 2004, The University Court of the University of Glasgow.
+-- All rights reserved.
+--
+-- Redistribution and use in source and binary forms, with or without
+-- modification, are permitted provided that the following conditions are met:
+--
+-- - Redistributions of source code must retain the above copyright notice,
+-- this list of conditions and the following disclaimer.
+--
+-- - Redistributions in binary form must reproduce the above copyright notice,
+-- this list of conditions and the following disclaimer in the documentation
+-- and/or other materials provided with the distribution.
+--
+-- - Neither name of the University nor the names of its contributors may be
+-- used to endorse or promote products derived from this software without
+-- specific prior written permission.
+--
+-- THIS SOFTWARE IS PROVIDED BY THE UNIVERSITY COURT OF THE UNIVERSITY OF
+-- GLASGOW AND THE CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+-- INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+-- FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+-- UNIVERSITY COURT OF THE UNIVERSITY OF GLASGOW OR THE CONTRIBUTORS BE LIABLE
+-- FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+-- DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+-- SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+-- CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+-- LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+-- OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+-- DAMAGE.
 module Bootstrap.Bitstream (
   Value(..), Limits(..), Entry(..), Symbol(..),
   Tables(..), Layout(..), Cursor(..), Read(..),
@@ -34,6 +69,7 @@ module Bootstrap.Bitstream (
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.IntTree as KeyBits;
   import qualified Bootstrap.IndexVec as V;
 
   -- The schema above this layer owns constructor tags and field types. VBits
@@ -127,9 +163,37 @@ module Bootstrap.Bitstream (
   -- collisions use the original balanced map, so even deliberately colliding
   -- inputs retain logarithmic bucket lookup instead of a linear chain.
   data EntryBucket = UniqueEntry Entry Int | CollidingEntries (Map Entry Int);
-  data EntryIndex = EntryIndex (IntMap EntryBucket);
+  -- Canonical-node interning needs exact lookup and insertion, never rank or
+  -- cardinality. Keep only Patricia prefixes and lazy payloads in this private
+  -- index; physical node counts remain in NodeState and the codec limits.
+  data KeyIndex a = KeyEmpty | KeyTip Int a | KeyBranch Int (KeyIndex a) (KeyIndex a);
+  keyTip :: forall a. Int -> a -> KeyIndex a;
+  keyTip key value = seq key (KeyTip key value);
+  keyBranch :: forall a. Int -> KeyIndex a -> KeyIndex a -> KeyIndex a;
+  keyBranch prefix left right = seq prefix (seq left (seq right (KeyBranch prefix left right)));
+  keyLink :: forall a. Int -> KeyIndex a -> Int -> KeyIndex a -> KeyIndex a;
+  keyLink a left b right = let { prefix = KeyBits.mask a (KeyBits.branchMask a b) } in
+    if KeyBits.left a prefix then keyBranch prefix left right else keyBranch prefix right left;
+  keyLookup :: forall a. Int -> KeyIndex a -> Maybe a;
+  keyLookup key tree = case tree of {
+    KeyEmpty -> Nothing;
+    KeyTip previous value -> if key == previous then Just value else Nothing;
+    KeyBranch prefix left right ->
+      if KeyBits.left key prefix then keyLookup key left else keyLookup key right
+  };
+  keyInsert :: forall a. Int -> a -> KeyIndex a -> KeyIndex a;
+  keyInsert key value tree = case tree of {
+    KeyEmpty -> keyTip key value;
+    KeyTip previous old -> if key == previous then keyTip key value
+      else keyLink key (keyTip key value) previous tree;
+    KeyBranch prefix left right ->
+      if KeyBits.nomatch key prefix then keyLink key (keyTip key value) prefix tree
+      else if KeyBits.left key prefix then keyBranch prefix (keyInsert key value left) right
+      else keyBranch prefix left (keyInsert key value right)
+  };
+  data EntryIndex = EntryIndex (KeyIndex EntryBucket);
   data EntryLookup = ExistingEntry Int | MissingEntry (Int -> EntryIndex);
-  emptyEntryIndex = EntryIndex IM.empty;
+  emptyEntryIndex = EntryIndex KeyEmpty;
   mixEntry hash word = xorInt (hash * 1099511628211) word;
   entryHash entry = case entry of {
     EInt value -> mixEntry 1 value;
@@ -139,8 +203,8 @@ module Bootstrap.Bitstream (
   };
   internIndexed entry index = internIndexedAt (entryHash entry) entry index;
   internIndexedAt hash entry (EntryIndex buckets) =
-    let { insert bucket = EntryIndex (IM.insert hash bucket buckets) } in
-    case IM.lookup hash buckets of {
+    let { insert bucket = EntryIndex (keyInsert hash bucket buckets) } in
+    case keyLookup hash buckets of {
       Nothing -> MissingEntry (\value -> insert (UniqueEntry entry value));
       Just (UniqueEntry old value) -> if compareEntry entry old == 0 then ExistingEntry value
         else MissingEntry (\next -> insert (CollidingEntries
@@ -154,9 +218,9 @@ module Bootstrap.Bitstream (
   -- identity. Other constructors keep hash-narrowed, full-key comparison.
   -- Packed keys use two arity bits, disjoint fixed-width tag/child fields,
   -- and at most 63 bits. These are indexes only; wire entries are unchanged.
-  data NodeIndex = NodeIndex (IntMap Int) (IntMap Int) (IntMap Int) (IntMap Int) EntryIndex;
+  data NodeIndex = NodeIndex (KeyIndex Int) (KeyIndex Int) (KeyIndex Int) (KeyIndex Int) EntryIndex;
   data NodeLookup = ExistingNode Int | MissingNode (Int -> NodeIndex);
-  emptyNodeIndex = NodeIndex IM.empty IM.empty IM.empty IM.empty emptyEntryIndex;
+  emptyNodeIndex = NodeIndex KeyEmpty KeyEmpty KeyEmpty KeyEmpty emptyEntryIndex;
   shortNodeKey tag children =
     if tag < 0 || tag >= 65536 then Nothing else case children of {
       [] -> Just (shiftLInt tag 2);
@@ -170,22 +234,22 @@ module Bootstrap.Bitstream (
       _ -> Nothing
     };
   internNodeKey entry (NodeIndex ints bits texts short constructors) = case entry of {
-    EInt key -> case IM.lookup key ints of {
+    EInt key -> case keyLookup key ints of {
       Just value -> ExistingNode value;
-      Nothing -> MissingNode (\value -> NodeIndex (IM.insert key value ints) bits texts short constructors)
+      Nothing -> MissingNode (\value -> NodeIndex (keyInsert key value ints) bits texts short constructors)
     };
-    EBits key -> case IM.lookup key bits of {
+    EBits key -> case keyLookup key bits of {
       Just value -> ExistingNode value;
-      Nothing -> MissingNode (\value -> NodeIndex ints (IM.insert key value bits) texts short constructors)
+      Nothing -> MissingNode (\value -> NodeIndex ints (keyInsert key value bits) texts short constructors)
     };
-    EText key -> case IM.lookup key texts of {
+    EText key -> case keyLookup key texts of {
       Just value -> ExistingNode value;
-      Nothing -> MissingNode (\value -> NodeIndex ints bits (IM.insert key value texts) short constructors)
+      Nothing -> MissingNode (\value -> NodeIndex ints bits (keyInsert key value texts) short constructors)
     };
     ENode tag children -> case shortNodeKey tag children of {
-      Just key -> case IM.lookup key short of {
+      Just key -> case keyLookup key short of {
         Just value -> ExistingNode value;
-        Nothing -> MissingNode (\value -> NodeIndex ints bits texts (IM.insert key value short) constructors)
+        Nothing -> MissingNode (\value -> NodeIndex ints bits texts (keyInsert key value short) constructors)
       };
       Nothing -> case internIndexed entry constructors of {
         ExistingEntry value -> ExistingNode value;
@@ -677,7 +741,12 @@ module Bootstrap.Bitstream (
       packedBits bytes (index + 1) 0 0 (width - room) (unsignedShiftRInt bits room) next
     });
   packedField bytes index width bits next =
-    if width < 8 then next index width bits else do {
+    if width >= 16 then do {
+      writeByteArray bytes index (andInt bits 255);
+      writeByteArray bytes (index + 1) (andInt (unsignedShiftRInt bits 8) 255);
+      let { rest = unsignedShiftRInt bits 16 };
+      seq rest (packedField bytes (index + 2) (width - 16) rest next)
+    } else if width < 8 then next index width bits else do {
       writeByteArray bytes index (andInt bits 255);
       let { rest = unsignedShiftRInt bits 8 };
       seq rest (packedField bytes (index + 1) (width - 8) rest next)
@@ -697,20 +766,44 @@ module Bootstrap.Bitstream (
     if unsignedLtInt bits 128 then packedByte bytes index used pending bits next
     else packedByte bytes index used pending (orInt (andInt bits 127) 128)
       (\i u p -> packedVar bytes i u p (unsignedShiftRInt bits 7) next);
+  -- Two bounded references fit the general writer's 56-bit field. Keep the
+  -- low reference within its own width, including when testing raw values.
   packedRefs bytes width references index used pending next = case references of {
     [] -> next index used pending;
-    (:) value rest -> packedBits bytes index used pending width value
-      (\i u p -> packedRefs bytes width rest i u p next)
+    (:) first more -> case more of {
+      [] -> packedBits bytes index used pending width first next;
+      (:) second rest -> if width > 0 && width <= 28 then let {
+        low = andInt first (shiftLInt 1 width - 1);
+        pair = orInt low (shiftLInt second width)
+      } in packedBits bytes index used pending (width + width) pair
+        (\i u p -> packedRefs bytes width rest i u p next)
+      else packedBits bytes index used pending width first
+        (\i u p -> packedRefs bytes width more i u p next)
+    }
   };
-  packedEntry bytes nodeWidth symbolWidth entry index used pending next =
-    packedBits bytes index used pending 2 (entryKind entry) (\i u p -> case entry of {
-      EInt value -> packedVar bytes i u p (zigzag value) next;
-      EBits bits -> packedBits bytes i u p 64 bits next;
-      EText symbol -> packedBits bytes i u p symbolWidth symbol next;
-      ENode tag children -> packedVar bytes i u p tag (\i1 u1 p1 ->
-        packedVar bytes i1 u1 p1 (length children) (\i2 u2 p2 ->
-          packedRefs bytes nodeWidth children i2 u2 p2 next))
-    });
+  -- An owned node's kind, tag varint and arity are contiguous little-endian
+  -- fields. When the tag takes one or two bytes and arity takes one, append
+  -- the entire header before emitting the children.
+  packedEntry bytes nodeWidth symbolWidth entry index used pending next = case entry of {
+    ENode tag children -> let {
+      arity = length children;
+      refs = \i u p -> packedRefs bytes nodeWidth children i u p next
+    } in if unsignedLtInt tag 16384 && arity < 128 then let {
+      single = tag < 128;
+      arityShift = if single then 10 else 18;
+      encoded = if single then tag else
+        orInt (orInt (andInt tag 127) 128) (shiftLInt (unsignedShiftRInt tag 7) 8);
+      header = orInt 3 (orInt (shiftLInt encoded 2) (shiftLInt arity arityShift))
+    } in packedBits bytes index used pending (arityShift + 8) header refs
+    else packedBits bytes index used pending 2 3 (\i u p ->
+      packedVar bytes i u p tag (\j v q -> packedVar bytes j v q arity refs));
+    EInt value -> packedBits bytes index used pending 2 0 (\i u p ->
+      packedVar bytes i u p (zigzag value) next);
+    EBits bits -> packedBits bytes index used pending 2 1 (\i u p ->
+      packedBits bytes i u p 64 bits next);
+    EText symbol -> packedBits bytes index used pending 2 2 (\i u p ->
+      packedBits bytes i u p symbolWidth symbol next)
+  };
   packedEntries bytes nodeWidth symbolWidth entries index used pending next = case entries of {
     [] -> next index used pending;
     (:) entry rest -> packedEntry bytes nodeWidth symbolWidth entry index used pending

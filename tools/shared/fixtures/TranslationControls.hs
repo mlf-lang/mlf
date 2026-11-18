@@ -51,4 +51,15 @@ main = do
   (case R.integer (eval term) of T.Left e -> e=="translation input"; _ -> False)
  value <- integer (C.optimizeChecked (prim T.PIfThenElse [T.XEBool False,poison,T.XEInt 42]))
  need "unselected branch stays lazy" (value==42)
+ let dropUnused = fst . C.liveDeclarationSpine
+     hidden = T.XName 1 "same identity, another hint"
+     keepOuter = T.XELet (n 1) (T.XEInt 7) (T.XELet hidden (v 1) (T.XEVar hidden))
+     keepRec = T.XELet (n 1) (T.XEInt 7) (T.XELetRec [(n 2,v 1)] (v 2))
+     harmless = T.XELet (n 1) poison (T.XEInt 5)
+ need "unused initializer drops before renaming" (X.equalErased (dropUnused harmless) (T.XEInt 5))
+ need "nonrecursive RHS sees the outer identity" (X.equalErased (dropUnused keepOuter) keepOuter)
+ need "recursive RHS keeps its outer dependency" (X.equalErased (dropUnused keepRec) keepRec)
+ need "an inner binder masks an identically numbered outer name"
+   (X.equalErased (dropUnused (T.XELet (n 1) poison (T.XELet hidden (T.XEInt 8) (T.XEVar hidden))))
+                  (T.XELet hidden (T.XEInt 8) (T.XEVar hidden)))
  putStrLn "PASS 150 translation cases at three stages, independent evaluation, scopes and fallbacks"

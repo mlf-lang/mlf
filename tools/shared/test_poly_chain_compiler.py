@@ -20,7 +20,9 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--fused', action='store_true', help='also check the single-invocation retained-root entry')
     parser.add_argument('--cached-codegen', action='store_true', help='check fused codegen cache/report interoperability')
-    parser.add_argument('--signed', action='store_true', help='exercise signed Int dependency templates')
+    kind = parser.add_mutually_exclusive_group()
+    kind.add_argument('--signed', action='store_true', help='exercise signed Int dependency templates')
+    kind.add_argument('--inferred', action='store_true', help='exercise inferred Int dependency templates')
     args = parser.parse_args()
     if args.cached_codegen and not args.fused:
         parser.error('--cached-codegen requires --fused')
@@ -32,7 +34,8 @@ def main():
     output.mkdir(parents=True, exist_ok=False)
     evidence = {'complete': False, 'producer_sha256': sha(receipt),
                 'driver_sha256': sha(__file__), 'fused': args.fused,
-                'cached_codegen': args.cached_codegen, 'signed': args.signed, 'commands': [], 'checks': []}
+                'cached_codegen': args.cached_codegen, 'signed': args.signed,
+                'inferred': args.inferred, 'commands': [], 'checks': []}
     def save():
         (output / 'receipt.json').write_text(json.dumps(evidence, indent=2) + '\n')
     def check(label, condition):
@@ -43,7 +46,7 @@ def main():
     save()
     runner = CommandRunner(ROOT, output, evidence, save)
     emlf = producer / 'bin/emlf'
-    if args.signed:
+    if args.signed or args.inferred:
         # Compile semantic controls against the authenticated producer objects.
         built = json.loads(receipt.read_text())
         objects = {str(p.relative_to(producer)): sha(p)
@@ -55,7 +58,9 @@ def main():
         for package in ['base', 'array', 'bytestring', 'text', 'containers', 'directory']:
             flags += ['-package', package]
         linked = sorted(p for p in (producer / 'objects').rglob('*.o') if p.name != 'Main.o')
-        for fixture in ['SignedTemplate', 'SignedSourceRoots', 'TranslationControls', 'IntDemandControls', 'OwnerEncodingControls']:
+        fixtures = (['InferredTemplate'] if args.inferred else
+                    ['SignedTemplate', 'SignedSourceRoots', 'TranslationControls', 'IntDemandControls', 'OwnerEncodingControls'])
+        for fixture in fixtures:
             directory = output / fixture; directory.mkdir()
             runner.run(fixture + '-compile', [built['ghc']['path'], '-c', *flags,
                 '-i', '-i' + str(producer / 'objects'), '-o', directory / 'Main.o',
@@ -75,10 +80,12 @@ def main():
         str(cache), str(builtin)]))
     prefix = output / 'unit'
     def write(first=None):
-        if args.signed:
+        if args.signed or args.inferred:
             first = first or 'addInt y 1'
-            definitions = ['f0 :: Int -> Int; f0 y = ' + first] + [
-                f'f{i} :: Int -> Int; f{i} y = f{i-1} (addInt y 1)' for i in range(1, 9)]
+            def signature(i):
+                return f'f{i} :: Int -> Int; ' if args.signed else ''
+            definitions = [signature(0) + 'f0 y = ' + first] + [
+                signature(i) + f'f{i} y = f{i-1} (addInt y 1)' for i in range(1, 9)]
             source.write_text(HEADER + 'module Main (main) where { import MLF.Primitive; '
                 + '; '.join(definitions) + '; entry :: Int -> Int; entry x = f8 x; '
                 'main :: IO (); main = printInt (entry 7); }\n')
@@ -147,7 +154,8 @@ def main():
                        if key.startswith('8:InferScc') and node['payload'] is not None)
     victim, users = payloads.most_common(1)[0]
     check('distinct declarations share an immutable payload',
-          users == (8 if args.signed else 7) and len(payloads) == (5 if args.signed else 6))
+          users == (8 if args.signed or args.inferred else 7)
+          and len(payloads) == (5 if args.signed or args.inferred else 6))
     payload = graph / 'results' / (victim + '.mlfqr')
     damaged = bytearray(payload.read_bytes()); damaged[-1] ^= 1; payload.write_bytes(damaged)
     repaired = compile('repair-shared-payload')
@@ -156,20 +164,20 @@ def main():
     check('one repaired payload restores its exact address', sha(payload) == victim)
     check('repair restores checked artifacts', artifacts() == original)
     execute('repaired-value', '16\n')
-    write('addInt y 2' if args.signed else 'step (step y)')
+    write('addInt y 2' if args.signed or args.inferred else 'step (step y)')
     changed = compile('changed-predecessor')
     # This edit changes f0's scheme. The existing query graph invalidates the
     # full consumer chain through its recorded reads, including entry and main;
     # only the synthetic crate entry reuses. The checkpoint compiler has the
     # same 11/1 boundary. Template sharing must preserve that invalidation.
-    if args.signed:
+    if args.signed or args.inferred:
         check('same-scheme body edit preserves downstream checked reuse',
               changed['inferred_groups'] == 1 and changed['reused_groups'] == count - 1)
     else:
         check('changed scheme preserves consumer-chain invalidation',
               changed['inferred_groups'] == count - 1 and changed['reused_groups'] == 1
               and changed['groups'][-1]['cached'])
-    execute('changed-value', '17\n' if args.signed else '-17\n')
+    execute('changed-value', '17\n' if args.signed or args.inferred else '-17\n')
     stable = (graph / 'CURRENT').read_bytes()
     if args.signed:
         valid = source.read_text()
@@ -183,17 +191,18 @@ def main():
         source.write_text(unknown)
         compile('reject-unknown-signature-type', status=1)
         check('unknown type leaves last good generation', (graph / 'CURRENT').read_bytes() == stable)
-    write('ltInt y 1' if args.signed else 'addInt y 1')
+    write('ltInt y 1' if args.signed or args.inferred else 'addInt y 1')
     compile('reject-monomorphic-predecessor', status=1)
     check('failed checking leaves the last good generation', (graph / 'CURRENT').read_bytes() == stable)
-    write('addInt y 2' if args.signed else 'step (step y)')
+    write('addInt y 2' if args.signed or args.inferred else 'step (step y)')
     restored = compile('restore-good-source', verify=True)
     check('restored source reuses the last good generation', restored['inferred_groups'] == 0)
-    execute('restored-value', '17\n' if args.signed else '-17\n')
+    execute('restored-value', '17\n' if args.signed or args.inferred else '-17\n')
     authenticate_build(receipt, producer / 'bin')
     check('producer receipt is unchanged', sha(receipt) == evidence['producer_sha256'])
     evidence['complete'] = True; save()
-    print('PASS ' + ('signed Int' if args.signed else 'polymorphic') + ' chain CLI cache controls')
+    print('PASS ' + ('signed Int' if args.signed else 'inferred Int' if args.inferred else 'polymorphic')
+          + ' chain CLI cache controls')
 
 
 if __name__ == '__main__':

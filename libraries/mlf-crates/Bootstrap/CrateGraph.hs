@@ -39,7 +39,7 @@ module Bootstrap.CrateGraph where {
   templateExpression globals names depth expression = let {
     child = templateExpression globals names depth;
     variable slot = Right (Q.node "variable" [showInt slot]);
-    lambda scope name body = mapEither (\text -> Q.node "lambda" [name,text])
+    lambda scope name body = mapEither (\text -> Q.node "lambda" [text])
       (templateExpression scope (M.insert compareString name depth names) (depth + 1) body)
   } in case expression of {
     SGlobal identity _ -> case M.lookup compareInt (V.toInt identity) globals of {
@@ -71,8 +71,7 @@ module Bootstrap.CrateGraph where {
     [(,) owner ((,,) _ annotation body)] -> do {
       signature <- case annotation of {
         Nothing -> do {
-          ensure (any (\((,,) _ _ ty) -> case ty of { XForall _ _ _ -> True; _ -> False }) parameters)
-            "unsigned template needs a polymorphic dependency";
+          ensure (not (null parameters)) "unsigned template needs a dependency";
           Right Nothing
         };
         Just written -> do {
@@ -328,7 +327,12 @@ module Bootstrap.CrateGraph where {
     Nothing -> fresh
   };
   preparedValue slots prepared = fst (preparedValueCached Nothing slots prepared);
-  preparedValueCached previous slots prepared = let {
+  preparedValueCached = preparedWith preparedTree;
+  preparedVersion :: String;
+  preparedVersion = "prepared-declarations-1";
+  preparedTree names original lowered metadata = W.VNode 421
+    [W.VText preparedVersion,A.toList A.toText names,W.VText original,W.VText lowered,A.toList A.toText metadata];
+  preparedWith create previous slots prepared = let {
     table = Q.referenceTable slots prepared;
     member = Q.referenceMember table;
     token = Q.referenceToken table;
@@ -337,9 +341,8 @@ module Bootstrap.CrateGraph where {
     original = map member (Source.groupOriginal prepared);
     lowered = map member (Source.groupMembers prepared)
   } in case preparedSyntax previous original lowered of { (,,) first second cached ->
-    (,) (W.VNode 421 [W.VText "prepared-declarations-1", A.toList A.toText (Q.referenceDefinitions table),
-      W.VText first, W.VText second,
-      A.toList A.toText (Q.sourceGroupMetadataWith token candidate prepared)]) cached
+    (,) (create (Q.referenceDefinitions table) first second
+      (Q.sourceGroupMetadataWith token candidate prepared)) cached
   };
   -- Rebuilt inputs/receipts have no disk payload. Preserve the wire planner's exact
   -- scalar, depth, work and allocation bounds, but hash their complete framed
@@ -350,8 +353,7 @@ module Bootstrap.CrateGraph where {
     W.VNode 421 [W.VText version, definitions, W.VText original, W.VText lowered, metadata] -> do {
       names <- A.fromList A.fromText definitions;
       fields <- A.fromList A.fromText metadata;
-      Right (append ["MLF-PREPARED-INPUT-TEXT-1",version,showInt (length names)]
-        (append names (append [original,lowered,showInt (length fields)] fields)))
+      Right (preparedFrames version names original lowered fields)
     };
     W.VNode 427 [W.VText group, W.VText fragment, bindings] -> do {
       contracts <- A.fromList (A.fromPair A.fromText A.fromText) bindings;
@@ -371,6 +373,9 @@ module Bootstrap.CrateGraph where {
     };
     _ -> Left "not a rebuilt text value"
   };
+  preparedFrames version names original lowered metadata =
+    append ["MLF-PREPARED-INPUT-TEXT-1",version,showInt (length names)]
+      (append names (append [original,lowered,showInt (length metadata)] metadata));
   framedSize limit total fields = case fields of {
     [] -> Just total;
     (:) field rest -> let { size = stringLength field;
@@ -383,12 +388,13 @@ module Bootstrap.CrateGraph where {
   -- Even charging each text as a distinct symbol and every reference as eight
   -- bits leaves the complete envelope below 80000 bytes. Larger or differently
   -- shaped values keep the exact planner and its diagnostics.
-  smallRebuiltValue value = let { limits = W.defaultLimits } in
+  smallRebuiltLimits limits =
     W.validLimits limits && W.maxBytes limits >= 80000 &&
     W.maxSymbols limits >= 256 && W.maxSymbolBytes limits >= 65536 &&
     W.maxTotalSymbolBytes limits >= 65536 && W.maxNodes limits >= 256 &&
     W.maxEdges limits >= 256 && W.maxDepth limits >= 8 &&
-    W.maxExpandedWork limits >= 65792 &&
+    W.maxExpandedWork limits >= 65792;
+  smallRebuiltValue value = smallRebuiltLimits W.defaultLimits &&
     case smallRebuiltTree 1 256 16384 value of { Just _ -> True; Nothing -> False };
   smallRebuiltTree depth nodes scalars value =
     if depth > 8 || nodes == 0 then Nothing else case value of {
@@ -413,17 +419,37 @@ module Bootstrap.CrateGraph where {
       Left _ -> G.hashValue value;
       Right fields -> case framedSize (W.maxBytes W.defaultLimits / 4) 0 fields of {
         Nothing -> G.hashValue value;
-        Just _ -> do {
-          -- Four UTF-8 bytes per validated scalar bounds the temporary buffer
-          -- before allocation. Oversized framing keeps the ordinary encoding.
-          bytes <- byteArrayFromString (Separate.pack fields);
-          digest <- byteArrayDigest bytes;
-          ioReturn (if G.validHash digest then Right digest
-            else Left "query input SHA failed")
-        }
+        Just _ -> hashTextFields fields
       }
     }
   };
+  hashTextFields :: ([] String) -> IO (Either String String);
+  hashTextFields fields = do {
+    bytes <- byteArrayFromString (Separate.pack fields);
+    digest <- byteArrayDigest bytes;
+    ioReturn (if G.validHash digest then Right digest else Left "query input SHA failed")
+  };
+  smallPreparedTexts nodes scalars fields = case fields of {
+    [] -> Just ((,) nodes scalars);
+    (:) text rest -> let { n = stringLength text } in
+      if nodes <= 0 || n > scalars then Nothing
+      else smallPreparedTexts (nodes - 1) (scalars - n) rest
+  };
+  hashPrepared names original lowered metadata = let {
+    -- Visit in preparedTree order, charging its root, version and name-list nodes first.
+    -- Charge the metadata-list container after both syntax fields. The largest generated
+    -- frame uses one marker, two counts and fewer than 259 length prefixes of
+    -- six scalars. The small tree and its length-framed text both fit in 80000 bytes.
+    small = smallRebuiltLimits W.defaultLimits &&
+      case smallPreparedTexts 253 (16384 - stringLength preparedVersion) names of {
+        Nothing -> False;
+        Just ((,) left scalars) -> case smallPreparedTexts left scalars [original,lowered] of {
+          Nothing -> False; Just ((,) more budget) ->
+            more > 0 && isJust (smallPreparedTexts (more - 1) budget metadata)
+        }
+      }
+  } in if small then hashTextFields (preparedFrames preparedVersion names original lowered metadata)
+    else hashRebuiltValue (preparedTree names original lowered metadata);
   recordRebuilt identity reads value session = do {
     hashed <- hashRebuiltValue value;
     ioReturn (mapEither (\digest -> G.recordDigest identity reads Nothing digest Nothing session) hashed)
@@ -473,9 +499,10 @@ module Bootstrap.CrateGraph where {
     ioReturn (mapEither fst answer)
   };
   preparedInputCached previous slots prepared session =
-    case preparedValueCached previous slots prepared of { (,) value cached -> do {
-      answer <- recordRebuilt (G.inputKey (groupKey PreparedQuery slots)) [] value session;
-      ioReturn (mapEither (\result -> (,) result cached) answer)
+    case preparedWith hashPrepared previous slots prepared of { (,) action cached -> do {
+      answer <- action;
+      ioReturn (mapEither (\digest -> (,) (G.recordDigest (G.inputKey (groupKey PreparedQuery slots))
+        [] Nothing digest Nothing session) cached) answer)
     } };
   scopeInventory prepared = case Source.groupAuthority prepared of {
     Nothing -> W.VNode 422 [];

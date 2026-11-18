@@ -85,7 +85,7 @@ module Bootstrap.Separate where {
     else let { code = stringCodeAt text position } in
       if compactNameCode code then compactNameChunks text start (position + 1)
       else (:) (stringSlice text start (position - start))
-        ((:) (if code == 122 then "zz" else "z" ++ compactNameHex code ++ "z")
+        ((:) (if code == 122 then "zz" else if code == 58 then "z3az" else "z" ++ compactNameHex code ++ "z")
           (compactNameChunks text (position + 1) (position + 1)));
   compactName text = concatStringList (compactNameChunks text 0 0);
   queryGroupName crateId members = "Query_" ++ encoded crateId ++ "z_" ++ encoded (head members);
@@ -511,26 +511,29 @@ module Bootstrap.Separate where {
            c = stringCodeAt text i
          } in
          if ((c >= 48) && (c <= 57)) then digitEnd text (i + 1) else i;
+  -- Read each decimal length in one pass. A padded length still has a
+  -- valid frame boundary, so validate the rest before reporting its spelling.
+  unpackFields :: Maybe String -> String -> Int -> Either String ([] String);
+  unpackFields canonicalError text initial = let {
+    limit = stringLength text;
+    malformed = Left "malformed module artifact framing";
+    fields start = if start == limit then Right [] else digits start start 0;
+    digits start position n =
+      if position >= limit then malformed else let { c = stringCodeAt text position } in
+      if c == 58 && position > start then
+        if n > limit - position - 1 then Left "truncated module artifact" else do {
+          rest <- fields (position + 1 + n);
+          case canonicalError of {
+            Nothing -> Right ();
+            Just message -> ensure (position - start == 1 || stringCodeAt text start /= 48) message
+          };
+          Right ((:) (stringSlice text (position + 1) n) rest)
+        }
+      else if c < 48 || c > 57 || position - start >= 9 then malformed
+      else digits start (position + 1) (10 * n + (c - 48))
+  } in fields initial;
   unpackFrom :: String -> Int -> Either String ([] String);
-  unpackFrom text start =
-    if (start == stringLength text)
-    then Right []
-    else do {
-           let {
-             end = digitEnd text start
-           };
-           ensure
-             ((end > start) &&
-              (((end - start) <= 9) &&
-               ((end < stringLength text) && (stringCodeAt text end == 58))))
-             "malformed module artifact framing";
-           let {
-             n = readInt (stringSlice text start (end - start))
-           };
-           ensure (n <= ((stringLength text - end) - 1)) "truncated module artifact";
-           rest <- unpackFrom text ((end + 1) + n);
-           Right ((:) (stringSlice text (end + 1) n) rest)
-         };
+  unpackFrom text start = unpackFields Nothing text start;
   unpack text = unpackFrom text 0;
   fingerprintFrom :: String -> Int -> Int -> Int -> String;
   fingerprintFrom text i a b =

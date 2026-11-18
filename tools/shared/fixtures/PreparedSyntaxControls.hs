@@ -3,6 +3,7 @@ module Main where
 import Prelude
 import Control.Monad (forM_, unless)
 import Data.IORef
+import Control.Exception (SomeException, displayException, try)
 import qualified Corpus as C
 import qualified Bootstrap.SourceEquality as E
 import qualified Bootstrap.CrateGraph as G
@@ -129,5 +130,25 @@ main = do
   check "old expression equality keeps NaN semantics" (not (E.eqSExpr (T.SDoubleLit (P.doubleFromBits 9221120237041090561)) (T.SDoubleLit (P.doubleFromBits 9221120237041090561))))
   check "exact expression equality distinguishes zero sign" (not (E.eqSExprBits (T.SDoubleLit (P.doubleFromBits 0)) (T.SDoubleLit (P.doubleFromBits (-9223372036854775808)))))
   check "exact expression equality admits identical NaN payload" (E.eqSExprBits (T.SDoubleLit (P.doubleFromBits 9221120237041090561)) (T.SDoubleLit (P.doubleFromBits 9221120237041090561)))
+  -- Prepared input hashes must use scalar lengths and preserve the generic
+  -- reader's demand order through both admission paths.
+  let fields ns o l ms = W.VNode 421 [W.VText "prepared-declarations-1",
+        A.toList W.VText ns,W.VText o,W.VText l,A.toList W.VText ms]
+      digest value = case value of T.Right h -> Just (B.unpack h); T.Left _ -> Nothing
+      answer action = do
+        v <- try action :: IO (Either SomeException (T.Either B.String B.String))
+        pure (case v of Left e -> displayException e; Right _ -> "success")
+      samples = [([], "", "", []),(["λ", "0:"], "\0", "😀", ["", "λ"]),
+                 (replicate 250 "", "a", "b", []),(replicate 251 "", "a", "b", []),
+                 ([],B.literal (replicate 16384 '界'),"",[])]
+  forM_ samples $ \(ns,o,l,ms) -> do
+    a <- G.hashPrepared ns o l ms
+    b <- G.hashRebuiltValue (fields ns o l ms)
+    check "typed and generic Prepared hashes" (digest a /= Nothing && digest a == digest b)
+  let names = [errorWithoutStackTrace "bad prepared name"]
+      original = errorWithoutStackTrace "bad original syntax"
+  typedError <- answer (G.hashPrepared names original "" [])
+  wireError <- answer (G.hashRebuiltValue (fields names original "" []))
+  check "Prepared input error precedence" (typedError == "bad prepared name" && typedError == wireError)
   total<-readIORef count
   putStrLn ("Prepared syntax controls: "++show total++" checks; "++show (length rows)++" syntax variants")

@@ -135,6 +135,10 @@ def command_run(args, setup=None):
         raise SystemExit('fewer than three repetitions are qualification data, not samples; use --pilot in run.py')
     argv = [sys.executable, '-B', HERE / 'run.py', '--setup', setup, '--output', output,
             '--endpoint', args.endpoint, '--cohort', cohort, '--repeats', repeats]
+    if getattr(args, 'interleave_pairs', False):
+        argv.append('--interleave-pairs')
+    if getattr(args, 'cohort_output_gib', None) is not None:
+        argv += ['--cohort-output-gib', args.cohort_output_gib]
     if include_baseline:
         argv += ['--family', 'baseline']
     for family in families:
@@ -194,6 +198,8 @@ def main():
     runner.add_argument('--family', action='append')
     runner.add_argument('--size', action='append', type=int)
     runner.add_argument('--repeats', type=int)
+    runner.add_argument('--interleave-pairs', action='store_true')
+    runner.add_argument('--cohort-output-gib', type=int)
     runner.add_argument('--setup', type=Path)
     runner.set_defaults(func=command_run)
 
@@ -212,6 +218,8 @@ def main():
     everything.add_argument('--family', action='append')
     everything.add_argument('--size', action='append', type=int)
     everything.add_argument('--repeats', type=int)
+    everything.add_argument('--interleave-pairs', action='store_true')
+    everything.add_argument('--cohort-output-gib', type=int)
     everything.add_argument('--producer', type=Path)
     everything.add_argument('--source', type=Path)
     everything.add_argument('--builtin-prefix', type=Path)

@@ -282,9 +282,41 @@ module Bootstrap.Surface where {
   lowerExpression :: SExpr -> Either String SExpr;
   lowerExpression = lowerExpressionWithData D.emptyDataEnv;
   lowerExpressionWithData :: DataEnv -> SExpr -> Either String SExpr;
-  lowerExpressionWithData env original = do {
-    shared <- Desugar.lowerSharedDo env original;
-    runFresh (Desugar.allNames shared) (lower env (Desugar.desugarDo shared))
+  lowerExpressionWithData env original =
+    if surfaceCore original then Right original else do {
+      shared <- Desugar.lowerSharedDo env original;
+      -- lowerSharedDo also expands every legacy do block it visits.
+      runFresh (Desugar.allNames shared) (lower env shared)
+    };
+  -- These forms need no pattern compilation or fresh names. Preserve the
+  -- existing tree, including its declaration IDs, name hints and source spans.
+  -- A case, equation or do block takes the ordinary lowering path.
+  surfaceCore :: SExpr -> Bool;
+  surfaceCore expression = case expression of {
+    SDeclScope _ body -> surfaceCore body;
+    SSourceDefinition body -> surfaceCore body;
+    SCallSite _ _ body -> surfaceCore body;
+    SLam _ _ body -> surfaceCore body;
+    SApp f x -> surfaceCore f && surfaceCore x;
+    SLet _ rhs body -> surfaceCore rhs && surfaceCore body;
+    SAnn body _ -> surfaceCore body;
+    SSignature body _ -> surfaceCore body;
+    SChecked _ body -> surfaceCore body;
+    SLetRec ds body -> all (\((,,) _ _ rhs) -> surfaceCore rhs) ds && surfaceCore body;
+    SCase _ _ -> False;
+    SEquations _ -> False;
+    SDo _ _ -> False;
+    SSharedBind _ _ _ _ _ -> False;
+    SGlobal _ _ -> True;
+    SWantedRefs _ _ -> True;
+    SVar _ -> True;
+    SConstructor _ -> True;
+    SIntLit _ -> True;
+    SDoubleLit _ -> True;
+    SBoolLit _ -> True;
+    SStringLit _ -> True;
+    SPrimitive _ -> True;
+    SWanted _ _ -> True
   };
   flatPattern :: SPattern -> Bool;
   flatPattern pattern =

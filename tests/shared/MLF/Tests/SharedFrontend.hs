@@ -53,6 +53,34 @@ module MLF.Tests.SharedFrontend where {
       Left _ -> False;
       Right m -> isRight (Modules.linkModules ImplicitPrelude ((:) m []))
     };
+  atomNameCase = case (,) (parse "main = true") (parse "main = True") of {
+    (,) (Right (SourceModule _ _ _ _ _ _ _ [((,,) _ _
+          (SCallSite label (SourceSpan _ _ _ 5 8 5 12) (SVar variable)))] _ _))
+        (Right (SourceModule _ _ _ _ _ _ _ [((,,) _ _ (SConstructor constructor))] _ _)) ->
+      eqString variable "true" && eqString label variable && eqString constructor "$MLF.Source.True";
+    _ -> False
+  };
+  openSymbolOrder = let {
+    iface names = Artifact.CrateInterface "crate" [] [] [] [] [] [] [] []
+      (map (\n -> (,) n (XCon "Int" [])) names) "" "" []
+  } in case (,) (Artifact.openIndex [iface ["z","a"]] [])
+                (Artifact.openIndex [iface ["x"],iface ["x"]] []) of {
+    (,) (Right (Artifact.OpenIndex ids _ _ _)) (Left message) ->
+      eqString message "duplicate crate crate symbol" &&
+      case (,) (M.lookup compareString "z" ids) (M.lookup compareString "a" ids) of {
+        (,) (Just first) (Just second) -> Index.toInt first == 0 && Index.toInt second == 1;
+        _ -> False
+      };
+    _ -> False
+  };
+  boundedDeclarationReads = let {
+    readId i = XVarTerm (XName i "same hint");
+    source = XLetRec [((,,) (XName 1 "binder") (XCon "Int" []) (readId (0 - 3)))]
+      (XApp (readId 5) (XApp (readId 4) (readId 90)));
+    before name = if X.nameId name < 5 then Set.singleton name else Set.empty;
+    ids names = map X.nameId (Set.toList names)
+  } in eqList eqInt (ids (Artifact.variableReadsWith before source)) [0 - 3,4] &&
+    eqList eqInt (ids (Artifact.declarationVariableReads source)) [0 - 3,4,5,90];
   forwardScope =
     case parse "main = let { x = y; y = 3 } in x" of {
       Right (SourceModule _ _ _ _ _ _ _ ((:) ((,,) _ _ (SLet y (SIntLit 3)
@@ -1933,6 +1961,31 @@ module MLF.Tests.SharedFrontend where {
         Left message -> eqString message "function equations must be contiguous; duplicate value declaration";
         Right _ -> False
       });
+    check "preconstructed shared module rejects duplicate values"
+      (case P.validateSharedModule (moduleFor ["f", "f"] [] []) of {
+        Left message -> eqString message "duplicate value declaration"; Right _ -> False
+      });
+    let { open = Just (SAnnotation ["a"] (STVar "a"));
+          raw rhs = SourceModule "Inventory.hs" (Just "Inventory") Nothing [] [] [] []
+            [(,,) "f" open rhs] Nothing SharedHaskellV1 };
+    check "preconstructed recursive group requires a closed signature"
+      (case P.validateSharedModule (raw (SVar "f")) of {
+        Left message -> eqString message "recursive definition f requires an explicit closed signature";
+        Right _ -> False
+      });
+    check "preconstructed nonrecursive annotation keeps its scope"
+      (isRight (P.validateSharedModule (raw (SIntLit 1))));
+    let { slot = Index.fromInt 3; span = SourceSpan "pkg" "Inventory" "Inventory.hs" 1 1 1 2;
+          scoped rhs = SDeclScope [slot] (SLet "x" rhs (SCallSite "f" span (SGlobal slot "f")));
+          core = scoped (SIntLit 1) };
+    check "surface lowering preserves declaration IDs, hints and spans"
+      (case Surface.lowerExpression core of {
+        Right result -> SourceEquality.eqSExprBits result core; Left _ -> False
+      });
+    check "surface lowering finds equations inside a scope"
+      (case Surface.lowerExpression (scoped (SEquations [])) of {
+        Left message -> eqString message "function has no equations"; Right _ -> False
+      });
     check "adjacent equations still form one declaration"
       (accept "choose True = 1\nchoose False = 2");
     let { large = map (\n -> "value" ++ showInt n) (range 0 1023) };
@@ -1974,8 +2027,18 @@ module MLF.Tests.SharedFrontend where {
            (P.parseModule "Example.hs"
               (prologue ++
                "{-# LANGUAGE X, #-}\nmodule Example where\nimport MLF.Primitive\nmain = 1\n")));
+      let { plain = concatStringList (map (\_ -> "a") (range 1 257));
+            invalid = "x\n" ++ plain ++ "\t" } in
+        check "plain source run keeps the next error at its scalar column"
+          (case L.validateSharedSource "Run.hs" invalid (stringLength invalid) (L.Cursor 0 1 1) 0 of {
+            Left message -> eqString message "Run.hs:2:258: shared source requires LF and spaces-only whitespace";
+            Right _ -> False
+          });
       check "module metadata" (accept "main = 42");
       check "forward group scope" forwardScope;
+      check "ordinary true and constructor True" atomNameCase;
+      check "open symbol slot order and repeated names" openSymbolOrder;
+      check "bounded Prelude variable reads" boundedDeclarationReads;
       check "legacy sequential scope" legacyScope;
       check "fixed do identity" fixedDo;
       check "mixed per-file profiles" mixedGraph;

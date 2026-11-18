@@ -738,6 +738,14 @@ module Bootstrap.Lexer where {
               then Right ((:) name [])
               else mapEither ((:) name) (pragmaExtensionsAt text (i + 1) (i + 1))
     else pragmaExtensionsAt text begin (i + 1);
+  -- Printable ASCII with no quote or comment opener stays on the same line.
+  -- Walk a run with a scalar index and advance the source column once.
+  plainSharedChar :: Int -> Bool;
+  plainSharedChar c = c >= 32 && c < 127 && c /= 34 && c /= 45 && c /= 123;
+  plainSharedEnd :: String -> Int -> Int -> Int;
+  plainSharedEnd source size index =
+    if index < size && plainSharedChar (stringCodeAt source index)
+    then plainSharedEnd source size (index + 1) else index;
   validateSharedSource :: String -> String -> Int -> Cursor -> Int -> Either String ();
   validateSharedSource file source size cursor prologueEnd =
     let {
@@ -748,8 +756,13 @@ module Bootstrap.Lexer where {
     else let {
            c = codeAt source size i
          } in
-         if ((c == 32) || (c == 10))
-         then validateSharedSource file source size (advance c cursor) prologueEnd
+         if plainSharedChar c then case advance c cursor of {
+           Cursor start line column -> let {
+             end = plainSharedEnd source size start;
+             nextColumn = column + (end - start)
+           } in seq nextColumn (validateSharedSource file source size (Cursor end line nextColumn) prologueEnd)
+         }
+         else if c == 10 then validateSharedSource file source size (advance c cursor) prologueEnd
          else if U.isSpace c
               then Left
                      (lexError file cursor "shared source requires LF and spaces-only whitespace")

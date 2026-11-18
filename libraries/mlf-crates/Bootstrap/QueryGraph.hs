@@ -181,11 +181,7 @@ module Bootstrap.QueryGraph where {
   addressId (Address _ identity) = identity;
   addressTag (Address tag _) = tag;
   isGroup tag = elem (\a b -> a == b) tag [preparedTag,inventoryTag,scopeTag,inferTag,finishTag];
-  canonicalFields text = do {
-    fields <- Separate.unpack text;
-    ensure (eqString (Separate.pack fields) text) "noncanonical query identity";
-    Right fields
-  };
+  canonicalFields text = Separate.unpackFields (Just "noncanonical query identity") text 0;
   parseAddress wanted = do {
     fields <- canonicalFields wanted;
     case fields of {

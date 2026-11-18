@@ -473,6 +473,28 @@ module Bootstrap.ArtifactStructure where {
   toCrateInterfaceFields value = case value of {
     CrateInterfaceFields x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 -> W.VNode 242 [toText x0, (toList (toTriple toText toText toText)) x1, (toList toText) x2, (toList (toPair toText (toList toEntity))) x3, (toList (toPair toText (toList toText))) x4, (toList toDataDecl) x5, (toList toSClassDecl) x6, (toList (toPair toText toInterfaceInstance)) x7, (toList toDataDecl) x8, (toList (toPair toText toXType)) x9, toText x10, toText x11, (toList (toPair toText toBool)) x12]
   };
+  -- Share the ordinary encoding's field values, but let metadata receipts
+  -- keep binding types in their compact typed form. Splitting at field 9 keeps
+  -- comparison in wire order; excluded instance bodies stay outside the key.
+  crateMetadataParts fields@(CrateInterfaceFields _ _ _ _ _ _ _ _ _ bindings _ _ _) =
+    let { value = toCrateInterfaceFields fields } in case value of {
+      W.VNode _ [a,b,c,d,e,f,g,h,i,_,k,l,m] ->
+        (,,,) value [a,b,c,d,e,f,g,h,i] bindings [k,l,m];
+      _ -> panic "invalid internal crate interface encoding"
+    };
+  -- Exact equality of the structural encoding, including constructor tags,
+  -- list order/multiplicity and bound-variable IDs. This is not alpha equality.
+  sameEncodedXType a b = case (,) a b of {
+    (,) (XVar (XTyVar x)) (XVar (XTyVar y)) -> x == y;
+    (,) XBot XBot -> True;
+    (,) (XBotKind x) (XBotKind y) -> S.eqKind x y;
+    (,) (XArrow x y) (XArrow u v) -> sameEncodedXType x u && sameEncodedXType y v;
+    (,) (XCon x xs) (XCon y ys) -> eqString x y && S.eqList sameEncodedXType xs ys;
+    (,) (XApply x y) (XApply u v) -> sameEncodedXType x u && sameEncodedXType y v;
+    (,) (XForall (XTyVar x) a1 a2) (XForall (XTyVar y) b1 b2) ->
+      x == y && sameEncodedXType a1 b1 && sameEncodedXType a2 b2;
+    _ -> False
+  };
   fromCrateInterfaceFields :: W.Value -> Either String CrateInterfaceFields;
   fromCrateInterfaceFields value = S.bindEither (decodeValue ShapeCrateInterfaceFields value) expectCrateInterfaceFields;
 

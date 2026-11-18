@@ -379,6 +379,8 @@ def main():
                    ROOT / 'tests/native/runtime_utf8_length.c',
                    ROOT / 'tools/shared/test_parser_satisfy.py',
                    ROOT / 'tools/shared/fixtures/ParserSatisfyControls.hs',
+                   ROOT / 'tools/shared/test_metadata_receipt.py',
+                   ROOT / 'tools/shared/fixtures/MetadataReceiptControls.hs',
                    ROOT / 'tools/shared/test_candidate_selection.py',
                    ROOT / 'tools/shared/fixtures/CandidateSelectionControls.hs',
                    ROOT / 'tests/indexvec/OrderedMapControls.hs',
@@ -429,6 +431,8 @@ def main():
         runner.run('candidate-selection', [sys.executable, '-B', ROOT / 'tools/shared/test_candidate_selection.py',
                    '--build-receipt', build_receipt, '--clang', args.clang,
                    '--output', output / 'candidate-selection'], timeout=600)
+        runner.run('metadata-receipt', [sys.executable, '-B', ROOT / 'tools/shared/test_metadata_receipt.py',
+                   '--build-receipt', build_receipt, '--output', output / 'metadata-receipt'], timeout=300)
         for collection in [receipt['inputs'], receipt['helpers']]:
             if any(sha(path) != digest for path, digest in collection.items()):
                 raise RuntimeError('test input changed during qualification')
