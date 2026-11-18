@@ -32,5 +32,5 @@ main = do
   missing <- M.runProcess (text "") (text ("3\0\0\0\0" ++ child ++ ".missing\0"))
   if missing==127 then pure () else error "missing executable status"
   after <- fds
-  values <- mapM stat [0..6]
+  values <- mapM stat [0..7]
   print (before,after,values)

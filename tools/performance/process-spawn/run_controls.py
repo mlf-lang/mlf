@@ -5,6 +5,7 @@ import argparse
 import ast
 import json
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -72,10 +73,16 @@ def main():
     def expected(code=7,message=''):
         value=message.encode();return f'{int(bool(message))} {0 if message else code} {len(value)} {value.hex()}\n'.encode()
     cc=before['cc']['path'];fixtures=ROOT/'tools/performance/process-readiness/fixtures'
+    # The POSIX chdir file action is available from the macOS 26 SDK and runtime.
+    definitions=subprocess.check_output([cc,'-dM','-E','-include','spawn.h','-'],input=b'')
+    cwd_sdk=b'#define __MAC_26_0 ' in definitions
+    cwd_supported=cwd_sdk and int(platform.mac_ver()[0].split('.')[0])>=26
+    source_contract=H.module(HERE/'source_contract.py','exact_spawn_headers')
+    cwd_header=H.sha(ROOT/'runtime/mlf_system.h')==source_contract.CWD_SHA
     pins={str(x):H.sha(x) for x in [Path(__file__),HERE/'SpawnFaults.c',HERE/'SpawnUnavailable.c',hp,
         ROOT/'runtime/mlf_system.h',base/'runtime/mlf_system.h',fixtures/'Probe.c',
         ROOT/'tools/performance/process-readiness/darwin/Faults.c',
-        HERE/'SpawnHooks.c',HERE/'Eligibility.hs',HERE/'ChildState.c']}
+        HERE/'SpawnHooks.c',HERE/'Eligibility.hs',HERE/'ChildState.c',HERE/'source_contract.py']}
     record['inputs']=pins;save()
     with H.SerialLock(ROOT/'.mlf-build'):
         for side,source,producer in [('base',base,old),('candidate',ROOT,a.producer)]:
@@ -83,7 +90,8 @@ def main():
             if producer:require(H.sha(out/(side+'.o'))==H.sha(producer/'host.o'),'ordinary host object identity '+side)
             run('build-probe-'+side,[cc,'-O2','-std=c11',fixtures/'Probe.c',out/(side+'.o'),old/'supervisor.o','-o',out/('probe-'+side)])
         names=['fork','getpgrp','clock_gettime','waitpid','kqueue','kevent','fcntl','close','nanosleep','kill',
-            'posix_spawnattr_init','posix_spawnattr_setpgroup','posix_spawnattr_setflags','posix_spawnattr_destroy','posix_spawnp']
+            'posix_spawnattr_init','posix_spawnattr_setpgroup','posix_spawnattr_setflags','posix_spawnattr_destroy','posix_spawnp',
+            'posix_spawn_file_actions_init','posix_spawn_file_actions_addchdir','posix_spawn_file_actions_destroy']
         flags=['-D'+n+'=mlf_mock_'+n for n in names]+['-Dsigaction(...)=mlf_mock_sigaction(__VA_ARGS__)']
         run('mock-host',[cc,'-O2','-std=c11','-I'+str(ROOT/'runtime'),*flags,'-c',ROOT/'host/ghc/cbits/host.c','-o',out/'mock.o'])
         run('build-mock-probe',[cc,'-O2','-std=c11',fixtures/'Probe.c',HERE/'SpawnFaults.c',out/'mock.o',old/'supervisor.o','-o',out/'mock-probe'])
@@ -96,7 +104,20 @@ def main():
             cases.append((name,name,'immediate',None,b'',spec('/usr/bin/true'),expected(),prefix+ready+'wait,close'))
         for name,scope,prefix in [('supervised','4242','init,spawn,destroy,'),('stale-scope','4241',spawn),('invalid-scope','bad',spawn)]:
             cases.append((name,'ok','immediate',scope,b'',spec('/usr/bin/true'),expected(),prefix+ready+'wait,close'))
-        for name,first,wire in [('cwd',b'.',spec('/usr/bin/true')),('stdin',b'',spec('/usr/bin/true',stdin='/unused')),
+        if cwd_header and cwd_supported:
+            start='init,group,flags,'
+            for mode,tail in [
+                    ('ok','actions-init,chdir,spawn,actions-destroy,destroy,'),
+                    ('actions-init-fail','actions-init,destroy,fork,'),
+                    ('chdir-fail','actions-init,chdir,actions-destroy,destroy,fork,'),
+                    ('spawn-fail','actions-init,chdir,spawn,actions-destroy,destroy,fork,')]:
+                cases.append(('cwd-'+mode,mode,'immediate',None,b'.',spec('/usr/bin/true'),
+                              expected(),start+tail+ready+'wait,close'))
+        else:
+            prefix='init,group,flags,destroy,' if cwd_header else ''
+            cases.append(('cwd-fallback','ok','immediate',None,b'.',spec('/usr/bin/true'),
+                          expected(),prefix+'fork,'+ready+'wait,close'))
+        for name,first,wire in [('relative-cwd',b'.',spec('./true')),('stdin',b'',spec('/usr/bin/true',stdin='/unused')),
             ('stdout',b'',spec('/usr/bin/true',stdout='/unused')),('stderr',b'',spec('/usr/bin/true',stderr='/unused'))]:
             cases.append(('ineligible-'+name,'ok','immediate',None,first,wire,expected(),'fork,'+ready+'wait,close'))
         for fault,tail,wanted in [('deadline-ready','wait,close',expected()),
@@ -127,6 +148,16 @@ def main():
                 (d/'a').write_bytes(b'');(d/'b').write_bytes(spec(executable,argv))
                 require(run(name+'-'+side,[out/('probe-'+side),'7',d/'a',d/'b'])==expected(status),name+' parity '+side)
                 record['real'].append([side,name]);save()
+            for name,child_dir,executable,args,status in [
+                    ('cwd-relative-argument',d,'/bin/test',['-f',plain.name],0),
+                    ('cwd-relative-executable',d,'./'+plain.name,[],9),
+                    ('cwd-text-executable',d,str(plain),[],9),
+                    ('cwd-missing-directory',d/'absent','/usr/bin/true',[],126),
+                    ('cwd-missing-executable',d,str(d/'absent'),[],127)]:
+                (d/'a').write_bytes(os.fsencode(child_dir));(d/'b').write_bytes(spec(executable,args))
+                require(run(name+'-'+side,[out/('probe-'+side),'7',d/'a',d/'b'])==expected(status),
+                        name+' parity '+side)
+                record['real'].append([side,name]);save()
         H.check_pins(pins)
     if a.full:
         require(a.producer and a.gc_prefix and a.gmp_prefix,'full retained controls require ordinary producer and native dependencies')
@@ -156,7 +187,13 @@ def main():
             argv.insert(argv.index('-o'),str(out/'spawn-hooks.o'))
             run('build-eligibility',argv);H.check_pins(object_pins)
             fds_before,fds_after,counters=ast.literal_eval(run('eligibility-result',[out/'eligibility',out/'child-state']).decode())
-            require(fds_before==fds_after and fds_before>0 and counters==[29,28,2,29,29,20,9],
+            expected_counts=[29,28,2,29,29,20,9,0]
+            if cwd_header:
+                if cwd_supported:
+                    expected_counts=[30,29,1,30,30,21,9,1]
+                else:
+                    expected_counts=[29,28,2,30,30,20,9,0]
+            require(fds_before==fds_after and fds_before>0 and counters==expected_counts,
                 'actual GHC spawn, fallback, process groups, inherited environment and descriptor ownership')
             record['eligibility']={'fds_before':fds_before,'fds_after':fds_after,'counters':counters};save()
     H.check_pins(pins)

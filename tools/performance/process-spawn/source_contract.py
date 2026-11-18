@@ -5,6 +5,7 @@ from pathlib import Path
 HEADER = 'runtime/mlf_system.h'
 OLD_SHA = '9254a1d28a0718ef100916020a96d860ee559e797d311cd4569f887d5fec841e'
 NEW_SHA = 'cc87aa9445c45e7e6fe66b2631a887be870baf3015f9daa6d6705d356ed37477'
+CWD_SHA = '0d6a18502a37aa0cb99e42db990142b4b68c1bd20f8e7319bc1d92f5290dbbfc'
 
 
 def require(value, message):
@@ -17,7 +18,7 @@ def sha(raw):
 
 
 def restore_previous(raw):
-    require(sha(raw) == NEW_SHA, 'exact reviewed spawn header')
+    require(sha(raw) in {NEW_SHA, CWD_SHA}, 'exact reviewed spawn header')
     includes = b'#include <crt_externs.h>\n#include <spawn.h>\n'
     start = b'#if defined(__APPLE__)\n    pid_t pid = -1;\n'
     end = b'#else\n    pid_t pid = fork();\n#endif\n'
@@ -34,4 +35,4 @@ def candidate_dependencies(expected, source):
     if sha(raw) == OLD_SHA:
         return expected
     restore_previous(raw)
-    return {**expected, HEADER: NEW_SHA}
+    return {**expected, HEADER: sha(raw)}

@@ -27,7 +27,7 @@ VALIDATION_PINS = {
     'source_contract.py': '039bb8833ef6a232e80458b584005ad88bb46cd9797459d6ef813b7b378cddc6',
     'source-contract.json': 'ec83da63b4021b65a882c0edd9bd5b7f39d4fcb14f47af61655389d1caeea6c5'}
 SPAWN_CONTRACT = HERE.parent / 'process-spawn/source_contract.py'
-SPAWN_CONTRACT_SHA = '5ce3dfbc559445ba91096453939b198faa717f7c86be40c515a0b0abe2bcbc15'
+SPAWN_CONTRACT_SHA = '9f1cbe37799f4db70cdd6fcf441e3fd72d6b654861cf4ec57493f9a7dbab386e'
 COMPARISON_CONTRACT = HERE.parent / 'integer-compare/source_contract.py'
 COMPARISON_CONTRACT_SHA = '912676a53b8059b334018f186290490f7675e8f79eab8315c03c2fc401adef8a'
 BUILTIN_STDOUT = b'PASS current builtin: canonical literal, full check, exact wire, 7 malformed/mismatch rejections\n'
