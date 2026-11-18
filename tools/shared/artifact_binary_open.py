@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independent schema7/8 open-pair inspection and explicit companion controls.
+"""Independent versioned open-pair inspection and explicit companion controls.
 
 The frozen wire/typed oracles remain unchanged. This validates complete raw
 syntax and reference identity, not proof evidence. Actual public readers plus
@@ -7,6 +7,7 @@ retained Open.audit results and their complete rebuilt bytes supply the
 separate production-checker evidence.
 """
 import hashlib
+from dataclasses import dataclass
 from artifact_binary_reference import Invalid, Limits, read_document, tree_document, repair_crc
 from artifact_binary_typed import (value_node as fields, list_values as items,
     text, validate_type, builtin_datatypes, pack, unpack)
@@ -85,21 +86,182 @@ def decoded(raw, schema, family=None):
 
 OPEN_ROOT_WORK = 64 * 1024**2
 OPEN_PACKAGE_WORK = 256 * 1024**2
-OPEN_FORMATS = {7: 'MLF-OPEN-CRATE-1/checker-1', 8: 'MLF-OPEN-CRATE-2/checker-1'}
+OPEN_FORMATS = {7: 'MLF-OPEN-CRATE-1/checker-1', 8: 'MLF-OPEN-CRATE-2/checker-1',
+                9: 'MLF-OPEN-CRATE-3/checker-1'}
 
 
-def open_document(raw):
-    """Keep the frozen default codec unchanged; schema8 owns a bounded root sum."""
+def _pattern_fields(value, tag):
+    require(value[:2] == ('node', tag), 'application pattern constructor')
+    return value[2]
+
+
+def _pattern_integer(value):
+    require(value[0] == 'int', 'application pattern integer')
+    return value[1]
+
+
+@dataclass
+class ApplicationPattern:
+    entries: list
+    runs: list
+    root: int
+    depth: int
+    work: int
+
+
+def _read_application_pattern(children):
+    require(len(children) == 3, 'application pattern header')
+    table = _pattern_fields(children[0], 1)
+    root = _pattern_integer(children[2])
+    require(1 < len(table) <= 512 and root == len(table) - 1, 'application pattern root')
+    require(table[0] == ('node', 87, ()), 'application pattern first literal slot')
+    shapes, geometry = [None], [(2, 2, 1)]
+    keys = set()
+    for index, entry in enumerate(table[1:], 1):
+        require(entry[0] == 'node', 'application pattern entry')
+        if entry[1] == 88:
+            refs = _pattern_fields(entry, 88)
+            require(len(refs) == 2, 'application pattern arity')
+            left, right = map(_pattern_integer, refs)
+            require(0 <= left < index and 0 <= right < index, 'application pattern forward reference')
+            ld, lw, ln = geometry[left]
+            rd, rw, rn = geometry[right]
+            metrics = 1 + max(ld, rd), 1 + lw + rw, ln + rn
+            value = (left, right)
+        elif entry[1] == 70:
+            args = _pattern_fields(entry, 70)
+            require(len(args) == 1, 'application pattern variable arity')
+            name = _pattern_fields(args[0], 31)
+            require(len(name) == 2 and name[0][0] == 'int' and name[1][0] == 'text',
+                    'application pattern variable identity and hint')
+            metrics = 3, 4 + len(name[1][1].encode('utf-8')), 0
+            value = entry
+        else:
+            args = _pattern_fields(entry, 81)
+            require(len(args) == 2 and args[1] == ('node', 1, ()), 'application pattern primitive arity')
+            code = _pattern_fields(args[0], 32)
+            require(len(code) == 1 and code[0][0] == 'int', 'application pattern primitive code')
+            metrics = 3, 4, 0
+            value = entry
+        depth, work, slots = metrics
+        require(depth <= 130 and work <= 4194304 and slots <= 1048576, 'application pattern resource bound')
+        require(value not in keys, 'duplicate application pattern entry')
+        keys.add(value)
+        shapes.append(value)
+        geometry.append(metrics)
+
+    seen = {0}
+
+    def visit(index):
+        if index in seen:
+            return
+        entry = shapes[index]
+        if len(entry) == 2:
+            visit(entry[0])
+            visit(entry[1])
+        require(index == len(seen), 'application pattern first-use order')
+        seen.add(index)
+
+    visit(root)
+    require(len(seen) == len(table), 'unused application pattern entry')
+    depth, work, slots = geometry[root]
+    require(slots >= 8, 'application pattern minimum literal count')
+    runs, remaining = [], slots
+    for item in _pattern_fields(children[1], 1):
+        if item[0] == 'int':
+            count, start, step = 1, item[1], 0
+        else:
+            parts = _pattern_fields(item, 89)
+            require(len(parts) == 3, 'application pattern arithmetic run arity')
+            start, step, count = map(_pattern_integer, parts)
+            require(count >= 3, 'application pattern minimum arithmetic run')
+        require(count <= remaining, 'application pattern extra literals')
+        runs.append((count, start, step))
+        remaining -= count
+    require(remaining == 0, 'application pattern missing literals')
+    return ApplicationPattern(shapes, runs, root, depth, work)
+
+
+def _restore_application_pattern(pattern):
+    def integers():
+        for count, start, step in pattern.runs:
+            for index in range(count):
+                yield (start + index * step + 2**63) % 2**64 - 2**63
+
+    literals = integers()
+
+    def walk(index):
+        entry = pattern.entries[index]
+        if entry is None:
+            return ('node', 77, (('int', next(literals)),))
+        if len(entry) == 2:
+            return ('node', 72, (walk(entry[0]), walk(entry[1])))
+        return entry
+
+    value = walk(pattern.root)
+    require(next(literals, None) is None, 'application pattern unused literal')
+    return value
+
+
+def expand_application_document(document, aggregate):
+    """Check aggregate expanded work before allocating reconstructed terms."""
+    limits = Limits()
+    geometry, patterns, wire = [], {}, []
+    budget = min(limits.nodes - len(document.nodes), (limits.edges - document.edges) // 2,
+                 (limits.bytes - document.raw_size) // 32)
+    for index, n in enumerate(document.nodes):
+        if n.kind == 3:
+            tag, refs = n.data
+            raw = ('node', tag, tuple(wire[i] for i in refs))
+            if tag == 86:
+                template = _read_application_pattern(raw[2])
+                patterns[index] = template
+                depth, work = template.depth, template.work
+                budget -= work
+                require(budget >= 0, 'application pattern allocation budget')
+            else:
+                depth = 1 + max((geometry[i][0] for i in refs), default=0)
+                work = 1 + sum(geometry[i][1] for i in refs)
+        elif n.kind == 2:
+            raw = ('text', document.symbols[n.data])
+            depth, work = 1, 1 + document.symbol_sizes[n.data]
+        else:
+            raw = ('int' if n.kind == 0 else 'bits', n.data)
+            depth, work = 1, 1
+        require(depth <= limits.depth and work <= limits.work, 'expanded application node geometry')
+        geometry.append((depth, work))
+        wire.append(raw)
+    total = sum(geometry[i][1] for i in document.roots)
+    require(total <= aggregate, 'expanded application package work')
+    values = []
+    for index, n in enumerate(document.nodes):
+        if index in patterns:
+            value = _restore_application_pattern(patterns[index])
+        elif n.kind == 3:
+            tag, refs = n.data
+            value = ('node', tag, tuple(values[i] for i in refs))
+        else:
+            value = wire[index]
+        values.append(value)
+    return tuple(values[i] for i in document.roots), total
+
+
+def checked_open_document(raw):
+    """Read the public roots and charge both wire and reconstructed work."""
     require(isinstance(raw, bytes) and len(raw) >= 20, 'complete open binary header')
     schema = int.from_bytes(raw[16:20], 'little')
     require(schema in OPEN_FORMATS, 'unsupported open schema')
     limits = Limits() if schema == 7 else Limits(work=OPEN_PACKAGE_WORK)
     document = read_document(raw, schema, limits)
-    if schema == 8:
+    if schema in (8, 9):
         require(all(work <= OPEN_ROOT_WORK for work in document.expanded_work),
                 'open per-root expanded work cap')
     values = document.values()
     require(tree_document(values, schema) == raw, 'canonical whole open binary bytes')
+    logical_work = 0
+    if schema == 9:
+        physical_work = sum(document.expanded_work[i] for i in document.roots)
+        values, logical_work = expand_application_document(document, OPEN_PACKAGE_WORK - physical_work)
     if schema == 7:
         require(len(values) == 1, 'exactly one schema7 open root')
         opened = fields(values[0], 430, 6)
@@ -111,7 +273,11 @@ def open_document(raw):
         for fragment in values[1:]:
             fields(fragment, 401, 7)
         opened = (*header[:5], sequence(values[1:]))
-    return schema, document, opened
+    return schema, document, opened, logical_work
+
+
+def open_document(raw):
+    return checked_open_document(raw)[:3]
 
 
 def open_bytes(schema, opened, header_tag=None):
@@ -122,7 +288,7 @@ def open_bytes(schema, opened, header_tag=None):
     fragments = items(opened[5])
     header = node(432 if header_tag is None else header_tag,
                   *opened[:5], ('int', len(fragments)))
-    return tree_document([header, *fragments], 8)
+    return tree_document([header, *fragments], schema)
 
 
 def syntax_equal(left, right):
@@ -148,7 +314,7 @@ def syntax_equal(left, right):
 def compare_retained_audit(original, audited, dependency_interfaces):
     before = inspect_pair(original, dependency_interfaces)
     after = inspect_pair(audited, dependency_interfaces)
-    require(after['schema'] == 8, 'retained audit writer must emit schema8')
+    require(after['schema'] in (8, 9), 'retained audit writer must emit a current open schema')
     left = fields(before['interface'], 242, 13)
     right = fields(after['interface'], 242, 13)
     require(all(syntax_equal(left[i], right[i]) for i in range(13) if i != 11),
@@ -158,8 +324,8 @@ def compare_retained_audit(original, audited, dependency_interfaces):
     require(syntax_equal(before['opened'][1:], after['opened'][1:]),
             'retained audit changed complete fragment semantics')
     exact = tuple(audited) == tuple(original)
-    if before['schema'] == 8:
-        require(exact, 'retained schema8 audit rebuild changed original pair bytes')
+    if before['schema'] == after['schema']:
+        require(exact, 'retained same-schema audit rebuild changed original pair bytes')
     return {'retained_audit_rebuild_exact': exact,
             'retained_audit_semantics_exact': True,
             'retained_audit_schema_transition': [before['schema'], after['schema']]}
@@ -376,7 +542,7 @@ def _inspect_pair(pair, dependency_interfaces):
     require(type(pair) is tuple and len(pair) == 2, 'complete open artifact pair')
     interface = decoded(pair[0], 3, 'CrateInterfaceFields')
     header = fields(interface, 242, 13)
-    schema, document, opened = open_document(pair[1])
+    schema, document, opened, logical_work = checked_open_document(pair[1])
     require(text(header[11]) == hashlib.sha256(pair[1]).hexdigest(), 'open object SHA mismatch')
     require(text(opened[0]) == OPEN_FORMATS[schema], 'wrong open package family')
     require(text(opened[1]) == compatibility_identity(), 'wrong open compatibility identity')
@@ -409,6 +575,7 @@ def _inspect_pair(pair, dependency_interfaces):
     declarations = keyed([(text(fields(value, arity=3)[0]), value) for iface in interfaces
                           for value in items(fields(iface, 242, 13)[8])], 'datatype ownership')
     wire_work = sum(document.expanded_work[index] for index in document.roots)
+    wire_work += logical_work
     reference_work = 0
     def references(value, available, encode, label):
         nonlocal reference_work
@@ -419,7 +586,7 @@ def _inspect_pair(pair, dependency_interfaces):
             key = text(key)
             require(key in available, label + ' reference out of scope')
             value = encode(available[key])
-            if schema == 8:
+            if schema in (8, 9):
                 raw = tree_document([value], 6)
                 hashed = read_document(raw, 6)
                 used = sum(hashed.expanded_work[index] for index in hashed.roots)
@@ -473,8 +640,8 @@ def _inspect_pair(pair, dependency_interfaces):
                         'dependencies': [tuple(text(x) for x in fields(row, 3, 3)) for row in items(header[1])],
                         'modules': [text(value) for value in items(header[2])], 'entry': text(header[10])},
             'accounting': {'schema': schema, 'wire_expanded_work': wire_work,
-                           'reference_hash_expanded_work': reference_work if schema == 8 else None,
-                           'combined_expanded_work': wire_work + reference_work if schema == 8 else None,
+                           'reference_hash_expanded_work': reference_work if schema in (8, 9) else None,
+                           'combined_expanded_work': wire_work + reference_work if schema in (8, 9) else None,
                            'fragment_count': len(fragments), 'binding_references': len(binding_refs),
                            'datatype_references': len(data_refs),
                            'metadata_sha256': hashlib.sha256(pair[0]).hexdigest(),

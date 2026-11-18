@@ -700,8 +700,8 @@ module Bootstrap.CrateGraph where {
   };
   scopeValue prepared dependencies = W.VNode 423
     [scopeInventory prepared,A.toList (A.toPair A.toText A.toText) (map G.edge dependencies)];
-  rawValue references group fragment = W.VNode 425
-    [A.toList (A.toPair A.toText A.toText) references,Open.encodeBody "raw" group fragment];
+  rawValue references group fragment = Open.encodeRaw
+    (A.toList (A.toPair A.toText A.toText) references) "raw" group fragment;
   compile verify crateId compilerHash cacheDir imports protected originalPlan =
     case do {
       (,) plan open <- Source.protectedQueryPlan originalPlan protected;

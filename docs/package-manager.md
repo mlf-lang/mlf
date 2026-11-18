@@ -375,6 +375,12 @@ reuse; outer hits report no new object checks. Metadata graph and semantic
 contract validation still precede dependency reuse.
 New `.mlfco` objects pool repeated datatype declarations while retaining separate
 interface and implementation contexts and independent fragment checking.
+Open object schema 9 can store a repeated application tree once and supply its
+integer literals in occurrence order. The reader checks the reconstructed work
+and depth before expanding it. The compiler still reads schema 7 and 8 objects
+and emits schema 8 for groups of fragments that gain no such representation.
+When an older compiler reports a schema mismatch, rebuild the named library
+with that compiler, then build its dependents.
 Inference cache entries can obtain identical contexts from their full semantic
 key. These encodings reduce repeated artifact text without changing exported
 schemes or weakening validation; see [crate compilation](crate-compilation.md).

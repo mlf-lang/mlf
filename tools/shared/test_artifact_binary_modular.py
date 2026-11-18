@@ -99,6 +99,32 @@ class ModularControls(unittest.TestCase):
                 self.assertFalse(O.companion_group_matches('other', legacy, owner, members))
                 self.assertFalse(O.companion_group_matches(crate, legacy, owner + 'x', members))
 
+    def test_application_pattern_restores_each_signed_literal_and_charges_each_root(self):
+        import artifact_binary_open as O
+        from artifact_binary_reference import Limits, read_document, tree_document
+        value = lambda n: ('int', n)
+        hole = O.node(87)
+        join = lambda a, b: O.node(88, value(a), value(b))
+        rows = [hole, join(0, 0), join(1, 1), join(2, 2)]
+
+        def document(entries, count, root):
+            run = O.node(89, value(2**63 - 1), value(1), value(count))
+            pattern = O.node(86, O.sequence(entries), O.sequence([run]), value(root))
+            return read_document(tree_document([pattern, pattern], 9), 9, Limits())
+
+        graph = document(rows, 8, 3)
+        logical, work = O.expand_application_document(graph, 46)
+        literals = [O.node(77, value((2**63 - 1 + i + 2**63) % 2**64 - 2**63)) for i in range(8)]
+        while len(literals) > 1:
+            literals = [O.node(72, a, b) for a, b in zip(literals[::2], literals[1::2])]
+        self.assertEqual((logical, work), ((literals[0], literals[0]), 46))
+        with self.assertRaises(ValueError):
+            O.expand_application_document(graph, 45)
+        for entries, count, root in [(rows, 7, 3), (rows, 9, 3), ([hole, join(0, 1)], 8, 1),
+                                     ([*rows, join(1, 1)], 8, 4)]:
+            with self.subTest(count=count, root=root), self.assertRaises(ValueError):
+                O.expand_application_document(document(entries, count, root), 1000)
+
     def test_stamp_syntax_and_semantic_mutations_remain_distinct(self):
         import artifact_binary_open as O
         for value in ('0-0', '0-1', '2147483646-2147483628'):

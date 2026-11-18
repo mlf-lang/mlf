@@ -8,6 +8,7 @@ module Bootstrap.ArtifactStructure where {
   import qualified Bootstrap.Std as S;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.Bitstream as W;
@@ -938,8 +939,8 @@ module Bootstrap.ArtifactStructure where {
     DecodedTriple Decoded Decoded Decoded |
     DecodedNothing |
     DecodedJust Decoded;
-  data DecodeInput = ValueInput W.Value | GraphInput W.Graph Int;
-  data DecodeView = ViewInt Int | ViewBits Int | ViewText String | ViewNode Int ([] DecodeInput);
+  data DecodeInput = ValueInput W.Value | GraphInput W.Graph Int | StoredInput W.Graph (IntMap TermPattern) Int;
+  data DecodeView = ViewPattern XTerm | ViewInt Int | ViewBits Int | ViewText String | ViewNode Int ([] DecodeInput);
   data DecodeTask =
     DecodeOne DecodeShape DecodeInput |
     DecodeFields ([] ((,) DecodeShape DecodeInput)) |
@@ -1032,6 +1033,199 @@ module Bootstrap.ArtifactStructure where {
     (:) index rest -> if remaining <= 0 then Left "binary typed list count limit exceeded"
       else graphInputs (remaining - 1) graph rest ((:) (GraphInput graph index) acc)
   };
+  data PatternNode = PatternHole | PatternAtom XTerm | PatternJoin Int Int;
+  data PatternRow = PatternRow PatternNode Int Int Int;
+  data PatternRun = PatternRun Int Int Int;
+  data TermPattern = TermPattern (IntMap PatternRow) Int ([] PatternRun) Int Int;
+  patternNode = W.lookupGraphNode;
+  patternInt graph index = do {
+    n <- patternNode graph index;
+    case n of { W.GInt value -> Right value; _ -> malformed "application pattern integer" }
+  };
+  patternList graph index cap = do {
+    n <- patternNode graph index;
+    case n of {
+      W.GNode 1 values -> do { W.boundedLength cap values; Right values };
+      _ -> malformed "application pattern list"
+    }
+  };
+  patternPlan graph indices = case indices of {
+    [table,stream,rootIndex] -> do {
+      entries <- patternList graph table 512;
+      root <- patternInt graph rootIndex;
+      let { entryCount = S.length entries };
+      S.ensure (root > 0 && root == entryCount - 1) "invalid application pattern root";
+      -- The physical graph already interns complete shallow keys. Reusing an
+      -- entry ordinal in this table would give one term two template slots.
+      S.ensure (IS.size (IS.fromList entries) == entryCount) "duplicate application pattern entry";
+      let {
+        row ordinal prior index = do {
+          node <- patternNode graph index;
+          case node of {
+            W.GNode 87 [] -> if ordinal == 0 then Right (PatternRow PatternHole 2 2 1)
+              else malformed "duplicate application pattern hole";
+            W.GNode 88 [l,r] -> do {
+              left <- patternInt graph l; right <- patternInt graph r;
+              case (,) (IM.lookup left prior) (IM.lookup right prior) of {
+                (,) (Just (PatternRow _ ld lw ln)) (Just (PatternRow _ rd rw rn)) -> let {
+                  dep = 1 + S.max ld rd; work = 1 + lw + rw; count = ln + rn
+                } in if dep > 130 || work > 4194304 || count > 1048576 then malformed "application pattern resource limit"
+                  else seq dep (seq work (seq count (Right (PatternRow (PatternJoin left right) dep work count))));
+                _ -> malformed "application pattern forward reference"
+              }
+            };
+            W.GNode tag _ -> if ordinal == 0 || (tag /= 70 && tag /= 81) then malformed "application pattern atom" else do {
+              term <- fromGraphXTerm graph index;
+              case term of {
+                XPrimitive _ [] -> Right (PatternRow (PatternAtom term) 3 4 0);
+                XVarTerm (XName _ hint) -> let { work = 4 + stringUtf8Length hint } in
+                  if work > 4194304 then malformed "application pattern name too large"
+                  else Right (PatternRow (PatternAtom term) 3 work 0);
+                _ -> malformed "application pattern atom"
+              }
+            };
+            _ -> malformed "application pattern entry"
+          }
+        };
+        rows rest ordinal seen = case rest of {
+          [] -> Right seen;
+          (:) x tail -> do { item <- row ordinal seen x;
+            let { saved = IM.insert ordinal item seen } in seq saved (rows tail (ordinal + 1) saved) }
+        };
+        runs fields remaining accum = case fields of {
+          [] -> if remaining == 0 then Right (S.reverse accum) else malformed "application pattern literal count";
+          (:) x tail -> do {
+            node <- patternNode graph x;
+            case node of {
+              W.GInt start -> if remaining < 1 then malformed "application pattern extra literal"
+                else runs tail (remaining - 1) ((:) (PatternRun 1 start 0) accum);
+              W.GNode 89 [a,b,n] -> do {
+                start <- patternInt graph a; step <- patternInt graph b; count <- patternInt graph n;
+                S.ensure (count >= 3 && count <= remaining) "invalid application pattern run";
+                runs tail (remaining - count) ((:) (PatternRun count start step) accum)
+              };
+              _ -> malformed "application pattern literal"
+            }
+          }
+        }
+      };
+      index <- rows entries 0 IM.empty;
+      let {
+        visit i next seen = if IS.member i seen then Right ((,) next seen) else do {
+          children <- case IM.get i index of {
+            PatternRow (PatternJoin left right) _ _ _ -> do {
+              (,) n visited <- visit left next seen;
+              visit right n visited
+            };
+            _ -> Right ((,) next seen)
+          };
+          case children of { (,) n visited -> do {
+            S.ensure (i == n) "application pattern entries are not in first-use order";
+            Right ((,) (n + 1) (IS.insert i visited))
+          } }
+        }
+      };
+      (,) reached _ <- visit root 1 (IS.singleton 0);
+      S.ensure (reached == entryCount) "unused application pattern entry";
+      case IM.lookup root index of {
+        Just (PatternRow _ depth work count) -> do {
+          S.ensure (count >= 8) "application pattern without literal slots";
+          fields <- patternList graph stream count;
+          literals <- runs fields count [];
+          Right (TermPattern index root literals depth work)
+        };
+        _ -> malformed "application pattern root"
+      }
+    };
+    _ -> malformed "application pattern fields"
+  };
+  restorePattern (TermPattern table root input _ _) = let {
+    term i runs = case IM.get i table of {
+      PatternRow PatternHole _ _ _ -> case runs of {
+        (:) (PatternRun count start step) tail ->
+          let { next = start + step } in seq next (Right ((,) (XIntTerm start)
+            (if count == 1 then tail else (:) (PatternRun (count - 1) next step) tail)));
+        _ -> malformed "application pattern literal underflow"
+      };
+      PatternRow (PatternAtom atom) _ _ _ -> Right ((,) atom runs);
+      PatternRow (PatternJoin left right) _ _ _ -> do {
+        (,) f rest <- term left runs;
+        (,) arg next <- term right rest;
+        Right ((,) (XApp f arg) next)
+      }
+    }
+  } in do {
+    (,) result rest <- term root input;
+    S.ensure (S.null rest) "trailing application pattern literals"; Right result
+  };
+  -- Add each child occurrence, even when its ordinal was seen before.
+  -- Validate all expanded roots before constructing any term from a template.
+  admitPatterns graph aggregate = let {
+    limits = W.defaultLimits;
+    cap = W.maxExpandedWork limits;
+    addChildren ids seen deep work = case ids of {
+      [] -> Right ((,) deep work);
+      (:) i tail -> case IM.lookup i seen of {
+        Just ((,) d w) -> if w > cap - work then malformed "expanded application work limit"
+          else let { next = work + w; dep = S.max deep (d + 1) } in
+            seq dep (seq next (addChildren tail seen dep next));
+        _ -> malformed "application pattern forward graph reference"
+      }
+    };
+    roots ids seen remaining = case ids of {
+      [] -> Right (aggregate - remaining);
+      (:) i rest -> case IM.lookup i seen of {
+        Just ((,) _ w) -> if w > remaining then malformed "expanded application package work limit"
+          else roots rest seen (remaining - w);
+        _ -> malformed "application pattern root reference"
+      }
+    };
+    scan i seen plans budget = if i == W.graphNodeCount graph then do {
+      used <- roots (W.graphRoots graph) seen aggregate;
+      Right ((,) plans used)
+    } else do {
+      node <- patternNode graph i;
+      let {
+        finish depth work next left = if depth > W.maxDepth limits || work > cap then malformed "expanded application resource limit"
+          else let { saved = IM.insert i ((,) depth work) seen } in
+            seq saved (scan (i + 1) saved next left)
+      };
+      case node of {
+        W.GNode 86 fields -> do {
+          plan <- patternPlan graph fields;
+          case plan of { TermPattern _ _ _ depth work ->
+            if work > budget then malformed "application pattern allocation limit"
+            else finish depth work (IM.insert i plan plans) (budget - work)
+          }
+        };
+        W.GNode _ children -> do { (,) depth work <- addChildren children seen 1 1; finish depth work plans budget };
+        W.GText t -> finish 1 (stringUtf8Length t + 1) plans budget;
+        _ -> finish 1 1 plans budget
+      }
+    }
+  } in do {
+    physical <- W.graphResourceStats graph;
+    let { remainingNodes = W.maxNodes limits - W.resourceNodes physical;
+      remainingEdges = (W.maxEdges limits - W.resourceEdges physical) / 2;
+      remainingBytes = (W.maxBytes limits - W.resourceBytes physical) / 32;
+      budget = S.min remainingNodes (S.min remainingEdges remainingBytes) };
+    scan 0 IM.empty IM.empty budget
+  };
+  storedFields remaining graph plans fields acc = case fields of {
+    [] -> Right (S.reverse acc);
+    (:) i tail -> if remaining <= 0 then malformed "application pattern field limit"
+      else storedFields (remaining - 1) graph plans tail ((:) (StoredInput graph plans i) acc)
+  };
+  decodeStoredManyWith plans graph indices = do {
+    inputs <- storedFields (W.maxExpandedWork W.defaultLimits) graph plans indices [];
+    results <- decodeWork (W.maxExpandedWork W.defaultLimits) [DecodeRepeated ShapeXTerm inputs] [] (NodeMemo IM.empty);
+    Right (S.reverse results)
+  };
+  storedTerm graph index = do {
+    prepared <- admitPatterns graph (W.maxExpandedWork W.defaultLimits);
+    results <- decodeStoredManyWith (S.fst prepared) graph [index];
+    case results of { [answer] -> expectXTerm answer; _ -> malformed "application pattern root" }
+  };
   inspectInput :: DecodeShape -> Int -> DecodeInput -> Either String DecodeView;
   inspectInput shape remaining input = let {
     -- Only a list shape has variable arity. No closed constructor exceeds 13
@@ -1039,6 +1233,17 @@ module Bootstrap.ArtifactStructure where {
     arityLimit = case shape of { ShapeList _ -> W.maxEdges W.defaultLimits; _ -> 13 };
     width = S.min remaining arityLimit
   } in case input of {
+    StoredInput graph plans index -> case (,) shape (IM.lookup index plans) of {
+      (,) ShapeXTerm (Just plan) -> S.mapEither ViewPattern (restorePattern plan);
+      _ -> do {
+        node <- W.lookupGraphNode graph index;
+        case node of {
+          W.GInt n -> Right (ViewInt n); W.GBits bits -> Right (ViewBits bits);
+          W.GText text -> Right (ViewText text);
+          W.GNode tag fields -> S.mapEither (ViewNode tag) (storedFields width graph plans fields [])
+        }
+      }
+    };
     ValueInput value -> case value of {
       W.VInt number -> Right (ViewInt number);
       W.VBits bits -> Right (ViewBits bits);
@@ -1113,18 +1318,20 @@ module Bootstrap.ArtifactStructure where {
     (:) task rest -> case task of {
       DecodeOne shape input ->
         if remaining <= 0 then Left "binary typed expanded-work limit exceeded"
-        else let { next = remaining - 1 } in case input of {
-          ValueInput _ -> do {
+        else let {
+          next = remaining - 1;
+          use following = do {
             view <- inspectInput shape next input;
-            decodeShapeWork next shape view rest values memo
+            decodeShapeWork next shape view following values memo
           };
-          GraphInput _ index -> case findDecoded shape index memo of {
+          cached index = case findDecoded shape index memo of {
             Just result -> decodeWork next rest ((:) result values) memo;
-            Nothing -> do {
-              view <- inspectInput shape next input;
-              decodeShapeWork next shape view ((:) (DecodeRemember shape index) rest) values memo
-            }
+            Nothing -> use ((:) (DecodeRemember shape index) rest)
           }
+        } in case input of {
+          GraphInput _ index -> cached index;
+          StoredInput _ _ index -> cached index;
+          _ -> use rest
         };
       DecodeFields fields -> case fields of {
         [] -> decodeWork remaining rest values memo;
@@ -1766,6 +1973,7 @@ module Bootstrap.ArtifactStructure where {
       _ -> malformed "XComputation"
     };
     ShapeXTerm -> case value of {
+      ViewPattern term -> decodeTasks remaining rest ((:) (DecodedXTerm term) values) memo;
       ViewNode tag fields ->
         if tag == 70 then case fields of {
           [x0] ->

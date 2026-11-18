@@ -6,6 +6,7 @@ import Data.Bits (testBit)
 import Data.List (nub, sort)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Bootstrap.ArtifactStructure as Structure
 import qualified Bootstrap.Bitstream as W
 import qualified Bootstrap.Classes as Classes
 import qualified Bootstrap.Compiler as Compiler
@@ -819,6 +820,46 @@ fragmentFingerprintChecks = do
     check "fragment stamp matches scalar-length-framed pretty text"
       (H.unpack (Separate.fingerprint (Separate.pack fields))) (H.unpack (Open.fingerprint fragment))
 
+applicationPatternChecks = do
+  let right (T.Right value) = pure value
+      right (T.Left message) = fail (H.unpack message)
+      rejected (T.Left _) = True
+      rejected _ = False
+      add a b = T.XApp (T.XApp (T.XPrimitive T.PAddInt []) a) b
+      tree [x] = x
+      tree xs = let (l,r) = splitAt (length xs `div` 2) xs in add (tree l) (tree r)
+      arg = T.XName 0 "arg:λ"
+      result = T.XName 1 "export😀"
+      ty = T.XCon "Int" []
+      bodies = [take 32 (iterate (+7) (maxBound-4)),replicate 32 minBound,
+                take 63 (cycle [maxBound,0,7,7,-1,minBound])]
+  env <- right (Open.environment [])
+  forM_ bodies $ \xs -> do
+    let source = T.XLet result (tree [add (T.XVarTerm arg) (T.XIntTerm n) | n <- xs]) (T.XConstructor "()" [])
+    checked <- right (Open.check env [(arg,ty)] source)
+    graph <- right (W.planGraph W.defaultLimits [Open.encodeRaw (W.VNode 1 []) "raw" "unit" checked])
+    W.GNode 425 [_,record] <- right (W.lookupGraphNode graph (head (W.graphRoots graph)))
+    W.GNode 440 [_,_,_,_,body,_,_] <- right (W.lookupGraphNode graph record)
+    restored <- right (Structure.storedTerm graph body)
+    unless (H.unpack (Pretty.prettyTerm restored) == H.unpack (Pretty.prettyTerm source)) (fail "stored checked application term")
+    unless (rejected (Structure.fromGraphXTerm graph body)) (fail "unversioned term reader accepted application pattern")
+  let hole = W.VNode 87 []
+      join i j = W.VNode 88 [W.VInt i,W.VInt j]
+      run n = W.VNode 89 [W.VInt maxBound,W.VInt 1,W.VInt n]
+      pattern rows numbers root = W.VNode 86 [W.VNode 1 rows,W.VNode 1 numbers,W.VInt root]
+      rows = [hole,join 0 0,join 1 1,join 2 2]
+      good = pattern rows [run 8] 3
+      malformed = [pattern [hole,join 1 0] [run 8] 1,pattern rows [run 7] 3,
+                   pattern rows [run 9] 3,pattern (hole:[join n n | n <- [0..28]]) [run 8] 29,
+                   pattern [hole,join 0 0,join 0 0,join 2 2,join 3 3] [run 8] 4]
+  forM_ malformed $ \raw -> do
+    graph <- right (W.planGraph W.defaultLimits [raw])
+    unless (rejected (Structure.storedTerm graph (head (W.graphRoots graph)))) (fail "malformed application pattern")
+  graph <- right (W.planGraph W.defaultLimits [good,good])
+  unless (rejected (Structure.admitPatterns graph 45)) (fail "expanded work for repeated application roots")
+  _ <- right (Structure.admitPatterns graph 46)
+  pure ()
+
 main = do
   let chain = [("v" ++ show i,["v" ++ show (i+1)]) | i <- [0..24 :: Int]]
       wide = [("top",map fst chain)] ++ chain
@@ -844,6 +885,7 @@ main = do
   protectionChecks
   projectedBindingChecks
   fragmentFingerprintChecks
+  applicationPatternChecks
   importConventionChecks
   typedClassChecks
   putStrLn "1032 ordered SCC and reach comparisons, query DAG and package controls passed"
