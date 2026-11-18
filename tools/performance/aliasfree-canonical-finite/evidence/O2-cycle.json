@@ -1,0 +1,17 @@
+{
+  "scope": "one second divergence smoke check only",
+  "rows": [
+    {
+      "side": "original",
+      "bounded_timeout": true,
+      "cleanup": true,
+      "exit": -9
+    },
+    {
+      "side": "candidate",
+      "bounded_timeout": true,
+      "cleanup": true,
+      "exit": -9
+    }
+  ]
+}

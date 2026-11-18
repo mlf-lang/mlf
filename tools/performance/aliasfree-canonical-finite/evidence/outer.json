@@ -1,0 +1,29 @@
+{
+  "complete": true,
+  "phase": "terminal",
+  "command": [
+    "/usr/bin/python3",
+    "controls/tools/performance/aliasfree-canonical-finite/finite.py",
+    "/home/runner/work/_temp/edge-44228625865-1",
+    "/home/runner/work/mlf/mlf/baseline"
+  ],
+  "work_seconds": 420.0,
+  "cleanup_seconds": 10.0,
+  "cleanup_complete": true,
+  "reaped": [
+    {
+      "pid": 73424,
+      "status": 0
+    }
+  ],
+  "signals": [],
+  "scope": "owned descendants via Linux subreaper and direct-child pidfds; supervisor SIGKILL not contained",
+  "initial_discovery": {
+    "mode": "task-children"
+  },
+  "root_pid": 73424,
+  "reason": "target exited",
+  "target_exit_code": 0,
+  "survivors": [],
+  "cancel_signals": []
+}

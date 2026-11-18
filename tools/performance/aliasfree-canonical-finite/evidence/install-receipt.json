@@ -1,0 +1,29 @@
+{
+  "complete": true,
+  "errors": [],
+  "ci_identity": {
+    "GITHUB_SHA": "887b2d1e74245fa47dea8e4888cbc3c4f56c5af8",
+    "GITHUB_RUN_ID": "44228625865",
+    "GITHUB_RUN_ATTEMPT": "1",
+    "GITHUB_REPOSITORY": "mlf-lang/mlf",
+    "GITHUB_REF": "refs/heads/perf/aliasfree-canonical-finite-20261118"
+  },
+  "official_url": "https://downloads.haskell.org/~ghc/9.14.1/ghc-9.14.1-x86_64-deb12-linux.tar.xz",
+  "expected_sha256": "60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841",
+  "initial_disk_floor_bytes": 12884901888,
+  "resources": {
+    "mem_available_KiB": 15357824,
+    "disk_bytes": 91291967488,
+    "required_disk_bytes": 12884901888
+  },
+  "archive_verified": true,
+  "toolchain_inventory_sha256": "1180d62f9f0064919befe9587d0bfc63aaa3b2a3e3958de48ba920ff30a08f86",
+  "toolchain_files": 15551,
+  "limit_policy_phase": "install",
+  "child_fsize_limit_bytes": 1073741824,
+  "cleanup": true,
+  "whole_s": 110.195567055,
+  "within_whole": true,
+  "process_group_scope_only": true,
+  "global_descendants_or_ECHILD_claim": false
+}

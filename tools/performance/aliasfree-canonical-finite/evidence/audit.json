@@ -1,0 +1,14 @@
+{
+  "run": 44228625865,
+  "artifact": 14393279831,
+  "sha256": "c53b157294b54d9562f8a2e5aed4fdd102133c48032d60efe3fd92bd91b7a224",
+  "bytes": 994129,
+  "inventory_hashes_verified": 1281,
+  "zip_crc_verified": true,
+  "sidecars_equal_each_level": 612,
+  "validation_cases": 33,
+  "unify_cases": 160,
+  "cleanup_passed": true,
+  "qualification_scope": "finite cases only; no general semantic equivalence or performance conclusion",
+  "library_file_id": "libfile_fde3_f-49587c7d94e48191a34bdc0398a26f2e_9e6dfc38be588191bd66ca408fcce736"
+}

@@ -1,0 +1,24 @@
+{
+  "complete": true,
+  "errors": [],
+  "production": false,
+  "performance_claim": false,
+  "resources": {
+    "mem_available_KiB": 15297000,
+    "disk_bytes": 83321626624,
+    "required_disk_bytes": 8589934592
+  },
+  "sidecars": 612,
+  "optimization_levels": [
+    "O0",
+    "O2"
+  ],
+  "full_sidecars_equal": true,
+  "limit_policy_phase": "build",
+  "child_fsize_limit_bytes": 268435456,
+  "cleanup": true,
+  "whole_s": 33.091343967,
+  "within_whole": true,
+  "process_group_scope_only": true,
+  "global_descendants_or_ECHILD_claim": false
+}
