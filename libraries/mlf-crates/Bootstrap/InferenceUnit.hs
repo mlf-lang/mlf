@@ -324,7 +324,10 @@ module Bootstrap.InferenceUnit where {
       Right fragment -> Right fragment;
       Left _ -> case groundIndexed parameters members lowered of {
         Right fragment -> Right fragment;
-        Left _ -> finishOpenGroup externalTypes (map snd members) lowered
+        Left _ -> case groundRecursiveIndexed parameters members lowered of {
+          Right fragment -> Right fragment;
+          Left _ -> finishOpenGroup externalTypes (map snd members) lowered
+        }
       }
     }
   };
@@ -542,6 +545,67 @@ module Bootstrap.InferenceUnit where {
       Right fragment
     };
     _ -> Left "ground specialization requires a signed monotype"
+  };
+  -- Each member of a fully signed recursive group can be checked against the
+  -- common declared environment. Its local unification variables cannot occur
+  -- in a peer's closed signature. Only the term identity supply crosses RHSs.
+  data GroundMember = GroundMember Int XName XType GroundType SExpr;
+  groundRecursiveIndexed parameters members lowered = case lowered of {
+    (,) (SProgram declarations expression) _ -> groundRecursiveGroup parameters members declarations expression;
+    _ -> Left "ground recursive group requires lowered declarations"
+  };
+  groundRecursiveGroup parameters members declarations expression = do {
+    let { sorted = sortBy (\((,,) _ n _) ((,,) _ m _) -> compareString n m) parameters;
+      imported = mapIndexed (\serial ((,,) i name ty) -> (,,) (V.toInt i) (XName serial name) ty) sorted;
+      count = length imported;
+      declared = M.fromList compareInt (map (\((,) i value) -> (,) (V.toInt i) value) members) };
+    core <- case (,) sorted expression of {
+      (,) [] _ -> Right expression;
+      (,) _ (SDeclScope ids (SLetRec stubs body)) -> do {
+        ensure (eqList eqInt (map V.toInt ids) (map (\((,,) id _ _) -> id) imported) &&
+          eqList eqString (map (\((,,) n _ _) -> n) stubs) (map (\((,,) _ n _) -> X.nameHint n) imported))
+          "ground recursive import scope";
+        Right body
+      };
+      _ -> Left "ground recursive import boundary"
+    };
+    rows <- case core of {
+      SDeclScope ids (SLetRec definitions (SConstructor "()")) -> do {
+        ensure (not (null definitions) && length ids == length definitions && length ids == length members &&
+          length members == M.size declared) "ground recursive declaration inventory";
+        traverseEither (groundMember declared count) (mapIndexed (,) (zip ids definitions))
+      };
+      _ -> Left "ground specialization requires a recursive group"
+    };
+    let { bindings = append (map (\((,,) i n ty) -> (,,) i n (GroundImport n ty)) imported)
+            (map (\(GroundMember i n _ ty _) -> (,,) i n (GroundLocal n ty)) rows);
+      globals = M.fromList compareInt (map (\((,,) i _ value) -> (,) i value) bindings);
+      names = M.fromList compareString (map (\((,,) _ n value) -> (,) (X.nameHint n) value) bindings);
+      ps = map (\((,,) _ n ty) -> (,) n ty) imported;
+      memberTypes = map (\(GroundMember _ n ty _ _) -> (,) n ty) rows };
+    ensure (M.size globals == length bindings && M.size names == length bindings) "duplicate ground recursive binding";
+    (,) reversed _ <- foldM (groundRecursiveBody globals names) ((,) [] (advanceIdentity count (length rows))) rows;
+    env <- Open.environment declarations;
+    fragment <- Open.check env ps (XLetRec (reverse reversed) (XConstructor "()" []));
+    ensure (eqList (\((,) n ty) ((,) m other) -> X.equalName n m && T.alphaEq ty other)
+      memberTypes (Open.bindings fragment)) "ground recursive export mismatch";
+    Right fragment
+  };
+  groundMember declared count ((,) ordinal ((,) i ((,,) name mode rhs))) = case (,) mode (M.lookup compareInt (V.toInt i) declared) of {
+    (,) (CheckRecursive annotation) (Just ((,,) hint (Just declaredType) _)) -> do {
+      expected <- monomorphicAnnotation declaredType;
+      actual <- monomorphicAnnotation annotation;
+      ensure (eqString name hint && T.alphaEq expected actual) "ground recursive signature mismatch";
+      ty <- groundType M.empty expected;
+      Right (GroundMember (V.toInt i) (XName (advanceIdentity count ordinal) name) expected ty rhs)
+    };
+    _ -> Left "ground recursive member requires a closed monotype"
+  };
+  groundRecursiveBody globals names ((,) reversed serial) (GroundMember _ binder expected wanted rhs) = do {
+    (,,) term actual initial <- groundInfer globals names (GroundState 0 M.empty M.empty serial) rhs;
+    solved <- groundUnify initial actual wanted;
+    sealed <- groundSeal solved term;
+    case solved of { GroundState _ _ _ next -> Right ((,) ((:) ((,,) binder expected sealed) reversed) next) }
   };
   -- Closed nonrecursive monotypes need no generalization. This deliberately
   -- partial elaborator accepts only exact monomorphic uses and

@@ -427,12 +427,38 @@ module Bootstrap.LLVM.Codegen where {
                       names
                       registers)
              };
-             definitionBody symbol (L.map pointer registers)
+             state <- get;
+             let { keepWorker = M.size (functions state) > 128 &&
+                     hasBranchTailTransfer state name (L.length names) (A.functionBody f) };
+             definitionBodyWithPolicy keepWorker "ptr" symbol (L.map pointer registers)
                (finishOrdinary (L.length names) scope (A.functionBody f));
              modify (withInlinePrimitives inline)
            };
       cgPure symbol
     };
+  -- In a large module, preserve a branching worker's tail transfer to a peer.
+  -- Inlining these workers into each other duplicates the branches along the
+  -- chain. Straight-line wrappers and calls with a different ABI stay eligible.
+  hasBranchTailTransfer :: Output -> XName -> Int -> XErased -> Bool;
+  hasBranchTailTransfer state owner arity expression = let {
+    tailCall term = case O.applications term of {
+      (,) (XEVar name) args -> L.not (O.eqName owner name) && L.isJust (ordinaryTailTarget state arity name args);
+      _ -> False
+    }
+  } in case expression of {
+    XECase _ alternatives -> L.any (\(XErasedAlternative _ branch) -> tailCall branch) alternatives;
+    _ -> case O.applications expression of {
+      (,) (XEPrimitive PIfThenElse) [_,yes,no] -> tailCall yes || tailCall no;
+      _ -> False
+    }
+  };
+  ordinaryTailTarget :: Output -> Int -> XName -> [] XErased -> Maybe A.WorkerFunction;
+  ordinaryTailTarget state arity name args = case M.lookup O.compareName name (functions state) of {
+    Just f -> if L.length args == L.length (A.parameters f) && L.length (A.captures f) + L.length args == arity &&
+      L.not (S.member O.compareName name (numericKernels state)) && L.not (M.member O.compareName name (producerPlans state))
+      then Just f else Nothing;
+    Nothing -> Nothing
+  };
   -- Ordinary boxed workers also need a real tail transfer at O0. Values and
   -- capture environments are heap objects; CGSlot operands load their values,
   -- never addresses in the caller's frame. Only equal all-pointer ABIs qualify.
@@ -502,20 +528,15 @@ module Bootstrap.LLVM.Codegen where {
         finishOrdinary arity scope next
       };
       (,) (XEVar name) args -> do {
-        fs <- gets functions;
-        kernels <- gets numericKernels;
-        plans <- gets producerPlans;
-        case M.lookup O.compareName name fs of {
-          Just f -> if L.length args == L.length (A.parameters f) &&
-            L.length (A.captures f) + L.length args == arity &&
-            L.not (S.member O.compareName name kernels) && L.not (M.member O.compareName name plans)
-            then do {
-              symbol <- worker name f;
-              prepared <- workerArguments scope f args;
-              value <- result ("musttail call ptr " ++ symbol ++ "(" ++
-                L.intercalate ", " (L.map pointer (L.append (L.fst prepared) (L.snd prepared))) ++ ")");
-              emit ("  ret ptr " ++ value)
-            } else finishOrdinaryValue scope expression;
+        state <- get;
+        case ordinaryTailTarget state arity name args of {
+          Just f -> do {
+            symbol <- worker name f;
+            prepared <- workerArguments scope f args;
+            value <- result ("musttail call ptr " ++ symbol ++ "(" ++
+              L.intercalate ", " (L.map pointer (L.append (L.fst prepared) (L.snd prepared))) ++ ")");
+            emit ("  ret ptr " ++ value)
+          };
           Nothing -> finishOrdinaryValue scope expression
         }
       };
@@ -1027,7 +1048,25 @@ module Bootstrap.LLVM.Codegen where {
       XEApp f a -> application scope expression;
       XEEvidenceHole hole -> failure "LLVM unresolved dictionary evidence"
     };
-  -- In a large recursive scope retain function values once, rather than
+  -- A saturated call to a known worker can bypass its boxed closure. Scan each
+  -- complete application spine once, including uses inside suspended arguments.
+  escapingWorkers :: Map XName A.WorkerFunction -> Set XName -> XErased -> Set XName;
+  escapingWorkers fs found expression = case expression of {
+    XEApp _ _ -> case O.applications expression of {
+      (,) head args -> let { inArgs = L.foldlStrict (escapingWorkers fs) found args } in case head of {
+        XEVar name -> workerValueUse fs name args inArgs;
+        _ -> escapingWorkers fs inArgs head
+      }
+    };
+    XEVar name -> workerValueUse fs name [] found;
+    _ -> L.foldlStrict (escapingWorkers fs) found (A.children expression)
+  };
+  workerValueUse :: Map XName A.WorkerFunction -> XName -> [] XErased -> Set XName -> Set XName;
+  workerValueUse fs name args found = case M.lookup O.compareName name fs of {
+    Just f -> if L.length args == L.length (A.parameters f) then found else S.insert O.compareName name found;
+    Nothing -> found
+  };
+  -- In a large recursive scope retain escaping function values once, rather than
   -- rebuilding their environments at every lookup. Stack slots shorten the
   -- SSA lifetimes of recursive roots; only entry-block slots are allowed.
   -- Environments load their values and never capture addresses of these slots.
@@ -1036,7 +1075,13 @@ module Bootstrap.LLVM.Codegen where {
     fs <- gets functions;
     let {
       large = M.size scope + L.length bindings > 128 || O.remainingSize 16384 body < 0;
-      values = L.filter (\((,) name _) -> large || L.not (M.member O.compareName name fs)) bindings
+      escapes = L.foldlStrict (\seen binding -> escapingWorkers fs seen (L.snd binding))
+        (escapingWorkers fs S.empty body) bindings;
+      needsHole entry = case M.lookup O.compareName (L.fst entry) fs of {
+        Nothing -> True;
+        Just f -> large && (L.not (L.null (A.captures f)) || S.member O.compareName (L.fst entry) escapes)
+      };
+      values = L.filter needsHole bindings
     };
     current <- gets block;
     holes <- L.mapM (\((,) name _) -> do {

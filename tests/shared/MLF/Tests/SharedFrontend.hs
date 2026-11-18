@@ -1656,6 +1656,7 @@ module MLF.Tests.SharedFrontend where {
   };
   groundGroupChecks = do {
     groundAliasChecks;
+    groundRecursiveChecks;
     let { a = XTyVar 100; b = XTyVar 101; c = XTyVar 102;
       xa = XVar a; xb = XVar b; xc = XVar c;
       int = SCon "Int" []; arrow = SArrow int int;
@@ -1715,6 +1716,39 @@ module MLF.Tests.SharedFrontend where {
       check "ground invalid use rejects combined route"
         (isLeft (Inference.compileOpenGroupIndexed "control" (parameter identity) [] members))
     }) bad
+  };
+  groundRecursiveChecks = do {
+    let { int = SCon "Int" []; bool = SCon "Bool" [];
+      sig = \ty -> Just (SAnnotation [] (SArrow int ty));
+      peer = \i -> SGlobal (Index.fromInt i) "non-authoritative hint";
+      member = \i name annotation rhs -> (,) (Index.fromInt i) ((,,) name annotation
+        (SDeclScope [Index.fromInt (i + 100)] (SLam "x" Nothing (rhs (peer (i + 100))))));
+      choose = \yes no -> SApp (SApp (SApp (SPrimitive PIfThenElse) (SBoolLit True)) yes) no;
+      left = member 20 "left" (sig int) (\x -> choose (SIntLit 7) (SApp (peer 10) x));
+      right = member 10 "right" (sig int) (\x -> SApp (peer 20) x);
+      self = member 40 "self" (sig int) (\x -> choose x (SApp (peer 40) x));
+      a = XTyVar 50; poly = [(,,) (Index.fromInt 3) "identity" (XForall a XBot (XArrow (XVar a) (XVar a)))];
+      imported = member 10 "right" (sig int) (\x -> SApp (peer 3) (SApp (peer 20) x));
+      wrong = member 10 "right" (sig bool) (\x -> SApp (peer 20) x);
+      mixed = member 10 "right" Nothing (\x -> SApp (peer 20) x);
+      route = inferenceGroupCase Inference.groundRecursiveIndexed };
+    route "recursive ground mutual by declaration identity" True [] [right,left];
+    route "recursive ground use of polymorphic import" True poly [imported,left];
+    route "recursive ground self edge" True [] [self];
+    prepared <- recursiveRight "recursive ground mixed preparation"
+      (Inference.prepareIndexedGroup [] [] [mixed,left]);
+    check "recursive ground requires every signature"
+      (isLeft (Inference.groundRecursiveIndexed [] [mixed,left] (snd prepared)));
+    invalid <- recursiveRight "recursive ground mismatched peer preparation"
+      (Inference.prepareIndexedGroup [] [] [wrong,left]);
+    check "recursive ground rejects a mismatched peer"
+      (isLeft (Inference.groundRecursiveIndexed [] [wrong,left] (snd invalid)));
+    check "recursive ground keeps ordinary error" (case (,)
+      (Inference.finishOpenGroup (fst invalid) (map snd [wrong,left]) (snd invalid))
+      (Inference.compileOpenGroupIndexed "control" [] [] [wrong,left]) of {
+        (,) (Left expected) (Left actual) -> eqString expected actual;
+        _ -> False
+      })
   };
   groundAliasDepth known identity = case M.lookup compareInt identity known of {
     Just (Inference.GroundVar next) -> 1 + groundAliasDepth known next;

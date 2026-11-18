@@ -343,7 +343,9 @@ module Bootstrap.LLVM.Build where {
   definitionBody :: String -> [] String -> Build () -> Build ();
   definitionBody name args body = definitionBodyTyped "ptr" name args body;
   definitionBodyTyped :: String -> String -> [] String -> Build () -> Build ();
-  definitionBodyTyped ty name args body =
+  definitionBodyTyped = definitionBodyWithPolicy False;
+  definitionBodyWithPolicy :: Bool -> String -> String -> [] String -> Build () -> Build ();
+  definitionBodyWithPolicy keepWorker ty name args body =
     do {
       saved <- get;
       modify
@@ -365,7 +367,7 @@ module Bootstrap.LLVM.Build where {
           if (startsWith "@mlf.numeric." name &&
               (L.not (startsWith "@mlf.numeric.entry." name) && L.not collectingWorker))
           then " alwaysinline"
-          else if startsWith "@mlf.worker." name && workerBodyLimit 64 code
+          else if startsWith "@mlf.worker." name && (keepWorker || workerBodyLimit 64 code)
                then " noinline"
                else ""
       };

@@ -24,6 +24,7 @@ MACOS_BASE_SOURCE = 'eff291112f318206ce0f7ab85cb8a2e474be41489441204696630a395f4
 PERFORMANCE_BASE = 'fc300bc9fdc389b585cbef0630fc8915d53e89c5'
 ADAPTER_ENDPOINT = '798282547f3169d6d729d17c088f5cc29ac3eab0'
 CHAIN_ENDPOINT = 'ee495d5783fca3c26a3c0e659ebeac1bab76a37d'
+PUBLISHED_CHAIN = 'd37094188cbee0c4335c35cf1e22d45830dbd386'
 
 def performance_base_bytes(path):
     return subprocess.check_output(['git', '--no-replace-objects', '-C', str(ROOT),
@@ -279,24 +280,51 @@ class PR43SourceReconciliation(unittest.TestCase):
         with self.assertRaises(ValueError):
             c.advance_tree_bytes(ancestor, {})
 
-    def test_inferred_chain_accounts_for_every_live_source_after_the_adapter(self):
+    def test_inferred_chain_accounts_for_every_owned_source_at_publication(self):
         c = self.contract
         git = ['git', '--no-replace-objects', '-C', str(ROOT)]
         manifest = json.loads((c.directory / 'pr43-reconciliation-migration.json').read_bytes())
         edge = manifest['inferred_chain_transition']
         self.assertEqual((edge['predecessor'], edge['measured']), (ADAPTER_ENDPOINT, CHAIN_ENDPOINT))
-        inventory = c.live_source_inventory(ROOT)
+        published = json.loads(subprocess.check_output([*git, 'show',
+            PUBLISHED_CHAIN + ':tools/performance/artifact-binary/pr43-reconciliation-migration.json']))
+        self.assertEqual(edge, published['inferred_chain_transition'])
         paths = subprocess.check_output([*git, 'diff', '--name-only', ADAPTER_ENDPOINT, CHAIN_ENDPOINT],
                                         text=True).splitlines()
-        self.assertEqual(set(paths) & set(inventory), set(edge['changes']))
+        self.assertEqual(set(paths) & set(c.value['current_files']), set(edge['changes']))
         for path, row in edge['changes'].items():
             old, measured = (subprocess.check_output([*git, 'show', rev + ':' + path])
                              for rev in (ADAPTER_ENDPOINT, CHAIN_ENDPOINT))
             self.assertEqual(row, [hashlib.sha256(old).hexdigest(), hashlib.sha256(measured).hexdigest()])
-            self.assertEqual(measured, (ROOT / path).read_bytes())
-            self.assertEqual(inventory[path], row[1])
+            self.assertEqual(measured, subprocess.check_output([*git, 'show', PUBLISHED_CHAIN + ':' + path]))
+            self.assertEqual(published['changes'][path][1], row[1])
             with self.subTest(path=path), self.assertRaises(ValueError):
                 c.restore_path(old, path)
+
+    def test_compiler_changes_match_the_complete_owned_delta(self):
+        c = self.contract
+        module = sys.modules[type(c).__module__]
+        spec = json.loads((c.directory / module.MANIFEST).read_bytes())
+        git = ['git', '--no-replace-objects', '-C', str(ROOT)]
+        inventory = c.live_source_inventory(ROOT)
+        edges = spec['compiler_source_transitions']
+        self.assertEqual(edges[0]['predecessor'], PUBLISHED_CHAIN)
+        for index, edge in enumerate(edges):
+            before = edge['predecessor']
+            after = [edges[index+1]['predecessor']] if index+1 < len(edges) else []
+            paths = subprocess.check_output([*git, 'diff', '--name-only', before, *after], text=True).splitlines()
+            self.assertEqual(set(paths) & set(inventory), set(edge['changes']))
+            for path, row in edge['changes'].items():
+                old = subprocess.check_output([*git, 'show', before + ':' + path])
+                new = subprocess.check_output([*git, 'show', after[0] + ':' + path]) if after else (ROOT / path).read_bytes()
+                with self.subTest(path=path):
+                    self.assertEqual(row, [hashlib.sha256(old).hexdigest(), hashlib.sha256(new).hexdigest()])
+                    self.assertNotEqual(old, new)
+        for key in ('predecessor', 'predecessor_tree', 'predecessor_manifest_sha256', 'changes'):
+            bad = copy.deepcopy(spec)
+            bad['compiler_source_transitions'][-1][key] = {} if key == 'changes' else '0' * 40
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                module.validate_live_transition(bad, ROOT, c.core)
 
     def test_direct_runner_extends_the_frozen_controls_only_with_metadata(self):
         path = 'tools/shared/test_direct.py'

@@ -55,7 +55,7 @@ RECONCILIATION_PATH = 'tools/performance/artifact-binary/pr43-reconciliation-mig
 
 @lru_cache(maxsize=1)
 def map_successor_inputs():
-    # The inferred-chain commit leaves Map at the published adapter endpoint.
+    # The compiler changes leave Map at the published adapter endpoint.
     # Check its live row before replaying the three fixed blobs, without a compiler.
     root = HERE.parents[2]
     git = ['git', '--no-replace-objects', '-C', str(root)]
@@ -66,12 +66,13 @@ def map_successor_inputs():
     adapter = subprocess.check_output([*git, 'show',
         '798282547f3169d6d729d17c088f5cc29ac3eab0:' + RECONCILIATION_PATH], timeout=30)
     live = (root / RECONCILIATION_PATH).read_bytes()
-    C.require(C.sha_bytes(live) == 'f611478915e5da8a47ee1d065f17ab26152029efb847418e0d6e0580b23cca74',
-              'fixed inferred-chain successor manifest')
+    C.require(C.sha_bytes(live) == 'bc5d94dd067567b07541f6806b8fca4a9b3a84fb5e8689d6c29186f3393789a0',
+              'fixed compiler successor manifest')
     spec = json.loads(live)
     C.require(MAP_PATH not in spec['inferred_chain_transition']['changes'] and
+              all(MAP_PATH not in edge['changes'] for edge in spec['compiler_source_transitions']) and
               spec['changes'][MAP_PATH] == json.loads(adapter)['changes'][MAP_PATH],
-              'continuous Map endpoint after inferred-chain changes')
+              'continuous Map endpoint after compiler changes')
     return (adapter, old(RECONCILIATION_PATH), old(MAP_PATH), (root / MAP_PATH).read_bytes(), tree)
 
 

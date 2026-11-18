@@ -10,6 +10,7 @@ import qualified Bootstrap.Set as Set
 import qualified Bootstrap.LLVM.Build as B
 import qualified Bootstrap.LLVM.Codegen as C
 import qualified Bootstrap.LLVM.Analysis as A
+import qualified Bootstrap.LLVM.Kernel as K
 import qualified Bootstrap.LLVM.Optimize as O
 import qualified MLF.Primitive as P
 n i = T.XName i "test"
@@ -62,4 +63,32 @@ main = do
  assert "large worker bounds cloning" ("noinline" `isInfixOf` definitionHeader state "@mlf.worker.10" 64)
  assert "large numeric worker stays inline" ("alwaysinline" `isInfixOf` definitionHeader state "@mlf.numeric.10" 64)
  assert "collecting numeric worker stays ordinary" (not ("alwaysinline" `isInfixOf` definitionHeader (B.withCollectingKernels (Set.singleton (n 10)) state) "@mlf.numeric.10" 64))
- putStrLn "Independent callback sharing audit: 27 checks passed"
+ let unary body = A.WorkerFunction [x] body [] Set.empty (A.EntryDemand [] False)
+     binary body = A.WorkerFunction [x,y] body [] Set.empty (A.EntryDemand [] False)
+     use name = app (var name) (var x)
+     branch predicate yes no = app (app (app (prim T.PIfThenElse) predicate) yes) no
+     action = app (prim T.PIOReturn) (var x)
+     graph = M.fromList O.compareName
+       [(a,unary (use b)), (b,unary (branch (var x) (use a) action)),
+        (f,unary (use g)), (g,unary (branch action (use f) (var x))),
+        (n 70,unary (T.XELet y action (use g))), (n 80,unary (prim T.PIOReturn))]
+     namesEqual expected actual = S.eqList O.eqName (Set.toList (Set.fromList O.compareName expected)) (Set.toList actual)
+     targets = M.fromList O.compareName [(f,unary (var x)),(g,binary (var x))]
+     escaping = C.escapingWorkers targets Set.empty
+     ordinary = B.withFunctions targets state
+     branches = branch (var x) (T.XEInt 42) (use f)
+ assert "kernel anchors reach whole cycle" (namesEqual [a,b] (K.anchoredWorkers graph))
+ assert "kernel anchors match per-root traversal"
+   (all (\name -> Set.member O.compareName name (K.anchoredWorkers graph) == K.anchored graph Set.empty name) (M.keys graph))
+ assert "saturated nested workers need no closure"
+   (namesEqual [] (escaping (app (var f) (app (app (var g) (var x)) (var y)))))
+ assert "partial nested workers retain closure" (namesEqual [g] (escaping (app (var f) (use g))))
+ assert "escaping and oversaturated workers retain closures"
+   (namesEqual [f,g] (escaping (T.XEAbs y (app (app (var f) (var g)) (var y)))))
+ assert "branched peer tail transfer" (C.hasBranchTailTransfer ordinary g 1 branches)
+ assert "self or different ABI keeps inline choice"
+   (not (C.hasBranchTailTransfer ordinary f 1 branches || C.hasBranchTailTransfer ordinary g 2 branches))
+ assert "specialized or straight line calls keep inline choice"
+   (not (C.hasBranchTailTransfer (B.withNumericKernels (Set.singleton f) ordinary) g 1 branches ||
+         C.hasBranchTailTransfer ordinary g 1 (use f)))
+ putStrLn "Independent callback sharing audit: 35 checks passed"

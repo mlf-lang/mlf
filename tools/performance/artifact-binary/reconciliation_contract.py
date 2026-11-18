@@ -14,7 +14,9 @@ PREDECESSOR = '4fd6730d35b6ecaf8e169ad228ac3c7a3ed56160'
 PREDECESSOR_TREE = '1c60d3daca5162bd24658d295169f601593345ef'
 PREDECESSOR_MANIFEST = '69bc6cc39ec70a0209a6011f4ce7fef0aaf5039d903fa1b8477ee4a2bc46dcd8'
 MANIFEST = 'pr43-reconciliation-migration.json'
-MANIFEST_SHA256 = 'f611478915e5da8a47ee1d065f17ab26152029efb847418e0d6e0580b23cca74'
+MANIFEST_SHA256 = 'bc5d94dd067567b07541f6806b8fca4a9b3a84fb5e8689d6c29186f3393789a0'
+INFERRED_CHAIN_MANIFEST_SHA256 = 'f611478915e5da8a47ee1d065f17ab26152029efb847418e0d6e0580b23cca74'
+COMPILER_SOURCE_EDGES = ['119554684dde21433b8068a044ca7155a9a9fe7b42c6f484025730deaefbaf23']
 ADAPTER_MANIFEST_SHA256 = '6bbc1da597cb7eaaeab16aff52e8b44e2d4dc11ff10997679a45b3405bf0be98'
 CHAIN_EDGE_SHA256 = '5acc941d400b8b194ca97ca6a3c3ad6322e199279191bbf7b2d5816dab59841c'
 PREDECESSOR_IMPLEMENTATION = '7cacadad979f3db29da9067b5fe0ca8e1634d960dbf978ad6d5cae39ba338794'
@@ -260,39 +262,79 @@ def canonical_manifest(value):
     return (json.dumps(value, indent=2, sort_keys=True) + '\n').encode()
 
 
-def adapter_endpoint(spec):
-    """Recover the exact adapter manifest without requiring a checkout."""
+def rewind_sources(current, delta):
+    changes = dict(current)
+    for path, (old, new) in delta.items():
+        # A return to the original bytes disappears from the cumulative table.
+        first, last = changes.get(path, [new, new])
+        require(old != new and last == new, 'compiler source endpoint: ' + path)
+        if first == old:
+            changes.pop(path, None)
+        else:
+            changes[path] = [first, old]
+    return changes
+
+
+def compiler_history(spec):
+    """Reconstruct complete manifests back to the published inferred-chain merge."""
+    edges = spec.get('compiler_source_transitions')
+    require(type(edges) is list and [sha(canonical_manifest(edge)) for edge in edges] == COMPILER_SOURCE_EDGES,
+            'fixed compiler source transitions')
+    history = [spec]
+    for index in reversed(range(len(edges))):
+        edge = edges[index]
+        current = history[-1]
+        prior = {**current, 'changes': rewind_sources(current['changes'], edge['changes'])}
+        if index:
+            prior['compiler_source_transitions'] = edges[:index]
+        else:
+            del prior['compiler_source_transitions']
+        require(sha(canonical_manifest(prior)) == edge['predecessor_manifest_sha256'],
+                'complete compiler source predecessor')
+        history.append(prior)
+    require(sha(canonical_manifest(history[-1])) == INFERRED_CHAIN_MANIFEST_SHA256, 'published inferred-chain manifest')
+    return history
+
+
+def chain_predecessor(spec):
     prior = dict(spec)
     edge = prior.pop('inferred_chain_transition', None)
     require(sha(canonical_manifest(edge)) == CHAIN_EDGE_SHA256, 'fixed inferred-chain transition')
-    changes = dict(prior['changes'])
-    for path, (old, new) in edge['changes'].items():
-        row = changes.get(path)
-        require(type(row) is list and len(row) == 2 and row[1] == new,
-                'inferred-chain endpoint: ' + path)
-        if row[0] == old:
-            del changes[path]
-        else:
-            changes[path] = [row[0], old]
-    prior['changes'] = changes
+    prior['changes'] = rewind_sources(prior['changes'], edge['changes'])
     require(sha(canonical_manifest(prior)) == ADAPTER_MANIFEST_SHA256, 'entire adapter endpoint')
     return prior
 
 
+def adapter_endpoint(spec):
+    """Recover the exact adapter manifest without requiring a checkout."""
+    return chain_predecessor(compiler_history(spec)[-1])
+
+
 def validate_live_transition(spec, repository, core, history_root=None):
-    """Join the published adapter history to the measured compiler source tree."""
-    prior = adapter_endpoint(spec)
-    validate_adapter_transition(prior, repository, core, history_root)
-    edge = spec['inferred_chain_transition']
     git = ['git', '--no-replace-objects', '-C', str(repository)]
+    manifest_path = 'tools/performance/artifact-binary/' + MANIFEST
 
     def at(commit, path, limit):
         data = subprocess.check_output([*git, 'show', commit + ':' + path])
-        require(len(data) <= limit, 'inferred-chain byte bound: ' + path)
+        require(len(data) <= limit, 'compiler source byte bound: ' + path)
         return data
 
+    history = compiler_history(spec)
+    for current, previous in zip(history, history[1:]):
+        delta = current['compiler_source_transitions'][-1]
+        commit = delta['predecessor']
+        tree = subprocess.check_output([*git, 'rev-parse', commit + '^{tree}'], text=True).strip()
+        require(tree == delta['predecessor_tree'], 'compiler source predecessor tree')
+        require(at(commit, manifest_path, core.MAX_METADATA_BYTES) == canonical_manifest(previous),
+                'archived compiler source manifest')
+        for path, (old, _) in delta['changes'].items():
+            require(sha(at(commit, path, core.MAX_SOURCE_BYTES)) == old, 'archived compiler source: ' + path)
+
+    spec = history[-1]
+    prior = chain_predecessor(spec)
+    validate_adapter_transition(prior, repository, core, history_root)
+    edge = spec['inferred_chain_transition']
     base, measured = edge['predecessor'], edge['measured']
-    manifest_path = 'tools/performance/artifact-binary/' + MANIFEST
     for role, commit in [('predecessor', base), ('measured', measured)]:
         tree = subprocess.check_output([*git, 'rev-parse', commit + '^{tree}'], text=True).strip()
         require(tree == edge[role + '_tree'], 'inferred-chain ' + role + ' tree')
@@ -346,7 +388,7 @@ class Contract:
         raw = self.core.read_file(self.directory, MANIFEST, self.core.MAX_METADATA_BYTES)
         require(sha(raw) == manifest_sha256, 'successor manifest SHA')
         spec = self.core.strict_json(raw)
-        require(set(spec) == {'format', 'predecessor', 'changes', 'additions', 'maintenance', 'live_transition', 'performance_transition', 'adapter_successor', 'inferred_chain_transition'} and
+        require(set(spec) == {'format', 'predecessor', 'changes', 'additions', 'maintenance', 'live_transition', 'performance_transition', 'adapter_successor', 'inferred_chain_transition', 'compiler_source_transitions'} and
                 spec['format'] == 'pr43-reconciliation-source-migration-v1' and spec['predecessor'] == PREDECESSOR,
                 'successor manifest schema')
         validate_live_transition(spec, location, self.core, history_root)
