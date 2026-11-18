@@ -413,6 +413,30 @@ module Bootstrap.Layout where {
   -- Shared Haskell layout opens let bindings on the same line as well as
   -- subsequent lines. Inline do/of/where use the same indentation and
   -- delimiter closures as multiline blocks; legacy let remains sequential.
+  -- No virtual token is emitted without a layout frame or a pending opener.
+  -- When the top level and each layout keyword have explicit braces, the
+  -- validated scanner tokens are already the arranged stream.
+  explicitLayout program tokens = let {
+    startsExplicit = case tokens of {
+      [] -> False;
+      (:) first _ -> eqString (tokenText first) "module" || eqString (tokenText first) "{"
+    };
+    blocks input = case input of {
+      [] -> True;
+      (:) token rest -> let {
+        text = tokenText token;
+        opens = case stringLength text of {
+          2 -> eqString text "of" || eqString text "do";
+          3 -> eqString text "let";
+          5 -> eqString text "where";
+          _ -> False
+        }
+      } in if opens then case rest of {
+        (:) brace more -> eqString (tokenText brace) "{" && blocks more;
+        [] -> False
+      } else blocks rest
+    }
+  } in (not program || startsExplicit) && blocks tokens;
   layoutTokensWithProfile :: SourceSyntax -> Bool -> String -> String -> Either String Scanned;
   layoutTokensWithProfile syntax program file source =
     if not (isSharedSyntax syntax)
@@ -428,11 +452,13 @@ module Bootstrap.Layout where {
                  validateSharedTokens file tokens;
                  -- Validation and layout consume the same immutable token stream.
                  -- Keep the scanner failure and validation order above intact.
-                 arranged <- layoutTokensUsing True (\_ _ -> Right (Scanned tokens finish)) program file source;
-                 case arranged of {
-                   Scanned ordered _ -> validateSharedArranged file [] Nothing ordered
-                 };
-                 Right arranged
+                 if explicitLayout program tokens then Right (Scanned tokens finish) else do {
+                   arranged <- layoutTokensUsing True (\_ _ -> Right (Scanned tokens finish)) program file source;
+                   case arranged of {
+                     Scanned ordered _ -> validateSharedArranged file [] Nothing ordered
+                   };
+                   Right arranged
+                 }
                }
            }
          };
