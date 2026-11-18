@@ -14,7 +14,8 @@ PREDECESSOR = '4fd6730d35b6ecaf8e169ad228ac3c7a3ed56160'
 PREDECESSOR_TREE = '1c60d3daca5162bd24658d295169f601593345ef'
 PREDECESSOR_MANIFEST = '69bc6cc39ec70a0209a6011f4ce7fef0aaf5039d903fa1b8477ee4a2bc46dcd8'
 MANIFEST = 'pr43-reconciliation-migration.json'
-MANIFEST_SHA256 = 'cb10b853c5576cf6e85bb9921a485fb4e23b5e9d8dc3fd60f409e715a65829e9'
+MANIFEST_SHA256 = '9fe8131948aa2ba012a026fc3661a4278673c0872ca04b3b993ee8d58eb96d36'
+MANIFEST_BYTES = 66046
 INFERRED_CHAIN_MANIFEST_SHA256 = 'f611478915e5da8a47ee1d065f17ab26152029efb847418e0d6e0580b23cca74'
 COMPILER_SOURCE_EDGES = [
     '119554684dde21433b8068a044ca7155a9a9fe7b42c6f484025730deaefbaf23',
@@ -53,6 +54,7 @@ COMPILER_SOURCE_EDGES = [
     '047fef08617b4165d150a46923d1419cbb9835074be1321d76a1ea716c8c1316',
     '3f693e1d8290c8b73cc6b03028f901f773d991eda770b63fdcd1ca5c24dd52ac',
     '775d99db299794843a244a473f4eced6cf08e0e21b6c90b1dc6ef84426de43aa',
+    'a2a6f14ee2986a04e99aa8ff61a28d24d56bb97f2edfd395e8f4ee8c2da15101',
 ]
 ADAPTER_MANIFEST_SHA256 = '6bbc1da597cb7eaaeab16aff52e8b44e2d4dc11ff10997679a45b3405bf0be98'
 CHAIN_EDGE_SHA256 = '5acc941d400b8b194ca97ca6a3c3ad6322e199279191bbf7b2d5816dab59841c'
@@ -175,10 +177,12 @@ def manifest_bytes(directory):
                          getattr(os, 'O_NONBLOCK', 0))
     try:
         info = os.fstat(descriptor)
-        require(stat.S_ISREG(info.st_mode) and info.st_size <= 65536,
+        require(stat.S_ISREG(info.st_mode) and info.st_size <= MANIFEST_BYTES,
                 'bounded regular successor manifest')
-        raw = os.read(descriptor, 65537)
-        require(len(raw) <= 65536, 'successor manifest byte bound')
+        # Short inputs cannot match the pin. Preserve the identity diagnostic.
+        require(info.st_size == MANIFEST_BYTES, 'successor manifest SHA')
+        raw = os.read(descriptor, MANIFEST_BYTES + 1)
+        require(len(raw) == MANIFEST_BYTES, 'successor manifest byte bound')
         return raw
     finally:
         os.close(descriptor)
