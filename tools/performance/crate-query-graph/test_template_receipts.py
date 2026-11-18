@@ -221,6 +221,32 @@ class TemplateReceiptTests(unittest.TestCase):
         with self.assertRaisesRegex(Invalid, 'template dependency scheme inventory'):
             rebind_template(f['references'], f['original'], [], [f['owner']], f['types'])
 
+    def test_template_lambda_uses_one_body_field_and_extends_scope(self):
+        var = lambda i: pack(['variable', str(i)])
+        lam = lambda body: pack(['lambda', body])
+        # CrateGraph.templateExpression erases the name; only the body is keyed.
+        expression_key(lam(var(0)), 0)
+        expression_key(lam(lam(pack(['application', var(0), var(1)]))), 0)
+        expression_key(lam(pack(['application', var(0), var(2)])), 2)
+        f = self.unsigned_monomorphic_fixture()
+        key = unpack(f['references'][2][0][2][1][1])
+        key[3] = lam(pack(['application', var(0), var(2)]))
+        f['references'] = l(n(2, s('checked-inference-template-1'), s(pack(key))))
+        self.assertEqual(self.check(f)['retained'], 1)
+        f['mode'] = 'concrete'
+        self.reject(f, 'finish receipt commitment')
+
+    def test_template_lambda_rejects_wrong_arity_and_invalid_body_scope(self):
+        for args in ([], ['name', pack(['variable', '0'])],
+                     ['name', '', pack(['variable', '0'])]):
+            with self.subTest(args=args), self.assertRaisesRegex(Invalid, 'unsupported template expression key'):
+                expression_key(pack(['lambda', *args]), 0)
+        for body in (pack(['variable', '-1']), pack(['variable', '1'])):
+            with self.subTest(body=body), self.assertRaisesRegex(Invalid, 'template variable slot'):
+                expression_key(pack(['lambda', body]), 0)
+        with self.assertRaisesRegex(Invalid, 'empty template expression key'):
+            expression_key(pack(['lambda', '']), 0)
+
     def test_checked_expression_uses_closed_surface_monotype(self):
         integer = pack(['constructor', 'Int', ''])
         expression_key(pack(['checked', integer, pack(['variable', '0'])]), 1)

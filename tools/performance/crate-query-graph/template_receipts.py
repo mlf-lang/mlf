@@ -96,8 +96,8 @@ def expression_key(source, depth):
     tag, *args = row
     if tag == 'variable' and len(args) == 1:
         require(0 <= integer(args[0]) < depth, 'template variable slot')
-    elif tag == 'lambda' and len(args) == 2:
-        expression_key(args[1], depth + 1)
+    elif tag == 'lambda' and len(args) == 1:
+        expression_key(args[0], depth + 1)
     elif tag == 'application' and len(args) == 2:
         for child in args:
             expression_key(child, depth)
