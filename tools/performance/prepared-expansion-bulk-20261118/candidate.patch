@@ -1,0 +1,44 @@
+--- a/libraries/mlf-inference/Bootstrap/Graph/Solver.hs
++++ b/libraries/mlf-inference/Bootstrap/Graph/Solver.hs
+@@ -1891,6 +1891,32 @@
+   -- The full expanded Graph and full local validation are not omitted. Only
+   -- fresh intermediate reverse indexes and their component rediscovery are
+   -- avoided, after an ordered negative prefix proves every graft must fail.
++  -- PRIVATE prepared-Solver route only. prepare establishes fresh-ID separation;
++  -- prior operations preserve it. Public G.expandWithScopes remains unchanged.
++  -- Keep its traversal, kind prepass, allocation and ordered strictNode demands.
++  -- Build the fresh ascending map once, instead of inserting each fresh node
++  -- into the progressively larger old graph and resolving known-fresh IDs.
++  expandPreparedBulk :: IntMap ((,) Int Int) -> Int -> Int -> Graph ->
++    Either String ((,) ((,,) Int (IntMap Int) ([] ((,) Int Int))) Graph);
++  expandPreparedBulk intervals generalization destination old =
++    let { source = G.genRoot old generalization } in
++    case G.expansionVisitCached old generalization intervals ((,) IS.empty IM.empty)
++           ((:) source []) of {
++      (,) visited scopes -> let { originals = IS.toList visited } in
++        G.bindE (G.kindsAt old originals) (\kinds ->
++          case G.allocateCopies old originals of {
++            (,) copies allocated ->
++              let { copy = G.copyIdentity old copies;
++                    entries = L.map (\n -> (,) (copy n)
++                      (G.expansionNode old generalization destination source copies kinds scopes n)) originals;
++                    fresh = G.nodesFromDistinctAscList entries;
++                    result = G.mkGraph (IM.union fresh (G.nodes allocated))
++                      (G.links allocated) (G.nextId allocated);
++                    frontier = L.filter (\n -> L.not (IM.findWithDefault False n scopes)) originals
++              } in Right ((,) ((,,) (copy source) copies
++                   (L.map (\n -> (,) n (copy n)) frontier)) result)
++          })
++    };
+   expandedGraphPrepared :: Int ->
+               Int -> Solver -> Either String ((,,,) Int (IntMap Int) ([] ((,) Int Int)) Graph);
+   expandedGraphPrepared source target solver =
+@@ -1909,7 +1935,7 @@
+                    Nothing -> Left "instance target has no binder";
+                    Just destination ->
+                      G.bindE
+-                       (G.expandWithScopes (scopeIntervals (scopeIndex solver)) source destination
++                       (expandPreparedBulk (scopeIntervals (scopeIndex solver)) source destination
+                           old)
+                        (\answer ->
+                           case answer of {
