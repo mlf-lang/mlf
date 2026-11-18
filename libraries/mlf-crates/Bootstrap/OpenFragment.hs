@@ -84,58 +84,54 @@ module Bootstrap.OpenFragment
   } in seq next (if count == 0 then LiteralStream next 1 value value 0 tail
     else if count == 1 || diff == step then seq diff (seq following (LiteralStream next following first value diff tail))
     else LiteralStream next 1 value value 0 (finishRun count first last step tail));
-  data PatternTask = PatternTerm Int XTerm | PatternApp;
+  data PatternVisit = NoPattern | Visited Int Int PatternTable LiteralStream;
+  -- The format limits nesting to 128. Thread each completed child directly
+  -- into its parent, preserving postorder numbering and the occurrence budget.
   expressionPattern value = let {
-    run tasks results table@(PatternTable count entries pairs names primitives) stream fuel =
-      if fuel < 0 then Nothing else case tasks of {
-        [] -> case (,) results stream of {
-          (,) [root] (LiteralStream size amount first last step tail) ->
-            if size < 8 || 1048576 - fuel < count * 3 then Nothing else
-              Just (W.VNode 86 [W.VNode 1 (reverse entries),
-                W.VNode 1 (reverse (finishRun amount first last step tail)),W.VInt root]);
-          _ -> Nothing
-        };
-        (:) task rest -> let {
-          use i nextResults = run rest ((:) i nextResults) table stream fuel;
-          add node ps ns ms nextResults = if count >= 512 then Nothing else let {
-            next = count + 1;
-            saved = PatternTable next ((:) node entries) ps ns ms
-          } in seq next (run rest ((:) count nextResults) saved stream fuel)
-        } in case task of {
-          PatternApp -> case results of {
-            (:) right ((:) left prior) -> let { key = left * 512 + right } in case IM.lookup key pairs of {
-              Just i -> use i prior;
-              Nothing -> add (W.VNode 88 [W.VInt left,W.VInt right]) (IM.insert key count pairs) names primitives prior
-            };
-            _ -> Nothing
-          };
-          PatternTerm depth term -> if depth > 128 then Nothing else let {
-            nextFuel = fuel - 1;
-            atom i nextTable nextStream = run rest ((:) i results) nextTable nextStream nextFuel;
-            save node ps ns ms = if count >= 512 then Nothing else let { following = count + 1 } in
-              seq following (atom count (PatternTable following ((:) node entries) ps ns ms) stream)
-          } in case term of {
-            XApp left right -> run ((:) (PatternTerm (depth + 1) left)
-              ((:) (PatternTerm (depth + 1) right) ((:) PatternApp rest))) results table stream nextFuel;
-            XIntTerm integer -> let { next = addLiteral integer stream } in seq next (atom 0 table next);
-            XVarTerm (XName i hint) -> let { key = (,) i hint } in
-              case M.lookup (comparePair compareInt compareString) key names of {
-                Just index -> atom index table stream;
-                Nothing -> save (Structure.toXTerm term) pairs (M.insert (comparePair compareInt compareString) key count names) primitives
-              };
-            XPrimitive p args -> case args of {
-                [] -> let { code = Structure.primitiveCode p } in case IM.lookup code primitives of {
-                  Just index -> atom index table stream;
-                  Nothing -> save (Structure.toXTerm term) pairs names (IM.insert code count primitives)
-                };
-                _ -> Nothing
-              };
-            _ -> Nothing
+    visit depth fuel table@(PatternTable count entries pairs names primitives) stream term =
+      if fuel < 0 || depth > 128 then NoPattern else let {
+        remaining = fuel - 1;
+        finish i nextTable nextStream = if remaining < 0 then NoPattern else Visited i remaining nextTable nextStream;
+        save node nextNames nextPrimitives = if count >= 512 then NoPattern else let { next = count + 1 } in
+          seq next (finish count (PatternTable next ((:) node entries) pairs nextNames nextPrimitives) stream);
+        application left right = case visit (depth + 1) remaining table stream left of {
+          NoPattern -> NoPattern;
+          Visited l available leftTable leftStream -> case visit (depth + 1) available leftTable leftStream right of {
+            NoPattern -> NoPattern;
+            Visited h rest current@(PatternTable size nodes apps ns ps) literals -> let {
+              key = l * 512 + h
+            } in case IM.lookup key apps of {
+              Just i -> Visited i rest current literals;
+              Nothing -> if size >= 512 then NoPattern else let {
+                next = size + 1; row = W.VNode 88 [W.VInt l,W.VInt h]
+              } in seq next (Visited size rest (PatternTable next ((:) row nodes) (IM.insert key size apps) ns ps) literals)
+            }
           }
         }
-      }
-  } in run [PatternTerm 1 value] [] (PatternTable 1 [W.VNode 87 []] IM.empty M.empty IM.empty)
-    (LiteralStream 0 0 0 0 0 []) 1048576;
+      } in case term of {
+        XApp left right -> application left right;
+        XIntTerm integer -> let { next = addLiteral integer stream } in seq next (finish 0 table next);
+        XVarTerm (XName i hint) -> let { key = (,) i hint } in
+          case M.lookup (comparePair compareInt compareString) key names of {
+            Just index -> finish index table stream;
+            Nothing -> save (Structure.toXTerm term) (M.insert (comparePair compareInt compareString) key count names) primitives
+          };
+        XPrimitive p args -> case args of {
+          [] -> let { code = Structure.primitiveCode p } in case IM.lookup code primitives of {
+            Just index -> finish index table stream;
+            Nothing -> save (Structure.toXTerm term) names (IM.insert code count primitives)
+          };
+          _ -> NoPattern
+        };
+        _ -> NoPattern
+      };
+    table = PatternTable 1 [W.VNode 87 []] IM.empty M.empty IM.empty
+  } in case visit 1 1048576 table (LiteralStream 0 0 0 0 0 []) value of {
+    NoPattern -> Nothing;
+    Visited root fuel (PatternTable count entries _ _ _) (LiteralStream size amount first last step tail) ->
+      if size < 8 || 1048576 - fuel < count * 3 then Nothing else
+        Just (W.VNode 86 [W.VNode 1 (reverse entries),W.VNode 1 (reverse (finishRun amount first last step tail)),W.VInt root])
+  };
   compactNode tag fields = let {
       replace rest = case rest of {
         [] -> Nothing;
