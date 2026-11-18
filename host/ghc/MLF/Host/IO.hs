@@ -229,8 +229,9 @@ v_readDoubleArray (DoubleArray a) = readArray a
 v_readByteArray :: ByteArray -> Int -> IO Int
 v_readByteArray array n = do
   ByteArray size storage <- evaluate array
-  i <- evaluate (stIndex (fromIntegral size) n)
-  fromIntegral <$> AB.unsafeRead storage i
+  if (fromIntegral n :: Word64) >= fromIntegral size
+    then throwIO (HostError "array index out of bounds")
+    else fromIntegral <$> AB.unsafeRead storage (fromIntegral n)
 v_writeIntArray :: IntArray -> Int -> Int -> IO ()
 v_writeIntArray array n value = do
   IntArray size cells <- evaluate array
