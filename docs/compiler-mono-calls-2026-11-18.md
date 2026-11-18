@@ -1,6 +1,21 @@
 # Monomorphic constructor calls
 
-At 1,024 calls MLF and GHC took 0.343 / 0.727 s to build a native executable. At 8,192 calls the medians were 0.615 / 2.029 s. The fitted exponents were 0.941 / 0.887 on the primary schedule and 1.072 / 1.015 on the extension. The fitted exponent has yet to clear both paired confidence gates.
+At revision `81e0b1eb4ec175064290deeb523143c63d5148f6`, MLF passed all six performance checks on both size ranges. The table gives complete native build times, including worker launch and linking. Every positive size had a lower MLF median, and all four exponent fits were interior.
+
+| Calls | Pairs per size | Largest median in seconds, MLF / GHC | OLS slope in ms/call, MLF / GHC | Fitted exponent, MLF / GHC | Paired 95% interval for MLF minus GHC exponent |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 0–1,024 | 32 | 0.2937 / 0.6749 | 0.01361 / 0.15852 | 0.4154 / 0.9364 | [−0.7545, −0.1207] |
+| 0–8,192 | 6 | 0.3661 / 1.9671 | 0.01120 / 0.17625 | 0.7715 / 1.0389 | [−0.4059, −0.0527] |
+
+The 568 builds produced 1,704 checked native outputs. Replaying each fit from its retained pairs reproduced the original result byte for byte. The producer receipt has SHA-256 `13094cbb8de6157964fac2282e0300e5f04f3a9e7bf060676c12ce08bd2224dd`. The primary and extended timing receipts under `.mlf-build/mono-calls-integrated-20261119/qualification-07/` have SHA-256 `1b46b04f952bd3cf5e288e02ad9068c61bd18cdae60eaf8f76c4c6580f11bf3d` and `e234e5a53664485d45ab62fadf4f59c82c699da6dbdb9b9938a5e9bd2656cb4f`.
+
+At 8,192 calls, sharing checked application templates reduced the public object from 311,931 to 2,746 bytes. Current readers accepted both object versions. A version 8 reader identified the version 9 object to rebuild. The separate staged library tests exercised cold builds, warm reuse and linking with the library source removed. In the final matched memory comparison against `3fd1a894`, compiler allocation at this size fell from 441.0 to 404.3 MB, GC copying from 109.3 to 69.2 MB, and peak RSS from 84.8 to 73.6 MB. The larger GHC nursery raised baseline peak RSS from 30 to 42 MB.
+
+The source-provenance regression at `81e0b1eb` caught a stale live benchmark pin for `Bootstrap/Std.hs`. Both measured cohorts used the optimized source. The historical benchmark manifest retains the original hash.
+
+## Handoff measurements on 18 November 2026
+
+At the handoff, MLF and GHC took 0.343 / 0.727 s at 1,024 calls and 0.615 / 2.029 s at 8,192. The fitted exponents were 0.941 / 0.887 on the primary schedule and 1.072 / 1.015 on the extension.
 
 ![Growth in native build time and maximum live compiler heap](assets/compiler-mono-calls-2026-11-18.svg)
 
