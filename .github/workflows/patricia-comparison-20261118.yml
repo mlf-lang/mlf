@@ -1,0 +1,56 @@
+name: Bounded Patricia comparison
+on:
+  push:
+    branches: [perf/patricia-paired-20261118]
+permissions:
+  contents: read
+concurrency:
+  group: bounded-patricia-20261118
+  cancel-in-progress: false
+jobs:
+  compare:
+    if: github.repository == 'mlf-lang/mlf' && github.ref == 'refs/heads/perf/patricia-paired-20261118'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Isolated pinned source worktrees
+        run: |
+          git worktree add --detach old 798282547f3169d6d729d17c088f5cc29ac3eab0
+          git worktree add --detach new ff099d8b144003fd9264c939b42ff7f669d2907f
+      - name: Official pinned GHC
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang libgc-dev libgmp-dev libnuma-dev libncurses-dev pkg-config xz-utils
+          archive="$RUNNER_TEMP/ghc-9.14.1.tar.xz"
+          curl -fsSL https://downloads.haskell.org/~ghc/9.14.1/ghc-9.14.1-x86_64-deb12-linux.tar.xz -o "$archive"
+          printf '%s  %s\n' 60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841 "$archive" | sha256sum -c -
+          tar -xJf "$archive" -C "$RUNNER_TEMP"
+          (cd "$RUNNER_TEMP/ghc-9.14.1-x86_64-unknown-linux" && ./configure --prefix="$RUNNER_TEMP/ghc" && make install)
+          test "$("$RUNNER_TEMP/ghc/bin/ghc" --numeric-version)" = 9.14.1
+          echo "$RUNNER_TEMP/ghc/bin" >> "$GITHUB_PATH"
+          rm "$archive"
+      - name: Serial producers
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          for source in old new; do
+            (cd "$source" && python3 -B tools/shared/crc_process_supervisor.py --receipt ../evidence/"$source-build-supervisor.json" --work-seconds 1800 --cleanup-seconds 10 python3 -B tools/shared/resource_watchdog.py --seconds 1740 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 ../evidence/"$source-build-guard" python3 tools/shared/build.py --bootstrap-only --optimization 2 --build-dir .mlf-build/shared-ghc) > "evidence/$source-build.log" 2>&1
+          done
+      - name: At most two order-balanced emit pairs
+        run: python3 -B new/tools/shared/crc_process_supervisor.py --receipt evidence/comparison-supervisor.json --work-seconds 1800 --cleanup-seconds 10 python3 -B tools/research/patricia-comparison-20261118.py
+      - name: Preserve all diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: bounded-patricia-comparison
+          path: |
+            evidence/
+            old/.mlf-build/shared-ghc/receipt.json
+            new/.mlf-build/shared-ghc/receipt.json
+          retention-days: 14
