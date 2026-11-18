@@ -20,7 +20,7 @@ import qualified Data.Map.Lazy as M
 #endif
 import Data.IORef
 import Data.Int (Int64)
-import Data.Word (Word8, Word32)
+import Data.Word (Word8, Word32, Word64)
 import Foreign.Marshal.Alloc (mallocBytes)
 import Foreign.Marshal.Utils (copyBytes, fillBytes)
 import Foreign (alloca, peek, peekElemOff, pokeElemOff, nullPtr, free, castPtr, plusPtr)
@@ -242,9 +242,13 @@ v_writeDoubleArray (DoubleArray a) = writeArray a
 v_writeByteArray :: ByteArray -> Int -> Int -> IO ()
 v_writeByteArray array n x = do
   ByteArray size storage <- evaluate array
-  i <- evaluate (stIndex (fromIntegral size) n)
-  value <- evaluate (fromIntegral (bounded "byte value must be between 0 and 255" 255 x) :: Word8)
-  AB.unsafeWrite storage i value
+  -- Size fits the host index. Test it before demanding the byte, keeping
+  -- both checks in the action while passing unboxed values to the store.
+  if (fromIntegral n :: Word64) >= fromIntegral size
+    then throwIO (HostError "array index out of bounds")
+    else if (fromIntegral x :: Word64) > 255
+      then throwIO (HostError "byte value must be between 0 and 255")
+      else AB.unsafeWrite storage (fromIntegral n) (fromIntegral x)
 v_lengthIntArray :: IntArray -> IO Int
 v_lengthIntArray array = do
   IntArray size _ <- evaluate array
