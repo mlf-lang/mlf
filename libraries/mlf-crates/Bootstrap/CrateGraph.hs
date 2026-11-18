@@ -8,6 +8,7 @@ module Bootstrap.CrateGraph where {
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.Data as D;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.SourceInference as Source;
@@ -449,16 +450,16 @@ module Bootstrap.CrateGraph where {
     -- until all nodes have been admitted.
     pageNodes :: Int;
     pageNodes = 128;
-    collect budget pending chunks pages slots line column names = if budget < 0 then Nothing else case pending of {
+    collect budget pending chunks pages slots line column names locations = if budget < 0 then Nothing else case pending of {
       [] -> let {
         finalPages = case chunks of { [] -> pages; _ -> (:) (concatStringList (reverse chunks)) pages }
       } in Just (concatStringList ((:) "P3" ((:) header (reverse finalPages))));
       (:) expr rest -> if slots == 0 then let {
           page = concatStringList (reverse chunks)
-        } in seq page (collect budget pending [] ((:) page pages) pageNodes line column names) else let {
-        next cost fields items = collect (budget - cost) items fields pages (slots - 1) line column names;
+        } in seq page (collect budget pending [] ((:) page pages) pageNodes line column names locations) else let {
+        next cost fields items = collect (budget - cost) items fields pages (slots - 1) line column names locations;
         named tag spelling overhead = case positionSymbol spelling names of { (,,) code bytes table ->
-          collect (budget - overhead - bytes) rest ((:) code ((:) tag chunks)) pages (slots - 1) line column table
+          collect (budget - overhead - bytes) rest ((:) code ((:) tag chunks)) pages (slots - 1) line column table locations
         };
         scalar tag fields overhead = next (overhead + stringUtf8Length fields) ((:) fields ((:) tag chunks)) rest
       } in case expr of {
@@ -474,8 +475,21 @@ module Bootstrap.CrateGraph where {
             withEndLine = if short then fromColumn else coordinateChunks (el - sl) fromColumn;
             complete = coordinateChunks (ec - sc) withEndLine;
             cost = 29 + originBytes + nameBytes +
-              positionBytes sl + positionBytes sc + positionBytes el + positionBytes ec
-          } in collect (budget - cost) ((:) body rest) complete pages (slots - 1) sl sc table }
+              positionBytes sl + positionBytes sc + positionBytes el + positionBytes ec;
+            next fields known = collect (budget - cost) ((:) body rest) fields pages (slots - 1) sl sc table known;
+            offset = sc - column; width = ec - sc;
+            -- Only back-references have a one-scalar spelling. Definitions
+            -- include their framed text and always go through the general path.
+            small = short && offset >= (0 - 64) && offset < 64 && width >= (0 - 64) && width < 64 &&
+              stringLength code == 1;
+            key = (stringCodeAt code 0 * 128 + offset + 64) * 128 + width + 64
+          } in if not small then next complete locations else case IM.lookup key locations of {
+            Just fragment -> next ((:) fragment chunks) locations;
+            Nothing -> if IM.size locations >= 256 then next complete locations else let {
+              fragment = concatStringList (reverse (coordinateChunks width
+                (coordinateChunks offset [code,"d"])))
+            } in next ((:) fragment chunks) (IM.insert key fragment locations)
+          } }
             else let { fields = Separate.pack [label,Q.encodeSourceSpan span] } in
               next (20 + stringUtf8Length fields) ((:) fields ((:) "S" chunks)) ((:) body rest)
         };
@@ -486,7 +500,7 @@ module Bootstrap.CrateGraph where {
           next (stringUtf8Length value) ((:) (Separate.pack [value]) ((:) "x" chunks)) rest
       }
     }
-  } in collect initialBudget [tree] [] [] pageNodes 0 0 M.empty;
+  } in collect initialBudget [tree] [] [] pageNodes 0 0 M.empty IM.empty;
   relativePrepared original lowered names metadata = case (,) original lowered of {
     (,) [(,,) name annotation body] [(,,) nextName nextAnnotation candidate] ->
       if templateNodesLeft 257 body > 0 || not (eqString name nextName && eqMaybe E.eqSAnnotation annotation nextAnnotation)
