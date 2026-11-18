@@ -1,0 +1,29 @@
+name: Patricia observable capability
+on:
+  push:
+    branches: [perf/patricia-observer-probe-20261118]
+permissions:
+  contents: read
+concurrency:
+  group: bounded-patricia-20261118
+  cancel-in-progress: false
+jobs:
+  probe:
+    if: github.repository == 'mlf-lang/mlf' && github.ref == 'refs/heads/perf/patricia-observer-probe-20261118'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Supervised synthetic capability probe only
+        run: |
+          mkdir -p evidence
+          python3 -B tools/shared/crc_process_supervisor.py --receipt evidence/probe-supervisor.json --work-seconds 30 --cleanup-seconds 5 "$(command -v bash)" tools/research/patricia-perf-capability.sh
+      - name: Preserve probe evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: synthetic-perf-capability
+          path: evidence/
+          retention-days: 14
