@@ -59,10 +59,22 @@ module Bootstrap.X.Check where {
   checkComputationScoped ds env p source =
     do {
       wellFormedIn ds env source;
+      checkedComputationResult ds env p source
+    };
+  -- The source has passed kind checking in this exact environment. Each
+  -- composition passes its checked result to the next computation.
+  checkedComputationResult ds env p source = case p of {
+    XRefl -> Right source;
+    XThen first second -> do {
+      middle <- checkedComputationResult ds env first source;
+      checkedComputationResult ds env second middle
+    };
+    _ -> do {
       result <- computeResult ds env p source;
       wellFormedIn ds env result;
-      return result
-    };
+      Right result
+    }
+  };
   computeResult :: DataEnv -> Map XTyVar XType -> XComputation -> XType -> Either String XType;
   computeResult ds env p source =
     case p of {
