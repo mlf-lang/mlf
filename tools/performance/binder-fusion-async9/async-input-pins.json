@@ -1,0 +1,86 @@
+{
+  "source_ref": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "rows": [
+    {
+      "repo_path": "libraries/mlf-async/Async/Process.hs",
+      "module": "Async.Process",
+      "git_blob": "7141c2d2e1e8e159f5c61a9b16a5d465cabdcfd7",
+      "A": {
+        "bytes": 11490,
+        "sha256": "482169c6d92a16b5a3071088ec24ee7206324995f8e69f6df073cc24559fcb73"
+      }
+    },
+    {
+      "repo_path": "libraries/mlf-async/Async/Process/Internal.hs",
+      "module": "Async.Process.Internal",
+      "git_blob": "0aa1592e44296a8f17bd5f2b59011bb4c89b8a30",
+      "A": {
+        "bytes": 2819,
+        "sha256": "ef551f51dcf7da4b48e49f2807e2d5efe84c009cfa911913402c493fce7a25bc"
+      }
+    },
+    {
+      "repo_path": "libraries/mlf-async/Async/Task.hs",
+      "module": "Async.Task",
+      "git_blob": "b579a585277ec5ded4ef79c9a28bc9e60091b900",
+      "A": {
+        "bytes": 1335,
+        "sha256": "cce3de39e4e4fe7537944da1f6b000a8146737340bd0d05ba03fc7e3550acd3b"
+      }
+    },
+    {
+      "repo_path": "libraries/mlf-async/Async/Task/Core.hs",
+      "module": "Async.Task.Core",
+      "git_blob": "08f2cd9aa716facbe4dff9810c25750756119078",
+      "A": {
+        "bytes": 49853,
+        "sha256": "0a75da421779203053d535e09367bce368e245e3608b12cad23507358dedf1af"
+      }
+    },
+    {
+      "repo_path": "libraries/mlf-async/Async/Task/Internal.hs",
+      "module": "Async.Task.Internal",
+      "git_blob": "2ada3e9c16e0703512a7bf31bc78982d958529f1",
+      "A": {
+        "bytes": 1019,
+        "sha256": "a87ab11e316ec7c4ff28a5f9974b61ecb58aebeeb3f3227646d02ed3e7416e00"
+      }
+    },
+    {
+      "repo_path": "libraries/mlf-foundation/Bootstrap/IndexVec.hs",
+      "module": "Bootstrap.IndexVec",
+      "git_blob": "33a339e71ad7dede8c866a1903bf85bad1034d13",
+      "A": {
+        "bytes": 5573,
+        "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e"
+      }
+    },
+    {
+      "repo_path": "libraries/mlf-foundation/Bootstrap/Std.hs",
+      "module": "Bootstrap.Std",
+      "git_blob": "8e7a513d336815f313ab63be975ce4af3303554c",
+      "A": {
+        "bytes": 20088,
+        "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca"
+      }
+    },
+    {
+      "repo_path": "libraries/mlf-foundation/Bootstrap/Types.hs",
+      "module": "Bootstrap.Types",
+      "git_blob": "4acbd097fe227d6f01f9d8b728fd5cc22cce6500",
+      "A": {
+        "bytes": 12757,
+        "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596"
+      }
+    },
+    {
+      "repo_path": "libraries/mlf-foundation/Bootstrap/Version.hs",
+      "module": "Bootstrap.Version",
+      "git_blob": "31f40d68b05d57e6be08cbca26eef6ceae98d492",
+      "A": {
+        "bytes": 327,
+        "sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479"
+      }
+    }
+  ]
+}
