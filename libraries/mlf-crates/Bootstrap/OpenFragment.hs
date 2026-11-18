@@ -392,6 +392,7 @@ module Bootstrap.OpenFragment
   -- Storage framing has an independent version.
   wireFormat8 :: String;
   wireFormat8 = "MLF-OPEN-CRATE-2/checker-1";
+  wireFormat9 :: String;
   wireFormat9 = "MLF-OPEN-CRATE-3/checker-1";
   -- Candidate engineering resource class; qualification is required.
   packageWorkLimit :: Int;
