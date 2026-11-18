@@ -1,7 +1,7 @@
 name: Bounded Patricia comparison
 on:
   push:
-    branches: [perf/patricia-as-reservation-20261118]
+    branches: [perf/patricia-as-exact-image-20261118]
 permissions:
   contents: read
 concurrency:
@@ -9,16 +9,31 @@ concurrency:
   cancel-in-progress: false
 jobs:
   compare:
-    if: github.repository == 'mlf-lang/mlf' && github.ref == 'refs/heads/perf/patricia-as-reservation-20261118'
+    if: github.repository == 'mlf-lang/mlf' && github.ref == 'refs/heads/perf/patricia-as-exact-image-20261118'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
+      - name: Admit exact historical hosted image before building
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/patricia-admission" evidence
+          python3 - <<'PY'
+          import json, os, pathlib, sys
+          actual=os.environ.get('ImageVersion')
+          ok=actual=='20261111.370.1'
+          record={'expected_image':'20261111.370.1','actual_image':actual,'accepted':ok,'policy':'No automatic retry or fallback image.'}
+          pathlib.Path('evidence/image-admission.json').write_text(json.dumps(record,indent=2)+'\n')
+          pathlib.Path(os.environ['RUNNER_TEMP'],'patricia-admission','image-admission.json').write_text(json.dumps(record,indent=2)+'\n')
+          if not ok: sys.exit('STOP: exact runner image absent or mismatched')
+          PY
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           fetch-depth: 0
           persist-credentials: false
       - name: Isolated pinned source worktrees
         run: |
+          mkdir -p evidence
+          cp "$RUNNER_TEMP/patricia-admission/image-admission.json" evidence/
           git worktree add --detach old d8325d909c249fd82d4ad6173d44d8818cc6f8bf
           git worktree add --detach new ee495d5783fca3c26a3c0e659ebeac1bab76a37d
       - name: Official pinned GHC
@@ -35,6 +50,21 @@ jobs:
           test "$("$RUNNER_TEMP/ghc/bin/ghc" --numeric-version)" = 9.14.1
           echo "$RUNNER_TEMP/ghc/bin" >> "$GITHUB_PATH"
           rm "$archive"
+      - name: Admit exact GHC and global package dump before producers
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,pathlib,shutil,subprocess,sys
+          ghc=pathlib.Path(shutil.which('ghc')).resolve()
+          pkg=ghc.with_name('ghc-pkg')
+          if not pkg.exists():pkg=pathlib.Path(shutil.which('ghc-pkg')).resolve()
+          dump=subprocess.check_output([pkg,'dump','--global','--no-user-package-db'],text=True)
+          digest=hashlib.sha256(dump.encode()).hexdigest()
+          ghc_sha=hashlib.file_digest(ghc.open('rb'),'sha256').hexdigest()
+          records={'ghc_sha256':ghc_sha,'package_database_sha256':digest,'accepted':ghc_sha=='38115f3ce136434725893c3e009f1c1c510f3f48ac32a293befbb79bbec34697' and digest=='7c5c88d13d3d9843cd868e849c9dcadea1ebd194020a789da5cd9a9d6b93e0e3'}
+          pathlib.Path('evidence/toolchain-admission.json').write_text(json.dumps(records,indent=2)+'\n')
+          if not records['accepted']: sys.exit('STOP: GHC or global package dump mismatch')
+          PY
       - name: Serial producers
         run: |
           set -euo pipefail
