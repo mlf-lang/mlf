@@ -1,4 +1,4 @@
-"""Finite observer-only gate. No compiler benchmark, cache or native work."""
+"""Finite canonical memo candidate gate. No compiler benchmark or native work."""
 import json,re,sys,subprocess
 from bounded import *
 from instrument import instrument
@@ -32,10 +32,10 @@ try:
         cmd += [dst/'src/Main.hs',*objects,'-o',dst/'finite']
         sup.run(opt+'-ghc',cmd,dst,150,env)
         results=art/opt;results.mkdir()
-        sup.run(opt+'-cycle-control',['/usr/bin/python3',HERE/'cycle_gate.py',dst/'finite',art/(opt+'-cycle.json')],dst,15,env)
         log,_=sup.run(opt+'-finite',[dst/'finite'],results,15,env)
         need(P(str(log)+'.stdout').read_bytes()==b'PASS 24 canonical memo finite cases; no performance claim\n','marker')
         need(P(str(log)+'.stderr').read_bytes()==b'','fixture stderr')
+        sup.run(opt+'-cycle-control',['/usr/bin/python3',HERE/'cycle_gate.py',dst/'finite',art/(opt+'-cycle.json')],dst,15,env)
     left={p.name:p.read_bytes() for p in (art/'O0').iterdir()};right={p.name:p.read_bytes() for p in (art/'O2').iterdir()}
     need(len(left)==96 and left==right,'O0/O2 complete sidecar equality')
     need(inventory(root/'ghc',sup.check)==installed,'toolchain after')
