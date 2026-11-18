@@ -1,0 +1,38 @@
+{
+  "verdict": "GO_ONE_BOUNDED_PAIRED_SCREEN_AFTER_RESOURCE_CLEARANCE",
+  "changed_harness_files": [
+    "build.py",
+    "instrument.py",
+    "bounded.py",
+    "workflow.yml"
+  ],
+  "candidate_exact_finite_pass_source": true,
+  "candidate_sha256": "3b6e328f5940f4f2d06cda7b38d0e7366114d87cc2f6c71354acbfb433ea6ed2",
+  "reviewed_integration": [
+    "Only Solver candidate transformation; Graph alias-free edit absent",
+    "A/C same main fc300 and95home111pins;staged postchecks",
+    "Existing qualification+seed excluded from fixed ABBA samples;fresh cache/full output parity retained",
+    "Branch gate and workflow paths exactly new scope;caps unchanged"
+  ],
+  "python_syntax": "PASS",
+  "files": {
+    "artifact_checks.py": "daa4149bb42fa977fa4deb2d731d853f828d04d47096dc4b04974ba4fd0f403e",
+    "build.py": "b36eafacf86baa1fee6c80b5692c87cf7bcb6b8d315cfdb3825a49c75c754c4d",
+    "checker_selftest.py": "138cb892e4dfba03a3bb4450e8aa2c42f586ea0cb7b54bc0210d7819a5bac89d",
+    "crc_process_supervisor.py": "f7ef37453a151239e985bc2fbc95d89fb86c3206a5ed8dcf83f6e3b6820e955b",
+    "foundation-input-pins.json": "a6503e94fa1560177013b611b0fca169581d423eb0e459db7d860f6a84ced707",
+    "install.py": "60e5fc20eba3bdac1988ca0cfa5f4aa7356b6349827ac27fe1210a118f48f255",
+    "measure.py": "6b439101eec45da77161e4ff0302c1a6ab694046e9a990e6f7582922fd5b450e",
+    "preflight.py": "b2e18dd983d62e8ef6179014b4d56271719aff6b91acdc52d6759f578f5eae8f",
+    "query-contract.json": "f781734c47422eddac3c51ecaf8da60acc5c6579d31d83504398ede6570a9f2c",
+    "sampling_policy.py": "fdedd59fe050317110d73d7aec498722959eb757f2ecb25380ad06a66bf2360d",
+    "screen.py": "d6f929e250c9727037c36d0538a3a933b81072e0ed1e5b612dd00f2510caf041",
+    "source-pins.json": "441b9442a9b2d19d1cd342e6a6df1c98b2741624659546ca9353fcb8efb9f63f",
+    "instrument.py": "3441cfc85e91c40949a6d18622bc35f344ec87f8964caad11eaae6d6217eff23",
+    "bounded.py": "d6179dbe4c9534187dd821005c565de6980cab57c005839f50ac7a96cca58bb4",
+    "workflow.yml": "25c2ea5b81141952f17916c2630f662685d942636e718ed4b47c6d1af29c42b1"
+  },
+  "finite_gate_run": 44234494887,
+  "performance_claim": false,
+  "merge_approval": false
+}
