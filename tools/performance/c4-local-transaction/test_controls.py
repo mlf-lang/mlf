@@ -66,7 +66,7 @@ def map_successor_inputs():
     adapter = subprocess.check_output([*git, 'show',
         '798282547f3169d6d729d17c088f5cc29ac3eab0:' + RECONCILIATION_PATH], timeout=30)
     live = (root / RECONCILIATION_PATH).read_bytes()
-    C.require(C.sha_bytes(live) == 'd941f2160e0054b6214fe2f8cff93e237ca7ae24ee73bea4e9cb293766df8831',
+    C.require(C.sha_bytes(live) == '2ed35b12160cce372c25bf6d6cf7391e7383004a8119cc08c0ffb065bed4ef7e',
               'fixed compiler successor manifest')
     spec = json.loads(live)
     C.require(MAP_PATH not in spec['inferred_chain_transition']['changes'] and

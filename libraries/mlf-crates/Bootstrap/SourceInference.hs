@@ -8,6 +8,7 @@ module Bootstrap.SourceInference where {
   import Bootstrap.Std;
   import Bootstrap.Fresh;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.Set as Set;
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Classes as Classes;
@@ -550,7 +551,8 @@ module Bootstrap.SourceInference where {
   -- small unshared tree we can prove both identity and all wire bounds in
   -- one bounded scan. Shared/deep inputs still use the exact DAG planner.
   smallFinalValue :: Wire.Value -> Maybe Bool;
-  smallFinalValue raw = let {
+  smallFinalValue = smallFinalTree False;
+  smallFinalTree stored raw = let {
     limits = Wire.defaultLimits;
     -- Bound expanded nodes independently of text bytes. A symbol can occupy
     -- many bytes while contributing only one node and one symbol.
@@ -564,15 +566,42 @@ module Bootstrap.SourceInference where {
     scalars = min ((nodes - 1) / 4) (Wire.maxSymbolBytes limits / 4);
     chargeText = \text available -> let { bytes = stringUtf8Length text } in
         if stringLength text > scalars || bytes > available then Nothing else Just (available - bytes)
-  } in finalGeometryTasks chargeText (min 256 (Wire.maxDepth limits)) [(,,) 1 False [raw]] nodes work False;
+  } in finalGeometryWith stored chargeText (min 256 (Wire.maxDepth limits)) [(,,) 1 False [raw]] nodes work False;
   -- Preserve the scalar-weighted budget of the existing task-list entry point.
   smallFinalTasks pending remaining maxDepth nested = let {
     chargeText = \text available -> let { count = stringLength text } in
       if count > available / 4 then Nothing else Just (available - 4 * count)
   } in finalGeometryTasks chargeText maxDepth pending remaining remaining nested;
+  -- A template has no computation nodes. Charge every logical occurrence
+  -- using the same depth, node, text and UTF-8 limits as the ordinary tree.
+  -- This view comes only from a Fragment's own checked term.
+  applicationGeometry fields chargeText nodeLimit workLimit = case fields of {
+    [Wire.VNode 1 rows,_,Wire.VInt root] -> let {
+      collect i seen pending = case pending of {
+        [] -> IM.lookup root seen;
+        (:) row rest -> let {
+          save d n w = if n > nodeLimit || w > workLimit then Nothing else
+            let { next = IM.insert i ((,,) d n w) seen } in seq d (seq n (seq w (seq next (collect (i + 1) next rest))))
+        } in case row of {
+          Wire.VNode 87 [] -> save 2 2 2;
+          Wire.VNode 70 [Wire.VNode 31 [Wire.VInt _,Wire.VText hint]] -> case chargeText hint (workLimit - 4) of {
+            Just remaining -> save 3 4 (workLimit - remaining); Nothing -> Nothing
+          };
+          Wire.VNode 81 [Wire.VNode 32 [Wire.VInt _],Wire.VNode 1 []] -> save 3 4 4;
+          Wire.VNode 88 [Wire.VInt l,Wire.VInt r] -> case (,) (IM.lookup l seen) (IM.lookup r seen) of {
+            (,) (Just ((,,) ld ln lw)) (Just ((,,) rd rn rw)) -> save (1 + max ld rd) (1 + ln + rn) (1 + lw + rw);
+            _ -> Nothing
+          };
+          _ -> Nothing
+        }
+      }
+    } in collect 0 IM.empty rows;
+    _ -> Nothing
+  };
   finalGeometryTasks :: (String -> Int -> Maybe Int) -> Int ->
     [] ((,,) Int Bool ([] Wire.Value)) -> Int -> Int -> Bool -> Maybe Bool;
-  finalGeometryTasks chargeText maxDepth = let {
+  finalGeometryTasks = finalGeometryWith False;
+  finalGeometryWith stored chargeText maxDepth = let {
     visit pending nodes work nested = case pending of {
       [] -> Just nested;
       (:) ((,,) depth parentThen values) rest -> case values of {
@@ -583,7 +612,11 @@ module Bootstrap.SourceInference where {
           Wire.VText text -> case chargeText text next of {
             Nothing -> Nothing; Just available -> visit tail left available nested
           };
-          Wire.VNode tag children -> if tag < 0 || tag > 2147483647 then Nothing else let {
+          Wire.VNode tag children -> if stored && tag == 86 then case applicationGeometry children chargeText nodes work of {
+            Just ((,,) height size cost) -> if height > maxDepth - depth + 1 then Nothing
+              else visit tail (nodes - size) (work - cost) nested;
+            Nothing -> Nothing
+          } else if tag < 0 || tag > 2147483647 then Nothing else let {
             changed = nested || (parentThen && tag == 58)
           } in seq changed (visit ((:) ((,,) (depth + 1) (tag == 58) children) tail) left next changed);
           _ -> visit tail left next nested
@@ -1731,9 +1764,13 @@ module Bootstrap.SourceInference where {
       }
     }
   };
-  canonicalOpen object = case smallFinalValue (Open.bodyValue object) of {
-    Just False -> Right object;
-    _ -> canonicalOpenPlanned object
+  canonicalOpen object = let {
+    ordinary = case smallFinalValue (Open.bodyValue object) of {
+      Just False -> Right object; _ -> canonicalOpenPlanned object
+    }
+  } in case Open.storageValue object of {
+    Nothing -> ordinary;
+    Just stored -> case smallFinalTree True stored of { Just False -> Right object; _ -> ordinary }
   };
   canonicalOpenPlanned object = do {
     plan <- Wire.prepareGraphPlan Wire.defaultLimits [Open.bodyValue object];

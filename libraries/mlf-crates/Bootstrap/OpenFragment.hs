@@ -4,7 +4,7 @@
              MultiParamTypeClasses, OverloadedStrings #-}
 module Bootstrap.OpenFragment
   (Environment, environment, declarations, dataEnvironment, Fragment, check, fromChecked,
-   parameters, body, bodyValue, bindings, usedParameters, context, fingerprint,
+   parameters, body, bodyValue, storageValue, bindings, usedParameters, context, fingerprint,
    normalize, withNameHints, encodeBody, encodeRaw, decodeTrusted, decodeTrustedIds, audit, closedTerm, fresh,
    Package, makePackage, readPackage, readPackageProfiled, packageFragments, packageBytes,
    packageHash, packageMetadata, packageFamily, declarationValue, compatibilityIdentity,
@@ -61,7 +61,7 @@ module Bootstrap.OpenFragment
   data Fragment = Fragment Environment ([] ((,) XName XType)) XTerm
     ([] ((,) XName XType)) ([] XName) String W.Value (Maybe W.Value);
   fragmentWith env ps term bs used saved =
-    let { raw = Structure.toXTerm term } in Fragment env ps term bs used saved raw (compactTerm raw);
+    let { raw = Structure.toXTerm term } in Fragment env ps term bs used saved raw (compactTerm term);
   context (Fragment env _ _ _ _ _ _ _) = env;
   parameters (Fragment _ ps _ _ _ _ _ _) = ps;
   body (Fragment _ _ term _ _ _ _ _) = term;
@@ -84,7 +84,7 @@ module Bootstrap.OpenFragment
   } in seq next (if count == 0 then LiteralStream next 1 value value 0 tail
     else if count == 1 || diff == step then seq diff (seq following (LiteralStream next following first value diff tail))
     else LiteralStream next 1 value value 0 (finishRun count first last step tail));
-  data PatternTask = PatternTerm Int W.Value | PatternApp;
+  data PatternTask = PatternTerm Int XTerm | PatternApp;
   expressionPattern value = let {
     run tasks results table@(PatternTable count entries pairs names primitives) stream fuel =
       if fuel < 0 then Nothing else case tasks of {
@@ -115,17 +115,17 @@ module Bootstrap.OpenFragment
             save node ps ns ms = if count >= 512 then Nothing else let { following = count + 1 } in
               seq following (atom count (PatternTable following ((:) node entries) ps ns ms) stream)
           } in case term of {
-            W.VNode 72 [left,right] -> run ((:) (PatternTerm (depth + 1) left)
+            XApp left right -> run ((:) (PatternTerm (depth + 1) left)
               ((:) (PatternTerm (depth + 1) right) ((:) PatternApp rest))) results table stream nextFuel;
-            W.VNode 77 [W.VInt integer] -> let { next = addLiteral integer stream } in seq next (atom 0 table next);
-            W.VNode 70 [W.VNode 31 [W.VInt i,W.VText hint]] -> let { key = (,) i hint } in
+            XIntTerm integer -> let { next = addLiteral integer stream } in seq next (atom 0 table next);
+            XVarTerm (XName i hint) -> let { key = (,) i hint } in
               case M.lookup (comparePair compareInt compareString) key names of {
                 Just index -> atom index table stream;
-                Nothing -> save term pairs (M.insert (comparePair compareInt compareString) key count names) primitives
+                Nothing -> save (Structure.toXTerm term) pairs (M.insert (comparePair compareInt compareString) key count names) primitives
               };
-            W.VNode 81 [W.VNode 32 [W.VInt code],W.VNode 1 []] -> case IM.lookup code primitives of {
+            XPrimitive p [] -> let { code = Structure.primitiveCode p } in case IM.lookup code primitives of {
               Just index -> atom index table stream;
-              Nothing -> save term pairs names (IM.insert code count primitives)
+              Nothing -> save (Structure.toXTerm term) pairs names (IM.insert code count primitives)
             };
             _ -> Nothing
           }
@@ -133,21 +133,32 @@ module Bootstrap.OpenFragment
       }
   } in run [PatternTerm 1 value] [] (PatternTable 1 [W.VNode 87 []] IM.empty M.empty IM.empty)
     (LiteralStream 0 0 0 0 0 []) 1048576;
-  compactTerm term = case term of {
-    W.VNode 72 _ -> expressionPattern term;
-    W.VNode tag fields -> if tag == 70 || (tag >= 77 && tag <= 82) then Nothing
-      else let {
-        replace input = case input of {
-          [] -> Nothing;
-          (:) value rest -> case compactTerm value of {
-            Just packed -> Just ((:) packed (map (\v -> fromMaybe v (compactTerm v)) rest));
-            Nothing -> mapMaybeHead value (replace rest)
-          }
-        };
-        mapMaybeHead value remaining = case remaining of {
-          Nothing -> Nothing; Just tail -> Just ((:) value tail)
+  compactTerm term = let {
+    still value = (,) value Nothing;
+    child value = (,) (Structure.toXTerm value) (compactTerm value);
+    node tag fields = let {
+      replace rest = case rest of {
+        [] -> Nothing;
+        (:) ((,) raw changed) tail -> case changed of {
+          Nothing -> mapOptional ((:) raw) (replace tail);
+          Just updated -> Just ((:) updated (map (\((,) plain option) -> fromMaybe plain option) tail))
         }
-      } in case replace fields of { Nothing -> Nothing; Just next -> Just (W.VNode tag next) };
+      }
+    } in mapOptional (W.VNode tag) (replace fields);
+    binding row@((,,) name ty body) = (,) (Structure.toTriple Structure.toXName Structure.toXType Structure.toXTerm row)
+      (node 3 [still (Structure.toXName name),still (Structure.toXType ty),child body]);
+    alternative row@(XAlternative pat body) = (,) (Structure.toXAlternative row)
+      (node 92 [still (Structure.toXPattern pat),child body]);
+    list values = (,) (W.VNode 1 (map fst values)) (node 1 values)
+  } in case term of {
+    XApp _ _ -> expressionPattern term;
+    XAbs n ty b -> node 71 [still (Structure.toXName n),still (Structure.toXType ty),child b];
+    XTypeAbs v ty b -> node 73 [still (Structure.toXTyVar v),still (Structure.toXType ty),child b];
+    XTypeApp f p -> node 74 [child f,still (Structure.toXComputation p)];
+    XLet n rhs b -> node 75 [still (Structure.toXName n),child rhs,child b];
+    XLetRec defs b -> node 76 [list (map binding defs),child b];
+    XCase scrut ty alts -> node 83 [child scrut,still (Structure.toXType ty),list (map alternative alts)];
+    XWithData ds b -> node 84 [still (Structure.toList Structure.toDataDecl ds),child b];
     _ -> Nothing
   };
   bindings (Fragment _ _ _ bs _ _ _ _) = bs;
