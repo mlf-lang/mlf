@@ -48,13 +48,14 @@ entry=OUT/'Main.hs';entry.write_text(fixture);record['fixture_sha256']=sha(entry
 import inspect,time,resource
 ref_bins={'old':'d90ecca441c0c1a00c224639b335124ec4802d97f99e7d44eea9ccce3a715c8d','new':'8845fbb4729e555157c2cd3ca45d2981741bf8308bbdbef6ece74c85a5d90245'}
 assert record['fixture_sha256']=='e7bc0d6bdd6ec6ac1a7d9b2cd6f71cb398c430f3029c870057d096efff2aaa82'
-locked_inputs={"old":{"object_inputs":"3d4e55562e15482eb19265820d648d8f7fe261e4700c585bdd4fe02228d7b779","resolved_modules":"dc980d404188953009eba29c04a7fa856be709708e04923fcfd6416e73da7ae8","resolved_host_modules":"f6bb370236c702e1282baca2ada46b5944df522bb1eca16a28ca5f4980d35d7f","configuration_inputs":"ec04b1382d64c5b43ffa6ffd2b663e1d94e216006526695fef1d28869cb36501","shared_inputs":"1c1b747c167c5936b8856e89d0280789622d4538173a93306464a2ae04b8d2f0","host_inputs":"a8a09986e2e01b941741151e12e7a2cbf8665996bb6d53f78561b556cfa28e04","flags":"50e344ad68ebb24127b0b8e73be203817bc964f033bcf3fbcf1d43afe166258f","ghc":"8057b580fb047c5302ab1291596cf79a30e906f21c4cd223ea2d5e7c71ada348","cc":"f0eaee113e92135d35342b0994c6a039894e5da8991860c3f7c11c6202c4afa3","installed_dependencies":"6588b2ecaea0410f237fd3a23d4a78073940ca89304ea83e1596ff16ee6b9572","toolchain":"08c0814ca993e4904b1087c717838ef95273f955fdc71432df2b46b8d0d66301"},"new":{"object_inputs":"26215720f9596e5462c611c0254498fd8c1a4ede4b6b9281666c28d40c41243a","resolved_modules":"2a65c9034307623cc7d411925648209d56021b9657e01341b9768259b6f46a6a","resolved_host_modules":"7d6328f49a88fc532323ac3be760d3ff3fa37bcee9fb50bd395650d664de8b1e","configuration_inputs":"d14ae947e683961893ca57020002c71042fa797a69dd1a63eb890994aa5179cd","shared_inputs":"36c769215036a3f72d32d82b54193304a291930b2e967dff63cbc10509927bdb","host_inputs":"ea210294596583ac33ff4dbedb5d5e82a0c4c30d7a48cf9d31a962f2bd9c3694","flags":"0f373f3be1a95bf7d1a0a00fcd9e8dc6be3435188249f2f67ad23208db703e8c","ghc":"8057b580fb047c5302ab1291596cf79a30e906f21c4cd223ea2d5e7c71ada348","cc":"f0eaee113e92135d35342b0994c6a039894e5da8991860c3f7c11c6202c4afa3","installed_dependencies":"6588b2ecaea0410f237fd3a23d4a78073940ca89304ea83e1596ff16ee6b9572","toolchain":"08c0814ca993e4904b1087c717838ef95273f955fdc71432df2b46b8d0d66301"}}
+locked_inputs={"old":{"object_inputs":"3d4e55562e15482eb19265820d648d8f7fe261e4700c585bdd4fe02228d7b779","resolved_modules":"dc980d404188953009eba29c04a7fa856be709708e04923fcfd6416e73da7ae8","resolved_host_modules":"f6bb370236c702e1282baca2ada46b5944df522bb1eca16a28ca5f4980d35d7f","configuration_inputs":"ec04b1382d64c5b43ffa6ffd2b663e1d94e216006526695fef1d28869cb36501","shared_inputs":"1c1b747c167c5936b8856e89d0280789622d4538173a93306464a2ae04b8d2f0","host_inputs":"a8a09986e2e01b941741151e12e7a2cbf8665996bb6d53f78561b556cfa28e04","flags":"50e344ad68ebb24127b0b8e73be203817bc964f033bcf3fbcf1d43afe166258f","ghc":"8057b580fb047c5302ab1291596cf79a30e906f21c4cd223ea2d5e7c71ada348","cc":"f0eaee113e92135d35342b0994c6a039894e5da8991860c3f7c11c6202c4afa3","installed_dependencies":"6588b2ecaea0410f237fd3a23d4a78073940ca89304ea83e1596ff16ee6b9572","toolchain":"ac75b1bd6f94190ba6e09c5d687876f57d229bf992a3678fe2104e311814ddfa"},"new":{"object_inputs":"26215720f9596e5462c611c0254498fd8c1a4ede4b6b9281666c28d40c41243a","resolved_modules":"2a65c9034307623cc7d411925648209d56021b9657e01341b9768259b6f46a6a","resolved_host_modules":"7d6328f49a88fc532323ac3be760d3ff3fa37bcee9fb50bd395650d664de8b1e","configuration_inputs":"d14ae947e683961893ca57020002c71042fa797a69dd1a63eb890994aa5179cd","shared_inputs":"36c769215036a3f72d32d82b54193304a291930b2e967dff63cbc10509927bdb","host_inputs":"ea210294596583ac33ff4dbedb5d5e82a0c4c30d7a48cf9d31a962f2bd9c3694","flags":"0f373f3be1a95bf7d1a0a00fcd9e8dc6be3435188249f2f67ad23208db703e8c","ghc":"8057b580fb047c5302ab1291596cf79a30e906f21c4cd223ea2d5e7c71ada348","cc":"f0eaee113e92135d35342b0994c6a039894e5da8991860c3f7c11c6202c4afa3","installed_dependencies":"6588b2ecaea0410f237fd3a23d4a78073940ca89304ea83e1596ff16ee6b9572","toolchain":"ac75b1bd6f94190ba6e09c5d687876f57d229bf992a3678fe2104e311814ddfa"}}
 
 import re
 # This is an independent new-host experiment, not the historic executable cohort.
 def canon(x):return hashlib.sha256(json.dumps(x,sort_keys=True,separators=(',',':'),ensure_ascii=True).encode()).hexdigest()
 def file_sha(p):
     with open(p,'rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
+current_epoch_files={'/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2': '5fc0940888e9d2e1a00e66d6b1a559c36364ee867683652e1074fa576952cc3f', '/usr/lib/x86_64-linux-gnu/libc.so.6': '755a371e86cc9f564ab54f66140747700fb0a103f698f659f2060f707897e09a', '/usr/lib/x86_64-linux-gnu/libm.so.6': '5dcc4d25466e29ca390ed6fabb371c69b65dff6fa4e91c34561057a020d6994a'}
 def runtime_manifest(exe):
     # Use the trusted, just-built program and clean loader environment. Identify ELF interpreter and ELF runtime closure.
     if any(os.environ.get(k) for k in ('LD_PRELOAD','LD_AUDIT','LD_LIBRARY_PATH')):raise RuntimeError('nonempty loader override')
@@ -71,13 +72,17 @@ def runtime_manifest(exe):
     ph=subprocess.check_output(['/usr/bin/readelf','-lW',str(exe)],text=True,env=env,timeout=15)
     ld=re.search(r'Requesting program interpreter: ([^]]+)\]',ph)
     if not ld or str(pathlib.Path(ld.group(1)).resolve(strict=True)) not in files:raise RuntimeError('missing interpreter')
+    for path,expected in current_epoch_files.items():
+        if file_sha(path)!=expected:raise RuntimeError('frozen same-host epoch file differs: '+path)
     return {'binary_sha256':file_sha(exe),'interpreter':str(pathlib.Path(ld.group(1)).resolve()),'loaded_elf_dependencies':files}
-cohort={'epoch':'new-runner independent; never substitute for historical hashes','image':os.environ.get('ImageVersion'),'run_id':os.environ.get('GITHUB_RUN_ID'),'members':{}}
+cohort={'epoch':'44392609307 producer-toolchain cohort, independent; never substitute for historical runtime identity','image':os.environ.get('ImageVersion'),'run_id':os.environ.get('GITHUB_RUN_ID'),'members':{}}
 if not cohort['image'] or not cohort['run_id']:raise RuntimeError('missing environment identity')
+expected_epoch_native_elf={'old': 'fbc253d428204532bff22c36c1361969c8f4e73174bf15945127c6ca030e1467', 'new': '50892889234f62276128a542a718f0c74ce7cdf9f06cd62fa094adf18faa0677'}
 for l,r in roots.items():
     receipt=json.loads((r/'.mlf-build/shared-ghc/receipt.json').read_text())
     actual={k:canon(receipt[k]) for k in locked_inputs[BASE[l]]}
     if l not in DONOR:
+        if record[l]['binary_sha256']!=expected_epoch_native_elf[l]:raise RuntimeError('new epoch native executable differs: '+l)
         if actual!=locked_inputs[l]:raise RuntimeError('pinned native intermediate mismatch: '+l)
     else:
         base=BASE[l];donor=DONOR[l];baseline=json.loads((roots[base]/'.mlf-build/shared-ghc/receipt.json').read_text())

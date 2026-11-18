@@ -1,7 +1,7 @@
 name: Bounded Patricia comparison
 on:
   push:
-    branches: [perf/patricia-surface-derived-20261118]
+    branches: [perf/patricia-surface-epoch2-20261118]
 permissions:
   contents: read
 concurrency:
@@ -9,7 +9,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   compare:
-    if: github.repository == 'mlf-lang/mlf' && github.ref == 'refs/heads/perf/patricia-surface-derived-20261118'
+    if: github.repository == 'mlf-lang/mlf' && github.ref == 'refs/heads/perf/patricia-surface-epoch2-20261118'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -45,6 +45,10 @@ jobs:
           test "$("$RUNNER_TEMP/ghc/bin/ghc" --numeric-version)" = 9.14.1
           echo "$RUNNER_TEMP/ghc/bin" >> "$GITHUB_PATH"
           rm "$archive"
+      - name: Exact new epoch gate after package setup
+        run: |
+          set -euo pipefail
+          printf '%s\n' '5fc0940888e9d2e1a00e66d6b1a559c36364ee867683652e1074fa576952cc3f  /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2' '755a371e86cc9f564ab54f66140747700fb0a103f698f659f2060f707897e09a  /usr/lib/x86_64-linux-gnu/libc.so.6' '5dcc4d25466e29ca390ed6fabb371c69b65dff6fa4e91c34561057a020d6994a  /usr/lib/x86_64-linux-gnu/libm.so.6' | sha256sum --check --strict | tee evidence/epoch2-preflight.log
       - name: Serial producers
         run: |
           set -euo pipefail
