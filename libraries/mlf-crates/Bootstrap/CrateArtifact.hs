@@ -4129,8 +4129,7 @@ module Bootstrap.CrateArtifact where {
   linkOpenFragment allowedLayouts ((,) indexed (FragmentState serial available bodies allData groups))
       (IndexedFragment group fragment parameters members) = do {
     ensure (not (Set.member compareString group groups)) "duplicate crate inference fragment";
-    let { renamed = Open.fresh serial fragment; fresh = snd renamed;
-      ds = Open.declarations (Open.context fresh) };
+    let { ds = Open.declarations (Open.context fragment) };
     mapM_ (\d -> case M.lookup compareString (D.datatypeName d) allowedLayouts of {
       Nothing -> Left ("open fragment has undeclared datatype: " ++ D.datatypeName d);
       Just expected -> ensure (eqString (D.prettyDeclaration d) (fst expected)) "open fragment datatype layout mismatch"
@@ -4141,15 +4140,18 @@ module Bootstrap.CrateArtifact where {
         ensure (T.alphaEq ty expected) ("open fragment import type mismatch: " ++ X.nameHint n);
         Right ((,) n actual)
       }
-    }) (zip parameters (Open.parameters fresh));
-    let { provided = zip members (Open.bindings fresh) };
-    ensure (all (\entry -> not (IM.member (V.toInt (fst entry)) indexed)) provided) "duplicate crate symbol";
-    let { substitution = M.fromList X.compareName replacements;
-      linked = Separate.mapTerm (\n -> M.findWithDefault X.compareName n n substitution) (\a -> a) (Open.body fresh);
-      updated = foldlStrict (\table ((,) d binding) -> IM.insert (V.toInt d) binding table) indexed provided;
-      added = M.fromList compareString (map (\((,) n ty) -> (,) (X.nameHint n) ((,) n ty)) (Open.bindings fresh)) };
-    combined <- foldEither Separate.mergeDeclaration allData ds;
-    Right ((,) updated (FragmentState (fst renamed) (M.union compareString added available) ((:) linked bodies)
-      combined (Set.insert compareString group groups)))
+    }) (zip parameters (Open.parameters fragment));
+    let { substitution = M.fromList X.compareName replacements };
+    case Open.linkBody serial substitution fragment of {
+      (,,) next exports linked -> do {
+        let { provided = zip members exports };
+        ensure (all (\entry -> not (IM.member (V.toInt (fst entry)) indexed)) provided) "duplicate crate symbol";
+        let { updated = foldlStrict (\table ((,) d binding) -> IM.insert (V.toInt d) binding table) indexed provided;
+          added = M.fromList compareString (map (\((,) n ty) -> (,) (X.nameHint n) ((,) n ty)) exports) };
+        combined <- foldEither Separate.mergeDeclaration allData ds;
+        Right ((,) updated (FragmentState next (M.union compareString added available) ((:) linked bodies)
+          combined (Set.insert compareString group groups)))
+      }
+    }
   };
 }

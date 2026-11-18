@@ -5,7 +5,7 @@
 module Bootstrap.OpenFragment
   (Environment, environment, declarations, dataEnvironment, Fragment, check, fromChecked,
    parameters, body, bodyValue, storageValue, bindings, usedParameters, context, fingerprint,
-   normalize, withNameHints, encodeBody, encodeRaw, decodeTrusted, decodeTrustedIds, audit, closedTerm, fresh,
+   normalize, withNameHints, encodeBody, encodeRaw, decodeTrusted, decodeTrustedIds, audit, closedTerm, fresh, linkBody,
    Package, makePackage, readPackage, readPackageProfiled, packageFragments, packageBytes,
    packageHash, packageMetadata, packageFamily, declarationValue, compatibilityIdentity,
    MetadataReceipt, makeMetadataReceipt, metadataReceiptHash, withMetadataReceipt, cachedMetadata) where {
@@ -362,17 +362,25 @@ module Bootstrap.OpenFragment
   };
   -- Injective alpha-renaming preserves this exact checked environment/body.
   -- Imported identities participate even if the body never uses them.
-  fresh serial fragment = let {
+  withFreshNames serial fragment action = let {
     ids = IS.toList (foldl (\seen p -> IS.insert (X.nameId (fst p)) seen)
       (Separate.termIdentities (body fragment) IS.empty) (parameters fragment));
     replacements = IM.fromList (zip ids (range serial (advanceIdentity serial (length ids) - 1)));
     name = \(XName n hint) -> XName (IM.get n replacements) hint;
-    variable = \(XTyVar n) -> XTyVar (IM.get n replacements);
+    variable = \(XTyVar n) -> XTyVar (IM.get n replacements)
+  } in action (advanceIdentity serial (length ids)) name variable;
+  freshExports name fragment = map (\((,) n ty) -> (,) (name n) (Separate.normalType ty)) (bindings fragment);
+  fresh serial fragment = withFreshNames serial fragment (\next name variable -> let {
     ps = map (\((,) n ty) -> (,) (name n) ty) (parameters fragment);
     term = Separate.mapTerm name variable (body fragment);
-    bs = map (\((,) n ty) -> (,) (name n) (Separate.normalType ty)) (bindings fragment);
+    bs = freshExports name fragment;
     renamed = checkedFragment (context fragment) ps term bs (map name (usedParameters fragment))
-  } in (,) (advanceIdentity serial (length ids)) renamed;
+  } in (,) next renamed);
+  -- Parameters are keyed by their original fragment identities. All other
+  -- term and type identities receive the same injective renaming as fresh.
+  linkBody serial imports fragment = withFreshNames serial fragment (\next name variable -> let {
+    resolve n = M.findWithDefault X.compareName (name n) n imports
+  } in (,,) next (freshExports name fragment) (Separate.mapTerm resolve variable (body fragment)));
   -- The environment and external types are supplied from verified shared
   -- dependency nodes. This record contains their local identities, not copies.
   encodeBody stage name fragment = bodyRecord 400 stage name fragment (bodyValue fragment);
