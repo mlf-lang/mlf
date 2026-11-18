@@ -22,7 +22,7 @@ module Bootstrap.Dependency where {
   valueNames observation = map termRefName (valueRefs observation);
   expressionNamedReads expression = mapMaybe (\ref -> case ref of {
     LexicalRef n -> Just n; DeclRef _ _ -> Nothing
-  }) (valueRefs (observeExpression expression));
+  }) (valueOccurrences True False expression);
   typeNames (Observation _ types _ _) = types;
   constructorNames (Observation _ _ constructors _) = constructors;
   classNames (Observation _ _ _ classes) = classes;
@@ -95,7 +95,25 @@ module Bootstrap.Dependency where {
   observeExpressionWith includeCandidates = observeSyntax includeCandidates False;
   -- Prepared input serialization includes declaration markers and their
   -- enclosed occurrences. Dependency selection uses only free references.
-  querySyntaxRefs expression = valueRefs (observeSyntax True True expression);
+  querySyntaxRefs = valueOccurrences True True;
+  -- Keep the observation constructor's demand separate from the reference
+  -- list. A scoped subtree may produce a lazy filtered list of candidates.
+  data ValueOccurrences = ValueOccurrences ([] TermRef);
+  valueOccurrences includeCandidates inventory expression = let {
+    empty = ValueOccurrences [];
+    child body = case collect body empty of { ValueOccurrences refs -> Observation refs [] [] [] };
+    collect body rest = case body of {
+      SSourceDefinition inner -> collect inner rest; SCallSite _ _ inner -> collect inner rest;
+      SApp f a -> collect f (collect a rest);
+      SGlobal i n -> case rest of { ValueOccurrences refs -> ValueOccurrences ((:) (DeclRef i n) refs) };
+      SVar n -> case rest of { ValueOccurrences refs -> ValueOccurrences ((:) (LexicalRef (lexicalValueName n)) refs) };
+      SConstructor _ -> rest; SPrimitive _ -> rest; SIntLit _ -> rest; SBoolLit _ -> rest;
+      SStringLit _ -> rest; SDoubleLit _ -> rest;
+      _ -> case observeScopedWith child includeCandidates inventory body of {
+        Observation values _ _ _ -> case rest of { ValueOccurrences refs -> ValueOccurrences (append values refs) }
+      }
+    }
+  } in case collect expression empty of { ValueOccurrences refs -> refs };
   observeSyntax includeCandidates inventory expression =
     observeBefore includeCandidates inventory expression emptyObservation;
   -- Application subtrees contribute ordered occurrences to four independent lists.
@@ -111,8 +129,9 @@ module Bootstrap.Dependency where {
     SPrimitive _ -> rest; SIntLit _ -> rest; SBoolLit _ -> rest; SStringLit _ -> rest; SDoubleLit _ -> rest;
     _ -> merge (observeScoped includeCandidates inventory expression) rest
   };
-  observeScoped includeCandidates inventory expression =
-    let { child = observeSyntax includeCandidates inventory } in case expression of {
+  observeScoped includeCandidates inventory =
+    observeScopedWith (observeSyntax includeCandidates inventory) includeCandidates inventory;
+  observeScopedWith child includeCandidates inventory expression = case expression of {
       SSharedBind pattern action body binding failure ->
         merge (observePattern pattern)
           (merge (bindObservation (S.fromList compareString (Desugar.patternVariables pattern)) (child body))
@@ -169,7 +188,7 @@ module Bootstrap.Dependency where {
   expressionGlobalIds :: SExpr -> [] (V.Index Declaration);
   expressionGlobalIds expression = mapMaybe (\ref -> case ref of {
     LexicalRef _ -> Nothing; DeclRef i _ -> Just i
-  }) (valueRefs (observeExpression expression));
+  }) (valueOccurrences True False expression);
   observeDeclaration ((,,) _ annotation body) =
     normalize (merge (observeOptional annotation) (observeExpression body));
   declarationObservations values =

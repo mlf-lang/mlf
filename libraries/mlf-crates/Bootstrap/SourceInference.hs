@@ -1259,7 +1259,7 @@ module Bootstrap.SourceInference where {
   declarationRefs scope refs = mapMaybe (\ref -> case ref of {
     DeclRef i _ -> Just i; LexicalRef n -> lookupDecl scope n
   }) refs;
-  expressionDeclarations scope body = declarationRefs scope (Dependency.valueRefs (Dependency.observeExpression body));
+  expressionDeclarations scope body = declarationRefs scope (Dependency.valueOccurrences True False body);
   selectedContractIds scope owners members = let {
     -- Only the current winner for each spelling can be ignored on a repeat.
     -- A distinct slot may shadow it, then the original slot may appear again.
