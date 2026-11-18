@@ -49,7 +49,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p evidence
-          python3 -B tools/shared/crc_process_supervisor.py --receipt evidence/all-builds-supervisor.json --work-seconds 3480 --cleanup-seconds 10 "$(command -v bash)" tools/research/patricia-surface-builds.sh
+          python3 -B tools/shared/crc_process_supervisor.py --receipt evidence/all-builds-supervisor.json --work-seconds 1800 --cleanup-seconds 10 "$(command -v bash)" tools/research/patricia-surface-builds.sh
       - name: Native controls then reciprocal Surface swaps at 6 GiB
         run: python3 -B tools/shared/crc_process_supervisor.py --receipt evidence/comparison-supervisor.json --work-seconds 1800 --cleanup-seconds 10 "$(command -v python3)" -B tools/research/patricia-comparison-20261118.py
       - name: Preserve all diagnostic evidence
