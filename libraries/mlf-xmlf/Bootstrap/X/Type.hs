@@ -161,8 +161,9 @@ module Bootstrap.X.Type where {
   kindOf :: DataEnv -> Map XTyVar XType -> XType -> Either String Kind;
   kindOf ds bounds ty =
     do {
+      -- Set traversal supplies each free variable once, in environment key order.
       kinds <- L.mapM (kindBinding ds bounds S.empty) (S.toList (freeVars ty));
-      kindIn ds (M.fromList compareTyVar kinds) ty
+      kindIn ds (M.fromDistinctAscList kinds) ty
     };
   kindBinding :: DataEnv ->
                  Map XTyVar XType -> Set XTyVar -> XTyVar -> Either String ((,) XTyVar Kind);
@@ -182,7 +183,7 @@ module Bootstrap.X.Type where {
                kinds <-
                  L.mapM (kindBinding ds bounds (S.insert compareTyVar a seen))
                    (S.toList (freeVars b));
-               kindIn ds (M.fromList compareTyVar kinds) b
+               kindIn ds (M.fromDistinctAscList kinds) b
              }
          };
   kindIn :: DataEnv -> Map XTyVar Kind -> XType -> Either String Kind;
