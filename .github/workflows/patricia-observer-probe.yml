@@ -19,7 +19,7 @@ jobs:
       - name: Supervised synthetic capability probe only
         run: |
           mkdir -p evidence
-          python3 -B tools/shared/crc_process_supervisor.py --receipt evidence/probe-supervisor.json --work-seconds 30 --cleanup-seconds 5 "$(command -v bash)" tools/research/patricia-perf-capability.sh
+          python3 -B tools/shared/crc_process_supervisor.py --receipt evidence/probe-supervisor.json --work-seconds 30 --cleanup-seconds 5 "$(command -v setpriv)" --no-new-privs "$(command -v bash)" tools/research/patricia-perf-capability.sh
       - name: Preserve probe evidence
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f

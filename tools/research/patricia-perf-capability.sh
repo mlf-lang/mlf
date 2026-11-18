@@ -11,6 +11,7 @@ exec > "$d/probe.log" 2>&1
 echo "scope=owned synthetic process only; no compiler build or benchmark"
 echo "effective_uid=$(id -u)"
 test "$(id -u)" -ne 0
+awk '/^Cap(Prm|Eff|Amb):/ {print; seen++; if ($2 !~ /^0+$/) bad=1} /^NoNewPrivs:/ {print; if ($2=="1") safe=1} END {exit !(seen==3 && !bad && safe)}' /proc/self/status
 test "$(awk '/MemAvailable:/{print $2}' /proc/meminfo)" -ge 3145728
 test "$(df -Pk "$d" | awk 'END{print $4}')" -ge 5242880
 cat /proc/sys/kernel/perf_event_paranoid || true
