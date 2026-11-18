@@ -120,6 +120,18 @@ v_panic s = s `pseq` failure (unpack s)
 literal :: P.String -> String
 literal chars = if any (\c -> let n=ord c in n>=0xd800 && n<=0xdfff) chars
   then failure "invalid Unicode scalar" else mkText (T.pack chars)
+-- unpackCString# reads one Latin-1 scalar per byte up to NUL. Copy the
+-- complete address while it is in scope, including when a Haskell caller
+-- supplies a nonliteral address. Its length is also the scalar count.
+byteAddressLiteral :: G.Addr# -> String
+byteAddressLiteral address =
+  let bytes = unsafeDupablePerformIO (BS.packCString (G.Ptr address))
+  in mkSizedText (BS.length bytes) (TE.decodeLatin1 bytes)
+{-# OPAQUE literal #-}
+{-# RULES
+"mlf/literal/byte-address" forall address. literal (G.unpackCString# address) =
+  byteAddressLiteral address
+#-}
 unpack :: String -> P.String
 unpack (String t _ _) = T.unpack t
 utf8 :: String -> BS.ByteString

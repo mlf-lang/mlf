@@ -26,7 +26,7 @@
     ],
     "host/ghc/MLF/Host/Base.hs": [
       "b324805ea2d62b3aaccf3c49e973b7839f952b164bcbe4cc37bf483b07518116",
-      "54871df1211843fa0e0cfe58a0c57bf6374cdd2e85d54deff4d8f15aa1696c46"
+      "4e6fee84ec2928c387e11e6c710a231d77c719cfd881ed71e997398ec6bba514"
     ],
     "host/ghc/MLF/Host/IO.hs": [
       "042164a571c9b60c9fc1abe984ccc687400a01602b3a980cff61342941bfe22a",
@@ -935,6 +935,17 @@
       "predecessor": "540cac2682bd6f92dd590ef552bd19f782b55a0e",
       "predecessor_manifest_sha256": "1dcd4941e39fe4142151bd3683013612310c78940ea871871725ae27a1182b66",
       "predecessor_tree": "d96953116fa9cf8c3033f795e24a9fe11ba337ad"
+    },
+    {
+      "changes": {
+        "host/ghc/MLF/Host/Base.hs": [
+          "54871df1211843fa0e0cfe58a0c57bf6374cdd2e85d54deff4d8f15aa1696c46",
+          "4e6fee84ec2928c387e11e6c710a231d77c719cfd881ed71e997398ec6bba514"
+        ]
+      },
+      "predecessor": "dab2476f2f838ef11ead3533b6e2fd962ff650a4",
+      "predecessor_manifest_sha256": "7696053f7312277fa4e37dcec9cc51eca0885fa3f0499c5bc8f31bf6284f4ae3",
+      "predecessor_tree": "5a82e5690aa145617ab3635ff3a9aec871c31ee0"
     }
   ],
   "format": "pr43-reconciliation-source-migration-v1",

@@ -1,9 +1,10 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MagicHash, OverloadedStrings #-}
 module Main where
 
 import Prelude
 import Control.Exception (evaluate, try)
 import Control.Monad (forM_, unless)
+import qualified GHC.Exts as G
 import qualified MLF.Host.Base as B
 import qualified MLF.Primitive as P
 
@@ -30,6 +31,13 @@ sign EQ = 0
 sign GT = 1
 
 main = do
+  let checkAddress address expected = do
+        let text = B.literal (G.unpackCString# address)
+        need "byte-address scalar values" (B.unpack text) expected
+        need "byte-address UTF-8" (B.utf8 text) (B.utf8 (B.literal (opaque expected)))
+  checkAddress "\x80\xff"# ['\x80', '\xff']
+  checkAddress "\xc3\xa9"# ['\xc3', '\xa9']
+  checkAddress "a\0b"# "a"
   let suffixes = ["", "a", "b", "ab", "abc", "\0", "a\0b", "é", "α", "中", "😀", "\x10ffff"]
       strings = suffixes ++
         [replicate n 'x' ++ suffix | n <- [1, 2, 7, 63, 255, 256, 257, 1024], suffix <- suffixes]
