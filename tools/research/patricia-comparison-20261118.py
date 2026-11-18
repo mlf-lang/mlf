@@ -33,46 +33,66 @@ original=inspect.getsource(base_group)
 needle="            if int(fields[2]) == group or int(fields[3]) == group:"
 assert original.count(needle)==1
 modified=original.replace(needle,"            if entry.name == str(group): capture(group,fields)\n"+needle)
-record['scope']='unmodified type binaries; CPU/VM/fault snapshots already available in the existing guard poll. Not allocation attribution, timing or heap profiling.'
-record['schedule']=['control-old','control-new','observe-old','observe-new']
-record['observer_rows']=['elapsed_since_first_poll_s','ru_minflt','ru_majflt','utime_ticks','stime_ticks','vsize_bytes','rss_bytes']
-record['clock_ticks_per_second']=os.sysconf('SC_CLK_TCK')
+HINT=0x4200000000
+MIB=1<<20
+HIST={'old':3984908288,'new':4300558336}
+def map_shape(body,cap):
+    spans=[]; started=False; total=0
+    for line in body.splitlines():
+        cols=line.split(None,5);lo,hi=[int(v,16) for v in cols[0].split('-')]
+        valid=(len(cols)==5 and cols[1] in ('rw-p','---p') and cols[2].strip('0')=='' and cols[3]=='00:00' and cols[4]=='0')
+        if not started:
+            if lo!=HINT:continue
+            started=True
+        if lo!=HINT+total or not valid:break
+        spans.append([cols[1],hi-lo]);total+=hi-lo
+    want=(int(cap*0.666)//MIB)*MIB
+    return {'hint_exact':started,'predicted_bytes':want,'observed_bytes':total,'extent_count':len(spans),'rw_bytes':sum(b for a,b in spans if a=='rw-p'),'none_bytes':sum(b for a,b in spans if a=='---p'),'match':bool(spans and total in (want,want+MIB))}
+def map_once(pid,fields,exe,cap):
+    box=pathlib.Path('/proc')/str(pid)
+    def stamp():
+        return ((box/'stat').read_text().rsplit(') ',1)[1].split()[19],os.readlink(box/'exe'))
+    expect=(fields[19],str(exe.resolve()))
+    if stamp()!=expect:return {'match':False,'error':'leader identity before read'}
+    body=(box/'maps').read_text();line=next(x for x in (box/'limits').read_text().splitlines() if x.startswith('Max address space'))
+    if stamp()!=expect:return {'match':False,'error':'leader identity after read'}
+    o=map_shape(body,cap);ns=line.split()[3:5]
+    o.update(same_leader=True,soft_hard_as=ns)
+    o['match']=o['match'] and ns==[str(cap),str(cap)]
+    return o
+record['scope']='RLIMIT_AS-only ordinary binary comparison; exact-hint anonymous mapping and early cap verification; nonarena headroom also changes, no function or allocation attribution.'
+record['schedule']=['old-6','new-6','new-5.5','old-5.5']
+record['observer_rows']=['elapsed_since_first_poll_s','minflt','majflt','utime_ticks','stime_ticks','vsize_bytes','rss_bytes']
 page_size=os.sysconf('SC_PAGE_SIZE')
-for i,(label,enabled) in enumerate([('old',False),('new',False),('old',True),('new',True)]):
-    rows=[]; start=None; next_sample=0.0
+for i,(label,cap) in enumerate([('old',6<<30),('new',6<<30),('new',11<<29),('old',11<<29)]):
+    rows=[];start=None;next_sample=0.0;maps=None;root=roots[label];exe=root/'.mlf-build/shared-ghc/bin/emlf';dest=OUT/('leg-'+str(i)+'-'+label)
     def capture(group,fields):
-        global start,next_sample
+        global start,next_sample,maps
         now=time.monotonic()
-        if now < next_sample or len(rows)>=602:return
+        if now<next_sample or len(rows)>=602:return
         if start is None:start=now
         next_sample=now+1.0
-        # Linux /proc/PID/stat split after final comm delimiter, same indices and bytes already read by guard.
         rows.append([round(now-start,4),int(fields[7]),int(fields[9]),int(fields[11]),int(fields[12]),int(fields[20]),int(fields[21])*page_size])
-    if enabled:
-        namespace=dict(base_group.__globals__);namespace['capture']=capture
-        exec(compile(modified,'<exact-guard-stat-observer>','exec'),namespace)
-        H.process_group=namespace['process_group']
-    root=roots[label];dest=OUT/('leg-'+str(i)+'-'+label)
-    argv=[root/'.mlf-build/shared-ghc/bin/emlf','-i',root/'libraries/mlf-foundation','--type',entry]
+        if maps is None and now-start>=2.0 and fields[0]!='Z':
+            maps={'match':False,'error':'read failed'}
+            try: maps=map_once(group,fields,exe,cap)
+            except (OSError,ValueError,IndexError,StopIteration) as e:maps={'match':False,'error':type(e).__name__}
+    ns=dict(base_group.__globals__);ns['capture']=capture
+    exec(compile(modified,'<exact-guard-stat-observer>','exec'),ns);H.process_group=ns['process_group']
     expected=0 if label=='old' else 251
-    try:
-        H.Runner(OUT,limits).run(argv,root,dest,expected_exit=expected)
-    except RuntimeError as e:
-        record['last_error']=repr(e)
+    try:H.Runner(OUT,dict(limits,address_space_per_process_bytes=cap)).run([exe,'-i',root/'libraries/mlf-foundation','--type',entry],root,dest,expected_exit=expected)
+    except RuntimeError as e:record['last_runner_exception']=repr(e)
     finally:
         H.process_group=base_group
-        if enabled:(OUT/('stat-'+str(i)+'-'+label+'.json')).write_text(json.dumps(rows)+'\n')
-    if not (dest/'command.json').exists():
-        record['stop_reason']='missing leg receipt';save();break
-    receipt=json.loads((dest/'command.json').read_text())
-    valid=receipt.get('complete') and receipt.get('exit_code')==expected and not receipt.get('reason') and not receipt.get('terminal_live_descendants') and (dest/'stdout').read_bytes()==(b'IO ()\n' if label=='old' else b'') and (dest/'stderr').read_bytes()==(b'' if label=='old' else b'emlf: out of memory\n') and (not enabled or (len(rows)>=2 and rows[-1][0] >= 0.8*receipt['wall_seconds']))
-    record['legs'].append({'label':label,'observed':enabled,'outcome_reproduced':bool(valid),'samples':len(rows),'max_child_rss_bytes':receipt.get('max_individual_child_rss_bytes'),'exit_code':receipt.get('exit_code')});save()
-    if not valid:record['stop_reason']='control, reproduction, guard or observation failed';save();break
-record['complete']=len(record['legs'])==4 and all(k['outcome_reproduced'] for k in record['legs'])
+        (OUT/('stat-'+str(i)+'-'+label+'.json')).write_text(json.dumps(rows)+'\n')
+        (OUT/('map-'+str(i)+'-'+label+'.json')).write_text(json.dumps(maps)+'\n')
+    if not (dest/'command.json').exists():record['stop_reason']='missing receipt';save();break
+    j=json.loads((dest/'command.json').read_text());ec=j.get('exit_code')
+    stdout=(dest/'stdout').read_bytes();stderr=(dest/'stderr').read_bytes()
+    verdict=(ec==0 and stdout==b'IO ()\n' and stderr==b'') or (ec==251 and not stdout and stderr==b'emlf: out of memory\n')
+    accepted=bool(verdict and j.get('reason') is None and j.get('terminal_live_descendants')==[] and j.get('limits',{}).get('address_space_per_process_bytes')==cap and j.get('logs') and all(sha(pathlib.Path(k))==v for k,v in j['logs'].items()) and maps and maps['match'] and len(rows)>2 and rows[-1][0]>=.8*j['wall_seconds'])
+    if i<2:accepted=accepted and bool(j['complete']) and ec==expected and .95<=j['max_individual_child_rss_bytes']/HIST[label]<=1.05
+    record['legs'].append({'label':label,'cap':cap,'exit_code':ec,'observations':len(rows),'map':maps,'max_child_rss_bytes':j['max_individual_child_rss_bytes'],'accepted':accepted});save()
+    if not accepted:record['stop_reason']='control, map, exact outcome, identity, safety or observation gate failed';save();break
+record['complete']=len(record['legs'])==4 and all(k['accepted'] for k in record['legs'])
 save()
-if record['complete']:
-    rss={l['label']+'-'+str(l['observed']):l['max_child_rss_bytes'] for l in record['legs']}
-    record['observer_rss_ratios']={k:rss[k+'-True']/rss[k+'-False'] for k in ['old','new']}
-    record['rss_comparable']=all(0.95 <= r <= 1.05 for r in record['observer_rss_ratios'].values())
-    if not record['rss_comparable']:record['interpretation']='Observer/control max RSS differs by >5%; no trusted differential trajectory.'
-    save()
