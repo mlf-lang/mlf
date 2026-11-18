@@ -1,0 +1,2732 @@
+{
+  "source_commit": "d9c14d396353dffe2b5cebbcfb78aeb91817a9df",
+  "all_sidecars_verified": 71,
+  "reports": {
+    "alias-chain.events": {
+      "status": "complete-observation",
+      "frames": [
+        {
+          "rule": "global-root-binding-euler",
+          "identity": "-",
+          "start": 1,
+          "end": 39,
+          "outcome": "success",
+          "direct_events": [
+            [
+              7,
+              "success:global-euler",
+              "-"
+            ]
+          ],
+          "children": [
+            {
+              "rule": "binder-exists",
+              "identity": "0",
+              "start": 2,
+              "end": 3,
+              "outcome": "success",
+              "direct_events": [],
+              "children": []
+            },
+            {
+              "rule": "binder-exists",
+              "identity": "1",
+              "start": 4,
+              "end": 6,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  5,
+                  "node:present",
+                  "0"
+                ]
+              ],
+              "children": []
+            },
+            {
+              "rule": "kind-fact",
+              "identity": "0",
+              "start": 8,
+              "end": 35,
+              "outcome": "success",
+              "direct_events": [],
+              "children": [
+                {
+                  "rule": "node-binder",
+                  "identity": "0",
+                  "start": 9,
+                  "end": 11,
+                  "outcome": "success",
+                  "direct_events": [
+                    [
+                      10,
+                      "selector:root-tag",
+                      "0"
+                    ]
+                  ],
+                  "children": []
+                },
+                {
+                  "rule": "tag-kind",
+                  "identity": "0",
+                  "start": 12,
+                  "end": 34,
+                  "outcome": "success",
+                  "direct_events": [
+                    [
+                      13,
+                      "selector:gen-flag",
+                      "0"
+                    ]
+                  ],
+                  "children": [
+                    {
+                      "rule": "edge-gates",
+                      "identity": "-",
+                      "start": 14,
+                      "end": 33,
+                      "outcome": "success",
+                      "direct_events": [
+                        [
+                          15,
+                          "alias:present",
+                          "10"
+                        ],
+                        [
+                          16,
+                          "alias:absent",
+                          "1"
+                        ],
+                        [
+                          20,
+                          "selector:child-tag",
+                          "1"
+                        ],
+                        [
+                          21,
+                          "selector:child-binder",
+                          "1"
+                        ],
+                        [
+                          22,
+                          "dependency:global-euler",
+                          "-"
+                        ]
+                      ],
+                      "children": [
+                        {
+                          "rule": "require",
+                          "identity": "1",
+                          "start": 17,
+                          "end": 19,
+                          "outcome": "success",
+                          "direct_events": [
+                            [
+                              18,
+                              "node:present",
+                              "1"
+                            ]
+                          ],
+                          "children": []
+                        },
+                        {
+                          "rule": "kind-fact",
+                          "identity": "1",
+                          "start": 23,
+                          "end": 32,
+                          "outcome": "success",
+                          "direct_events": [],
+                          "children": [
+                            {
+                              "rule": "node-binder",
+                              "identity": "1",
+                              "start": 24,
+                              "end": 29,
+                              "outcome": "success",
+                              "direct_events": [
+                                [
+                                  28,
+                                  "selector:parent-tag",
+                                  "0"
+                                ]
+                              ],
+                              "children": [
+                                {
+                                  "rule": "require",
+                                  "identity": "0",
+                                  "start": 25,
+                                  "end": 27,
+                                  "outcome": "success",
+                                  "direct_events": [
+                                    [
+                                      26,
+                                      "node:present",
+                                      "0"
+                                    ]
+                                  ],
+                                  "children": []
+                                }
+                              ]
+                            },
+                            {
+                              "rule": "tag-kind",
+                              "identity": "1",
+                              "start": 30,
+                              "end": 31,
+                              "outcome": "success",
+                              "direct_events": [],
+                              "children": []
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "rule": "kind-fact",
+              "identity": "1",
+              "start": 36,
+              "end": 38,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  37,
+                  "cache:kind-hit",
+                  "1"
+                ]
+              ],
+              "children": []
+            }
+          ]
+        }
+      ],
+      "frame_count": 13,
+      "unkeyed_edge_frames": 1,
+      "global_euler_dependencies": 1,
+      "reusable": false
+    },
+    "cached-kind-edge.events": {
+      "status": "complete-observation",
+      "frames": [
+        {
+          "rule": "global-root-binding-euler",
+          "identity": "-",
+          "start": 1,
+          "end": 89,
+          "outcome": "failure",
+          "direct_events": [
+            [
+              13,
+              "success:global-euler",
+              "-"
+            ]
+          ],
+          "children": [
+            {
+              "rule": "binder-exists",
+              "identity": "0",
+              "start": 2,
+              "end": 3,
+              "outcome": "success",
+              "direct_events": [],
+              "children": []
+            },
+            {
+              "rule": "binder-exists",
+              "identity": "1",
+              "start": 4,
+              "end": 6,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  5,
+                  "node:present",
+                  "0"
+                ]
+              ],
+              "children": []
+            },
+            {
+              "rule": "binder-exists",
+              "identity": "2",
+              "start": 7,
+              "end": 9,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  8,
+                  "node:present",
+                  "1"
+                ]
+              ],
+              "children": []
+            },
+            {
+              "rule": "binder-exists",
+              "identity": "3",
+              "start": 10,
+              "end": 12,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  11,
+                  "node:present",
+                  "0"
+                ]
+              ],
+              "children": []
+            },
+            {
+              "rule": "kind-fact",
+              "identity": "0",
+              "start": 14,
+              "end": 88,
+              "outcome": "failure",
+              "direct_events": [],
+              "children": [
+                {
+                  "rule": "node-binder",
+                  "identity": "0",
+                  "start": 15,
+                  "end": 17,
+                  "outcome": "success",
+                  "direct_events": [
+                    [
+                      16,
+                      "selector:root-tag",
+                      "0"
+                    ]
+                  ],
+                  "children": []
+                },
+                {
+                  "rule": "tag-kind",
+                  "identity": "0",
+                  "start": 18,
+                  "end": 87,
+                  "outcome": "failure",
+                  "direct_events": [
+                    [
+                      19,
+                      "selector:gen-flag",
+                      "0"
+                    ]
+                  ],
+                  "children": [
+                    {
+                      "rule": "edge-gates",
+                      "identity": "-",
+                      "start": 20,
+                      "end": 86,
+                      "outcome": "failure",
+                      "direct_events": [
+                        [
+                          21,
+                          "alias:absent",
+                          "1"
+                        ],
+                        [
+                          25,
+                          "selector:child-tag",
+                          "1"
+                        ],
+                        [
+                          26,
+                          "selector:child-binder",
+                          "1"
+                        ],
+                        [
+                          27,
+                          "dependency:global-euler",
+                          "-"
+                        ]
+                      ],
+                      "children": [
+                        {
+                          "rule": "require",
+                          "identity": "1",
+                          "start": 22,
+                          "end": 24,
+                          "outcome": "success",
+                          "direct_events": [
+                            [
+                              23,
+                              "node:present",
+                              "1"
+                            ]
+                          ],
+                          "children": []
+                        },
+                        {
+                          "rule": "kind-fact",
+                          "identity": "1",
+                          "start": 28,
+                          "end": 85,
+                          "outcome": "failure",
+                          "direct_events": [],
+                          "children": [
+                            {
+                              "rule": "node-binder",
+                              "identity": "1",
+                              "start": 29,
+                              "end": 34,
+                              "outcome": "success",
+                              "direct_events": [
+                                [
+                                  33,
+                                  "selector:parent-tag",
+                                  "0"
+                                ]
+                              ],
+                              "children": [
+                                {
+                                  "rule": "require",
+                                  "identity": "0",
+                                  "start": 30,
+                                  "end": 32,
+                                  "outcome": "success",
+                                  "direct_events": [
+                                    [
+                                      31,
+                                      "node:present",
+                                      "0"
+                                    ]
+                                  ],
+                                  "children": []
+                                }
+                              ]
+                            },
+                            {
+                              "rule": "tag-kind",
+                              "identity": "1",
+                              "start": 35,
+                              "end": 84,
+                              "outcome": "failure",
+                              "direct_events": [],
+                              "children": [
+                                {
+                                  "rule": "edge-gates",
+                                  "identity": "-",
+                                  "start": 36,
+                                  "end": 55,
+                                  "outcome": "success",
+                                  "direct_events": [
+                                    [
+                                      37,
+                                      "alias:absent",
+                                      "2"
+                                    ],
+                                    [
+                                      41,
+                                      "selector:child-tag",
+                                      "2"
+                                    ],
+                                    [
+                                      42,
+                                      "selector:child-binder",
+                                      "2"
+                                    ],
+                                    [
+                                      43,
+                                      "dependency:global-euler",
+                                      "-"
+                                    ]
+                                  ],
+                                  "children": [
+                                    {
+                                      "rule": "require",
+                                      "identity": "2",
+                                      "start": 38,
+                                      "end": 40,
+                                      "outcome": "success",
+                                      "direct_events": [
+                                        [
+                                          39,
+                                          "node:present",
+                                          "2"
+                                        ]
+                                      ],
+                                      "children": []
+                                    },
+                                    {
+                                      "rule": "kind-fact",
+                                      "identity": "2",
+                                      "start": 44,
+                                      "end": 54,
+                                      "outcome": "success",
+                                      "direct_events": [],
+                                      "children": [
+                                        {
+                                          "rule": "node-binder",
+                                          "identity": "2",
+                                          "start": 45,
+                                          "end": 51,
+                                          "outcome": "success",
+                                          "direct_events": [
+                                            [
+                                              49,
+                                              "selector:parent-tag",
+                                              "1"
+                                            ],
+                                            [
+                                              50,
+                                              "alias:absent",
+                                              "2"
+                                            ]
+                                          ],
+                                          "children": [
+                                            {
+                                              "rule": "require",
+                                              "identity": "1",
+                                              "start": 46,
+                                              "end": 48,
+                                              "outcome": "success",
+                                              "direct_events": [
+                                                [
+                                                  47,
+                                                  "node:present",
+                                                  "1"
+                                                ]
+                                              ],
+                                              "children": []
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "rule": "tag-kind",
+                                          "identity": "2",
+                                          "start": 52,
+                                          "end": 53,
+                                          "outcome": "success",
+                                          "direct_events": [],
+                                          "children": []
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "rule": "edge-gates",
+                                  "identity": "-",
+                                  "start": 56,
+                                  "end": 83,
+                                  "outcome": "failure",
+                                  "direct_events": [
+                                    [
+                                      57,
+                                      "alias:absent",
+                                      "3"
+                                    ],
+                                    [
+                                      61,
+                                      "selector:child-tag",
+                                      "3"
+                                    ],
+                                    [
+                                      62,
+                                      "selector:child-binder",
+                                      "3"
+                                    ],
+                                    [
+                                      63,
+                                      "dependency:global-euler",
+                                      "-"
+                                    ]
+                                  ],
+                                  "children": [
+                                    {
+                                      "rule": "require",
+                                      "identity": "3",
+                                      "start": 58,
+                                      "end": 60,
+                                      "outcome": "success",
+                                      "direct_events": [
+                                        [
+                                          59,
+                                          "node:present",
+                                          "3"
+                                        ]
+                                      ],
+                                      "children": []
+                                    },
+                                    {
+                                      "rule": "kind-fact",
+                                      "identity": "3",
+                                      "start": 64,
+                                      "end": 82,
+                                      "outcome": "failure",
+                                      "direct_events": [],
+                                      "children": [
+                                        {
+                                          "rule": "node-binder",
+                                          "identity": "3",
+                                          "start": 65,
+                                          "end": 70,
+                                          "outcome": "success",
+                                          "direct_events": [
+                                            [
+                                              69,
+                                              "selector:parent-tag",
+                                              "0"
+                                            ]
+                                          ],
+                                          "children": [
+                                            {
+                                              "rule": "require",
+                                              "identity": "0",
+                                              "start": 66,
+                                              "end": 68,
+                                              "outcome": "success",
+                                              "direct_events": [
+                                                [
+                                                  67,
+                                                  "node:present",
+                                                  "0"
+                                                ]
+                                              ],
+                                              "children": []
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "rule": "tag-kind",
+                                          "identity": "3",
+                                          "start": 71,
+                                          "end": 81,
+                                          "outcome": "failure",
+                                          "direct_events": [],
+                                          "children": [
+                                            {
+                                              "rule": "edge-gates",
+                                              "identity": "-",
+                                              "start": 72,
+                                              "end": 80,
+                                              "outcome": "failure",
+                                              "direct_events": [
+                                                [
+                                                  73,
+                                                  "alias:absent",
+                                                  "2"
+                                                ],
+                                                [
+                                                  77,
+                                                  "selector:child-tag",
+                                                  "2"
+                                                ],
+                                                [
+                                                  78,
+                                                  "selector:child-binder",
+                                                  "2"
+                                                ],
+                                                [
+                                                  79,
+                                                  "dependency:global-euler",
+                                                  "-"
+                                                ]
+                                              ],
+                                              "children": [
+                                                {
+                                                  "rule": "require",
+                                                  "identity": "2",
+                                                  "start": 74,
+                                                  "end": 76,
+                                                  "outcome": "success",
+                                                  "direct_events": [
+                                                    [
+                                                      75,
+                                                      "node:present",
+                                                      "2"
+                                                    ]
+                                                  ],
+                                                  "children": []
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "frame_count": 28,
+      "unkeyed_edge_frames": 4,
+      "global_euler_dependencies": 4,
+      "reusable": false
+    },
+    "containment.events": {
+      "status": "complete-observation",
+      "frames": [
+        {
+          "rule": "global-root-binding-euler",
+          "identity": "-",
+          "start": 1,
+          "end": 102,
+          "outcome": "failure",
+          "direct_events": [
+            [
+              13,
+              "success:global-euler",
+              "-"
+            ]
+          ],
+          "children": [
+            {
+              "rule": "binder-exists",
+              "identity": "0",
+              "start": 2,
+              "end": 3,
+              "outcome": "success",
+              "direct_events": [],
+              "children": []
+            },
+            {
+              "rule": "binder-exists",
+              "identity": "1",
+              "start": 4,
+              "end": 6,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  5,
+                  "node:present",
+                  "0"
+                ]
+              ],
+              "children": []
+            },
+            {
+              "rule": "binder-exists",
+              "identity": "2",
+              "start": 7,
+              "end": 9,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  8,
+                  "node:present",
+                  "0"
+                ]
+              ],
+              "children": []
+            },
+            {
+              "rule": "binder-exists",
+              "identity": "3",
+              "start": 10,
+              "end": 12,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  11,
+                  "node:present",
+                  "1"
+                ]
+              ],
+              "children": []
+            },
+            {
+              "rule": "kind-fact",
+              "identity": "0",
+              "start": 14,
+              "end": 71,
+              "outcome": "success",
+              "direct_events": [],
+              "children": [
+                {
+                  "rule": "node-binder",
+                  "identity": "0",
+                  "start": 15,
+                  "end": 17,
+                  "outcome": "success",
+                  "direct_events": [
+                    [
+                      16,
+                      "selector:root-tag",
+                      "0"
+                    ]
+                  ],
+                  "children": []
+                },
+                {
+                  "rule": "tag-kind",
+                  "identity": "0",
+                  "start": 18,
+                  "end": 70,
+                  "outcome": "success",
+                  "direct_events": [
+                    [
+                      19,
+                      "selector:gen-flag",
+                      "0"
+                    ]
+                  ],
+                  "children": [
+                    {
+                      "rule": "edge-gates",
+                      "identity": "-",
+                      "start": 20,
+                      "end": 69,
+                      "outcome": "success",
+                      "direct_events": [
+                        [
+                          21,
+                          "alias:absent",
+                          "1"
+                        ],
+                        [
+                          25,
+                          "selector:child-tag",
+                          "1"
+                        ],
+                        [
+                          26,
+                          "selector:child-binder",
+                          "1"
+                        ],
+                        [
+                          27,
+                          "dependency:global-euler",
+                          "-"
+                        ]
+                      ],
+                      "children": [
+                        {
+                          "rule": "require",
+                          "identity": "1",
+                          "start": 22,
+                          "end": 24,
+                          "outcome": "success",
+                          "direct_events": [
+                            [
+                              23,
+                              "node:present",
+                              "1"
+                            ]
+                          ],
+                          "children": []
+                        },
+                        {
+                          "rule": "kind-fact",
+                          "identity": "1",
+                          "start": 28,
+                          "end": 68,
+                          "outcome": "success",
+                          "direct_events": [],
+                          "children": [
+                            {
+                              "rule": "node-binder",
+                              "identity": "1",
+                              "start": 29,
+                              "end": 34,
+                              "outcome": "success",
+                              "direct_events": [
+                                [
+                                  33,
+                                  "selector:parent-tag",
+                                  "0"
+                                ]
+                              ],
+                              "children": [
+                                {
+                                  "rule": "require",
+                                  "identity": "0",
+                                  "start": 30,
+                                  "end": 32,
+                                  "outcome": "success",
+                                  "direct_events": [
+                                    [
+                                      31,
+                                      "node:present",
+                                      "0"
+                                    ]
+                                  ],
+                                  "children": []
+                                }
+                              ]
+                            },
+                            {
+                              "rule": "tag-kind",
+                              "identity": "1",
+                              "start": 35,
+                              "end": 67,
+                              "outcome": "success",
+                              "direct_events": [],
+                              "children": [
+                                {
+                                  "rule": "edge-gates",
+                                  "identity": "-",
+                                  "start": 36,
+                                  "end": 54,
+                                  "outcome": "success",
+                                  "direct_events": [
+                                    [
+                                      37,
+                                      "alias:absent",
+                                      "2"
+                                    ],
+                                    [
+                                      41,
+                                      "selector:child-tag",
+                                      "2"
+                                    ],
+                                    [
+                                      42,
+                                      "selector:child-binder",
+                                      "2"
+                                    ],
+                                    [
+                                      43,
+                                      "dependency:global-euler",
+                                      "-"
+                                    ]
+                                  ],
+                                  "children": [
+                                    {
+                                      "rule": "require",
+                                      "identity": "2",
+                                      "start": 38,
+                                      "end": 40,
+                                      "outcome": "success",
+                                      "direct_events": [
+                                        [
+                                          39,
+                                          "node:present",
+                                          "2"
+                                        ]
+                                      ],
+                                      "children": []
+                                    },
+                                    {
+                                      "rule": "kind-fact",
+                                      "identity": "2",
+                                      "start": 44,
+                                      "end": 53,
+                                      "outcome": "success",
+                                      "direct_events": [],
+                                      "children": [
+                                        {
+                                          "rule": "node-binder",
+                                          "identity": "2",
+                                          "start": 45,
+                                          "end": 50,
+                                          "outcome": "success",
+                                          "direct_events": [
+                                            [
+                                              49,
+                                              "selector:parent-tag",
+                                              "0"
+                                            ]
+                                          ],
+                                          "children": [
+                                            {
+                                              "rule": "require",
+                                              "identity": "0",
+                                              "start": 46,
+                                              "end": 48,
+                                              "outcome": "success",
+                                              "direct_events": [
+                                                [
+                                                  47,
+                                                  "node:present",
+                                                  "0"
+                                                ]
+                                              ],
+                                              "children": []
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "rule": "tag-kind",
+                                          "identity": "2",
+                                          "start": 51,
+                                          "end": 52,
+                                          "outcome": "success",
+                                          "direct_events": [],
+                                          "children": []
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "rule": "edge-gates",
+                                  "identity": "-",
+                                  "start": 55,
+                                  "end": 66,
+                                  "outcome": "success",
+                                  "direct_events": [
+                                    [
+                                      56,
+                                      "alias:absent",
+                                      "2"
+                                    ],
+                                    [
+                                      60,
+                                      "selector:child-tag",
+                                      "2"
+                                    ],
+                                    [
+                                      61,
+                                      "selector:child-binder",
+                                      "2"
+                                    ],
+                                    [
+                                      62,
+                                      "dependency:global-euler",
+                                      "-"
+                                    ]
+                                  ],
+                                  "children": [
+                                    {
+                                      "rule": "require",
+                                      "identity": "2",
+                                      "start": 57,
+                                      "end": 59,
+                                      "outcome": "success",
+                                      "direct_events": [
+                                        [
+                                          58,
+                                          "node:present",
+                                          "2"
+                                        ]
+                                      ],
+                                      "children": []
+                                    },
+                                    {
+                                      "rule": "kind-fact",
+                                      "identity": "2",
+                                      "start": 63,
+                                      "end": 65,
+                                      "outcome": "success",
+                                      "direct_events": [
+                                        [
+                                          64,
+                                          "cache:kind-hit",
+                                          "2"
+                                        ]
+                                      ],
+                                      "children": []
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "rule": "kind-fact",
+              "identity": "1",
+              "start": 72,
+              "end": 74,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  73,
+                  "cache:kind-hit",
+                  "1"
+                ]
+              ],
+              "children": []
+            },
+            {
+              "rule": "kind-fact",
+              "identity": "2",
+              "start": 75,
+              "end": 77,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  76,
+                  "cache:kind-hit",
+                  "2"
+                ]
+              ],
+              "children": []
+            },
+            {
+              "rule": "kind-fact",
+              "identity": "3",
+              "start": 78,
+              "end": 101,
+              "outcome": "failure",
+              "direct_events": [],
+              "children": [
+                {
+                  "rule": "node-binder",
+                  "identity": "3",
+                  "start": 79,
+                  "end": 100,
+                  "outcome": "failure",
+                  "direct_events": [
+                    [
+                      83,
+                      "selector:parent-tag",
+                      "1"
+                    ],
+                    [
+                      84,
+                      "alias:absent",
+                      "2"
+                    ],
+                    [
+                      85,
+                      "alias:absent",
+                      "2"
+                    ],
+                    [
+                      86,
+                      "alias:absent",
+                      "1"
+                    ],
+                    [
+                      90,
+                      "selector:structural-tag-children",
+                      "1"
+                    ],
+                    [
+                      91,
+                      "alias:absent",
+                      "2"
+                    ],
+                    [
+                      95,
+                      "selector:structural-tag-children",
+                      "2"
+                    ],
+                    [
+                      96,
+                      "alias:absent",
+                      "2"
+                    ]
+                  ],
+                  "children": [
+                    {
+                      "rule": "require",
+                      "identity": "1",
+                      "start": 80,
+                      "end": 82,
+                      "outcome": "success",
+                      "direct_events": [
+                        [
+                          81,
+                          "node:present",
+                          "1"
+                        ]
+                      ],
+                      "children": []
+                    },
+                    {
+                      "rule": "require",
+                      "identity": "1",
+                      "start": 87,
+                      "end": 89,
+                      "outcome": "success",
+                      "direct_events": [
+                        [
+                          88,
+                          "node:present",
+                          "1"
+                        ]
+                      ],
+                      "children": []
+                    },
+                    {
+                      "rule": "require",
+                      "identity": "2",
+                      "start": 92,
+                      "end": 94,
+                      "outcome": "success",
+                      "direct_events": [
+                        [
+                          93,
+                          "node:present",
+                          "2"
+                        ]
+                      ],
+                      "children": []
+                    },
+                    {
+                      "rule": "require",
+                      "identity": "2",
+                      "start": 97,
+                      "end": 99,
+                      "outcome": "success",
+                      "direct_events": [
+                        [
+                          98,
+                          "node:present",
+                          "2"
+                        ]
+                      ],
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "frame_count": 31,
+      "unkeyed_edge_frames": 3,
+      "global_euler_dependencies": 3,
+      "reusable": false
+    },
+    "forced-kind.events": {
+      "status": "unavailable",
+      "frames": [],
+      "reusable": false
+    },
+    "gen-before-poison.events": {
+      "status": "complete-observation",
+      "frames": [
+        {
+          "rule": "global-root-binding-euler",
+          "identity": "-",
+          "start": 1,
+          "end": 51,
+          "outcome": "failure",
+          "direct_events": [
+            [
+              16,
+              "success:global-euler",
+              "-"
+            ]
+          ],
+          "children": [
+            {
+              "rule": "binder-exists",
+              "identity": "0",
+              "start": 2,
+              "end": 3,
+              "outcome": "success",
+              "direct_events": [],
+              "children": []
+            },
+            {
+              "rule": "binder-exists",
+              "identity": "1",
+              "start": 4,
+              "end": 6,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  5,
+                  "node:present",
+                  "0"
+                ]
+              ],
+              "children": []
+            },
+            {
+              "rule": "binder-exists",
+              "identity": "2",
+              "start": 7,
+              "end": 9,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  8,
+                  "node:present",
+                  "0"
+                ]
+              ],
+              "children": []
+            },
+            {
+              "rule": "binder-exists",
+              "identity": "3",
+              "start": 10,
+              "end": 12,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  11,
+                  "node:present",
+                  "0"
+                ]
+              ],
+              "children": []
+            },
+            {
+              "rule": "binder-exists",
+              "identity": "4",
+              "start": 13,
+              "end": 15,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  14,
+                  "node:present",
+                  "2"
+                ]
+              ],
+              "children": []
+            },
+            {
+              "rule": "kind-fact",
+              "identity": "0",
+              "start": 17,
+              "end": 50,
+              "outcome": "failure",
+              "direct_events": [],
+              "children": [
+                {
+                  "rule": "node-binder",
+                  "identity": "0",
+                  "start": 18,
+                  "end": 20,
+                  "outcome": "success",
+                  "direct_events": [
+                    [
+                      19,
+                      "selector:root-tag",
+                      "0"
+                    ]
+                  ],
+                  "children": []
+                },
+                {
+                  "rule": "tag-kind",
+                  "identity": "0",
+                  "start": 21,
+                  "end": 49,
+                  "outcome": "failure",
+                  "direct_events": [
+                    [
+                      22,
+                      "selector:gen-flag",
+                      "0"
+                    ]
+                  ],
+                  "children": [
+                    {
+                      "rule": "edge-gates",
+                      "identity": "-",
+                      "start": 23,
+                      "end": 48,
+                      "outcome": "failure",
+                      "direct_events": [
+                        [
+                          24,
+                          "alias:absent",
+                          "1"
+                        ],
+                        [
+                          28,
+                          "selector:child-tag",
+                          "1"
+                        ],
+                        [
+                          29,
+                          "selector:child-binder",
+                          "1"
+                        ],
+                        [
+                          30,
+                          "dependency:global-euler",
+                          "-"
+                        ]
+                      ],
+                      "children": [
+                        {
+                          "rule": "require",
+                          "identity": "1",
+                          "start": 25,
+                          "end": 27,
+                          "outcome": "success",
+                          "direct_events": [
+                            [
+                              26,
+                              "node:present",
+                              "1"
+                            ]
+                          ],
+                          "children": []
+                        },
+                        {
+                          "rule": "kind-fact",
+                          "identity": "1",
+                          "start": 31,
+                          "end": 47,
+                          "outcome": "failure",
+                          "direct_events": [],
+                          "children": [
+                            {
+                              "rule": "node-binder",
+                              "identity": "1",
+                              "start": 32,
+                              "end": 37,
+                              "outcome": "success",
+                              "direct_events": [
+                                [
+                                  36,
+                                  "selector:parent-tag",
+                                  "0"
+                                ]
+                              ],
+                              "children": [
+                                {
+                                  "rule": "require",
+                                  "identity": "0",
+                                  "start": 33,
+                                  "end": 35,
+                                  "outcome": "success",
+                                  "direct_events": [
+                                    [
+                                      34,
+                                      "node:present",
+                                      "0"
+                                    ]
+                                  ],
+                                  "children": []
+                                }
+                              ]
+                            },
+                            {
+                              "rule": "tag-kind",
+                              "identity": "1",
+                              "start": 38,
+                              "end": 46,
+                              "outcome": "failure",
+                              "direct_events": [],
+                              "children": [
+                                {
+                                  "rule": "edge-gates",
+                                  "identity": "-",
+                                  "start": 39,
+                                  "end": 45,
+                                  "outcome": "failure",
+                                  "direct_events": [
+                                    [
+                                      40,
+                                      "alias:absent",
+                                      "2"
+                                    ],
+                                    [
+                                      44,
+                                      "selector:child-tag",
+                                      "2"
+                                    ]
+                                  ],
+                                  "children": [
+                                    {
+                                      "rule": "require",
+                                      "identity": "2",
+                                      "start": 41,
+                                      "end": 43,
+                                      "outcome": "success",
+                                      "direct_events": [
+                                        [
+                                          42,
+                                          "node:present",
+                                          "2"
+                                        ]
+                                      ],
+                                      "children": []
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "frame_count": 17,
+      "unkeyed_edge_frames": 2,
+      "global_euler_dependencies": 1,
+      "reusable": false
+    },
+    "missing-binder-before-kind.events": {
+      "status": "complete-observation",
+      "frames": [
+        {
+          "rule": "global-root-binding-euler",
+          "identity": "-",
+          "start": 1,
+          "end": 7,
+          "outcome": "failure",
+          "direct_events": [],
+          "children": [
+            {
+              "rule": "binder-exists",
+              "identity": "0",
+              "start": 2,
+              "end": 3,
+              "outcome": "success",
+              "direct_events": [],
+              "children": []
+            },
+            {
+              "rule": "binder-exists",
+              "identity": "1",
+              "start": 4,
+              "end": 6,
+              "outcome": "failure",
+              "direct_events": [
+                [
+                  5,
+                  "node:absent",
+                  "99"
+                ]
+              ],
+              "children": []
+            }
+          ]
+        }
+      ],
+      "frame_count": 3,
+      "unkeyed_edge_frames": 0,
+      "global_euler_dependencies": 0,
+      "reusable": false
+    },
+    "missing-child.events": {
+      "status": "complete-observation",
+      "frames": [
+        {
+          "rule": "global-root-binding-euler",
+          "identity": "-",
+          "start": 1,
+          "end": 22,
+          "outcome": "failure",
+          "direct_events": [
+            [
+              7,
+              "success:global-euler",
+              "-"
+            ]
+          ],
+          "children": [
+            {
+              "rule": "binder-exists",
+              "identity": "0",
+              "start": 2,
+              "end": 3,
+              "outcome": "success",
+              "direct_events": [],
+              "children": []
+            },
+            {
+              "rule": "binder-exists",
+              "identity": "1",
+              "start": 4,
+              "end": 6,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  5,
+                  "node:present",
+                  "0"
+                ]
+              ],
+              "children": []
+            },
+            {
+              "rule": "kind-fact",
+              "identity": "0",
+              "start": 8,
+              "end": 21,
+              "outcome": "failure",
+              "direct_events": [],
+              "children": [
+                {
+                  "rule": "node-binder",
+                  "identity": "0",
+                  "start": 9,
+                  "end": 11,
+                  "outcome": "success",
+                  "direct_events": [
+                    [
+                      10,
+                      "selector:root-tag",
+                      "0"
+                    ]
+                  ],
+                  "children": []
+                },
+                {
+                  "rule": "tag-kind",
+                  "identity": "0",
+                  "start": 12,
+                  "end": 20,
+                  "outcome": "failure",
+                  "direct_events": [
+                    [
+                      13,
+                      "selector:gen-flag",
+                      "0"
+                    ]
+                  ],
+                  "children": [
+                    {
+                      "rule": "edge-gates",
+                      "identity": "-",
+                      "start": 14,
+                      "end": 19,
+                      "outcome": "failure",
+                      "direct_events": [
+                        [
+                          15,
+                          "alias:absent",
+                          "99"
+                        ]
+                      ],
+                      "children": [
+                        {
+                          "rule": "require",
+                          "identity": "99",
+                          "start": 16,
+                          "end": 18,
+                          "outcome": "failure",
+                          "direct_events": [
+                            [
+                              17,
+                              "node:absent",
+                              "99"
+                            ]
+                          ],
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "frame_count": 8,
+      "unkeyed_edge_frames": 1,
+      "global_euler_dependencies": 0,
+      "reusable": false
+    },
+    "occurs.events": {
+      "status": "complete-observation",
+      "frames": [
+        {
+          "rule": "global-root-binding-euler",
+          "identity": "-",
+          "start": 1,
+          "end": 49,
+          "outcome": "failure",
+          "direct_events": [
+            [
+              10,
+              "success:global-euler",
+              "-"
+            ]
+          ],
+          "children": [
+            {
+              "rule": "binder-exists",
+              "identity": "0",
+              "start": 2,
+              "end": 3,
+              "outcome": "success",
+              "direct_events": [],
+              "children": []
+            },
+            {
+              "rule": "binder-exists",
+              "identity": "1",
+              "start": 4,
+              "end": 6,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  5,
+                  "node:present",
+                  "0"
+                ]
+              ],
+              "children": []
+            },
+            {
+              "rule": "binder-exists",
+              "identity": "2",
+              "start": 7,
+              "end": 9,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  8,
+                  "node:present",
+                  "0"
+                ]
+              ],
+              "children": []
+            },
+            {
+              "rule": "kind-fact",
+              "identity": "0",
+              "start": 11,
+              "end": 48,
+              "outcome": "failure",
+              "direct_events": [],
+              "children": [
+                {
+                  "rule": "node-binder",
+                  "identity": "0",
+                  "start": 12,
+                  "end": 14,
+                  "outcome": "success",
+                  "direct_events": [
+                    [
+                      13,
+                      "selector:root-tag",
+                      "0"
+                    ]
+                  ],
+                  "children": []
+                },
+                {
+                  "rule": "tag-kind",
+                  "identity": "0",
+                  "start": 15,
+                  "end": 47,
+                  "outcome": "failure",
+                  "direct_events": [
+                    [
+                      16,
+                      "selector:gen-flag",
+                      "0"
+                    ]
+                  ],
+                  "children": [
+                    {
+                      "rule": "edge-gates",
+                      "identity": "-",
+                      "start": 17,
+                      "end": 46,
+                      "outcome": "failure",
+                      "direct_events": [
+                        [
+                          18,
+                          "alias:absent",
+                          "1"
+                        ],
+                        [
+                          22,
+                          "selector:child-tag",
+                          "1"
+                        ],
+                        [
+                          23,
+                          "selector:child-binder",
+                          "1"
+                        ],
+                        [
+                          24,
+                          "dependency:global-euler",
+                          "-"
+                        ]
+                      ],
+                      "children": [
+                        {
+                          "rule": "require",
+                          "identity": "1",
+                          "start": 19,
+                          "end": 21,
+                          "outcome": "success",
+                          "direct_events": [
+                            [
+                              20,
+                              "node:present",
+                              "1"
+                            ]
+                          ],
+                          "children": []
+                        },
+                        {
+                          "rule": "kind-fact",
+                          "identity": "1",
+                          "start": 25,
+                          "end": 45,
+                          "outcome": "failure",
+                          "direct_events": [],
+                          "children": [
+                            {
+                              "rule": "node-binder",
+                              "identity": "1",
+                              "start": 26,
+                              "end": 31,
+                              "outcome": "success",
+                              "direct_events": [
+                                [
+                                  30,
+                                  "selector:parent-tag",
+                                  "0"
+                                ]
+                              ],
+                              "children": [
+                                {
+                                  "rule": "require",
+                                  "identity": "0",
+                                  "start": 27,
+                                  "end": 29,
+                                  "outcome": "success",
+                                  "direct_events": [
+                                    [
+                                      28,
+                                      "node:present",
+                                      "0"
+                                    ]
+                                  ],
+                                  "children": []
+                                }
+                              ]
+                            },
+                            {
+                              "rule": "tag-kind",
+                              "identity": "1",
+                              "start": 32,
+                              "end": 44,
+                              "outcome": "failure",
+                              "direct_events": [],
+                              "children": [
+                                {
+                                  "rule": "edge-gates",
+                                  "identity": "-",
+                                  "start": 33,
+                                  "end": 43,
+                                  "outcome": "failure",
+                                  "direct_events": [
+                                    [
+                                      34,
+                                      "alias:absent",
+                                      "1"
+                                    ],
+                                    [
+                                      38,
+                                      "selector:child-tag",
+                                      "1"
+                                    ],
+                                    [
+                                      39,
+                                      "selector:child-binder",
+                                      "1"
+                                    ],
+                                    [
+                                      40,
+                                      "dependency:global-euler",
+                                      "-"
+                                    ]
+                                  ],
+                                  "children": [
+                                    {
+                                      "rule": "require",
+                                      "identity": "1",
+                                      "start": 35,
+                                      "end": 37,
+                                      "outcome": "success",
+                                      "direct_events": [
+                                        [
+                                          36,
+                                          "node:present",
+                                          "1"
+                                        ]
+                                      ],
+                                      "children": []
+                                    },
+                                    {
+                                      "rule": "kind-fact",
+                                      "identity": "1",
+                                      "start": 41,
+                                      "end": 42,
+                                      "outcome": "failure",
+                                      "direct_events": [],
+                                      "children": []
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "frame_count": 16,
+      "unkeyed_edge_frames": 2,
+      "global_euler_dependencies": 2,
+      "reusable": false
+    },
+    "root-before-parent-poison.events": {
+      "status": "complete-observation",
+      "frames": [
+        {
+          "rule": "global-root-binding-euler",
+          "identity": "-",
+          "start": 1,
+          "end": 2,
+          "outcome": "failure",
+          "direct_events": [],
+          "children": []
+        }
+      ],
+      "frame_count": 1,
+      "unkeyed_edge_frames": 0,
+      "global_euler_dependencies": 0,
+      "reusable": false
+    },
+    "sparse-unobserved.events": {
+      "status": "sparse-unobserved",
+      "frames": [],
+      "reusable": false
+    },
+    "unused-kind.events": {
+      "status": "complete-observation",
+      "frames": [
+        {
+          "rule": "global-root-binding-euler",
+          "identity": "-",
+          "start": 1,
+          "end": 39,
+          "outcome": "success",
+          "direct_events": [
+            [
+              7,
+              "success:global-euler",
+              "-"
+            ]
+          ],
+          "children": [
+            {
+              "rule": "binder-exists",
+              "identity": "0",
+              "start": 2,
+              "end": 3,
+              "outcome": "success",
+              "direct_events": [],
+              "children": []
+            },
+            {
+              "rule": "binder-exists",
+              "identity": "1",
+              "start": 4,
+              "end": 6,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  5,
+                  "node:present",
+                  "0"
+                ]
+              ],
+              "children": []
+            },
+            {
+              "rule": "kind-fact",
+              "identity": "0",
+              "start": 8,
+              "end": 35,
+              "outcome": "success",
+              "direct_events": [],
+              "children": [
+                {
+                  "rule": "node-binder",
+                  "identity": "0",
+                  "start": 9,
+                  "end": 11,
+                  "outcome": "success",
+                  "direct_events": [
+                    [
+                      10,
+                      "selector:root-tag",
+                      "0"
+                    ]
+                  ],
+                  "children": []
+                },
+                {
+                  "rule": "tag-kind",
+                  "identity": "0",
+                  "start": 12,
+                  "end": 34,
+                  "outcome": "success",
+                  "direct_events": [
+                    [
+                      13,
+                      "selector:gen-flag",
+                      "0"
+                    ]
+                  ],
+                  "children": [
+                    {
+                      "rule": "edge-gates",
+                      "identity": "-",
+                      "start": 14,
+                      "end": 33,
+                      "outcome": "success",
+                      "direct_events": [
+                        [
+                          15,
+                          "alias:absent",
+                          "1"
+                        ],
+                        [
+                          19,
+                          "selector:child-tag",
+                          "1"
+                        ],
+                        [
+                          20,
+                          "selector:child-binder",
+                          "1"
+                        ],
+                        [
+                          21,
+                          "dependency:global-euler",
+                          "-"
+                        ]
+                      ],
+                      "children": [
+                        {
+                          "rule": "require",
+                          "identity": "1",
+                          "start": 16,
+                          "end": 18,
+                          "outcome": "success",
+                          "direct_events": [
+                            [
+                              17,
+                              "node:present",
+                              "1"
+                            ]
+                          ],
+                          "children": []
+                        },
+                        {
+                          "rule": "kind-fact",
+                          "identity": "1",
+                          "start": 22,
+                          "end": 32,
+                          "outcome": "success",
+                          "direct_events": [],
+                          "children": [
+                            {
+                              "rule": "node-binder",
+                              "identity": "1",
+                              "start": 23,
+                              "end": 28,
+                              "outcome": "success",
+                              "direct_events": [
+                                [
+                                  27,
+                                  "selector:parent-tag",
+                                  "0"
+                                ]
+                              ],
+                              "children": [
+                                {
+                                  "rule": "require",
+                                  "identity": "0",
+                                  "start": 24,
+                                  "end": 26,
+                                  "outcome": "success",
+                                  "direct_events": [
+                                    [
+                                      25,
+                                      "node:present",
+                                      "0"
+                                    ]
+                                  ],
+                                  "children": []
+                                }
+                              ]
+                            },
+                            {
+                              "rule": "tag-kind",
+                              "identity": "1",
+                              "start": 29,
+                              "end": 31,
+                              "outcome": "success",
+                              "direct_events": [
+                                [
+                                  30,
+                                  "selector:kind-payload-not-forced",
+                                  "1"
+                                ]
+                              ],
+                              "children": []
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "rule": "kind-fact",
+              "identity": "1",
+              "start": 36,
+              "end": 38,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  37,
+                  "cache:kind-hit",
+                  "1"
+                ]
+              ],
+              "children": []
+            }
+          ]
+        }
+      ],
+      "frame_count": 13,
+      "unkeyed_edge_frames": 1,
+      "global_euler_dependencies": 1,
+      "reusable": false
+    },
+    "unused-name.events": {
+      "status": "complete-observation",
+      "frames": [
+        {
+          "rule": "global-root-binding-euler",
+          "identity": "-",
+          "start": 1,
+          "end": 39,
+          "outcome": "success",
+          "direct_events": [
+            [
+              7,
+              "success:global-euler",
+              "-"
+            ]
+          ],
+          "children": [
+            {
+              "rule": "binder-exists",
+              "identity": "0",
+              "start": 2,
+              "end": 3,
+              "outcome": "success",
+              "direct_events": [],
+              "children": []
+            },
+            {
+              "rule": "binder-exists",
+              "identity": "1",
+              "start": 4,
+              "end": 6,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  5,
+                  "node:present",
+                  "0"
+                ]
+              ],
+              "children": []
+            },
+            {
+              "rule": "kind-fact",
+              "identity": "0",
+              "start": 8,
+              "end": 35,
+              "outcome": "success",
+              "direct_events": [],
+              "children": [
+                {
+                  "rule": "node-binder",
+                  "identity": "0",
+                  "start": 9,
+                  "end": 11,
+                  "outcome": "success",
+                  "direct_events": [
+                    [
+                      10,
+                      "selector:root-tag",
+                      "0"
+                    ]
+                  ],
+                  "children": []
+                },
+                {
+                  "rule": "tag-kind",
+                  "identity": "0",
+                  "start": 12,
+                  "end": 34,
+                  "outcome": "success",
+                  "direct_events": [
+                    [
+                      13,
+                      "selector:gen-flag",
+                      "0"
+                    ]
+                  ],
+                  "children": [
+                    {
+                      "rule": "edge-gates",
+                      "identity": "-",
+                      "start": 14,
+                      "end": 33,
+                      "outcome": "success",
+                      "direct_events": [
+                        [
+                          15,
+                          "alias:absent",
+                          "1"
+                        ],
+                        [
+                          19,
+                          "selector:child-tag",
+                          "1"
+                        ],
+                        [
+                          20,
+                          "selector:child-binder",
+                          "1"
+                        ],
+                        [
+                          21,
+                          "dependency:global-euler",
+                          "-"
+                        ]
+                      ],
+                      "children": [
+                        {
+                          "rule": "require",
+                          "identity": "1",
+                          "start": 16,
+                          "end": 18,
+                          "outcome": "success",
+                          "direct_events": [
+                            [
+                              17,
+                              "node:present",
+                              "1"
+                            ]
+                          ],
+                          "children": []
+                        },
+                        {
+                          "rule": "kind-fact",
+                          "identity": "1",
+                          "start": 22,
+                          "end": 32,
+                          "outcome": "success",
+                          "direct_events": [],
+                          "children": [
+                            {
+                              "rule": "node-binder",
+                              "identity": "1",
+                              "start": 23,
+                              "end": 28,
+                              "outcome": "success",
+                              "direct_events": [
+                                [
+                                  27,
+                                  "selector:parent-tag",
+                                  "0"
+                                ]
+                              ],
+                              "children": [
+                                {
+                                  "rule": "require",
+                                  "identity": "0",
+                                  "start": 24,
+                                  "end": 26,
+                                  "outcome": "success",
+                                  "direct_events": [
+                                    [
+                                      25,
+                                      "node:present",
+                                      "0"
+                                    ]
+                                  ],
+                                  "children": []
+                                }
+                              ]
+                            },
+                            {
+                              "rule": "tag-kind",
+                              "identity": "1",
+                              "start": 29,
+                              "end": 31,
+                              "outcome": "success",
+                              "direct_events": [
+                                [
+                                  30,
+                                  "selector:kind-payload-not-forced",
+                                  "1"
+                                ]
+                              ],
+                              "children": []
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "rule": "kind-fact",
+              "identity": "1",
+              "start": 36,
+              "end": 38,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  37,
+                  "cache:kind-hit",
+                  "1"
+                ]
+              ],
+              "children": []
+            }
+          ]
+        }
+      ],
+      "frame_count": 13,
+      "unkeyed_edge_frames": 1,
+      "global_euler_dependencies": 1,
+      "reusable": false
+    },
+    "unused-next.events": {
+      "status": "complete-observation",
+      "frames": [
+        {
+          "rule": "global-root-binding-euler",
+          "identity": "-",
+          "start": 1,
+          "end": 38,
+          "outcome": "success",
+          "direct_events": [
+            [
+              7,
+              "success:global-euler",
+              "-"
+            ]
+          ],
+          "children": [
+            {
+              "rule": "binder-exists",
+              "identity": "0",
+              "start": 2,
+              "end": 3,
+              "outcome": "success",
+              "direct_events": [],
+              "children": []
+            },
+            {
+              "rule": "binder-exists",
+              "identity": "1",
+              "start": 4,
+              "end": 6,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  5,
+                  "node:present",
+                  "0"
+                ]
+              ],
+              "children": []
+            },
+            {
+              "rule": "kind-fact",
+              "identity": "0",
+              "start": 8,
+              "end": 34,
+              "outcome": "success",
+              "direct_events": [],
+              "children": [
+                {
+                  "rule": "node-binder",
+                  "identity": "0",
+                  "start": 9,
+                  "end": 11,
+                  "outcome": "success",
+                  "direct_events": [
+                    [
+                      10,
+                      "selector:root-tag",
+                      "0"
+                    ]
+                  ],
+                  "children": []
+                },
+                {
+                  "rule": "tag-kind",
+                  "identity": "0",
+                  "start": 12,
+                  "end": 33,
+                  "outcome": "success",
+                  "direct_events": [
+                    [
+                      13,
+                      "selector:gen-flag",
+                      "0"
+                    ]
+                  ],
+                  "children": [
+                    {
+                      "rule": "edge-gates",
+                      "identity": "-",
+                      "start": 14,
+                      "end": 32,
+                      "outcome": "success",
+                      "direct_events": [
+                        [
+                          15,
+                          "alias:absent",
+                          "1"
+                        ],
+                        [
+                          19,
+                          "selector:child-tag",
+                          "1"
+                        ],
+                        [
+                          20,
+                          "selector:child-binder",
+                          "1"
+                        ],
+                        [
+                          21,
+                          "dependency:global-euler",
+                          "-"
+                        ]
+                      ],
+                      "children": [
+                        {
+                          "rule": "require",
+                          "identity": "1",
+                          "start": 16,
+                          "end": 18,
+                          "outcome": "success",
+                          "direct_events": [
+                            [
+                              17,
+                              "node:present",
+                              "1"
+                            ]
+                          ],
+                          "children": []
+                        },
+                        {
+                          "rule": "kind-fact",
+                          "identity": "1",
+                          "start": 22,
+                          "end": 31,
+                          "outcome": "success",
+                          "direct_events": [],
+                          "children": [
+                            {
+                              "rule": "node-binder",
+                              "identity": "1",
+                              "start": 23,
+                              "end": 28,
+                              "outcome": "success",
+                              "direct_events": [
+                                [
+                                  27,
+                                  "selector:parent-tag",
+                                  "0"
+                                ]
+                              ],
+                              "children": [
+                                {
+                                  "rule": "require",
+                                  "identity": "0",
+                                  "start": 24,
+                                  "end": 26,
+                                  "outcome": "success",
+                                  "direct_events": [
+                                    [
+                                      25,
+                                      "node:present",
+                                      "0"
+                                    ]
+                                  ],
+                                  "children": []
+                                }
+                              ]
+                            },
+                            {
+                              "rule": "tag-kind",
+                              "identity": "1",
+                              "start": 29,
+                              "end": 30,
+                              "outcome": "success",
+                              "direct_events": [],
+                              "children": []
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "rule": "kind-fact",
+              "identity": "1",
+              "start": 35,
+              "end": 37,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  36,
+                  "cache:kind-hit",
+                  "1"
+                ]
+              ],
+              "children": []
+            }
+          ]
+        }
+      ],
+      "frame_count": 13,
+      "unkeyed_edge_frames": 1,
+      "global_euler_dependencies": 1,
+      "reusable": false
+    },
+    "valid.events": {
+      "status": "complete-observation",
+      "frames": [
+        {
+          "rule": "global-root-binding-euler",
+          "identity": "-",
+          "start": 1,
+          "end": 38,
+          "outcome": "success",
+          "direct_events": [
+            [
+              7,
+              "success:global-euler",
+              "-"
+            ]
+          ],
+          "children": [
+            {
+              "rule": "binder-exists",
+              "identity": "0",
+              "start": 2,
+              "end": 3,
+              "outcome": "success",
+              "direct_events": [],
+              "children": []
+            },
+            {
+              "rule": "binder-exists",
+              "identity": "1",
+              "start": 4,
+              "end": 6,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  5,
+                  "node:present",
+                  "0"
+                ]
+              ],
+              "children": []
+            },
+            {
+              "rule": "kind-fact",
+              "identity": "0",
+              "start": 8,
+              "end": 34,
+              "outcome": "success",
+              "direct_events": [],
+              "children": [
+                {
+                  "rule": "node-binder",
+                  "identity": "0",
+                  "start": 9,
+                  "end": 11,
+                  "outcome": "success",
+                  "direct_events": [
+                    [
+                      10,
+                      "selector:root-tag",
+                      "0"
+                    ]
+                  ],
+                  "children": []
+                },
+                {
+                  "rule": "tag-kind",
+                  "identity": "0",
+                  "start": 12,
+                  "end": 33,
+                  "outcome": "success",
+                  "direct_events": [
+                    [
+                      13,
+                      "selector:gen-flag",
+                      "0"
+                    ]
+                  ],
+                  "children": [
+                    {
+                      "rule": "edge-gates",
+                      "identity": "-",
+                      "start": 14,
+                      "end": 32,
+                      "outcome": "success",
+                      "direct_events": [
+                        [
+                          15,
+                          "alias:absent",
+                          "1"
+                        ],
+                        [
+                          19,
+                          "selector:child-tag",
+                          "1"
+                        ],
+                        [
+                          20,
+                          "selector:child-binder",
+                          "1"
+                        ],
+                        [
+                          21,
+                          "dependency:global-euler",
+                          "-"
+                        ]
+                      ],
+                      "children": [
+                        {
+                          "rule": "require",
+                          "identity": "1",
+                          "start": 16,
+                          "end": 18,
+                          "outcome": "success",
+                          "direct_events": [
+                            [
+                              17,
+                              "node:present",
+                              "1"
+                            ]
+                          ],
+                          "children": []
+                        },
+                        {
+                          "rule": "kind-fact",
+                          "identity": "1",
+                          "start": 22,
+                          "end": 31,
+                          "outcome": "success",
+                          "direct_events": [],
+                          "children": [
+                            {
+                              "rule": "node-binder",
+                              "identity": "1",
+                              "start": 23,
+                              "end": 28,
+                              "outcome": "success",
+                              "direct_events": [
+                                [
+                                  27,
+                                  "selector:parent-tag",
+                                  "0"
+                                ]
+                              ],
+                              "children": [
+                                {
+                                  "rule": "require",
+                                  "identity": "0",
+                                  "start": 24,
+                                  "end": 26,
+                                  "outcome": "success",
+                                  "direct_events": [
+                                    [
+                                      25,
+                                      "node:present",
+                                      "0"
+                                    ]
+                                  ],
+                                  "children": []
+                                }
+                              ]
+                            },
+                            {
+                              "rule": "tag-kind",
+                              "identity": "1",
+                              "start": 29,
+                              "end": 30,
+                              "outcome": "success",
+                              "direct_events": [],
+                              "children": []
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "rule": "kind-fact",
+              "identity": "1",
+              "start": 35,
+              "end": 37,
+              "outcome": "success",
+              "direct_events": [
+                [
+                  36,
+                  "cache:kind-hit",
+                  "1"
+                ]
+              ],
+              "children": []
+            }
+          ]
+        }
+      ],
+      "frame_count": 13,
+      "unkeyed_edge_frames": 1,
+      "global_euler_dependencies": 1,
+      "reusable": false
+    }
+  },
+  "production_eligible": false
+}
