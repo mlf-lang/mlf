@@ -1,0 +1,16 @@
+{
+  "run": 44218625636,
+  "commit": "404514a11dd748fac4c404bad1efa9cb88352efc",
+  "artifact": 14389880847,
+  "zip_sha256": "f1b36a4bdfed014473c6f9419a1dc2af641eede0da0c749dd1b00e797355fdf7",
+  "job_complete": true,
+  "failed_before_install": true,
+  "compiler_executed": false,
+  "finite_executed": false,
+  "inventory": {
+    "files": [],
+    "bytes": 0
+  },
+  "error": "bounded.GateError: only exact qualification branch admitted",
+  "repair": "Exact new branch guard; negative old/main guards, fixture mapping and original-helper prefix controls"
+}

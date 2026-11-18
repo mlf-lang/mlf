@@ -2,11 +2,14 @@
 import json,re,sys,subprocess
 from bounded import *
 from instrument import instrument
+from static_gate import verify,verify_original
 HERE=P(__file__).resolve().parent
 root=P(sys.argv[1]).resolve();source=P(sys.argv[2]).resolve();art=root/'artifacts'
 ci_only();sup=Supervisor(art,420,400,'build');env=safe_env(root,root/'ghc')
 rec=dict(complete=False,errors=[],production=False,performance_claim=False)
 try:
+    verify()
+    verify_original((source/'libraries/mlf-inference/Bootstrap/Graph.hs').read_text())
     need(subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()=='fc300bc9fdc389b585cbef0630fc8915d53e89c5','baseline head')
     need(not subprocess.check_output(['git','status','--porcelain','--untracked-files=no'],cwd=source),'baseline dirty')
     rec['resources']=resource_floor(root,8)

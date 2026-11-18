@@ -110,7 +110,7 @@ def ci_identity():
     need(re.fullmatch(r'[0-9a-f]{40}',value['GITHUB_SHA']) is not None,'invalid CI commit identity')
     for key in ['GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT']:need(re.fullmatch(r'[1-9][0-9]*',value[key]) is not None,'invalid CI run identity')
     need(value['GITHUB_REPOSITORY']=='mlf-lang/mlf','only target repository admitted')
-    need(value['GITHUB_REF']=='refs/heads/perf/resolve-memo-finite-20261118','only exact qualification branch admitted')
+    need(value['GITHUB_REF']=='refs/heads/perf/binder-fusion-finite-20261118','only exact qualification branch admitted')
     return value
 def ci_only():
     need(os.environ.get('GITHUB_ACTIONS')=='true','only GitHub Actions admitted')
