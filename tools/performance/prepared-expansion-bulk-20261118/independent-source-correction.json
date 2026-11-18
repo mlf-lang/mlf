@@ -1,0 +1,21 @@
+{
+  "verdict": "CORRECTION_VERIFIED_FINITE_RETRY_ONLY_AFTER_RESOURCE_CLEARANCE",
+  "failed_run": 44229855191,
+  "failure": "source admission expected SHA was computed from incorrectly LF-appended local materialization",
+  "failure_zip_sha256": "c3c72e8daf4aa25576cc1b9bcd415aa0a0e7c4b8c0b33b3dbe092c8d328963bd",
+  "inventory_files": 25,
+  "install_completed": true,
+  "gcc_ghc_fixture_steps_started": false,
+  "failure_preserved": true,
+  "cleanup_verified": true,
+  "remote_blob_independently_refetched": "ac4807fa23c0763ba83a0f9c52c1c734cc059720",
+  "corrected_source_bytes": 99201,
+  "corrected_source_sha256": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612",
+  "corrected_candidate_sha256": "3b6e328f5940f4f2d06cda7b38d0e7366114d87cc2f6c71354acbfb433ea6ed2",
+  "exact_correction": "Remove one extra terminal LF from original and candidate; only two instrument hashes changed; patch byte-identical",
+  "instrument_reconstruction": "PASS",
+  "performance_claim": false,
+  "tests_passed": false,
+  "finite_controller_started": true,
+  "finite_fixture_started": false
+}

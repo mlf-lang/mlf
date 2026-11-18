@@ -1,0 +1,53 @@
+{
+  "artifact_sha256": "c3c72e8daf4aa25576cc1b9bcd415aa0a0e7c4b8c0b33b3dbe092c8d328963bd",
+  "verified_inventory_files": 25,
+  "finite": {
+    "complete": false,
+    "errors": [
+      "ValueError('original Solver pin')"
+    ],
+    "production": false,
+    "performance_claim": false,
+    "resources": {
+      "mem_available_KiB": 15350292,
+      "disk_bytes": 83316224000,
+      "required_disk_bytes": 8589934592
+    },
+    "limit_policy_phase": "build",
+    "child_fsize_limit_bytes": 268435456,
+    "cleanup": true,
+    "whole_s": 4.9619384160000095,
+    "within_whole": true,
+    "process_group_scope_only": true,
+    "global_descendants_or_ECHILD_claim": false
+  },
+  "outer": {
+    "complete": false,
+    "phase": "terminal",
+    "command": [
+      "/usr/bin/python3",
+      "controls/tools/performance/prepared-expansion-bulk-20261118/finite.py",
+      "/home/runner/work/_temp/edge-44229855191-1",
+      "/home/runner/work/mlf/mlf/baseline"
+    ],
+    "work_seconds": 420.0,
+    "cleanup_seconds": 10.0,
+    "cleanup_complete": true,
+    "reaped": [
+      {
+        "pid": 73442,
+        "status": 1
+      }
+    ],
+    "signals": [],
+    "scope": "owned descendants via Linux subreaper and direct-child pidfds; supervisor SIGKILL not contained",
+    "initial_discovery": {
+      "mode": "task-children"
+    },
+    "root_pid": 73442,
+    "reason": "target exited",
+    "target_exit_code": 1,
+    "survivors": [],
+    "cancel_signals": []
+  }
+}
