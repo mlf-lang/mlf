@@ -1,0 +1,2 @@
+# Foundation15 preparation versus finish diagnostic
+Exact main A versus instrumentation-only P. Adds prepare_indexed_ms and finish_open_ms within compile_open_ms. WHNF timing, NOT pure algorithm cost centres. Preparation includes indexedMembers/external merge/class lowering; finishing includes compileGroupBody/Open.environment/Open.check/ownership checks. Laziness can shift earlier work to finishing. Original checks retained; complete output byte equality mandatory. No GHC comparison, no speedup claim, native fixed-point remains paused.
