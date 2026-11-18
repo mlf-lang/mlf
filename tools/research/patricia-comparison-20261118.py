@@ -3,7 +3,7 @@ ROOT=pathlib.Path.cwd(); OUT=ROOT/'evidence'; OUT.mkdir(exist_ok=True)
 def load(path):
     m=types.ModuleType(path.stem);m.__file__=str(path);exec(compile(path.read_bytes(),str(path),'exec'),m.__dict__);return m
 def sha(p): return hashlib.sha256(p.read_bytes()).hexdigest()
-pins={'old':'d37094188cbee0c4335c35cf1e22d45830dbd386','new':'ff099d8b144003fd9264c939b42ff7f669d2907f'}
+pins={'old':'798282547f3169d6d729d17c088f5cc29ac3eab0','new':'ee495d5783fca3c26a3c0e659ebeac1bab76a37d'}
 roots={k:(ROOT/k).resolve() for k in pins}
 H=load(roots['new']/'tools/performance/a1-private-index/helper.py')
 limits=dict(address_space_per_process_bytes=6*1024**3,disk_free_floor_bytes=5*1024**3,host_available_floor_bytes=3*1024**3,process_tree_rss_bytes=5*1024**3,max_work_bytes=2*1024**3,wall_seconds=600)

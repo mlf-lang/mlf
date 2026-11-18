@@ -1,7 +1,7 @@
 name: Bounded Patricia comparison
 on:
   push:
-    branches: [perf/patricia-bisect1-20261118]
+    branches: [perf/patricia-merge-parents-20261118]
 permissions:
   contents: read
 concurrency:
@@ -9,7 +9,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   compare:
-    if: github.repository == 'mlf-lang/mlf' && github.ref == 'refs/heads/perf/patricia-bisect1-20261118'
+    if: github.repository == 'mlf-lang/mlf' && github.ref == 'refs/heads/perf/patricia-merge-parents-20261118'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -19,8 +19,8 @@ jobs:
           persist-credentials: false
       - name: Isolated pinned source worktrees
         run: |
-          git worktree add --detach old d37094188cbee0c4335c35cf1e22d45830dbd386
-          git worktree add --detach new ff099d8b144003fd9264c939b42ff7f669d2907f
+          git worktree add --detach old 798282547f3169d6d729d17c088f5cc29ac3eab0
+          git worktree add --detach new ee495d5783fca3c26a3c0e659ebeac1bab76a37d
       - name: Official pinned GHC
         timeout-minutes: 20
         run: |
@@ -40,10 +40,10 @@ jobs:
           set -euo pipefail
           mkdir -p evidence
           for source in old new; do
-            (cd "$source" && python3 -B tools/shared/crc_process_supervisor.py --receipt ../evidence/"$source-build-supervisor.json" --work-seconds 1800 --cleanup-seconds 10 "$(command -v python3)" -B tools/shared/resource_watchdog.py --seconds 1740 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 ../evidence/"$source-build-guard" python3 tools/shared/build.py --bootstrap-only --optimization 2 --build-dir .mlf-build/shared-ghc) > "evidence/$source-build.log" 2>&1
+            (cd "$source" && python3 -B ../old/tools/shared/crc_process_supervisor.py --receipt ../evidence/"$source-build-supervisor.json" --work-seconds 1800 --cleanup-seconds 10 "$(command -v python3)" -B tools/shared/resource_watchdog.py --seconds 1740 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 ../evidence/"$source-build-guard" python3 tools/shared/build.py --bootstrap-only --optimization 2 --build-dir .mlf-build/shared-ghc) > "evidence/$source-build.log" 2>&1
           done
       - name: At most two order-balanced emit pairs
-        run: python3 -B new/tools/shared/crc_process_supervisor.py --receipt evidence/comparison-supervisor.json --work-seconds 1800 --cleanup-seconds 10 "$(command -v python3)" -B tools/research/patricia-comparison-20261118.py
+        run: python3 -B old/tools/shared/crc_process_supervisor.py --receipt evidence/comparison-supervisor.json --work-seconds 1800 --cleanup-seconds 10 "$(command -v python3)" -B tools/research/patricia-comparison-20261118.py
       - name: Preserve all diagnostic evidence
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
