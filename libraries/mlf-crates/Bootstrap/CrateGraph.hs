@@ -501,7 +501,17 @@ module Bootstrap.CrateGraph where {
       }
     }
   } in collect initialBudget [tree] [] [] pageNodes 0 0 M.empty IM.empty;
-  relativePrepared original lowered names metadata = case (,) original lowered of {
+  matchingSourceMembers original lowered = case (,) original lowered of {
+    (,) [(,,) name annotation body] [(,,) other next candidate] ->
+      eqString name other && eqMaybe E.eqSAnnotation annotation next &&
+        (case candidate of {
+          SChecked ty inner -> null (Q.leadingTypes ty) && matchedLower body inner;
+          _ -> matchedLower body candidate
+        });
+    _ -> False
+  };
+  relativePrepared original lowered names metadata = relativePreparedWith False original lowered names metadata;
+  relativePreparedWith matched original lowered names metadata = case (,) original lowered of {
     (,) [(,,) name annotation body] [(,,) nextName nextAnnotation candidate] ->
       if templateNodesLeft 257 body > 0 || not (eqString name nextName && eqMaybe E.eqSAnnotation annotation nextAnnotation)
       then Nothing else case preparedLocation 64 body of {
@@ -519,7 +529,7 @@ module Bootstrap.CrateGraph where {
             stringUtf8Length (Q.node "member" [name,caption])
         } in if not compactPreparedLimits then Nothing else case remainingPreparedBytes 249 budget (append names metadata) of {
           Nothing -> Nothing;
-          Just available -> if not (matchedLower body normalized) then Nothing else
+          Just available -> if not (matched || matchedLower body normalized) then Nothing else
             case packedOrigin span originBytes available body preamble of {
               Just text -> if stringUtf8Length text <= maxField then Just ((,) text descriptor) else Nothing;
               Nothing -> Nothing
@@ -537,8 +547,9 @@ module Bootstrap.CrateGraph where {
     original = map member (Source.groupOriginal prepared);
     lowered = map member (Source.groupMembers prepared);
     names = Q.referenceDefinitions table;
-    metadata = Q.sourceGroupMetadataWith token candidate prepared
-  } in case relativePrepared original lowered names metadata of {
+    metadata = Q.sourceGroupMetadataWith token candidate prepared;
+    sameSource = matchingSourceMembers (Source.groupOriginal prepared) (Source.groupMembers prepared)
+  } in case relativePreparedWith sameSource original lowered names metadata of {
     -- A relative pair has at least 257 syntax nodes on the original
     -- application/lambda spine. Dropping a location wrapper preserves its
     -- subtree; the lowered key therefore exceeds the 256-node retention limit.
