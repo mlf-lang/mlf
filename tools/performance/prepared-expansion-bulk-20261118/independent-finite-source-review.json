@@ -1,0 +1,20 @@
+{
+  "verdict": "GO_BOUNDED_FINITE_ONLY_AFTER_RESOURCE_CLEARANCE",
+  "files": {
+    "Main.hs": "c908cee106ae22f3d8174d62d0081d0b01c8712adf0b48de0bb882da56dca9ea",
+    "finite.py": "736c946fcd2bb44503d60a9605fdaa63448325f49e104eb4db23b410af03e3e6",
+    "bounded.py": "3108be127ff53d36c04cd8debaac1c4ebaa7b9f5248fa28247abe6907f089b4e",
+    "workflow.yml": "7cf2920ec804f34b5b8857e5d39b969c8193391b746daf70c3fdd848aa9bf098",
+    "instrument.py": "eb45df1590c6cd8f4e637fedb43b18d20429e51da4a7196d89980825a8bd0fbb"
+  },
+  "actual_haskell_execution": false,
+  "performance_admission": false,
+  "python_syntax": "PASS",
+  "marker_inventory_branch_checks": "PASS",
+  "notes": [
+    "Prior stale binder-fusion branch gate corrected.",
+    "Fixture is 11 cases/86 observations/88 files, known literal baseline cases plus authored translated/exhaustion expectations.",
+    "All finite source claims remain unqualified until actual O0/O2 run and output audit.",
+    "Current source proof requires internal standard-constructor valid trie domain; arbitrary raw prepare alone is insufficient."
+  ]
+}
