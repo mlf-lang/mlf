@@ -69,11 +69,32 @@ module Bootstrap.OpenFragment
   bindings (Fragment _ _ _ bs _ _ _) = bs;
   usedParameters (Fragment _ _ _ _ used _ _) = used;
   fingerprint (Fragment _ _ _ _ _ stamp _) = stamp;
-  stamp env ps term bs = Separate.fingerprint (Separate.pack
-    [Separate.pack (map (compose D.prettyDeclaration canonicalDeclaration) (declarations env)),
-     Separate.pack (map (\((,) n ty) -> Separate.pack [showInt (X.nameId n), X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) ps),
-     Pretty.prettyTerm term,
-     Separate.pack (map (\((,) n ty) -> Separate.pack [X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) bs)]);
+  -- The fingerprint frames each field with its Unicode scalar length. Hash
+  -- successive pages of pretty-printer output while counting that length,
+  -- then prepend the length with the same polynomial composition as pack.
+  termEncoding term = let {
+    consume :: [] String -> [] String -> Int -> Int -> Int -> Int -> Separate.FingerprintEncoding;
+    consume chunks page slots count a b = case chunks of {
+      [] -> flush [] page count a b True;
+      (:) piece rest -> seq piece (if slots == 1 then flush rest ((:) piece page) count a b False
+        else consume rest ((:) piece page) (slots - 1) count a b)
+    };
+    flush rest page count a b done = let {
+      text = concatStringList (reverse page);
+      size = stringLength text;
+      total = count + size
+    } in case Separate.canonicalFingerprintText text 0 size a b of {
+      (,) x y -> seq total (seq x (seq y (if done then
+        Separate.FingerprintEncoding total (Separate.fingerprintPower 65599 total 2147483647)
+          (Separate.fingerprintPower 131 total 2147483629) x y
+        else consume rest [] 128 total x y)))
+    }
+  } in consume (Pretty.termChunks 0 term []) [] 128 0 0 0;
+  stamp env ps term bs = Separate.encodingFingerprint (Separate.encodingPack
+    [Separate.encodingText (Separate.pack (map (compose D.prettyDeclaration canonicalDeclaration) (declarations env))),
+     Separate.encodingText (Separate.pack (map (\((,) n ty) -> Separate.pack [showInt (X.nameId n), X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) ps)),
+     termEncoding term,
+     Separate.encodingText (Separate.pack (map (\((,) n ty) -> Separate.pack [X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) bs))]);
   make env ps term bs = fragmentWith env ps term bs
     (Boundary.nubNames (Boundary.freeNames term)) (stamp env ps term bs);
   -- Hints are labels, never binder identities. This transformation starts from

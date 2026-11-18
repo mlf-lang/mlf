@@ -800,6 +800,25 @@ projectedBindingChecks = do
     snd3 (D.Bound _ _ rhs) = rhs
 
 
+fragmentFingerprintChecks = do
+  let right (T.Right value) = pure value
+      right (T.Left message) = fail (H.unpack message)
+  env <- right (Open.environment [])
+  let ty = T.XCon "Int" []
+      arg = T.XName 0 "arg:λ"
+      result = T.XName 1 "結果😀"
+      add a b = T.XApp (T.XApp (T.XPrimitive T.PAddInt []) a) b
+      tree 0 = T.XVarTerm arg
+      tree n = add (tree (n-1)) (tree (n-1))
+      parameters = Separate.pack [Separate.pack ["0", "arg:λ", "Int"]]
+      exports = Separate.pack [Separate.pack ["結果😀", "Int"]]
+  forM_ [0..8 :: Int] $ \depth -> do
+    let body = T.XLet result (tree depth) (T.XConstructor "()" [])
+        fields = [Separate.pack [], parameters, Pretty.prettyTerm body, exports]
+    fragment <- right (Open.check env [(arg,ty)] body)
+    check "fragment stamp matches scalar-length-framed pretty text"
+      (H.unpack (Separate.fingerprint (Separate.pack fields))) (H.unpack (Open.fingerprint fragment))
+
 main = do
   let chain = [("v" ++ show i,["v" ++ show (i+1)]) | i <- [0..24 :: Int]]
       wide = [("top",map fst chain)] ++ chain
@@ -824,6 +843,7 @@ main = do
   resolverChecks
   protectionChecks
   projectedBindingChecks
+  fragmentFingerprintChecks
   importConventionChecks
   typedClassChecks
   putStrLn "1032 ordered SCC and reach comparisons, query DAG and package controls passed"
