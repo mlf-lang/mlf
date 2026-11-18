@@ -4,7 +4,12 @@ def load(path):
     m=types.ModuleType(path.stem);m.__file__=str(path);exec(compile(path.read_bytes(),str(path),'exec'),m.__dict__);return m
 def sha(p): return hashlib.sha256(p.read_bytes()).hexdigest()
 pins={'old':'d8325d909c249fd82d4ad6173d44d8818cc6f8bf','new':'ee495d5783fca3c26a3c0e659ebeac1bab76a37d'}
-roots={k:(ROOT/k).resolve() for k in pins}
+BASE={'old':'old','new':'new','old_swap':'old','new_swap':'new'}
+DONOR={'old_swap':'new','new_swap':'old'}
+surface='libraries/mlf-frontend/Bootstrap/Surface.hs'
+surf_blobs={'old':'3e8082684587d25915d7f209bbf74d32e7c3dcc7','new':'a11262a585792e391d02e379e11e233af627fff0'}
+roots={k:(ROOT/k).resolve() for k in BASE}
+def git(root,*args):return subprocess.check_output(['git','-C',str(root),*args],text=True).strip()
 H=load(roots['new']/'tools/performance/a1-private-index/helper.py')
 limits=dict(address_space_per_process_bytes=6*1024**3,disk_free_floor_bytes=5*1024**3,host_available_floor_bytes=3*1024**3,process_tree_rss_bytes=5*1024**3,max_work_bytes=2*1024**3,wall_seconds=600)
 record={'complete':False,'scope':'type-only bounded same-runner diagnosis; not semantic or speed qualification','pins':pins,'limits':limits,'legs':[],'host':H.host()}
@@ -12,7 +17,14 @@ def save(): (OUT/'comparison.json').write_text(json.dumps(record,indent=2)+'\n')
 save()
 fixture=None
 for label,root in roots.items():
-    assert subprocess.check_output(['git','-C',str(root),'rev-parse','HEAD'],text=True).strip()==pins[label]
+    head=git(root,'rev-parse','HEAD');base=pins[BASE[label]]
+    if label in DONOR:
+        assert git(root,'show','-s','--format=%P',head)==base
+        assert git(root,'diff','--name-only',base,head).splitlines()==[surface]
+        assert git(root,'rev-parse','HEAD:'+surface)==surf_blobs[DONOR[label]]
+    else:assert head==base and git(root,'rev-parse','HEAD:'+surface)==surf_blobs[label]
+    assert git(root,'status','--porcelain','--untracked-files=no')==''
+    assert not git(root,'diff','--name-only','HEAD')
     producer=root/'.mlf-build/shared-ghc'
     H.authenticate(producer,root)
     text,wanted,_,_=load(root/'tools/performance/patricia/run_native.py').fixture('rank-views')
@@ -53,13 +65,28 @@ cohort={'epoch':'new-runner independent; never substitute for historical hashes'
 if not cohort['image'] or not cohort['run_id']:raise RuntimeError('missing environment identity')
 for l,r in roots.items():
     receipt=json.loads((r/'.mlf-build/shared-ghc/receipt.json').read_text())
-    if any(canon(receipt[k])!=v for k,v in locked_inputs[l].items()):raise RuntimeError('pinned intermediate identity mismatch: '+l)
+    actual={k:canon(receipt[k]) for k in locked_inputs[BASE[l]]}
+    if l not in DONOR:
+        if actual!=locked_inputs[l]:raise RuntimeError('pinned native intermediate mismatch: '+l)
+    else:
+        base=BASE[l];donor=DONOR[l];baseline=json.loads((roots[base]/'.mlf-build/shared-ghc/receipt.json').read_text())
+        donor_receipt=json.loads((roots[donor]/'.mlf-build/shared-ghc/receipt.json').read_text())
+        def normalized(x,root):return json.loads(json.dumps(x,sort_keys=True).replace(str(root)+'/', '<worktree>/'))
+        for k in ['resolved_modules','shared_inputs','configuration_inputs','resolved_host_modules','host_inputs','flags','ghc','cc','installed_dependencies','toolchain']:
+            bx=normalized(baseline[k],roots[base]);vx=normalized(receipt[k],r)
+            if k in ('resolved_modules','shared_inputs'):
+                bx['Bootstrap.Surface']=normalized(donor_receipt[k]['Bootstrap.Surface'],roots[donor])
+            if bx!=vx:raise RuntimeError('hybrid admitted inputs mismatch '+l+' '+k)
+        if set(receipt['object_inputs'])!=set(baseline['object_inputs']):raise RuntimeError('object membership mismatch')
+    record[l]['git_head']=git(r,'rev-parse','HEAD')
     ex=r/'.mlf-build/shared-ghc/bin/emlf'
     m=runtime_manifest(ex)
     if m['binary_sha256']!=record[l]['binary_sha256'] or m['binary_sha256']!=receipt['outputs']['emlf']['sha256']:raise RuntimeError('unverified executable')
-    cohort['members'][l]={'runtime':m,'package_database_sha256':receipt['package_database_sha256'],'receipt_sha256':record[l]['receipt_sha256'],'intermediate_sha256':locked_inputs[l]}
+    cohort['members'][l]={'runtime':m,'package_database_sha256':receipt['package_database_sha256'],'receipt_sha256':record[l]['receipt_sha256'],'intermediate_sha256':actual}
 a,b=cohort['members']['old'],cohort['members']['new']
 if a['runtime']['loaded_elf_dependencies']!=b['runtime']['loaded_elf_dependencies'] or a['package_database_sha256']!=b['package_database_sha256'] or a['runtime']['binary_sha256']==b['runtime']['binary_sha256']:raise RuntimeError('mismatched shared runtime or non-distinct producers')
+for member in cohort['members'].values():
+    if member['runtime']['loaded_elf_dependencies']!=a['runtime']['loaded_elf_dependencies'] or member['package_database_sha256']!=a['package_database_sha256']:raise RuntimeError('inconsistent 4-build runtime')
 manifest=OUT/'new-epoch-cohort.json';manifest.write_text(json.dumps(cohort,indent=2)+'\n');frozen=sha(manifest)
 def verify_frozen(l):
     if sha(manifest)!=frozen:raise RuntimeError('mutated manifest')
@@ -69,77 +96,41 @@ record['epoch_manifest_sha256']=frozen;save()
 
 helper=roots['new']/'tools/performance/a1-private-index/helper.py'
 assert subprocess.check_output(['git','hash-object',str(helper)],text=True).strip()=='1feffe5d9f360a8fbb9f27868985d4a1a97ab010'
-base_group=H.process_group
-original=inspect.getsource(base_group)
-needle="            if int(fields[2]) == group or int(fields[3]) == group:"
-assert original.count(needle)==1
-modified=original.replace(needle,"            if entry.name == str(group): capture(group,fields)\n"+needle)
-HINT=0x4200000000
-MIB=1<<20
-HIST={}
-def map_shape(body,cap):
-    spans=[]; started=False; total=0
-    for line in body.splitlines():
-        cols=line.split(None,5);lo,hi=[int(v,16) for v in cols[0].split('-')]
-        valid=(len(cols)==5 and cols[1] in ('rw-p','---p') and cols[2].strip('0')=='' and cols[3]=='00:00' and cols[4]=='0')
-        if not started:
-            if lo!=HINT:continue
-            started=True
-        if lo!=HINT+total or not valid:break
-        spans.append([cols[1],hi-lo]);total+=hi-lo
-    want=(int(cap*0.666)//MIB)*MIB
-    return {'hint_exact':started,'predicted_bytes':want,'observed_bytes':total,'extent_count':len(spans),'normalized_spans':spans,'rw_bytes':sum(b for a,b in spans if a=='rw-p'),'none_bytes':sum(b for a,b in spans if a=='---p'),'match':bool(spans and total in (want,want+MIB))}
-def map_once(pid,fields,exe,cap):
-    box=pathlib.Path('/proc')/str(pid)
-    def stamp():
-        return ((box/'stat').read_text().rsplit(') ',1)[1].split()[19],os.readlink(box/'exe'))
-    expect=(fields[19],str(exe.resolve()))
-    if stamp()!=expect:return {'match':False,'error':'leader identity before read'}
-    body=(box/'maps').read_text();line=next(x for x in (box/'limits').read_text().splitlines() if x.startswith('Max address space'))
-    if stamp()!=expect:return {'match':False,'error':'leader identity after read'}
-    o=map_shape(body,cap);ns=line.split()[3:5]
-    o.update(same_leader=True,soft_hard_as=ns)
-    o['match']=o['match'] and ns==[str(cap),str(cap)]
-    return o
-record['scope']='NEW COHORT ONLY: same-job independently frozen binaries and runtime, untreated then observed 6 GiB controls followed by reduced 5.5 GiB; no equivalence to historical ELF identities, timing or allocation attribution.'
-record['schedule']=['plain-old-6','plain-new-6','observed-old-6','observed-new-6','observed-new-5.5','observed-old-5.5']
-record['observer_rows']=['elapsed_since_first_poll_s','minflt','majflt','utime_ticks','stime_ticks','vsize_bytes','rss_bytes']
-page_size=os.sysconf('SC_PAGE_SIZE')
-record['page_size_bytes']=page_size;record['clock_ticks_per_second']=os.sysconf('SC_CLK_TCK')
-for i,(label,cap) in enumerate([('old',6<<30),('new',6<<30),('old',6<<30),('new',6<<30),('new',11<<29),('old',11<<29)]):
-    verify_frozen(label)
-    observed=i>=2
-    rows=[];start=None;next_sample=0.0;maps=None;root=roots[label];exe=root/'.mlf-build/shared-ghc/bin/emlf';dest=OUT/('leg-'+str(i)+'-'+label)
-    def capture(group,fields):
-        global start,next_sample,maps
-        now=time.monotonic()
-        if now<next_sample or len(rows)>=602:return
-        if start is None:start=now
-        next_sample=now+1.0
-        rows.append([round(now-start,4),int(fields[7]),int(fields[9]),int(fields[11]),int(fields[12]),int(fields[20]),int(fields[21])*page_size])
-        if maps is None and now-start>=2.0 and fields[0]!='Z':
-            maps={'match':False,'error':'read failed'}
-            try: maps=map_once(group,fields,exe,cap)
-            except (OSError,ValueError,IndexError,StopIteration) as e:maps={'match':False,'error':type(e).__name__}
-    ns=dict(base_group.__globals__);ns['capture']=capture
-    exec(compile(modified,'<exact-guard-stat-observer>','exec'),ns);H.process_group=ns['process_group'] if observed else base_group
-    expected=0 if label=='old' else 251
-    try:H.Runner(OUT,dict(limits,address_space_per_process_bytes=cap)).run([exe,'-i',root/'libraries/mlf-foundation','--type',entry],root,dest,expected_exit=expected)
-    except RuntimeError as e:record['last_runner_exception']=repr(e)
-    finally:
-        H.process_group=base_group
-        (OUT/('stat-'+str(i)+'-'+label+'.json')).write_text(json.dumps(rows)+'\n')
-        (OUT/('map-'+str(i)+'-'+label+'.json')).write_text(json.dumps(maps)+'\n')
+
+record['scope']='Independent ordinary 6GiB reciprocal historical Surface module swaps. Binary cohort is not historical ELF. No compiler probes or RSS/time speed conclusions.'
+record['schedule']=['old','new','new_swap','old_swap']
+smoke=OUT/'SurfaceSmoke.hs';smoke.write_text('''-- mlf:syntax shared-haskell-v1
+{-# LANGUAGE NoImplicitPrelude #-}
+module Main (main) where {
+import MLF.Primitive;
+identityInt :: Int -> Int; identityInt x = x;
+choose :: Bool -> Int; choose flag = case flag of { True -> identityInt 7; False -> identityInt 0 };
+main :: IO (); main = printInt (choose True)
+}
+''');record['smoke_fixture_sha256']=sha(smoke);record['smoke']=[]
+for i,label in enumerate(record['schedule']):
+    verify_frozen(label);r=roots[label];dest=OUT/('leg-'+str(i)+'-'+label)
+    if label in DONOR:
+        sd=OUT/('smoke-'+label)
+        try:H.Runner(OUT,dict(limits,wall_seconds=45)).run([r/'.mlf-build/shared-ghc/bin/emlf','--run',smoke],r,sd,expected_exit=0)
+        except RuntimeError as err:record['last_runner_exception']=repr(err)
+        verify_frozen(label);rec=sd/'command.json'
+        ok_smoke=False
+        if rec.exists():
+            v=json.loads(rec.read_text());ok_smoke=bool(v.get('complete') and v.get('exit_code')==0 and v.get('reason') is None and v.get('terminal_live_descendants')==[] and (sd/'stdout').read_bytes()==b'7\n' and not (sd/'stderr').read_bytes())
+        record['smoke'].append({'label':label,'passed':ok_smoke});save()
+        if not ok_smoke:record['stop_reason']='hybrid semantic smoke failed';save();break
+    expected=251 if BASE[label]=='new' else 0
+    try:H.Runner(OUT,limits).run([r/'.mlf-build/shared-ghc/bin/emlf','-i',r/'libraries/mlf-foundation','--type',entry],r,dest,expected_exit=expected)
+    except RuntimeError as err:record['last_runner_exception']=repr(err)
     verify_frozen(label)
     if not (dest/'command.json').exists():record['stop_reason']='missing receipt';save();break
     j=json.loads((dest/'command.json').read_text());ec=j.get('exit_code')
-    stdout=(dest/'stdout').read_bytes();stderr=(dest/'stderr').read_bytes()
-    verdict=(ec==0 and stdout==b'IO ()\n' and stderr==b'') or (ec==251 and not stdout and stderr==b'emlf: out of memory\n')
-    accepted=bool(verdict and j.get('reason') is None and j.get('terminal_live_descendants')==[] and j.get('limits',{}).get('address_space_per_process_bytes')==cap and j.get('logs') and all(sha(pathlib.Path(k))==v for k,v in j['logs'].items()) and (not observed or (maps and maps['match'] and len(rows)>2 and rows[-1][0]>=.8*j['wall_seconds'])))
-    if i<4:accepted=accepted and bool(j['complete']) and ec==expected
-    if i<2 and accepted:HIST[label]=j['max_individual_child_rss_bytes']
-    if i in (2,3):accepted=accepted and .95<=j['max_individual_child_rss_bytes']/HIST[label]<=1.05
-    record['legs'].append({'label':label,'observed':observed,'cap':cap,'exit_code':ec,'observations':len(rows),'map':maps,'max_child_rss_bytes':j['max_individual_child_rss_bytes'],'accepted':accepted});save()
-    if not accepted:record['stop_reason']='control, map, exact outcome, identity, safety or observation gate failed';save();break
-record['complete']=len(record['legs'])==6 and all(k['accepted'] for k in record['legs'])
+    ok=(ec==0 and (dest/'stdout').read_bytes()==b'IO ()\n' and not (dest/'stderr').read_bytes())
+    oom=(ec==251 and (dest/'stderr').read_bytes()==b'emlf: out of memory\n' and not (dest/'stdout').read_bytes())
+    accept=bool((ok or oom) and j.get('reason') is None and j.get('terminal_live_descendants')==[] and j.get('limits')==limits and j.get('logs') and all(sha(pathlib.Path(k))==v for k,v in j['logs'].items()))
+    if i<2:accept=accept and bool(j.get('complete')) and ec==expected
+    record['legs'].append({'label':label,'exit':ec,'output':'IO ()' if ok else 'emlf: out of memory' if oom else 'unexpected','accepted':accept,'rss':j.get('max_individual_child_rss_bytes')});save()
+    if not accept:record['stop_reason']='required baseline, outcome or safety rejected';save();break
+record['complete']=len(record['legs'])==4 and all(x['accepted'] for x in record['legs'])
 save()

@@ -1,7 +1,7 @@
 name: Bounded Patricia comparison
 on:
   push:
-    branches: [perf/patricia-new-epoch-as-20261118]
+    branches: [perf/patricia-surface-swap-20261118]
 permissions:
   contents: read
 concurrency:
@@ -9,7 +9,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   compare:
-    if: github.repository == 'mlf-lang/mlf' && github.ref == 'refs/heads/perf/patricia-new-epoch-as-20261118'
+    if: github.repository == 'mlf-lang/mlf' && github.ref == 'refs/heads/perf/patricia-surface-swap-20261118'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -21,6 +21,16 @@ jobs:
         run: |
           git worktree add --detach old d8325d909c249fd82d4ad6173d44d8818cc6f8bf
           git worktree add --detach new ee495d5783fca3c26a3c0e659ebeac1bab76a37d
+          git worktree add --detach old_swap d8325d909c249fd82d4ad6173d44d8818cc6f8bf
+          git worktree add --detach new_swap ee495d5783fca3c26a3c0e659ebeac1bab76a37d
+          mkdir -p evidence
+          surface=libraries/mlf-frontend/Bootstrap/Surface.hs
+          for lane in old_swap new_swap; do
+            if test "$lane" = old_swap; then donor=ee495d5783fca3c26a3c0e659ebeac1bab76a37d; else donor=d8325d909c249fd82d4ad6173d44d8818cc6f8bf; fi
+            git -C "$lane" checkout "$donor" -- "$surface"
+            git -C "$lane" -c user.name='Diagnostic' -c user.email='diag@localhost' commit -m 'Temporary exact historical Surface donor'
+            git -C "$lane" diff HEAD^ HEAD > "evidence/$lane.patch"
+          done
       - name: Official pinned GHC
         timeout-minutes: 20
         run: |
@@ -39,12 +49,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p evidence
-          for source in old new; do
-            (cd "$source" && python3 -B ../tools/shared/crc_process_supervisor.py --receipt ../evidence/"$source-build-supervisor.json" --work-seconds 1800 --cleanup-seconds 10 "$(command -v python3)" -B tools/shared/resource_watchdog.py --seconds 1740 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 ../evidence/"$source-build-guard" python3 tools/shared/build.py --bootstrap-only --optimization 2 --build-dir .mlf-build/shared-ghc) > "evidence/$source-build.log" 2>&1
-            cp "$source/.mlf-build/shared-ghc/receipt.json" "evidence/$source-producer-receipt.json"
-            cmp "$source/.mlf-build/shared-ghc/receipt.json" "evidence/$source-producer-receipt.json"
-          done
-      - name: New-epoch plain and observed 6 GiB controls before 5.5 GiB
+          python3 -B tools/shared/crc_process_supervisor.py --receipt evidence/all-builds-supervisor.json --work-seconds 3480 --cleanup-seconds 10 "$(command -v bash)" tools/research/patricia-surface-builds.sh
+      - name: Native controls then reciprocal Surface swaps at 6 GiB
         run: python3 -B tools/shared/crc_process_supervisor.py --receipt evidence/comparison-supervisor.json --work-seconds 1800 --cleanup-seconds 10 "$(command -v python3)" -B tools/research/patricia-comparison-20261118.py
       - name: Preserve all diagnostic evidence
         if: always()
