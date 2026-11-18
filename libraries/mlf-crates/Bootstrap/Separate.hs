@@ -190,6 +190,26 @@ module Bootstrap.Separate where {
       SLazyPattern pattern -> SLazyPattern (hygienePattern env pattern);
       _ -> p
     };
+  -- A binder-free application keeps the local name supply unchanged. Resolve
+  -- just its lexical occurrences, retaining locations and declared IDs.
+  plainHygiene term = case term of {
+    SApp f a -> plainHygiene f && plainHygiene a;
+    SCallSite _ _ e -> plainHygiene e;
+    SVar _ -> True; SGlobal _ _ -> True; SPrimitive _ -> True; SConstructor _ -> True;
+    SIntLit _ -> True; SBoolLit _ -> True; SDoubleLit _ -> True; SStringLit _ -> True;
+    _ -> False
+  };
+  renamePlain env term = case term of {
+    SApp f a -> SApp (renamePlain env f) (renamePlain env a);
+    SCallSite n span e -> SCallSite n span (renamePlain env e);
+    SVar n -> SVar (hygieneName env n);
+    _ -> term
+  };
+  hygieneApplication env term = case term of {
+    SApp f a -> do { x <- hygieneApplication env f; y <- hygieneApplication env a; freshPure (SApp x y) };
+    SCallSite n span e -> do { b <- hygieneApplication env e; freshPure (SCallSite n span b) };
+    _ -> hygieneIn env term
+  };
   hygieneIn :: Map String String -> SExpr -> Fresh SExpr;
   hygieneIn env expression =
     case expression of {
@@ -214,12 +234,9 @@ module Bootstrap.Separate where {
           body <- hygieneIn scope b;
           freshPure (SLam (hygieneName scope n) a body)
         };
-      SApp f a ->
-        do {
-          x <- hygieneIn env f;
-          y <- hygieneIn env a;
-          freshPure (SApp x y)
-        };
+      SApp _ _ -> if plainHygiene expression
+        then freshPure (if M.null env then expression else renamePlain env expression)
+        else hygieneApplication env expression;
       SLet n a b ->
         do {
           scope <- hygieneBind env ((:) n []);
