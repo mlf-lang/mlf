@@ -1679,11 +1679,87 @@ module Bootstrap.LLVM.Optimize where {
           summaries (X.patternNames pattern)) body)) alternatives);
     _ -> expression
   };
+  -- Normalize one complete first-order integer expression before the checked
+  -- optimizer copies its declaration spine. A summary retains its one demanded
+  -- binder even when its coefficient wraps to zero. A unary field can pass
+  -- through only a matching constructor and selector proven in this scope.
+  affineField facts expression = let {
+    child = affineField facts;
+    offset n arg = fmap (\((,,) name factor c) -> (,,) name factor (c + n)) (child arg);
+    times n arg = fmap (\((,,) name factor c) -> (,,) name (factor * n) (c * n)) (child arg)
+  } in case expression of {
+    XEVar name -> Just ((,,) name 1 0);
+    XEApp (XEVar select) (XEApp (XEVar build) arg) -> case M.lookup compareName select facts of {
+      Just (SelectsField wanted) -> case M.lookup compareName build facts of {
+        Just (BuildsField actual) -> if eqString wanted actual then child arg else Nothing;
+        _ -> Nothing
+      };
+      _ -> Nothing
+    };
+    XEApp (XEApp (XEPrimitive PAddInt) left) right -> case (,) left right of {
+      (,) (XEInt n) arg -> offset n arg;
+      (,) arg (XEInt n) -> offset n arg;
+      _ -> case child left of {
+        Just ((,,) name a c) -> case child right of {
+          Just ((,,) other b d) -> if eqName name other then Just ((,,) name (a + b) (c + d)) else Nothing;
+          Nothing -> Nothing
+        };
+        Nothing -> Nothing
+      }
+    };
+    XEApp (XEApp (XEPrimitive PMulInt) left) right -> case (,) left right of {
+      (,) (XEInt n) arg -> times n arg;
+      (,) arg (XEInt n) -> times n arg;
+      _ -> Nothing
+    };
+    _ -> Nothing
+  };
+  -- Shared checked declarations can contain erased identity coercions and
+  -- local aliases. Resolve only aliases of the sole argument. Each alias RHS
+  -- sees its outer scope, and a matching field return sees the pattern scope.
+  skipIdentity expression = case expression of {
+    XEApp (XEAbs x (XEVar y)) a -> if eqName x y then skipIdentity a else expression;
+    _ -> expression
+  };
+  scopedUnaryUse expression = case skipIdentity expression of {
+    XEAbs parameter value -> let {
+      from names term = case skipIdentity term of {
+        XEVar n -> S.member compareName n names; _ -> False
+      };
+      body names term = case skipIdentity term of {
+        XELet n rhs rest -> if from names rhs then body (S.insert compareName n names) rest else Nothing;
+        XEApp (XEConstructor constructor) arg ->
+          if from names arg then Just (BuildsField constructor) else Nothing;
+        XECase subject [XErasedAlternative (XConstructorPattern constructor [Just field]) result] ->
+          if from names subject then case skipIdentity result of {
+            XEVar n -> if eqName n field then Just (SelectsField constructor) else Nothing;
+            _ -> Nothing
+          } else Nothing;
+        _ -> Nothing
+      }
+    } in body (S.singleton parameter) value;
+    _ -> Nothing
+  };
+  foldScopedFields facts expression = case expression of {
+    XELet name value body -> let {
+      following = case scopedUnaryUse value of {
+        Just role -> M.insert compareName name role facts;
+        Nothing -> M.delete compareName name facts
+      }
+    } in XELet name (foldScopedFields facts value) (foldScopedFields following body);
+    XEAbs name body -> XEAbs name (foldScopedFields (M.delete compareName name facts) body);
+    XEApp _ _ -> if M.null facts then expression else case affineField facts expression of {
+      Just ((,,) name factor offset) -> translated offset
+        (if factor == 1 then XEVar name else XEApp (XEApp (XEPrimitive PMulInt) (XEVar name)) (XEInt factor));
+      Nothing -> expression
+    };
+    _ -> expression
+  };
   -- This extra algebraic pass is for finite checked programs. Its rewrites
   -- introduce no binders and preserve evaluation of the single input value.
   -- Keep the raw and exact legacy-pass interfaces available independently.
   optimizeChecked expression = optimizeOwnedWith (optimizeOwnedUsing (checkedIdentities M.empty))
-    (simplifyIterations M.empty (simplifyTranslations M.empty expression));
+    (simplifyIterations M.empty (simplifyTranslations M.empty (foldScopedFields M.empty expression)));
   -- A translation evaluates its one Int input once and adds a constant in
   -- the language's wrapping Int64 ring. Retain every unknown/effectful body.
   -- Summaries follow resolved binder identities and never cross shadowing.

@@ -95,6 +95,27 @@ checkUnaryConstructors = do
  need "demanded field keeps its error" (agree demanded && result demanded==Left "field demanded")
  need "unselected field stays lazy" (agree unused && result unused==Right 42)
  need "shadowed selector with the same numeric id is handled after freshening" (agree shadowed && result shadowed==Right 8)
+ let identity term = T.XEApp (T.XEAbs (n 40) (v 40)) term
+     aliased parameter alias body = identity (T.XEAbs (n parameter)
+       (T.XELet (n alias) (identity (v parameter)) body))
+     wrappedBuilder tag = aliased 10 11 (T.XEApp (T.XEConstructor tag) (identity (v 11)))
+     wrappedSelector tag field = aliased 20 21 (T.XECase (identity (v 21))
+       [T.XErasedAlternative (T.XConstructorPattern tag [T.Just (n 21)]) (identity (v field))])
+     wrappedPair = wrap (wrappedBuilder "A") (wrappedSelector "A" 21)
+     sumOfCalls = prim T.PAddInt [call (v 50),call (prim T.PAddInt [v 50,T.XEInt 7])]
+     checked = C.foldScopedFields M.empty (wrappedPair sumOfCalls)
+     close input = T.XELet (n 50) (T.XEInt input)
+ need "identity-wrapped aliases expose a common affine argument"
+   (not (X.equalErased (lastBody checked) sumOfCalls))
+ forM_ [minBound,-3,0,9,maxBound] $ \input ->
+   forM_ [wrappedPair sumOfCalls,checked] $ \term ->
+     need "constructor projection through aliases preserves wrapping" (result (close input term)==Right (input+input+7))
+ need "a field pattern shadows the argument alias with the same numeric id"
+   (case C.scopedUnaryUse (wrappedSelector "A" 20) of T.Nothing -> True; _ -> False)
+ let different = wrap (wrappedBuilder "A") (wrappedSelector "B" 21) sumOfCalls
+ need "a different constructor still follows the case failure path"
+   (X.equalErased (lastBody (C.foldScopedFields M.empty different)) sumOfCalls &&
+    case result (close 9 different) of Left _ -> True; _ -> False)
  putStrLn "PASS unary constructor and selector, binding scopes, mismatches and field demand"
 
 main = do
