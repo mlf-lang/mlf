@@ -1225,6 +1225,19 @@ applicationPatternChecks = do
       (compareGeometry True d n w (spine 257))
   let checkedTree = T.XLet result (foldr (add . T.XIntTerm) (T.XIntTerm 0) terms) (T.XConstructor "()" [])
   checkedSpine <- right (Open.check env [] checkedTree)
+  let decl = T.DataDeclK "Tree" [] [T.ConstructorDecl "End" [],
+             T.ConstructorDecl "Branchλ" [T.Applied "Int" [],T.Applied "Tree" []]]
+      leaf = T.XConstructor "End" []
+      branch n tail = T.XApp (T.XApp (T.XConstructor "Branchλ" []) (T.XIntTerm n)) tail
+      rhs = foldr branch leaf terms
+      owner = T.XName 51 "rootλ"
+      expression = T.XLet owner rhs (T.XConstructor "()" [])
+      expected = Separate.fingerprint (Separate.pack [Separate.pack [Data.prettyDeclaration decl],
+                 Separate.pack [],Pretty.prettyTerm expression,Separate.pack [Separate.pack ["rootλ","Tree"]]])
+  declared <- right (Open.environment [decl])
+  saved <- right (Open.check declared [] expression)
+  check "repeated constructor fingerprints include every signed slot and parenthesis"
+    (H.unpack expected) (H.unpack (Open.fingerprint saved))
   let wireRaw encode = encode (W.VNode 1 []) "raw" "checked" checkedSpine
   plainQuery <- right (W.planGraph W.defaultLimits [wireRaw Open.encodeRaw])
   compactQuery <- right (W.planGraph W.defaultLimits [wireRaw Open.encodeCheckedRaw])

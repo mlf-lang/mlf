@@ -321,12 +321,29 @@ module Bootstrap.OpenFragment
     (,) (StampSlots p xs q) (StampSlots s ys t) -> StampSlots p (StampJoin xs (Separate.encodingAppend q s) ys) t
   };
   stampSyntax value = StampText (Separate.encodingText value);
+  -- Consecutive heads share their fixed printer text. Doubling composes both
+  -- scalar hashes and keeps a balanced traversal for any integer slots.
+  repeatStamp count piece = if count <= 1 then piece else let {
+    half = repeatStamp (quotInt count 2) piece;
+    twice = stampJoin half half
+  } in if andInt count 1 == 0 then twice else stampJoin twice piece;
   stampTable entries = let {
     build index table rest = case rest of {
       [] -> Just table;
       (:) entry more -> let {
         add plain arg = build (index + 1) (IM.insert index ((,) plain arg) table) more;
-        leaf text = let { plan = stampSyntax text } in add plan plan
+        leaf text = let { plan = stampSyntax text } in add plan plan;
+        application l r count = case (,) (IM.lookup l table) (IM.lookup r table) of {
+          (,) (Just ((,) f _)) (Just ((,) _ a)) -> let {
+            once = stampJoin f (stampJoin (stampSyntax " ") a);
+            -- f (f (... (f a))) has count-1 opening and closing parentheses.
+            plain = if count == 1 then once else stampJoin
+              (repeatStamp (count - 1) (stampJoin f (stampSyntax " (")))
+              (stampJoin once (repeatStamp (count - 1) (stampSyntax ")")));
+            arg = stampJoin (stampSyntax "(") (stampJoin plain (stampSyntax ")"))
+          } in add plain arg;
+          _ -> Nothing
+        }
       } in case entry of {
         W.VNode 87 [] -> let { hole = StampSlots Separate.encodingEmpty StampHole Separate.encodingEmpty } in add hole hole;
         W.VNode 70 [W.VNode 31 [W.VInt i,W.VText hint]] -> leaf (Pretty.name (XName i hint));
@@ -334,13 +351,10 @@ module Bootstrap.OpenFragment
         W.VNode 81 [p,W.VNode 1 []] -> case Structure.fromPrimitive p of {
           Right primitive -> leaf (Pretty.prettyTerm (XPrimitive primitive [])); Left _ -> Nothing
         };
-        W.VNode 88 [W.VInt l,W.VInt r] -> case (,) (IM.lookup l table) (IM.lookup r table) of {
-          (,) (Just ((,) f _)) (Just ((,) _ a)) -> let {
-            plain = stampJoin f (stampJoin (stampSyntax " ") a);
-            arg = stampJoin (stampSyntax "(") (stampJoin plain (stampSyntax ")"))
-          } in add plain arg;
-          _ -> Nothing
-        };
+        W.VNode 82 [W.VText name,W.VNode 1 []] -> leaf (Pretty.prettyTerm (XConstructor name []));
+        W.VNode 88 [W.VInt l,W.VInt r] -> application l r 1;
+        W.VNode 88 [W.VInt l,W.VInt r,W.VInt count] ->
+          if count >= 2 && count <= W.maxDepth W.defaultLimits then application l r count else Nothing;
         _ -> Nothing
       }
     }
@@ -429,38 +443,55 @@ module Bootstrap.OpenFragment
       XPrimitive p args -> seq p (case args of { [] -> next; _ -> 0 });
       _ -> 0
     };
-  -- Reuse the exact physical table at every root whose fingerprint uses the
-  -- same typed application grammar. Either view can be requested first.
+  -- Before the row builder inspects a later head, demand each supported
+  -- spelling in the order of the pretty printer. An unsupported leaf returns
+  -- directly to the printer with its original remaining demand.
+  orderedSpineLeaves fuel pending = if fuel <= 0 then False else case pending of {
+    [] -> True;
+    (:) term rest -> let { next = fuel - 1; more = orderedSpineLeaves next rest } in case term of {
+      XApp f a -> orderedSpineLeaves next ((:) f ((:) a rest));
+      XIntTerm n -> seq n more;
+      XVarTerm (XName i hint) -> seq hint (seq i more);
+      XPrimitive p args -> seq p (case args of { [] -> more; _ -> False });
+      XConstructor name args -> seq name (case args of { [] -> more; _ -> False });
+      _ -> False
+    }
+  };
+  data TermViews = TermViews (Maybe StoredTerm) (Maybe StoredTerm) Separate.FingerprintEncoding;
+  ordinaryRows (TermViews rows _ _) = rows;
+  spineRows (TermViews _ rows _) = rows;
+  prettyStamp (TermViews _ _ stamp) = stamp;
+  rowStamp fallback storage = case storage of {
+    Just (StoredTerm _ (W.VNode 86 [W.VNode 1 rows,W.VNode 1 runs,W.VInt root])) ->
+      fromMaybe fallback (patternEncoding rows runs root);
+    _ -> fallback
+  };
   termViews term = case term of {
     XLet name rhs body -> let {
       left = termViews rhs; right = termViews body;
-      stored = compactNode 75 [(,) (Structure.toXName name) Nothing,
-        (,) (Structure.toXTerm rhs) (fst left),(,) (Structure.toXTerm body) (fst right)];
+      stored select = compactNode 75 [(,) (Structure.toXName name) Nothing,
+        (,) (Structure.toXTerm rhs) (select left),(,) (Structure.toXTerm body) (select right)];
       summary = stampThen (Separate.encodingText ("let " ++ Pretty.name name ++ " = "))
-        (stampThen (snd left) (stampThen (Separate.encodingText " in ") (snd right)))
-    } in (,) stored summary;
+        (stampThen (prettyStamp left) (stampThen (Separate.encodingText " in ") (prettyStamp right)))
+    } in TermViews (stored ordinaryRows) (stored spineRows) summary;
     XAbs name ty body -> let {
       nested = termViews body;
-      stored = compactNode 71 [(,) (Structure.toXName name) Nothing,(,) (Structure.toXType ty) Nothing,
-        (,) (Structure.toXTerm body) (fst nested)];
+      stored select = compactNode 71 [(,) (Structure.toXName name) Nothing,(,) (Structure.toXType ty) Nothing,
+        (,) (Structure.toXTerm body) (select nested)];
       summary = stampThen (Separate.encodingText ("\\(" ++ Pretty.name name ++ " : " ++ Pretty.prettyType ty ++ ") -> "))
-        (snd nested)
-    } in (,) stored summary;
+        (prettyStamp nested)
+    } in TermViews (stored ordinaryRows) (stored spineRows) summary;
     XApp _ _ -> let {
-      stored = expressionPattern term;
-      plain = termEncoding term;
-      summary = if orderedPatternLeaves 1 1048577 term > 0 then case stored of {
-        Just (StoredTerm _ (W.VNode 86 [W.VNode 1 rows,W.VNode 1 runs,W.VInt root])) ->
-          fromMaybe plain (patternEncoding rows runs root);
-        _ -> plain
-      } else plain
-    } in (,) stored summary;
-    _ -> (,) (compactTerm term) (termEncoding term)
+      ordinary = expressionPattern term; spines = spinePattern term; plain = termEncoding term;
+      summary = if orderedPatternLeaves 1 1048577 term > 0 then rowStamp plain ordinary
+        else if orderedSpineLeaves 1048577 [term] then rowStamp plain spines else plain
+    } in TermViews ordinary spines summary;
+    _ -> TermViews (compactTerm term) (compactTermWith spinePattern term) (termEncoding term)
   };
   checkedFragment env ps term bs used = let {
     views = termViews term;
-    saved = stampEncoding env ps (snd views) bs
-  } in Fragment env ps term bs used saved (Structure.toXTerm term) (fst views) (compactTermWith spinePattern term) Nothing;
+    saved = stampEncoding env ps (prettyStamp views) bs
+  } in Fragment env ps term bs used saved (Structure.toXTerm term) (ordinaryRows views) (spineRows views) Nothing;
   stamp env ps term bs = stampEncoding env ps (termEncoding term) bs;
   stampEncoding env ps summary bs = Separate.encodingFingerprint (Separate.encodingPack
     [Separate.encodingText (Separate.pack (map (compose D.prettyDeclaration canonicalDeclaration) (declarations env))),
