@@ -791,6 +791,21 @@ knownConstructorFoldChecks = do
   forM_ [(pair (leaf (T.XEInt minBound)) (leaf (T.XEInt 9)), Right (9 - minBound)),
          (pair (leaf (poison "left")) (leaf (poison "right")), Left "right")] $ \(subject, expected) ->
     forM_ [use subject, Optimize.optimizeChecked (use subject)] $ \term -> check "constructor fold demand" expected (run term)
+  let identity i = app (T.XEAbs (n i) (v i))
+      consumer alias = identity 30 (T.XEAbs (n 2)
+        (T.XELet (n alias) (identity 31 (v 2)) (T.XECase (v alias) [base, step 6 5])))
+      subject = pair (leaf (v 18)) (leaf (v 19))
+      bind f body = T.XELetRec [(n 1, f)] body
+      normalized = Optimize.foldScopedFields M.empty
+      apply = app (v 1) subject
+  check "fold the checked tree before copying its declaration"
+    True (X.equalErased (normalized (bind (consumer 3) apply))
+      (bind (consumer 3) (prim T.PSubInt [v 19, v 18])))
+  let shadowed = bind (consumer 3) (T.XEAbs (n 1) apply)
+  check "early fold respects a rebound function" True (X.equalErased shadowed (normalized shadowed))
+  case Optimize.constructorFold (n 1) (consumer 1) of
+    T.Nothing -> pure ()
+    _ -> fail "an argument alias shadowed the recursive name"
   case Optimize.constructorFold (n 1) function of
     T.Just rules -> do
       let subject = pair (leaf (v 18)) (leaf (v 19))

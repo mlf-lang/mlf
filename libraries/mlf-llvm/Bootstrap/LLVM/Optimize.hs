@@ -359,13 +359,19 @@ module Bootstrap.LLVM.Optimize where {
       if eqName name subject && eqName field result then Just (SelectsField constructor) else Nothing;
     _ -> Nothing
   };
-  -- After freshening and identity reduction, a closed case can select a
-  -- field or combine two distinct recursive children with a primitive.
-  -- Keep the operator and the order of its arguments from the checked body.
-  constructorFold self value = case value of {
-    XEAbs parameter (XECase (XEVar subject) branches) -> if eqName parameter subject &&
-      L.not (eqName self parameter) && L.not (L.null branches)
-      then L.foldM (foldAlternative self) M.empty branches else Nothing;
+  -- The checked argument can pass through erased identities and local
+  -- aliases on its way to a case. A recursive name must remain in scope
+  -- for every recursive call in the branch table.
+  constructorFold self value = case skipIdentity value of {
+    XEAbs parameter rhs -> let {
+      inspect names expression = case skipIdentity expression of {
+        XELet alias from rest -> if L.not (eqName alias self) && argumentAlias names from
+          then inspect (S.insert compareName alias names) rest else Nothing;
+        XECase subject branches -> if argumentAlias names subject && L.not (L.null branches)
+          then L.foldM (foldAlternative self) M.empty branches else Nothing;
+        _ -> Nothing
+      }
+    } in if eqName self parameter then Nothing else inspect (S.singleton parameter) rhs;
     _ -> Nothing
   };
   foldAlternative self known (XErasedAlternative pattern body) = case pattern of {
@@ -1786,17 +1792,17 @@ module Bootstrap.LLVM.Optimize where {
     XEApp (XEAbs x (XEVar y)) a -> if eqName x y then skipIdentity a else expression;
     _ -> expression
   };
+  argumentAlias names term = case skipIdentity term of {
+    XEVar n -> S.member compareName n names; _ -> False
+  };
   scopedUnaryUse expression = case skipIdentity expression of {
     XEAbs parameter value -> let {
-      from names term = case skipIdentity term of {
-        XEVar n -> S.member compareName n names; _ -> False
-      };
       body names term = case skipIdentity term of {
-        XELet n rhs rest -> if from names rhs then body (S.insert compareName n names) rest else Nothing;
+        XELet n rhs rest -> if argumentAlias names rhs then body (S.insert compareName n names) rest else Nothing;
         XEApp (XEConstructor constructor) arg ->
-          if from names arg then Just (BuildsField constructor) else Nothing;
+          if argumentAlias names arg then Just (BuildsField constructor) else Nothing;
         XECase subject [XErasedAlternative (XConstructorPattern constructor [Just field]) result] ->
-          if from names subject then case skipIdentity result of {
+          if argumentAlias names subject then case skipIdentity result of {
             XEVar n -> if eqName n field then Just (SelectsField constructor) else Nothing;
             _ -> Nothing
           } else Nothing;
@@ -1812,11 +1818,24 @@ module Bootstrap.LLVM.Optimize where {
         Nothing -> M.delete compareName name facts
       }
     } in XELet name (foldScopedFields facts value) (foldScopedFields following body);
-    XEAbs name body -> XEAbs name (foldScopedFields (M.delete compareName name facts) body);
-    XEApp _ _ -> if M.null facts then expression else case affineField facts expression of {
-      Just ((,,) name factor offset) -> translated offset
-        (if factor == 1 then XEVar name else XEApp (XEApp (XEPrimitive PMulInt) (XEVar name)) (XEInt factor));
+    XELetRec [(,) name rhs] body -> case constructorFold name rhs of {
+      Just rules -> XELetRec [(,) name rhs]
+        (foldScopedFields (M.insert compareName name (FoldsConstructors rules) facts) body);
       Nothing -> expression
+    };
+    XEAbs name body -> XEAbs name (foldScopedFields (M.delete compareName name facts) body);
+    XEApp function argument -> let {
+      affine = case affineField facts expression of {
+        Just ((,,) name factor offset) -> translated offset
+          (if factor == 1 then XEVar name else XEApp (XEApp (XEPrimitive PMulInt) (XEVar name)) (XEInt factor));
+        Nothing -> expression
+      }
+    } in if M.null facts then expression else case function of {
+      XEVar name -> case M.lookup compareName name facts of {
+        Just (FoldsConstructors rules) -> L.fromMaybe expression (foldKnownConstructor rules argument);
+        _ -> affine
+      };
+      _ -> affine
     };
     _ -> expression
   };
