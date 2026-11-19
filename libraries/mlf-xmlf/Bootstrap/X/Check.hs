@@ -175,7 +175,53 @@ module Bootstrap.X.Check where {
   closedPrimitiveType p = IM.findWithDefault (instantiateClosedPrimitive p)
     (P.primitiveCode p) closedPrimitiveTypes;
   inferIn :: DataEnv -> XEnv -> XTerm -> Either String XType;
-  inferIn ds env term =
+  inferIn ds env term = inferApplications ds env (scopeApplications ds env) term;
+  -- Preserve the input map's order and build an answer only when its key is
+  -- requested. Each visited branch and its answer are shared in this scope.
+  checkedLookup :: forall k a b. (k -> k -> Int) -> (k -> a -> b) -> Map k a -> k -> Maybe b;
+  checkedLookup cmp answer tree = case tree of {
+    MapEmpty -> \_ -> Nothing;
+    MapNode _ key value left right -> let {
+      below = checkedLookup cmp answer left; above = checkedLookup cmp answer right;
+      found = Just (answer key value)
+    } in \wanted -> let { order = cmp wanted key } in
+      if order < 0 then below wanted else if order > 0 then above wanted else found
+  };
+  scopeApplications ds env = let {
+    scheme _ ty = let {
+      check name _ = let {
+        first = checkedComputationResult ds (typeEnv env) (XInner (XBottom (XCon name []))) ty;
+        result = do { middle <- first; checkedComputationResult ds (typeEnv env) XElim middle }
+      } in (,) first result;
+      primitive = checkedLookup compareString check D.primitiveKinds;
+      named = case ds of { DataEnv _ _ declared -> checkedLookup compareString check declared };
+      arguments name = case primitive name of { Nothing -> named name; found -> found }
+    } in (,,) ty (wellFormedIn ds (typeEnv env) ty) arguments
+  } in checkedLookup X.compareName scheme (termEnv env);
+  -- The same variable and constructor in this environment receive the same
+  -- two checked results. Validate the source first and demand the first step
+  -- before inspecting the suffix, as in the ordinary computation checker.
+  checkedVariableApplication ds env source admitted arguments proof = do {
+    admitted;
+    let { ordinary = checkedComputationResult ds env proof source };
+    case proof of {
+      XThen first following -> case source of {
+        XForall _ XBot _ -> case first of {
+          XInner (XBottom (XCon name [])) -> case arguments name of {
+            Nothing -> ordinary;
+            Just ((,) firstChecked eliminated) -> do {
+              middle <- firstChecked;
+              case following of { XElim -> eliminated; _ -> checkedComputationResult ds env following middle }
+            }
+          };
+          _ -> ordinary
+        };
+        _ -> ordinary
+      };
+      _ -> ordinary
+    }
+  };
+  inferApplications ds env applications term =
     case term of {
       XVarTerm x ->
         case M.lookup X.compareName x (termEnv env) of {
@@ -191,8 +237,8 @@ module Bootstrap.X.Check where {
         };
       XApp f a ->
         do {
-          ft <- inferIn ds env f;
-          at <- inferIn ds env a;
+          ft <- inferApplications ds env applications f;
+          at <- inferApplications ds env applications a;
           case ft of {
             XArrow domain result ->
               if T.alphaEq domain at then Right result else Left "application type mismatch";
@@ -207,11 +253,16 @@ module Bootstrap.X.Check where {
             inferIn ds (XEnv (M.insert T.compareTyVar a bound (typeEnv env)) (termEnv env)) body;
           return (XForall a bound result)
         };
-      XTypeApp t p ->
-        do {
-          source <- inferIn ds env t;
-          checkComputationScoped ds (typeEnv env) p source
+      XTypeApp t p -> case t of {
+        XVarTerm name -> case applications name of {
+          Nothing -> Left ("unbound term variable " ++ X.nameHint name);
+          Just ((,,) ty valid arguments) -> checkedVariableApplication ds (typeEnv env) ty valid arguments p
         };
+        _ -> do {
+          source <- inferApplications ds env applications t;
+          checkComputationScoped ds (typeEnv env) p source
+        }
+      };
       XLet x a b ->
         do {
           t <- inferLetBinding ds env x a;
@@ -272,7 +323,7 @@ module Bootstrap.X.Check where {
         };
       XCase scrutinee result alternatives ->
         do {
-          st <- inferIn ds env scrutinee;
+          st <- inferApplications ds env applications scrutinee;
           termType ds (typeEnv env) result;
           owner <- D.checkAlternatives ds (L.map shape alternatives);
           parameters <- caseParameters ds st owner;

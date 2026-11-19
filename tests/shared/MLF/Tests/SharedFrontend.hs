@@ -1656,7 +1656,27 @@ module MLF.Tests.SharedFrontend where {
       (CrateGraph.compileIndexedMemo "context" full "second" (parameters 23 "otherPrevious" ty) [] second);
     check "template inventory stays bounded" (M.size (snd limited) == 64)
   };
+  checkedGroundUses = do {
+    let { a = XTyVar 41; x = XName 10 "poly"; t = XVar a;
+      use target = XTypeApp (XVarTerm x) (XThen (XInner (XBottom target)) XElim);
+      scope signature = XEnv M.empty (M.singleton x signature);
+      same = XForall a XBot (XArrow t t); alwaysBool = XForall a XBot (XArrow t recursiveBool);
+      repeated = XApp (use recursiveInt) (XApp (use recursiveInt) (XIntTerm 7));
+      compare label signature term expected = do {
+        recursiveCheckedType label expected (Check.inferIn Data.emptyDataEnv (scope signature) term);
+        recursiveCheckedType (label ++ " independent") expected (Independent.inferIn Data.emptyDataEnv (scope signature) term)
+      }
+    };
+    compare "repeated ground instantiation" same repeated recursiveInt;
+    compare "same binder identity with a different scheme" alwaysBool (use recursiveInt) (XArrow recursiveInt recursiveBool);
+    compare "same binder with another type argument" same (use recursiveBool) (XArrow recursiveBool recursiveBool);
+    check "ground instantiation on a monomorphic variable still fails"
+      (case Check.inferIn Data.emptyDataEnv (scope recursiveInt) (use recursiveInt) of {
+        Left reason -> eqString reason "Inst-Inner requires a forall source"; Right _ -> False
+      })
+  };
   groundGroupChecks = do {
+    checkedGroundUses;
     groundAliasChecks;
     groundRecursiveChecks;
     let { a = XTyVar 100; b = XTyVar 101; c = XTyVar 102;
