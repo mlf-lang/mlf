@@ -1025,7 +1025,7 @@ module Bootstrap.Classes where {
           Nothing -> False; Just ((,) target classes) -> flag target || elem eqString callStackPredicate classes
         })
       }
-    } in managedExpression body || any reads (Dependency.valueRefs (Dependency.observeExpression body))
+    } in managedExpression body || any reads (Dependency.valueOccurrences True False body)
   };
   -- Metadata is derived before class expansion, including original instance
   -- methods. It cannot be recovered from a plain result target type.
@@ -1113,7 +1113,7 @@ module Bootstrap.Classes where {
         redirected r = case Dependency.selectorId generation r of {
           Just selector -> [r, selector]; Nothing -> [r]
         };
-        references body = Dependency.valueRefs (Dependency.observeExpression body);
+        references body = Dependency.valueOccurrences True False body;
         required name = case Dependency.generatedNameId generation name of {
           Just i -> Right i; Nothing -> Left ("missing protection declaration: " ++ name)
         };
@@ -1126,7 +1126,7 @@ module Bootstrap.Classes where {
         i <- required name;
         let { supportRefs = case M.lookup compareString name supportBodies of {
                 Nothing -> []; Just rhs -> filter (\ref -> elem eqString (termRefName ref) supportNames)
-                  (Dependency.valueRefs (Dependency.observeExpressionWith False rhs))
+                  (Dependency.valueOccurrences False False rhs)
               };
               namesRead = append (concatMap references bodies) supportRefs;
               refs = concatMap (refsIn i) namesRead;
