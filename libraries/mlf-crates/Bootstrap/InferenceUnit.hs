@@ -347,14 +347,21 @@ module Bootstrap.InferenceUnit where {
       let { numbered = zip parameters (range 0 (length parameters - 1));
         bindings = map (\((,) ((,,) _ hint ty) number) -> (,) (XName number hint) ty) numbered;
         globals = M.fromList compareInt (zipWith (\((,,) id _ _) binding ->
-          (,) (V.toInt id) (XVarTerm (fst binding))) parameters bindings);
-        names = M.fromList compareString (map (\((,) name _) ->
-          (,) (X.nameHint name) (XVarTerm name)) bindings);
-        count = length parameters; identity = V.toInt owner };
+          (,) (V.toInt id) binding) parameters bindings);
+        names = M.fromList compareString (map (\binding -> (,) (X.nameHint (fst binding)) binding) bindings);
+        count = length parameters; identity = V.toInt owner; serial = advanceIdentity count 1;
+        term binding = XVarTerm (fst binding);
+        scoped binding = signedBinding (fst binding) (snd binding) };
       ensure (M.size globals == count && M.size names == count && not (M.member compareInt identity globals)
-        && not (M.member compareString exported names) && all (compose monomorphicTarget snd) bindings)
-        "signed application needs distinct monomorphic parameters";
-      result <- signedApplicationSpine identity globals names (advanceIdentity count 1) expected expression;
+        && not (M.member compareString exported names)) "signed application needs distinct parameters";
+      result <- if all (compose monomorphicTarget snd) bindings
+        then signedApplicationSpine identity (M.map term globals) (M.map term names) serial expected expression
+        else do {
+          ensure (all (\binding -> case scoped binding of { SignedUnsupported -> False; _ -> True }) bindings)
+            "signed application needs ground or unary parameters";
+          signedApplicationSpineUsing (\n ty -> SignedValue (XVarTerm n) ty) signedInstanceTerm
+            identity (M.map scoped globals) (M.map scoped names) serial expected expression
+        };
       env <- Open.environment declarations;
       fragment <- Open.check env bindings (XLet (XName count exported) result (XConstructor "()" []));
       ensure (case Open.bindings fragment of {
@@ -364,13 +371,14 @@ module Bootstrap.InferenceUnit where {
     };
     _ -> Left "signed application needs one signature"
   };
-  signedApplicationSpine owner globals names serial expected expression = let {
+  signedApplicationSpine = signedApplicationSpineUsing (\name _ -> XVarTerm name) signedApplicationBody;
+  signedApplicationSpineUsing bind finish owner globals names serial expected expression = let {
     annotated written body = do {
       actual <- monomorphicAnnotation written;
       ensure (T.alphaEq expected actual) "signed application annotation mismatch";
       again body
     };
-    again = signedApplicationSpine owner globals names serial expected;
+    again = signedApplicationSpineUsing bind finish owner globals names serial expected;
     lambda slot name written body = case expected of {
       XArrow domain result -> do {
         case written of {
@@ -378,7 +386,7 @@ module Bootstrap.InferenceUnit where {
             ensure (T.alphaEq domain actual) "signed application binder annotation mismatch" };
           Nothing -> Right ()
         };
-        let { binder = XName serial name; variable = XVarTerm binder };
+        let { binder = XName serial name; variable = bind binder domain };
         scope <- case slot of {
           Nothing -> Right globals;
           Just i -> do {
@@ -386,7 +394,7 @@ module Bootstrap.InferenceUnit where {
             Right (M.insert compareInt i variable globals)
           }
         };
-        value <- signedApplicationSpine owner scope (M.insert compareString name variable names)
+        value <- signedApplicationSpineUsing bind finish owner scope (M.insert compareString name variable names)
           (advanceIdentity serial 1) result body;
         Right (XAbs binder domain value)
       };
@@ -400,7 +408,7 @@ module Bootstrap.InferenceUnit where {
     SAnn body ty -> annotated ty body;
     SCallSite _ _ body -> again body;
     SSourceDefinition body -> again body;
-    _ -> signedApplicationBody globals names expression
+    _ -> finish globals names expression
   };
   signedApplicationBody globals names expression = let {
     sub = signedApplicationBody globals names;
@@ -425,6 +433,61 @@ module Bootstrap.InferenceUnit where {
     SCallSite _ _ body -> sub body;
     SSourceDefinition body -> sub body;
     _ -> Left "ordinary elaboration required"
+  };
+  -- The operand of a unary scheme determines its only type argument. Keep
+  -- that evidence on the variable occurrence and check the constructed term
+  -- in the complete datatype and parameter environment before accepting it.
+  data SignedValue = SignedValue XTerm XType | SignedUnary XName GroundParameter GroundParameter | SignedUnsupported;
+  signedBinding name ty = case groundImport name ty of {
+    GroundUnaryImport _ _ _ input output -> SignedUnary name input output;
+    _ -> if monomorphicTarget ty then SignedValue (XVarTerm name) ty else SignedUnsupported
+  };
+  signedInstanceTerm globals names expression = let {
+    variable key = case key of { Just value -> Right value; Nothing -> Left "unknown signed application variable" };
+    operand shape actual = case shape of {
+      GroundBare -> Just actual;
+      GroundWrapped wrapper -> case actual of {
+        XCon name [ty] -> if eqString name wrapper then Just ty else Nothing;
+        _ -> Nothing
+      }
+    };
+    result shape ty = case shape of { GroundBare -> ty; GroundWrapped name -> XCon name [ty] };
+    visit term = case term of {
+      SApp f a -> do {
+        function <- visit f;
+        argument <- visit a;
+        case argument of {
+          SignedValue value ty -> case function of {
+            SignedValue operator (XArrow _ out) -> Right (SignedValue (XApp operator value) out);
+            SignedUnary name input output -> case operand input ty of {
+              Just actual -> let { proof = XThen (XInner (XBottom actual)) XElim } in
+                Right (SignedValue (XApp (XTypeApp (XVarTerm name) proof) value) (result output actual));
+              Nothing -> Left "signed application operand requires inference"
+            };
+            _ -> Left "signed application requires a function"
+          };
+          _ -> Left "signed application operand requires a monotype"
+        }
+      };
+      SGlobal i _ -> variable (M.lookup compareInt (V.toInt i) globals);
+      SVar name -> if eqString name "$MLF.Stack.callStack" then Left "managed call stack requires evidence"
+        else variable (M.lookup compareString name names);
+      SPrimitive p -> do {
+        ty <- Check.closedPrimitiveType p;
+        ensure (monomorphicTarget ty) "nonmonomorphic primitive";
+        Right (SignedValue (XPrimitive p []) ty)
+      };
+      SIntLit n -> Right (SignedValue (XIntTerm n) (XCon "Int" []));
+      SBoolLit b -> Right (SignedValue (XBoolTerm b) (XCon "Bool" []));
+      SDoubleLit n -> Right (SignedValue (XDoubleTerm n) (XCon "Double" []));
+      SStringLit s -> Right (SignedValue (XStringTerm s) (XCon "String" []));
+      SCallSite _ _ body -> visit body;
+      SSourceDefinition body -> visit body;
+      _ -> Left "ordinary elaboration required"
+    }
+  } in do {
+    value <- visit expression;
+    case value of { SignedValue term _ -> Right term; _ -> Left "signed application result requires a monotype" }
   };
   -- A signed monotype can specialize imported schemes without building a
   -- generalization graph. Every temporary variable, including every imported

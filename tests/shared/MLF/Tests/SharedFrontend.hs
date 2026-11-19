@@ -1694,6 +1694,14 @@ module MLF.Tests.SharedFrontend where {
       localIdentity = SLam "v" Nothing (SVar "v");
       row = \ty body -> [(,) (Index.fromInt 10) ((,,) "function" (Just (SAnnotation [] ty)) body)];
       conditional = \p yes no -> SApp (SApp (SApp (SPrimitive PIfThenElse) p) yes) no };
+    let { ps = parameter identity; typed = row arrow (SLam "x" Nothing (SApp use (SVar "x"))) };
+    direct <- recursiveRight "direct unary import" (Inference.signedApplicationGroup ps [] typed);
+    elaborated <- recursiveRight "elaborated unary import" (Inference.compileElaboratedGroup ps [] typed);
+    check "direct unary import preserves the checked term"
+      (eqString (Open.fingerprint direct) (Open.fingerprint elaborated));
+    recursiveRight "frozen unary import" (Independent.checkClosed (Open.closedTerm direct));
+    check "bounded import requires full elaboration"
+      (isLeft (Inference.signedApplicationGroup (parameter constant) [] typed));
     groundGroupCase "ground imported identity" True (parameter identity)
       (row arrow (SLam "x" Nothing (SApp use (SVar "x"))));
     groundGroupCase "ground independent Bool and Int instantiations" True (parameter identity)
