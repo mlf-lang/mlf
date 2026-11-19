@@ -416,27 +416,19 @@ module Bootstrap.Layout where {
   -- No virtual token is emitted without a layout frame or a pending opener.
   -- When the top level and each layout keyword have explicit braces, the
   -- validated scanner tokens are already the arranged stream.
+  explicitLayoutStart program tokens = not program || case tokens of {
+    [] -> False;
+    (:) first _ -> eqString (tokenText first) "module" || eqString (tokenText first) "{"
+  };
   explicitLayout program tokens = let {
-    startsExplicit = case tokens of {
-      [] -> False;
-      (:) first _ -> eqString (tokenText first) "module" || eqString (tokenText first) "{"
-    };
     blocks input = case input of {
       [] -> True;
-      (:) token rest -> let {
-        text = tokenText token;
-        opens = case stringLength text of {
-          2 -> eqString text "of" || eqString text "do";
-          3 -> eqString text "let";
-          5 -> eqString text "where";
-          _ -> False
-        }
-      } in if opens then case rest of {
+      (:) token rest -> if sharedLayoutKeyword (tokenText token) then case rest of {
         (:) brace more -> eqString (tokenText brace) "{" && blocks more;
         [] -> False
       } else blocks rest
     }
-  } in (not program || startsExplicit) && blocks tokens;
+  } in explicitLayoutStart program tokens && blocks tokens;
   layoutTokensWithProfile :: SourceSyntax -> Bool -> String -> String -> Either String Scanned;
   layoutTokensWithProfile syntax program file source =
     if not (isSharedSyntax syntax)
@@ -444,21 +436,12 @@ module Bootstrap.Layout where {
            MetadataSyntax -> layoutTokens program file source;
            _ -> layoutTokensWithScanner scanSourceTokens program file source
          }
-    else do {
-           boundValueShared1 <- scanValidatedSharedTokens file source;
-           case boundValueShared1 of {
-             Scanned tokens finish ->
-               do {
-                 if explicitLayout program tokens then Right (Scanned tokens finish) else do {
-                   arranged <- layoutTokensUsing True (\_ _ -> Right (Scanned tokens finish)) program file source;
-                   case arranged of {
-                     Scanned ordered _ -> validateSharedArranged file [] Nothing ordered
-                   };
-                   Right arranged
-                 }
-               }
-           }
-         };
+    else scanSharedWithLayout (\tokens finish blocks -> let { scanned = Scanned tokens finish } in
+      if explicitLayoutStart program tokens && blocks then Right scanned else do {
+        arranged <- layoutTokensUsing True (\_ _ -> Right scanned) program file source;
+        case arranged of { Scanned ordered _ -> validateSharedArranged file [] Nothing ordered };
+        Right arranged
+      }) file source;
   virtualToken :: Token -> Bool;
   virtualToken token =
     ((tokenLine token == tokenEndLine token) && (tokenColumn token == tokenEndColumn token));

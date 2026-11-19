@@ -250,10 +250,20 @@ module Bootstrap.Lexer where {
   -- tokens retain the full spelling and neighbor checks. Lexing reaches EOF
   -- first, so a later scanner failure still takes precedence.
   data SharedTokenHistory = NoSharedTokens | PlainSharedToken Token SharedTokenHistory |
-    CheckedSharedToken Token SharedTokenHistory | CapitalSharedToken Token SharedTokenHistory;
+    CheckedSharedToken Token SharedTokenHistory | CapitalSharedToken Token SharedTokenHistory |
+    PossibleLayoutWord Token SharedTokenHistory;
   data SharedTokenChecks = NoSharedChecks | SharedTokenCheck Token ([] Token) SharedTokenChecks;
-  scanValidatedSharedTokens file source = let {
-    word first = if first >= 97 && first <= 122 then PlainSharedToken else if first >= 65 && first <= 90 then CapitalSharedToken else CheckedSharedToken;
+  scanValidatedSharedTokens = scanSharedWithLayout (\tokens end _ -> Right (Scanned tokens end));
+  sharedLayoutKeyword text = case stringLength text of {
+    2 -> eqString text "of" || eqString text "do";
+    3 -> eqString text "let";
+    5 -> eqString text "where";
+    _ -> False
+  };
+  scanSharedWithLayout complete file source = let {
+    word first = if first == 100 || first == 108 || first == 111 || first == 119 then PossibleLayoutWord
+      else if first >= 97 && first <= 122 then PlainSharedToken
+      else if first >= 65 && first <= 90 then CapitalSharedToken else CheckedSharedToken;
     number next = if sharedIdentifierFirst next || next == 46 then CheckedSharedToken else PlainSharedToken;
     validate todo = case todo of {
       NoSharedChecks -> Right ();
@@ -261,17 +271,25 @@ module Bootstrap.Lexer where {
     };
     -- Reverse the scanner's history once. Each deferred check sees its real
     -- following tokens, and validation still visits them in source order.
-    finish end history ordered checks = case history of {
-      NoSharedTokens -> do { validate checks; Right (Scanned ordered end) };
-      PlainSharedToken token rest -> finish end rest ((:) token ordered) checks;
-      CheckedSharedToken token rest -> finish end rest ((:) token ordered) (SharedTokenCheck token ordered checks);
+    -- During reversal the following token is already available. Only a
+    -- keyword can open an implicit block. Full-scanner tokens can follow
+    -- comments or tabs and must be checked as well.
+    braced token following rest = if sharedLayoutKeyword (tokenText token) then case following of {
+      (:) next _ -> eqString (tokenText next) "{" && rest; [] -> False
+    } else rest;
+    finish end history ordered checks blocks = case history of {
+      NoSharedTokens -> do { validate checks; complete ordered end blocks };
+      PlainSharedToken token rest -> finish end rest ((:) token ordered) checks blocks;
+      PossibleLayoutWord token rest -> finish end rest ((:) token ordered) checks (braced token ordered blocks);
+      CheckedSharedToken token rest -> finish end rest ((:) token ordered)
+        (SharedTokenCheck token ordered checks) (braced token ordered blocks);
       CapitalSharedToken token rest -> let { next = case ordered of {
         (:) member _ -> let { name = tokenText member } in stringLength name > 0 && stringCodeAt name 0 == 46;
         [] -> False
-      } } in finish end rest ((:) token ordered) (if next then SharedTokenCheck token ordered checks else checks)
+      } } in finish end rest ((:) token ordered) (if next then SharedTokenCheck token ordered checks else checks) blocks
     };
     output = TokenOutput word number PlainSharedToken CheckedSharedToken
-      (\history end -> finish end history [] NoSharedChecks)
+      (\history end -> finish end history [] NoSharedChecks True)
   } in collectTokensWith output scanSourceQuoted file source (stringLength source) IM.empty NoSharedTokens (Cursor 0 1 1);
   scanMoreWith :: (String -> String -> Int -> Cursor -> Either String Cursor) ->
                   String -> String -> Int -> Cursor -> Either String Scanned;

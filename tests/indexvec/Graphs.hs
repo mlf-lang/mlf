@@ -1067,6 +1067,16 @@ lexicalRunChecks = do
           reference = any (\i -> take (length prefix) (drop i text) == prefix) [0..length text]
       check "parsed source hygiene conservatively detects every binder prefix"
         reference (Separate.sourceHasHygienePrefix (H.literal text))
+  let captureBlocks _ _ braced = T.Right (Lexer.Scanned [] (Lexer.Token (if braced then "yes" else "no") 0 0 0 0))
+  forM_ ["where","let","of","do","otherwise","loop","done","Where"] $ \word ->
+    forM_ [" ","\t"," {- a -} "," -- x\n "] $ \space ->
+      forM_ ["","{ }","x"] $ \next -> do
+        let text = H.literal ("f x " ++ word ++ space ++ next)
+            expected = word `notElem` ["where","let","of","do"] || next == "{ }"
+        case Lexer.scanSharedWithLayout captureBlocks "blocks" text of
+          T.Right (Lexer.Scanned _ end) -> check "shared layout keyword followed by an explicit brace"
+            expected (H.unpack (Lexer.tokenText end) == "yes")
+          T.Left err -> fail (H.unpack err)
   forM_ [Lexer.isDigit,Lexer.isHexDigit,Lexer.isIdentChar,Lexer.isOperator] $ \predicate ->
     forM_ [0..size] $ \i -> do
       let before = Lexer.Cursor i 12 19
