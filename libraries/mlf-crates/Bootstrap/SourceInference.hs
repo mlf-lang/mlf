@@ -1294,7 +1294,7 @@ module Bootstrap.SourceInference where {
         entries = M.insert compareString name i names
       } in seq name (seq next (seq entries ((,) next entries)));
     selectMember state member =
-      foldlStrict select state (expressionDeclarations scope (sourceRhs member));
+      foldDeclarationRefs scope select state (Dependency.valueOccurrences True False (sourceRhs member));
     ordered = snd (foldlStrict selectMember ((,) IS.empty M.empty) members)
   } in filter (\i -> not (elem (\a b -> compareDecl a b == 0) i owners)) (M.elems ordered);
   slotPrepared checked owners (SlotPrepared _ named) = slotPrepared checked owners named;
