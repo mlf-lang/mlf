@@ -333,18 +333,18 @@ module Bootstrap.Module where {
   -- messages at this boundary. Both the emitted spelling and stable key may
   -- appear in serialized/query diagnostics. An identified term has its own
   -- display label independent of either spelling.
-  resolvedCrateDisplayNames crate = case resolvedCrateBindings crate of { Bindings symbols table -> let {
+  resolvedCrateDisplayNames crate = displayBindingNames (resolvedCrateBindings crate)
+    (concatMap (compose (map Dependency.boundId) (compose renamedBindings resolvedContents)) (resolvedCrateModules crate));
+  displayBindingNames (Bindings symbols table) ids = let {
     entries ((,) entity binding) = case binding of {
       OtherName name -> [(,) name (displayEntity entity)];
       TermSlot i -> let { display = Dependency.symbolDisplay symbols i; key = Dependency.symbolKey symbols i;
         name = Dependency.symbolName symbols i
       } in if eqString key name then [(,) name display] else [(,) name display,(,) key display]
     };
-    local = M.fromList compareString (concatMap (\r ->
-        map (\b -> let { i = Dependency.boundId b } in
-          (,) (Dependency.symbolName symbols i) (Dependency.symbolDisplay symbols i))
-          (renamedBindings (resolvedContents r))) (resolvedCrateModules crate))
-  } in M.union compareString local (M.fromList compareString (concatMap entries (M.toList table))) };
+    local = M.fromList compareString (map (\i ->
+      (,) (Dependency.symbolName symbols i) (Dependency.symbolDisplay symbols i)) ids)
+  } in M.union compareString local (M.fromList compareString (concatMap entries (M.toList table)));
   resolvedCrateModules (ResolvedCrate _ modules _ _) = modules;
   resolvedInstanceRows crate = concatMap (\entry ->
     map (\inst -> (,) (moduleIdentity (resolvedSource entry)) inst) (resolvedInstances (resolvedContents entry)))
@@ -1221,13 +1221,14 @@ module Bootstrap.Module where {
   };
   resolveExpr bindings env expression = resolveBound bindings env Set.empty
     (if Surface.surfaceCore expression then expression else Desugar.desugarDo expression);
-  entryExpr crate entry = let {
-    source = resolvedSource entry; bindings = resolvedCrateBindings crate
-  } in case resolvedBody (resolvedContents entry) of {
+  entryExpr crate entry = let { source = resolvedSource entry } in
+    moduleEntryExpr (resolvedCrateBindings crate) (moduleIdentity source)
+      (any (\value -> eqString (valueName value) "main") (sourceValues source))
+      (resolvedScope entry) (resolvedContents entry);
+  moduleEntryExpr bindings ownerName hasMain env contents = case resolvedBody contents of {
     Just body -> Right body;
-    Nothing -> if any (\value -> eqString (valueName value) "main") (sourceValues source)
-      then mapEither R.Global (termId bindings (Entity (moduleIdentity source) "main" Value))
-      else resolveExpr bindings (resolvedScope entry) (SVar "main")
+    Nothing -> if hasMain then mapEither R.Global (termId bindings (Entity ownerName "main" Value))
+      else resolveExpr bindings env (SVar "main")
   };
   managedAnnotation :: SExpr -> Bool;
   managedAnnotation expression = case expression of {
@@ -1470,7 +1471,8 @@ module Bootstrap.Module where {
     };
   -- Run the original strict selectors after the namespace fixed point. This
   -- preserves private-name, missing-member and conflicting-export diagnostics.
-  resolveOneWith mode names localMap exports source =
+  resolveOneWith = resolveModuleUsing (\_ source env _ renamed -> Right (Resolved source env renamed));
+  resolveModuleUsing complete mode names localMap exports source =
     do {
       local <-
         case M.lookup compareString (moduleIdentity source) localMap of {
@@ -1486,7 +1488,7 @@ module Bootstrap.Module where {
       renamed <-
         mapLeft (\message -> (sourcePath source ++ (": " ++ message)))
           (renameModule names local env source);
-      Right (Resolved source env renamed)
+      complete names source env exported renamed
     };
   -- External-only modules are leaf vertices. Publish only owners from the
   -- input table, using the existing name sets required by crate interfaces.
@@ -1538,9 +1540,10 @@ module Bootstrap.Module where {
   -- Source-only clients can choose colliding display names independently.
   resolveCrateDefinitions mode external definition supplied =
     resolveWithTermKey mode external definition definition supplied;
-  resolveWithTermKey mode external mangle stable supplied = do {
+  resolveWithTermKey = resolveWithTermKeyUsing resolvePlanWithKey;
+  resolveWithTermKeyUsing finish mode external mangle stable supplied = do {
     plan <- prepareCrateResolution mode external supplied;
-    resolvePlanWithKey (\_ entities -> Names (M.fromList compareEntity
+    finish (\_ entities -> Names (M.fromList compareEntity
       (map (\entity -> (,) entity (mangle entity)) (Set.toList entities)))) stable plan
   };
   data CrateResolution = CrateResolution PreludeMode ([] SourceModule)
@@ -1667,18 +1670,20 @@ module Bootstrap.Module where {
            Right (CrateResolution mode modules localMap exports allEntities)
          };
   resolveCratePlan allocate = resolvePlanWithKey allocate termIdentity;
-  resolvePlanWithKey allocate stable (CrateResolution mode modules localMap exports allEntities) = do {
+  resolvePlanWithKey = resolveModuleRows resolveOneWith fullResolution;
+  fullResolution mode modules bindings resolved =
+    let { instances = concatMap (\entry -> map (\inst -> (,) (moduleIdentity (resolvedSource entry)) inst)
+             (resolvedInstances (resolvedContents entry))) resolved;
+          reach = crateReach mode modules;
+          scopes = M.fromList compareString (map (\source -> let { name = moduleIdentity source } in
+            (,) name (candidateScope reach instances name)) modules) } in ResolvedCrate bindings resolved scopes reach;
+  resolveModuleRows resolve complete allocate stable (CrateResolution mode modules localMap exports allEntities) = do {
            let { bindings = resolveNamesWithKey stable (allocate modules allEntities);
                  symbols = bindingSymbols bindings };
            ensure (M.size (Dependency.symbolKeyIndex symbols) == V.count (Dependency.symbolNodes symbols))
              "duplicate stable declaration identity";
-           resolved <- mapM (resolveOneWith mode bindings localMap exports) modules;
-           let { instances = concatMap (\entry -> map (\inst -> (,) (moduleIdentity (resolvedSource entry)) inst)
-                    (resolvedInstances (resolvedContents entry))) resolved;
-                 reach = crateReach mode modules;
-                 scopes = M.fromList compareString (map (\source -> let { name = moduleIdentity source } in
-                   (,) name (candidateScope reach instances name)) modules) };
-           Right (ResolvedCrate bindings resolved scopes reach)
+           resolved <- mapM (resolve mode bindings localMap exports) modules;
+           Right (complete mode modules bindings resolved)
          };
   linkModules :: PreludeMode -> [] SourceModule -> Either String LinkedModule;
   linkModules mode supplied = mapEither fst (linkModulesUsing Surface.bindResolvedExpr Surface.closeResolvedInstance mode supplied);

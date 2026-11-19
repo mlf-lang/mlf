@@ -20,6 +20,7 @@ module Bootstrap.Crate where {
   import qualified Bootstrap.CrateQuery as Query;
   import qualified Bootstrap.SourceInference as Source;
   import qualified Bootstrap.Dependency as Dependency;
+  import qualified Bootstrap.Resolved as R;
   import qualified Bootstrap.Surface as Surface;
   import qualified Bootstrap.CrateArtifact as Artifact;
   import qualified Bootstrap.BuiltinPreludeContext as Builtin;
@@ -270,18 +271,20 @@ module Bootstrap.Crate where {
     Nothing -> Inference.loweredNames (preparedLowered prepared)
   };
   entryBindings spec resolution = let {
-    modules = Modules.resolvedCrateModules resolution; bindings = Modules.boundIn resolution modules
-  } in if eqString (specEntry spec) "" then Right ((,) NoEntry bindings) else do {
-    entry <- case find (\r -> eqString (Modules.moduleIdentity (Modules.resolvedSource r)) (specEntry spec)) modules of {
-      Nothing -> Left "crate entry module was not resolved"; Just r -> Right r
-    };
-    expression <- Modules.entryExpr resolution entry;
-    let { symbol = Artifact.definitionName (specIdentity spec)
-            (Modules.Entity (specEntry spec) "<crate-entry>" Modules.Value) };
-    case Dependency.appendBoundWithId bindings symbol expression of {
-      (,) slot allocated@(Dependency.BoundValues symbols _) -> Right ((,) (CrateEntry symbols slot) allocated)
+    modules = Modules.resolvedCrateModules resolution;
+    expression = case find (\r -> eqString (Modules.moduleIdentity (Modules.resolvedSource r)) (specEntry spec)) modules of {
+      Nothing -> Left "crate entry module was not resolved"; Just r -> Modules.entryExpr resolution r
     }
-  };
+  } in entryBindingsFor spec (Modules.boundIn resolution modules) expression;
+  entryBindingsFor spec bindings expression =
+    if eqString (specEntry spec) "" then Right ((,) NoEntry bindings) else do {
+      body <- expression;
+      let { symbol = Artifact.definitionName (specIdentity spec)
+        (Modules.Entity (specEntry spec) "<crate-entry>" Modules.Value) };
+      case Dependency.appendBoundWithId bindings symbol body of {
+        (,) slot allocated@(Dependency.BoundValues symbols _) -> Right ((,) (CrateEntry symbols slot) allocated)
+      }
+    };
   externalInstanceOwners interfaces =
     concatMap
       (\((,) _ iface) ->
@@ -290,7 +293,41 @@ module Bootstrap.Crate where {
               mapEither (\owner -> (,) owner ((,) name inst)) (Artifact.instanceOwner iface name))
            (Artifact.crateInstances iface))
       interfaces;
-  prepareCrate spec interfaces sources =
+  -- File compilation needs the checked export namespace and renamed
+  -- declarations. The public prepared-crate API also retains its source
+  -- modules for inspection.
+  data CompilationModule = CompilationModule String Modules.Renamed
+    (Either String (R.Expr Declaration)) (Either String Modules.Interface);
+  data CompilationModules = CompilationModules Modules.Bindings ([] CompilationModule) (Map String (Set String));
+  compilationName (CompilationModule name _ _ _) = name;
+  compilationContents (CompilationModule _ contents _ _) = contents;
+  compilationEntry (CompilationModule _ _ entry _) = entry;
+  compilationExports (CompilationModule _ _ _ exports) = exports;
+  compilationBindings = compose Modules.renamedBindings compilationContents;
+  compilationNames (CompilationModules table rows _) = Modules.displayBindingNames table
+    (concatMap (compose (map Dependency.boundId) compilationBindings) rows);
+  prepareCrate = prepareCrateUsing (\mode external definition sources -> do {
+    full <- Modules.resolveCrateDefinitions mode external definition sources;
+    let { row item = CompilationModule (Modules.moduleIdentity (Modules.resolvedSource item))
+            (Modules.resolvedContents item) (Modules.entryExpr full item) (Modules.resolvedExports mode item);
+          inputs = CompilationModules (Modules.resolvedCrateBindings full) (map row (Modules.resolvedCrateModules full))
+            (Modules.resolvedCrateReach full)
+    };
+    Right ((,) inputs (PreparedCrate full))
+  });
+  prepareFileCrate finish = prepareCrateUsing (\mode external definition sources -> let {
+    capture bindings source env exported renamed = let {
+      owner = Modules.moduleIdentity source;
+      hasMain = any (\v -> eqString (Modules.valueName v) "main") (Modules.sourceValues source);
+      entry = Modules.moduleEntryExpr bindings owner hasMain env renamed
+    } in seq owner (seq hasMain (Right (CompilationModule owner renamed entry (Right exported))));
+    collect selected original bindings units = let {
+      reach = Modules.crateReach selected original;
+      result = CompilationModules bindings units reach
+    } in seq (M.foldlWithKeyStrict (\_ name reachable -> seq name (seq (Set.size reachable) ())) () reach) ((,) result (finish result));
+    run = Modules.resolveModuleRows (Modules.resolveModuleUsing capture) collect
+  } in Modules.resolveWithTermKeyUsing run mode external definition definition sources);
+  prepareCrateUsing resolve spec interfaces sources =
     do {
       traverseEither
         (\source ->
@@ -314,29 +351,32 @@ module Bootstrap.Crate where {
               (M.findWithDefault compareString encodedDefault (Modules.owner entity) encodedOwners)
               entity
       };
-      resolution <- Modules.resolveCrateDefinitions (specMode spec) external mangle sources;
-      let {
-        resolved = Modules.resolvedCrateModules resolution
-      };
+      (,) inputs@(CompilationModules table resolved ownedReach) complete <- resolve (specMode spec) external mangle sources;
+      let { symbols = Modules.bindingSymbols table;
+            ownBindings = Dependency.BoundValues symbols (concatMap compilationBindings resolved) };
       -- Canonicalize only this crate's freshly resolved source declarations.
       -- Imported checked layouts are validation context, never rewrite input.
       -- Do this before SourcePlan, dictionary inventory and cache-key creation.
       ownData <- D.canonicalSourceDeclarations
         (concatMap (\p -> Artifact.crateData (snd p)) interfaces)
-        (concatMap (\r -> Modules.renamedDatatypes (Modules.resolvedContents r)) resolved);
+        (concatMap (\r -> Modules.renamedDatatypes (compilationContents r)) resolved);
       -- Checked class headers are ABI context. Canonicalize only this crate's
       -- fresh headers, before selectors, dictionary inventory and saved metadata.
       ownClasses <- Classes.canonicalSourceClasses Set.empty
         (append (concatMap (\p -> Artifact.crateData (snd p)) interfaces) ownData)
         (concatMap (\p -> Artifact.crateClasses (snd p)) interfaces)
-        (concatMap (\r -> Modules.renamedClasses (Modules.resolvedContents r)) resolved);
-      entryAndBindings <- entryBindings spec resolution;
+        (concatMap (\r -> Modules.renamedClasses (compilationContents r)) resolved);
+      let { expression = case find (\unit -> eqString (compilationName unit) (specEntry spec)) resolved of {
+        Nothing -> Left "crate entry module was not resolved"; Just unit -> compilationEntry unit
+      } };
+      entryAndBindings <- entryBindingsFor spec ownBindings expression;
       case entryAndBindings of {
         (,) entry bindings ->
           do {
             let {
-              localRows = Modules.resolvedInstanceRows resolution;
-              describe ((,) owner row) = let { inst = Modules.instanceValue resolution row } in
+              localRows = concatMap (\unit -> map (\inst -> (,) (compilationName unit) inst)
+                (Modules.resolvedInstances (compilationContents unit))) resolved;
+              describe ((,) owner row) = let { inst = R.namedInstance (Dependency.symbolName symbols) row } in
                 (,) owner ((,) (Artifact.instanceName (specIdentity spec) owner inst) inst);
               localInstances = map describe localRows
             };
@@ -354,7 +394,7 @@ module Bootstrap.Crate where {
                      interfaces)
             };
             let {
-              direct = M.union compareString (Modules.resolvedCrateReach resolution) externalReach
+              direct = M.union compareString ownedReach externalReach
             };
             let {
               reach = Modules.moduleReach direct
@@ -366,7 +406,8 @@ module Bootstrap.Crate where {
             };
             let {
               valueScopes = case bindings of { Dependency.BoundValues symbols _ ->
-                Dependency.indexedScopes symbols (append (Modules.resolvedScopeRows resolved candidates)
+                Dependency.indexedScopes symbols (append (concatMap (\unit -> let { scope = candidates (compilationName unit) } in
+                  map (\binding -> (,) (Dependency.boundId binding) scope) (compilationBindings unit)) resolved)
                   (case entry of { NoEntry -> []; CrateEntry _ i -> [(,) i (candidates (specEntry spec))] }))
               }
             };
@@ -399,7 +440,7 @@ module Bootstrap.Crate where {
                   importedTypes
             };
             let {
-              sourceNames = Modules.resolvedCrateDisplayNames resolution
+              sourceNames = compilationNames inputs
             };
             let {
               diagnosticNames =
@@ -425,7 +466,7 @@ module Bootstrap.Crate where {
               })
             };
             Right
-              (PreparedCrate resolution ownData ownClasses
+              (complete ownData ownClasses
                  (map (\((,) _ ((,) name inst)) -> (,) name (Separate.stripInstance inst))
                     localInstances)
                  lowered
