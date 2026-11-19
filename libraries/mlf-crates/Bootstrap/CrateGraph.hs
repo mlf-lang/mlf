@@ -362,7 +362,8 @@ module Bootstrap.CrateGraph where {
   };
   -- A large application tree can repeat one file origin at every reference.
   -- P3 writes a preorder tree with delta coordinates and a bounded spelling
-  -- table. An x leaf carries the ordinary encoding of all other syntax.
+  -- table. P4 also pools constructor names. In both formats an x leaf
+  -- carries the ordinary encoding of syntax outside the tables.
   -- Debit the old wire size as we go. For each admitted subtree its child's
   -- decimal length and colon fit in nine bytes. An oversized original still
   -- enters the ordinary planner and receives the same limit diagnostic.
@@ -490,8 +491,9 @@ module Bootstrap.CrateGraph where {
       [] -> case outer of {
         (:) ((,) previous items) more -> scan previous more budget items chunks pages slots line column names locations constructors;
         [] -> let {
-          finalPages = if slots == pageNodes then pages else (:) (concatStringList (chunks [])) pages
-        } in Just (concatStringList ((:) "P3" ((:) header (reverse finalPages))))
+          finalPages = if slots == pageNodes then pages else (:) (concatStringList (chunks [])) pages;
+          version = if M.size constructors == 0 then "P3" else "P4"
+        } in Just (concatStringList ((:) version ((:) header (reverse finalPages))))
       };
       (:) expr rest -> if slots == 0 then let {
           page = concatStringList (chunks [])
@@ -569,8 +571,9 @@ module Bootstrap.CrateGraph where {
           SourceOrigin rank _ _ _ _ -> named "v" (Q.ordinalToken (rank i)) 10;
           WrittenOrigin -> ordinary expr
         };
-        -- A constructor is unchanged by source/name canonicalization. Reuse
-        -- its complete ordinary x-field and its original UTF-8 charge.
+        -- The first 32 eligible constructors are defined by C and a framed
+        -- name. A subsequent c carries the zero-based slot as an ASCII scalar.
+        -- Each use still consumes its full ordinary UTF-8 budget.
         SConstructor name -> seq scope (let {
           emit cost field saved = collect (budget - cost) rest (\tail -> chunks ((:) field tail))
             pages (slots - 1) line column names locations saved
@@ -578,9 +581,9 @@ module Bootstrap.CrateGraph where {
           Just ((,) cost field) -> emit cost field constructors;
           Nothing -> if M.size constructors >= 32 || stringLength name > 4096 then ordinary expr else let {
             text = Q.encodeExpression expr; cost = stringUtf8Length text;
-            field = "x" ++ Separate.pack [text];
-            saved = M.insert compareString name ((,) cost field) constructors
-          } in emit cost field saved
+            code = "c" ++ V.at coordinateAlphabet (V.fromInt (M.size constructors));
+            saved = M.insert compareString name ((,) cost code) constructors
+          } in emit cost ("C" ++ Separate.pack [name]) saved
         });
         SPrimitive p -> named "p" (Primitive.primitiveName p) 11;
         SIntLit n -> let {

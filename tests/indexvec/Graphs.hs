@@ -156,10 +156,23 @@ queryChecks = do
       field name = "x" ++ H.unpack (Separate.pack [literal name])
       charge name = H.v_stringUtf8Length (literal name)
       budget = charge "end" + sum [25 + charge name | name <- uses]
-      bytes = "P3header" ++ concat ["a" ++ field name | name <- uses] ++ field "end"
+      framed name = let value = H.unpack name in show (length value) ++ ":" ++ value
+      symbol seen name = case lookup name (zip seen [0..]) of
+        Just slot -> ('c' : [toEnum slot],seen)
+        Nothing | length seen < 32 -> ('C' : framed name,seen ++ [name])
+                | otherwise -> (field name,seen)
+      encode seen [] = fst (symbol seen "end")
+      encode seen (name:rest) = let (encoded,next) = symbol seen name
+                                in 'a' : encoded ++ encode next rest
+      bytes = "P4header" ++ encode [] uses
   forM_ [CrateGraph.WrittenOrigin,source] $ \scope -> do
-    check "prepared constructors retain every ordinary field across pages" (Just bytes) (prepared scope budget expr)
+    check "prepared constructors retain definitions and references across pages" (Just bytes) (prepared scope budget expr)
     check "prepared constructors charge each occurrence" Nothing (prepared scope (budget-1) expr)
+    check "a prepared tree without constructors keeps its P3 key"
+      (Just "P3headeri1:7") (prepared scope 20 (T.SIntLit 7))
+    let large = H.literal (replicate 4097 '葉')
+    check "a constructor above the dictionary limit keeps its ordinary framing"
+      (Just ("P3header" ++ field large)) (prepared scope (charge large) (T.SConstructor large))
   let sha = H.literal (replicate 64 '1')
       other = H.literal (replicate 64 '2')
       node k reads = Q.QueryNode k sha reads T.Nothing

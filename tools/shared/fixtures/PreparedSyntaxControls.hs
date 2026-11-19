@@ -98,7 +98,7 @@ expandPositions wire =
       (syntax,end,_)=tree (0,0) after
   in if null end then "P1"++concatMap frame header++syntax else error "trailing delta syntax"
 
-expandSymbolTable wire =
+expandSymbolTable poolConstructors wire =
   let frame x=show (length x)++":"++x
       get s=case span (\c->c>='0'&&c<='9') s of
         (n,':':xs)|not(null n)->let k=read n;(x,rest)=splitAt k xs in
@@ -115,29 +115,37 @@ expandSymbolTable wire =
       number _=error "invalid pooled coordinate"
       numbers 0 s=("",s)
       numbers n s=let (v,t)=number s;(vs,end)=numbers (n-1::Int) t in (v++vs,end)
-      node table (tag:s) = case tag of
+      node table@(symbols,constructors) (tag:s) = case tag of
         'a' -> let (x,s1,t1)=node table s;(y,rest,t2)=node t1 s1 in ('a':x++y,rest,t2)
         'l' -> nested 2
         'S' -> nested 2
         'd' -> located 2
         'D' -> located 4
-        'v' -> let (v,r,t)=name table s in ('v':frame v,r,t)
-        'p' -> let (v,r,t)=name table s in ('x':frame(frame "primitive"++frame v),r,t)
+        'v' -> let (v,r,t)=name symbols s in ('v':frame v,r,(t,constructors))
+        'p' -> let (v,r,t)=name symbols s in ('x':frame(frame "primitive"++frame v),r,(t,constructors))
+        'C' | poolConstructors -> let (v,r)=get s in
+          if length constructors < 32 && length v <= 4096 && v `notElem` constructors
+          then (constructor v,r,(symbols,constructors++[v])) else error "invalid constructor definition"
+        'c' | poolConstructors -> case s of
+          slot:r | fromEnum slot < length constructors -> (constructor (constructors!!fromEnum slot),r,table)
+          _ -> error "undefined constructor reference"
         'x' -> raw
         'i' -> raw
         _ -> error "invalid pooled syntax"
        where
+        constructor v='x':frame(frame "constructor"++frame v)
         raw=let (v,r)=get s in (tag:frame v,r,table)
         nested n=let (vs,r)=fields n s;(x,end,t)=node table r in (tag:concatMap frame vs++x,end,t)
-        located n=let (v,r,t)=name table s;(coords,r1)=numbers n r;(x,end,t1)=node t r1
+        located n=let (v,r,t)=name symbols s;(coords,r1)=numbers n r;(x,end,t1)=node (t,constructors) r1
                   in (tag:frame v++coords++x,end,t1)
       node _ []=error "missing pooled syntax"
       (header,after)=fields 5 wire
-      (syntax,end,_)=node [] after
+      (syntax,end,_)=node ([],[]) after
   in if null end then expandPositions (concatMap frame header++syntax) else error "trailing pooled syntax"
 
 restoreOrigin :: String -> String
-restoreOrigin ('P':'3':wire) = restoreOrigin (expandSymbolTable wire)
+restoreOrigin ('P':'4':wire) = restoreOrigin (expandSymbolTable True wire)
+restoreOrigin ('P':'3':wire) = restoreOrigin (expandSymbolTable False wire)
 restoreOrigin ('P':'2':wire) = restoreOrigin (expandPositions wire)
 restoreOrigin ('P':'1':wire) = case fields 5 wire of
   ([pkg,modName,file,name,annotation],tree) ->
@@ -261,7 +269,7 @@ relativeChecks check = do
       group raw lowered = S.SlotPrepared slots (S.PreparedGroup raw lowered [] M.empty [] T.Nothing [])
       (_,smallCache) = G.preparedValueCached T.Nothing slots smallGroup
       ordinary text = case B.unpack text of
-        'P':version:_ | version `elem` ("123" :: String) -> restoreOrigin (B.unpack text)
+        'P':version:_ | version `elem` ("1234" :: String) -> restoreOrigin (B.unpack text)
         x -> x
       verifyEntry tag raw lowered expectRelative = do
         let current = group raw lowered
