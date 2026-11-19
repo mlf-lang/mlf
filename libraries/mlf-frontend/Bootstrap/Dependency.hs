@@ -98,22 +98,32 @@ module Bootstrap.Dependency where {
   querySyntaxRefs = valueOccurrences True True;
   -- Keep the observation constructor's demand separate from the reference
   -- list. A scoped subtree may produce a lazy filtered list of candidates.
-  data ValueOccurrences = ValueOccurrences ([] TermRef);
+  data ValueOccurrences = NoValueOccurrences | ValueOccurrences ([] TermRef);
   valueOccurrences includeCandidates inventory expression = let {
-    empty = ValueOccurrences [];
-    child body = case collect body empty of { ValueOccurrences refs -> Observation refs [] [] [] };
+    refsOf values = case values of { NoValueOccurrences -> []; ValueOccurrences refs -> refs };
+    child body = case collect body NoValueOccurrences of {
+      NoValueOccurrences -> emptyObservation; ValueOccurrences refs -> Observation refs [] [] []
+    };
+    prepend ref rest = case rest of {
+      NoValueOccurrences -> ValueOccurrences [ref]; ValueOccurrences refs -> ValueOccurrences ((:) ref refs)
+    };
+    -- A complete scope already owns its ordered references. Append only when
+    -- an enclosing application has actual work in the following position.
+    before values rest = case rest of {
+      NoValueOccurrences -> ValueOccurrences values; ValueOccurrences tail -> ValueOccurrences (append values tail)
+    };
     collect body rest = case body of {
       SSourceDefinition inner -> collect inner rest; SCallSite _ _ inner -> collect inner rest;
       SApp f a -> collect f (collect a rest);
-      SGlobal i n -> case rest of { ValueOccurrences refs -> ValueOccurrences ((:) (DeclRef i n) refs) };
-      SVar n -> case rest of { ValueOccurrences refs -> ValueOccurrences ((:) (LexicalRef (lexicalValueName n)) refs) };
+      SGlobal i n -> prepend (DeclRef i n) rest;
+      SVar n -> prepend (LexicalRef (lexicalValueName n)) rest;
       SConstructor _ -> rest; SPrimitive _ -> rest; SIntLit _ -> rest; SBoolLit _ -> rest;
       SStringLit _ -> rest; SDoubleLit _ -> rest;
       _ -> case observeScopedWith child includeCandidates inventory body of {
-        Observation values _ _ _ -> case rest of { ValueOccurrences refs -> ValueOccurrences (append values refs) }
+        Observation values _ _ _ -> before values rest
       }
     }
-  } in case collect expression empty of { ValueOccurrences refs -> refs };
+  } in refsOf (collect expression NoValueOccurrences);
   observeSyntax includeCandidates inventory expression =
     observeBefore includeCandidates inventory expression emptyObservation;
   -- Application subtrees contribute ordered occurrences to four independent lists.
