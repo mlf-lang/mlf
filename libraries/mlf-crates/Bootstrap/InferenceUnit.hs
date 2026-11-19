@@ -513,6 +513,9 @@ module Bootstrap.InferenceUnit where {
     SGlobal i _ -> variable (M.lookup compareInt (V.toInt i) globals);
     SVar name -> if eqString name "$MLF.Stack.callStack" then Left "managed call stack requires evidence"
       else variable (M.lookup compareString name names);
+    -- A constructor with no type arguments is checked in the declaration's
+    -- datatype environment along with the rest of the application.
+    SConstructor name -> Right (XConstructor name []);
     SPrimitive p -> case Primitive.primitiveSignature p of {
       (,) [] signature -> do {
         ty <- T.instantiateField M.empty signature;

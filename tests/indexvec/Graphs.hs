@@ -719,6 +719,46 @@ signedDataChecks = do
     (T.Left actual, T.Left reference) -> check "duplicate signed field diagnostic" (H.unpack reference) (H.unpack actual)
     _ -> fail "duplicate signed fields must fail"
 
+-- A signed first-order application may use bare constructors only when
+-- the full datatype environment checks it. An omitted polymorphic argument
+-- and an invalid child take the ordinary inference and diagnostic paths.
+signedConstructorChecks = do
+  let int = T.SCon "Int" []
+      tree = T.SCon "Tree" []
+      box = T.SCon "Box" [int]
+      ds = [T.DataDecl "Tree" [] [T.ConstructorDecl "Tip" [T.Applied "Int" []],
+                                   T.ConstructorDecl "Fork" [T.Applied "Tree" [], T.Applied "Tree" []]],
+            T.DataDecl "Box" ["a"] [T.ConstructorDecl "Box" [T.Parameter "a"]]]
+      construct name fields = foldl T.SApp (T.SConstructor name) fields
+      tip = construct "Tip" [T.SVar "x"]
+      fork = construct "Fork" [tip, tip]
+      rows result rhs = let sig = T.SArrow int result
+                        in [(V.fromInt 9, ("f", T.Just (T.SAnnotation [] sig), T.SChecked sig (T.SLam "x" T.Nothing rhs)))]
+      checked (T.Right x) = pure x
+      checked (T.Left why) = fail (H.unpack why)
+      accepts result rhs = do
+        let members = rows result rhs
+        actual <- checked (Inference.compileOpenGroupIndexed "test" [] ds members)
+        prior <- checked (Inference.compileElaboratedGroup [] ds members)
+        let [(_, ty)] = Open.bindings actual
+            [(_, original)] = Open.bindings prior
+        check "signed constructor export" True (XT.alphaEq ty original)
+        _ <- checked (Independent.checkClosed (Open.closedTerm actual))
+        pure ()
+  forM_ [(tree, fork), (T.SArrow int tree, T.SConstructor "Tip"),
+         (T.SArrow tree tree, construct "Fork" [tip])] $ \(result, rhs) -> do
+    direct <- checked (Inference.signedApplicationGroup [] ds (rows result rhs))
+    _ <- checked (Independent.checkClosed (Open.closedTerm direct))
+    accepts result rhs
+  let polymorphic = construct "Box" [T.SVar "x"]
+  case Inference.signedApplicationGroup [] ds (rows box polymorphic) of
+    T.Left _ -> accepts box polymorphic
+    _ -> fail "a polymorphic constructor needs its ordinary type argument"
+  let bad = rows tree (construct "Fork" [tip, T.SBoolLit True])
+  case (Inference.compileOpenGroupIndexed "test" [] ds bad, Inference.compileElaboratedGroup [] ds bad) of
+    (T.Left a, T.Left b) -> check "constructor operand diagnostic" (H.unpack b) (H.unpack a)
+    _ -> fail "invalid signed constructor operand admitted"
+
 protectionChecks = do
   let chain = [(show i,[show (i+1)]) | i <- [0..126::Int]] ++ [("127",[])]
       diamond = [("join",["left","right"]),("left",["import"]),("right",["import"]),
@@ -1137,4 +1177,5 @@ main = do
   importConventionChecks
   typedClassChecks
   signedDataChecks
+  signedConstructorChecks
   putStrLn "1032 ordered SCC and reach comparisons, query DAG and package controls passed"
