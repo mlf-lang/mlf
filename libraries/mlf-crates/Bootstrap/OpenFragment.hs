@@ -93,26 +93,22 @@ module Bootstrap.OpenFragment
   -- The format limits nesting to 128. Thread each completed child directly
   -- into its parent, preserving postorder numbering and the occurrence budget.
   expressionPattern value = let {
-    visit depth fuel table@(PatternTable count entries pairs names primitives ground) stream term =
+    visit depth fuel table@(PatternTable count entries pairs names primitives ground) stream term complete =
       if fuel < 0 || depth > 128 then NoPattern else let {
         remaining = fuel - 1;
-        finish i nextTable nextStream = if remaining < 0 then NoPattern else Visited i remaining nextTable nextStream;
+        finish i nextTable nextStream = if remaining < 0 then NoPattern else complete i remaining nextTable nextStream;
         save node nextNames nextPrimitives nextGround = if count >= 512 then NoPattern else let { next = count + 1 } in
           seq next (finish count (PatternTable next ((:) node entries) pairs nextNames nextPrimitives nextGround) stream);
-        application left right = case visit (depth + 1) remaining table stream left of {
-          NoPattern -> NoPattern;
-          Visited l available leftTable leftStream -> case visit (depth + 1) available leftTable leftStream right of {
-            NoPattern -> NoPattern;
-            Visited h rest current@(PatternTable size nodes apps ns ps gs) literals -> let {
+        application left right = visit (depth + 1) remaining table stream left
+          (\l available leftTable leftStream -> visit (depth + 1) available leftTable leftStream right
+            (\h rest current@(PatternTable size nodes apps ns ps gs) literals -> let {
               key = l * 512 + h
             } in case IM.lookup key apps of {
-              Just i -> Visited i rest current literals;
+              Just i -> complete i rest current literals;
               Nothing -> if size >= 512 then NoPattern else let {
                 next = size + 1; row = W.VNode 88 [W.VInt l,W.VInt h]
-              } in seq next (Visited size rest (PatternTable next ((:) row nodes) (IM.insert key size apps) ns ps gs) literals)
-            }
-          }
-        }
+              } in seq next (complete size rest (PatternTable next ((:) row nodes) (IM.insert key size apps) ns ps gs) literals)
+            }))
       } in case term of {
         XApp left right -> application left right;
         XIntTerm integer -> let { next = addLiteral integer stream } in seq next (finish 0 table next);
@@ -138,7 +134,7 @@ module Bootstrap.OpenFragment
         _ -> NoPattern
       };
     table = PatternTable 1 [W.VNode 87 []] IM.empty M.empty IM.empty M.empty
-  } in case visit 1 1048576 table (LiteralStream 0 0 0 0 0 []) value of {
+  } in case visit 1 1048576 table (LiteralStream 0 0 0 0 0 []) value Visited of {
     NoPattern -> Nothing;
     Visited root fuel (PatternTable count entries _ _ _ ground) (LiteralStream size amount first last step tail) ->
       if size < 8 || 1048576 - fuel < count * 3 then Nothing else
