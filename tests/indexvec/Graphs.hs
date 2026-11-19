@@ -646,6 +646,20 @@ protectionChecks = do
         settle flags = let next = spread flags in if next == flags then next else settle next
         flags = Classes.propagateProtection (fromIntegral (length keys)) rows
     check "protection equals independent named fixed point" (settle []) [n | n <- keys,V.at flags (slots Map.! n)]
+  let slot = V.fromInt
+      repeated = replicate 1024 (slot 2)
+      rows = [(slot 0,False,repeated),(slot 1,False,[slot 2]),(slot 0,False,repeated),
+              (slot 2,True,[slot 0]),(slot 3,False,[slot 3])]
+      flags = Classes.propagateProtection 4 rows
+  check "retained readers across repeated rows, a cycle and an unrelated declaration"
+    [True,True,True,False] (V.toList flags)
+  let dormant = Classes.propagateProtection 1 [(error "unused owner",False,replicate 3 (slot 0))]
+  check "an unprotected reverse edge leaves its owner lazy" [False] (V.toList dormant)
+  beforeFlags <- try (evaluate (V.at (Classes.propagateProtection 1
+    [(slot 0,error "early seed",[]),(slot 0,False,[error "later reference"])]) (slot 0))) :: IO (Either ErrorCall Bool)
+  check "all reference bounds are demanded before any protection seed"
+    (Left "later reference") (either (Left . takeWhile (/= '\n') . displayException) Right beforeFlags)
+
 -- Recover the calling convention from the checked result path. Do not
 -- instantiate or rewrite the type actually imported by the checker.
 importConventionChecks = do

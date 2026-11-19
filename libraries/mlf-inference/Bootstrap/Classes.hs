@@ -1145,12 +1145,18 @@ module Bootstrap.Classes where {
       Right (M.fromList compareString (map (\((,,) i _ _) ->
         (,) (Dependency.symbolName symbols i) (V.at flags i)) rows))
     };
-  propagateProtection count rows = runST (stBind (V.filled count []) (\users ->
-    stBind (ST.map_ (\((,,) i _ refs) -> ST.map_ (\r ->
-      stBind (V.get users r) (\old -> V.set users r ((:) i old))) refs) rows) (\_ ->
-    stBind (V.filled count False) (\flags ->
-      let { seeds = mapMaybe (\((,,) i direct _) -> if direct then Just i else Nothing) rows } in
-      stBind (spreadProtection users flags seeds) (\_ -> V.freeze flags)))));
+  -- Input references can be released after their reverse edges are stored.
+  -- Only test the saved seed flags after all rows have passed bounds checks.
+  propagateProtection count rows = runST (stBind (V.filled count []) (\users -> let {
+    build saved remaining = case remaining of {
+      [] -> stReturn saved;
+      (:) ((,,) owner direct refs) rest -> stBind (ST.map_ (\r ->
+        stBind (V.get users r) (\old -> V.set users r ((:) owner old))) refs)
+        (\_ -> build ((:) ((,) owner direct) saved) rest)
+    }
+  } in stBind (build [] rows) (\saved -> stBind (V.filled count False) (\flags ->
+    stBind (spreadProtection users flags (protectionSeeds saved)) (\_ -> V.freeze flags)))));
+  protectionSeeds reversed = foldl (\tail ((,) owner direct) -> if direct then (:) owner tail else tail) [] reversed;
   spreadProtection users flags pending = case pending of {
     [] -> stReturn ();
     (:) i rest -> stBind (V.get flags i) (\marked ->
