@@ -36,7 +36,7 @@ BUILTIN_VERIFICATION_HELPERS = ('tools/shared/builtin_prelude_identity.py',
 def executable_link_flags(name):
     # The compiler's larger nursery reduces copying of short-lived syntax trees.
     if name == 'emlf':
-        return [*LINK_FLAGS, '-with-rtsopts=-F4 -A16m']
+        return [*LINK_FLAGS, '-with-rtsopts=-F4 -A24m']
     if name == 'mlfpkg':
         return [*LINK_FLAGS, '-with-rtsopts=-F4']
     return list(LINK_FLAGS)

@@ -218,7 +218,7 @@
     ],
     "mlf-shared.cabal": [
       "b2abd4810918a0b5cc96257d636b0f3a4aea853d0b2296e2ebcf7932bef43ec3",
-      "1959ceccc8aa2c9af7c07d471316e601de0da0a7794672a51001dfd3085f0383"
+      "a5afeb68fe9c158e3398dcdf72bf011678eec8d656b551dc237a475f2fb3d210"
     ],
     "mlf.lock": [
       "5f7f58dece7a251711a3da2b78ba42502bd25554672bbbeaf8bf95abbc469077",
@@ -254,7 +254,7 @@
     ],
     "tools/shared/build.py": [
       "3ac387f43f4ce6261a94fd514da2108d7dce607867bab2a4267bb73918b1de1f",
-      "ea27ec12794b891735f263e96b7c48556dc5c1ae9eb0cdd0c8cd7ea12aa63b87"
+      "1a4b20505a9e945047ceae2aa36ba5e101ae06a6aca3e7687bb5a14cfe3f28a5"
     ],
     "tools/shared/test_direct.py": [
       "138b387bbcff0f8bb717a3c7d7906337e9942d32f621ea963ca320d8d5ddd85e",
@@ -1327,6 +1327,21 @@
       "predecessor": "e5be3f3fb01d761360e36e4138f644294749f074",
       "predecessor_manifest_sha256": "acb6f3510d89ec607155687184976233bfcfe42e10d65a30fec4b0bd4d3763e6",
       "predecessor_tree": "a4f05c66ce4d8e82245600dff64fab70a86e4a39"
+    },
+    {
+      "changes": {
+        "mlf-shared.cabal": [
+          "1959ceccc8aa2c9af7c07d471316e601de0da0a7794672a51001dfd3085f0383",
+          "a5afeb68fe9c158e3398dcdf72bf011678eec8d656b551dc237a475f2fb3d210"
+        ],
+        "tools/shared/build.py": [
+          "ea27ec12794b891735f263e96b7c48556dc5c1ae9eb0cdd0c8cd7ea12aa63b87",
+          "1a4b20505a9e945047ceae2aa36ba5e101ae06a6aca3e7687bb5a14cfe3f28a5"
+        ]
+      },
+      "predecessor": "e2d036d25a785a7c9b0430d2f4a570ca2211b67b",
+      "predecessor_manifest_sha256": "72c0fc6d42cd875f6115d3f6fd918198d24c0926b4c0b0a122067dbd8f33390c",
+      "predecessor_tree": "044924059c6aaa11a5d9ce6ed83ec3357d31995c"
     }
   ],
   "format": "pr43-reconciliation-source-migration-v1",

@@ -22,7 +22,7 @@ executable emlf
   main-is: Main.hs
   build-depends: base >= 4.22 && < 4.23, mlf-shared
   default-language: Haskell2010
-  ghc-options: -fpedantic-bottoms -fno-state-hack -rtsopts=ignoreAll "-with-rtsopts=-F4 -A16m"
+  ghc-options: -fpedantic-bottoms -fno-state-hack -rtsopts=ignoreAll "-with-rtsopts=-F4 -A24m"
 
 executable mlfpkg
   hs-source-dirs: host/ghc/app/mlfpkg
