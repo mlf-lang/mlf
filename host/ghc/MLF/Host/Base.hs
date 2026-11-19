@@ -306,18 +306,39 @@ v_readDouble text = let s=unpack text in
         exponent _ = False
 v_concatString :: String -> String -> String
 v_concatString = orderedStrict (\(String a na _) (String b nb _) -> mkSizedText (na+nb) (T.append a b))
+-- The validation pass forces every piece in order and checks the exact
+-- byte total. Copy the same immutable slices into that single destination.
+copyStringPieces :: Bool -> P.Int -> [String] -> T.Text
+copyStringPieces framed total@(G.I# size#) pieces
+  | total == 0 = T.empty
+  | otherwise = G.runRW# $ \initial ->
+      case G.newByteArray# size# initial of
+        (# ready, target #) ->
+          let copy (TI.Text (TA.ByteArray src) (G.I# off#) (G.I# len#)) pos# state =
+                case G.copyByteArray# src off# target pos# len# state of
+                  next -> (# next, pos# G.+# len# #)
+              fill _ [] state = case G.unsafeFreezeByteArray# target state of
+                (# _, result #) -> TI.Text (TA.ByteArray result) 0 total
+              fill pos# (String text count _ : rest) state =
+                let payload start# previous = case copy text start# previous of
+                      (# next, end# #) -> fill end# rest next
+                in if framed then case fieldPrefix count of
+                     String prefix _ _ -> case copy prefix pos# state of
+                       (# next, end# #) -> payload end# next
+                   else payload pos# state
+          in fill 0# pieces ready
 -- Force each fragment before demanding the next list cell, matching the
--- balanced source join's observable failure order. Text.concat then copies
--- the validated fragments once rather than at every balanced-tree level.
+-- balanced source join's observable failure order. The validated byte and
+-- scalar lengths determine the allocation and the resulting scalar index.
 v_concatStringList :: [String] -> String
 v_concatStringList pieces = case pieces of
   [] -> literal ""
   first:rest -> first `pseq` case rest of
     [] -> first
-    _ -> collect 0 0 [] pieces
+    _ -> collect 0 0 pieces
   where
-    collect scalarCount byteCount chunks remaining = case remaining of
-      [] -> mkSizedText scalarCount (T.concat (reverse chunks))
+    collect scalarCount byteCount remaining = case remaining of
+      [] -> mkSizedText scalarCount (copyStringPieces False byteCount pieces)
       piece:rest -> piece `pseq` case piece of
         String text count _ -> case text of
           TI.Text _ _ bytes ->
@@ -326,26 +347,26 @@ v_concatStringList pieces = case pieces of
             else let nextScalars = scalarCount + count
                      nextBytes = byteCount + bytes
                  in nextScalars `pseq` nextBytes `pseq`
-                      collect nextScalars nextBytes (text:chunks) rest
+                      collect nextScalars nextBytes rest
 -- Canonical length-prefixed fields: decimal scalar length, colon, payload.
 -- Fuse framing with the fragment traversal without allocating a source list
 -- of three String wrappers per field. Validate heads before demanding tails.
 v_packStringFields :: [String] -> String
-v_packStringFields pieces = collect 0 0 [] pieces
+v_packStringFields pieces = collect 0 0 pieces
   where
-    collect scalarCount byteCount chunks remaining = case remaining of
-      [] -> mkSizedText scalarCount (T.concat (reverse chunks))
+    collect scalarCount byteCount remaining = case remaining of
+      [] -> mkSizedText scalarCount (copyStringPieces True byteCount pieces)
       piece:rest -> piece `pseq` case piece of
         String text count _ -> case text of
           TI.Text _ _ bytes -> case fieldPrefix count of
-            String prefix extra _ ->
+            String _ extra _ ->
               if extra > maxBound - scalarCount || count > maxBound - scalarCount - extra ||
                    extra > maxBound - byteCount || bytes > maxBound - byteCount - extra
               then failure "string too large"
               else let nextScalars = scalarCount + extra + count
                        nextBytes = byteCount + extra + bytes
                    in nextScalars `pseq` nextBytes `pseq`
-                        collect nextScalars nextBytes (text:prefix:chunks) rest
+                        collect nextScalars nextBytes rest
 -- Keep the decimal length and colon together. The fixed lazy table bounds
 -- sharing independently of input length; larger fields use the same framing.
 fieldPrefix :: P.Int -> String
