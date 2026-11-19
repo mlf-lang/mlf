@@ -202,23 +202,39 @@ module Bootstrap.OpenFragment
   -- successive pages of pretty-printer output while counting that length,
   -- then prepend the length with the same polynomial composition as pack.
   termEncoding term = let {
-    consume :: [] String -> [] String -> Int -> Int -> Int -> Int -> Separate.FingerprintEncoding;
-    consume chunks page slots count a b = case chunks of {
-      [] -> flush [] page count a b True;
-      (:) piece rest -> seq piece (if slots == 1 then flush rest ((:) piece page) count a b False
-        else consume rest ((:) piece page) (slots - 1) count a b)
+    -- Long repeated chunks, such as qualified names, have the same length
+    -- and polynomial contribution at every occurrence. Bound the number
+    -- and size of saved pieces within this term.
+    flush page count a b next = case page of {
+      [] -> next count a b;
+      _ -> let { text = concatStringList (reverse page); size = stringLength text;
+                 total = count + size } in case Separate.canonicalFingerprintText text 0 size a b of {
+        (,) x y -> seq total (seq x (seq y (next total x y)))
+      }
     };
-    flush rest page count a b done = let {
-      text = concatStringList (reverse page);
-      size = stringLength text;
-      total = count + size
-    } in case Separate.canonicalFingerprintText text 0 size a b of {
-      (,) x y -> seq total (seq x (seq y (if done then
-        Separate.FingerprintEncoding total (Separate.fingerprintPower 65599 total 2147483647)
-          (Separate.fingerprintPower 131 total 2147483629) x y
-        else consume rest [] 128 total x y)))
+    finish count a b = Separate.FingerprintEncoding count
+      (Separate.fingerprintPower 65599 count 2147483647)
+      (Separate.fingerprintPower 131 count 2147483629) a b;
+    consume chunks page slots saved count a b = case chunks of {
+      [] -> flush page count a b finish;
+      (:) piece rest -> seq piece (let {
+        size = stringLength piece;
+        buffered = (:) piece page;
+        ordinary = if slots == 1 then flush buffered count a b
+          (consume rest [] 128 saved) else consume rest buffered (slots - 1) saved count a b;
+        reuse pool encoded start x y = case Separate.encodingState ((,) x y) encoded of {
+          (,) u v -> let { total = start + size } in
+            seq total (seq u (seq v (consume rest [] 128 pool total u v)))
+        }
+      } in if size < 32 || size > 4096 then ordinary else case M.lookup compareString piece saved of {
+        Just encoded -> flush page count a b (reuse saved encoded);
+        Nothing -> if M.size saved >= 32 then ordinary else let {
+          encoded = Separate.encodingText piece;
+          next = M.insert compareString piece encoded saved
+        } in flush page count a b (reuse next encoded)
+      })
     }
-  } in consume (Pretty.termChunks 0 term []) [] 128 0 0 0;
+  } in consume (Pretty.termChunks 0 term []) [] 128 M.empty 0 0 0;
   -- Between two literal slots each scalar is fixed by the application table.
   -- Summarize these strings once, including the parentheses on right children.
   data StampText = StampText Separate.FingerprintEncoding |

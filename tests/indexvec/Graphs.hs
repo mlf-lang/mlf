@@ -1088,6 +1088,18 @@ fragmentFingerprintChecks = do
     check "fragment stamp matches scalar-length-framed pretty text"
       (H.unpack (Separate.fingerprint (Separate.pack fields))) (H.unpack (Open.fingerprint fragment))
 
+  forM_ [31,32,33,4096,4097] $ \width -> do
+    let label = H.literal (take width (cycle "λx😀"))
+        variable = T.XName 4 label
+        leaf = T.XVarTerm variable
+        sumOfArgs = foldr1 add (replicate 41 leaf)
+        body = T.XLet result sumOfArgs (T.XConstructor "()" [])
+        parameter = Separate.pack [Separate.pack ["4", label, "Int"]]
+        fields = [Separate.pack [], parameter, Pretty.prettyTerm body, exports]
+    fragment <- right (Open.check env [(variable,ty)] body)
+    check "repeated Unicode names retain the scalar-framed fingerprint"
+      (H.unpack (Separate.fingerprint (Separate.pack fields))) (H.unpack (Open.fingerprint fragment))
+
 applicationPatternChecks = do
   let right (T.Right value) = pure value
       right (T.Left message) = fail (H.unpack message)
