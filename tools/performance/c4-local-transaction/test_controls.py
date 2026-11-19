@@ -51,29 +51,40 @@ PERFORMANCE_TREE = '386f0b41ab5f9b39fca273f3040f51d73df924a1'
 PERFORMANCE_MANIFEST_SHA = 'ebe5671476447cd4b256784e7d898ed6095c7c54cc9286c6869ca4909b2b708b'
 RECONCILIATION_SHA = '82b9b045993ff9ac2d14a5b67dbfd35288004a79ae08303a1047f81de438d009'
 RECONCILIATION_PATH = 'tools/performance/artifact-binary/pr43-reconciliation-migration.json'
+ADAPTER_REVISION = '798282547f3169d6d729d17c088f5cc29ac3eab0'
+
+
+def validate_compiler_map(spec, adapter_row, adapter_source, live_source):
+    origin, endpoint = adapter_row
+    C.require(C.sha_bytes(adapter_source) == endpoint, 'physical adapter Map endpoint')
+    for edge in [spec['inferred_chain_transition'], *spec['compiler_source_transitions']]:
+        if MAP_PATH in edge['changes']:
+            before, after = edge['changes'][MAP_PATH]
+            C.require(before == endpoint and before != after, 'continuous compiler Map transition')
+            endpoint = after
+    C.require(spec['changes'][MAP_PATH] == [origin, endpoint] and
+              C.sha_bytes(live_source) == endpoint, 'complete transition to current Map')
 
 
 @lru_cache(maxsize=1)
 def map_successor_inputs():
-    # The compiler changes leave Map at the published adapter endpoint.
-    # Check its live row before replaying the three fixed blobs, without a compiler.
+    # Replay the C4 comparison with its original Map. Its successor chain
+    # independently authenticates the physical file used by the compiler today.
     root = HERE.parents[2]
     git = ['git', '--no-replace-objects', '-C', str(root)]
     tree = subprocess.check_output([*git, 'rev-parse', PERFORMANCE_BASE + '^{tree}'],
                                    text=True, timeout=30).strip()
-    def old(path):
-        return subprocess.check_output([*git, 'show', PERFORMANCE_BASE + ':' + path], timeout=30)
-    adapter = subprocess.check_output([*git, 'show',
-        '798282547f3169d6d729d17c088f5cc29ac3eab0:' + RECONCILIATION_PATH], timeout=30)
+    def at(revision, path):
+        return subprocess.check_output([*git, 'show', revision + ':' + path], timeout=30)
+    adapter = at(ADAPTER_REVISION, RECONCILIATION_PATH)
+    adapter_map = at(ADAPTER_REVISION, MAP_PATH)
     live = (root / RECONCILIATION_PATH).read_bytes()
     C.require(C.sha_bytes(live) == '7bcdbb13daf1d271cfeb3057676e7751298905417285a7fd1438b8fdbeacfb25',
               'fixed compiler successor manifest')
-    spec = json.loads(live)
-    C.require(MAP_PATH not in spec['inferred_chain_transition']['changes'] and
-              all(MAP_PATH not in edge['changes'] for edge in spec['compiler_source_transitions']) and
-              spec['changes'][MAP_PATH] == json.loads(adapter)['changes'][MAP_PATH],
-              'continuous Map endpoint after compiler changes')
-    return (adapter, old(RECONCILIATION_PATH), old(MAP_PATH), (root / MAP_PATH).read_bytes(), tree)
+    validate_compiler_map(json.loads(live), json.loads(adapter)['changes'][MAP_PATH],
+                          adapter_map, (root / MAP_PATH).read_bytes())
+    return (adapter, at(PERFORMANCE_BASE, RECONCILIATION_PATH), at(PERFORMANCE_BASE, MAP_PATH),
+            adapter_map, tree)
 
 
 def restore_reconciliation_predecessor(raw):
@@ -254,6 +265,25 @@ class StaticControls(unittest.TestCase):
             wrong = dict(delta); wrong[field] = '' if field == 'reviewed_change' else '0' * 64
             with self.subTest(field=field), self.assertRaisesRegex(ValueError, 'continuous C4 Int64 performance Map endpoints'):
                 validate_map_successor(wrong, *inputs)
+
+    def test_compiler_map_rejects_unrecorded_edges_and_stale_live_bytes(self):
+        adapter, _, _, adapter_map, _ = map_successor_inputs()
+        start = json.loads(adapter)['changes'][MAP_PATH]
+        root = HERE.parents[2]
+        live = (root / MAP_PATH).read_bytes()
+        spec = json.loads((root / RECONCILIATION_PATH).read_bytes())
+        with self.assertRaisesRegex(ValueError, 'complete transition to current Map'):
+            validate_compiler_map(spec, start, adapter_map, adapter_map)
+        with self.assertRaisesRegex(ValueError, 'physical adapter Map endpoint'):
+            validate_compiler_map(spec, start, live, live)
+        first = next(edge['changes'] for edge in spec['compiler_source_transitions']
+                     if MAP_PATH in edge['changes'])
+        first[MAP_PATH][0] = '0' * 64
+        with self.assertRaisesRegex(ValueError, 'continuous compiler Map transition'):
+            validate_compiler_map(spec, start, adapter_map, live)
+        del first[MAP_PATH]
+        with self.assertRaises(ValueError):
+            validate_compiler_map(spec, start, adapter_map, live)
 
     def test_exact_darwin_source_basis(self):
         previous = inverse_darwin_source_basis(MANIFEST, (HERE/'source-basis-darwin.json').read_bytes())
