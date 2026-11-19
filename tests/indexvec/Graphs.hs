@@ -1243,6 +1243,14 @@ main = do
   packageChecks
   queryChecks
   datatypeChecks
+  let sourceTuples = ["(" ++ replicate (arity-1) ',' ++ ")" | arity <- [2..64]]
+      sourceTypes = "()" : "[]" : sourceTuples
+      otherNames = ["(:)", ":", "Leaf", "Prelude.()", "MLFLegacyUnit", "List", "True",
+                    "()", "[]", "(" ++ replicate 64 ',' ++ ")", "λ"]
+  forM_ (sourceTypes ++ otherNames) $ \name -> do
+    let s = H.literal name
+    check ("wired source type " ++ name) (name `elem` sourceTypes) (Data.sourceBuiltinType s)
+    check ("wired source constructor " ++ name) (name `elem` (":" : sourceTypes)) (Data.sourceBuiltinConstructor s)
   orderedSyntaxChecks
   lexicalRunChecks
   layoutTokenChecks
