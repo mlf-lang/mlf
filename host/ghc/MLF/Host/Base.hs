@@ -3,7 +3,7 @@ module MLF.Host.Base
   ( Int, Integer, Bool(..), Double, Char, IO, String, ST, STArray
   , MLFCallStack, MLFHasCallStack, MLFStackFrame(..), MLFStackEvidence(..)
   , v_emptyCallStack, v_pushCallStack, v_prettyCallStack
-  , literal, unpack, utf8, fromUtf8, matchString, neInt, leInt, gtInt, geInt
+  , literal, unpack, stringText, utf8, fromUtf8, matchString, neInt, leInt, gtInt, geInt
   , v_textToChars, v_textFromChars, v_charCode, v_charFromCode
   , v_ioReturn, v_ioBind, v_stReturn, v_stBind, v_runST
   , v_newSTArray, v_readSTArray, v_writeSTArray, v_lengthSTArray, v_freezeSTArray
@@ -137,8 +137,10 @@ byteAddressLiteral address =
 #-}
 unpack :: String -> P.String
 unpack (String t _ _) = T.unpack t
+stringText :: String -> T.Text
+stringText (String text _ _) = text
 utf8 :: String -> BS.ByteString
-utf8 (String t _ _) = TE.encodeUtf8 t
+utf8 = TE.encodeUtf8 . stringText
 fromUtf8 :: BS.ByteString -> String
 fromUtf8 bytes = case TE.decodeUtf8' bytes of
   Left _ -> failure "IO error: invalid UTF-8 input"

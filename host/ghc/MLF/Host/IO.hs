@@ -6,6 +6,8 @@ import qualified Prelude as P
 import MLF.Host.Base
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Unsafe as BU
+import qualified Data.Text.Array as TA
+import qualified Data.Text.Internal as TI
 import qualified Data.Array.IO as A
 import qualified Data.Array.Base as AB
 import qualified Data.Array.IO.Internals as AI
@@ -271,7 +273,15 @@ copyByteArray input size = do
   if size == 0 then pure () else withByteStorage storage $ \pointer -> copyBytes pointer input size
   pure (ByteArray size storage)
 v_byteArrayFromString :: String -> IO ByteArray
-v_byteArrayFromString = bytesArray . utf8
+v_byteArrayFromString value = do
+  -- The host text already contains valid UTF-8. Copy its exact slice once
+  -- into independent mutable storage, including embedded zero bytes.
+  text <- evaluate (stringText value)
+  case text of
+    TI.Text (TA.ByteArray source) (G.I# offset#) size@(G.I# length#) -> do
+      storage@(AI.IOUArray (AB.STUArray _ _ _ target)) <- newByteStorage size
+      IO $ \world -> case G.copyByteArray# source offset# target 0# length# world of
+        next -> (# next, ByteArray size storage #)
 v_getByteLine :: IO ByteArray
 v_getByteLine = ioErrorAs "IO error: byte input failed" $ do
   bytes <- readByteLine []

@@ -1053,6 +1053,13 @@ lexicalRunChecks = do
     let text = H.literal (wordsInFile ++ suffix)
     check "shared file scanner preserves prefix collisions, extents and first diagnostics"
       (scanned (checked text)) (scanned (Lexer.scanValidatedSharedTokens "lex" text))
+  let section = Prim.stringSlice (H.literal "先😀\0終") 1 2
+  first <- Prim.byteArrayFromString section
+  second <- Prim.byteArrayFromString section
+  Prim.writeByteArray first 0 17
+  check "UTF8 array snapshots preserve a slice and embedded NUL" [240,159,152,128,0]
+    =<< mapM (Prim.readByteArray second) [0..4]
+  check "mutating a UTF8 array preserves the input string" "😀\0" (H.unpack section)
   forM_ [Lexer.isDigit,Lexer.isHexDigit,Lexer.isIdentChar,Lexer.isOperator] $ \predicate ->
     forM_ [0..size] $ \i -> do
       let before = Lexer.Cursor i 12 19
