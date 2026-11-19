@@ -1752,7 +1752,7 @@ module MLF.Tests.SharedFrontend where {
         _ -> False
       })
   };
-  groundAliasDepth known identity = case M.lookup compareInt identity known of {
+  groundAliasDepth known identity = case IM.lookup identity known of {
     Just (Inference.GroundVar next) -> 1 + groundAliasDepth known next;
     _ -> 0
   };
@@ -1762,13 +1762,13 @@ module MLF.Tests.SharedFrontend where {
       call = \body -> SApp (SGlobal (Index.fromInt 3) "wrong") body;
       body = SLam "x" Nothing (foldl (\body _ -> call body) (SVar "x") (range 0 255)) };
     (,,) template actual inferred <- recursiveRight "nested ground uses"
-      (Inference.groundInfer globals M.empty (Inference.GroundState 0 M.empty M.empty 1) body);
+      (Inference.groundInfer globals M.empty (Inference.GroundState 0 IM.empty IM.empty 1) body);
     wanted <- recursiveRight "nested ground target"
       (Inference.groundType M.empty (XArrow (XCon "Int" []) (XCon "Int" [])));
     solved <- recursiveRight "nested ground solve" (Inference.groundUnify inferred actual wanted);
     case solved of { Inference.GroundState _ known _ _ ->
       check "nested polymorphic uses do not build a linear type-alias chain"
-        (all (\identity -> groundAliasDepth known identity <= 16) (M.keys known))
+        (all (\identity -> groundAliasDepth known identity <= 16) (IM.keys known))
     };
     sealed <- recursiveRight "nested ground seal" (Inference.groundSeal solved template);
     checked <- recursiveRight "nested ground independent check" (Independent.checkClosed (XAbs (XName 0 "poly") ty sealed));

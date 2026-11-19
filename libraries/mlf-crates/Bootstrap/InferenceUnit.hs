@@ -12,6 +12,7 @@ module Bootstrap.InferenceUnit where {
   import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.IntSet as IS;
+  import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.Classes as Classes;
   import qualified Bootstrap.CompilerCore as Compiler;
   import qualified Bootstrap.Primitive as Primitive;
@@ -431,7 +432,7 @@ module Bootstrap.InferenceUnit where {
   -- with a rank-1 approximation. Ambiguity and unsupported forms fall back.
   data GroundType = GroundVar Int | GroundArrow GroundType GroundType |
     GroundCon String ([] GroundType) | GroundApply GroundType GroundType;
-  data GroundState = GroundState Int (Map Int GroundType) (Map Int Int) Int;
+  data GroundState = GroundState Int (IntMap GroundType) (IntMap Int) Int;
   data GroundBinding = GroundLocal XName GroundType | GroundImport XName XType;
   data GroundTerm = GroundLiteral XTerm | GroundVariable XName XType ([] ((,) XTyVar GroundType)) |
     GroundPrimitive Primitive ([] GroundType) | GroundLambda XName GroundType GroundTerm |
@@ -439,7 +440,7 @@ module Bootstrap.InferenceUnit where {
   groundFresh (GroundState next known ranks serial) =
     (,) (GroundVar next) (GroundState (advanceIdentity next 1) known ranks serial);
   groundDeref state ty = case (,) state ty of {
-    (,) (GroundState _ known _ _) (GroundVar i) -> case M.lookup compareInt i known of {
+    (,) (GroundState _ known _ _) (GroundVar i) -> case IM.lookup i known of {
       Nothing -> ty; Just value -> groundDeref state value
     };
     _ -> ty
@@ -466,14 +467,14 @@ module Bootstrap.InferenceUnit where {
   -- Both arguments are unbound roots after dereferencing. Rank bounds alias
   -- depth even when a nested polymorphic call spine joins them in reverse order.
   groundUnion (GroundState next known ranks serial) left right = let {
-    a = M.findWithDefault compareInt 0 left ranks;
-    b = M.findWithDefault compareInt 0 right ranks
-  } in if a < b then GroundState next (M.insert compareInt left (GroundVar right) known) ranks serial
-    else GroundState next (M.insert compareInt right (GroundVar left) known)
-      (if a == b then M.insert compareInt left (a + 1) ranks else ranks) serial;
+    a = IM.findWithDefault 0 left ranks;
+    b = IM.findWithDefault 0 right ranks
+  } in if a < b then GroundState next (IM.insert left (GroundVar right) known) ranks serial
+    else GroundState next (IM.insert right (GroundVar left) known)
+      (if a == b then IM.insert left (a + 1) ranks else ranks) serial;
   groundBind state identity value = case state of { GroundState next known ranks serial -> do {
     ensure (not (groundOccurs state identity value)) "recursive ground type";
-    Right (GroundState next (M.insert compareInt identity value known) ranks serial)
+    Right (GroundState next (IM.insert identity value known) ranks serial)
   } };
   groundType :: Map XTyVar GroundType -> XType -> Either String GroundType;
   groundType variables ty = case ty of {
@@ -527,7 +528,7 @@ module Bootstrap.InferenceUnit where {
     XBot -> Right (XBottom target);
     XBotKind _ -> Right (XBottom target);
     _ -> do {
-      (,,) proposed arguments initial <- groundScheme M.empty [] (GroundState 0 M.empty M.empty 0) source;
+      (,,) proposed arguments initial <- groundScheme M.empty [] (GroundState 0 IM.empty IM.empty 0) source;
       wanted <- groundType M.empty target;
       solved <- groundUnify initial proposed wanted;
       groundEvidence solved source arguments
@@ -641,7 +642,7 @@ module Bootstrap.InferenceUnit where {
         };
         _ -> Left "not a single signed nonrecursive monotype"
       };
-      (,,) template actual initial <- groundInfer globals names (GroundState 0 M.empty M.empty (length parameters + 1)) rhs;
+      (,,) template actual initial <- groundInfer globals names (GroundState 0 IM.empty IM.empty (length parameters + 1)) rhs;
       wanted <- groundType M.empty expected;
       solved <- groundUnify initial actual wanted;
       implementation <- groundSeal solved template;
@@ -710,7 +711,7 @@ module Bootstrap.InferenceUnit where {
     _ -> Left "ground recursive member requires a closed monotype"
   };
   groundRecursiveBody globals names ((,) reversed serial) (GroundMember _ binder expected wanted rhs) = do {
-    (,,) term actual initial <- groundInfer globals names (GroundState 0 M.empty M.empty serial) rhs;
+    (,,) term actual initial <- groundInfer globals names (GroundState 0 IM.empty IM.empty serial) rhs;
     solved <- groundUnify initial actual wanted;
     sealed <- groundSeal solved term;
     case solved of { GroundState _ _ _ next -> Right ((,) ((:) ((,,) binder expected sealed) reversed) next) }
