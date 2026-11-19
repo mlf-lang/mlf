@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, KindSignatures, FlexibleInstances, ForeignFunctionInterface, ConstraintKinds, MagicHash, ExtendedLiterals #-}
+{-# LANGUAGE RankNTypes, KindSignatures, FlexibleInstances, ForeignFunctionInterface, ConstraintKinds, MagicHash, UnboxedTuples, ExtendedLiterals #-}
 module MLF.Host.Base
   ( Int, Integer, Bool(..), Double, Char, IO, String, ST, STArray
   , MLFCallStack, MLFHasCallStack, MLFStackFrame(..), MLFStackEvidence(..)
@@ -37,9 +37,7 @@ import qualified Data.Word as Word
 import Data.Typeable (Typeable)
 import Control.Exception (Exception, throw)
 import qualified Control.Monad.ST as S
-import qualified Data.Array as Boxed
-import qualified Data.Array.ST as A
-import qualified Data.Array.Base as AB
+import qualified GHC.ST as GS
 import GHC.Float (castDoubleToWord64, castWord64ToDouble)
 import GHC.Conc (pseq)
 import GHC.Exts (isTrue#, (<#))
@@ -56,7 +54,7 @@ type Int = Fixed.Int64
 type ST = S.ST
 -- The private constructor fixes zero-based bounds once. Language lengths are
 -- Int64; only a proven in-range index is converted to the host machine index.
-data STArray s a = STArray !Int !(A.STArray s P.Int a)
+data STArray s a = STArray !Int (G.MutableArray# s a)
 -- Text is strict UTF-8 in the supported text-2 toolchain. String indices and
 -- lengths below count Unicode scalars, never bytes or UTF-16 code units.
 data String = String !T.Text !P.Int (Array.UArray P.Int P.Int)
@@ -183,29 +181,37 @@ bounded message limit n = if n<0 || n>limit || n>fromIntegral (maxBound::P.Int)
 arrayLength :: Int -> P.Int
 arrayLength = bounded "invalid array length" (9223372036854775807 `quot` 8)
 v_newSTArray :: Int -> a -> ST s (STArray s a)
-v_newSTArray n initial = pure n >>= \operand -> do
-  let size=arrayLength operand
-  cells <- size `pseq` A.newArray (0,size-1) initial
-  pure (STArray (fromIntegral size) cells)
+v_newSTArray n initial = GS.ST $ \state -> case arrayLength n of
+  size@(G.I# count#) -> case G.newArray# count# initial state of
+    (# next, cells #) -> (# next, STArray (fromIntegral size) cells #)
 stIndex :: Int -> Int -> P.Int
 stIndex size n =
   -- Array lengths are validated nonnegative and fit the host Int.
   if (fromIntegral n :: Word.Word64) < fromIntegral size
   then fromIntegral n else failure "array index out of bounds"
 v_readSTArray :: STArray s a -> Int -> ST s a
-v_readSTArray a n = pure a >>= \(STArray size cells) ->
-  AB.unsafeRead cells (stIndex size (a `pseq` n))
+v_readSTArray array index = GS.ST $ \state -> case array of
+  STArray size cells -> case stIndex size (array `pseq` index) of
+    G.I# i# -> G.readArray# cells i# state
 v_writeSTArray :: STArray s a -> Int -> a -> ST s ()
-v_writeSTArray a n value = pure a >>= \(STArray size cells) ->
-  AB.unsafeWrite cells (stIndex size (a `pseq` n)) value
+v_writeSTArray array index value = GS.ST $ \state -> case array of
+  STArray size cells -> case stIndex size (array `pseq` index) of
+    G.I# i# -> case G.writeArray# cells i# value state of
+      next -> (# next, () #)
 v_lengthSTArray :: STArray s a -> ST s Int
-v_lengthSTArray a = pure a >>= \(STArray size _) -> pure size
+v_lengthSTArray array = GS.ST $ \state -> case array of
+  STArray size _ -> (# state, size #)
 
--- freeze copies the boxed cells in this action, without evaluating their contents.
+-- Copy the cells at this point in the action. Stored values stay lazy,
+-- and later writes through aliases cannot change the immutable snapshot.
 v_freezeSTArray :: STArray s a -> ST s (Int -> a)
-v_freezeSTArray array = pure array >>= \(STArray size cells) -> do
-  snapshot <- A.freeze cells
-  pure (\index -> snapshot Boxed.! stIndex size index)
+v_freezeSTArray array = GS.ST $ \state -> case array of
+  STArray size cells -> case (fromIntegral size :: P.Int) of
+    G.I# count# -> case G.freezeArray# cells 0# count# state of
+      (# next, frozen #) ->
+        let get index = case stIndex size index of
+              G.I# i# -> case G.indexArray# frozen i# of (# value #) -> value
+        in (# next, get #)
 
 strict2 :: (a -> b -> c) -> a -> b -> c
 strict2 f a b = a `pseq` b `pseq` f a b
