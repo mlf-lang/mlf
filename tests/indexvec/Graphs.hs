@@ -13,6 +13,7 @@ import qualified Bootstrap.Classes as Classes
 import qualified Bootstrap.Compiler as Compiler
 import qualified Bootstrap.Crate as Crate
 import qualified Bootstrap.CrateArtifact as Artifact
+import qualified Bootstrap.CrateGraph as CrateGraph
 import qualified Bootstrap.CrateQuery as CQ
 import qualified Bootstrap.Data as Data
 import qualified Bootstrap.Dependency as D
@@ -142,6 +143,22 @@ packageChecks = do
 -- Construct the typed input independently of the writer, including the
 -- noncanonical row order that an older reader accepts and must republish.
 queryChecks = do
+  let origin = T.SourceSpan "pkg" "Mod" "file" 1 1 1 1
+      prepared scope budget expression = case CrateGraph.packedOriginIn scope origin 0 budget expression "header" of
+        T.Nothing -> Nothing
+        T.Just value -> Just (H.unpack value)
+      source = CrateGraph.SourceOrigin id (M.singleton "ctor" "local:0") 0 M.empty 0
+      names = map H.literal (["","ctor","葉:λ","a\0"] ++ map show [1..40 :: Int])
+      uses = take 150 (cycle names)
+      expr = foldr (T.SApp . T.SConstructor) (T.SConstructor "end") uses
+      literal name = CQ.encodeExpression (T.SConstructor name)
+      field name = "x" ++ H.unpack (Separate.pack [literal name])
+      charge name = H.v_stringUtf8Length (literal name)
+      budget = charge "end" + sum [25 + charge name | name <- uses]
+      bytes = "P3header" ++ concat ["a" ++ field name | name <- uses] ++ field "end"
+  forM_ [CrateGraph.WrittenOrigin,source] $ \scope -> do
+    check "prepared constructors retain every ordinary field across pages" (Just bytes) (prepared scope budget expr)
+    check "prepared constructors charge each occurrence" Nothing (prepared scope (budget-1) expr)
   let sha = H.literal (replicate 64 '1')
       other = H.literal (replicate 64 '2')
       node k reads = Q.QueryNode k sha reads T.Nothing

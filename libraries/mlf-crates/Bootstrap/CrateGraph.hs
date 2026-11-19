@@ -486,19 +486,19 @@ module Bootstrap.CrateGraph where {
         else (:) (V.at coordinateAlphabet (V.fromInt (orInt digit 64))) (bytes rest)
     } in bytes (xorInt (shiftLInt number 1) (shiftRInt number 63));
     scan scope outer = let {
-      collect budget pending chunks pages slots line column names locations = if budget < 0 then Nothing else case pending of {
+      collect budget pending chunks pages slots line column names locations constructors = if budget < 0 then Nothing else case pending of {
       [] -> case outer of {
-        (:) ((,) previous items) more -> scan previous more budget items chunks pages slots line column names locations;
+        (:) ((,) previous items) more -> scan previous more budget items chunks pages slots line column names locations constructors;
         [] -> let {
           finalPages = if slots == pageNodes then pages else (:) (concatStringList (chunks [])) pages
         } in Just (concatStringList ((:) "P3" ((:) header (reverse finalPages))))
       };
       (:) expr rest -> if slots == 0 then let {
           page = concatStringList (chunks [])
-        } in seq page (collect budget pending id ((:) page pages) pageNodes line column names locations) else let {
-        next cost emit items = collect (budget - cost) items (compose chunks emit) pages (slots - 1) line column names locations;
+        } in seq page (collect budget pending id ((:) page pages) pageNodes line column names locations constructors) else let {
+        next cost emit items = collect (budget - cost) items (compose chunks emit) pages (slots - 1) line column names locations constructors;
         named tag spelling overhead = case positionSymbol spelling names of { (,,) code bytes table ->
-          collect (budget - overhead - bytes) rest (\tail -> chunks ((:) tag ((:) code tail))) pages (slots - 1) line column table locations
+          collect (budget - overhead - bytes) rest (\tail -> chunks ((:) tag ((:) code tail))) pages (slots - 1) line column table locations constructors
         };
         enter nested = scan nested (case rest of { [] -> outer; _ -> (:) ((,) scope rest) outer });
         ordinary value = let { text = Q.encodeExpression value } in
@@ -510,11 +510,11 @@ module Bootstrap.CrateGraph where {
           -- inspects the function. Stay within that page and budget.
           applied prefix spelling overhead = case positionSymbol spelling names of {
             (,,) code bytes table -> collect (budget - 25 - overhead - bytes) ((:) a rest)
-              (\tail -> chunks ((:) prefix ((:) code tail))) pages (slots - 2) line column table locations
+              (\tail -> chunks ((:) prefix ((:) code tail))) pages (slots - 2) line column table locations constructors
           }
         } in if slots < 2 || budget < 25 then single else case f of {
           SApp g b -> collect (budget - 50) ((:) g ((:) b ((:) a rest)))
-            (\tail -> chunks ((:) "aa" tail)) pages (slots - 2) line column names locations;
+            (\tail -> chunks ((:) "aa" tail)) pages (slots - 2) line column names locations constructors;
           SVar name -> applied "av" (case scope of {
             WrittenOrigin -> name; SourceOrigin _ env _ _ _ -> Q.canonicalReference env name
           }) 10;
@@ -533,7 +533,7 @@ module Bootstrap.CrateGraph where {
             fields = Separate.pack [local,Q.optional Q.encodeAnnotation (Separate.mapMaybeValue (Q.canonicalAnnotation types typeDepth) ann)];
             child = SourceOrigin rank (M.insert compareString n local env) (depth + 1) types typeDepth
           } in enter child (budget - 17 - stringUtf8Length fields) [b] (\tail -> chunks ((:) "l" ((:) fields tail)))
-            pages (slots - 1) line column names locations
+            pages (slots - 1) line column names locations constructors
         };
         SCallSite label span@(SourceSpan pkg mod file sl sc el ec) body -> case origin of {
           SourceSpan p m f _ _ _ _ -> if eqString pkg p && eqString mod m && eqString file f then case positionSymbol label names of { (,,) code nameBytes table -> let {
@@ -546,7 +546,7 @@ module Bootstrap.CrateGraph where {
             } in (:) (if short then "d" else "D") ((:) code startLine);
             cost = 29 + originBytes + nameBytes +
               positionBytes sl + positionBytes sc + positionBytes el + positionBytes ec;
-            next emit known = collect (budget - cost) ((:) body rest) (compose chunks emit) pages (slots - 1) sl sc table known;
+            next emit known = collect (budget - cost) ((:) body rest) (compose chunks emit) pages (slots - 1) sl sc table known constructors;
             offset = sc - column; width = ec - sc;
             -- Only back-references have a one-scalar spelling. Definitions
             -- include their framed text and always go through the general path.
@@ -569,6 +569,19 @@ module Bootstrap.CrateGraph where {
           SourceOrigin rank _ _ _ _ -> named "v" (Q.ordinalToken (rank i)) 10;
           WrittenOrigin -> ordinary expr
         };
+        -- A constructor is unchanged by source/name canonicalization. Reuse
+        -- its complete ordinary x-field and its original UTF-8 charge.
+        SConstructor name -> seq scope (let {
+          emit cost field saved = collect (budget - cost) rest (\tail -> chunks ((:) field tail))
+            pages (slots - 1) line column names locations saved
+        } in case M.lookup compareString name constructors of {
+          Just ((,) cost field) -> emit cost field constructors;
+          Nothing -> if M.size constructors >= 32 || stringLength name > 4096 then ordinary expr else let {
+            text = Q.encodeExpression expr; cost = stringUtf8Length text;
+            field = "x" ++ Separate.pack [text];
+            saved = M.insert compareString name ((,) cost field) constructors
+          } in emit cost field saved
+        });
         SPrimitive p -> named "p" (Primitive.primitiveName p) 11;
         SIntLit n -> let {
           digits = showInt n; count = stringLength digits;
@@ -579,12 +592,12 @@ module Bootstrap.CrateGraph where {
           WrittenOrigin -> ordinary expr;
           SourceOrigin rank env depth types typeDepth ->
             enter WrittenOrigin budget [Q.canonicalExpressionWith rank env depth types typeDepth expr]
-              chunks pages slots line column names locations
+              chunks pages slots line column names locations constructors
         }
       }
       }
     } in collect
-  } in scan initialScope [] initialBudget [tree] id [] pageNodes 0 0 M.empty IM.empty;
+  } in scan initialScope [] initialBudget [tree] id [] pageNodes 0 0 M.empty IM.empty M.empty;
   matchingSourceMembers original lowered = case (,) original lowered of {
     (,) [(,,) name annotation body] [(,,) other next candidate] ->
       templateNodesLeft 257 body <= 0 && eqString name other && eqMaybe E.eqSAnnotation annotation next &&
