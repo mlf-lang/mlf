@@ -346,16 +346,70 @@ module Bootstrap.LLVM.Optimize where {
     XELet n (XEVar a) b -> copy (M.singleton n (XEVar a)) b;
     _ -> freshPure normalized
   };
-  -- Only closed unary constructors and their exact field selectors qualify.
-  -- The declaration spine has already been freshened. These identities remain
-  -- distinct underneath nested lambdas, patterns and recursive definitions.
-  data UnaryConstructorUse = BuildsField String | SelectsField String;
+  -- Recognize helpers on the freshened declaration spine. These identities
+  -- remain distinct underneath nested lambdas, patterns and recursive groups.
+  data FoldBranch = ReturnField Int | CombineFields Primitive Int Int;
+  data UnaryConstructorUse = BuildsField String | SelectsField String |
+    FoldsConstructors (Map String ((,) Int FoldBranch));
   unaryConstructorUse term = case term of {
     XEAbs name (XEApp (XEConstructor constructor) (XEVar field)) ->
       if eqName name field then Just (BuildsField constructor) else Nothing;
     XEAbs name (XECase (XEVar subject)
         [XErasedAlternative (XConstructorPattern constructor [Just field]) (XEVar result)]) ->
       if eqName name subject && eqName field result then Just (SelectsField constructor) else Nothing;
+    _ -> Nothing
+  };
+  -- After freshening and identity reduction, a closed case can select a
+  -- field or combine two distinct recursive children with a primitive.
+  -- Keep the operator and the order of its arguments from the checked body.
+  constructorFold self value = case value of {
+    XEAbs parameter (XECase (XEVar subject) branches) -> if eqName parameter subject &&
+      L.not (eqName self parameter) && L.not (L.null branches)
+      then L.foldM (foldAlternative self) M.empty branches else Nothing;
+    _ -> Nothing
+  };
+  foldAlternative self known (XErasedAlternative pattern body) = case pattern of {
+    XConstructorPattern tag fields -> let {
+      named = X.patternNames pattern;
+      field name = fmap L.fst (L.find (\((,) _ item) -> case item of {
+        Just binder -> eqName binder name; Nothing -> False
+      }) (L.mapIndexed (\i item -> (,) i item) fields));
+      child expr = case expr of {
+        XEApp (XEVar f) (XEVar arg) -> if eqName self f then field arg else Nothing;
+        _ -> Nothing
+      }
+    } in if M.member compareString tag known || L.any (eqName self) named ||
+      S.size (S.fromList compareName named) /= L.length named then Nothing else do {
+      rule <- case body of {
+        XEVar name -> fmap ReturnField (field name);
+        XEApp (XEApp (XEPrimitive primitive) left) right -> do {
+          a <- child left; b <- child right;
+          if a == b then Nothing else Just (CombineFields primitive a b)
+        };
+        _ -> Nothing
+      };
+      Just (M.insert compareString tag ((,) (L.length fields) rule) known)
+    };
+    _ -> Nothing
+  };
+  -- Every demanded subtree must have a known saturated constructor. Each
+  -- field is substituted at most once, and unused fields remain unevaluated.
+  foldKnownConstructor rules tree = case applications tree of {
+    (,) (XEConstructor tag) args -> case M.lookup compareString tag rules of {
+      Just ((,) arity rule) -> if arity /= L.length args then Nothing else case rule of {
+        ReturnField index -> L.at index args;
+        CombineFields primitive first second -> do {
+          left <- L.at first args >>= foldKnownConstructor rules;
+          right <- L.at second args >>= foldKnownConstructor rules;
+          let { apply = XEApp (XEApp (XEPrimitive primitive) left) right };
+          Just (case primitive of {
+            PAddInt -> L.fromMaybe apply (combineIntSummands left right);
+            _ -> apply
+          })
+        }
+      };
+      Nothing -> Nothing
+    };
     _ -> Nothing
   };
   checkedIdentities known expression = case expression of {
@@ -367,6 +421,14 @@ module Bootstrap.LLVM.Optimize where {
       result <- checkedIdentities following body;
       reduceIdentity (XELet name rhs result)
     };
+    XELetRec [(,) name value] body -> do {
+      rhs <- constructorIdentities known value;
+      result <- case constructorFold name rhs of {
+        Just rules -> checkedIdentities (M.insert compareName name (FoldsConstructors rules) known) body;
+        Nothing -> constructorIdentities known body
+      };
+      freshPure (XELetRec [(,) name rhs] result)
+    };
     _ -> constructorIdentities known expression
   };
   constructorIdentities known expression = if M.null known
@@ -374,14 +436,17 @@ module Bootstrap.LLVM.Optimize where {
   constructorApplications known expression = do {
     term <- children (constructorApplications known) expression;
     case term of {
-      XEApp (XEVar select) (XEApp (XEVar build) field) ->
-        case M.lookup compareName select known of {
-          Just (SelectsField wanted) -> case M.lookup compareName build known of {
+      XEApp (XEVar function) argument -> case M.lookup compareName function known of {
+        Just (FoldsConstructors rules) -> freshPure (L.fromMaybe term (foldKnownConstructor rules argument));
+        Just (SelectsField wanted) -> case argument of {
+          XEApp (XEVar build) field -> case M.lookup compareName build known of {
             Just (BuildsField actual) -> freshPure (if eqString wanted actual then field else term);
             _ -> freshPure term
           };
           _ -> freshPure term
         };
+        _ -> freshPure term
+      };
       XEApp (XEApp (XEPrimitive PAddInt) left) right ->
         freshPure (L.fromMaybe term (combineIntSummands left right));
       _ -> reduceIdentity term

@@ -28,6 +28,7 @@ import qualified Bootstrap.QueryGraph as Q
 import qualified Bootstrap.InferenceUnit as Inference
 import qualified Bootstrap.OpenFragment as Open
 import qualified Bootstrap.Separate as Separate
+import qualified Bootstrap.LLVM.Optimize as Optimize
 import qualified Bootstrap.X.Pretty as Pretty
 import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Type as XT
@@ -759,6 +760,51 @@ signedConstructorChecks = do
     (T.Left a, T.Left b) -> check "constructor operand diagnostic" (H.unpack b) (H.unpack a)
     _ -> fail "invalid signed constructor operand admitted"
 
+-- The checked fold uses the field order in the function's body. A field
+-- absent from that body may fail if demanded, including on a nested branch.
+knownConstructorFoldChecks = do
+  let n i = T.XName i "same spelling"
+      v i = T.XEVar (n i)
+      app = T.XEApp
+      prim op = foldl app (T.XEPrimitive op)
+      con tag = foldl app (T.XEConstructor tag)
+      poison message = prim T.PPanic [T.XEString message]
+      leaf x = con "Tip" [poison "ignored", x]
+      pair a b = con "Fork" [a, b]
+      present = T.Just . n
+      arm tag fields = T.XErasedAlternative (T.XConstructorPattern tag fields)
+      base = arm "Tip" [T.Nothing, present 4] (v 4)
+      step left right = arm "Fork" [present 5, present 6]
+        (prim T.PSubInt [app (v 1) (v left), app (v 1) (v right)])
+      rule branches = T.XEAbs (n 2) (T.XECase (v 2) branches)
+      function = rule [base, step 6 5]
+      use tree = T.XELetRec [(n 1, function)] (app (v 1) tree)
+      int = T.Applied "Int" []
+      tree = T.Applied "Tree" []
+      ds = [T.DataDecl "Tree" [] [T.ConstructorDecl "Tip" [int, int], T.ConstructorDecl "Fork" [tree, tree]]]
+  env <- case Data.validateDeclarations ds of
+    T.Right ok -> pure ok
+    T.Left why -> fail (H.unpack why)
+  let run expr = case Runtime.integer (Runtime.evaluate env (Runtime.REnv M.empty) expr) of
+        T.Left why -> Left (H.unpack why)
+        T.Right value -> Right value
+  forM_ [(pair (leaf (T.XEInt minBound)) (leaf (T.XEInt 9)), Right (9 - minBound)),
+         (pair (leaf (poison "left")) (leaf (poison "right")), Left "right")] $ \(subject, expected) ->
+    forM_ [use subject, Optimize.optimizeChecked (use subject)] $ \term -> check "constructor fold demand" expected (run term)
+  case Optimize.constructorFold (n 1) function of
+    T.Just rules -> do
+      let subject = pair (leaf (v 18)) (leaf (v 19))
+      case Optimize.foldKnownConstructor rules subject of
+        T.Just reduced -> check "resolved fold operands" True (X.equalErased (prim T.PSubInt [v 19, v 18]) reduced)
+        _ -> fail "statically known fold was missed"
+      case Optimize.foldKnownConstructor rules (pair (v 8) (leaf (v 19))) of
+        T.Nothing -> pure ()
+        _ -> fail "unspecified subtree collapsed"
+    _ -> fail "missing recursive constructor fold"
+  case Optimize.constructorFold (n 1) (rule [base, step 6 6]) of
+    T.Nothing -> pure ()
+    _ -> fail "duplicate recursive field in constructor fold"
+
 protectionChecks = do
   let chain = [(show i,[show (i+1)]) | i <- [0..126::Int]] ++ [("127",[])]
       diamond = [("join",["left","right"]),("left",["import"]),("right",["import"]),
@@ -1177,5 +1223,6 @@ main = do
   importConventionChecks
   typedClassChecks
   signedDataChecks
+  knownConstructorFoldChecks
   signedConstructorChecks
   putStrLn "1032 ordered SCC and reach comparisons, query DAG and package controls passed"
