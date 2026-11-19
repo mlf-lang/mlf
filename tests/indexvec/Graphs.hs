@@ -29,6 +29,10 @@ import qualified Bootstrap.InferenceUnit as Inference
 import qualified Bootstrap.OpenFragment as Open
 import qualified Bootstrap.Separate as Separate
 import qualified Bootstrap.X.Pretty as Pretty
+import qualified Bootstrap.X.Syntax as X
+import qualified Bootstrap.X.Type as XT
+import qualified Bootstrap.Runtime as Runtime
+import qualified Tests.IndependentCheck as Independent
 import qualified Bootstrap.IndexVec as V
 import qualified Bootstrap.IntSet as I
 import qualified Bootstrap.Parser as Parser
@@ -652,6 +656,69 @@ typedClassChecks = do
 
 -- The reference propagates named flags to convergence, independently of
 -- reverse edges and the candidate's work queue.
+-- Compare the routed program with ordinary graph inference. The outer
+-- argument and the selected field share a spelling, and the other field fails
+-- if evaluation demands it.
+signedDataChecks = do
+  let a = T.STVar "a"
+      pair = T.SCon "Pair" [a]
+      ds = [T.DataDecl "Pair" ["a"] [T.ConstructorDecl "P" [T.Parameter "a", T.Parameter "a"]]]
+      rows from to rhs =
+        let sig = T.SForall T.Flexible "a" T.SBottom (T.SArrow from to)
+        in [(V.fromInt 27, ("f", T.Just (T.SAnnotation [] sig), T.SChecked sig (T.SLam "x" T.Nothing rhs)))]
+      make = T.SApp (T.SApp (T.SConstructor "P") (T.SVar "x")) (T.SVar "x")
+      field first second = T.SCase (T.SVar "x")
+        [T.SAlternative (T.SConstructorPattern "P" [T.Just first, T.Just second]) (T.SVar "x")]
+      int = T.XCon "Int" []
+      panicField = T.XApp (T.XPrimitive T.PPanic [int]) (T.XStringTerm "unused field")
+      applied value arg = T.XApp (T.XTypeApp value (X.typeApplication int)) arg
+      packed = T.XApp (T.XApp (T.XConstructor "P" [int]) panicField) (T.XIntTerm 37)
+      checked (T.Right value) = pure value
+      checked (T.Left message) = fail (H.unpack message)
+  forM_ [(rows a pair make, False), (rows pair a (field "ignored" "x"), True)] $ \(members, projection) -> do
+    (externals, lowered) <- checked (Inference.prepareIndexedGroup [] ds members)
+    direct <- checked (Inference.signedDataGroup [] members lowered)
+    routed <- checked (Inference.compileOpenGroupIndexed "scope" [] ds members)
+    ordinary <- checked (Inference.finishOpenGroup externals (map snd members) lowered)
+    check "signed data route" (H.unpack (Open.fingerprint direct)) (H.unpack (Open.fingerprint routed))
+    let [(_, referenceTy)] = Open.bindings ordinary
+    forM_ [routed, ordinary] $ \fragment -> do
+      let [(owner, ty)] = Open.bindings fragment
+          env = Open.context fragment
+      check "signed data export" True (H.unpack (X.nameHint owner) == "f" && XT.alphaEq ty referenceTy)
+      _ <- checked (Independent.checkClosed (Open.closedTerm fragment))
+      case Open.body fragment of
+        T.XLet n impl _ -> do
+          let use = applied (T.XVarTerm n) (if projection then packed else panicField)
+              term = T.XWithData (Open.declarations env) (T.XLet n impl use)
+          _ <- checked (Independent.checkClosed term)
+          result <- checked (Runtime.evaluate (Open.dataEnvironment env) (Runtime.REnv M.empty) (X.erase term))
+          case (projection, result) of
+            (True, Runtime.RInteger value) -> check "select the shadowing field" 37 value
+            (False, Runtime.RConstructor name values) -> check "lazy signed constructor" ("P", 2) (H.unpack name, length values)
+            _ -> fail "unexpected signed data result"
+        _ -> fail "expected a nonrecursive signed data binding"
+  -- The graph solver drops an unused quantifier, including shadowed ones.
+  -- Preserve the exact exported scheme when this declaration falls back.
+  let two = T.SForall T.Flexible "a" T.SBottom
+            (T.SForall T.Flexible "unused" T.SBottom (T.SArrow a pair))
+      unused = [(V.fromInt 28, ("f", T.Just (T.SAnnotation [] two), T.SChecked two (T.SLam "x" T.Nothing make)))]
+  (scope, core) <- checked (Inference.prepareIndexedGroup [] ds unused)
+  case Inference.signedDataGroup [] unused core of
+    T.Left _ -> pure ()
+    T.Right _ -> fail "direct route retained an unused quantifier"
+  viaGraph <- checked (Inference.finishOpenGroup scope (map snd unused) core)
+  viaPublic <- checked (Inference.compileOpenGroupIndexed "scope" [] ds unused)
+  let [(_, expected)] = Open.bindings viaGraph
+      [(_, actual)] = Open.bindings viaPublic
+  check "unused signed quantifier follows source inference" True (XT.alphaEq expected actual)
+  let duplicates = rows pair a (field "x" "x")
+  (externals, lowered) <- checked (Inference.prepareIndexedGroup [] ds duplicates)
+  case (Inference.compileOpenGroupIndexed "scope" [] ds duplicates,
+        Inference.finishOpenGroup externals (map snd duplicates) lowered) of
+    (T.Left actual, T.Left reference) -> check "duplicate signed field diagnostic" (H.unpack reference) (H.unpack actual)
+    _ -> fail "duplicate signed fields must fail"
+
 protectionChecks = do
   let chain = [(show i,[show (i+1)]) | i <- [0..126::Int]] ++ [("127",[])]
       diamond = [("join",["left","right"]),("left",["import"]),("right",["import"]),
@@ -1069,4 +1136,5 @@ main = do
   applicationPatternChecks
   importConventionChecks
   typedClassChecks
+  signedDataChecks
   putStrLn "1032 ordered SCC and reach comparisons, query DAG and package controls passed"

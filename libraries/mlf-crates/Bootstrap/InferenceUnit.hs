@@ -22,6 +22,8 @@ module Bootstrap.InferenceUnit where {
   import qualified Bootstrap.X.Checked as Checked;
   import qualified Bootstrap.X.Check as Check;
   import qualified Bootstrap.Data as Data;
+  import qualified Bootstrap.Kinding as Kinding;
+  import qualified Bootstrap.SourceEquality as SourceEquality;
   import qualified Bootstrap.OpenFragment as Open;
   import qualified Bootstrap.X.Pretty as Pretty;
   -- Class translation is a crate query, before the value dependency graph is
@@ -334,10 +336,102 @@ module Bootstrap.InferenceUnit where {
         Right fragment -> Right fragment;
         Left _ -> case groundRecursiveIndexed parameters members lowered of {
           Right fragment -> Right fragment;
-          Left _ -> finishOpenGroup externalTypes (map snd members) lowered
+          Left _ -> case signedDataGroup parameters members lowered of {
+            Right fragment -> Right fragment;
+            Left _ -> finishOpenGroup externalTypes (map snd members) lowered
+          }
         }
       }
     }
+  };
+  -- A closed, explicitly quantified constructor or case projection has its
+  -- type arguments in the declaration. The ordinary xMLF checker verifies
+  -- constructor arity, coverage, branch types and the complete exported type.
+  signedDataGroup parameters members lowered = case (,,) parameters members lowered of {
+    (,,) [] [(,) owner ((,,) exported (Just declared) _)]
+      ((,) (SProgram datatypes (SDeclScope [slot] (SLet name (SSignature source written)
+        (SConstructor "()")))) _) -> do {
+      ensure (V.toInt owner == V.toInt slot && eqString exported name &&
+        SourceEquality.eqSAnnotation declared written) "signed data declaration mismatch";
+      signature <- case written of {
+        SAnnotation [] scheme@(SForall Flexible _ _ _) -> Right scheme;
+        _ -> Left "signed data declaration needs an explicit universal type"
+      };
+      implementation <- case source of {
+        SChecked ty value -> do {
+          ensure (SourceEquality.eqSType ty signature) "signed data body annotation mismatch";
+          Right value
+        };
+        _ -> Right source
+      };
+      env <- Open.environment datatypes;
+      Kinding.annotationType (Open.dataEnvironment env) M.empty signature;
+      field <- Classes.fieldType signature;
+      expected <- T.instantiateField M.empty field;
+      term <- signedDataValue expected implementation;
+      result <- Open.check env [] (XLet (XName 0 name) term (XConstructor "()" []));
+      ensure (case Open.bindings result of {
+        [(,) actual ty] -> eqString (X.nameHint actual) name && T.alphaEq expected ty;
+        _ -> False
+      }) "signed data result type mismatch";
+      Right result
+    };
+    _ -> Left "ordinary data elaboration required"
+  };
+  dataMonotype ty = case ty of {
+    XVar _ -> True;
+    XArrow a b -> dataMonotype a && dataMonotype b;
+    XCon _ arguments -> all dataMonotype arguments;
+    XApply f a -> dataMonotype f && dataMonotype a;
+    _ -> False
+  };
+  -- Source inference can remove vacuous quantifiers and reorder a prefix.
+  -- With one used star-kinded variable the declared prefix is canonical.
+  signedDataValue expected value = case (,) expected value of {
+    (,) (XForall variable XBot body@(XArrow input output)) (SLam argument Nothing expression) -> do {
+      ensure (dataMonotype input && dataMonotype output &&
+        S.member T.compareTyVar variable (T.freeVars body)) "data declaration needs one used type parameter";
+      let { binder = XName 1 argument };
+      term <- signedDataBody binder output expression;
+      Right (XTypeAbs variable XBot (XAbs binder input term))
+    };
+    _ -> Left "signed data declaration needs a singly quantified function"
+  };
+  signedDataBody binder expected expression = let {
+    local name = eqString name (X.nameHint binder);
+    constructor arguments node = case node of {
+      SConstructor name -> case expected of {
+        XCon _ types -> Right (foldlStrict XApp (XConstructor name types) arguments);
+        _ -> Left "constructor result requires a datatype"
+      };
+      SApp function (SVar name) -> if local name
+        then constructor ((:) (XVarTerm binder) arguments) function
+        else Left "unknown constructor argument";
+      _ -> Left "ordinary constructor elaboration required"
+    };
+    branch ((,) reversed serial) alternative = case alternative of {
+      SAlternative (SConstructorPattern name bindings) (SVar selected) -> let {
+        make i item = case item of { Nothing -> Nothing; Just hint -> Just (XName (advanceIdentity serial i) hint) };
+        fields = mapIndexed make bindings;
+        named = concatMap maybeToList fields
+      } in do {
+        ensure (S.size (S.fromList compareString (map X.nameHint named)) == length named)
+          "duplicate data pattern variable";
+        case filter (compose (eqString selected) X.nameHint) named of {
+          [found] -> Right ((,) ((:) (XAlternative (XConstructorPattern name fields) (XVarTerm found)) reversed)
+            (advanceIdentity serial (length bindings)));
+          _ -> Left "data projection needs a bound field"
+        }
+      };
+      _ -> Left "ordinary case elaboration required"
+    }
+  } in case expression of {
+    SCase (SVar name) alternatives -> do {
+      ensure (local name && not (null alternatives)) "data case requires its argument";
+      (,) reversed _ <- foldM branch ((,) [] 2) alternatives;
+      Right (XCase (XVarTerm binder) expected (reverse reversed))
+    };
+    _ -> constructor [] expression
   };
   -- In a signed first-order body, applications introduce neither a type
   -- annotation nor a binder. Build the resolved term once and let the
