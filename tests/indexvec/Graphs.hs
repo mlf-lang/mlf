@@ -923,6 +923,32 @@ applicationPatternChecks = do
   W.GNode 441 [_,_,_,_,stored,_,_] <- right (W.lookupGraphNode persisted record)
   got <- right (Structure.storedTermFor True persisted stored)
   check "checked ground application roundtrip" (H.unpack (Pretty.prettyTerm source)) (H.unpack (Pretty.prettyTerm got))
+  let unused = T.XName (-74) "unused"; local = T.XName 65 "input"
+      linked serial imports fragment = let (end, bindings, term) = Open.linkBody serial imports fragment
+        in (end, [(H.unpack (Pretty.name n), H.unpack (Pretty.prettyType t)) | (n,t) <- bindings],
+            H.unpack (Pretty.prettyTerm term))
+  forM_ [9,10] $ \version -> do
+    let qualified = version == 10
+        shown i = if even i then f else T.XName 0 "same identity, another hint"
+        leaf i n = let ref = shown i
+                       value = add (T.XVarTerm local) (T.XIntTerm n)
+                   in if qualified then T.XApp (unary ref ty) value else add (T.XVarTerm ref) value
+        values = take 33 (iterate (+1) (maxBound-5))
+        rhs = T.XAbs local ty (tree (zipWith leaf [0 :: Int ..] values))
+        body = T.XLet result rhs (T.XConstructor "()" [])
+    logical <- right (Open.check env [(f,if qualified then scheme else ty),(unused,ty)] body)
+    package <- Open.makePackage "link-test" "owner" [("group",logical)] >>= right
+    let bytes = Open.packageBytes package
+        contracts = M.fromList H.v_compareString
+          [(hint,Separate.normalType t) | (T.XName _ hint,t) <- Open.parameters logical ++ Open.bindings logical]
+    _ <- W.decodeGraph W.defaultLimits version bytes >>= right
+    restored <- Open.readPackage bytes (Open.packageHash package) "link-test" "owner" contracts M.empty >>= right
+    forM_ [package,restored] $ \actual -> do
+      [("group",fragment)] <- pure (Open.packageFragments actual)
+      forM_ [0,401,maxBound-8] $ \serial ->
+        forM_ [M.empty,M.singleton f (T.XName 200 "imported")] $ \imports ->
+          check "linked application rows retain identity allocation, hints and signed literals"
+            (linked serial imports logical) (linked serial imports fragment)
   graph <- right (W.planGraph W.defaultLimits [good,good])
   unless (rejected (Structure.admitPatterns graph 45)) (fail "expanded work for repeated application roots")
   _ <- right (Structure.admitPatterns graph 46)
