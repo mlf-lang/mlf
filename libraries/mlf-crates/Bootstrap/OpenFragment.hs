@@ -412,9 +412,46 @@ module Bootstrap.OpenFragment
   } in (,) next renamed);
   -- Parameters are keyed by their original fragment identities. All other
   -- term and type identities receive the same injective renaming as fresh.
+  data LinkRow = LinkFixed XTerm | LinkHole | LinkChildren LinkRow LinkRow;
+  mapLinkPattern name variable (Structure.TermPattern table root runs _ _) = let {
+    add prior i (Structure.PatternRow row _ _ _) = let {
+      value = case row of {
+        Structure.PatternHole -> LinkHole;
+        Structure.PatternAtom atom -> LinkFixed (Separate.mapTerm name variable atom);
+        Structure.PatternJoin lhs rhs -> let { a = IM.get lhs prior; b = IM.get rhs prior } in
+          case (,) a b of {
+            (,) (LinkFixed f) (LinkFixed x) -> LinkFixed (XApp f x);
+            _ -> LinkChildren a b
+          }
+      }
+    } in seq value (IM.insert i value prior);
+    rows = IM.foldlWithKey add IM.empty table;
+    fill row remaining done = case row of {
+      LinkFixed term -> done term remaining;
+      LinkHole -> case remaining of {
+        (:) (Structure.PatternRun count start step) rest -> let { next = start + step } in
+          seq next (done (XIntTerm start) (if count == 1 then rest
+            else (:) (Structure.PatternRun (count - 1) next step) rest));
+        [] -> Nothing
+      };
+      LinkChildren f a -> fill f remaining (\left rest ->
+        fill a rest (\right tail -> done (XApp left right) tail))
+    }
+  } in fill (IM.get root rows) runs (\term rest -> if null rest then Just term else Nothing);
+  mapLinkedTerm name variable source view = let {
+    ordinary = Separate.mapTerm name variable source;
+    child = mapLinkedTerm name variable
+  } in case (,) source view of {
+    (,) _ (Just (LinkPattern plan)) -> fromMaybe ordinary (mapLinkPattern name variable plan);
+    (,) (XLet binder a b) (Just (LinkLet left right)) ->
+      XLet (name binder) (child a left) (child b right);
+    (,) (XAbs binder ty b) (Just (LinkLambda inner)) ->
+      XAbs (name binder) (Separate.mapType variable ty) (child b (Just inner));
+    _ -> ordinary
+  };
   linkBody serial imports fragment = withFreshNames serial fragment (\next name variable -> let {
     resolve n = M.findWithDefault X.compareName (name n) n imports
-  } in (,,) next (freshExports name fragment) (Separate.mapTerm resolve variable (body fragment)));
+  } in (,,) next (freshExports name fragment) (mapLinkedTerm resolve variable (body fragment) (fragmentLinkView fragment)));
   -- The environment and external types are supplied from verified shared
   -- dependency nodes. This record contains their local identities, not copies.
   encodeBody stage name fragment = bodyRecord 400 stage name fragment (bodyValue fragment);
