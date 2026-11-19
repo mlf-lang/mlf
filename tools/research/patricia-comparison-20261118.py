@@ -67,15 +67,15 @@ def load(path):
     m=types.ModuleType(path.stem);m.__file__=str(path);exec(compile(path.read_bytes(),str(path),'exec'),m.__dict__);return m
 def sha(p): return hashlib.sha256(p.read_bytes()).hexdigest()
 pins={'old':'d8325d909c249fd82d4ad6173d44d8818cc6f8bf','new':'ee495d5783fca3c26a3c0e659ebeac1bab76a37d'}
-BASE={'old':'old','new':'new','old_swap':'old','new_swap':'new'}
-DONOR={'old_swap':'new','new_swap':'old'}
+factor_refs={'old': {'surface_blob': '3e8082684587d25915d7f209bbf74d32e7c3dcc7', 'builtin_source': 'builtin-source-v1:b54f095675c2c7bd91b804689ab3de3775c0461ab982dc24bfc8d08477d88b6f'}, 'fast_only': {'surface_blob': 'b781f419b82b91bbfed90aa5189107f0af6bf82d', 'builtin_source': 'builtin-source-v1:276ab74f565ea04cac324bbbf026a12c4ceda8316ac1c2e0f6c2efe2fc11ac82'}, 'omit_only': {'surface_blob': '0d50f8ae4713674ac7654c1a84cba0289ee6c57e', 'builtin_source': 'builtin-source-v1:47cef3a374d2075d43a2c707993baa62a3db760fa950a0ea0633afd8af0d3758'}, 'old_swap': {'surface_blob': 'a11262a585792e391d02e379e11e233af627fff0', 'builtin_source': 'builtin-source-v1:b43c5ddf9224142d296b984833de88528272e318f53fa6203614cd9576c7abae'}}
+BASE={k:'old' for k in factor_refs}
+DONOR=set(BASE)-{'old'}
 surface='libraries/mlf-frontend/Bootstrap/Surface.hs'
 literal='bootstrap/MLF/BuiltinPreludeData.hs'
-expected_identity={'old_swap':'builtin-source-v1:b43c5ddf9224142d296b984833de88528272e318f53fa6203614cd9576c7abae','new_swap':'builtin-source-v1:3e12091e64154a07bfd2e0423383cdcedcd509f980c656ca5352a7b481faaa21'}
-surf_blobs={'old':'3e8082684587d25915d7f209bbf74d32e7c3dcc7','new':'a11262a585792e391d02e379e11e233af627fff0'}
+expected_identity={k:v['builtin_source'] for k,v in factor_refs.items()}
 roots={k:(ROOT/k).resolve() for k in BASE}
 def git(root,*args):return subprocess.check_output(['git','-C',str(root),*args],text=True).strip()
-H=load(roots['new']/'tools/performance/a1-private-index/helper.py')
+H=load(roots['old']/'tools/performance/a1-private-index/helper.py')
 limits=dict(address_space_per_process_bytes=6*1024**3,disk_free_floor_bytes=5*1024**3,host_available_floor_bytes=3*1024**3,process_tree_rss_bytes=5*1024**3,max_work_bytes=2*1024**3,wall_seconds=600)
 record={'complete':False,'scope':'type-only bounded same-runner diagnosis; not semantic or speed qualification','pins':pins,'limits':limits,'legs':[],'host':H.host()}
 def save(): (OUT/'comparison.json').write_text(json.dumps(record,indent=2)+'\n')
@@ -86,8 +86,8 @@ for label,root in roots.items():
     if label in DONOR:
         assert git(root,'show','-s','--format=%P',head)==base
         assert git(root,'diff','--name-only',base,head).splitlines()==sorted([surface,literal])
-        assert git(root,'rev-parse','HEAD:'+surface)==surf_blobs[DONOR[label]]
-    else:assert head==base and git(root,'rev-parse','HEAD:'+surface)==surf_blobs[label]
+        assert git(root,'rev-parse','HEAD:'+surface)==factor_refs[label]['surface_blob']
+    else:assert head==base and git(root,'rev-parse','HEAD:'+surface)==factor_refs[label]['surface_blob']
     assert git(root,'status','--porcelain','--untracked-files=no')==''
     assert not git(root,'diff','--name-only','HEAD')
     producer=root/'.mlf-build/shared-ghc'
@@ -109,7 +109,6 @@ entry=OUT/'Main.hs';entry.write_text(fixture);record['fixture_sha256']=sha(entry
 
 # No compiler or fixture changes. Both control legs must reproduce before observation.
 import inspect,time,resource
-ref_bins={'old':'d90ecca441c0c1a00c224639b335124ec4802d97f99e7d44eea9ccce3a715c8d','new':'8845fbb4729e555157c2cd3ca45d2981741bf8308bbdbef6ece74c85a5d90245'}
 assert record['fixture_sha256']=='e7bc0d6bdd6ec6ac1a7d9b2cd6f71cb398c430f3029c870057d096efff2aaa82'
 locked_inputs={"old":{"object_inputs":"3d4e55562e15482eb19265820d648d8f7fe261e4700c585bdd4fe02228d7b779","resolved_modules":"dc980d404188953009eba29c04a7fa856be709708e04923fcfd6416e73da7ae8","resolved_host_modules":"f6bb370236c702e1282baca2ada46b5944df522bb1eca16a28ca5f4980d35d7f","configuration_inputs":"ec04b1382d64c5b43ffa6ffd2b663e1d94e216006526695fef1d28869cb36501","shared_inputs":"1c1b747c167c5936b8856e89d0280789622d4538173a93306464a2ae04b8d2f0","host_inputs":"a8a09986e2e01b941741151e12e7a2cbf8665996bb6d53f78561b556cfa28e04","flags":"50e344ad68ebb24127b0b8e73be203817bc964f033bcf3fbcf1d43afe166258f","ghc":"8057b580fb047c5302ab1291596cf79a30e906f21c4cd223ea2d5e7c71ada348","cc":"f0eaee113e92135d35342b0994c6a039894e5da8991860c3f7c11c6202c4afa3","installed_dependencies":"6588b2ecaea0410f237fd3a23d4a78073940ca89304ea83e1596ff16ee6b9572","toolchain":"ac75b1bd6f94190ba6e09c5d687876f57d229bf992a3678fe2104e311814ddfa"},"new":{"object_inputs":"26215720f9596e5462c611c0254498fd8c1a4ede4b6b9281666c28d40c41243a","resolved_modules":"2a65c9034307623cc7d411925648209d56021b9657e01341b9768259b6f46a6a","resolved_host_modules":"7d6328f49a88fc532323ac3be760d3ff3fa37bcee9fb50bd395650d664de8b1e","configuration_inputs":"d14ae947e683961893ca57020002c71042fa797a69dd1a63eb890994aa5179cd","shared_inputs":"36c769215036a3f72d32d82b54193304a291930b2e967dff63cbc10509927bdb","host_inputs":"ea210294596583ac33ff4dbedb5d5e82a0c4c30d7a48cf9d31a962f2bd9c3694","flags":"0f373f3be1a95bf7d1a0a00fcd9e8dc6be3435188249f2f67ad23208db703e8c","ghc":"8057b580fb047c5302ab1291596cf79a30e906f21c4cd223ea2d5e7c71ada348","cc":"f0eaee113e92135d35342b0994c6a039894e5da8991860c3f7c11c6202c4afa3","installed_dependencies":"6588b2ecaea0410f237fd3a23d4a78073940ca89304ea83e1596ff16ee6b9572","toolchain":"ac75b1bd6f94190ba6e09c5d687876f57d229bf992a3678fe2104e311814ddfa"}}
 
@@ -141,28 +140,29 @@ def runtime_manifest(exe):
     return {'binary_sha256':file_sha(exe),'interpreter':str(pathlib.Path(ld.group(1)).resolve()),'loaded_elf_dependencies':files}
 cohort={'epoch':'live prebuild frozen libc/libm/loader cohort; independent, not a historical runtime identity','image':os.environ.get('ImageVersion'),'run_id':os.environ.get('GITHUB_RUN_ID'),'members':{}}
 if not cohort['image'] or not cohort['run_id']:raise RuntimeError('missing environment identity')
-expected_epoch_native_elf={'old': 'fbc253d428204532bff22c36c1361969c8f4e73174bf15945127c6ca030e1467', 'new': '50892889234f62276128a542a718f0c74ce7cdf9f06cd62fa094adf18faa0677'}
 for l in locked_inputs:locked_inputs[l]['toolchain']=canon(prebuild_lock['expected_toolchain'])
 for l,r in roots.items():
     receipt=json.loads((r/'.mlf-build/shared-ghc/receipt.json').read_text())
+    build_root=r/'.mlf-build/shared-ghc'
+    if {str(path.relative_to(build_root)):file_sha(path) for path in sorted((build_root/'objects').rglob('*')) if path.is_file()}!=receipt['object_inputs']:raise RuntimeError('producer object inventory changed '+l)
     if receipt['toolchain']!=prebuild_lock['expected_toolchain']:raise RuntimeError('producer full toolchain does not match prebuild lock: '+l)
     actual={k:canon(receipt[k]) for k in locked_inputs[BASE[l]]}
-    if {k:v for k,v in actual.items() if k!='toolchain'}!=selected_family['lanes'][l]['pins']:raise RuntimeError('selected family lane identity mismatch '+l)
-    if record[l]['binary_sha256']!=selected_family['lanes'][l]['elf']:raise RuntimeError('selected family ELF mismatch '+l)
+    if l in ('old','old_swap'):
+        if {k:v for k,v in actual.items() if k!='toolchain'}!=selected_family['lanes'][l]['pins']:raise RuntimeError('endpoint lane mismatch '+l)
+        if record[l]['binary_sha256']!=selected_family['lanes'][l]['elf']:raise RuntimeError('endpoint ELF mismatch '+l)
     pkg=r/'.mlf-build/shared-ghc/packages.txt'
     if pkg.read_bytes()!=(OUT/'prebuild-packages.txt').read_bytes() or sha(pkg)!=receipt['package_database_sha256']:raise RuntimeError('producer package dump mismatch '+l)
     shutil.copyfile(pkg,OUT/(l+'-packages.txt'))
     if l not in DONOR:
         pass # Complete selected-family pins already checked above.
     else:
-        base=BASE[l];donor=DONOR[l];baseline=json.loads((roots[base]/'.mlf-build/shared-ghc/receipt.json').read_text())
-        donor_receipt=json.loads((roots[donor]/'.mlf-build/shared-ghc/receipt.json').read_text())
+        base=BASE[l];baseline=json.loads((roots[base]/'.mlf-build/shared-ghc/receipt.json').read_text())
         def normalized(x,root):return json.loads(json.dumps(x,sort_keys=True).replace(str(root)+'/', '<worktree>/'))
         for k in ['resolved_modules','shared_inputs','configuration_inputs','resolved_host_modules','host_inputs','flags','ghc','cc','installed_dependencies','toolchain']:
             bx=normalized(baseline[k],roots[base]);vx=normalized(receipt[k],r)
             if k in ('resolved_modules','shared_inputs'):
                 bx['MLF.BuiltinPreludeData']['sha256']=sha(r/literal)
-                bx['Bootstrap.Surface']=normalized(donor_receipt[k]['Bootstrap.Surface'],roots[donor])
+                bx['Bootstrap.Surface']['sha256']=sha(r/surface)
             if bx!=vx:raise RuntimeError('hybrid admitted inputs mismatch '+l+' '+k)
         if set(receipt['object_inputs'])!=set(baseline['object_inputs']):raise RuntimeError('object membership mismatch')
     record[l]['git_head']=git(r,'rev-parse','HEAD')
@@ -171,24 +171,28 @@ for l,r in roots.items():
     m=runtime_manifest(ex)
     if m['binary_sha256']!=record[l]['binary_sha256'] or m['binary_sha256']!=receipt['outputs']['emlf']['sha256']:raise RuntimeError('unverified executable')
     cohort['members'][l]={'runtime':m,'package_database_sha256':receipt['package_database_sha256'],'receipt_sha256':record[l]['receipt_sha256'],'intermediate_sha256':actual}
-a,b=cohort['members']['old'],cohort['members']['new']
+a,b=cohort['members']['old'],cohort['members']['old_swap']
 if a['runtime']['loaded_elf_dependencies']!=b['runtime']['loaded_elf_dependencies'] or a['package_database_sha256']!=b['package_database_sha256'] or a['runtime']['binary_sha256']==b['runtime']['binary_sha256']:raise RuntimeError('mismatched shared runtime or non-distinct producers')
 for member in cohort['members'].values():
     if member['runtime']['loaded_elf_dependencies']!=a['runtime']['loaded_elf_dependencies'] or member['package_database_sha256']!=a['package_database_sha256']:raise RuntimeError('inconsistent 4-build runtime')
 manifest=OUT/'new-epoch-cohort.json';manifest.write_text(json.dumps(cohort,indent=2)+'\n');frozen=sha(manifest)
 def verify_frozen(l):
     read_lock()
+    if sha(entry)!=record['fixture_sha256']:raise RuntimeError('mutated target fixture')
+    if 'smoke_fixture_sha256' in record and sha(smoke)!=record['smoke_fixture_sha256']:raise RuntimeError('mutated smoke fixture')
     if (roots[l]/'.mlf-build/shared-ghc/packages.txt').read_bytes()!=(OUT/'prebuild-packages.txt').read_bytes() or (OUT/(l+'-packages.txt')).read_bytes()!=(OUT/'prebuild-packages.txt').read_bytes():raise RuntimeError('frozen producer packages changed')
     if sha(manifest)!=frozen:raise RuntimeError('mutated manifest')
     ex=roots[l]/'.mlf-build/shared-ghc/bin/emlf'
     if runtime_manifest(ex)!=cohort['members'][l]['runtime'] or sha(roots[l]/'.mlf-build/shared-ghc/receipt.json')!=cohort['members'][l]['receipt_sha256']:raise RuntimeError('changed executable, dependency or receipt')
 record['epoch_manifest_sha256']=frozen;save()
 
-helper=roots['new']/'tools/performance/a1-private-index/helper.py'
+helper=roots['old']/'tools/performance/a1-private-index/helper.py'
 assert subprocess.check_output(['git','hash-object',str(helper)],text=True).strip()=='1feffe5d9f360a8fbb9f27868985d4a1a97ab010'
 
-record['scope']='Independent ordinary 6GiB reciprocal historical Surface + necessary freshly generated canonical literal swaps. Binary cohort is not historical ELF. No compiler probes or RSS/time speed conclusions.'
-record['schedule']=['old','new','new_swap','old_swap']
+record['scope']='Parent-only 2x2 at 6GiB AS: original vs fast path only vs omit second desugarDo only vs both; each includes necessary verified generated literal. Threshold only.'
+record['schedule']=['old','old_swap','fast_only','omit_only']
+record['factor_refs']=factor_refs
+
 smoke=OUT/'SurfaceSmoke.hs';smoke.write_text('''-- mlf:syntax shared-haskell-v1
 {-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}
 module Main (main) where {
@@ -198,6 +202,103 @@ choose flag = case flag of { True -> identityInt 7; False -> identityInt 0 };
 main = do { printInt (choose True); printInt (choose False) };
 }
 ''');record['smoke_fixture_sha256']=sha(smoke);record['smoke']=[]
+"""Append before the driver loop; call factor_semantic_guard(label), abort on False.
+Requires H, verify_frozen, OUT, limits, roots, record, save.
+Runs inside existing comparison supervisor; never grants a new total budget.
+The outer exact case/do 7/0 smoke remains mandatory separately.
+"""
+import hashlib as _fhash, json as _fjson, pathlib as _fpath, time as _ftime
+
+_FACTOR_HEADER = '''-- mlf:syntax shared-haskell-v1
+{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}
+module Main (main) where {
+import MLF.Primitive;
+'''
+_FACTOR_CASES = (
+    ('core', _FACTOR_HEADER + '''identityInt x = x;
+main = printInt ((\\x -> let { y = identityInt x } in y) 7);
+}
+''', 0, b'7\n', None),
+    ('equations', _FACTOR_HEADER + '''identityInt x = x;
+choose True = identityInt 7;
+choose False = identityInt 0;
+main = do { printInt (choose True); printInt (choose False) };
+}
+''', 0, b'7\n0\n', None),
+    ('profile-reject', '-- mlf:syntax shared-haskell-v1\n{-# LANGUAGE NoImplicitPrelude #-}\nmodule Main (main) where {\nimport MLF.Primitive;\nmain = printInt 7;\n}\n',
+     1, b'', 'Parsing: {path}: shared-haskell-v1 requires exactly the approved LANGUAGE extension set\n'),
+    ('scope-reject', _FACTOR_HEADER + 'main = printInt missingSurfaceGuardName;\n}\n',
+     1, b'', 'ModuleResolution: {path}: name is not in scope: missingSurfaceGuardName\n'),
+)
+_FACTOR_LIMITATIONS = (
+    'Finite source-level guards, not proof of lowering equivalence or direct branch instrumentation. '
+    'core exercises application/lambda/let; equations exercises pattern equations and shared do. '
+    'Outer case/do smoke is separately required. No explicit legacy-do, SChecked, SWantedRefs, '
+    'SGlobal, declaration-ID/source-span, annotation/signature or fresh-name collision oracle. '
+    'Negative cases cover profile parsing and name resolution, not type-solver rejection. '
+    'PR22 local sanity uses a different producer and does not qualify this cohort.'
+)
+
+def factor_semantic_guard(label):
+    started = _ftime.monotonic()
+    rows = record.setdefault('factor_semantics', [])
+    result = {'label': label, 'complete': False, 'wall_budget_seconds': 45,
+              'scope': _FACTOR_LIMITATIONS, 'commands': []}
+    rows.append(result)
+    def persist():
+        result['elapsed_seconds'] = _ftime.monotonic() - started
+        save()
+    def require(ok, why):
+        if not ok: raise RuntimeError(why)
+    def digest(path):
+        return _fhash.sha256(path.read_bytes()).hexdigest()
+    try:
+        require(label in roots, 'unknown semantic lane')
+        require(sum(x['label'] == label for x in rows) == 1, 'duplicate semantic lane')
+        fixtures = OUT / 'factor-semantic-fixtures'
+        fixtures.mkdir(exist_ok=True)
+        for name, source, expected_exit, stdout, stderr_template in _FACTOR_CASES:
+            path = (fixtures / (name + '.hs')).resolve()
+            expected_bytes = source.encode('utf-8')
+            if not path.exists():
+                with path.open('xb') as f: f.write(expected_bytes)
+            require(not path.is_symlink() and path.read_bytes() == expected_bytes, 'fixture changed')
+            verify_frozen(label)
+            remaining = 45 - (_ftime.monotonic() - started)
+            require(remaining > 0, 'semantic guard aggregate budget exhausted')
+            guard_limits = dict(limits, wall_seconds=min(10, remaining))
+            dest = OUT / ('factor-semantic-' + label + '-' + name)
+            argv = [roots[label] / '.mlf-build/shared-ghc/bin/emlf', '--run', path]
+            expected_err = b'' if stderr_template is None else stderr_template.format(path=str(path)).encode('utf-8')
+            row = {'name': name, 'fixture_sha256': _fhash.sha256(expected_bytes).hexdigest(),
+                   'expected_exit': expected_exit, 'expected_stdout_sha256': _fhash.sha256(stdout).hexdigest(),
+                   'expected_stderr_sha256': _fhash.sha256(expected_err).hexdigest(), 'accepted': False}
+            result['commands'].append(row); persist()
+            try:
+                H.Runner(OUT, guard_limits).run(argv, roots[label], dest, expected_exit=expected_exit)
+            except RuntimeError as exc:
+                row['runner_exception'] = repr(exc)
+            verify_frozen(label)
+            require(path.read_bytes() == expected_bytes and not path.is_symlink(), 'fixture changed after execution')
+            receipt = dest / 'command.json'
+            require(receipt.is_file(), 'missing semantic command receipt')
+            command = _fjson.loads(receipt.read_text())
+            expected_logs = {str(dest / n): digest(dest / n) for n in ('stdout', 'stderr')}
+            require(command.get('complete') is True and command.get('exit_code') == expected_exit
+                    and command.get('reason') is None and command.get('terminal_live_descendants') == []
+                    and command.get('limits') == guard_limits and command.get('argv') == list(map(str, argv))
+                    and command.get('cwd') == str(roots[label].resolve()) and command.get('logs') == expected_logs,
+                    'semantic receipt or cleanup rejected')
+            require((dest / 'stdout').read_bytes() == stdout and (dest / 'stderr').read_bytes() == expected_err,
+                    'semantic exact output rejected')
+            require(_ftime.monotonic() - started <= 45, 'semantic guard aggregate budget exceeded')
+            row.update(accepted=True, receipt_sha256=digest(receipt)); persist()
+        result['complete'] = True
+    except Exception as exc:
+        result['error'] = repr(exc)
+    persist()
+    return result['complete']
+
 for i,label in enumerate(record['schedule']):
     verify_frozen(label);r=roots[label];dest=OUT/('leg-'+str(i)+'-'+label)
     if label in BASE:
@@ -210,7 +311,8 @@ for i,label in enumerate(record['schedule']):
             v=json.loads(rec.read_text());ok_smoke=bool(v.get('complete') and v.get('exit_code')==0 and v.get('reason') is None and v.get('terminal_live_descendants')==[] and (sd/'stdout').read_bytes()==b'7\n0\n' and not (sd/'stderr').read_bytes())
         record['smoke'].append({'label':label,'passed':ok_smoke});save()
         if not ok_smoke:record['stop_reason']='same-cohort semantic smoke failed';save();break
-    expected=251 if BASE[label]=='new' else 0
+    if not factor_semantic_guard(label):record['stop_reason']='factor semantic guard failed '+label;save();break
+    expected=251 if label=='old_swap' else 0
     try:H.Runner(OUT,limits).run([r/'.mlf-build/shared-ghc/bin/emlf','-i',r/'libraries/mlf-foundation','--type',entry],r,dest,expected_exit=expected)
     except RuntimeError as err:record['last_runner_exception']=repr(err)
     verify_frozen(label)
@@ -228,3 +330,5 @@ record['prebuild_lock_sha256']=digest_path(LOCK)
 record['final_full_toolchain_verified']=True
 record['complete']=len(record['legs'])==4 and all(x['accepted'] for x in record['legs'])
 save()
+
+if not record["complete"]:raise SystemExit("incomplete factorial comparison; see comparison.json")

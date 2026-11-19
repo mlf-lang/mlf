@@ -1,7 +1,7 @@
 name: Bounded Patricia comparison
 on:
   push:
-    branches: [perf/patricia-surface-family-20261118]
+    branches: [perf/patricia-surface-factor-20261119]
 permissions:
   contents: read
 concurrency:
@@ -9,7 +9,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   compare:
-    if: github.repository == 'mlf-lang/mlf' && github.ref == 'refs/heads/perf/patricia-surface-family-20261118'
+    if: github.repository == 'mlf-lang/mlf' && github.ref == 'refs/heads/perf/patricia-surface-factor-20261119'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -17,20 +17,8 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Isolated pinned source worktrees
-        run: |
-          git worktree add --detach old d8325d909c249fd82d4ad6173d44d8818cc6f8bf
-          git worktree add --detach new ee495d5783fca3c26a3c0e659ebeac1bab76a37d
-          git worktree add --detach old_swap d8325d909c249fd82d4ad6173d44d8818cc6f8bf
-          git worktree add --detach new_swap ee495d5783fca3c26a3c0e659ebeac1bab76a37d
-          mkdir -p evidence
-          surface=libraries/mlf-frontend/Bootstrap/Surface.hs
-          for lane in old_swap new_swap; do
-            if test "$lane" = old_swap; then donor=ee495d5783fca3c26a3c0e659ebeac1bab76a37d; else donor=d8325d909c249fd82d4ad6173d44d8818cc6f8bf; fi
-            git -C "$lane" checkout "$donor" -- "$surface"
-            git -C "$lane" -c user.name='Diagnostic' -c user.email='diag@localhost' commit -m 'Temporary exact historical Surface donor'
-            git -C "$lane" diff HEAD^ HEAD > "evidence/$lane.patch"
-          done
+      - name: Exact factorial Surface source worktrees
+        run: python3 -B tools/research/patricia-joint-generation.py prepare
       - name: Official pinned GHC
         timeout-minutes: 20
         run: |
@@ -52,7 +40,7 @@ jobs:
           set -euo pipefail
           mkdir -p evidence
           python3 -B tools/shared/crc_process_supervisor.py --receipt evidence/all-builds-supervisor.json --work-seconds 1800 --cleanup-seconds 10 "$(command -v bash)" tools/research/patricia-surface-builds.sh
-      - name: Native controls then reciprocal Surface plus generated builtin swaps at 6 GiB
+      - name: Native endpoints then isolated Surface factors at 6 GiB
         run: python3 -B tools/shared/crc_process_supervisor.py --receipt evidence/comparison-supervisor.json --work-seconds 1800 --cleanup-seconds 10 "$(command -v python3)" -B tools/research/patricia-comparison-20261118.py
       - name: Copy verifier receipts and raw outputs to visible evidence
         if: always()
@@ -65,5 +53,5 @@ jobs:
           path: |
             evidence/
             old/.mlf-build/shared-ghc/receipt.json
-            new/.mlf-build/shared-ghc/receipt.json
+            old_swap/.mlf-build/shared-ghc/receipt.json
           retention-days: 14
