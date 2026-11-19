@@ -21,6 +21,7 @@ module Bootstrap.InferenceUnit where {
   import qualified Bootstrap.X.Syntax as X;
   import qualified Bootstrap.X.Checked as Checked;
   import qualified Bootstrap.X.Check as Check;
+  import qualified Bootstrap.Data as Data;
   import qualified Bootstrap.OpenFragment as Open;
   import qualified Bootstrap.X.Pretty as Pretty;
   -- Class translation is a crate query, before the value dependency graph is
@@ -437,9 +438,22 @@ module Bootstrap.InferenceUnit where {
   -- The operand of a unary scheme determines its only type argument. Keep
   -- that evidence on the variable occurrence and check the constructed term
   -- in the complete datatype and parameter environment before accepting it.
-  data SignedValue = SignedValue XTerm XType | SignedUnary XName GroundParameter GroundParameter | SignedUnsupported;
+  data SignedValue = SignedValue XTerm XType | SignedUnary GroundParameter (XType -> ((,) XTerm XType)) | SignedUnsupported;
+  -- A variable's type application and its result can be shared for each
+  -- atomic argument in the primitive kind table. Wider arguments use the
+  -- same construction with their original type.
+  signedInstantiation name shape = let {
+    instantiate ty = let {
+      proof = XThen (XInner (XBottom ty)) XElim;
+      result = case shape of { GroundBare -> ty; GroundWrapped wrapper -> XCon wrapper [ty] }
+    } in (,) (XTypeApp (XVarTerm name) proof) result;
+    atoms = Check.checkedLookup compareString (\tag _ -> instantiate (XCon tag [])) Data.primitiveKinds
+  } in \actual -> case actual of {
+    XCon tag [] -> fromMaybe (instantiate actual) (atoms tag);
+    _ -> instantiate actual
+  };
   signedBinding name ty = case groundImport name ty of {
-    GroundUnaryImport _ _ _ input output -> SignedUnary name input output;
+    GroundUnaryImport _ _ _ input output -> SignedUnary input (signedInstantiation name output);
     _ -> if monomorphicTarget ty then SignedValue (XVarTerm name) ty else SignedUnsupported
   };
   signedInstanceTerm globals names expression = let {
@@ -451,7 +465,6 @@ module Bootstrap.InferenceUnit where {
         _ -> Nothing
       }
     };
-    result shape ty = case shape of { GroundBare -> ty; GroundWrapped name -> XCon name [ty] };
     visit term = case term of {
       SApp f a -> do {
         function <- visit f;
@@ -459,9 +472,9 @@ module Bootstrap.InferenceUnit where {
         case argument of {
           SignedValue value ty -> case function of {
             SignedValue operator (XArrow _ out) -> Right (SignedValue (XApp operator value) out);
-            SignedUnary name input output -> case operand input ty of {
-              Just actual -> let { proof = XThen (XInner (XBottom actual)) XElim } in
-                Right (SignedValue (XApp (XTypeApp (XVarTerm name) proof) value) (result output actual));
+            SignedUnary input instantiate -> case operand input ty of {
+              Just actual -> let { instanceTerm = instantiate actual } in
+                Right (SignedValue (XApp (fst instanceTerm) value) (snd instanceTerm));
               Nothing -> Left "signed application operand requires inference"
             };
             _ -> Left "signed application requires a function"
