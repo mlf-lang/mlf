@@ -218,7 +218,7 @@
     ],
     "mlf-shared.cabal": [
       "b2abd4810918a0b5cc96257d636b0f3a4aea853d0b2296e2ebcf7932bef43ec3",
-      "babcdf1592e35e78a65fad692e451ae7c29c3f3abcd7abf5542ab5256cf081ac"
+      "834ce8f2e3d4b0cf068efc79b21fe635f4043faf292a0512d2fa24828d3fe553"
     ],
     "mlf.lock": [
       "5f7f58dece7a251711a3da2b78ba42502bd25554672bbbeaf8bf95abbc469077",
@@ -1970,6 +1970,17 @@
       "predecessor": "0db5b80d8698c27ff613205ab7ae7da28da4170a",
       "predecessor_manifest_sha256": "19d49c9c4aa95bbbc7fd07e9005f78fa25772d68fd253069854d649a16780022",
       "predecessor_tree": "8e02de51b2b24c50daa177c25e5bcd16c11e174e"
+    },
+    {
+      "changes": {
+        "mlf-shared.cabal": [
+          "babcdf1592e35e78a65fad692e451ae7c29c3f3abcd7abf5542ab5256cf081ac",
+          "834ce8f2e3d4b0cf068efc79b21fe635f4043faf292a0512d2fa24828d3fe553"
+        ]
+      },
+      "predecessor": "7f16366a4ed62346483ac83798b338e602cec497",
+      "predecessor_manifest_sha256": "30edca7a8421f19e91fbfff269f319fde687a3258bd05d3d39f8a9b9233a31fb",
+      "predecessor_tree": "91b4cd52ed9e87dba407bcf997a7f1f44deb0a4c"
     }
   ],
   "format": "pr43-reconciliation-source-migration-v1",
