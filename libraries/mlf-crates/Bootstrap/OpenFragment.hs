@@ -62,15 +62,21 @@ module Bootstrap.OpenFragment
   data StoredTerm = StoredTerm Bool W.Value;
   storedWire (StoredTerm _ value) = value;
   hasGroundRows (StoredTerm ground _) = ground;
+  -- A compact view belongs to the exact bytes that passed the package's
+  -- expanded-work and first-use checks. Unpublished fragments retain their
+  -- ordinary linking behavior, including demand for individual fields.
+  data LinkView = LinkPattern Structure.TermPattern | LinkLambda LinkView |
+    LinkLet (Maybe LinkView) (Maybe LinkView);
   data Fragment = Fragment Environment ([] ((,) XName XType)) XTerm
-    ([] ((,) XName XType)) ([] XName) String W.Value (Maybe StoredTerm);
+    ([] ((,) XName XType)) ([] XName) String W.Value (Maybe StoredTerm) (Maybe LinkView);
   fragmentWith env ps term bs used saved =
-    let { raw = Structure.toXTerm term } in Fragment env ps term bs used saved raw (compactTerm term);
-  context (Fragment env _ _ _ _ _ _ _) = env;
-  parameters (Fragment _ ps _ _ _ _ _ _) = ps;
-  body (Fragment _ _ term _ _ _ _ _) = term;
-  bodyValue (Fragment _ _ _ _ _ _ value _) = value;
-  fragmentStorage (Fragment _ _ _ _ _ _ _ stored) = stored;
+    let { raw = Structure.toXTerm term } in Fragment env ps term bs used saved raw (compactTerm term) Nothing;
+  context (Fragment env _ _ _ _ _ _ _ _) = env;
+  parameters (Fragment _ ps _ _ _ _ _ _ _) = ps;
+  body (Fragment _ _ term _ _ _ _ _ _) = term;
+  bodyValue (Fragment _ _ _ _ _ _ value _ _) = value;
+  fragmentStorage (Fragment _ _ _ _ _ _ _ stored _) = stored;
+  fragmentLinkView (Fragment _ _ _ _ _ _ _ _ view) = view;
   storageValue fragment = mapOptional storedWire (fragmentStorage fragment);
   -- Rows retain variables, ground variable instantiations, primitives, literal
   -- slots and applications of two earlier rows. Literal slots consume the
@@ -172,9 +178,9 @@ module Bootstrap.OpenFragment
     XWithData ds b -> node 84 [still (Structure.toList Structure.toDataDecl ds),child b];
     _ -> Nothing
   };
-  bindings (Fragment _ _ _ bs _ _ _ _) = bs;
-  usedParameters (Fragment _ _ _ _ used _ _ _) = used;
-  fingerprint (Fragment _ _ _ _ _ stamp _ _) = stamp;
+  bindings (Fragment _ _ _ bs _ _ _ _ _) = bs;
+  usedParameters (Fragment _ _ _ _ used _ _ _ _) = used;
+  fingerprint (Fragment _ _ _ _ _ stamp _ _ _) = stamp;
   -- The fingerprint frames each field with its Unicode scalar length. Hash
   -- successive pages of pretty-printer output while counting that length,
   -- then prepend the length with the same polynomial composition as pack.
@@ -326,7 +332,7 @@ module Bootstrap.OpenFragment
   checkedFragment env ps term bs used = let {
     views = termViews term;
     saved = stampEncoding env ps (snd views) bs
-  } in Fragment env ps term bs used saved (Structure.toXTerm term) (fst views);
+  } in Fragment env ps term bs used saved (Structure.toXTerm term) (fst views) Nothing;
   stamp env ps term bs = stampEncoding env ps (termEncoding term) bs;
   stampEncoding env ps summary bs = Separate.encodingFingerprint (Separate.encodingPack
     [Separate.encodingText (Separate.pack (map (compose D.prettyDeclaration canonicalDeclaration) (declarations env))),
@@ -376,9 +382,23 @@ module Bootstrap.OpenFragment
   };
   -- Injective alpha-renaming preserves this exact checked environment/body.
   -- Imported identities participate even if the body never uses them.
+  -- Every non-hole row is reachable, and each variable row retains its
+  -- original name. Literals and applications introduce no other identities.
+  linkIdentities source view seen = case (,) source view of {
+    (,) _ (Just (LinkPattern (Structure.TermPattern table _ _ _ _))) ->
+      IM.foldl (\ids row -> case row of {
+        Structure.PatternRow (Structure.PatternAtom term) _ _ _ -> Separate.termIdentities term ids;
+        _ -> ids
+      }) seen table;
+    (,) (XLet name a b) (Just (LinkLet left right)) ->
+      linkIdentities b right (linkIdentities a left (IS.insert (X.nameId name) seen));
+    (,) (XAbs name ty b) (Just (LinkLambda inner)) ->
+      linkIdentities b (Just inner) (Separate.typeIdentities ty (IS.insert (X.nameId name) seen));
+    _ -> Separate.termIdentities source seen
+  };
   withFreshNames serial fragment action = let {
     ids = IS.toList (foldl (\seen p -> IS.insert (X.nameId (fst p)) seen)
-      (Separate.termIdentities (body fragment) IS.empty) (parameters fragment));
+      (linkIdentities (body fragment) (fragmentLinkView fragment) IS.empty) (parameters fragment));
     replacements = IM.fromList (zip ids (range serial (advanceIdentity serial (length ids) - 1)));
     name = \(XName n hint) -> XName (IM.get n replacements) hint;
     variable = \(XTyVar n) -> XTyVar (IM.get n replacements)
@@ -808,7 +828,11 @@ module Bootstrap.OpenFragment
                   if eqString auditSetting "1"
                     then mapM_ (compose audit snd) fragments
                     else Right ();
-                  Right (Package metadata fragments bytes digest Nothing)
+                  let { linked = case plans of {
+                    Just table -> attachLinkViews graph table fragments;
+                    Nothing -> fragments
+                  } };
+                  Right (Package metadata linked bytes digest Nothing)
                   }))
                     }
                   }
@@ -890,6 +914,38 @@ module Bootstrap.OpenFragment
   -- Keep the last lazy value, matching Map.fromList, for repeated references.
   referenceTable :: forall a. [] ((,) String a) -> Map String a;
   referenceTable entries = M.fromList compareString entries;
+  -- Keep the admitted plans on their own fragment only. The rest of the
+  -- decoded package graph can be released before linking.
+  packageLinkView graph plans index = case IM.lookup index plans of {
+    Just plan -> Just (LinkPattern plan);
+    Nothing -> case W.lookupGraphNode graph index of {
+      Right (W.GNode 71 [_,_,child]) -> mapOptional LinkLambda (packageLinkView graph plans child);
+      Right (W.GNode 75 [_,lhs,body]) -> let {
+        left = packageLinkView graph plans lhs; right = packageLinkView graph plans body
+      } in seq left (seq right (case (,) left right of {
+        (,) Nothing Nothing -> Nothing; _ -> Just (LinkLet left right)
+      }));
+      _ -> Nothing
+    }
+  };
+  attachLinkViews graph plans fragments = let {
+    attach rows entries = case (,) rows entries of {
+      (,) ((:) ((,) label fragment) rest) ((:) index tail) -> let {
+        view = case W.lookupGraphNode graph index of {
+          Right (W.GNode 401 [_,_,_,_,t,_,_]) -> packageLinkView graph plans t;
+          _ -> Nothing
+        };
+        withView = case fragment of {
+          Fragment env ps source bs used stamp raw stored _ ->
+            Fragment env ps source bs used stamp raw stored view
+        }
+      } in seq view ((:) ((,) label withView) (attach rest tail));
+      _ -> rows
+    }
+  } in case W.graphRoots graph of {
+    (:) _ entries -> attach fragments entries;
+    [] -> fragments
+  };
   makePackage compiler metadata fragments = do {
     let {
       ps = M.toList (referenceTable (concatMap
@@ -922,7 +978,10 @@ module Bootstrap.OpenFragment
                      W.VInt count];
                   write schema format stored = W.encodeRootsWithAtoms Structure.termAtomShapes W.defaultLimits
                     remaining schema ((:) (header format) (map (encodeFinal stored) fragments));
-                  legacy = write 8 wireFormat8 False;
+                  legacy = do {
+                    encoded <- write 8 wireFormat8 False;
+                    ioReturn (mapEither (\bytes -> (,) bytes fragments) encoded)
+                  };
                   requiredSchema current entries = case entries of {
                     [] -> current;
                     (:) entry rest -> case fragmentStorage (snd entry) of {
@@ -940,16 +999,17 @@ module Bootstrap.OpenFragment
                       decoded <- W.decodeGraphRootBounded W.defaultLimits remaining schema bytes;
                       case bindEither decoded (\graph -> do {
                         used <- W.graphExpandedWork graph;
-                        Structure.admitPatternsFor (schema == 10) graph (remaining - used)
-                      }) of { Left _ -> legacy; Right _ -> ioReturn (Right bytes) }
+                        (,) plans _ <- Structure.admitPatternsFor (schema == 10) graph (remaining - used);
+                        Right (attachLinkViews graph plans fragments)
+                      }) of { Left _ -> legacy; Right rows -> ioReturn (Right ((,) bytes rows)) }
                     }
                   }
                 };
                 case encoded of {
                   Left message -> ioReturn (Left message);
-                  Right bytes -> do {
+                  Right ((,) bytes rows) -> do {
                     digest <- byteArrayDigest bytes;
-                    ioReturn (Right (Package metadata fragments bytes digest Nothing))
+                    ioReturn (Right (Package metadata rows bytes digest Nothing))
                   }
                 }
               }
