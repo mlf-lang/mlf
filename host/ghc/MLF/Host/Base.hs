@@ -63,7 +63,12 @@ data String = String !T.Text !P.Int (Array.UArray P.Int P.Int)
 mkText :: T.Text -> String
 mkText text = mkSizedText (T.length text) text
 mkSizedText :: P.Int -> T.Text -> String
-mkSizedText count text = String text count (scalarOffsets count text)
+mkSizedText count text@(TI.Text _ _ bytes)
+  | count < 256 || count == bytes = String text count firstScalarBlock
+  | otherwise = String text count (scalarOffsets count text)
+-- Every text shorter than one index block starts its only block at zero.
+firstScalarBlock :: Array.UArray P.Int P.Int
+firstScalarBlock = Array.listArray (0,0) [0]
 -- One byte offset per 256 Unicode scalars, rather than a boxed Char per
 -- scalar. Most blocks in compiler objects are ASCII even when the object
 -- contains Unicode literals; those blocks retain constant-time indexing.
