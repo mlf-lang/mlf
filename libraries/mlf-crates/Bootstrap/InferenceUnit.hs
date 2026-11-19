@@ -456,6 +456,15 @@ module Bootstrap.InferenceUnit where {
     GroundUnaryImport _ _ _ input output -> SignedUnary input (signedInstantiation name output);
     _ -> if monomorphicTarget ty then SignedValue (XVarTerm name) ty else SignedUnsupported
   };
+  -- A primitive with a closed monomorphic signature has the same typed
+  -- occurrence in every scope. Preserve its ordinary admission and error.
+  signedPrimitive p = do {
+    ty <- Check.closedPrimitiveType p;
+    ensure (monomorphicTarget ty) "nonmonomorphic primitive";
+    Right (SignedValue (XPrimitive p []) ty)
+  };
+  signedPrimitives :: IntMap (Either String SignedValue);
+  signedPrimitives = IM.fromList (map (\p -> (,) (Primitive.primitiveCode p) (signedPrimitive p)) Primitive.allPrimitives);
   signedInstanceTerm globals names expression = let {
     variable key = case key of { Just value -> Right value; Nothing -> Left "unknown signed application variable" };
     operand shape actual = case shape of {
@@ -485,11 +494,7 @@ module Bootstrap.InferenceUnit where {
       SGlobal i _ -> variable (M.lookup compareInt (V.toInt i) globals);
       SVar name -> if eqString name "$MLF.Stack.callStack" then Left "managed call stack requires evidence"
         else variable (M.lookup compareString name names);
-      SPrimitive p -> do {
-        ty <- Check.closedPrimitiveType p;
-        ensure (monomorphicTarget ty) "nonmonomorphic primitive";
-        Right (SignedValue (XPrimitive p []) ty)
-      };
+      SPrimitive p -> IM.findWithDefault (signedPrimitive p) (Primitive.primitiveCode p) signedPrimitives;
       SIntLit n -> Right (SignedValue (XIntTerm n) (XCon "Int" []));
       SBoolLit b -> Right (SignedValue (XBoolTerm b) (XCon "Bool" []));
       SDoubleLit n -> Right (SignedValue (XDoubleTerm n) (XCon "Double" []));
