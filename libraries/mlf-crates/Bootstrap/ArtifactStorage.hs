@@ -920,7 +920,19 @@ module Bootstrap.ArtifactStorage where {
     };
   decodeBase64 :: String -> IO (Either String ByteArray);
   decodeBase64 text = let { total = stringLength text;
-      maximum = (quotInt maxBytes 3 + 1) * 4 } in
+      maximum = (quotInt maxBytes 3 + 1) * 4;
+      -- The length check places all four scalars in bounds. Before the
+      -- final quartet padding is invalid and exactly three bytes are due.
+      preceding bytes offset output = if offset + 4 >= total then decodeBase64Groups text total offset bytes output
+        else let {
+          a = base64Digit (stringCodeAt text offset); b = base64Digit (stringCodeAt text (offset + 1));
+          c = base64Digit (stringCodeAt text (offset + 2)); d = base64Digit (stringCodeAt text (offset + 3))
+        } in if a < 0 || b < 0 || c < 0 || d < 0 then ioReturn (Left "noncanonical release base64") else do {
+          writeByteArray bytes output (orInt (shiftLInt a 2) (shiftRInt b 4));
+          writeByteArray bytes (output + 1) (orInt (shiftLInt (andInt b 15) 4) (shiftRInt c 2));
+          writeByteArray bytes (output + 2) (orInt (shiftLInt (andInt c 3) 6) d);
+          preceding bytes (offset + 4) (output + 3)
+        } } in
     if total > maximum || remInt total 4 /= 0
     then ioReturn (Left "invalid release base64 length")
     else let { padding = if total == 0 then 0
@@ -930,7 +942,7 @@ module Bootstrap.ArtifactStorage where {
       if count < 0 || count > maxBytes then ioReturn (Left "release byte payload exceeds limit")
       else do {
         bytes <- newByteArray count 0;
-        decodeBase64Groups text total 0 bytes 0
+        preceding bytes 0 0
       };
   readBase64 :: String -> IO (Either String String);
   readBase64 path = do {
