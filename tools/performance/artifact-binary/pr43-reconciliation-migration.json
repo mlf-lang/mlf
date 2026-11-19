@@ -14,7 +14,7 @@
   "changes": {
     "bootstrap/MLF/BuiltinPreludeData.hs": [
       "91b2dee48f06af0432c7d2e81372d3a51d223c0e91ff22eab6e132559b4e3211",
-      "a2b4d14785941c19698f08f714636aba412a880fb3f7a1cf906730d77a9a40cc"
+      "677a5103b785839efc90d63c0d86adb47cb28a35871fbeee0470b9a1ca37e2df"
     ],
     "bootstrap/MLF/Entry/Emlf.hs": [
       "171273f182ff3b4b2b65f1eb03bb8db002ee07a5b57b77cee96e5a8c5f6ba480",
@@ -134,11 +134,11 @@
     ],
     "libraries/mlf-frontend/Bootstrap/Layout.hs": [
       "2d728d0dedebb05abe620095abe0f03999e3a8e00fca845faf47036fc81178de",
-      "914a39a67468082a82f6402806798d38cb477ab5000b7b97608602fa01bbfb53"
+      "acf385fec4874ef21486b5f7166261881abd4e96bc3c538997aad51c524d9648"
     ],
     "libraries/mlf-frontend/Bootstrap/Lexer.hs": [
       "d053db12391324d4305a78ac5dad24b3fe81c449007e318e14183c4e464adb43",
-      "925024b83b114922a5bd11eb81d4b98904f6611352035ec6b18da935ffe06c88"
+      "ec5e8679d4e3fdcb2c43b9d0162acdb9450d91dbf4a79439c822b4a9943cb10d"
     ],
     "libraries/mlf-frontend/Bootstrap/Module.hs": [
       "1f7ea629418456d898ad30227abd9aab444494199425b489d4330319ca9b42ca",
@@ -222,7 +222,7 @@
     ],
     "mlf.lock": [
       "5f7f58dece7a251711a3da2b78ba42502bd25554672bbbeaf8bf95abbc469077",
-      "694ad263ae9b97ed5f2d159a1f69952b3e8583e59aea2a32f9bff5170db52ad4"
+      "492bb6b1b15a0304b5d4421924c5d86ba14c7943ceda378afd2d1c2b297e8dd1"
     ],
     "runtime/mlf_build_runner_hash.h": [
       "cbbdfd06eb43324dceef594e42b21621559df3e3d4e91d62f2b73e2b04d9e778",
@@ -1559,6 +1559,29 @@
       "predecessor": "a9102b256e764a0a59e27379b625df90871d088a",
       "predecessor_manifest_sha256": "c789e31cde70df9778d1f5a8d198e9ae46834969a08e45d7c5aced2f9acb1471",
       "predecessor_tree": "0357e7c8f543e08838e27ccdbb86946f22c2e417"
+    },
+    {
+      "changes": {
+        "bootstrap/MLF/BuiltinPreludeData.hs": [
+          "a2b4d14785941c19698f08f714636aba412a880fb3f7a1cf906730d77a9a40cc",
+          "677a5103b785839efc90d63c0d86adb47cb28a35871fbeee0470b9a1ca37e2df"
+        ],
+        "libraries/mlf-frontend/Bootstrap/Layout.hs": [
+          "914a39a67468082a82f6402806798d38cb477ab5000b7b97608602fa01bbfb53",
+          "acf385fec4874ef21486b5f7166261881abd4e96bc3c538997aad51c524d9648"
+        ],
+        "libraries/mlf-frontend/Bootstrap/Lexer.hs": [
+          "925024b83b114922a5bd11eb81d4b98904f6611352035ec6b18da935ffe06c88",
+          "ec5e8679d4e3fdcb2c43b9d0162acdb9450d91dbf4a79439c822b4a9943cb10d"
+        ],
+        "mlf.lock": [
+          "694ad263ae9b97ed5f2d159a1f69952b3e8583e59aea2a32f9bff5170db52ad4",
+          "492bb6b1b15a0304b5d4421924c5d86ba14c7943ceda378afd2d1c2b297e8dd1"
+        ]
+      },
+      "predecessor": "a9474dc4965a987906f1f49aebc80fbc88aa9ddb",
+      "predecessor_manifest_sha256": "d8f6b40ec5a1ec3fa01846ff8cd0f16a9e0521535b2bd381ff3541327a6f7081",
+      "predecessor_tree": "78ff7249430eb9e90472622ef3b5fb6938448b4b"
     }
   ],
   "format": "pr43-reconciliation-source-migration-v1",

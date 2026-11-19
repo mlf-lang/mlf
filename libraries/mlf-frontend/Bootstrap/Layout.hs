@@ -445,13 +445,10 @@ module Bootstrap.Layout where {
            _ -> layoutTokensWithScanner scanSourceTokens program file source
          }
     else do {
-           boundValueShared1 <- scanSourceTokens file source;
+           boundValueShared1 <- scanValidatedSharedTokens file source;
            case boundValueShared1 of {
              Scanned tokens finish ->
                do {
-                 validateSharedTokens file tokens;
-                 -- Validation and layout consume the same immutable token stream.
-                 -- Keep the scanner failure and validation order above intact.
                  if explicitLayout program tokens then Right (Scanned tokens finish) else do {
                    arranged <- layoutTokensUsing True (\_ _ -> Right (Scanned tokens finish)) program file source;
                    case arranged of {

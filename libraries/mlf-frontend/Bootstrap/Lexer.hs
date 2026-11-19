@@ -238,49 +238,87 @@ module Bootstrap.Lexer where {
     else case IM.lookup key known of {
       Just name -> if matches name 0 then (,) name known else store; Nothing -> store
     };
+  -- A scanner consumer chooses how to collect ordinary ASCII words, decimal
+  -- tokens, punctuation and the full lexer branch. The public raw scanner
+  -- retains its lazy token list, including an explicitly supplied prefix.
+  data TokenOutput h = TokenOutput (Int -> Token -> h -> h) (Int -> Token -> h -> h)
+    (Token -> h -> h) (Token -> h -> h) (h -> Token -> Either String Scanned);
+  rawTokenOutput = TokenOutput (\_ -> (:)) (\_ -> (:)) (:) (:)
+    (\seen end -> Right (Scanned (reverse seen) end));
+  -- Fast lowercase words and single punctuation have no shared-grammar
+  -- lookahead. A plain decimal needs it only before a letter or dot. Other
+  -- tokens retain the full spelling and neighbor checks. Lexing reaches EOF
+  -- first, so a later scanner failure still takes precedence.
+  data SharedTokenHistory = NoSharedTokens | PlainSharedToken Token SharedTokenHistory |
+    CheckedSharedToken Token SharedTokenHistory | CapitalSharedToken Token SharedTokenHistory;
+  data SharedTokenChecks = NoSharedChecks | SharedTokenCheck Token ([] Token) SharedTokenChecks;
+  scanValidatedSharedTokens file source = let {
+    word first = if first >= 97 && first <= 122 then PlainSharedToken else if first >= 65 && first <= 90 then CapitalSharedToken else CheckedSharedToken;
+    number next = if sharedIdentifierFirst next || next == 46 then CheckedSharedToken else PlainSharedToken;
+    validate todo = case todo of {
+      NoSharedChecks -> Right ();
+      SharedTokenCheck token following rest -> do { validateSharedAt file token following; validate rest }
+    };
+    -- Reverse the scanner's history once. Each deferred check sees its real
+    -- following tokens, and validation still visits them in source order.
+    finish end history ordered checks = case history of {
+      NoSharedTokens -> do { validate checks; Right (Scanned ordered end) };
+      PlainSharedToken token rest -> finish end rest ((:) token ordered) checks;
+      CheckedSharedToken token rest -> finish end rest ((:) token ordered) (SharedTokenCheck token ordered checks);
+      CapitalSharedToken token rest -> let { next = case ordered of {
+        (:) member _ -> let { name = tokenText member } in stringLength name > 0 && stringCodeAt name 0 == 46;
+        [] -> False
+      } } in finish end rest ((:) token ordered) (if next then SharedTokenCheck token ordered checks else checks)
+    };
+    output = TokenOutput word number PlainSharedToken CheckedSharedToken
+      (\history end -> finish end history [] NoSharedChecks)
+  } in collectTokensWith output scanSourceQuoted file source (stringLength source) IM.empty NoSharedTokens (Cursor 0 1 1);
   scanMoreWith :: (String -> String -> Int -> Cursor -> Either String Cursor) ->
                   String -> String -> Int -> Cursor -> Either String Scanned;
   scanMoreWith quoted file source size = collectTokens quoted file source size IM.empty [];
   -- Plain ASCII tokens and whitespace remain on the same indexed input.
   -- Fall back at comments, quoted forms, numeric prefixes or a Unicode
   -- continuation, where the full lexer owns the decision and diagnostic.
-  collectTokens quoted file source size table tokens (Cursor start row col) = let {
+  collectTokens = collectTokensWith rawTokenOutput;
+  collectTokensWith output@(TokenOutput word number punctuation _ finish) quoted file source size table tokens (Cursor start row col) = let {
     letter c = (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95 || c == 39;
     identEnd i = if i >= size then i else let { c = stringCodeAt source i } in
       if letter c || isDigit c then identEnd (i + 1) else i;
     digitsEnd i = if i < size && isDigit (stringCodeAt source i) then digitsEnd (i + 1) else i;
-    loop i line column known seen = if i >= size then Right (Scanned (reverse seen) (Token "" line column line column))
+    loop i line column known seen = if i >= size then finish seen (Token "" line column line column)
       else let {
         c = stringCodeAt source i;
         next = i + 1;
-        slow = collectFullToken quoted file source size known seen (Cursor i line column);
-        emit end names spelling = let {
+        slow = collectFullTokenWith output quoted file source size known seen (Cursor i line column);
+        emit save end names spelling = let {
           lastColumn = column + (end - i);
-          token = Token spelling line column line lastColumn
-        } in seq lastColumn (loop end line lastColumn names ((:) token seen));
-        found end = case sharedSpelling source i end c known of { (,) spelling names -> emit end names spelling };
+          token = Token spelling line column line lastColumn;
+          more = save token seen
+        } in seq lastColumn (seq more (loop end line lastColumn names more));
+        found save end = case sharedSpelling source i end c known of { (,) spelling names -> emit save end names spelling };
         decimal = let { end = digitsEnd next; after = codeAt source size end } in
           if after == 46 || after == 69 || after == 101 ||
             (c == 48 && end == next && (after == 88 || after == 120 || after == 79 || after == 111))
-          then slow else found end;
+          then slow else found (number after) end;
         single = c == 40 || c == 41 || c == 44 || c == 59 || c == 91 || c == 93 || c == 125 ||
           (c == 123 && codeAt source size next /= 45)
       } in if c == 32 then let { colNext = column + 1 } in seq colNext (loop next line colNext known seen)
         else if c == 10 then let { rowNext = line + 1 } in seq rowNext (loop next rowNext 1 known seen)
         else if letter c then let { end = identEnd next } in
-          if end < size && stringCodeAt source end >= 128 then slow else found end
+          if end < size && stringCodeAt source end >= 128 then slow else found (word c) end
         else if isDigit c then decimal
-        else if single then emit next known (V.at singleAsciiTokens (V.fromInt c))
+        else if single then emit punctuation next known (V.at singleAsciiTokens (V.fromInt c))
         else slow
   } in loop start row col table tokens;
-  collectFullToken quoted file source size known seen cursor =
+  collectFullToken = collectFullTokenWith rawTokenOutput;
+  collectFullTokenWith output@(TokenOutput _ _ _ save finish) quoted file source size known seen cursor =
     case skipWhite file source size cursor of {
       Left e -> Left e;
       Right begin ->
         case begin of {
           Cursor i line column ->
             if (i >= size)
-            then Right (Scanned (reverse seen) (Token "" line column line column))
+            then finish seen (Token "" line column line column)
             else let {
                    c = codeAt source size i
                  } in
@@ -303,8 +341,9 @@ module Bootstrap.Lexer where {
                      case end of {
                        Cursor j lastLine lastColumn ->
                          case sharedSpelling source i j c known of { (,) spelling nextKnown -> let {
-                           token = Token spelling line column lastLine lastColumn
-                         } in collectTokens quoted file source size nextKnown ((:) token seen) end }
+                           token = Token spelling line column lastLine lastColumn;
+                           more = save token seen
+                         } in seq more (collectTokensWith output quoted file source size nextKnown more end) }
                      }
                  }
         }
@@ -909,45 +948,43 @@ module Bootstrap.Lexer where {
     else if sharedIdentifierFirst first then sharedIdentifier text
     else Set.member compareString text sharedPunctuationSet || sharedQualifiedOperator text;
   validateSharedTokens :: String -> [] Token -> Either String ();
-  validateSharedTokens file tokens =
-    case tokens of {
-      [] -> Right ();
-      (:) token rest ->
-        do {
-          let {
-            text = tokenText token;
-            size = stringLength text;
-            first = if size > 0 then stringCodeAt text 0 else (0 - 1)
-          };
-          unless (sharedTokenAllowed text size first)
-            (Left
-               (file ++
-                (":" ++
-                 (showInt (tokenLine token) ++
-                  (":" ++
-                   (showInt (tokenColumn token) ++
-                    (": token is outside shared-haskell-v1: " ++ text)))))));
-          case rest of {
-            (:) next following -> do {
-              when (first >= 65 && first <= 90 && (eqString (tokenText next) "." || sharedQualifiedOperator (tokenText next))) (do {
-                unless (tokenEndLine token == tokenLine next && tokenEndColumn token == tokenColumn next) (Left (file ++ ": qualified names must not contain whitespace before the dot"));
-                when (eqString (tokenText next) ".") (case following of {
-                  (:) final _ -> unless (tokenEndLine next == tokenLine final && tokenEndColumn next == tokenColumn final) (Left (file ++ ": qualified names must not contain whitespace after the dot"));
-                  [] -> Left (file ++ ": incomplete qualified name")
-                })
-              });
-              when
-                (isDigit first &&
-                  ((tokenEndLine token == tokenLine next) &&
-                   ((tokenEndColumn token == tokenColumn next) &&
-                    (sharedIdentifier (tokenText next) || eqString (tokenText next) "."))))
-                (Left (file ++ ": malformed numeric token boundary"))
-              };
-            _ -> Right ()
-          };
-          validateSharedTokens file rest
-        }
+  validateSharedTokens file tokens = case tokens of {
+    [] -> Right ();
+    (:) token rest -> do { validateSharedAt file token rest; validateSharedTokens file rest }
+  };
+  validateSharedAt file token rest = do {
+    let {
+      text = tokenText token;
+      size = stringLength text;
+      first = if size > 0 then stringCodeAt text 0 else (0 - 1)
     };
+    unless (sharedTokenAllowed text size first)
+      (Left
+         (file ++
+          (":" ++
+           (showInt (tokenLine token) ++
+            (":" ++
+             (showInt (tokenColumn token) ++
+              (": token is outside shared-haskell-v1: " ++ text)))))));
+    case rest of {
+      (:) next following -> do {
+        when (first >= 65 && first <= 90 && (eqString (tokenText next) "." || sharedQualifiedOperator (tokenText next))) (do {
+          unless (tokenEndLine token == tokenLine next && tokenEndColumn token == tokenColumn next) (Left (file ++ ": qualified names must not contain whitespace before the dot"));
+          when (eqString (tokenText next) ".") (case following of {
+            (:) final _ -> unless (tokenEndLine next == tokenLine final && tokenEndColumn next == tokenColumn final) (Left (file ++ ": qualified names must not contain whitespace after the dot"));
+            [] -> Left (file ++ ": incomplete qualified name")
+          })
+        });
+        when
+          (isDigit first &&
+            ((tokenEndLine token == tokenLine next) &&
+             ((tokenEndColumn token == tokenColumn next) &&
+              (sharedIdentifier (tokenText next) || eqString (tokenText next) "."))))
+          (Left (file ++ ": malformed numeric token boundary"))
+        };
+      _ -> Right ()
+    }
+  };
   -- Cache consumers must bind this semantic identity as well as raw source bytes.
   frontendSemanticVersion :: String;
   frontendSemanticVersion = "mlf-frontend/shared-haskell-v1/8";
