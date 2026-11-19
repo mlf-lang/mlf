@@ -1552,8 +1552,10 @@ module Bootstrap.SourceInference where {
       (contractOverloads contracts) (M.map contractProtected contracts);
   prepareGroupWithViews selectBindings = prepareGroupWithReservation selectBindings Nothing Nothing eligibleSource;
   prepareGroupWithReservation = prepareWithChecked Nothing Nothing;
-  checkedFacts (CheckedContracts _ contracts _) i = mapOptional
-    (\c -> (,) (contractClasses c) (contractProtected c)) (M.lookup compareDecl i contracts);
+  checkedFacts current = let {
+    read = case current of { CheckedContracts _ contracts _ -> M.lookupProjected compareDecl
+      (\_ c -> (,) (contractClasses c) (contractProtected c)) contracts }
+  } in \i -> read i;
   prepareWithChecked checked memberOrder selectBindings reserved knownOwner eligible (SourcePlan base graph count used _ _ _ supportProtection)
     contracts names original support overloads protected = do {
     let { inventory = case checked of {

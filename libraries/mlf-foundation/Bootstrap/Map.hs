@@ -88,6 +88,17 @@ module Bootstrap.Map where {
       Nothing -> panic "map key not found";
       Just value -> value
     };
+  -- Preserve the input map's order and build an answer only when its key is
+  -- requested. Each visited branch and its answer are shared in this scope.
+  lookupProjected :: forall k a b. (k -> k -> Int) -> (k -> a -> b) -> Map k a -> k -> Maybe b;
+  lookupProjected cmp answer tree = case tree of {
+    MapEmpty -> \_ -> Nothing;
+    MapNode _ key value left right -> let {
+      below = lookupProjected cmp answer left; above = lookupProjected cmp answer right;
+      found = Just (answer key value)
+    } in \wanted -> let { order = cmp wanted key } in
+      if order < 0 then below wanted else if order > 0 then above wanted else found
+  };
   member :: forall k v. (k -> k -> Int) -> k -> Map k v -> Bool;
   member cmp key tree = S.isJust (lookup cmp key tree);
   notMember :: forall k v. (k -> k -> Int) -> k -> Map k v -> Bool;

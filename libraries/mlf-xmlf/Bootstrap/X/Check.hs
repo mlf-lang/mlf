@@ -176,17 +176,8 @@ module Bootstrap.X.Check where {
     (P.primitiveCode p) closedPrimitiveTypes;
   inferIn :: DataEnv -> XEnv -> XTerm -> Either String XType;
   inferIn ds env term = inferApplications ds env (scopeApplications ds env) term;
-  -- Preserve the input map's order and build an answer only when its key is
-  -- requested. Each visited branch and its answer are shared in this scope.
   checkedLookup :: forall k a b. (k -> k -> Int) -> (k -> a -> b) -> Map k a -> k -> Maybe b;
-  checkedLookup cmp answer tree = case tree of {
-    MapEmpty -> \_ -> Nothing;
-    MapNode _ key value left right -> let {
-      below = checkedLookup cmp answer left; above = checkedLookup cmp answer right;
-      found = Just (answer key value)
-    } in \wanted -> let { order = cmp wanted key } in
-      if order < 0 then below wanted else if order > 0 then above wanted else found
-  };
+  checkedLookup = M.lookupProjected;
   scopeApplications ds env = let {
     scheme _ ty = let {
       check name _ = let {
