@@ -484,7 +484,27 @@ module Bootstrap.CrateGraph where {
         ordinary value = let { text = Q.encodeExpression value } in
           next (stringUtf8Length text) (\tail -> (:) "x" ((:) (Separate.pack [text]) tail)) rest
       } in case expr of {
-        SApp f a -> next 25 ((:) "a") ((:) f ((:) a rest));
+        SApp f a -> let {
+          single = next 25 ((:) "a") ((:) f ((:) a rest));
+          -- The original writer consumes the first application before it
+          -- inspects the function. Stay within that page and budget.
+          applied prefix spelling overhead = case positionSymbol spelling names of {
+            (,,) code bytes table -> collect (budget - 25 - overhead - bytes) ((:) a rest)
+              (\tail -> chunks ((:) prefix ((:) code tail))) pages (slots - 2) line column table locations
+          }
+        } in if slots < 2 || budget < 25 then single else case f of {
+          SApp g b -> collect (budget - 50) ((:) g ((:) b ((:) a rest)))
+            (\tail -> chunks ((:) "aa" tail)) pages (slots - 2) line column names locations;
+          SVar name -> applied "av" (case scope of {
+            WrittenOrigin -> name; SourceOrigin _ env _ _ _ -> Q.canonicalReference env name
+          }) 10;
+          SGlobal i _ -> case scope of {
+            SourceOrigin rank _ _ _ _ -> applied "av" (Q.ordinalToken (rank i)) 10;
+            WrittenOrigin -> single
+          };
+          SPrimitive p -> applied "ap" (Primitive.primitiveName p) 11;
+          _ -> single
+        };
         SLam n ann b -> case scope of {
           WrittenOrigin -> let { fields = Separate.pack [n,Q.optional Q.encodeAnnotation ann] } in
             next (17 + stringUtf8Length fields) (\tail -> (:) "l" ((:) fields tail)) ((:) b rest);
