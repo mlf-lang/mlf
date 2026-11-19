@@ -299,13 +299,15 @@ module Bootstrap.Lexer where {
         decimal = let { end = digitsEnd next; after = codeAt source size end } in
           if after == 46 || after == 69 || after == 101 ||
             (c == 48 && end == next && (after == 88 || after == 120 || after == 79 || after == 111))
-          then slow else found (number after) end;
+          then slow else emit (number after) end known (tokenSpelling source i end c);
         single = c == 40 || c == 41 || c == 44 || c == 59 || c == 91 || c == 93 || c == 125 ||
           (c == 123 && codeAt source size next /= 45)
       } in if c == 32 then let { colNext = column + 1 } in seq colNext (loop next line colNext known seen)
         else if c == 10 then let { rowNext = line + 1 } in seq rowNext (loop next rowNext 1 known seen)
         else if letter c then let { end = identEnd next } in
-          if end < size && stringCodeAt source end >= 128 then slow else found (word c) end
+          if end < size && stringCodeAt source end >= 128 then slow
+          else if end == next then emit (word c) next known (V.at singleAsciiTokens (V.fromInt c))
+          else found (word c) end
         else if isDigit c then decimal
         else if single then emit punctuation next known (V.at singleAsciiTokens (V.fromInt c))
         else slow

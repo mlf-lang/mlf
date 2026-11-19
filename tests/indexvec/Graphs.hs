@@ -814,6 +814,18 @@ lexicalRunChecks = do
       size = H.v_stringLength corpus
   forM_ [Lexer.scanTokens,Lexer.scanSourceTokens] $ \scan ->
     check "cached spelling collisions preserve all token extents" (Right expected) (scanned (scan "lex" (H.literal source)))
+  let names = [replicate n 'a' ++ suffix | n <- [1,2,6,7,8,30,31,32], suffix <- ["b","B","0z","'z"]]
+      distinct = ["word" ++ show n | n <- [0..300 :: Int]]
+      wordsInFile = unwords (names ++ distinct ++ reverse names ++ reverse distinct)
+      checked text = case Lexer.scanSourceTokens "lex" text of
+        T.Left e -> T.Left e
+        T.Right input@(Lexer.Scanned tokens _) -> case Lexer.validateSharedTokens "lex" tokens of
+          T.Left e -> T.Left e
+          T.Right () -> T.Right input
+  forM_ ["", " a界", " {- note -} again", " 1.bad", " {- open"] $ \suffix -> do
+    let text = H.literal (wordsInFile ++ suffix)
+    check "shared file scanner preserves prefix collisions, extents and first diagnostics"
+      (scanned (checked text)) (scanned (Lexer.scanValidatedSharedTokens "lex" text))
   forM_ [Lexer.isDigit,Lexer.isHexDigit,Lexer.isIdentChar,Lexer.isOperator] $ \predicate ->
     forM_ [0..size] $ \i -> do
       let before = Lexer.Cursor i 12 19
