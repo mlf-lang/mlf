@@ -1567,7 +1567,7 @@ module Bootstrap.SourceInference where {
   prepareGroupWithViews selectBindings = prepareGroupWithReservation selectBindings Nothing Nothing eligibleSource;
   prepareGroupWithReservation = prepareWithChecked Nothing Nothing;
   checkedFacts current = let {
-    read = case current of { CheckedContracts _ contracts _ -> M.lookupProjected compareDecl
+    read = case current of { CheckedContracts _ contracts _ -> M.lookupProjectedId V.toInt
       (\_ c -> (,) (contractClasses c) (contractProtected c)) contracts }
   } in \i -> read i;
   prepareWithChecked checked memberOrder selectBindings reserved knownOwner eligible (SourcePlan base graph count used _ _ _ supportProtection)

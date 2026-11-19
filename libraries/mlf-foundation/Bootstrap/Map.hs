@@ -99,6 +99,20 @@ module Bootstrap.Map where {
     } in \wanted -> let { order = cmp wanted key } in
       if order < 0 then below wanted else if order > 0 then above wanted else found
   };
+  -- For a map ordered by a signed identity, project each stored identity
+  -- once and pass the requested integer through the visited search path.
+  -- A miss visits only its search path. Answer payloads remain lazy.
+  lookupProjectedId :: forall k a b. (k -> Int) -> (k -> a -> b) -> Map k a -> k -> Maybe b;
+  lookupProjectedId identity answer tree = let {
+    search entries = case entries of {
+      MapEmpty -> \_ -> Nothing;
+      MapNode _ key value left right -> let {
+        stored = identity key; below = search left; above = search right;
+        found = Just (answer key value)
+      } in \wanted -> if wanted < stored then below wanted else if wanted == stored then found else above wanted
+    };
+    read = search tree
+  } in seq read (\key -> read (identity key));
   member :: forall k v. (k -> k -> Int) -> k -> Map k v -> Bool;
   member cmp key tree = S.isJust (lookup cmp key tree);
   notMember :: forall k v. (k -> k -> Int) -> k -> Map k v -> Bool;
