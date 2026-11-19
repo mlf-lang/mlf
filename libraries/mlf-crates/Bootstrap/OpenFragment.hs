@@ -450,15 +450,18 @@ module Bootstrap.OpenFragment
   } in (,) next renamed);
   -- Parameters are keyed by their original fragment identities. All other
   -- term and type identities receive the same injective renaming as fresh.
-  data LinkRow = LinkFixed XTerm | LinkHole | LinkChildren LinkRow LinkRow;
+  data LinkRow = LinkFixed XTerm | LinkHole | LinkFunction XTerm LinkRow | LinkChildren LinkRow LinkRow;
   mapLinkPattern name variable (Structure.TermPattern table root runs _ _) = let {
     add prior i (Structure.PatternRow row _ _ _) = let {
       value = case row of {
         Structure.PatternHole -> LinkHole;
         Structure.PatternAtom atom -> LinkFixed (Separate.mapTerm name variable atom);
         Structure.PatternJoin lhs rhs -> let { a = IM.get lhs prior; b = IM.get rhs prior } in
-          case (,) a b of {
-            (,) (LinkFixed f) (LinkFixed x) -> LinkFixed (XApp f x);
+          case a of {
+            LinkFixed f -> case b of {
+              LinkFixed x -> LinkFixed (XApp f x);
+              _ -> LinkFunction f b
+            };
             _ -> LinkChildren a b
           }
       }
@@ -474,9 +477,13 @@ module Bootstrap.OpenFragment
         (:) (Structure.PatternRun count first delta) following -> take count first delta following;
         [] -> Nothing
       } else take (previous - 1) start step runs;
-      LinkChildren f a -> fill f previous start step runs (\left rest value delta following ->
-        fill a rest value delta following (\right count next stride tail ->
-          done (XApp left right) count next stride tail))
+      LinkFunction f a -> fill a previous start step runs (\right count next stride tail ->
+        done (XApp f right) count next stride tail);
+      LinkChildren f a -> fill f previous start step runs (\left rest value delta following -> case a of {
+        LinkFixed right -> done (XApp left right) rest value delta following;
+        _ -> fill a rest value delta following (\right count next stride tail ->
+          done (XApp left right) count next stride tail)
+      })
     }
   } in fill (IM.get root rows) 1 0 0 runs (\term previous _ _ following ->
     if previous == 1 && null following then Just term else Nothing);
