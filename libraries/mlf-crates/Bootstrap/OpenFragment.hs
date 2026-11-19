@@ -252,12 +252,33 @@ module Bootstrap.OpenFragment
   data StampState = StampState Int Int Int ([] Int);
   stampFixed piece (StampState count a b literals) = let { total = count + Separate.encodingLength piece } in
     case Separate.encodingState ((,) a b) piece of { (,) x y -> seq total (seq x (seq y (StampState total x y literals))) };
+  -- A literal contributes its signed decimal spelling to both scalar hashes.
+  -- Keep the magnitude nonpositive so the minimum Int has a representation.
+  -- Two ASCII digits advance the same canonical residues as two scalar steps.
+  stampDigits width factorA factorB digitsA digitsB (StampState count a b rest) = let {
+    total = count + width;
+    x = (a * factorA + digitsA) % 2147483647;
+    y = (b * factorB + digitsB) % 2147483629
+  } in seq total (seq x (seq y (StampState total x y rest)));
+  stampPairCodes n = let {
+    tens = quotInt n 10; first = 48 + tens; last = 48 + n - tens * 10
+  } in (,) (first * 65599 + last) (first * 131 + last);
+  decimalStampPairs :: V.IndexVec Int ((,) Int Int);
+  decimalStampPairs = V.fromList (map stampPairCodes (range 0 99));
+  stampInteger value initial = let {
+    single code = stampDigits 1 65599 131 code code;
+    pair n current = case V.at decimalStampPairs (V.fromInt n) of {
+      (,) a b -> stampDigits 2 8261507 17161 a b current
+    };
+    digits n current = if n > (0 - 10) then single (48 - n) current else let {
+      higher = quotInt n 100; low = higher * 100 - n
+    } in pair low (if higher == 0 then current else digits higher current)
+  } in if value < 0 then digits value (single 45 initial) else digits (0 - value) initial;
   stampHoles holes state = case holes of {
     StampHole -> case state of {
-      StampState count a b ((:) value rest) -> let { digits = showInt value; n = stringLength digits; total = count + n } in
-        case Separate.canonicalFingerprintText digits 0 n a b of {
-          (,) x y -> seq total (seq x (seq y (Just (StampState total x y rest))))
-        };
+      StampState count a b ((:) value rest) -> let {
+        next = stampInteger value (StampState count a b rest)
+      } in seq next (Just next);
       _ -> Nothing
     };
     StampJoin left piece right -> case stampHoles left state of {
