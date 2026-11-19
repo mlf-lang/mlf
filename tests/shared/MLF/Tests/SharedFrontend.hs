@@ -2127,6 +2127,9 @@ module MLF.Tests.SharedFrontend where {
       [[],[")"],["f"],["f","(","g","x",")","y"],["f","(",")"],
        ["f","("],["f","[","x",","],["f","then"],["f","M",".","g"]];
     equations = append examples [
+      ["Fork","(","Tip","x",")","(","Tip","x",")",";","next"],
+      ["Z9'","(","A_","(","B1","x",")",")","}"],["True","(","A","x",")",";"],
+      ["Node","M",".","Leaf",";"],["Node","(","x",",","Leaf",")"],["Node","(","Leaf"],
       ["f","(","g","(","x",")",")","x",";","next"],["if","x","then","y","else","z"],
       ["f","(","x",",","y",")"],["x","::","Int"],["x","+",")"],["x","}"],
       ["f","0xff","3.25","9e-2"],["x","(","let","{","x","=","1","}","in","x",")"],
@@ -2136,7 +2139,9 @@ module MLF.Tests.SharedFrontend where {
     check "application tree, residual tokens and committed failures"
       (all (\syntax -> all (agrees reference P.application syntax) examples) profiles);
     check "equation RHS tree, coordinates, remaining tokens and committed failures"
-      (all (\syntax -> all (agrees P.expr P.equationExpression syntax) equations) profiles)
+      (all (\syntax -> all (agrees P.expr P.equationExpression syntax) equations) profiles);
+    check "scanned source equation constructors, coordinates and general grammar fallback"
+      (all (\syntax -> all (agrees P.expr (P.equationExpressionWith True) syntax) equations) profiles)
   };
   finalGeometryChecks :: IO ();
   finalGeometryChecks = do {

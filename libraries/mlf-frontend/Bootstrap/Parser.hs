@@ -187,7 +187,8 @@ module Bootstrap.Parser where {
   parseModuleSelectedInPackage sourcePackage syntax file source =
     do {
       tokens <- layoutTokensWithProfile syntax True file source;
-      result <- runParserWithProfileInPackage sourcePackage syntax (sourceModule file) file tokens;
+      result <- runParserWithProfileInPackage sourcePackage syntax
+        (sourceModuleWith (equationExpressionWith True) file) file tokens;
       when (eqString (moduleIdentity result) "MLF.Primitive")
         (Left "MLF.Primitive is a reserved native builtin module");
       if isSharedSyntax syntax
@@ -254,7 +255,8 @@ module Bootstrap.Parser where {
         }
     };
   sourceModule :: String -> Parser SourceModule;
-  sourceModule file =
+  sourceModule = sourceModuleWith equationExpression;
+  sourceModuleWith rhs file =
     do {
       syntax <- pSourceSyntax;
       header <-
@@ -270,7 +272,7 @@ module Bootstrap.Parser where {
       pBraces
         (do {
            imports <- pMany (pBefore importDeclaration separator);
-           declarations <- pMany (pBefore topDeclaration separator);
+           declarations <- pMany (pBefore (topDeclarationWith rhs) separator);
            values <-
              pEither
                (groupValues
@@ -373,14 +375,16 @@ module Bootstrap.Parser where {
   importItems :: Parser ([] Export);
   importItems = pParens (pSepEndBy (exportItem False) (pToken ","));
   topDeclaration :: Parser Top;
-  topDeclaration =
+  topDeclaration = topDeclarationWith equationExpression;
+  topDeclarationWith rhs =
     pChoices
       ((:) (pMap DataTop dataDeclaration)
          ((:) (pMap ClassTop classDeclaration)
             ((:) (pMap InstanceTop instanceDeclaration)
-               ((:) (pMap ValueTop valueDeclaration) []))));
+               ((:) (pMap ValueTop (valueDeclarationWith rhs)) []))));
   valueDeclaration :: Parser Value;
-  valueDeclaration =
+  valueDeclaration = valueDeclarationWith equationExpression;
+  valueDeclarationWith rhs =
     pChoice
       (pTry
          (do {
@@ -390,16 +394,17 @@ module Bootstrap.Parser where {
             pLook (pChoice (pToken ";") (pToken "}"));
             pPure (Signature name ty)
           }))
-      equation;
+      (equationWith rhs);
   equation :: Parser Value;
-  equation =
+  equation = equationWith equationExpression;
+  equationWith rhs =
     do {
       boundValueShared1 <- bindingHead;
       case boundValueShared1 of {
         (,,) name args ty ->
           do {
             body <-
-              pChoice (pThen (pToken "=") equationExpression)
+              pChoice (pThen (pToken "=") rhs)
                 (pBySyntax (pFail "guarded equations are outside shared-haskell-v1; use ordinary if/case") (pBind (pSome (guardBranch "=")) (\rows -> pEither (guarded rows))));
             pPure (Equation name args ty body)
           }
@@ -627,7 +632,11 @@ module Bootstrap.Parser where {
   -- A complete equation made of first-order syntax can be read from its
   -- token spine in one pass. Delimiters remain for the enclosing grammar.
   -- Retrying at the equation boundary limits a near miss to one extra scan.
-  equationExpression = Parser (\state -> case state of {
+  equationExpression = equationExpressionWith False;
+  -- The general constructor alternatives compare token offsets while
+  -- choosing a diagnostic. Only source scanned by the module reader has
+  -- fully defined token positions. Manual token streams retain that demand.
+  equationExpressionWith scanned = Parser (\state -> case state of {
     ParseState file tokens end SharedHaskellV1 owner packageName -> let {
       finish body rest = PSuccess body (ParseState file rest end SharedHaskellV1 owner packageName) True;
       appendAtom prior atom = case prior of { Nothing -> atom; Just f -> SApp f atom };
@@ -643,17 +652,19 @@ module Bootstrap.Parser where {
               seq next (scan known outer (Just next) more);
             _ -> Nothing
           } else if size == 1 && (code == 59 || code == 125) then finishAt groups current remaining
-          else if code >= 97 && code <= 122 then
-            -- An accepted spelling has one immutable variable leaf. Each
-            -- occurrence still carries the token's own package and coordinates.
-            let { reference names leaf = put names (SCallSite name (SourceSpan packageName owner file sl sc el ec) leaf) } in
-            case M.lookup compareString name known of {
-              Just leaf -> reference known leaf;
-              Nothing -> if sharedIdentifier name && not (Set.member compareString name sharedReservedSet) then let {
-                leaf = SVar name;
-                next = if M.size known < 64 then M.insert compareString name leaf known else known
-              } in reference next leaf else Nothing
-            }
+          else if (code >= 97 && code <= 122) || (scanned && code >= 65 && code <= 90) then let {
+            lower = code >= 97;
+            -- Variables retain each occurrence's call site. Constructors
+            -- have no call-site wrapper in the shared expression grammar.
+            reference names leaf = put names (if lower
+              then SCallSite name (SourceSpan packageName owner file sl sc el ec) leaf else leaf)
+          } in case M.lookup compareString name known of {
+            Just leaf -> reference known leaf;
+            Nothing -> if sharedIdentifier name && not (Set.member compareString name sharedReservedSet) then let {
+              leaf = if lower then SVar name else SConstructor (sharedSourceName name);
+              next = if M.size known < 64 then M.insert compareString name leaf known else known
+            } in reference next leaf else Nothing
+          }
           else if isDigit code then case naturalValue name of {
             Right number -> put known (SIntLit number); Left _ -> Nothing
           } else Nothing
