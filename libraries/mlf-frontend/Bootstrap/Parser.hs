@@ -15,6 +15,7 @@ module Bootstrap.Parser where {
   import Bootstrap.Fresh;
   import qualified Bootstrap.Std as SharedSyntax;
   import qualified Bootstrap.Set as Set;
+  import qualified Bootstrap.Map as M;
   data Top = DataTop DataDecl | ClassTop SClassDecl | InstanceTop SInstanceDecl | ValueTop Value;
   data SharedStatement =
     SharedBind SPattern SExpr SourceSpan |
@@ -643,11 +644,16 @@ module Bootstrap.Parser where {
             _ -> Nothing
           } else if size == 1 && (code == 59 || code == 125) then finishAt groups current remaining
           else if code >= 97 && code <= 122 then
-            let { reference names = put names (SCallSite name (SourceSpan packageName owner file sl sc el ec) (SVar name)) } in
-            if Set.member compareString name known then reference known else
-              if sharedIdentifier name && not (Set.member compareString name sharedReservedSet) then
-                reference (if Set.size known < 64 then Set.insert compareString name known else known)
-              else Nothing
+            -- An accepted spelling has one immutable variable leaf. Each
+            -- occurrence still carries the token's own package and coordinates.
+            let { reference names leaf = put names (SCallSite name (SourceSpan packageName owner file sl sc el ec) leaf) } in
+            case M.lookup compareString name known of {
+              Just leaf -> reference known leaf;
+              Nothing -> if sharedIdentifier name && not (Set.member compareString name sharedReservedSet) then let {
+                leaf = SVar name;
+                next = if M.size known < 64 then M.insert compareString name leaf known else known
+              } in reference next leaf else Nothing
+            }
           else if isDigit code then case naturalValue name of {
             Right number -> put known (SIntLit number); Left _ -> Nothing
           } else Nothing
@@ -656,7 +662,7 @@ module Bootstrap.Parser where {
         (,) [] (Just body) -> Just (finish body remaining);
         _ -> Nothing
       }
-    } in case scan Set.empty [] Nothing tokens of { Just result -> result; Nothing -> pRun expr state };
+    } in case scan M.empty [] Nothing tokens of { Just result -> result; Nothing -> pRun expr state };
     _ -> pRun expr state
   });
   expr :: Parser SExpr;
