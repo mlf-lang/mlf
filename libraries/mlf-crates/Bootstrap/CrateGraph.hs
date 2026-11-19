@@ -444,6 +444,10 @@ module Bootstrap.CrateGraph where {
         ((,) (V.at coordinateAlphabet (V.fromInt count)) bytes) names else names
     } in (,,) literal bytes table
   };
+  -- An Int has one to twenty signed decimal characters. The prefix is
+  -- part of the output page; the ordinary framed length still sets admission.
+  integerPositionPrefixes :: V.IndexVec Int String;
+  integerPositionPrefixes = V.fromList (map (\n -> "i" ++ showInt n ++ ":") (range 0 20));
   -- The same preorder writer accepts raw declarations or canonical syntax.
   -- Application children and source wrappers stay in their parent's scope.
   -- Save a continuation only where the projection changes, at binders or
@@ -479,7 +483,6 @@ module Bootstrap.CrateGraph where {
         named tag spelling overhead = case positionSymbol spelling names of { (,,) code bytes table ->
           collect (budget - overhead - bytes) rest (\tail -> chunks ((:) tag ((:) code tail))) pages (slots - 1) line column table locations
         };
-        scalar tag fields overhead = next (overhead + stringUtf8Length fields) (\tail -> (:) tag ((:) fields tail)) rest;
         enter nested = scan nested (case rest of { [] -> outer; _ -> (:) ((,) scope rest) outer });
         ordinary value = let { text = Q.encodeExpression value } in
           next (stringUtf8Length text) (\tail -> (:) "x" ((:) (Separate.pack [text]) tail)) rest
@@ -550,7 +553,11 @@ module Bootstrap.CrateGraph where {
           WrittenOrigin -> ordinary expr
         };
         SPrimitive p -> named "p" (Primitive.primitiveName p) 11;
-        SIntLit n -> scalar "i" (Separate.pack [showInt n]) 9;
+        SIntLit n -> let {
+          digits = showInt n; count = stringLength digits;
+          prefix = V.at integerPositionPrefixes (V.fromInt count);
+          framing = if count < 10 then 2 else 3
+        } in next (9 + framing + count) (\tail -> (:) prefix ((:) digits tail)) rest;
         _ -> case scope of {
           WrittenOrigin -> ordinary expr;
           SourceOrigin rank env depth types typeDepth ->
