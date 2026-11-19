@@ -879,12 +879,11 @@ module Bootstrap.Lexer where {
          then sharedGapEnd source (i + 1) end
          else if (c == 92) then Right i else Left "shared string gaps allow only spaces and LF";
   sharedIdentifier :: String -> Bool;
-  sharedIdentifier text =
-    ((stringLength text > 0) &&
-     (sharedIdentifierFirst (stringCodeAt text 0) &&
-      not
-        (stringAny (\c -> not (sharedIdentifierFirst c || (isDigit c || ((c == 95) || (c == 39)))))
-           text)));
+  sharedIdentifier text = let {
+    size = stringLength text;
+    invalid c = not (sharedIdentifierFirst c || isDigit c || c == 95 || c == 39)
+  } in size > 0 && sharedIdentifierFirst (stringCodeAt text 0) &&
+    not (stringAnyAt invalid text 1 size);
   sharedIdentifierFirst :: Int -> Bool;
   sharedIdentifierFirst c = (((c >= 65) && (c <= 90)) || ((c >= 97) && (c <= 122)));
   sharedValueOperators :: [] String;
