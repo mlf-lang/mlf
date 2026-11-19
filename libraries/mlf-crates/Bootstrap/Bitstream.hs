@@ -188,13 +188,17 @@ module Bootstrap.Bitstream (
     if ordinal == count then MissingNode (\_ -> keys)
     else if compareEntry (plannedEntry ordinal count entries pages) entry == 0 then ExistingNode ordinal
     else internNodeKey entry keys;
-  -- The caller describes two generated shapes: a unary name containing an
-  -- integer and text, and a primitive containing an integer and an empty list.
-  -- A mistaken descriptor can only miss reuse. The complete shape and scalar
-  -- payloads are compared against values already admitted in this plan.
-  data AtomShapes = AtomShapes Int Int Int Int Int;
-  data AtomIds = NoAtomIds | AtomIds AtomShapes (Maybe ((,) Int Int)) (IntMap ((,,) String Int Int));
-  emptyAtomIds shapes = AtomIds shapes Nothing IM.empty;
+  -- Descriptors name common generated shapes. A hit reuses only a
+  -- completely admitted node with the same tags and scalar payloads.
+  data AtomShapes = AtomShapes Int Int Int Int Int | NamedAtomShapes Int Int Int Int Int Int;
+  data NamedAtoms = NoNamedAtoms | NamedAtoms Int (Map String ((,) Int Int));
+  data AtomIds = NoAtomIds | AtomIds Int Int Int Int Int
+    (Maybe ((,) Int Int)) (IntMap ((,,) String Int Int)) NamedAtoms;
+  emptyAtomIds shapes = case shapes of {
+    AtomShapes n pair p opcode empty -> AtomIds n pair p opcode empty Nothing IM.empty NoNamedAtoms;
+    NamedAtomShapes n pair p opcode empty named ->
+      AtomIds n pair p opcode empty Nothing IM.empty (NamedAtoms named M.empty)
+  };
   -- A hash narrows structural lookup; it never establishes equality. Exact
   -- collisions use the original balanced map, so even deliberately colliding
   -- inputs retain logarithmic bucket lookup instead of a linear chain.
@@ -455,16 +459,24 @@ module Bootstrap.Bitstream (
     };
   rememberAtom tag children index saved = case saved of {
     NoAtomIds -> saved;
-    AtomIds shape@(AtomShapes nameTag namePair primTag opcodeTag emptyTag) prim names ->
-      if tag == primTag then case children of {
+    AtomIds nameTag namePair primTag opcodeTag emptyTag prim names named -> let {
+      save primitive bindings atoms = AtomIds nameTag namePair primTag opcodeTag emptyTag primitive bindings atoms
+    } in if tag == primTag then case children of {
         [VNode inner [VInt code],VNode tailTag []] -> if inner == opcodeTag && tailTag == emptyTag
-          then AtomIds shape (Just ((,) code index)) names else saved;
+          then save (Just ((,) code index)) names named else saved;
         _ -> saved
       } else if tag == nameTag then case children of {
         [VNode inner [VInt binding,VText hint]] -> if inner /= namePair || binding < 0 || binding >= 64 then saved
-          else AtomIds shape prim (IM.insert binding ((,,) hint (stringUtf8Length hint) index) names);
+          else save prim (IM.insert binding ((,,) hint (stringUtf8Length hint) index) names) named;
         _ -> saved
-      } else saved
+      } else case named of {
+        NamedAtoms namedTag table -> if tag /= namedTag || M.size table >= 64 then saved else case children of {
+          [VText text,VNode tailTag []] -> if tailTag == emptyTag then save prim names
+            (NamedAtoms namedTag (M.insert compareString text ((,) (stringUtf8Length text) index) table)) else saved;
+          _ -> saved
+        };
+        NoNamedAtoms -> saved
+      }
   };
   -- A miss follows ordinary planning. Keeping the shape tests separate also
   -- preserves its demand order on an ill-formed nested value: check the tag,
@@ -490,7 +502,8 @@ module Bootstrap.Bitstream (
   tryAtom limits depth tag children stack rest state@(PlanState _ (Nodes _ _ count edges saved _) work) ordinary =
     case saved of {
       NoAtomIds -> ordinary rest;
-      AtomIds (AtomShapes nameTag namePair primitiveTag opcodeTag emptyTag) primitive names -> let {
+      AtomIds nameTag namePair primitiveTag opcodeTag emptyTag primitive names named -> let {
+        isNamed = case named of { NamedAtoms namedTag _ -> tag == namedTag; NoNamedAtoms -> False };
         available = maxExpandedWork limits - work;
         -- Even a miss must be able to admit three descendants, four distinct
         -- nodes (including the root), and three edges before speculating.
@@ -517,14 +530,27 @@ module Bootstrap.Bitstream (
               _ -> remember
             }
           }
+        };
+        useNamed first second = case first of {
+          VText text -> case named of {
+            NamedAtoms _ table -> case M.lookup compareString text table of {
+              Nothing -> remember;
+              Just ((,) bytes index) -> if bytes > available - 2 then ordinary rest
+                else if atomEmpty emptyTag second then reuse (2 + bytes) index else remember
+            };
+            NoNamedAtoms -> ordinary rest
+          };
+          _ -> remember
         }
-      } in if (tag /= primitiveTag && tag /= nameTag) || not enoughRoom then ordinary rest else do {
+      } in if (tag /= primitiveTag && tag /= nameTag && not isNamed) || not enoughRoom then ordinary rest else do {
         let { cap = min (maxEdges limits) (maxExpandedWork limits - 1) };
         arity <- boundedLength cap children;
         if tag == primitiveTag && arity == 2 then case children of {
           [first,second] -> usePrimitive first second; _ -> ordinary rest
         } else if tag == nameTag && arity == 1 then case children of {
           [first] -> useName first; _ -> ordinary rest
+        } else if isNamed && arity == 2 then case children of {
+          [first,second] -> useNamed first second; _ -> ordinary rest
         } else ordinary rest
       }
     };

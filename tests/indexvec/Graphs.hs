@@ -42,6 +42,7 @@ import qualified Bootstrap.Module as Modules
 import qualified Bootstrap.Types as T
 import qualified Bootstrap.Set as S
 import qualified MLF.Host.Base as H
+import qualified MLF.Primitive as Prim
 import qualified Package.Json as J
 import qualified Package.Manifest as P
 import qualified Package.Scheduler as Jobs
@@ -1101,6 +1102,19 @@ fragmentFingerprintChecks = do
       (H.unpack (Separate.fingerprint (Separate.pack fields))) (H.unpack (Open.fingerprint fragment))
 
 applicationPatternChecks = do
+  let named text fields = W.VNode 82 [W.VText text,W.VNode 1 fields]
+      names = [named "A" [],named "長😀" [],named "A" [],named "長😀" [W.VInt 2],named "A" []]
+      encoded action = do
+        value <- action
+        case value of
+          T.Left m -> pure (Left (H.unpack m))
+          T.Right b -> do
+            n <- Prim.lengthByteArray b
+            Right <$> mapM (Prim.readByteArray b) [0..n-1]
+  forM_ [W.defaultLimits,W.Limits 1024 8 128 256 32 64 8 19] $ \limits -> do
+    expected <- encoded (W.encode limits 8 names)
+    actual <- encoded (W.encodeAtoms Structure.termAtomShapes limits 8 names)
+    check "named constructor atoms preserve bytes and resource diagnostics" expected actual
   let right (T.Right value) = pure value
       right (T.Left message) = fail (H.unpack message)
       rejected (T.Left _) = True

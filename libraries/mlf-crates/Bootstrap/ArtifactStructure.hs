@@ -211,7 +211,7 @@ module Bootstrap.ArtifactStructure where {
 
   -- Matches the generated XVarTerm/name and unapplied XPrimitive/code/list
   -- encodings below. Writers still compare each tagged value before reuse.
-  termAtomShapes = W.AtomShapes 70 31 81 32 1;
+  termAtomShapes = W.NamedAtomShapes 70 31 81 32 1 82;
   toXTerm :: XTerm -> W.Value;
   toXTerm value = case value of {
     XVarTerm x0 -> W.VNode 70 [toXName x0];
