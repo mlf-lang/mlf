@@ -682,15 +682,20 @@ module Bootstrap.CrateQuery where {
     (append (Source.groupOriginal prepared) (Source.groupMembers prepared));
   referenceTableUsing slots prepared members = let {
     scope = Source.slotScope slots;
-    observed = concatMap (compose (Source.declarationRefs scope) (compose Dependency.querySyntaxRefs Source.sourceRhs))
-      members;
-    ids = append (Source.memberIds slots) (append (Source.parameterIds slots)
-      (append (Source.candidateIds slots) observed));
+    prepend rest i = (:) i rest;
+    observe acc member = Source.foldDeclarationRefs scope prepend acc
+      (Dependency.querySyntaxRefs (Source.sourceRhs member));
+    -- Finish each input spine from left to right before deduplicating its
+    -- slots in reverse order. Slot values and display hints stay lazy.
+    owners = reverse (Source.memberIds slots);
+    parameters = foldlStrict prepend owners (Source.parameterIds slots);
+    candidates = foldlStrict prepend parameters (Source.candidateIds slots);
+    reversed = seq owners (seq parameters (seq candidates (foldlStrict observe candidates members)));
     -- Retain the last occurrence of each ID, including the old last-wins
     -- ordering for two distinct IDs whose caller-supplied stable key agrees.
     keep ((,) seen kept) i = let { index = V.toInt i } in
       if IS.member index seen then (,) seen kept else (,) (IS.insert index seen) ((:) i kept);
-    unique = snd (foldlStrict keep ((,) IS.empty []) (reverse ids));
+    unique = snd (foldlStrict keep ((,) IS.empty []) reversed);
     definitions = M.toList (M.fromList compareString (map (\i -> (,) (Source.declStable scope i) i) unique));
     ranks = zipWith (\ordinal ((,) _ i) -> (,) i (V.fromInt ordinal))
       (range 0 (length definitions - 1)) definitions;

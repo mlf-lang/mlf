@@ -1265,9 +1265,21 @@ module Bootstrap.SourceInference where {
   -- Lowered terms may introduce selector and dictionary uses. Admit these
   -- against the current declaration table; a recognized but unfinished read
   -- is an error, including a forward edge to a later SCC.
-  declarationRefs scope refs = mapMaybe (\ref -> case ref of {
+  declarationRef scope ref = case ref of {
     DeclRef i _ -> Just i; LexicalRef n -> lookupDecl scope n
-  }) refs;
+  };
+  declarationRefs scope = mapMaybe (declarationRef scope);
+  -- Visit accepted slots in encounter order, retaining the consumer's
+  -- accumulator across names that do not identify a declaration.
+  foldDeclarationRefs scope take = let {
+    visit acc refs = case refs of {
+      [] -> acc;
+      (:) ref rest -> case declarationRef scope ref of {
+        Nothing -> visit acc rest;
+        Just i -> let { next = take acc i } in seq next (visit next rest)
+      }
+    }
+  } in visit;
   expressionDeclarations scope body = declarationRefs scope (Dependency.valueOccurrences True False body);
   selectedContractIds scope owners members = let {
     -- Only the current winner for each spelling can be ignored on a repeat.
