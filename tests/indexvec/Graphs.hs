@@ -833,11 +833,16 @@ applicationPatternChecks = do
       result = T.XName 1 "export😀"
       ty = T.XCon "Int" []
       bodies = [take 32 (iterate (+7) (maxBound-4)),replicate 32 minBound,
-                take 63 (cycle [maxBound,0,7,7,-1,minBound])]
+                take 63 (cycle [maxBound,0,7,7,-1,minBound]),
+                take 64 (cycle [-10001,-1000,-101,-100,-99,-10,-9,0,9,10,99,100,101,9999,10000])]
   env <- right (Open.environment [])
   forM_ bodies $ \xs -> do
     let source = T.XLet result (tree [add (T.XVarTerm arg) (T.XIntTerm n) | n <- xs]) (T.XConstructor "()" [])
     checked <- right (Open.check env [(arg,ty)] source)
+    let frame = Separate.pack [Separate.pack [], Separate.pack [Separate.pack ["0", "arg:λ", "Int"]],
+          Pretty.prettyTerm source, Separate.pack [Separate.pack ["export😀", "Int"]]]
+    check "compact signed-literal fingerprint matches the complete pretty-printed frame"
+      (H.unpack (Separate.fingerprint frame)) (H.unpack (Open.fingerprint checked))
     graph <- right (W.planGraph W.defaultLimits [Open.encodeRaw (W.VNode 1 []) "raw" "unit" checked])
     W.GNode 425 [_,record] <- right (W.lookupGraphNode graph (head (W.graphRoots graph)))
     W.GNode 440 [_,_,_,_,body,_,_] <- right (W.lookupGraphNode graph record)
