@@ -1193,6 +1193,24 @@ applicationPatternChecks = do
   forM_ [-1,1,256,16384,maxBound] $ \count -> do
     invalid <- right (W.planGraph W.defaultLimits [spine count])
     unless (rejected (Structure.admitPatternsWith True True invalid logicalWork)) (fail "invalid repeated application count")
+  let checkedTree = T.XLet result (foldr (add . T.XIntTerm) (T.XIntTerm 0) terms) (T.XConstructor "()" [])
+  checkedSpine <- right (Open.check env [] checkedTree)
+  let wireRaw encode = encode (W.VNode 1 []) "raw" "checked" checkedSpine
+  plainQuery <- right (W.planGraph W.defaultLimits [wireRaw Open.encodeRaw])
+  compactQuery <- right (W.planGraph W.defaultLimits [wireRaw Open.encodeCheckedRaw])
+  let payload graph = do
+        W.GNode 425 [_,i] <- right (W.lookupGraphNode graph (head (W.graphRoots graph)))
+        W.GNode kind [_,_,_,_,term,_,_] <- right (W.lookupGraphNode graph i)
+        pure (kind,term)
+  (oldTag,oldBody) <- payload plainQuery
+  (newTag,newBody) <- payload compactQuery
+  check "versioned private query body" (400,442) (oldTag,newTag)
+  oldTerm <- right (Structure.fromGraphXTerm plainQuery oldBody)
+  newTerm <- right (Structure.storedTermWith True True compactQuery newBody)
+  oldBytes <- encoded (W.encode W.defaultLimits 6 [Structure.toXTerm oldTerm])
+  newBytes <- encoded (W.encode W.defaultLimits 6 [Structure.toXTerm newTerm])
+  check "raw query storage restores exact checked syntax" oldBytes newBytes
+  unless (rejected (Structure.storedTermFor True compactQuery newBody)) (fail "old query reader admitted a spine")
   -- A type argument is part of the literal template's identity. Count both
   -- UTF-8 strings and all nodes of its original, fully explicit evidence.
   let unary v t = T.XTypeApp (T.XVarTerm v) (T.XThen (T.XInner (T.XBottom t)) T.XElim)

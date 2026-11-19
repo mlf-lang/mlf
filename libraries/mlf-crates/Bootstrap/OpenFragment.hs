@@ -5,7 +5,7 @@
 module Bootstrap.OpenFragment
   (Environment, environment, declarations, dataEnvironment, Fragment, check, fromChecked,
    parameters, body, bodyValue, storageValue, bindings, usedParameters, context, fingerprint,
-   normalize, withNameHints, encodeBody, encodeRaw, decodeTrusted, decodeTrustedIds, audit, closedTerm, fresh, linkBody,
+   normalize, withNameHints, encodeBody, encodeRaw, encodeCheckedRaw, decodeTrusted, decodeTrustedIds, audit, closedTerm, fresh, linkBody,
    Package, makePackage, makeCheckedPackage, readPackage, readPackageProfiled, packageFragments, packageBytes,
    packageHash, packageMetadata, packageFamily, declarationValue, compatibilityIdentity,
    MetadataReceipt, makeMetadataReceipt, metadataReceiptHash, withMetadataReceipt, cachedMetadata) where {
@@ -600,14 +600,23 @@ module Bootstrap.OpenFragment
   -- The environment and external types are supplied from verified shared
   -- dependency nodes. This record contains their local identities, not copies.
   encodeBody stage name fragment = bodyRecord 400 stage name fragment (bodyValue fragment);
-  encodeRaw references stage name fragment = let {
+  selectedStorage :: Bool -> Fragment -> Maybe ((,) Int W.Value);
+  selectedStorage spines fragment = case fragmentStorage fragment of {
+    Just stored -> Just ((,) (if hasGroundRows stored then 10 else 9) (storedWire stored));
+    Nothing -> if not spines then Nothing else mapOptional (\stored -> (,) 11 (storedWire stored))
+      (compactTermWith spinePattern (body fragment))
+  };
+  encodeRaw = encodeRawWith False;
+  encodeCheckedRaw = encodeRawWith True;
+  encodeRawWith spines references stage name fragment = let {
     envelope record = W.VNode 425 [references,record];
     ordinary = encodeBody stage name fragment;
-    choose = case fragmentStorage fragment of {
+    choose = case selectedStorage spines fragment of {
       Nothing -> ordinary;
-      Just (StoredTerm ground term) -> let { record = bodyRecord (if ground then 441 else 440) stage name fragment term } in
+      Just ((,) version term) -> let { tag = if version == 11 then 442 else if version == 10 then 441 else 440;
+        record = bodyRecord tag stage name fragment term } in
         case bindEither (W.planGraph W.defaultLimits [envelope record])
-          (\graph -> Structure.admitPatternsFor ground graph (W.maxExpandedWork W.defaultLimits)) of {
+          (\graph -> Structure.admitPatternsWith (version >= 10) (version == 11) graph (W.maxExpandedWork W.defaultLimits)) of {
           Right _ -> record; Left _ -> ordinary
         }
     }
@@ -658,7 +667,7 @@ module Bootstrap.OpenFragment
             value <- W.lookupGraphNode graph record;
             case value of {
               W.GNode tag [s,n,h,ps,t,bs,uses] -> do {
-                ensure (tag == 400 || tag == 440 || tag == 441) "unknown open fragment storage; rebuild cache";
+                ensure (tag == 400 || tag == 440 || tag == 441 || tag == 442) "unknown open fragment storage; rebuild cache";
                 savedStage <- textAt graph s;
                 savedName <- textAt graph n;
                 savedStamp <- textAt graph h;
@@ -675,7 +684,7 @@ module Bootstrap.OpenFragment
                   ensure (eqString key stable) "open fragment dependency inventory mismatch";
                   Right ((,) binder ty)
                 }) (zip pairs expectedParameters);
-                term <- if tag == 400 then Structure.fromGraphXTerm graph t else Structure.storedTermFor (tag == 441) graph t;
+                term <- if tag == 400 then Structure.fromGraphXTerm graph t else Structure.storedTermWith (tag >= 441) (tag == 442) graph t;
                 ownedValues <- decodedList
                   (Structure.ShapePair Structure.ShapeXName Structure.ShapeXType) graph bs;
                 owned <- traverseEither (Structure.expectPair Structure.expectXName Structure.expectXType) ownedValues;
@@ -1166,15 +1175,7 @@ module Bootstrap.OpenFragment
                      Structure.toList
                        (Structure.toPair Structure.toText Structure.toText) d,
                      W.VInt count];
-                  -- Keep the public raw query format and the existing compact rows.
-                  -- Only the final package negotiates a repeated application row.
-                  plan entry@((,) _ fragment) = let {
-                    form = case fragmentStorage fragment of {
-                      Just stored -> Just ((,) (if hasGroundRows stored then 10 else 9) (storedWire stored));
-                      Nothing -> if not spines then Nothing else mapOptional (\stored -> (,) 11 (storedWire stored))
-                        (compactTermWith spinePattern (body fragment))
-                    }
-                  } in (,) entry form;
+                  plan entry = (,) entry (selectedStorage spines (snd entry));
                   plans = map plan fragments;
                   final ((,) entry selected) = case selected of {
                     Just ((,) _ wire) -> encodeFinalWire wire entry; Nothing -> encodeFinal False entry

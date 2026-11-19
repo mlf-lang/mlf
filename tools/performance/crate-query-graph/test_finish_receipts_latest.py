@@ -18,7 +18,7 @@ def sha(value):
     return hashlib.sha256(value).hexdigest()
 
 
-def authored(root, shared=True, finish=False):
+def authored(root, shared=True, finish=False, spine=False, split_public=False):
     prefix = root / 'unit'; cache = root / 'cache'; directory = cache / 'query-graph-v3'
     (directory / 'results').mkdir(parents=True)
     (directory / 'CURRENT').write_text('not consulted by receipt inspector')
@@ -28,7 +28,18 @@ def authored(root, shared=True, finish=False):
     finish_key = pack(['FinishScc', identity])
     binder = n(31, ('int', 19), s(member)); ty = n(44, s('Int'), l())
     body = n(75, binder, n(77, ('int', 5)), n(82, s('()'), l()))
-    record = n(400, s('raw'), s(group), s('10-20'), l(), body, l(n(2, binder, ty)), l())
+    public_body = body
+    if spine:
+        def storage(split):
+            integer = lambda x: ('int', x)
+            rows = l(n(87), n(82, s('leaf:λ'), l()), n(88, integer(1), integer(0)),
+                     n(82, s('end'), l()), n(88, integer(2), integer(3), integer(8)))
+            run = n(89, integer(-3), integer(1), integer(8))
+            stream = l(*(integer(i) for i in range(-3, 5))) if split else l(run)
+            return n(75, binder, n(86, rows, stream, integer(4)), n(82, s('()'), l()))
+        body = storage(False)
+        public_body = storage(split_public)
+    record = n(442 if spine else 400, s('raw'), s(group), s('10-20'), l(), body, l(n(2, binder, ty)), l())
     payload = tree_document([n(425, l(), record)], 6); digest = sha(payload)
     (directory / 'results' / (digest + '.mlfqr')).write_bytes(payload)
     if shared:
@@ -52,16 +63,27 @@ def authored(root, shared=True, finish=False):
         nodes[binding_key]['reads'] = [(finish_key, fh)]
     interface = [s('fixture'), l(), l(), l(), l(), l(), l(), l(), l(),
                  l(n(2, s(member), ty)), s(''), s(''), l(n(2, s(member), n(7)))]
-    final = n(401, s(group), s('10-20'), l(), l(), body, l(binder), l())
-    opened = [s('MLF-OPEN-CRATE-2/checker-1'), s('compiler'), s('metadata'), l(), l(), l(final)]
+    final = n(401, s(group), s('10-20'), l(), l(), public_body, l(binder), l())
+    opened = [s('MLF-OPEN-CRATE-5/checker-1' if spine else 'MLF-OPEN-CRATE-2/checker-1'), s('compiler'), s('metadata'), l(), l(), l(final)]
     prefix.with_suffix('.mlfci').write_bytes(tree_document([n(242, *interface)], 3))
-    prefix.with_suffix('.mlfco').write_bytes(open_bytes(8, opened))
+    prefix.with_suffix('.mlfco').write_bytes(open_bytes(11 if spine else 8, opened))
     prefix.with_suffix('.queries').write_text(json.dumps({'groups': [dict(id=group, members=[member])]}))
     return prefix, cache, nodes, dict(raw=raw_key, binding=binding_key, scope=scope,
                                     inventory=inventory, prepared=prepared, finish=finish_key)
 
 
 class LatestReceiptTests(unittest.TestCase):
+    def test_compact_query_commitment_binds_the_exact_retained_application_body(self):
+        for finish in (False, True):
+            for split in (False, True):
+                with self.subTest(finish=finish, split=split), tempfile.TemporaryDirectory() as tmp:
+                    prefix, cache, nodes, _ = authored(Path(tmp), finish=finish, spine=True, split_public=split)
+                    if split:
+                        with self.assertRaisesRegex(Invalid, 'retained application storage'):
+                            check_receipts(prefix, cache, nodes)
+                    else:
+                        self.assertEqual(check_receipts(prefix, cache, nodes)['retained'], 1)
+
     def test_handwritten_direct_and_explicit_finish_shared_and_group_scope(self):
         for shared in (False, True):
             for finish in (False, True):

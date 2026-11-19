@@ -207,10 +207,27 @@ module Bootstrap.CrateGraph where {
     Right template -> templateValue declarations template fragment;
     Left _ -> Right (rawValue references group fragment)
   };
+  -- Reproduce the committed encoding during ICH validation. An admitted
+  -- ordinary body may belong to a valid pre-spine generation.
+  checkedRawHash expected info declarations references group fragment = let {
+    previous = case rawValueFor info declarations references group fragment of {
+      Left e -> ioReturn (Left e); Right value -> G.hashValue value
+    }
+  } in case info of {
+    Right _ -> previous;
+    Left _ -> do {
+      hashed <- G.hashValue (checkedRawValue references group fragment);
+      case hashed of {
+        Right digest -> if eqString digest expected then ioReturn hashed
+          else previous;
+        Left _ -> ioReturn hashed
+      }
+    }
+  };
   recordRaw info declarations cached wanted reads references group fragment session =
     case info of {
       Left _ -> do {
-        recorded <- G.record wanted reads True (rawValue references group fragment) session;
+        recorded <- G.record wanted reads True (checkedRawValue references group fragment) session;
         ioReturn (mapEither (\entry -> (,) entry cached) recorded)
       };
       Right template@(TemplateInfo identity _ _ _ _) -> do {
@@ -806,7 +823,10 @@ module Bootstrap.CrateGraph where {
   };
   scopeValue prepared dependencies = W.VNode 423
     [scopeInventory prepared,A.toList (A.toPair A.toText A.toText) (map G.edge dependencies)];
-  rawValue references group fragment = Open.encodeRaw
+  rawValue = rawValueWith Open.encodeRaw;
+  checkedRawValue = rawValueWith Open.encodeCheckedRaw;
+  rawValueWith :: (W.Value -> String -> String -> Open.Fragment -> W.Value) -> [] ((,) String String) -> String -> Open.Fragment -> W.Value;
+  rawValueWith encode references group fragment = encode
     (A.toList (A.toPair A.toText A.toText) references) "raw" group fragment;
   compile verify crateId compilerHash cacheDir imports protected originalPlan =
     case do {
@@ -945,8 +965,7 @@ module Bootstrap.CrateGraph where {
                               case loaded of {
                                 Left e -> ioReturn (Left e);
                                 Right fragment -> do {
-                                  fingerprint <- if verify then case rawValueFor template declarations references group fragment of {
-                                    Left e -> ioReturn (Left e); Right value -> G.hashValue value }
+                                  fingerprint <- if verify then checkedRawHash digest template declarations references group fragment
                                     else ioReturn (Right digest);
                                   ioReturn (do {
                                     actual <- fingerprint;
@@ -1060,9 +1079,8 @@ module Bootstrap.CrateGraph where {
       Source.AdaptedBody _ -> False
     }; rawHash = G.nodeHash rawNode } in
     if same && not recheck then ioReturn (Right rawHash) else do {
-      hashed <- case if same then rawValueFor template declarations finalRefs group final
-        else Right (rawValue finalRefs group final) of {
-        Left e -> ioReturn (Left e); Right value -> G.hashValue value };
+      hashed <- if same then checkedRawHash rawHash template declarations finalRefs group final
+        else G.hashValue (rawValue finalRefs group final);
       ioReturn (do { digest <- hashed;
         ensure (not same || eqString digest rawHash) "retained final fragment SHA mismatch";
         Right digest })

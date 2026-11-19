@@ -5,10 +5,10 @@ import hashlib
 import json
 
 from query_generation import Generation, cache_directory
-from artifact_binary_reference import read_document, tree_document, require
+from artifact_binary_reference import Limits, read_document, tree_document, require
 from artifact_binary_typed import list_values, text, unpack, value_node
 from artifact_binary_open import (open_document, OPEN_FORMATS, type_alpha,
-    checked_stamp_syntax, different_content_stamp, open_bytes, repinned)
+    checked_stamp_syntax, different_content_stamp, expand_application_document, open_bytes, repinned, syntax_equal)
 from template_receipts import rebind_template
 
 
@@ -36,7 +36,11 @@ def package_fragments(raw):
     """Read committed schema dispatch, preserving each complete final record."""
     # Reuse the independent schema8 aggregate/per-root budget and canonical
     # framing checks already used by the binary-artifact correctness suite.
-    schema, _, package = open_document(raw)
+    return package_bodies(raw)[0]
+
+
+def package_bodies(raw):
+    schema, document, package = open_document(raw)
     fmt, compiler, association, bindings, declarations, finals = package
     require(text(fmt) == OPEN_FORMATS[schema], "open package format")
     finals = list_values(finals)
@@ -46,7 +50,12 @@ def package_fragments(raw):
         name = text(fields[0])
         require(name not in objects, "duplicate open package fragment")
         objects[name] = fields
-    return objects
+    stored = {}
+    if schema == 11:
+        for fragment in document.values()[1:]:
+            fields = value_node(fragment, 401, 7)
+            stored[text(fields[0])] = fields[4]
+    return objects, stored
 
 
 def scope_edge(raw, identity, nodes):
@@ -77,7 +86,7 @@ def check_receipts(prefix, cache, nodes):
     """Rebuild the fragment commitment from the emitted object and actual dependency versions."""
     results = cache_directory(cache) / "results"
     groups = json.loads(prefix.with_suffix(".queries").read_text())["groups"]
-    objects = package_fragments(prefix.with_suffix(".mlfco").read_bytes())
+    objects, stored_bodies = package_bodies(prefix.with_suffix(".mlfco").read_bytes())
     interface = value_node(read(prefix.with_suffix(".mlfci"), 3), 242, 13)
     types = {text(name): ty for name, ty in (value_node(b, 2, 2) for b in list_values(interface[9]))}
     retained = rewritten = 0
@@ -117,11 +126,20 @@ def check_receipts(prefix, cache, nodes):
         _, stamp, ds, ps, body, owned, uses = objects[g["id"]]
         payload = (results / (raw["sha"] + ".mlfqr")).read_bytes()
         require(raw['payload'] == raw['sha'] == sha(payload), 'raw payload commitment')
-        values = read_document(payload, 6).values()
+        document = read_document(payload, 6)
+        values = document.values()
         require(len(values) == 1 and tree_document(values, 6) == payload, 'canonical raw payload')
         original_refs, original = value_node(values[0], 425, 2)
-        stage, raw_owner, raw_stamp, raw_ps, raw_body, raw_owned, raw_uses = value_node(original, 400, 7)
+        compressed = original[:2] == ('node', 442)
+        logical = original
+        if compressed:
+            require(any(row.kind == 3 and row.data[0] == 88 and len(row.data[1]) == 3 for row in document.nodes),
+                    'repeated application query has no spine')
+            expanded, _ = expand_application_document(document, Limits().work, allow_ground=True, allow_spines=True)
+            _, logical = value_node(expanded[0], 425, 2)
+        stage, raw_owner, raw_stamp, raw_ps, raw_body, raw_owned, raw_uses = value_node(logical, 442 if compressed else 400, 7)
         template = text(raw_owner) == 'template'
+        require(not (compressed and template), 'inference template storage version')
         actual_raw_refs = n(1, *(n(2, ('text', k), ('text', h)) for k, h in raw_refs))
         if template:
             raw_ps, raw_body, raw_owned, raw_uses = rebind_template(
@@ -139,7 +157,7 @@ def check_receipts(prefix, cache, nodes):
         require(receipt_node["reads"][3:] == [edge for edge in receipt_node["reads"][3:] if unpack(edge[0])[0] == "Evidence"] + [
             (k, nodes[k]["sha"]) for k in keys if unpack(k)[0] == "Binding"], "finish binding reads")
         raw_binders = n(1, *(value_node(v, 2, 2)[0] for v in list_values(raw_owned)))
-        same_body = (params, body, owned, uses) == (raw_ps, raw_body, raw_binders, raw_uses)
+        same_body = syntax_equal((params, body, owned, uses), (raw_ps, raw_body, raw_binders, raw_uses))
         if not template:
             same_body = same_body and stamp == raw_stamp
         if same_body:
@@ -158,6 +176,16 @@ def check_receipts(prefix, cache, nodes):
             # its content validity is checked by mandatory actual audited links
             # and the targeted repinned wrong-stamp control in verify.py.
             content = sha(tree_document([n(425, original_refs, original)], schema=6))
+        elif compressed and same:
+            # The content hash binds the stored bytes. The full decoded term,
+            # types, references and stamp above bind those bytes to the final
+            # object. A compact final package supplies its own physical body.
+            stored = original[2][4]
+            if g['id'] in stored_bodies:
+                require(syntax_equal(stored_bodies[g['id']], stored), 'retained application storage')
+                stored = stored_bodies[g['id']]
+            content = sha(tree_document([n(425, refs, n(442, ('text', 'raw'), owner, stamp,
+                params, stored, final_types, uses))], schema=6))
         else:
             content = sha(tree_document([n(425, refs, n(400, ("text", "raw"), owner, stamp,
                 params, body, final_types, uses))], schema=6))
@@ -269,7 +297,7 @@ def forge_generation(cache, current, mode):
         raw_node = wire.nodes[packed(["InferScc", identity])]
         raw_record = read(directory / "results" / (raw_node["payload"] + ".mlfqr"), 6)
         _, fragment = value_node(raw_record, 425, 2)
-        owner = text(value_node(fragment, 400, 7)[1])
+        owner = text(value_node(fragment, 442 if fragment[:2] == ('node', 442) else 400, 7)[1])
         contracts = [(name, wire.nodes[packed(["Binding", name])]["sha"]) for name in members]
         stale = packed(["MLF-FINISH-RECEIPT-TEXT-1", owner, text(donor), str(len(contracts)),
                         *(field for pair in contracts for field in pair)])

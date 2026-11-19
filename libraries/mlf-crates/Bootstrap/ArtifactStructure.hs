@@ -1272,8 +1272,9 @@ module Bootstrap.ArtifactStructure where {
     Right (S.reverse results)
   };
   storedTerm = storedTermFor False;
-  storedTermFor allowGround graph index = do {
-    prepared <- admitPatternsFor allowGround graph (W.maxExpandedWork W.defaultLimits);
+  storedTermFor allowGround = storedTermWith allowGround False;
+  storedTermWith allowGround spines graph index = do {
+    prepared <- admitPatternsWith allowGround spines graph (W.maxExpandedWork W.defaultLimits);
     results <- decodeStoredManyWith (S.fst prepared) graph [index];
     case results of { [answer] -> expectXTerm answer; _ -> malformed "application pattern root" }
   };
