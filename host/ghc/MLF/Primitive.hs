@@ -77,6 +77,7 @@ ioReturn = Base.v_ioReturn
 
 ioBind :: IO a -> (a -> IO b) -> IO b
 ioBind = Base.v_ioBind
+{-# INLINE [1] ioBind #-}
 
 putStr :: String -> IO ()
 putStr = IO.v_putStr
@@ -199,6 +200,7 @@ lengthByteArray = IO.v_lengthByteArray
 
 byteArrayFromString :: String -> IO ByteArray
 byteArrayFromString = IO.v_byteArrayFromString
+{-# INLINE [1] byteArrayFromString #-}
 
 putBytes :: ByteArray -> Int -> Int -> IO ()
 putBytes = IO.v_putBytes
@@ -259,6 +261,11 @@ writeByteFileOrError = IO.v_writeByteFileOrError
 
 byteArrayDigest :: ByteArray -> IO String
 byteArrayDigest = IO.v_byteArrayDigest
+{-# INLINE [1] byteArrayDigest #-}
+-- The new array cannot escape this continuation. Ordinary callers keep a
+-- fresh mutable array, and a digest on an existing array takes its snapshot.
+{-# RULES "MLF/ioBind/immutable text digest" [~1] forall value.
+    ioBind (byteArrayFromString value) byteArrayDigest = IO.digestString value #-}
 
 -- CRC32/ISO-HDLC of the current bytes; the bounded range is logically zero.
 byteArrayCRC32 :: ByteArray -> Int -> Int -> IO Int

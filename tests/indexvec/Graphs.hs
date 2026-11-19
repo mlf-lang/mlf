@@ -1077,6 +1077,13 @@ lexicalRunChecks = do
           T.Right (Lexer.Scanned _ end) -> check "shared layout keyword followed by an explicit brace"
             expected (H.unpack (Lexer.tokenText end) == "yes")
           T.Left err -> fail (H.unpack err)
+  forM_ [(H.literal "","e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+         (H.literal "abc","ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"),
+         (H.literal "a\0λ😀","4fe290816c9390f64590f5c084138ccb45e844d36f955f7028682e3b18abbaad"),
+         (H.v_stringSlice (H.literal "α界\0λtail") 1 3,"6c47638d59677a2695a1a624c05600dec901583df1cf5b20bcf79ef73090adda"),
+         (H.literal (replicate 8193 'z'),"1740af352212ee326525f7bd044275adda2b46eb53128aca7c3e64b268121760")] $ \(text,expected) -> do
+    digest <- CQ.sourceInputHash text
+    check "immutable source UTF-8 SHA-256" expected (H.unpack digest)
   forM_ [Lexer.isDigit,Lexer.isHexDigit,Lexer.isIdentChar,Lexer.isOperator] $ \predicate ->
     forM_ [0..size] $ \i -> do
       let before = Lexer.Cursor i 12 19

@@ -8,6 +8,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Unsafe as BU
 import qualified Data.Text.Array as TA
 import qualified Data.Text.Internal as TI
+import qualified Data.Text.Foreign as TF
 import qualified Data.Array.IO as A
 import qualified Data.Array.Base as AB
 import qualified Data.Array.IO.Internals as AI
@@ -375,10 +376,26 @@ foreign import ccall safe "mlf_ghc_byte_array_digest" c_byteArrayDigest :: Ptr W
 v_byteArrayDigest :: ByteArray -> IO String
 v_byteArrayDigest array = do
   ByteArray size _ <- evaluate array
-  withByteSnapshot array $ \bytes ->
-    bracket (mallocBytes 65) free $ \digest -> do
-      c_byteArrayDigest bytes (fromIntegral size) digest
-      B.packCStringLen (digest,64) >>= evaluate . fromUtf8
+  withByteSnapshot array $ \bytes -> digestBytes bytes size
+
+digestBytes :: Ptr Word8 -> P.Int -> IO String
+digestBytes bytes size = bracket (mallocBytes 65) free $ \digest -> do
+  c_byteArrayDigest bytes (fromIntegral size) digest
+  B.packCStringLen (digest,64) >>= evaluate . fromUtf8
+
+-- The portable expression creates a private byte array solely to hash it.
+-- Borrow immutable pinned text for the safe call. For a movable slice,
+-- text's scoped pointer adapter supplies a pinned copy of the exact bytes.
+digestString :: String -> IO String
+digestString value = do
+  text <- evaluate (stringText value)
+  case text of
+    TI.Text (TA.ByteArray source) offset size
+      | G.isTrue# (G.isByteArrayPinned# source) ->
+          IO $ \world -> G.keepAlive# text world $ \next ->
+            case digestBytes (Ptr (G.byteArrayContents# source) `plusPtr` offset) size of
+              IO run -> run next
+      | otherwise -> TF.useAsPtr text $ \bytes _ -> digestBytes bytes size
 
 -- Expose the ordered primitive actions to hot codec loops. Bounds and value
 -- checks remain in the inlined body, including the IO demand boundaries.

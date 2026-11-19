@@ -750,8 +750,7 @@ module Bootstrap.CrateGraph where {
   };
   hashTextFields :: ([] String) -> IO (Either String String);
   hashTextFields fields = do {
-    bytes <- byteArrayFromString (Separate.pack fields);
-    digest <- byteArrayDigest bytes;
+    digest <- Q.sourceInputHash (Separate.pack fields);
     ioReturn (if G.validHash digest then Right digest else Left "query input SHA failed")
   };
   smallPreparedTexts nodes scalars fields = case fields of {

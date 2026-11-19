@@ -1568,7 +1568,7 @@ module Bootstrap.CrateQuery where {
       }
   };
   sourceInputHash :: String -> IO String;
-  sourceInputHash key = do { bytes <- byteArrayFromString key; byteArrayDigest bytes };
+  sourceInputHash key = ioBind (byteArrayFromString key) byteArrayDigest;
   -- Hash the same canonical UTF-8 bytes in memory for modest inputs. Large
   -- keys and an existing scratch path retain the original file/cleanup lane.
   sourceLookupHash directory key = let {
