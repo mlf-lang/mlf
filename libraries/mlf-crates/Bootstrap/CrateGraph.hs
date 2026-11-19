@@ -199,7 +199,7 @@ module Bootstrap.CrateGraph where {
   templateValue declarations info fragment = case info of {
     TemplateInfo identity _ _ parameters members -> do {
       renamed <- attachInferenceTemplate declarations parameters members fragment;
-      canonical <- Source.canonicalOpen renamed;
+      canonical <- Source.canonicalCheckedOpen renamed;
       Right (rawValue (templateReferences identity) "template" canonical)
     }
   };
@@ -253,7 +253,7 @@ module Bootstrap.CrateGraph where {
         ioReturn (do {
           template <- loaded;
           renamed <- attachInferenceTemplate declarations parameters members template;
-          canonical <- Source.canonicalOpen renamed;
+          canonical <- Source.canonicalCheckedOpen renamed;
           Source.validatePreparedOpen slots prepared canonical;
           Right canonical
         })
@@ -998,7 +998,7 @@ module Bootstrap.CrateGraph where {
                                 }
                               } else mapEither (\fragment -> (,) fragment templates) (Inference.compileOpenGroup group
                                 [Q.dependencyInterface (Source.groupBindings prepared)] declarations (Source.groupMembers prepared));
-                              canonical <- Source.canonicalOpen (fst inferredResult);
+                              canonical <- Source.canonicalCheckedOpen (fst inferredResult);
                               Source.validatePreparedOpen slots prepared canonical;
                               Right ((,) canonical (snd inferredResult))
                             }

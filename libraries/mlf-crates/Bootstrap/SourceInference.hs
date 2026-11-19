@@ -553,7 +553,8 @@ module Bootstrap.SourceInference where {
   smallFinalValue :: Wire.Value -> Maybe Bool;
   smallFinalValue = smallFinalTree False;
   smallFinalTree = finalTreeGeometry 256;
-  finalTreeGeometry depthLimit stored raw = let {
+  finalTreeGeometry = finalTreeGeometryUsing False;
+  finalTreeGeometryUsing spines depthLimit stored raw = let {
     limits = Wire.defaultLimits;
     -- Bound expanded nodes independently of text bytes. A symbol can occupy
     -- many bytes while contributing only one node and one symbol.
@@ -567,7 +568,7 @@ module Bootstrap.SourceInference where {
     scalars = min ((nodes - 1) / 4) (Wire.maxSymbolBytes limits / 4);
     chargeText = \text available -> let { bytes = stringUtf8Length text } in
         if stringLength text > scalars || bytes > available then Nothing else Just (available - bytes)
-  } in finalGeometryWith stored chargeText (min depthLimit (Wire.maxDepth limits)) [(,,) 1 False [raw]] nodes work False;
+  } in finalGeometryUsing spines stored chargeText (min depthLimit (Wire.maxDepth limits)) [(,,) 1 False [raw]] nodes work False;
   -- Preserve the scalar-weighted budget of the existing task-list entry point.
   smallFinalTasks pending remaining maxDepth nested = let {
     chargeText = \text available -> let { count = stringLength text } in
@@ -577,7 +578,8 @@ module Bootstrap.SourceInference where {
   -- No template row contains a nested XThen. Charge every logical occurrence
   -- using the same depth, node, text and UTF-8 limits as the ordinary tree.
   -- This view comes only from a Fragment's own checked term.
-  applicationGeometry fields chargeText nodeLimit workLimit = case fields of {
+  applicationGeometry = applicationGeometryUsing False;
+  applicationGeometryUsing spines fields chargeText nodeLimit workLimit = case fields of {
     [Wire.VNode 1 rows,_,Wire.VInt root] -> let {
       collect i seen pending = case pending of {
         [] -> IM.lookup root seen;
@@ -596,6 +598,20 @@ module Bootstrap.SourceInference where {
               Nothing -> Nothing; Just remaining -> save 6 12 (workLimit - remaining)
             }
           };
+          Wire.VNode 82 [Wire.VText name,Wire.VNode 1 []] -> if not spines then Nothing else
+            case chargeText name (workLimit - 3) of {
+              Just remaining -> save 2 3 (workLimit - remaining); Nothing -> Nothing
+            };
+          -- A repeated head contributes one application, its complete syntax
+          -- and its UTF-8 names each time. Prove the products fit first.
+          Wire.VNode 88 [Wire.VInt l,Wire.VInt r,Wire.VInt count] -> if not spines || count < 2 then Nothing else
+            case (,) (IM.lookup l seen) (IM.lookup r seen) of {
+              (,) (Just ((,,) ld ln lw)) (Just ((,,) rd rn rw)) ->
+                if count > Wire.maxDepth Wire.defaultLimits - max ld rd ||
+                   count > (nodeLimit - rn) / (1 + ln) || count > (workLimit - rw) / (1 + lw)
+                then Nothing else save (count + max ld rd) (rn + count * (1 + ln)) (rw + count * (1 + lw));
+              _ -> Nothing
+            };
           Wire.VNode 88 [Wire.VInt l,Wire.VInt r] -> case (,) (IM.lookup l seen) (IM.lookup r seen) of {
             (,) (Just ((,,) ld ln lw)) (Just ((,,) rd rn rw)) -> save (1 + max ld rd) (1 + ln + rn) (1 + lw + rw);
             _ -> Nothing
@@ -609,7 +625,8 @@ module Bootstrap.SourceInference where {
   finalGeometryTasks :: (String -> Int -> Maybe Int) -> Int ->
     [] ((,,) Int Bool ([] Wire.Value)) -> Int -> Int -> Bool -> Maybe Bool;
   finalGeometryTasks = finalGeometryWith False;
-  finalGeometryWith stored chargeText maxDepth = let {
+  finalGeometryWith = finalGeometryUsing False;
+  finalGeometryUsing spines stored chargeText maxDepth = let {
     visit pending nodes work nested = case pending of {
       [] -> Just nested;
       (:) ((,,) depth parentThen values) rest -> case values of {
@@ -620,7 +637,7 @@ module Bootstrap.SourceInference where {
           Wire.VText text -> case chargeText text next of {
             Nothing -> Nothing; Just available -> visit tail left available nested
           };
-          Wire.VNode tag children -> if stored && tag == 86 then case applicationGeometry children chargeText nodes work of {
+          Wire.VNode tag children -> if stored && tag == 86 then case applicationGeometryUsing spines children chargeText nodes work of {
             Just ((,,) height size cost) -> if height > maxDepth - depth + 1 then Nothing
               else visit tail (nodes - size) (work - cost) nested;
             Nothing -> Nothing
@@ -1803,12 +1820,14 @@ module Bootstrap.SourceInference where {
   -- Open fragments use the explicit geometry stack only to prove identity.
   -- A possible proof edit still goes through the graph finalizer. The local
   -- proof editor for standalone source objects retains its shallow bound.
-  canonicalOpen object = let {
-    geometry = finalTreeGeometry (Wire.maxDepth Wire.defaultLimits);
+  canonicalOpen = canonicalOpenUsing False Open.storageValue;
+  canonicalCheckedOpen = canonicalOpenUsing True Open.checkedStorageValue;
+  canonicalOpenUsing spines storage object = let {
+    geometry = finalTreeGeometryUsing spines (Wire.maxDepth Wire.defaultLimits);
     ordinary = case geometry False (Open.bodyValue object) of {
       Just False -> Right object; _ -> canonicalOpenPlanned object
     }
-  } in case Open.storageValue object of {
+  } in case storage object of {
     Nothing -> ordinary;
     Just stored -> case geometry True stored of { Just False -> Right object; _ -> ordinary }
   };
@@ -1905,7 +1924,7 @@ module Bootstrap.SourceInference where {
             ensure (case Open.bindings final of {
               [(,) actual actualType] -> X.equalName actual binder && Type.alphaEq actualType result;
               _ -> False }) "checked evidence adapter type mismatch";
-            canonical <- canonicalOpen final;
+            canonical <- canonicalCheckedOpen final;
             Right (OpenFinalGroup (AdaptedBody canonical) [(,) owner (SourceContract result [] False)])
           } }
       }

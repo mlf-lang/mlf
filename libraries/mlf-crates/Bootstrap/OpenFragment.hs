@@ -4,7 +4,7 @@
              MultiParamTypeClasses, OverloadedStrings #-}
 module Bootstrap.OpenFragment
   (Environment, environment, declarations, dataEnvironment, Fragment, check, fromChecked,
-   parameters, body, bodyValue, storageValue, bindings, usedParameters, context, fingerprint,
+   parameters, body, bodyValue, storageValue, checkedStorageValue, bindings, usedParameters, context, fingerprint,
    normalize, withNameHints, encodeBody, encodeRaw, encodeCheckedRaw, decodeTrusted, decodeTrustedIds, audit, closedTerm, fresh, linkBody,
    Package, makePackage, makeCheckedPackage, readPackage, readPackageProfiled, packageFragments, packageBytes,
    packageHash, packageMetadata, packageFamily, declarationValue, compatibilityIdentity,
@@ -68,15 +68,17 @@ module Bootstrap.OpenFragment
   data LinkView = LinkPattern Structure.TermPattern | LinkLambda LinkView |
     LinkLet (Maybe LinkView) (Maybe LinkView);
   data Fragment = Fragment Environment ([] ((,) XName XType)) XTerm
-    ([] ((,) XName XType)) ([] XName) String W.Value (Maybe StoredTerm) (Maybe LinkView);
+    ([] ((,) XName XType)) ([] XName) String W.Value (Maybe StoredTerm) (Maybe StoredTerm) (Maybe LinkView);
   fragmentWith env ps term bs used saved =
-    let { raw = Structure.toXTerm term } in Fragment env ps term bs used saved raw (compactTerm term) Nothing;
-  context (Fragment env _ _ _ _ _ _ _ _) = env;
-  parameters (Fragment _ ps _ _ _ _ _ _ _) = ps;
-  body (Fragment _ _ term _ _ _ _ _ _) = term;
-  bodyValue (Fragment _ _ _ _ _ _ value _ _) = value;
-  fragmentStorage (Fragment _ _ _ _ _ _ _ stored _) = stored;
-  fragmentLinkView (Fragment _ _ _ _ _ _ _ _ view) = view;
+    let { raw = Structure.toXTerm term } in Fragment env ps term bs used saved raw (compactTerm term) (compactTermWith spinePattern term) Nothing;
+  context (Fragment env _ _ _ _ _ _ _ _ _) = env;
+  parameters (Fragment _ ps _ _ _ _ _ _ _ _) = ps;
+  body (Fragment _ _ term _ _ _ _ _ _ _) = term;
+  bodyValue (Fragment _ _ _ _ _ _ value _ _ _) = value;
+  fragmentStorage (Fragment _ _ _ _ _ _ _ stored _ _) = stored;
+  fragmentLinkView (Fragment _ _ _ _ _ _ _ _ _ view) = view;
+  fragmentSpineStorage (Fragment _ _ _ _ _ _ _ _ stored _) = stored;
+  checkedStorageValue fragment = mapOptional snd (selectedStorage True fragment);
   storageValue fragment = mapOptional storedWire (fragmentStorage fragment);
   -- Rows retain variables, ground variable instantiations, primitives, literal
   -- slots and applications of two earlier rows. Literal slots consume the
@@ -267,9 +269,9 @@ module Bootstrap.OpenFragment
     XWithData ds b -> node 84 [still (Structure.toList Structure.toDataDecl ds),child b];
     _ -> Nothing
   };
-  bindings (Fragment _ _ _ bs _ _ _ _ _) = bs;
-  usedParameters (Fragment _ _ _ _ used _ _ _ _) = used;
-  fingerprint (Fragment _ _ _ _ _ stamp _ _ _) = stamp;
+  bindings (Fragment _ _ _ bs _ _ _ _ _ _) = bs;
+  usedParameters (Fragment _ _ _ _ used _ _ _ _ _) = used;
+  fingerprint (Fragment _ _ _ _ _ stamp _ _ _ _) = stamp;
   -- The fingerprint frames each field with its Unicode scalar length. Hash
   -- successive pages of pretty-printer output while counting that length,
   -- then prepend the length with the same polynomial composition as pack.
@@ -458,7 +460,7 @@ module Bootstrap.OpenFragment
   checkedFragment env ps term bs used = let {
     views = termViews term;
     saved = stampEncoding env ps (snd views) bs
-  } in Fragment env ps term bs used saved (Structure.toXTerm term) (fst views) Nothing;
+  } in Fragment env ps term bs used saved (Structure.toXTerm term) (fst views) (compactTermWith spinePattern term) Nothing;
   stamp env ps term bs = stampEncoding env ps (termEncoding term) bs;
   stampEncoding env ps summary bs = Separate.encodingFingerprint (Separate.encodingPack
     [Separate.encodingText (Separate.pack (map (compose D.prettyDeclaration canonicalDeclaration) (declarations env))),
@@ -604,7 +606,7 @@ module Bootstrap.OpenFragment
   selectedStorage spines fragment = case fragmentStorage fragment of {
     Just stored -> Just ((,) (if hasGroundRows stored then 10 else 9) (storedWire stored));
     Nothing -> if not spines then Nothing else mapOptional (\stored -> (,) 11 (storedWire stored))
-      (compactTermWith spinePattern (body fragment))
+      (fragmentSpineStorage fragment)
   };
   encodeRaw = encodeRawWith False;
   encodeCheckedRaw = encodeRawWith True;
@@ -1131,8 +1133,8 @@ module Bootstrap.OpenFragment
           _ -> Nothing
         };
         withView = case fragment of {
-          Fragment env ps source bs used stamp raw stored _ ->
-            Fragment env ps source bs used stamp raw stored view
+          Fragment env ps source bs used stamp raw stored spines _ ->
+            Fragment env ps source bs used stamp raw stored spines view
         }
       } in seq view ((:) ((,) label withView) (attach rest tail));
       _ -> rows

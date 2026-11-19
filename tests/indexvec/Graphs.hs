@@ -1193,6 +1193,19 @@ applicationPatternChecks = do
   forM_ [-1,1,256,16384,maxBound] $ \count -> do
     invalid <- right (W.planGraph W.defaultLimits [spine count])
     unless (rejected (Structure.admitPatternsWith True True invalid logicalWork)) (fail "invalid repeated application count")
+  let chargeName text available = let size = H.v_stringUtf8Length text in
+          if size <= available then T.Just (available-size) else T.Nothing
+      compareGeometry bySpine d nodeBudget workBudget value = case
+          Source.finalGeometryUsing bySpine bySpine chargeName d [(1,False,[value])] nodeBudget workBudget False of
+            T.Nothing -> Nothing
+            T.Just flag -> Just flag
+      countNodes = 3 + 7 * 257
+      chargeWork = 3 + H.v_stringUtf8Length "end" + 257 * (7 + H.v_stringUtf8Length "C:λ")
+  forM_ [(260,countNodes,chargeWork),(259,countNodes,chargeWork),(260,countNodes-1,chargeWork),
+         (260,countNodes,chargeWork-1)] $ \(d,n,w) ->
+    check "repeated application finalization charges original depth, nodes and UTF-8 work"
+      (compareGeometry False d n w (Structure.toXTerm original))
+      (compareGeometry True d n w (spine 257))
   let checkedTree = T.XLet result (foldr (add . T.XIntTerm) (T.XIntTerm 0) terms) (T.XConstructor "()" [])
   checkedSpine <- right (Open.check env [] checkedTree)
   let wireRaw encode = encode (W.VNode 1 []) "raw" "checked" checkedSpine
