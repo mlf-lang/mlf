@@ -10,7 +10,7 @@ for source in old; do
   cp "$source/.mlf-build/shared-ghc/receipt.json" "evidence/$source-producer-receipt.json"
   cmp "$source/.mlf-build/shared-ghc/receipt.json" "evidence/$source-producer-receipt.json"
 done
-for lane in old_swap fast_only omit_only; do
+for lane in old_swap sham_only; do
   source="${lane}_generation"
   git worktree add --detach "$source" "$(git -C "$lane" rev-parse HEAD)"
   # Failure is anticipated but only the authenticated exact stale failure may proceed.

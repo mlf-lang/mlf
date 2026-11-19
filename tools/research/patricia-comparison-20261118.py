@@ -67,7 +67,7 @@ def load(path):
     m=types.ModuleType(path.stem);m.__file__=str(path);exec(compile(path.read_bytes(),str(path),'exec'),m.__dict__);return m
 def sha(p): return hashlib.sha256(p.read_bytes()).hexdigest()
 pins={'old':'d8325d909c249fd82d4ad6173d44d8818cc6f8bf','new':'ee495d5783fca3c26a3c0e659ebeac1bab76a37d'}
-factor_refs={'old': {'surface_blob': '3e8082684587d25915d7f209bbf74d32e7c3dcc7', 'builtin_source': 'builtin-source-v1:b54f095675c2c7bd91b804689ab3de3775c0461ab982dc24bfc8d08477d88b6f'}, 'fast_only': {'surface_blob': 'b781f419b82b91bbfed90aa5189107f0af6bf82d', 'builtin_source': 'builtin-source-v1:276ab74f565ea04cac324bbbf026a12c4ceda8316ac1c2e0f6c2efe2fc11ac82'}, 'omit_only': {'surface_blob': '0d50f8ae4713674ac7654c1a84cba0289ee6c57e', 'builtin_source': 'builtin-source-v1:47cef3a374d2075d43a2c707993baa62a3db760fa950a0ea0633afd8af0d3758'}, 'old_swap': {'surface_blob': 'a11262a585792e391d02e379e11e233af627fff0', 'builtin_source': 'builtin-source-v1:b43c5ddf9224142d296b984833de88528272e318f53fa6203614cd9576c7abae'}}
+factor_refs={'old': {'surface_blob': '3e8082684587d25915d7f209bbf74d32e7c3dcc7', 'builtin_source': 'builtin-source-v1:b54f095675c2c7bd91b804689ab3de3775c0461ab982dc24bfc8d08477d88b6f'}, 'old_swap': {'surface_blob': 'a11262a585792e391d02e379e11e233af627fff0', 'builtin_source': 'builtin-source-v1:b43c5ddf9224142d296b984833de88528272e318f53fa6203614cd9576c7abae'}, 'sham_only': {'surface_blob': '56b1cd213089c94b016b9ed35dc4966f1a604026', 'builtin_source': 'builtin-source-v1:357e6cc725163a80b1560ea4b7c5976038fd662875fec773fe200acfbab6756e'}}
 BASE={k:'old' for k in factor_refs}
 DONOR=set(BASE)-{'old'}
 surface='libraries/mlf-frontend/Bootstrap/Surface.hs'
@@ -165,6 +165,9 @@ for l,r in roots.items():
                 bx['Bootstrap.Surface']['sha256']=sha(r/surface)
             if bx!=vx:raise RuntimeError('hybrid admitted inputs mismatch '+l+' '+k)
         if set(receipt['object_inputs'])!=set(baseline['object_inputs']):raise RuntimeError('object membership mismatch')
+    if l=='sham_only':
+        parent_receipt=json.loads((roots['old']/'.mlf-build/shared-ghc/receipt.json').read_text())
+        record[l]['changed_object_paths_vs_parent']=[key for key,val in receipt['object_inputs'].items() if parent_receipt['object_inputs'][key]!=val]
     record[l]['git_head']=git(r,'rev-parse','HEAD')
 
     ex=r/'.mlf-build/shared-ghc/bin/emlf'
@@ -189,9 +192,16 @@ record['epoch_manifest_sha256']=frozen;save()
 helper=roots['old']/'tools/performance/a1-private-index/helper.py'
 assert subprocess.check_output(['git','hash-object',str(helper)],text=True).strip()=='1feffe5d9f360a8fbb9f27868985d4a1a97ab010'
 
-record['scope']='Parent-only 2x2 at 6GiB AS: original vs fast path only vs omit second desugarDo only vs both; each includes necessary verified generated literal. Threshold only.'
-record['schedule']=['old','old_swap','fast_only','omit_only']
+record['scope']='Parent-only comment sham at 6GiB AS. Old and full Surface+literal endpoints must reproduce first. Sham changes only the capitalization of ordinary comment text and the necessary generated literal. Only a threshold test for this exact variant.'
+record['schedule']=['old','old_swap','sham_only']
 record['factor_refs']=factor_refs
+raw_source=(roots['old']/surface).read_bytes(); sham_source=(roots['sham_only']/surface).read_bytes()
+before=b'  -- Independently lowered source and generated rows';after=b'  -- independently lowered source and generated rows'
+assert raw_source.count(before)==1 and raw_source.replace(before,after)==sham_source
+g=json.loads((OUT/'sham_only-generation-receipt.json').read_text())
+assert g['comparison']['identity_only'] and g['comparison']['length']==64
+record['sham_one_byte_offset']=next(i for i,(x,y) in enumerate(zip(raw_source,sham_source)) if x!=y)
+
 
 smoke=OUT/'SurfaceSmoke.hs';smoke.write_text('''-- mlf:syntax shared-haskell-v1
 {-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}
@@ -328,7 +338,7 @@ verify_all_locked_files()
 record['selected_family']=prebuild_lock['family']
 record['prebuild_lock_sha256']=digest_path(LOCK)
 record['final_full_toolchain_verified']=True
-record['complete']=len(record['legs'])==4 and all(x['accepted'] for x in record['legs'])
+record['complete']=len(record['legs'])==3 and all(x['accepted'] for x in record['legs'])
 save()
 
 if not record["complete"]:raise SystemExit("incomplete factorial comparison; see comparison.json")

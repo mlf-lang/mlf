@@ -1,7 +1,7 @@
 name: Bounded Patricia comparison
 on:
   push:
-    branches: [perf/patricia-surface-factor-20261119]
+    branches: [perf/patricia-surface-sham-20261119]
 permissions:
   contents: read
 concurrency:
@@ -9,7 +9,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   compare:
-    if: github.repository == 'mlf-lang/mlf' && github.ref == 'refs/heads/perf/patricia-surface-factor-20261119'
+    if: github.repository == 'mlf-lang/mlf' && github.ref == 'refs/heads/perf/patricia-surface-sham-20261119'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -17,7 +17,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Exact factorial Surface source worktrees
+      - name: Exact ordinary-comment sham source worktrees
         run: python3 -B tools/research/patricia-joint-generation.py prepare
       - name: Official pinned GHC
         timeout-minutes: 20
@@ -40,7 +40,7 @@ jobs:
           set -euo pipefail
           mkdir -p evidence
           python3 -B tools/shared/crc_process_supervisor.py --receipt evidence/all-builds-supervisor.json --work-seconds 1800 --cleanup-seconds 10 "$(command -v bash)" tools/research/patricia-surface-builds.sh
-      - name: Native endpoints then isolated Surface factors at 6 GiB
+      - name: Native endpoints then comment-only sham at 6 GiB
         run: python3 -B tools/shared/crc_process_supervisor.py --receipt evidence/comparison-supervisor.json --work-seconds 1800 --cleanup-seconds 10 "$(command -v python3)" -B tools/research/patricia-comparison-20261118.py
       - name: Copy verifier receipts and raw outputs to visible evidence
         if: always()
