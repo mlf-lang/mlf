@@ -292,6 +292,17 @@ resolverChecks = do
       right (T.Right value) = pure value
       right (T.Left msg) = error (H.unpack msg)
       mangle e = H.literal (H.unpack (Modules.owner e) ++ "." ++ H.unpack (Modules.spelling e))
+  let constructor = Modules.Entity "A" "C" (Modules.Constructor "Tree")
+      names = Modules.resolveNames (Modules.Names (M.singleton constructor "Tree.C"))
+      env = Modules.interface [constructor]
+      scopes = S.singleton "C"
+      term = T.SApp (T.SConstructor "C") (T.SApp (T.SVar "C") (T.SConstructor "C"))
+  resolved <- right (Modules.resolveBound names env scopes term)
+  case resolved of
+    R.App (R.Constructor first) (R.App (R.Local variable) (R.Constructor lastName)) ->
+      check "constructor lookup preserves a same-spelled local in an application"
+        ["Tree.C","C","Tree.C"] (map H.unpack [first,variable,lastName])
+    _ -> error "incorrect constructor or local resolution"
   mods <- mapM parsed [("A","module A where\nvalue = 1\n"),("B","module B where\nvalue = 2\n"),
     ("Via","module Via (module A) where\nimport A\n"),
     ("Main",unlines ["module Main where","import qualified A as First","import qualified B as Second",

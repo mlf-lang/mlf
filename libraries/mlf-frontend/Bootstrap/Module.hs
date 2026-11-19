@@ -1245,32 +1245,40 @@ module Bootstrap.Module where {
     SQualified predicates body -> any (\(SPredicate name _) -> eqString name "MLFHasCallStack") predicates || managedAnnotationType body;
     _ -> False
   };
-  -- Application operands share a lexical environment. Keep the resolved
-  -- values of repeated variable spellings until a binder starts a new region.
-  -- Resolve each first occurrence through the ordinary variable policy.
-  resolveApplication child function argument = let {
-    term cache value = case value of {
+  -- All operands in an application share a lexical environment. The
+  -- ordinary resolver admits constructor spellings as well as variables.
+  -- Keep their namespaces separate, and start fresh under every binder.
+  resolveApplication = resolveApplicationIn Nothing;
+  resolveApplicationIn constructorNames child function argument = let {
+    term cache@((,) variables constructors) value = let {
+      ordinary = mapEither (\resolved -> (,) resolved cache) (child value);
+      remember name table replace = case M.lookup compareString name table of {
+        Just resolved -> Right ((,) resolved cache);
+        Nothing -> do {
+          resolved <- child value;
+          let { next = if M.size table < 64 then replace (M.insert compareString name resolved table) else cache };
+          Right ((,) resolved next)
+        }
+      }
+    } in case value of {
       SApp f a -> both cache f a;
       SCallSite display loc b -> do {
         (,) body next <- term cache b;
         Right ((,) (resolvedCallSite display loc body) next)
       };
-      SVar n -> case M.lookup compareString n cache of {
-        Just resolved -> Right ((,) resolved cache);
-        Nothing -> do {
-          resolved <- child value;
-          let { next = if M.size cache < 64 then M.insert compareString n resolved cache else cache };
-          Right ((,) resolved next)
-        }
+      SVar n -> remember n variables (\names -> (,) names constructors);
+      SConstructor n -> case constructors of {
+        Just names -> remember n names (\next -> (,) variables (Just next));
+        Nothing -> ordinary
       };
-      _ -> mapEither (\resolved -> (,) resolved cache) (child value)
+      _ -> ordinary
     };
     both cache f a = do {
       (,) left afterFunction <- term cache f;
       (,) right afterArgument <- term afterFunction a;
       Right ((,) (R.App left right) afterArgument)
     }
-  } in mapEither fst (both M.empty function argument);
+  } in mapEither fst (both ((,) M.empty constructorNames) function argument);
   resolvedCallSite display loc value =
     if eqString display "an expression type signature" && not (managedResolved value)
     then value else R.CallSite display loc value;
@@ -1301,7 +1309,7 @@ module Bootstrap.Module where {
       ty <- resolveOptionalAnnotation bindings env a;
       mapEither (R.Lam n ty) (walk (Set.insert compareString n bound) b)
     };
-    SApp a b -> resolveApplication child a b;
+    SApp a b -> resolveApplicationIn (Just M.empty) child a b;
     SLet n a b -> do { v <- child a; mapEither (R.Let n v) (walk (Set.insert compareString n bound) b) };
     SAnn a t -> do { v <- child a; mapEither (R.Ann v) (resolveAnnotation bindings env t) };
     SSignature a t -> do { v <- child a; mapEither (R.Signature v) (resolveAnnotation bindings env t) };
