@@ -20,6 +20,7 @@ module Bootstrap.InferenceUnit where {
   import qualified Bootstrap.X.Type as T;
   import qualified Bootstrap.X.Syntax as X;
   import qualified Bootstrap.X.Checked as Checked;
+  import qualified Bootstrap.X.Check as Check;
   import qualified Bootstrap.OpenFragment as Open;
   import qualified Bootstrap.X.Pretty as Pretty;
   -- Class translation is a crate query, before the value dependency graph is
@@ -580,7 +581,20 @@ module Bootstrap.InferenceUnit where {
       Right ((,,) (GroundVariable name ty arguments) actual next)
     }
   };
-  groundPrimitive state primitive = case Primitive.primitiveSignature primitive of { (,) variables signature -> do {
+  -- A closed primitive does not consume the group's type-variable supply.
+  -- Its signature and its sealed term depend only on the primitive ABI.
+  closedGroundPrimitive primitive = do {
+    ty <- Check.closedPrimitiveType primitive;
+    actual <- groundType M.empty ty;
+    Right ((,) (GroundLiteral (XPrimitive primitive [])) actual)
+  };
+  closedGroundPrimitives :: IntMap (Either String ((,) GroundTerm GroundType));
+  closedGroundPrimitives = IM.fromList (map (\p -> (,) (Primitive.primitiveCode p)
+    (closedGroundPrimitive p)) Primitive.allPrimitives);
+  groundPrimitive state primitive = case Primitive.primitiveSignature primitive of {
+    (,) [] _ -> mapEither (\((,) term ty) -> (,,) term ty state)
+      (IM.findWithDefault (closedGroundPrimitive primitive) (Primitive.primitiveCode primitive) closedGroundPrimitives);
+    (,) variables signature -> do {
     ensure (all (\((,) _ kind) -> case kind of { Star -> True; _ -> False }) variables)
       "higher-kinded primitive requires general inference";
     let { entries = zip (map fst variables) (map XTyVar (range 0 (length variables - 1))) };
