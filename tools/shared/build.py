@@ -33,10 +33,14 @@ BUILTIN_VERIFICATION_HELPERS = ('tools/shared/builtin_prelude_identity.py',
                                 'tools/shared/verify_builtin_prelude.py')
 
 
-def executable_link_flags(name):
+def executable_link_flags(name, optimization):
     # The compiler's larger nursery reduces copying of short-lived syntax trees.
     if name == 'emlf':
-        return [*LINK_FLAGS, '-with-rtsopts=-F4 -A48m']
+        flags = [*LINK_FLAGS, '-with-rtsopts=-F4 -A48m']
+        # Each cold build hashes the compiler image for its cache identity.
+        if sys.platform == 'darwin' and optimization == '2':
+            flags.append('-optl-Wl,-x,-exported_symbol,_main')
+        return flags
     if name == 'mlfpkg':
         return [*LINK_FLAGS, '-with-rtsopts=-F4']
     return list(LINK_FLAGS)
@@ -182,7 +186,7 @@ def load_manifest():
         if not re.search(r'^import qualified ' + re.escape(item['module']) + r' as Entry$', text, re.M) or not re.search(
                 r'^main = runEntry Entry\.main$', text, re.M):
             raise RuntimeError('wrapper does not select the declared shared entry: ' + item['name'])
-        if any(flag not in stanza for flag in [*DEMAND_FLAGS, *executable_link_flags(item['name'])]):
+        if any(flag not in stanza for flag in [*DEMAND_FLAGS, *executable_link_flags(item['name'], '2')]):
             raise RuntimeError('Cabal executable is missing contract flags: ' + item['name'])
     host_files = {'host/ghc/MLF/Primitive.hs', 'host/ghc/MLF/Host/Base.hs', 'host/ghc/MLF/Host/IO.hs',
                   'host/ghc/MLF/Host/Async.hs', 'host/ghc/cbits/host.c', 'runtime/mlf_process_supervisor.c'}
@@ -702,7 +706,8 @@ def main():
             destination = output / 'bin' / item['name']
             for suffix in ['.o', '.hi']:
                 (output / 'objects' / ('Main' + suffix)).unlink(missing_ok=True)
-            run([ghc, '--make', '-j1', *flags, *executable_link_flags(item['name']), ROOT / item['wrapper'], *c_objects, '-o', destination], 'link-' + item['name'])
+            link_flags = executable_link_flags(item['name'], options.optimization)
+            run([ghc, '--make', '-j1', *flags, *link_flags, ROOT / item['wrapper'], *c_objects, '-o', destination], 'link-' + item['name'])
             receipt['outputs'][item['name']] = identified(destination)
         emlf = output / 'bin/emlf'
         run([emlf, '--check-shared', *[ROOT / item['path'] for item in manifest['modules']]], 'shared-profile')
