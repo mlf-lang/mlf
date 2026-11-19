@@ -546,9 +546,24 @@ module Bootstrap.InferenceUnit where {
     (,) (XForall v bound body) ((:) ((,) expected variable) rest) -> do {
       ensure (T.tyVarId v == T.tyVarId expected) "ground quantifier identity changed";
       argument <- groundClosed state variable;
-      first <- groundClosedProof bound argument;
-      later <- groundEvidence state (T.substitute v argument body) rest;
-      Right (X.compose (X.compose (case first of { XRefl -> XRefl; _ -> XInner first }) XElim) later)
+      let { general = do {
+        first <- groundClosedProof bound argument;
+        later <- groundEvidence state (T.substitute v argument body) rest;
+        Right (X.compose (X.compose (case first of { XRefl -> XRefl; _ -> XInner first }) XElim) later)
+      } };
+      -- A closed ground type cannot be bottom. With a single bottom-bounded
+      -- quantifier and an arrow body, substitution leaves the outer arrow
+      -- intact and the remaining evidence is reflexive.
+      case bound of {
+        XBot -> case body of {
+          XArrow _ _ -> case rest of {
+            [] -> Right (XThen (XInner (XBottom argument)) XElim);
+            _ -> general
+          };
+          _ -> general
+        };
+        _ -> general
+      }
     };
     (,) _ [] -> Right XRefl;
     _ -> Left "ground quantifier inventory changed"
