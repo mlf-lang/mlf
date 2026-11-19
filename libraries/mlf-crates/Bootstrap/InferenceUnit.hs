@@ -569,9 +569,24 @@ module Bootstrap.InferenceUnit where {
     SApp f a -> do {
       (,,) function functionType next <- groundInfer globals names state f;
       (,,) argument argumentType following <- groundInfer globals names next a;
-      let { allocated = groundFresh following; result = fst allocated; fresh = snd allocated };
-      solved <- groundUnify fresh functionType (GroundArrow argumentType result);
-      Right ((,,) (GroundApplication function argument) result solved)
+      let {
+        allocated = groundFresh following;
+        fresh = snd allocated;
+        applied = GroundApplication function argument
+      };
+      case groundDeref following functionType of {
+        GroundArrow domain result -> do {
+          -- The result already belongs to this type. Preserve the identity
+          -- supply but avoid storing an alias for a new result variable.
+          solved <- groundUnify fresh domain argumentType;
+          Right ((,,) applied result solved)
+        };
+        unknown -> do {
+          let { result = fst allocated };
+          solved <- groundUnify fresh unknown (GroundArrow argumentType result);
+          Right ((,,) applied result solved)
+        }
+      }
     };
     SPrimitive primitive -> groundPrimitive state primitive;
     SIntLit n -> Right ((,,) (GroundLiteral (XIntTerm n)) (GroundCon "Int" []) state);
