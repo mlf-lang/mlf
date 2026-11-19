@@ -1172,6 +1172,27 @@ applicationPatternChecks = do
   forM_ malformed $ \raw -> do
     graph <- right (W.planGraph W.defaultLimits [raw])
     unless (rejected (Structure.storedTerm graph (head (W.graphRoots graph)))) (fail "malformed application pattern")
+  let ctor = T.XConstructor "C:λ" []
+      stop = T.XConstructor "end" []
+      repeatRow n = W.VNode 88 [W.VInt 2,W.VInt 3,W.VInt n]
+      spine n = pattern [hole,Structure.toXTerm ctor,join 1 0,Structure.toXTerm stop,repeatRow n] [run 257] 4
+      terms = take 257 (iterate (+1) maxBound)
+      original = foldr (\n t -> T.XApp (T.XApp ctor (T.XIntTerm n)) t) stop terms
+  graph11 <- right (W.planGraph W.defaultLimits [spine 257])
+  raw11 <- right (W.planGraph W.defaultLimits [Structure.toXTerm original])
+  logicalWork <- right (W.graphExpandedWork raw11)
+  (spinePlans,charged) <- right (Structure.admitPatternsWith True True graph11 logicalWork)
+  check "count each constructor, UTF-8 name and signed slot" logicalWork charged
+  unless (rejected (Structure.admitPatternsFor True graph11 logicalWork)) (fail "older schema admitted a repeated head")
+  unless (rejected (Structure.admitPatternsWith True True graph11 (logicalWork-1))) (fail "undercharged repeated head")
+  [restored11] <- right (Structure.decodeStoredManyWith spinePlans graph11 (W.graphRoots graph11))
+  restoredBody <- right (Structure.expectXTerm restored11)
+  expectedBytes <- encoded (W.encode W.defaultLimits 8 [Structure.toXTerm original])
+  restoredBytes <- encoded (W.encode W.defaultLimits 8 [Structure.toXTerm restoredBody])
+  check "source order and signed wrapping in repeated application heads" expectedBytes restoredBytes
+  forM_ [-1,1,256,16384,maxBound] $ \count -> do
+    invalid <- right (W.planGraph W.defaultLimits [spine count])
+    unless (rejected (Structure.admitPatternsWith True True invalid logicalWork)) (fail "invalid repeated application count")
   -- A type argument is part of the literal template's identity. Count both
   -- UTF-8 strings and all nodes of its original, fully explicit evidence.
   let unary v t = T.XTypeApp (T.XVarTerm v) (T.XThen (T.XInner (T.XBottom t)) T.XElim)

@@ -3939,7 +3939,7 @@ module Bootstrap.CrateArtifact where {
     compatibility <- Open.compatibilityIdentity;
     case do { digest <- metadata; identity <- compatibility; Right ((,) digest identity) } of {
     Left e -> ioReturn (Left e); Right ((,) ((,) digest receipt) compiler) -> do {
-      packed <- Open.makePackage compiler digest fragments;
+      packed <- Open.makeCheckedPackage compiler digest fragments;
       ioReturn (do {
         package <- packed;
         retained <- Open.withMetadataReceipt receipt package;

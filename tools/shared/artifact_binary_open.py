@@ -87,7 +87,8 @@ def decoded(raw, schema, family=None):
 OPEN_ROOT_WORK = 64 * 1024**2
 OPEN_PACKAGE_WORK = 256 * 1024**2
 OPEN_FORMATS = {7: 'MLF-OPEN-CRATE-1/checker-1', 8: 'MLF-OPEN-CRATE-2/checker-1',
-                9: 'MLF-OPEN-CRATE-3/checker-1', 10: 'MLF-OPEN-CRATE-4/checker-1'}
+                9: 'MLF-OPEN-CRATE-3/checker-1', 10: 'MLF-OPEN-CRATE-4/checker-1',
+                11: 'MLF-OPEN-CRATE-5/checker-1'}
 
 
 def _pattern_fields(value, tag):
@@ -109,7 +110,14 @@ class ApplicationPattern:
     work: int
 
 
-def _read_application_pattern(children, allow_ground=False):
+@dataclass(frozen=True)
+class ApplicationRepeat:
+    left: int
+    right: int
+    count: int
+
+
+def _read_application_pattern(children, allow_ground=False, allow_spines=False):
     require(len(children) == 3, 'application pattern header')
     table = _pattern_fields(children[0], 1)
     root = _pattern_integer(children[2])
@@ -121,13 +129,25 @@ def _read_application_pattern(children, allow_ground=False):
         require(entry[0] == 'node', 'application pattern entry')
         if entry[1] == 88:
             refs = _pattern_fields(entry, 88)
-            require(len(refs) == 2, 'application pattern arity')
-            left, right = map(_pattern_integer, refs)
+            require(len(refs) == 2 or (allow_spines and len(refs) == 3), 'application pattern arity')
+            left, right = map(_pattern_integer, refs[:2])
             require(0 <= left < index and 0 <= right < index, 'application pattern forward reference')
             ld, lw, ln = geometry[left]
             rd, rw, rn = geometry[right]
-            metrics = 1 + max(ld, rd), 1 + lw + rw, ln + rn
-            value = (left, right)
+            if len(refs) == 3:
+                count = _pattern_integer(refs[2])
+                require(2 <= count <= Limits().depth - max(ld, rd), 'application pattern repetition depth')
+                value = ApplicationRepeat(left, right, count)
+            else:
+                count = 1
+                value = (left, right)
+            metrics = count + max(ld, rd), count * (1 + lw) + rw, count * ln + rn
+        elif allow_spines and entry[1] == 82:
+            args = _pattern_fields(entry, 82)
+            require(len(args) == 2 and args[0][0] == 'text' and args[1] == ('node', 1, ()),
+                    'application pattern constructor arguments')
+            metrics = 2, 3 + len(args[0][1].encode('utf-8')), 0
+            value = entry
         elif entry[1] == 85:
             require(allow_ground, 'application pattern atom version')
             args = _pattern_fields(entry, 85)
@@ -154,7 +174,7 @@ def _read_application_pattern(children, allow_ground=False):
             metrics = 3, 4, 0
             value = entry
         depth, work, slots = metrics
-        require(depth <= 130 and work <= 4194304 and slots <= 1048576, 'application pattern resource bound')
+        require(depth <= (Limits().depth if allow_spines else 130) and work <= 4194304 and slots <= 1048576, 'application pattern resource bound')
         require(value not in keys, 'duplicate application pattern entry')
         keys.add(value)
         shapes.append(value)
@@ -166,7 +186,10 @@ def _read_application_pattern(children, allow_ground=False):
         if index in seen:
             return
         entry = shapes[index]
-        if len(entry) == 2:
+        if isinstance(entry, ApplicationRepeat):
+            visit(entry.left)
+            visit(entry.right)
+        elif len(entry) == 2:
             visit(entry[0])
             visit(entry[1])
         require(index == len(seen), 'application pattern first-use order')
@@ -204,6 +227,12 @@ def _restore_application_pattern(pattern):
         entry = pattern.entries[index]
         if entry is None:
             return ('node', 77, (('int', next(literals)),))
+        if isinstance(entry, ApplicationRepeat):
+            heads = [walk(entry.left) for _ in range(entry.count)]
+            tail = walk(entry.right)
+            for head in reversed(heads):
+                tail = ('node', 72, (head, tail))
+            return tail
         if len(entry) == 2:
             return ('node', 72, (walk(entry[0]), walk(entry[1])))
         return entry
@@ -213,7 +242,7 @@ def _restore_application_pattern(pattern):
     return value
 
 
-def expand_application_document(document, aggregate, allow_ground=False):
+def expand_application_document(document, aggregate, allow_ground=False, allow_spines=False):
     """Check aggregate expanded work before allocating reconstructed terms."""
     limits = Limits()
     geometry, patterns, wire = [], {}, []
@@ -224,7 +253,7 @@ def expand_application_document(document, aggregate, allow_ground=False):
             tag, refs = n.data
             raw = ('node', tag, tuple(wire[i] for i in refs))
             if tag == 86:
-                template = _read_application_pattern(raw[2], allow_ground)
+                template = _read_application_pattern(raw[2], allow_ground, allow_spines)
                 patterns[index] = template
                 depth, work = template.depth, template.work
                 budget -= work
@@ -263,15 +292,16 @@ def checked_open_document(raw):
     require(schema in OPEN_FORMATS, 'unsupported open schema')
     limits = Limits() if schema == 7 else Limits(work=OPEN_PACKAGE_WORK)
     document = read_document(raw, schema, limits)
-    if schema in (8, 9, 10):
+    if schema in (8, 9, 10, 11):
         require(all(work <= OPEN_ROOT_WORK for work in document.expanded_work),
                 'open per-root expanded work cap')
     values = document.values()
     require(tree_document(values, schema) == raw, 'canonical whole open binary bytes')
     logical_work = 0
-    if schema in (9, 10):
+    if schema in (9, 10, 11):
         physical_work = sum(document.expanded_work[i] for i in document.roots)
-        values, logical_work = expand_application_document(document, OPEN_PACKAGE_WORK - physical_work, allow_ground=schema == 10)
+        values, logical_work = expand_application_document(
+            document, OPEN_PACKAGE_WORK - physical_work, allow_ground=schema >= 10, allow_spines=schema == 11)
     if schema == 7:
         require(len(values) == 1, 'exactly one schema7 open root')
         opened = fields(values[0], 430, 6)
@@ -324,7 +354,7 @@ def syntax_equal(left, right):
 def compare_retained_audit(original, audited, dependency_interfaces):
     before = inspect_pair(original, dependency_interfaces)
     after = inspect_pair(audited, dependency_interfaces)
-    require(after['schema'] in (8, 9, 10), 'retained audit writer must emit a current open schema')
+    require(after['schema'] in (8, 9, 10, 11), 'retained audit writer must emit a current open schema')
     left = fields(before['interface'], 242, 13)
     right = fields(after['interface'], 242, 13)
     require(all(syntax_equal(left[i], right[i]) for i in range(13) if i != 11),
@@ -596,7 +626,7 @@ def _inspect_pair(pair, dependency_interfaces):
             key = text(key)
             require(key in available, label + ' reference out of scope')
             value = encode(available[key])
-            if schema in (8, 9, 10):
+            if schema in (8, 9, 10, 11):
                 raw = tree_document([value], 6)
                 hashed = read_document(raw, 6)
                 used = sum(hashed.expanded_work[index] for index in hashed.roots)
@@ -650,8 +680,8 @@ def _inspect_pair(pair, dependency_interfaces):
                         'dependencies': [tuple(text(x) for x in fields(row, 3, 3)) for row in items(header[1])],
                         'modules': [text(value) for value in items(header[2])], 'entry': text(header[10])},
             'accounting': {'schema': schema, 'wire_expanded_work': wire_work,
-                           'reference_hash_expanded_work': reference_work if schema in (8, 9, 10) else None,
-                           'combined_expanded_work': wire_work + reference_work if schema in (8, 9, 10) else None,
+                           'reference_hash_expanded_work': reference_work if schema in (8, 9, 10, 11) else None,
+                           'combined_expanded_work': wire_work + reference_work if schema in (8, 9, 10, 11) else None,
                            'fragment_count': len(fragments), 'binding_references': len(binding_refs),
                            'datatype_references': len(data_refs),
                            'metadata_sha256': hashlib.sha256(pair[0]).hexdigest(),

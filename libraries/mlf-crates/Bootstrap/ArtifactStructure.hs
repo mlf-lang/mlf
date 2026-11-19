@@ -1033,7 +1033,7 @@ module Bootstrap.ArtifactStructure where {
     (:) index rest -> if remaining <= 0 then Left "binary typed list count limit exceeded"
       else graphInputs (remaining - 1) graph rest ((:) (GraphInput graph index) acc)
   };
-  data PatternNode = PatternHole | PatternAtom XTerm | PatternJoin Int Int;
+  data PatternNode = PatternHole | PatternAtom XTerm | PatternJoin Int Int | PatternRepeat Int Int Int;
   data PatternRow = PatternRow PatternNode Int Int Int;
   data PatternRun = PatternRun Int Int Int;
   data TermPattern = TermPattern (IntMap PatternRow) Int ([] PatternRun) Int Int;
@@ -1057,7 +1057,8 @@ module Bootstrap.ArtifactStructure where {
     node <- patternNode graph index;
     case node of { W.GText value -> Right value; _ -> malformed "application pattern text" }
   };
-  patternPlan allowGround graph indices = case indices of {
+  patternPlan allowGround = patternPlanWith allowGround False;
+  patternPlanWith allowGround spines graph indices = case indices of {
     [table,stream,rootIndex] -> do {
       entries <- patternList graph table 512;
       root <- patternInt graph rootIndex;
@@ -1077,9 +1078,31 @@ module Bootstrap.ArtifactStructure where {
               case (,) (IM.lookup left prior) (IM.lookup right prior) of {
                 (,) (Just (PatternRow _ ld lw ln)) (Just (PatternRow _ rd rw rn)) -> let {
                   dep = 1 + S.max ld rd; work = 1 + lw + rw; count = ln + rn
-                } in if dep > 130 || work > 4194304 || count > 1048576 then malformed "application pattern resource limit"
+                } in if dep > (if spines then W.maxDepth W.defaultLimits else 130) || work > 4194304 || count > 1048576 then malformed "application pattern resource limit"
                   else seq dep (seq work (seq count (Right (PatternRow (PatternJoin left right) dep work count))));
                 _ -> malformed "application pattern forward reference"
+              }
+            };
+            W.GNode 88 [l,r,n] -> if S.not spines then malformed "application pattern atom" else do {
+              left <- patternInt graph l; right <- patternInt graph r; amount <- patternInt graph n;
+              case (,) (IM.lookup left prior) (IM.lookup right prior) of {
+                (,) (Just (PatternRow _ ld lw ln)) (Just (PatternRow _ rd rw rn)) -> do {
+                  S.ensure (amount >= 2 && amount <= W.maxDepth W.defaultLimits - S.max ld rd &&
+                    amount <= (4194304 - rw) / (1 + lw) &&
+                    (ln == 0 || amount <= (1048576 - rn) / ln)) "application pattern resource limit";
+                  let { deep = amount + S.max ld rd; work = rw + amount * (1 + lw); holes = rn + amount * ln };
+                  seq deep (seq work (seq holes (Right (PatternRow (PatternRepeat left right amount) deep work holes))))
+                };
+                _ -> malformed "application pattern forward reference"
+              }
+            };
+            W.GNode 82 [n,ts] -> if S.not spines || ordinal == 0 then malformed "application pattern atom" else do {
+              name <- patternText graph n; arguments <- patternNode graph ts;
+              case arguments of {
+                W.GNode 1 [] -> let { work = 3 + stringUtf8Length name } in
+                  if work > 4194304 then malformed "application pattern name too large"
+                  else Right (PatternRow (PatternAtom (XConstructor name [])) 2 work 0);
+                _ -> malformed "application pattern constructor arguments"
               }
             };
             W.GNode 85 [n,h,t] -> if S.not allowGround || ordinal == 0 then malformed "application pattern atom" else do {
@@ -1126,11 +1149,13 @@ module Bootstrap.ArtifactStructure where {
       index <- rows entries 0 IM.empty;
       let {
         visit i next seen = if IS.member i seen then Right ((,) next seen) else do {
+          let { pair left right = do {
+            (,) n visited <- visit left next seen;
+            visit right n visited
+          } };
           children <- case IM.get i index of {
-            PatternRow (PatternJoin left right) _ _ _ -> do {
-              (,) n visited <- visit left next seen;
-              visit right n visited
-            };
+            PatternRow (PatternJoin left right) _ _ _ -> pair left right;
+            PatternRow (PatternRepeat left right _) _ _ _ -> pair left right;
             _ -> Right ((,) next seen)
           };
           case children of { (,) n visited -> do {
@@ -1166,7 +1191,16 @@ module Bootstrap.ArtifactStructure where {
         (,) f rest <- term left runs;
         (,) arg next <- term right rest;
         Right ((,) (XApp f arg) next)
-      }
+      };
+      PatternRow (PatternRepeat left right amount) _ _ _ -> let {
+        collect n input heads = if n == 0 then do {
+          (,) tail remaining <- term right input;
+          Right ((,) (S.foldlStrict (\body head -> XApp head body) tail heads) remaining)
+        } else do {
+          (,) head more <- term left input;
+          collect (n - 1) more ((:) head heads)
+        }
+      } in collect amount runs []
     }
   } in do {
     (,) result rest <- term root input;
@@ -1175,7 +1209,8 @@ module Bootstrap.ArtifactStructure where {
   -- Add each child occurrence, even when its ordinal was seen before.
   -- Validate all expanded roots before constructing any term from a template.
   admitPatterns = admitPatternsFor False;
-  admitPatternsFor allowGround graph aggregate = let {
+  admitPatternsFor allowGround = admitPatternsWith allowGround False;
+  admitPatternsWith allowGround spines graph aggregate = let {
     limits = W.defaultLimits;
     cap = W.maxExpandedWork limits;
     addChildren ids seen deep work = case ids of {
@@ -1207,7 +1242,7 @@ module Bootstrap.ArtifactStructure where {
       };
       case node of {
         W.GNode 86 fields -> do {
-          plan <- patternPlan allowGround graph fields;
+          plan <- patternPlanWith allowGround spines graph fields;
           case plan of { TermPattern _ _ _ depth work ->
             if work > budget then malformed "application pattern allocation limit"
             else finish depth work (IM.insert i plan plans) (budget - work)

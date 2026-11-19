@@ -156,6 +156,38 @@ class ModularControls(unittest.TestCase):
             with self.subTest(count=count, root=root), self.assertRaises(ValueError):
                 O.expand_application_document(document(entries, count, root), 1000)
 
+    def test_repeated_application_heads_preserve_order_and_logical_limits(self):
+        import artifact_binary_open as O
+        from artifact_binary_reference import read_document, tree_document
+        integer = lambda value: ('int', value)
+        ctor = O.node(82, ('text', 'C:λ'), O.sequence([]))
+        last = O.node(82, ('text', 'end'), O.sequence([]))
+        tables = [O.node(87), ctor, O.node(88, integer(1), integer(0)), last]
+
+        def graph(count):
+            repeat = O.node(88, integer(2), integer(3), integer(count))
+            run = O.node(89, integer(2**63 - 1), integer(1), integer(257))
+            pattern = O.node(86, O.sequence([*tables, repeat]), O.sequence([run]), integer(4))
+            return read_document(tree_document([pattern, pattern], 11), 11)
+
+        expected = last
+        for i in reversed(range(257)):
+            value = (2**63 - 1 + i + 2**63) % 2**64 - 2**63
+            expected = O.node(72, O.node(72, ctor, O.node(77, integer(value))), expected)
+        canonical = tree_document([expected, expected], 8)
+        old = read_document(canonical, 8)
+        bound = sum(old.expanded_work[i] for i in old.roots)
+        wire = graph(257)
+        values, charged = O.expand_application_document(wire, bound, allow_ground=True, allow_spines=True)
+        self.assertEqual((tree_document(values, 8), charged), (canonical, bound))
+        with self.assertRaises(O.OpenPairError):
+            O.expand_application_document(wire, bound, allow_ground=True)
+        with self.assertRaises(O.OpenPairError):
+            O.expand_application_document(wire, bound-1, allow_ground=True, allow_spines=True)
+        for n in (-1, 0, 1, 256, 16384, 2**63 - 1):
+            with self.subTest(n=n), self.assertRaises(O.OpenPairError):
+                O.expand_application_document(graph(n), bound, allow_ground=True, allow_spines=True)
+
     def test_stamp_syntax_and_semantic_mutations_remain_distinct(self):
         import artifact_binary_open as O
         for value in ('0-0', '0-1', '2147483646-2147483628'):

@@ -6,7 +6,7 @@ module Bootstrap.OpenFragment
   (Environment, environment, declarations, dataEnvironment, Fragment, check, fromChecked,
    parameters, body, bodyValue, storageValue, bindings, usedParameters, context, fingerprint,
    normalize, withNameHints, encodeBody, encodeRaw, decodeTrusted, decodeTrustedIds, audit, closedTerm, fresh, linkBody,
-   Package, makePackage, readPackage, readPackageProfiled, packageFragments, packageBytes,
+   Package, makePackage, makeCheckedPackage, readPackage, readPackageProfiled, packageFragments, packageBytes,
    packageHash, packageMetadata, packageFamily, declarationValue, compatibilityIdentity,
    MetadataReceipt, makeMetadataReceipt, metadataReceiptHash, withMetadataReceipt, cachedMetadata) where {
   import MLF.Primitive;
@@ -164,6 +164,77 @@ module Bootstrap.OpenFragment
         Just (StoredTerm (not (M.null ground)) (W.VNode 86
           [W.VNode 1 (reverse entries),W.VNode 1 (reverse (finishRun amount first last step tail)),W.VInt root]))
   };
+  -- A run represents f1 (f2 (... tail)). Heads have the same immutable
+  -- application skeleton. Each integer still consumes its own source slot.
+  data SpineRows = SpineRows Int ([] W.Value) (Map ((,) ((,) Int Int) ((,) Int String)) Int) Bool;
+  data SpineVisit = NoSpine | SpineVisited Int Int SpineRows LiteralStream;
+  spinePattern term = let {
+    order = comparePair (comparePair compareInt compareInt) (comparePair compareInt compareString);
+    row kind a b text wire repeated fuel (SpineRows count rows index strong) stream done = let {
+      key = (,) ((,) kind a) ((,) b text)
+    } in case M.lookup order key index of {
+      Just i -> done i fuel (SpineRows count rows index (strong || repeated)) stream;
+      Nothing -> if count >= 512 then NoSpine else let {
+        next = count + 1; updated = M.insert order key count index
+      } in seq next (seq updated (done count fuel
+        (SpineRows next ((:) wire rows) updated (strong || repeated)) stream))
+    };
+    -- The first head has already been visited in source order and has at
+    -- most 64 syntax nodes. A failed comparison discards its literal state.
+    match first later literals = case first of {
+      XIntTerm _ -> case later of {
+        XIntTerm value -> let { next = addLiteral value literals } in seq next (Just next); _ -> Nothing };
+      XVarTerm (XName i hint) -> case later of {
+        XVarTerm (XName j text) -> if i == j && eqString hint text then Just literals else Nothing;
+        _ -> Nothing };
+      XConstructor name [] -> case later of {
+        XConstructor other [] -> if eqString name other then Just literals else Nothing; _ -> Nothing };
+      XPrimitive p [] -> case later of {
+        XPrimitive other [] -> if Structure.primitiveCode p == Structure.primitiveCode other then Just literals else Nothing;
+        _ -> Nothing };
+      XApp f x -> case later of {
+        XApp g y -> case match f g literals of { Just state -> match x y state; Nothing -> Nothing };
+        _ -> Nothing };
+      _ -> Nothing
+    };
+    visit depth fuel table stream value done = if depth > 128 || fuel <= 0 then NoSpine else let {
+      next = fuel - 1;
+      atom kind id text = row kind id 0 text (Structure.toXTerm value) False next table stream done
+    } in case value of {
+      XIntTerm n -> let { updated = addLiteral n stream } in seq updated (done 0 next table updated);
+      XVarTerm (XName i hint) -> atom 0 i hint;
+      XConstructor name [] -> atom 1 0 name;
+      XPrimitive p [] -> atom 2 (Structure.primitiveCode p) "";
+      XApp f x -> visit (depth + 1) next table stream f (\left remaining after fields -> let {
+        width = next - remaining;
+        finish count tail available literals = visit (depth + 1) available after literals tail
+          (\right rest rows slots -> let {
+            pair = left * 512 + right;
+            children = if count == 1 then [W.VInt left,W.VInt right] else [W.VInt left,W.VInt right,W.VInt count]
+          } in row 3 pair count "" (W.VNode 88 children) (count >= 8) rest rows slots done);
+        heads count tail available literals = if width > 64 then finish count tail available literals else case tail of {
+          XApp nextHead more -> if count >= W.maxDepth W.defaultLimits || available <= width then NoSpine
+            else case match f nextHead literals of {
+              Nothing -> finish count tail available literals;
+              Just updated -> let { total = count + 1; rest = available - width - 1 } in
+                seq total (seq rest (heads total more rest updated))
+            };
+          _ -> finish count tail available literals
+        }
+      } in heads 1 x remaining fields);
+      _ -> NoSpine
+    };
+    collect = case visit 1 1048576 (SpineRows 1 [W.VNode 87 []] M.empty False)
+      (LiteralStream 0 0 0 0 0 []) term SpineVisited of {
+      SpineVisited root _ (SpineRows _ rows _ True) (LiteralStream size n first last step tail) ->
+        if size < 8 then Nothing else Just (StoredTerm False (W.VNode 86
+          [W.VNode 1 (reverse rows),W.VNode 1 (reverse (finishRun n first last step tail)),W.VInt root]));
+      _ -> Nothing
+    }
+  } in case term of {
+    XApp _ (XApp _ (XApp _ (XApp _ _))) -> collect;
+    _ -> Nothing
+  };
   compactNode tag fields = let {
       replace rest = case rest of {
         [] -> Nothing;
@@ -175,9 +246,10 @@ module Bootstrap.OpenFragment
       };
       ground = any (\field -> case snd field of { Just value -> hasGroundRows value; Nothing -> False }) fields
     } in mapOptional (\children -> StoredTerm ground (W.VNode tag children)) (replace fields);
-  compactTerm term = let {
+  compactTerm = compactTermWith expressionPattern;
+  compactTermWith applications term = let {
     still value = (,) value Nothing;
-    child value = (,) (Structure.toXTerm value) (compactTerm value);
+    child value = (,) (Structure.toXTerm value) (compactTermWith applications value);
     node = compactNode;
     binding row@((,,) name ty body) = (,) (Structure.toTriple Structure.toXName Structure.toXType Structure.toXTerm row)
       (node 3 [still (Structure.toXName name),still (Structure.toXType ty),child body]);
@@ -185,7 +257,7 @@ module Bootstrap.OpenFragment
       (node 92 [still (Structure.toXPattern pat),child body]);
     list values = (,) (W.VNode 1 (map fst values)) (node 1 values)
   } in case term of {
-    XApp _ _ -> expressionPattern term;
+    XApp _ _ -> applications term;
     XAbs n ty b -> node 71 [still (Structure.toXName n),still (Structure.toXType ty),child b];
     XTypeAbs v ty b -> node 73 [still (Structure.toXTyVar v),still (Structure.toXType ty),child b];
     XTypeApp f p -> node 74 [child f,still (Structure.toXComputation p)];
@@ -466,12 +538,13 @@ module Bootstrap.OpenFragment
   } in (,) next renamed);
   -- Parameters are keyed by their original fragment identities. All other
   -- term and type identities receive the same injective renaming as fresh.
-  data LinkRow = LinkFixed XTerm | LinkHole | LinkFunction XTerm LinkRow | LinkChildren LinkRow LinkRow;
+  data LinkRow = LinkFixed XTerm | LinkHole | LinkFunction XTerm LinkRow | LinkChildren LinkRow LinkRow | LinkRepeated LinkRow LinkRow Int;
   mapLinkPattern name variable (Structure.TermPattern table root runs _ _) = let {
     add prior i (Structure.PatternRow row _ _ _) = let {
       value = case row of {
         Structure.PatternHole -> LinkHole;
         Structure.PatternAtom atom -> LinkFixed (Separate.mapTerm name variable atom);
+        Structure.PatternRepeat lhs rhs count -> LinkRepeated (IM.get lhs prior) (IM.get rhs prior) count;
         Structure.PatternJoin lhs rhs -> let { a = IM.get lhs prior; b = IM.get rhs prior } in
           case a of {
             LinkFixed f -> case b of {
@@ -495,6 +568,13 @@ module Bootstrap.OpenFragment
       } else take (previous - 1) start step runs;
       LinkFunction f a -> fill a previous start step runs (\right count next stride tail ->
         done (XApp f right) count next stride tail);
+      LinkRepeated head tail amount -> let {
+        collect n heads old value stride remaining = if n == 0 then
+          fill tail old value stride remaining (\last count next delta rest ->
+            done (foldlStrict (\body f -> XApp f body) last heads) count next delta rest)
+          else fill head old value stride remaining (\f count next delta rest ->
+            collect (n - 1) ((:) f heads) count next delta rest)
+      } in collect amount [] previous start step runs;
       LinkChildren f a -> fill f previous start step runs (\left rest value delta following -> case a of {
         LinkFixed right -> done (XApp left right) rest value delta following;
         _ -> fill a rest value delta following (\right count next stride tail ->
@@ -681,8 +761,10 @@ module Bootstrap.OpenFragment
   wireFormat9 = "MLF-OPEN-CRATE-3/checker-1";
   wireFormat10 :: String;
   wireFormat10 = "MLF-OPEN-CRATE-4/checker-1";
+  wireFormat11 :: String;
+  wireFormat11 = "MLF-OPEN-CRATE-5/checker-1";
   applicationFormat :: Int -> String;
-  applicationFormat schema = if schema == 10 then wireFormat10 else if schema == 9 then wireFormat9 else wireFormat8;
+  applicationFormat schema = if schema == 11 then wireFormat11 else if schema == 10 then wireFormat10 else if schema == 9 then wireFormat9 else wireFormat8;
   -- Candidate engineering resource class; qualification is required.
   packageWorkLimit :: Int;
   packageWorkLimit = Storage.maxBytes;
@@ -699,14 +781,16 @@ module Bootstrap.OpenFragment
   };
   packageFamily bytes = do {
     schema <- packageSchema bytes;
-    ioReturn (schema == 7 || schema == 8 || schema == 9 || schema == 10)
+    ioReturn (schema == 7 || schema == 8 || schema == 9 || schema == 10 || schema == 11)
   };
   bindingReference ((,) n _) = Structure.toXName n;
-  encodeFinal stored ((,) name fragment) = W.VNode 401
+  encodeFinal stored entry@((,) _ fragment) = encodeFinalWire
+    (if stored then fromMaybe (bodyValue fragment) (storageValue fragment) else bodyValue fragment) entry;
+  encodeFinalWire wire ((,) name fragment) = W.VNode 401
     [Structure.toText name, Structure.toText (fingerprint fragment),
      Structure.toList Structure.toText (map D.datatypeName (declarations (context fragment))),
      Structure.toList bindingReference (parameters fragment),
-     (if stored then fromMaybe (bodyValue fragment) (storageValue fragment) else bodyValue fragment),
+     wire,
      Structure.toList bindingReference (bindings fragment),
      Structure.toList Structure.toXName (usedParameters fragment)];
   hashSyntax value = do {
@@ -832,7 +916,7 @@ module Bootstrap.OpenFragment
   readPackage = readPackageProfiled Nothing;
   readPackageProfiled profile bytes expected compiler metadata allBindings allDeclarations = Host.phaseIO profile "validate_ms" (do {
     schema <- packageSchema bytes;
-    if schema == 8 || schema == 9 || schema == 10
+    if schema == 8 || schema == 9 || schema == 10 || schema == 11
     then readPackage8Profiled schema profile bytes expected compiler metadata allBindings allDeclarations
     else if schema == 7
     then readPackage7Profiled profile bytes expected compiler metadata allBindings allDeclarations
@@ -882,7 +966,7 @@ module Bootstrap.OpenFragment
                 physical <- W.graphExpandedWork graph;
                 ensure (physical >= 0 && physical <= packageWorkLimit) "open crate package-work accounting mismatch";
                 (,) plans available <- if schema >= 9 then do {
-                  prepared <- Structure.admitPatternsFor (schema == 10) graph (packageWorkLimit - physical);
+                  prepared <- Structure.admitPatternsWith (schema >= 10) (schema == 11) graph (packageWorkLimit - physical);
                   Right ((,) (Just (fst prepared)) (packageWorkLimit - physical - snd prepared))
                 } else Right ((,) Nothing (packageWorkLimit - physical));
                 seq available (Right (PackageHeader8 graph bindings declarations entries available plans))
@@ -1048,7 +1132,11 @@ module Bootstrap.OpenFragment
     (:) _ entries -> attach fragments entries;
     [] -> fragments
   };
-  makePackage compiler metadata fragments = do {
+  -- Only the checked crate-session path speculates on new storage shapes.
+  -- General callers retain the original field and fragment evaluation order.
+  makePackage = makePackageWith False;
+  makeCheckedPackage = makePackageWith True;
+  makePackageWith spines compiler metadata fragments = do {
     let {
       ps = M.toList (referenceTable (concatMap
         (\((,) _ f) -> map
@@ -1078,20 +1166,33 @@ module Bootstrap.OpenFragment
                      Structure.toList
                        (Structure.toPair Structure.toText Structure.toText) d,
                      W.VInt count];
+                  -- Keep the public raw query format and the existing compact rows.
+                  -- Only the final package negotiates a repeated application row.
+                  plan entry@((,) _ fragment) = let {
+                    form = case fragmentStorage fragment of {
+                      Just stored -> Just ((,) (if hasGroundRows stored then 10 else 9) (storedWire stored));
+                      Nothing -> if not spines then Nothing else mapOptional (\stored -> (,) 11 (storedWire stored))
+                        (compactTermWith spinePattern (body fragment))
+                    }
+                  } in (,) entry form;
+                  plans = map plan fragments;
+                  final ((,) entry selected) = case selected of {
+                    Just ((,) _ wire) -> encodeFinalWire wire entry; Nothing -> encodeFinal False entry
+                  };
                   write schema format stored = W.encodeRootsWithAtoms Structure.termAtomShapes W.defaultLimits
-                    remaining schema ((:) (header format) (map (encodeFinal stored) fragments));
+                    remaining schema ((:) (header format) (if stored then map final plans else map (encodeFinal False) fragments));
                   legacy = do {
                     encoded <- write 8 wireFormat8 False;
                     ioReturn (mapEither (\bytes -> (,) bytes fragments) encoded)
                   };
                   requiredSchema current entries = case entries of {
                     [] -> current;
-                    (:) entry rest -> case fragmentStorage (snd entry) of {
+                    (:) ((,) _ selected) rest -> case selected of {
                       Nothing -> requiredSchema current rest;
-                      Just stored -> if hasGroundRows stored then 10 else requiredSchema 9 rest
+                      Just ((,) version _) -> if version == (if spines then 11 else 10) then version else requiredSchema (max current version) rest
                     }
                   };
-                  schema = requiredSchema 8 fragments
+                  schema = requiredSchema 8 plans
                 };
                 encoded <- if schema == 8 then legacy else do {
                   candidate <- write schema (applicationFormat schema) True;
@@ -1101,7 +1202,7 @@ module Bootstrap.OpenFragment
                       decoded <- W.decodeGraphRootBounded W.defaultLimits remaining schema bytes;
                       case bindEither decoded (\graph -> do {
                         used <- W.graphExpandedWork graph;
-                        (,) plans _ <- Structure.admitPatternsFor (schema == 10) graph (remaining - used);
+                        (,) plans _ <- Structure.admitPatternsWith (schema >= 10) (schema == 11) graph (remaining - used);
                         Right (attachLinkViews graph plans fragments)
                       }) of { Left _ -> legacy; Right rows -> ioReturn (Right ((,) bytes rows)) }
                     }

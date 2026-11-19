@@ -79,7 +79,7 @@ def map_successor_inputs():
     adapter = at(ADAPTER_REVISION, RECONCILIATION_PATH)
     adapter_map = at(ADAPTER_REVISION, MAP_PATH)
     live = (root / RECONCILIATION_PATH).read_bytes()
-    C.require(C.sha_bytes(live) == '42b2e0719885c7ca4556630665ac1cb874702977f03d343eba08b287002a2fff',
+    C.require(C.sha_bytes(live) == 'e7f98ddb3bef9c2a9fff8f249bb638b2aa03f90a11f23de95953fcc3327fc4f4',
               'fixed compiler successor manifest')
     validate_compiler_map(json.loads(live), json.loads(adapter)['changes'][MAP_PATH],
                           adapter_map, (root / MAP_PATH).read_bytes())
