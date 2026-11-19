@@ -1786,38 +1786,32 @@ module Bootstrap.Classes where {
   -- and one or two identities per leaf. Preserve the same root and next
   -- identity, while reserving them together for a complete lambda body.
   plainLambdaApplication env body fallback = let {
-    ref name = case lookupQualified name env of {
-      Nothing -> Just ((,) (referenceExpr name) 1);
-      Just (QualifiedKnown known []) -> Just ((,) (referenceExpr known) 2);
-      _ -> Nothing
+    advance count cost term done = let { next = count + cost } in seq next (done term next);
+    ref name count done = case lookupQualified name env of {
+      Nothing -> advance count 1 (referenceExpr name) done;
+      Just (QualifiedKnown known []) -> advance count 2 (referenceExpr known) done;
+      _ -> fallback
     };
-    plain function expr = case expr of {
-      SApp f a -> case plain True f of {
-        Nothing -> Nothing;
-        Just ((,) left n) -> case plain False a of {
-          Nothing -> Nothing; Just ((,) right m) -> let { total = n + m + 1 } in
-            seq total (Just ((,) (SApp left right) total))
-        }
-      };
-      SCallSite label _ inner -> if function then plain True inner
+    plain function expr count done = case expr of {
+      SApp f a -> plain True f count (\left afterFunction ->
+        plain False a afterFunction (\right afterArgument -> advance afterArgument 1 (SApp left right) done));
+      SCallSite label _ inner -> if function then plain True inner count done
         else if eqString label "an expression type signature" && managedAnnotation inner
-        then Nothing else plain False inner;
-      SGlobal i hint -> ref (DeclRef i hint);
-      SVar n -> if eqString n "$MLF.Stack.callStack" then Nothing else ref (LexicalRef n);
-      SIntLit _ -> Just ((,) expr 1);
-      SDoubleLit _ -> Just ((,) expr 1);
-      SStringLit _ -> Just ((,) expr 1);
-      SBoolLit _ -> Just ((,) expr 1);
-      SPrimitive _ -> Just ((,) expr 1);
-      SConstructor _ -> Just ((,) expr 1);
-      _ -> Nothing
-    }
-  } in case body of {
-    SApp _ _ -> case plain False body of {
-      Just ((,) lowered count) -> Fresh (\first used -> let { next = first + count } in
-        Right ((,,) (PlainResult (next - 1) lowered) next used));
-      Nothing -> fallback
+        then fallback else plain False inner count done;
+      SGlobal i hint -> ref (DeclRef i hint) count done;
+      SVar n -> if eqString n "$MLF.Stack.callStack" then fallback else ref (LexicalRef n) count done;
+      SIntLit _ -> advance count 1 expr done;
+      SDoubleLit _ -> advance count 1 expr done;
+      SStringLit _ -> advance count 1 expr done;
+      SBoolLit _ -> advance count 1 expr done;
+      SPrimitive _ -> advance count 1 expr done;
+      SConstructor _ -> advance count 1 expr done;
+      _ -> fallback
     };
+    finish lowered count = Fresh (\first used -> let { next = first + count } in
+      Right ((,,) (PlainResult (next - 1) lowered) next used))
+  } in case body of {
+    SApp _ _ -> plain False body 0 finish;
     _ -> fallback
   };
   planQualifiedFunction :: Maybe ((,) String SourceSpan) ->
