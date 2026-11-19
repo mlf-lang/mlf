@@ -99,6 +99,37 @@ class ModularControls(unittest.TestCase):
                 self.assertFalse(O.companion_group_matches('other', legacy, owner, members))
                 self.assertFalse(O.companion_group_matches(crate, legacy, owner + 'x', members))
 
+    def test_ground_variable_preserves_evidence_and_utf8_work_at_each_use(self):
+        import artifact_binary_open as O
+        from artifact_binary_reference import read_document, tree_document
+        integer = lambda x: ('int', x)
+        hint, ty = O.string('xλ'), O.string('型')
+        ground = O.node(85, integer(-4), hint, ty)
+        join = lambda left, right: O.node(88, integer(left), integer(right))
+        rows = [O.node(87), ground, join(1, 0), join(2, 2), join(3, 3), join(4, 4)]
+        run = O.node(89, integer(-2), integer(1), integer(8))
+        def pattern(entries):
+            return O.node(86, O.sequence(entries), O.sequence([run]), integer(len(entries) - 1))
+        raw = pattern(rows)
+        doc = read_document(tree_document([raw, raw], 10), 10)
+        logical_leaf = O.node(74, O.node(70, O.node(31, integer(-4), hint)),
+                              O.node(58, O.node(53, O.node(51, O.node(44, ty, O.sequence([])))), O.node(55)))
+        terms = [O.node(72, logical_leaf, O.node(77, integer(i))) for i in range(-2, 6)]
+        while len(terms) > 1:
+            terms = [O.node(72, *terms[i:i+2]) for i in range(0, len(terms), 2)]
+        ordinary = read_document(tree_document(terms * 2, 8), 8)
+        budget = sum(ordinary.expanded_work[i] for i in ordinary.roots)
+        values, work = O.expand_application_document(doc, budget, allow_ground=True)
+        self.assertEqual((values, work), (tuple(terms * 2), budget))
+        with self.assertRaises(O.OpenPairError):
+            O.expand_application_document(doc, budget)
+        with self.assertRaises(O.OpenPairError):
+            O.expand_application_document(doc, budget - 1, allow_ground=True)
+        for broken in (O.node(85, integer(-4), hint), O.node(85, hint, integer(-4), ty),
+                       O.node(85, integer(-4), hint, O.sequence([]))):
+            with self.assertRaises(O.OpenPairError):
+                O._read_application_pattern(pattern([rows[0], broken, *rows[2:]])[2], allow_ground=True)
+
     def test_application_pattern_restores_each_signed_literal_and_charges_each_root(self):
         import artifact_binary_open as O
         from artifact_binary_reference import Limits, read_document, tree_document

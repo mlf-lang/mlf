@@ -1,5 +1,20 @@
 # Monomorphic constructor calls
 
+## Published qualification on 19 November 2026
+
+Revision `10d422939ec8ab61489d73bfdfbcc6ad02bedd2d` passed all six full-build checks on both ranges and was pushed to `codex/flat-functions-performance`. MLF finished faster at every positive size.
+
+| Calls | Pairs per size | Largest median in seconds, MLF / GHC | Exponent, MLF / GHC | Paired 95% interval, MLF minus GHC exponent |
+| --- | ---: | ---: | ---: | ---: |
+| 0–1,024 | 32 | 0.2914 / 0.6828 | 0.2170 / 0.9258 | [−0.8240, −0.5703] |
+| 0–8,192 | 6 | 0.3664 / 1.9689 | 0.7657 / 1.0380 | [−0.4110, −0.0212] |
+
+Both fits replayed exactly. The 568 native builds produced 1,704 verified program outputs. All 11 retained suites, 41 qualification commands, artifact cross-reads, staged library builds, selector tests and process controls passed. The qualification receipt under `.mlf-build/mono-calls-integrated-20261119/qualification-08/qualified-shape.json` has SHA-256 `d37b51cc494a8b7b0f34e8582d1b083db6d86930d21013bdb345425c0da91169`.
+
+In the separate release bootstrap, the frozen native package manager rejected the empty list at `tests/shared/Tests/IndependentCheck.hs:214:39`. Independent attempts on the preceding remote tip and the published revision produced the same diagnostic before either candidate compiler was built.
+
+## Measurements before the benchmark source pin was corrected
+
 At revision `81e0b1eb4ec175064290deeb523143c63d5148f6`, MLF passed all six performance checks on both size ranges. The table gives complete native build times, including worker launch and linking. Every positive size had a lower MLF median, and all four exponent fits were interior.
 
 | Calls | Pairs per size | Largest median in seconds, MLF / GHC | OLS slope in ms/call, MLF / GHC | Fitted exponent, MLF / GHC | Paired 95% interval for MLF minus GHC exponent |

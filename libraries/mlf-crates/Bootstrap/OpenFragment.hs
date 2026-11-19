@@ -58,20 +58,25 @@ module Bootstrap.OpenFragment
   dataEnvironment (Environment _ ds) = ds;
   -- Derive the wire tree once from the exact immutable checked term. The
   -- bytes for each envelope still go through their own ordinary writer.
+  -- The flag selects schema 10 only when a ground instantiation is present.
+  data StoredTerm = StoredTerm Bool W.Value;
+  storedWire (StoredTerm _ value) = value;
+  hasGroundRows (StoredTerm ground _) = ground;
   data Fragment = Fragment Environment ([] ((,) XName XType)) XTerm
-    ([] ((,) XName XType)) ([] XName) String W.Value (Maybe W.Value);
+    ([] ((,) XName XType)) ([] XName) String W.Value (Maybe StoredTerm);
   fragmentWith env ps term bs used saved =
     let { raw = Structure.toXTerm term } in Fragment env ps term bs used saved raw (compactTerm term);
   context (Fragment env _ _ _ _ _ _ _) = env;
   parameters (Fragment _ ps _ _ _ _ _ _) = ps;
   body (Fragment _ _ term _ _ _ _ _) = term;
   bodyValue (Fragment _ _ _ _ _ _ value _) = value;
-  storageValue (Fragment _ _ _ _ _ _ _ stored) = stored;
-  -- A template entry is an exact variable, primitive, literal slot, or
-  -- binary application of two earlier entries. Literal slots consume the
+  fragmentStorage (Fragment _ _ _ _ _ _ _ stored) = stored;
+  storageValue fragment = mapOptional storedWire (fragmentStorage fragment);
+  -- Rows retain variables, ground variable instantiations, primitives, literal
+  -- slots and applications of two earlier rows. Literal slots consume the
   -- signed integer stream in source order, including repeated subtrees.
   data PatternTable = PatternTable Int ([] W.Value)
-    (IntMap Int) (Map ((,) Int String) Int) (IntMap Int);
+    (IntMap Int) (Map ((,) Int String) Int) (IntMap Int) (Map ((,) Int ((,) String String)) Int);
   data LiteralStream = LiteralStream Int Int Int Int Int ([] W.Value);
   finishRun count first last step tail = if count == 0 then tail else
     if count == 1 then (:) (W.VInt first) tail else
@@ -88,23 +93,23 @@ module Bootstrap.OpenFragment
   -- The format limits nesting to 128. Thread each completed child directly
   -- into its parent, preserving postorder numbering and the occurrence budget.
   expressionPattern value = let {
-    visit depth fuel table@(PatternTable count entries pairs names primitives) stream term =
+    visit depth fuel table@(PatternTable count entries pairs names primitives ground) stream term =
       if fuel < 0 || depth > 128 then NoPattern else let {
         remaining = fuel - 1;
         finish i nextTable nextStream = if remaining < 0 then NoPattern else Visited i remaining nextTable nextStream;
-        save node nextNames nextPrimitives = if count >= 512 then NoPattern else let { next = count + 1 } in
-          seq next (finish count (PatternTable next ((:) node entries) pairs nextNames nextPrimitives) stream);
+        save node nextNames nextPrimitives nextGround = if count >= 512 then NoPattern else let { next = count + 1 } in
+          seq next (finish count (PatternTable next ((:) node entries) pairs nextNames nextPrimitives nextGround) stream);
         application left right = case visit (depth + 1) remaining table stream left of {
           NoPattern -> NoPattern;
           Visited l available leftTable leftStream -> case visit (depth + 1) available leftTable leftStream right of {
             NoPattern -> NoPattern;
-            Visited h rest current@(PatternTable size nodes apps ns ps) literals -> let {
+            Visited h rest current@(PatternTable size nodes apps ns ps gs) literals -> let {
               key = l * 512 + h
             } in case IM.lookup key apps of {
               Just i -> Visited i rest current literals;
               Nothing -> if size >= 512 then NoPattern else let {
                 next = size + 1; row = W.VNode 88 [W.VInt l,W.VInt h]
-              } in seq next (Visited size rest (PatternTable next ((:) row nodes) (IM.insert key size apps) ns ps) literals)
+              } in seq next (Visited size rest (PatternTable next ((:) row nodes) (IM.insert key size apps) ns ps gs) literals)
             }
           }
         }
@@ -114,33 +119,43 @@ module Bootstrap.OpenFragment
         XVarTerm (XName i hint) -> let { key = (,) i hint } in
           case M.lookup (comparePair compareInt compareString) key names of {
             Just index -> finish index table stream;
-            Nothing -> save (Structure.toXTerm term) (M.insert (comparePair compareInt compareString) key count names) primitives
+            Nothing -> save (Structure.toXTerm term) (M.insert (comparePair compareInt compareString) key count names) primitives ground
           };
+        XTypeApp (XVarTerm (XName i hint)) (XThen (XInner (XBottom (XCon ty []))) XElim) -> let {
+          key = (,) i ((,) hint ty);
+          order = comparePair compareInt (comparePair compareString compareString)
+        } in case M.lookup order key ground of {
+          Just index -> finish index table stream;
+          Nothing -> save (W.VNode 85 [W.VInt i,W.VText hint,W.VText ty]) names primitives (M.insert order key count ground)
+        };
         XPrimitive p args -> case args of {
           [] -> let { code = Structure.primitiveCode p } in case IM.lookup code primitives of {
             Just index -> finish index table stream;
-            Nothing -> save (Structure.toXTerm term) names (IM.insert code count primitives)
+            Nothing -> save (Structure.toXTerm term) names (IM.insert code count primitives) ground
           };
           _ -> NoPattern
         };
         _ -> NoPattern
       };
-    table = PatternTable 1 [W.VNode 87 []] IM.empty M.empty IM.empty
+    table = PatternTable 1 [W.VNode 87 []] IM.empty M.empty IM.empty M.empty
   } in case visit 1 1048576 table (LiteralStream 0 0 0 0 0 []) value of {
     NoPattern -> Nothing;
-    Visited root fuel (PatternTable count entries _ _ _) (LiteralStream size amount first last step tail) ->
+    Visited root fuel (PatternTable count entries _ _ _ ground) (LiteralStream size amount first last step tail) ->
       if size < 8 || 1048576 - fuel < count * 3 then Nothing else
-        Just (W.VNode 86 [W.VNode 1 (reverse entries),W.VNode 1 (reverse (finishRun amount first last step tail)),W.VInt root])
+        Just (StoredTerm (not (M.null ground)) (W.VNode 86
+          [W.VNode 1 (reverse entries),W.VNode 1 (reverse (finishRun amount first last step tail)),W.VInt root]))
   };
   compactNode tag fields = let {
       replace rest = case rest of {
         [] -> Nothing;
         (:) ((,) raw changed) tail -> case changed of {
           Nothing -> mapOptional ((:) raw) (replace tail);
-          Just updated -> Just ((:) updated (map (\((,) plain option) -> fromMaybe plain option) tail))
+          Just updated -> Just ((:) (storedWire updated)
+            (map (\((,) plain option) -> fromMaybe plain (mapOptional storedWire option)) tail))
         }
-      }
-    } in mapOptional (W.VNode tag) (replace fields);
+      };
+      ground = any (\field -> case snd field of { Just value -> hasGroundRows value; Nothing -> False }) fields
+    } in mapOptional (\children -> StoredTerm ground (W.VNode tag children)) (replace fields);
   compactTerm term = let {
     still value = (,) value Nothing;
     child value = (,) (Structure.toXTerm value) (compactTerm value);
@@ -206,6 +221,7 @@ module Bootstrap.OpenFragment
       } in case entry of {
         W.VNode 87 [] -> let { hole = StampSlots Separate.encodingEmpty StampHole Separate.encodingEmpty } in add hole hole;
         W.VNode 70 [W.VNode 31 [W.VInt i,W.VText hint]] -> leaf (Pretty.name (XName i hint));
+        W.VNode 85 [W.VInt i,W.VText hint,W.VText ty] -> leaf (Pretty.prettyTerm (Structure.groundVariable i hint ty));
         W.VNode 81 [p,W.VNode 1 []] -> case Structure.fromPrimitive p of {
           Right primitive -> leaf (Pretty.prettyTerm (XPrimitive primitive [])); Left _ -> Nothing
         };
@@ -274,6 +290,12 @@ module Bootstrap.OpenFragment
         if fuel <= 0 then 0 else orderedPatternLeaves (depth + 1) fuel a;
       XIntTerm value -> seq value next;
       XVarTerm (XName i hint) -> seq hint (seq i next);
+      XTypeApp (XVarTerm (XName i hint)) proof -> seq hint (seq i (case proof of {
+        XThen (XInner (XBottom (XCon ty arguments))) end -> case arguments of {
+          [] -> seq ty (case end of { XElim -> next; _ -> 0 }); _ -> 0
+        };
+        _ -> 0
+      }));
       XPrimitive p args -> seq p (case args of { [] -> next; _ -> 0 });
       _ -> 0
     };
@@ -298,7 +320,7 @@ module Bootstrap.OpenFragment
       stored = expressionPattern term;
       plain = termEncoding term;
       summary = if orderedPatternLeaves 1 1048577 term > 0 then case stored of {
-        Just (W.VNode 86 [W.VNode 1 rows,W.VNode 1 runs,W.VInt root]) ->
+        Just (StoredTerm _ (W.VNode 86 [W.VNode 1 rows,W.VNode 1 runs,W.VInt root])) ->
           fromMaybe plain (patternEncoding rows runs root);
         _ -> plain
       } else plain
@@ -383,11 +405,11 @@ module Bootstrap.OpenFragment
   encodeRaw references stage name fragment = let {
     envelope record = W.VNode 425 [references,record];
     ordinary = encodeBody stage name fragment;
-    choose = case storageValue fragment of {
+    choose = case fragmentStorage fragment of {
       Nothing -> ordinary;
-      Just term -> let { record = bodyRecord 440 stage name fragment term } in
+      Just (StoredTerm ground term) -> let { record = bodyRecord (if ground then 441 else 440) stage name fragment term } in
         case bindEither (W.planGraph W.defaultLimits [envelope record])
-          (\graph -> Structure.admitPatterns graph (W.maxExpandedWork W.defaultLimits)) of {
+          (\graph -> Structure.admitPatternsFor ground graph (W.maxExpandedWork W.defaultLimits)) of {
           Right _ -> record; Left _ -> ordinary
         }
     }
@@ -438,7 +460,7 @@ module Bootstrap.OpenFragment
             value <- W.lookupGraphNode graph record;
             case value of {
               W.GNode tag [s,n,h,ps,t,bs,uses] -> do {
-                ensure (tag == 400 || tag == 440) "unknown open fragment storage; rebuild cache";
+                ensure (tag == 400 || tag == 440 || tag == 441) "unknown open fragment storage; rebuild cache";
                 savedStage <- textAt graph s;
                 savedName <- textAt graph n;
                 savedStamp <- textAt graph h;
@@ -455,7 +477,7 @@ module Bootstrap.OpenFragment
                   ensure (eqString key stable) "open fragment dependency inventory mismatch";
                   Right ((,) binder ty)
                 }) (zip pairs expectedParameters);
-                term <- if tag == 440 then Structure.storedTerm graph t else Structure.fromGraphXTerm graph t;
+                term <- if tag == 400 then Structure.fromGraphXTerm graph t else Structure.storedTermFor (tag == 441) graph t;
                 ownedValues <- decodedList
                   (Structure.ShapePair Structure.ShapeXName Structure.ShapeXType) graph bs;
                 owned <- traverseEither (Structure.expectPair Structure.expectXName Structure.expectXType) ownedValues;
@@ -539,6 +561,10 @@ module Bootstrap.OpenFragment
   wireFormat8 = "MLF-OPEN-CRATE-2/checker-1";
   wireFormat9 :: String;
   wireFormat9 = "MLF-OPEN-CRATE-3/checker-1";
+  wireFormat10 :: String;
+  wireFormat10 = "MLF-OPEN-CRATE-4/checker-1";
+  applicationFormat :: Int -> String;
+  applicationFormat schema = if schema == 10 then wireFormat10 else if schema == 9 then wireFormat9 else wireFormat8;
   -- Candidate engineering resource class; qualification is required.
   packageWorkLimit :: Int;
   packageWorkLimit = Storage.maxBytes;
@@ -555,7 +581,7 @@ module Bootstrap.OpenFragment
   };
   packageFamily bytes = do {
     schema <- packageSchema bytes;
-    ioReturn (schema == 7 || schema == 8 || schema == 9)
+    ioReturn (schema == 7 || schema == 8 || schema == 9 || schema == 10)
   };
   bindingReference ((,) n _) = Structure.toXName n;
   encodeFinal stored ((,) name fragment) = W.VNode 401
@@ -688,7 +714,7 @@ module Bootstrap.OpenFragment
   readPackage = readPackageProfiled Nothing;
   readPackageProfiled profile bytes expected compiler metadata allBindings allDeclarations = Host.phaseIO profile "validate_ms" (do {
     schema <- packageSchema bytes;
-    if schema == 8 || schema == 9
+    if schema == 8 || schema == 9 || schema == 10
     then readPackage8Profiled schema profile bytes expected compiler metadata allBindings allDeclarations
     else if schema == 7
     then readPackage7Profiled profile bytes expected compiler metadata allBindings allDeclarations
@@ -719,7 +745,7 @@ module Bootstrap.OpenFragment
                 format <- textAt graph f;
                 identity <- textAt graph c;
                 association <- textAt graph m;
-                ensure (eqString format (if schema == 9 then wireFormat9 else wireFormat8) &&
+                ensure (eqString format (applicationFormat schema) &&
                   eqString identity compiler)
                   "open crate checker/compiler version mismatch; rebuild object";
                 ensure (eqString association metadata)
@@ -737,8 +763,8 @@ module Bootstrap.OpenFragment
                 declarations <- referenceList graph d;
                 physical <- W.graphExpandedWork graph;
                 ensure (physical >= 0 && physical <= packageWorkLimit) "open crate package-work accounting mismatch";
-                (,) plans available <- if schema == 9 then do {
-                  prepared <- Structure.admitPatterns graph (packageWorkLimit - physical);
+                (,) plans available <- if schema >= 9 then do {
+                  prepared <- Structure.admitPatternsFor (schema == 10) graph (packageWorkLimit - physical);
                   Right ((,) (Just (fst prepared)) (packageWorkLimit - physical - snd prepared))
                 } else Right ((,) Nothing (packageWorkLimit - physical));
                 seq available (Right (PackageHeader8 graph bindings declarations entries available plans))
@@ -901,17 +927,24 @@ module Bootstrap.OpenFragment
                   write schema format stored = W.encodeRootsWithAtoms Structure.termAtomShapes W.defaultLimits
                     remaining schema ((:) (header format) (map (encodeFinal stored) fragments));
                   legacy = write 8 wireFormat8 False;
-                  stored = any (\entry -> case storageValue (snd entry) of { Just _ -> True; Nothing -> False }) fragments
+                  requiredSchema current entries = case entries of {
+                    [] -> current;
+                    (:) entry rest -> case fragmentStorage (snd entry) of {
+                      Nothing -> requiredSchema current rest;
+                      Just stored -> if hasGroundRows stored then 10 else requiredSchema 9 rest
+                    }
+                  };
+                  schema = requiredSchema 8 fragments
                 };
-                encoded <- if not stored then legacy else do {
-                  candidate <- write 9 wireFormat9 True;
+                encoded <- if schema == 8 then legacy else do {
+                  candidate <- write schema (applicationFormat schema) True;
                   case candidate of {
                     Left _ -> legacy;
                     Right bytes -> do {
-                      decoded <- W.decodeGraphRootBounded W.defaultLimits remaining 9 bytes;
+                      decoded <- W.decodeGraphRootBounded W.defaultLimits remaining schema bytes;
                       case bindEither decoded (\graph -> do {
                         used <- W.graphExpandedWork graph;
-                        Structure.admitPatterns graph (remaining - used)
+                        Structure.admitPatternsFor (schema == 10) graph (remaining - used)
                       }) of { Left _ -> legacy; Right _ -> ioReturn (Right bytes) }
                     }
                   }

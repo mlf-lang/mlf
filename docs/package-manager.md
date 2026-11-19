@@ -379,6 +379,11 @@ Open object schema 9 can store a repeated application tree once and supply its
 integer literals in occurrence order. The reader checks the reconstructed work
 and depth before expanding it. The compiler still reads schema 7 and 8 objects
 and emits schema 8 for groups of fragments that gain no such representation.
+Schema 10 also stores repeated instantiations of a variable at a nullary type
+constructor. Each row preserves the variable identity, spelling hint and
+constructor name. Readers restore the original type evidence and charge its
+full depth and UTF-8 work for every occurrence. Applications without these
+rows retain their previous encoding.
 When an older compiler reports a schema mismatch, rebuild the named library
 with that compiler, then build its dependents.
 Inference cache entries can obtain identical contexts from their full semantic

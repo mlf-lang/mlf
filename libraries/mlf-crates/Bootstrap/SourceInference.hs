@@ -572,7 +572,8 @@ module Bootstrap.SourceInference where {
     chargeText = \text available -> let { count = stringLength text } in
       if count > available / 4 then Nothing else Just (available - 4 * count)
   } in finalGeometryTasks chargeText maxDepth pending remaining remaining nested;
-  -- A template has no computation nodes. Charge every logical occurrence
+  -- Ground instantiations have a single XThen with two atomic components.
+  -- No template row contains a nested XThen. Charge every logical occurrence
   -- using the same depth, node, text and UTF-8 limits as the ordinary tree.
   -- This view comes only from a Fragment's own checked term.
   applicationGeometry fields chargeText nodeLimit workLimit = case fields of {
@@ -588,6 +589,12 @@ module Bootstrap.SourceInference where {
             Just remaining -> save 3 4 (workLimit - remaining); Nothing -> Nothing
           };
           Wire.VNode 81 [Wire.VNode 32 [Wire.VInt _],Wire.VNode 1 []] -> save 3 4 4;
+          Wire.VNode 85 [Wire.VInt _,Wire.VText hint,Wire.VText ty] -> case chargeText hint (workLimit - 12) of {
+            Nothing -> Nothing;
+            Just left -> case chargeText ty left of {
+              Nothing -> Nothing; Just remaining -> save 6 12 (workLimit - remaining)
+            }
+          };
           Wire.VNode 88 [Wire.VInt l,Wire.VInt r] -> case (,) (IM.lookup l seen) (IM.lookup r seen) of {
             (,) (Just ((,,) ld ln lw)) (Just ((,,) rd rn rw)) -> save (1 + max ld rd) (1 + ln + rn) (1 + lw + rw);
             _ -> Nothing

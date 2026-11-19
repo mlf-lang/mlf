@@ -1049,7 +1049,15 @@ module Bootstrap.ArtifactStructure where {
       _ -> malformed "application pattern list"
     }
   };
-  patternPlan graph indices = case indices of {
+  -- The schema-10 atom preserves the variable identity, spelling hint and
+  -- the exact instantiation at a nullary constructor, including its evidence.
+  groundVariable i hint ty = XTypeApp (XVarTerm (XName i hint))
+    (XThen (XInner (XBottom (XCon ty []))) XElim);
+  patternText graph index = do {
+    node <- patternNode graph index;
+    case node of { W.GText value -> Right value; _ -> malformed "application pattern text" }
+  };
+  patternPlan allowGround graph indices = case indices of {
     [table,stream,rootIndex] -> do {
       entries <- patternList graph table 512;
       root <- patternInt graph rootIndex;
@@ -1073,6 +1081,12 @@ module Bootstrap.ArtifactStructure where {
                   else seq dep (seq work (seq count (Right (PatternRow (PatternJoin left right) dep work count))));
                 _ -> malformed "application pattern forward reference"
               }
+            };
+            W.GNode 85 [n,h,t] -> if S.not allowGround || ordinal == 0 then malformed "application pattern atom" else do {
+              i <- patternInt graph n; hint <- patternText graph h; ty <- patternText graph t;
+              let { work = 12 + stringUtf8Length hint + stringUtf8Length ty };
+              if work > 4194304 then malformed "application pattern instantiation too large"
+              else Right (PatternRow (PatternAtom (groundVariable i hint ty)) 6 work 0)
             };
             W.GNode tag _ -> if ordinal == 0 || (tag /= 70 && tag /= 81) then malformed "application pattern atom" else do {
               term <- fromGraphXTerm graph index;
@@ -1160,7 +1174,8 @@ module Bootstrap.ArtifactStructure where {
   };
   -- Add each child occurrence, even when its ordinal was seen before.
   -- Validate all expanded roots before constructing any term from a template.
-  admitPatterns graph aggregate = let {
+  admitPatterns = admitPatternsFor False;
+  admitPatternsFor allowGround graph aggregate = let {
     limits = W.defaultLimits;
     cap = W.maxExpandedWork limits;
     addChildren ids seen deep work = case ids of {
@@ -1192,7 +1207,7 @@ module Bootstrap.ArtifactStructure where {
       };
       case node of {
         W.GNode 86 fields -> do {
-          plan <- patternPlan graph fields;
+          plan <- patternPlan allowGround graph fields;
           case plan of { TermPattern _ _ _ depth work ->
             if work > budget then malformed "application pattern allocation limit"
             else finish depth work (IM.insert i plan plans) (budget - work)
@@ -1221,8 +1236,9 @@ module Bootstrap.ArtifactStructure where {
     results <- decodeWork (W.maxExpandedWork W.defaultLimits) [DecodeRepeated ShapeXTerm inputs] [] (NodeMemo IM.empty);
     Right (S.reverse results)
   };
-  storedTerm graph index = do {
-    prepared <- admitPatterns graph (W.maxExpandedWork W.defaultLimits);
+  storedTerm = storedTermFor False;
+  storedTermFor allowGround graph index = do {
+    prepared <- admitPatternsFor allowGround graph (W.maxExpandedWork W.defaultLimits);
     results <- decodeStoredManyWith (S.fst prepared) graph [index];
     case results of { [answer] -> expectXTerm answer; _ -> malformed "application pattern root" }
   };

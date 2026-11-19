@@ -874,6 +874,55 @@ applicationPatternChecks = do
   forM_ malformed $ \raw -> do
     graph <- right (W.planGraph W.defaultLimits [raw])
     unless (rejected (Structure.storedTerm graph (head (W.graphRoots graph)))) (fail "malformed application pattern")
+  -- A type argument is part of the literal template's identity. Count both
+  -- UTF-8 strings and all nodes of its original, fully explicit evidence.
+  let unary v t = T.XTypeApp (T.XVarTerm v) (T.XThen (T.XInner (T.XBottom t)) T.XElim)
+      ground n hint tyName = W.VNode 85 [W.VInt n, W.VText hint, W.VText tyName]
+      hints = [(-4,"xλ","型"),(-4,"x😀","型"),(-4,"xλ","Int"),(9,"xλ","型")]
+      groundRows = [ground n h t | (n,h,t) <- hints]
+      leaves = [T.XApp (unary (T.XName n h) (T.XCon t [])) (T.XIntTerm 11) | (n,h,t) <- hints]
+      logical = foldr1 T.XApp leaves
+      -- Keep the first-use table order explicit, including collisions in
+      -- both the printed hint and the numeric variable identity.
+      shared = T.XApp logical logical
+      cells = [hole,groundRows!!0,join 1 0,groundRows!!1,join 3 0,groundRows!!2,join 5 0,
+               groundRows!!3,join 7 0,join 6 8,join 4 9,join 2 10,join 11 11]
+      raw = pattern cells [W.VNode 89 [W.VInt 11,W.VInt 0,W.VInt 8]] 12
+      ordinary = Structure.toXTerm shared
+      charge txt remain = let size = H.v_stringUtf8Length txt in
+          if size > remain then T.Nothing else T.Just (remain - size)
+      geom stored nodes work depth value = case Source.finalGeometryWith stored charge depth
+          [(1,False,[value])] nodes work False of
+        T.Nothing -> Nothing
+        T.Just answer -> Just answer
+  wire <- right (W.planGraph W.defaultLimits [raw,raw])
+  original <- right (W.planGraph W.defaultLimits [ordinary,ordinary])
+  expanded <- right (W.graphExpandedWork original)
+  _ <- right (Structure.admitPatternsFor True wire expanded)
+  unless (rejected (Structure.admitPatternsFor True wire (expanded-1))) (fail "ground occurrence UTF-8 work")
+  unless (rejected (Structure.admitPatterns wire expanded)) (fail "ground rows crossed the schema-9 boundary")
+  loaded <- right (Structure.storedTermFor True wire (head (W.graphRoots wire)))
+  check "ground argument identity, hint, evidence and spelling" (H.unpack (Pretty.prettyTerm shared)) (H.unpack (Pretty.prettyTerm loaded))
+  forM_ [1..16] $ \depth ->
+    forM_ [10,98,99,104,119,120,121,128,160,240] $ \nodes ->
+      forM_ [19,120,160,211,218,224,260,512] $ \work ->
+        check "ground finalization geometry" (geom False nodes work depth ordinary) (geom True nodes work depth raw)
+  forM_ [W.VNode 85 [],W.VNode 85 [W.VInt 9,W.VInt 0,W.VText "Int"],W.VNode 85 [W.VText "x",W.VText "x",W.VText "Int"]] $ \bad -> do
+    fixture <- right (W.planGraph W.defaultLimits [pattern (hole:bad:drop 2 cells) [W.VNode 89 [W.VInt 11,W.VInt 0,W.VInt 8]] 12])
+    unless (rejected (Structure.storedTermFor True fixture (head (W.graphRoots fixture)))) (fail "malformed ground atom")
+  let f = T.XName 0 "fλ"; variable = T.XTyVar 42
+      scheme = T.XForall variable T.XBot (T.XArrow (T.XVar variable) (T.XVar variable))
+      xs = [-9..23]
+      source = T.XLet result (tree [T.XApp (unary f ty) (T.XIntTerm n) | n <- xs]) (T.XConstructor "()" [])
+      parameters = Separate.pack [Separate.pack ["0","fλ",Pretty.prettyType (Separate.normalType scheme)]]
+      exported = Separate.pack [Separate.pack ["export😀","Int"]]
+  verified <- right (Open.check env [(f,scheme)] source)
+  check "checked ground fingerprint" (H.unpack (Separate.fingerprint (Separate.pack [Separate.pack [],parameters,Pretty.prettyTerm source,exported]))) (H.unpack (Open.fingerprint verified))
+  persisted <- right (W.planGraph W.defaultLimits [Open.encodeRaw (W.VNode 1 []) "raw" "unit" verified])
+  W.GNode 425 [_,record] <- right (W.lookupGraphNode persisted (head (W.graphRoots persisted)))
+  W.GNode 441 [_,_,_,_,stored,_,_] <- right (W.lookupGraphNode persisted record)
+  got <- right (Structure.storedTermFor True persisted stored)
+  check "checked ground application roundtrip" (H.unpack (Pretty.prettyTerm source)) (H.unpack (Pretty.prettyTerm got))
   graph <- right (W.planGraph W.defaultLimits [good,good])
   unless (rejected (Structure.admitPatterns graph 45)) (fail "expanded work for repeated application roots")
   _ <- right (Structure.admitPatterns graph 46)
