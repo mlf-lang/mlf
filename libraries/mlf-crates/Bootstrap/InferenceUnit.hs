@@ -433,7 +433,36 @@ module Bootstrap.InferenceUnit where {
   data GroundType = GroundVar Int | GroundArrow GroundType GroundType |
     GroundCon String ([] GroundType) | GroundApply GroundType GroundType;
   data GroundState = GroundState Int (IntMap GroundType) (IntMap Int) Int;
-  data GroundBinding = GroundLocal XName GroundType | GroundImport XName XType;
+  -- A unary scheme can pass its fresh type argument straight from an operand
+  -- to the result. The wrapper, if present, must contain exactly that variable.
+  data GroundParameter = GroundBare | GroundWrapped String;
+  data GroundBinding = GroundLocal XName GroundType | GroundImport XName XType |
+    GroundUnaryImport XName XType XTyVar GroundParameter GroundParameter;
+  groundImport name scheme = let {
+    general = GroundImport name scheme;
+    shape variable ty = case ty of {
+      XVar other -> if T.tyVarId variable == T.tyVarId other then Just GroundBare else Nothing;
+      XCon wrapper [XVar other] -> if T.tyVarId variable == T.tyVarId other then Just (GroundWrapped wrapper) else Nothing;
+      _ -> Nothing
+    }
+  } in case scheme of {
+    XForall variable XBot (XArrow domain result) -> case (,) (shape variable domain) (shape variable result) of {
+      (,) (Just input) (Just output) -> GroundUnaryImport name scheme variable input output;
+      _ -> general
+    };
+    _ -> general
+  };
+  groundParameter shape value = case shape of {
+    GroundBare -> value;
+    GroundWrapped wrapper -> GroundCon wrapper [value]
+  };
+  groundOperand state shape actual = case shape of {
+    GroundBare -> Just actual;
+    GroundWrapped wrapper -> case groundDeref state actual of {
+      GroundCon name [value] -> if eqString wrapper name then Just value else Nothing;
+      _ -> Nothing
+    }
+  };
   data GroundTerm = GroundLiteral XTerm | GroundVariable XName XType ([] ((,) XTyVar GroundType)) |
     GroundPrimitive Primitive ([] GroundType) | GroundLambda XName GroundType GroundTerm |
     GroundApplication GroundTerm GroundTerm;
@@ -545,6 +574,7 @@ module Bootstrap.InferenceUnit where {
   groundUse state binding = case binding of {
     Nothing -> Left "unknown ground variable";
     Just (GroundLocal name ty) -> Right ((,,) (GroundLiteral (XVarTerm name)) ty state);
+    Just (GroundUnaryImport name ty _ _ _) -> groundUse state (Just (GroundImport name ty));
     Just (GroundImport name ty) -> do {
       (,,) actual arguments next <- groundScheme M.empty [] state ty;
       Right ((,,) (GroundVariable name ty arguments) actual next)
@@ -567,27 +597,54 @@ module Bootstrap.InferenceUnit where {
     SGlobal identity _ -> groundUse state (M.lookup compareInt (V.toInt identity) globals);
     SDeclScope [identity] (SLam name annotation body) -> groundLambda globals names state (Just identity) name annotation body;
     SLam name annotation body -> groundLambda globals names state Nothing name annotation body;
-    SApp f a -> do {
-      (,,) function functionType next <- groundInfer globals names state f;
-      (,,) argument argumentType following <- groundInfer globals names next a;
-      let {
-        allocated = groundFresh following;
-        fresh = snd allocated;
-        applied = GroundApplication function argument
-      };
-      case groundDeref following functionType of {
-        GroundArrow domain result -> do {
-          -- The result already belongs to this type. Preserve the identity
-          -- supply but avoid storing an alias for a new result variable.
-          solved <- groundUnify fresh domain argumentType;
-          Right ((,,) applied result solved)
+    SApp f a -> let {
+      ordinary operator = do {
+        (,,) function functionType next <- operator;
+        (,,) argument argumentType following <- groundInfer globals names next a;
+        let {
+          allocated = groundFresh following;
+          fresh = snd allocated;
+          applied = GroundApplication function argument
         };
-        unknown -> do {
-          let { result = fst allocated };
-          solved <- groundUnify fresh unknown (GroundArrow argumentType result);
-          Right ((,,) applied result solved)
+        case groundDeref following functionType of {
+          GroundArrow domain result -> do {
+            -- The result already belongs to this type. Preserve the identity
+            -- supply but avoid storing an alias for a new result variable.
+            solved <- groundUnify fresh domain argumentType;
+            Right ((,,) applied result solved)
+          };
+          unknown -> do {
+            let { result = fst allocated };
+            solved <- groundUnify fresh unknown (GroundArrow argumentType result);
+            Right ((,,) applied result solved)
+          }
         }
+      };
+      bound binding = case binding of {
+        Just (GroundUnaryImport name scheme variable input output) -> let {
+          allocated = groundFresh state; hole = fst allocated; next = snd allocated
+        } in do {
+          (,,) argument actual following <- groundInfer globals names next a;
+          let {
+            fresh = snd (groundFresh following);
+            applied value = GroundApplication (GroundVariable name scheme [(,) variable value]) argument
+          };
+          case groundOperand following input actual of {
+            -- Only this use owns the fresh parameter. Forwarding the actual
+            -- type also preserves constraints imposed later on that operand.
+            Just value -> Right ((,,) (applied value) (groundParameter output value) fresh);
+            Nothing -> do {
+              solved <- groundUnify fresh (groundParameter input hole) actual;
+              Right ((,,) (applied hole) (groundParameter output hole) solved)
+            }
+          }
+        };
+        _ -> ordinary (groundUse state binding)
       }
+    } in case f of {
+      SGlobal i _ -> bound (M.lookup compareInt (V.toInt i) globals);
+      SVar name -> bound (M.lookup compareString name names);
+      _ -> ordinary (groundInfer globals names state f)
     };
     SPrimitive primitive -> groundPrimitive state primitive;
     SIntLit n -> Right ((,,) (GroundLiteral (XIntTerm n)) (GroundCon "Int" []) state);
@@ -628,7 +685,7 @@ module Bootstrap.InferenceUnit where {
     (,) [(,) identity ((,,) name (Just annotation) _)] ((,) (SProgram declarations expression) _) -> do {
       expected <- monomorphicAnnotation annotation;
       let { entries = zip parameters (range 0 (length parameters - 1));
-        binding = \((,,) _ hint ty) serial -> GroundImport (XName serial hint) ty;
+        binding = \((,,) _ hint ty) serial -> groundImport (XName serial hint) ty;
         globals = M.fromList compareInt (map (\((,) row@((,,) i _ _) serial) -> (,) (V.toInt i) (binding row serial)) entries);
         names = M.fromList compareString (map (\((,) row@((,,) _ n _) serial) -> (,) n (binding row serial)) entries);
         ps = map (\((,) ((,,) _ hint ty) serial) -> (,) (XName serial hint) ty) entries;
@@ -686,7 +743,7 @@ module Bootstrap.InferenceUnit where {
       };
       _ -> Left "ground specialization requires a recursive group"
     };
-    let { bindings = append (map (\((,,) i n ty) -> (,,) i n (GroundImport n ty)) imported)
+    let { bindings = append (map (\((,,) i n ty) -> (,,) i n (groundImport n ty)) imported)
             (map (\(GroundMember i n _ ty _) -> (,,) i n (GroundLocal n ty)) rows);
       globals = M.fromList compareInt (map (\((,,) i _ value) -> (,) i value) bindings);
       names = M.fromList compareString (map (\((,,) _ n value) -> (,) (X.nameHint n) value) bindings);
