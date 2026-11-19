@@ -422,6 +422,44 @@ resolverChecks = do
   dictCrate <- right (Crate.prepareCrate (Crate.CrateSpec "dict-rec" "" T.NoImplicitPrelude [] [] "" "") [] [primitive,dictSource])
   case Crate.preparedSourcePlan dictCrate of
     T.Just _ -> pure (); T.Nothing -> error "copied helper incorrectly merged a source and dictionary SCC"
+  headerLib <- parsed ("HeaderLib","module HeaderLib (value) where\nvalue :: Int\nvalue = 4\nprivate = 8\n")
+  headerVia <- parsed ("HeaderVia","module HeaderVia (module L) where\nimport HeaderLib as L\n")
+  headerMain <- parsed ("Main","module Main (main) where\nimport HeaderVia\nmain = value\n")
+  let capture (Crate.CompilationModules table units _) _ _ _ _ entry reach _ =
+        (table,[(Crate.compilationName u,Crate.compilationExports u,Crate.compilationContents u) | u <- units],entry,reach)
+      entities iface = [(H.unpack (Modules.owner e),H.unpack (Modules.spelling e),Modules.roleCode (Modules.role e)) |
+                          e <- S.toList (Modules.visible iface)]
+      reachable reach = [(H.unpack owner,map H.unpack (S.toList names)) | (owner,names) <- M.toList reach]
+      bodyView m = [(H.unpack name,H.unpack (CQ.encodeExpression rhs)) | (name,_,rhs) <- Modules.sourceValues m]
+      describe table (owner,exports,contents) = do
+        iface <- right exports
+        let symbols = Modules.bindingSymbols table
+            binding (D.Bound slot _ rhs) = (H.unpack (D.symbolKey symbols slot),map V.toInt (R.references rhs))
+        pure (H.unpack owner,entities iface,map binding (Modules.renamedBindings contents))
+  forM_ [("",[primitive,dictSource]),("Main",[primitive,headerMain,headerVia,headerLib])] $ \(entry,inputs) -> do
+    let spec = Crate.CrateSpec "headers" entry T.NoImplicitPrelude [] [] "" ""
+    full <- right (Crate.prepareCrate spec [] inputs)
+    (table,units,entryId,reach) <- right (Crate.prepareFileCrate capture spec [] inputs)
+    let resolution = Crate.preparedResolution full
+        modules = Modules.resolvedCrateModules resolution
+        fullRows = [(Modules.moduleIdentity (Modules.resolvedSource m),Modules.resolvedExports T.NoImplicitPrelude m,
+                     Modules.resolvedContents m) | m <- modules]
+    want <- mapM (describe (Modules.resolvedCrateBindings resolution)) fullRows
+    got <- mapM (describe table) units
+    check "file compilation preserves defining exports, slots and references" want got
+    check "file compilation preserves entry ownership and transitive imports"
+      (H.unpack (Crate.preparedEntry full),reachable (Crate.preparedReach full))
+      (H.unpack (Crate.entryName entryId),reachable reach)
+    forM_ inputs $ \input -> do
+      let owner = Modules.moduleIdentity input
+          originals = [bodyView source | m <- modules, let source = Modules.resolvedSource m,
+                         Modules.moduleIdentity source == owner]
+      check "each supplied module retains its original value expressions" [bodyView input] originals
+    unless (H.unpack entry == "") $ do
+      check "re-export retains its defining module" [("HeaderLib","value",Modules.roleCode Modules.Value)]
+        (concat [es | ("HeaderVia",es,_) <- got])
+      check "entry includes its transitive import" True
+        ("HeaderLib" `elem` concat [ns | ("Main",ns) <- reachable reach])
   let fresh = D.symbols [("a",False),("b",False),("c",True)]
   let (appended, late) = D.appendSymbols fresh ["selector","dictionary"]
   check "generation appends slots in source order" [3,4] (map V.toInt late)
