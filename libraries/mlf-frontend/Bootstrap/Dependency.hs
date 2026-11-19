@@ -29,6 +29,12 @@ module Bootstrap.Dependency where {
   emptyObservation = Observation [] [] [] [];
   merge (Observation a b c d) (Observation w x y z) =
     Observation (append a w) (append b x) (append c y) (append d z);
+  -- Type observations have no term references. Match both observation
+  -- constructors as for merge, while reusing the expression's value field.
+  observeTypeAfter (Observation vs at ac ak) (Observation _ bt bc bk) =
+    Observation vs (append at bt) (append ac bc) (append ak bk);
+  observeTypeBefore (Observation _ at ac ak) (Observation vs bt bc bk) =
+    Observation vs (append at bt) (append ac bc) (append ak bk);
   mergeMany observations = foldr merge emptyObservation observations;
   canonical names = S.toList (S.fromList compareString names);
   normalize (Observation a b c d) =
@@ -160,8 +166,8 @@ module Bootstrap.Dependency where {
         merge (observeOptional a) (bindObservation (S.singleton n) (child b));
       SLet n a b ->
         merge (child a) (bindObservation (S.singleton n) (child b));
-      SAnn a t -> merge (child a) (observeAnnotation t);
-      SSignature a t -> merge (child a) (observeAnnotation t);
+      SAnn a t -> observeTypeAfter (child a) (observeAnnotation t);
+      SSignature a t -> observeTypeAfter (child a) (observeAnnotation t);
       SCase a branches ->
         merge (child a)
           (mergeMany
@@ -190,7 +196,7 @@ module Bootstrap.Dependency where {
       SWanted dictionary candidates ->
         Observation (if includeCandidates then map (compose LexicalRef snd) candidates else []) ((:) dictionary []) [] [];
       SWantedRefs dictionary candidates -> Observation (if includeCandidates then map snd candidates else []) [dictionary] [] [];
-      SChecked ty b -> merge (observeType ty) (child b);
+      SChecked ty b -> observeTypeBefore (observeType ty) (child b);
       _ -> emptyObservation
     };
   -- Typed reads survive a same-spelled local binder. Collect every RHS and

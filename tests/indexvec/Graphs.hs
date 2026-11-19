@@ -598,6 +598,24 @@ typedClassChecks = do
   check "scope with typed binder leaves a lexical reference free" ["same"] (map H.unpack (D.expressionNamedReads copied))
   check "prepared syntax also inventories the owned slot and enclosed occurrence"
     [1,1,1,0] [V.toInt i | T.DeclRef i _ <- D.querySyntaxRefs copied]
+  let annotation = T.SAnnotation [] (T.SQualified [T.SPredicate "C" [T.SCon "Inner" []]] (T.SCon "Body" []))
+      bodyWithType = T.SChecked (T.SCon "Head" []) (T.SSignature (T.SApp (T.SGlobal own "outer") (T.SConstructor "K")) annotation)
+      observed = D.observeSyntax True True bodyWithType
+  check "checked and annotated terms retain references and ordered type, constructor and class fields"
+    ([V.toInt own],["Head","Inner","Body"],["K"],["C"])
+    ([V.toInt i | T.DeclRef i _ <- D.valueOccurrences True True bodyWithType],
+     map H.unpack (D.typeNames observed),map H.unpack (D.constructorNames observed),map H.unpack (D.classNames observed))
+  let brokenType = T.SAnnotation [] (T.SArrow (error "annotation domain") (error "annotation codomain"))
+      incomplete = T.SApp (T.SSignature (T.SVar "x") brokenType) (error "following expression")
+      firstFault refs = do
+        outcome <- try (evaluate (null refs)) :: IO (Either ErrorCall Bool)
+        case outcome of
+          Left err -> pure (takeWhile (/= '\n') (displayException err))
+          Right _ -> fail "incomplete application produced a reference list"
+  expectedFault <- firstFault (D.valueRefs (D.observeSyntax False False incomplete))
+  collectedFault <- firstFault (D.valueOccurrences False False incomplete)
+  check "observing an incomplete application preserves the first source diagnostic"
+    expectedFault collectedFault
   let factsBase = D.symbolsWithKeys [("same","A.same",False),("same","B.same",False),
                                      ("method","C.method",True),("root","Root.root",False)]
       [qualified,plain,_,owner] = V.indices (D.symbolNodes factsBase)
