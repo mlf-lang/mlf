@@ -186,7 +186,7 @@ module Bootstrap.Crate where {
                             ensure (eqString name (Modules.moduleIdentity source))
                               ("crate source declares " ++
                                (Modules.moduleIdentity source ++ (", expected " ++ name)));
-                            Separate.cleanSource source
+                            Separate.cleanParsedSource source
                           } of {
                        Left message -> ioReturn (Left message);
                        Right clean ->

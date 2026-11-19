@@ -205,24 +205,39 @@ module Bootstrap.Separate where {
     SVar n -> SVar (hygieneName env n);
     _ -> term
   };
-  hygieneApplication env term = case term of {
-    SApp f a -> do { x <- hygieneApplication env f; y <- hygieneApplication env a; freshPure (SApp x y) };
-    SCallSite n span e -> do { b <- hygieneApplication env e; freshPure (SCallSite n span b) };
-    _ -> hygieneIn env term
+  -- A parsed application needs a new node only on a path to a renamed
+  -- lexical occurrence. Keep its original source spans and untouched
+  -- operands. General callers retain the original lazy tree mapping.
+  renameParsedPlain env expression = let {
+    changed term = case term of {
+      SVar name -> if managedIntrinsicName name then Nothing else mapOptional SVar (M.lookup compareString name env);
+      SCallSite label span body -> mapOptional (SCallSite label span) (changed body);
+      SApp f a -> case changed f of {
+        Nothing -> mapOptional (SApp f) (changed a);
+        Just function -> Just (SApp function (fromMaybe a (changed a)))
+      };
+      _ -> Nothing
+    }
+  } in fromMaybe expression (changed expression);
+  hygieneApplication env term = hygieneApplicationWith hygieneIn env term;
+  hygieneApplicationWith walk env term = let { child = hygieneApplicationWith walk env } in case term of {
+    SApp f a -> do { x <- child f; y <- child a; freshPure (SApp x y) };
+    SCallSite n span e -> do { b <- child e; freshPure (SCallSite n span b) };
+    _ -> walk env term
   };
   hygieneIn :: Map String String -> SExpr -> Fresh SExpr;
-  hygieneIn env expression =
-    case expression of {
+  hygieneIn env expression = hygieneWith renamePlain env expression;
+  hygieneWith rename env expression = let { walk = hygieneWith rename } in case expression of {
       SVar n -> freshPure (SVar (hygieneName env n));
       SGlobal _ _ -> freshPure expression;
       SWantedRefs n cs -> freshPure (SWantedRefs n (map (\((,) role r) -> (,) role (hygieneRef env r)) cs));
       SDeclScope ids enclosed -> do {
         b <- case enclosed of {
-          SLam n a body -> do { x <- hygieneIn env body; freshPure (SLam n a x) };
-          SLet n a body -> do { x <- hygieneIn env a; y <- hygieneIn env body; freshPure (SLet n x y) };
+          SLam n a body -> do { x <- walk env body; freshPure (SLam n a x) };
+          SLet n a body -> do { x <- walk env a; y <- walk env body; freshPure (SLet n x y) };
           SLetRec ds body -> do {
-            defs <- mapM (\((,,) n mode rhs) -> do { x <- hygieneIn env rhs; freshPure ((,,) n mode x) }) ds;
-            x <- hygieneIn env body; freshPure (SLetRec defs x)
+            defs <- mapM (\((,,) n mode rhs) -> do { x <- walk env rhs; freshPure ((,,) n mode x) }) ds;
+            x <- walk env body; freshPure (SLetRec defs x)
           };
           _ -> freshFail "invalid declaration binder in separate compilation"
         };
@@ -231,27 +246,27 @@ module Bootstrap.Separate where {
       SLam n a b ->
         do {
           scope <- hygieneBind env ((:) n []);
-          body <- hygieneIn scope b;
+          body <- walk scope b;
           freshPure (SLam (hygieneName scope n) a body)
         };
       SApp _ _ -> if plainHygiene expression
-        then freshPure (if M.null env then expression else renamePlain env expression)
-        else hygieneApplication env expression;
+        then freshPure (if M.null env then expression else rename env expression)
+        else hygieneApplicationWith walk env expression;
       SLet n a b ->
         do {
           scope <- hygieneBind env ((:) n []);
-          x <- hygieneIn env a;
-          y <- hygieneIn scope b;
+          x <- walk env a;
+          y <- walk scope b;
           freshPure (SLet (hygieneName scope n) x y)
         };
       SAnn a t ->
         do {
-          x <- hygieneIn env a;
+          x <- walk env a;
           freshPure (SAnn x t)
         };
       SSignature a t ->
         do {
-          x <- hygieneIn env a;
+          x <- walk env a;
           freshPure (SSignature x t)
         };
       SLetRec ds b ->
@@ -261,22 +276,22 @@ module Bootstrap.Separate where {
             mapM
               (\((,,) n mode a) ->
                  do {
-                   x <- hygieneIn scope a;
+                   x <- walk scope a;
                    freshPure ((,,) (hygieneName scope n) mode x)
                  })
               ds;
-          body <- hygieneIn scope b;
+          body <- walk scope b;
           freshPure (SLetRec definitions body)
         };
       SCase a bs ->
         do {
-          scrutinee <- hygieneIn env a;
+          scrutinee <- walk env a;
           branches <-
             mapM
               (\(SAlternative p b) ->
                  do {
                    scope <- hygieneBind env (Surface.patternVariables p);
-                   body <- hygieneIn scope b;
+                   body <- walk scope b;
                    freshPure (SAlternative (hygienePattern scope p) body)
                  })
               bs;
@@ -289,26 +304,26 @@ module Bootstrap.Separate where {
               (\((,) ps b) ->
                  do {
                    scope <- hygieneBind env (concatMap Surface.patternVariables ps);
-                   body <- hygieneIn scope b;
+                   body <- walk scope b;
                    freshPure ((,) (map (hygienePattern scope) ps) body)
                  })
               rows;
           freshPure (SEquations rows2)
         };
       SSourceDefinition body ->
-        do { result <- hygieneIn env body; freshPure (SSourceDefinition result) };
+        do { result <- walk env body; freshPure (SSourceDefinition result) };
       SCallSite label span body ->
-        do { result <- hygieneIn env body; freshPure (SCallSite label span result) };
+        do { result <- walk env body; freshPure (SCallSite label span result) };
       SSharedBind pattern action continuation bindMethod failure ->
         do {
           scope <- hygieneBind env (Surface.patternVariables pattern);
-          action2 <- hygieneIn env action;
-          continuation2 <- hygieneIn scope continuation;
-          bindMethod2 <- hygieneIn env bindMethod;
-          failure2 <- hygieneIn env failure;
+          action2 <- walk env action;
+          continuation2 <- walk scope continuation;
+          bindMethod2 <- walk env bindMethod;
+          failure2 <- walk env failure;
           freshPure (SSharedBind (hygienePattern scope pattern) action2 continuation2 bindMethod2 failure2)
         };
-      SDo _ _ -> hygieneIn env (Desugar.desugarDo expression);
+      SDo _ _ -> walk env (Desugar.desugarDo expression);
       _ -> freshPure expression
     };
   hygiene expression = runFresh (Desugar.allNames expression) (hygieneIn M.empty expression);
@@ -414,21 +429,23 @@ module Bootstrap.Separate where {
       Right t -> t;
       Left e -> panic e
     };
-  cleanSource (SourceModule path name exports imports ds cs is vs body syntax) =
+  cleanSource source = cleanSourceWith hygiene source;
+  cleanParsedSource source = cleanSourceWith (\e -> runFresh (Desugar.allNames e) (hygieneWith renameParsedPlain M.empty e)) source;
+  cleanSourceWith clean (SourceModule path name exports imports ds cs is vs body syntax) =
     do {
-      values <- traverseEither (\((,,) n a e) -> mapEither ((,,) n a) (hygiene e)) vs;
+      values <- traverseEither (\((,,) n a e) -> mapEither ((,,) n a) (clean e)) vs;
       instances <-
         traverseEither
           (\(SInstanceDecl vars context klass head methods) ->
              do {
-               methods2 <- traverseEither (\((,) n e) -> mapEither ((,) n) (hygiene e)) methods;
+               methods2 <- traverseEither (\((,) n e) -> mapEither ((,) n) (clean e)) methods;
                Right (SInstanceDecl vars context klass head methods2)
              })
           is;
       body2 <-
         case body of {
           Nothing -> Right Nothing;
-          Just e -> mapEither Just (hygiene e)
+          Just e -> mapEither Just (clean e)
         };
       Right (SourceModule path name exports imports ds cs instances values body2 syntax)
     };
