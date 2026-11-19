@@ -196,10 +196,11 @@ module Bootstrap.Surface where {
         (\_ -> V.freeze table)));
   bindResolvedWith project scoped values = bindResolvedRows scoped values
     (V.at (projectedBindings project values));
-  bindResolvedRows scoped values@(Dependency.BoundValues _ bindings) member body = case bindings of {
+  bindResolvedRows scoped values = bindResolvedEdgeRows scoped (Dependency.checkedSourceEdges values);
+  bindResolvedEdgeRows scoped edges@(Dependency.SourceEdges (Dependency.BoundValues _ bindings) _) member body = case bindings of {
     [] -> Right body;
     (:) _ _ -> do {
-      (,) _ groups <- Dependency.resolvedGroups values [] M.empty M.empty;
+      (,) _ groups <- Dependency.resolvedGroupsFromScopes edges [] M.empty (Dependency.NamedScopes M.empty);
       let { wrap continuation group = let { ids = map fst group } in mapEither (scoped ids)
               (wrapValueGroup (map member ids) (length group > 1 || any snd group) continuation)
       } in foldM wrap body (reverse groups)

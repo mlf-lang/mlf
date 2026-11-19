@@ -1079,6 +1079,7 @@ module Bootstrap.SourceInference where {
         NamedInput members -> (,) (Surface.bindValues members entry)
           (\_ supports methods targets -> namedPlan members supports methods (Dependency.namedScopes targets));
         ResolvedInput bindings@(Dependency.BoundValues base _) -> let {
+          edges = Dependency.checkedSourceEdges bindings;
           indexed = Surface.projectedBindings Surface.indexedValue bindings;
           row ordinal (Dependency.Bound i annotation rhs) = (,) i
             (ProjectedSource ordinal annotation rhs (sourceRhs (V.at indexed i)));
@@ -1089,10 +1090,10 @@ module Bootstrap.SourceInference where {
               original = Dependency.symbolNodes base;
               compatible = V.count original <= V.count (Dependency.symbolNodes target) &&
                 all (\i -> eqString (V.at original i) (Dependency.symbolName target i)) (V.indices original);
-              build = if compatible then indexedPlanUsing row else indexedPlanWith
-            } in build bindings generation supports (\i -> map snd (Classes.inventoryCandidateIds inventory i))
+              sourceRow = if compatible then row else plannedSourceRow
+            } in indexedPlanFrom sourceRow edges generation supports (\i -> map snd (Classes.inventoryCandidateIds inventory i))
           }
-        } in (,) (Surface.bindResolvedRows SDeclScope bindings (V.at indexed) entry) graph
+        } in (,) (Surface.bindResolvedEdgeRows SDeclScope edges (V.at indexed) entry) graph
       }
     };
     body <- fst parts;
@@ -1137,10 +1138,11 @@ module Bootstrap.SourceInference where {
               Dependency.IndexedScopes _ _ _ _ _ -> Dependency.scopeAt scopes i
             }))
     } in indexedPlanWith bindings generation supports targets;
-  indexedPlanWith = indexedPlanUsing (\ordinal (Dependency.Bound i annotation rhs) ->
-    (,) i (PlannedSource ordinal annotation rhs));
-  indexedPlanUsing sourceRow bindings@(Dependency.BoundValues base members) generation supports targets = do {
-    (,) symbols groups <- Dependency.resolvedGroupsWith bindings generation (Dependency.declarationEdges supports) targets;
+  plannedSourceRow ordinal (Dependency.Bound i annotation rhs) = (,) i (PlannedSource ordinal annotation rhs);
+  indexedPlanWith = indexedPlanUsing plannedSourceRow;
+  indexedPlanUsing sourceRow bindings = indexedPlanFrom sourceRow (Dependency.checkedSourceEdges bindings);
+  indexedPlanFrom sourceRow edges@(Dependency.SourceEdges (Dependency.BoundValues base members) _) generation supports targets = do {
+    (,) symbols groups <- Dependency.resolvedGroupsFrom edges generation (Dependency.declarationEdges supports) targets;
     let { baseCount = V.count (Dependency.symbolNodes base); count = V.count (Dependency.symbolNodes symbols);
           sources = map Dependency.boundId members; generated = Dependency.generatedSlots generation;
           source i = V.toInt i < baseCount;

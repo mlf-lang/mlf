@@ -547,25 +547,10 @@ module Bootstrap.Dependency where {
   resolvedGroups :: BoundValues -> [] ((,) String ([] String)) -> Map String ((,) String ([] String)) ->
     Map String ([] String) -> Either String ((,) Symbols ([] ([] ((,) (V.Index Declaration) Bool))));
   resolvedGroups bindings generated methods scopes = resolvedGroupsInScopes bindings generated methods (NamedScopes scopes);
-  resolvedGroupsInScopes bindings@(BoundValues base bound) generated methods scopes =
-    let { generation = generatedTable base (map boundId bound) (map fst generated) [] methods;
-          targets i = mapMaybe (generatedNameId generation) (fromMaybe []
-            (case scopes of {
-              NamedScopes values -> M.lookup compareString (symbolName base i) values;
-              IndexedScopes _ _ _ _ _ -> scopeAt scopes i
-            }))
-    } in resolvedGroupsWith bindings generation generated targets;
-  resolvedGroupsWith (BoundValues base bound) generation generated targets = do {
-    let { symbols = generatedSymbols generation; nodes = symbolNodes symbols;
-          generatedIds = generatedSlots generation;
-          present = append (map boundId bound) generatedIds;
-          active = IS.fromList (map V.toInt present);
-          presentId i = IS.member (V.toInt i) active;
-          duplicate = if null generated then "duplicate value declaration" else "duplicate source/support binding";
-          orderedIds = case symbols of { Symbols _ indices _ _ -> filter presentId indices }
-    };
-    -- Edges depend on the referenced declaration ID. Check every occurrence
-    -- in source order, sharing the first occurrence of each ID with row construction.
+  -- Source and support graphs use different active declarations and selector
+  -- targets. They can share the first occurrence of every checked source ID.
+  data SourceEdges = SourceEdges BoundValues ([] ((,) (V.Index Declaration) (Maybe ([] (V.Index Declaration)))));
+  checkedSourceEdges bindings@(BoundValues base bound) =
     let { valid i = V.toInt i >= 0 && V.toInt i < V.count (symbolNodes base);
           checked seen kept refs = case refs of {
             [] -> Just (reverse kept);
@@ -574,8 +559,27 @@ module Bootstrap.Dependency where {
               else checked (IS.insert key seen) ((:) i kept) rest
           };
           sourceIds (Bound i _ rhs) =
-            (,) i (if valid i then checked IS.empty [] (R.references rhs) else Nothing);
-          references = map sourceIds bound };
+            (,) i (if valid i then checked IS.empty [] (R.references rhs) else Nothing)
+    } in SourceEdges bindings (map sourceIds bound);
+  resolvedGroupsInScopes bindings = resolvedGroupsFromScopes (checkedSourceEdges bindings);
+  resolvedGroupsFromScopes edges@(SourceEdges (BoundValues base bound) _) generated methods scopes =
+    let { generation = generatedTable base (map boundId bound) (map fst generated) [] methods;
+          targets i = mapMaybe (generatedNameId generation) (fromMaybe []
+            (case scopes of {
+              NamedScopes values -> M.lookup compareString (symbolName base i) values;
+              IndexedScopes _ _ _ _ _ -> scopeAt scopes i
+            }))
+    } in resolvedGroupsFrom edges generation generated targets;
+  resolvedGroupsWith bindings = resolvedGroupsFrom (checkedSourceEdges bindings);
+  resolvedGroupsFrom (SourceEdges (BoundValues _ bound) references) generation generated targets = do {
+    let { symbols = generatedSymbols generation; nodes = symbolNodes symbols;
+          generatedIds = generatedSlots generation;
+          present = append (map boundId bound) generatedIds;
+          active = IS.fromList (map V.toInt present);
+          presentId i = IS.member (V.toInt i) active;
+          duplicate = if null generated then "duplicate value declaration" else "duplicate source/support binding";
+          orderedIds = case symbols of { Symbols _ indices _ _ -> filter presentId indices }
+    };
     ensure (all (compose isJust snd) references) "declaration slot out of bounds";
     ensure (IS.size active == length present && uniqueSlots nodes orderedIds) duplicate;
     let { order = V.fromList orderedIds;
