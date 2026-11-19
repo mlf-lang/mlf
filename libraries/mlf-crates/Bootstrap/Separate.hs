@@ -160,13 +160,15 @@ module Bootstrap.Separate where {
   managedIntrinsicName n = eqString n "$MLF.Stack.callStack";
   hygieneName env n =
     if managedIntrinsicName n then n else M.findWithDefault compareString n n env;
+  hygieneBinderPrefix :: String;
+  hygieneBinderPrefix = "separateLocal";
   hygieneBind env names =
     do {
       pairs <-
         mapM
           (\n ->
              do {
-               new <- freshName "separateLocal";
+               new <- freshName hygieneBinderPrefix;
                freshPure ((,) n new)
              })
           names;
@@ -430,7 +432,20 @@ module Bootstrap.Separate where {
       Left e -> panic e
     };
   cleanSource source = cleanSourceWith hygiene source;
-  cleanParsedSource source = cleanSourceWith (\e -> runFresh (Desugar.allNames e) (hygieneWith renameParsedPlain M.empty e)) source;
+  cleanParsedSource = cleanParsedReserving True;
+  cleanParsedReserving possible = cleanSourceWith (\e ->
+    runFresh (if possible then Desugar.allNames e else []) (hygieneWith renameParsedPlain M.empty e));
+  -- Shared identifiers have literal token spellings. Qualification joins
+  -- components with dots. The parser's generated names use other prefixes.
+  -- A hit anywhere, including a comment or string, keeps full reservations.
+  sourceHasHygienePrefix text = let {
+    size = stringLength text; last = stringLength hygieneBinderPrefix - 1;
+    first = stringCodeAt hygieneBinderPrefix 0; final = stringCodeAt hygieneBinderPrefix last;
+    scan end = end < size &&
+      ((stringCodeAt text end == final && stringCodeAt text (end - last) == first &&
+        Lexer.textStartsAt text (end - last) hygieneBinderPrefix) ||
+       scan (end + 1))
+  } in scan last;
   cleanSourceWith clean (SourceModule path name exports imports ds cs is vs body syntax) =
     do {
       values <- traverseEither (\((,,) n a e) -> mapEither ((,,) n a) (clean e)) vs;

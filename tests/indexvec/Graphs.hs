@@ -1060,6 +1060,13 @@ lexicalRunChecks = do
   check "UTF8 array snapshots preserve a slice and embedded NUL" [240,159,152,128,0]
     =<< mapM (Prim.readByteArray second) [0..4]
   check "mutating a UTF8 array preserves the input string" "😀\0" (H.unpack section)
+  let prefix = "separateLocal"
+  forM_ [0,1,7,256] $ \offset ->
+    forM_ ["",prefix,prefix ++ "0","separateLoca","separateLocλ","x" ++ prefix] $ \word -> do
+      let text = replicate offset 'λ' ++ word ++ replicate offset 'l'
+          reference = any (\i -> take (length prefix) (drop i text) == prefix) [0..length text]
+      check "parsed source hygiene conservatively detects every binder prefix"
+        reference (Separate.sourceHasHygienePrefix (H.literal text))
   forM_ [Lexer.isDigit,Lexer.isHexDigit,Lexer.isIdentChar,Lexer.isOperator] $ \predicate ->
     forM_ [0..size] $ \i -> do
       let before = Lexer.Cursor i 12 19

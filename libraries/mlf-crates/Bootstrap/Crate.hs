@@ -187,7 +187,10 @@ module Bootstrap.Crate where {
                             ensure (eqString name (Modules.moduleIdentity source))
                               ("crate source declares " ++
                                (Modules.moduleIdentity source ++ (", expected " ++ name)));
-                            Separate.cleanParsedSource source
+                            Separate.cleanParsedReserving
+                              (not (Lexer.isSharedSyntax (Modules.sourceSyntax source)) ||
+                               stringLength text /= stringUtf8Length text ||
+                               Separate.sourceHasHygienePrefix text) source
                           } of {
                        Left message -> ioReturn (Left message);
                        Right clean ->
