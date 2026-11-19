@@ -1145,24 +1145,34 @@ module Bootstrap.Classes where {
       Right (M.fromList compareString (map (\((,,) i _ _) ->
         (,) (Dependency.symbolName symbols i) (V.at flags i)) rows))
     };
-  -- Input references can be released after their reverse edges are stored.
-  -- Only test the saved seed flags after all rows have passed bounds checks.
-  propagateProtection count rows = runST (stBind (V.filled count []) (\users -> let {
-    build saved remaining = case remaining of {
+  -- Adjacent inputs of one source row each add its owner at most once to a
+  -- target's reverse list. Its generation number leaves the owner slot lazy.
+  data ProtectionReaders = NoProtectionReaders | ProtectionReaders Integer ([] (V.Index Declaration));
+  propagateProtection count rows = runST (stBind (V.filled count NoProtectionReaders) (\users -> let {
+    add serial owner target = stBind (V.get users target) (\old -> let {
+      save tail = V.set users target (ProtectionReaders serial ((:) owner tail))
+    } in case old of {
+      NoProtectionReaders -> save [];
+      ProtectionReaders last owners -> if eqInteger last serial then stReturn () else save owners
+    });
+    build serial saved remaining = case remaining of {
       [] -> stReturn saved;
-      (:) ((,,) owner direct refs) rest -> stBind (ST.map_ (\r ->
-        stBind (V.get users r) (\old -> V.set users r ((:) owner old))) refs)
-        (\_ -> build ((:) ((,) owner direct) saved) rest)
-    }
-  } in stBind (build [] rows) (\saved -> stBind (V.filled count False) (\flags ->
-    stBind (spreadProtection users flags (protectionSeeds saved)) (\_ -> V.freeze flags)))));
+      (:) ((,,) owner direct refs) rest -> stBind (ST.map_ (add serial owner) refs) (\_ ->
+        let { next = addInteger serial (intToInteger 1) } in seq next (build next ((:) ((,) owner direct) saved) rest))
+    };
+    children i = stBind (V.get users i) (\entry -> stReturn (case entry of {
+      NoProtectionReaders -> []; ProtectionReaders _ owners -> owners
+    }))
+  } in stBind (build (intToInteger 0) [] rows) (\saved -> stBind (V.filled count False) (\flags ->
+    stBind (spreadProtectionWith children flags (protectionSeeds saved)) (\_ -> V.freeze flags)))));
   protectionSeeds reversed = foldl (\tail ((,) owner direct) -> if direct then (:) owner tail else tail) [] reversed;
-  spreadProtection users flags pending = case pending of {
+  spreadProtection users = spreadProtectionWith (V.get users);
+  spreadProtectionWith children flags pending = case pending of {
     [] -> stReturn ();
     (:) i rest -> stBind (V.get flags i) (\marked ->
-      if marked then spreadProtection users flags rest else
-        stBind (V.set flags i True) (\_ -> stBind (V.get users i) (\next ->
-          spreadProtection users flags (append next rest))))
+      if marked then spreadProtectionWith children flags rest else
+        stBind (V.set flags i True) (\_ -> stBind (children i) (\next ->
+          spreadProtectionWith children flags (append next rest))))
   };
   inventoryOrdinaryRegistry :: ClassInventory -> Map String String;
   inventoryOrdinaryRegistry (ClassInventory _ _ infos _ _ _ _ _ _) =
