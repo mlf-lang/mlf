@@ -105,16 +105,33 @@ module Bootstrap.OpenFragment
         finish i nextTable nextStream = if remaining < 0 then NoPattern else complete i remaining nextTable nextStream;
         save node nextNames nextPrimitives nextGround = if count >= 512 then NoPattern else let { next = count + 1 } in
           seq next (finish count (PatternTable next ((:) node entries) pairs nextNames nextPrimitives nextGround) stream);
-        application left right = visit (depth + 1) remaining table stream left
-          (\l available leftTable leftStream -> visit (depth + 1) available leftTable leftStream right
-            (\h rest current@(PatternTable size nodes apps ns ps gs) literals -> let {
+        -- Successful atom lookups already have a postorder row. A miss
+        -- returns to the ordinary first-use writer before inspecting its sibling.
+        known atom = case atom of {
+          XVarTerm (XName i hint) -> M.lookup (comparePair compareInt compareString) ((,) i hint) names;
+          XTypeApp (XVarTerm (XName i hint)) (XThen (XInner (XBottom (XCon ty []))) XElim) ->
+            M.lookup (comparePair compareInt (comparePair compareString compareString)) ((,) i ((,) hint ty)) ground;
+          XPrimitive p args -> case args of {
+            [] -> IM.lookup (Structure.primitiveCode p) primitives; _ -> Nothing
+          };
+          _ -> Nothing
+        };
+        joined l h rest current@(PatternTable size nodes apps ns ps gs) literals = let {
               key = l * 512 + h
             } in case IM.lookup key apps of {
               Just i -> complete i rest current literals;
               Nothing -> if size >= 512 then NoPattern else let {
                 next = size + 1; row = W.VNode 88 [W.VInt l,W.VInt h]
               } in seq next (complete size rest (PatternTable next ((:) row nodes) (IM.insert key size apps) ns ps gs) literals)
-            }))
+            };
+        application left right = let {
+          afterLeft l available leftTable leftStream =
+            visit (depth + 1) available leftTable leftStream right (joined l);
+          ordinary = visit (depth + 1) remaining table stream left afterLeft
+        } in if depth >= 128 || remaining <= 0 then ordinary else case known left of {
+          Nothing -> ordinary;
+          Just l -> afterLeft l (remaining - 1) table stream
+        }
       } in case term of {
         XApp left right -> application left right;
         XIntTerm integer -> let { next = addLiteral integer stream } in seq next (finish 0 table next);
