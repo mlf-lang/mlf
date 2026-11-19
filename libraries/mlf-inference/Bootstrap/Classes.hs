@@ -1801,34 +1801,45 @@ module Bootstrap.Classes where {
   -- A class-free application allocates one empty demand for its result,
   -- and one or two identities per leaf. Preserve the same root and next
   -- identity, while reserving them together for a complete lambda body.
+  data PlainContinuation = PlainRoot | PlainArgument SExpr PlainContinuation |
+    PlainOperator SExpr PlainContinuation;
   plainLambdaApplication env body fallback = let {
-    advance count cost term done = let { next = count + cost } in seq next (done term next);
-    ref name count done = case lookupQualified name env of {
-      Nothing -> advance count 1 (referenceExpr name) done;
-      Just (QualifiedKnown known []) -> advance count 2 (referenceExpr known) done;
+    returnTo value count pending = case pending of {
+      PlainRoot -> Fresh (\first used -> let { next = first + count } in
+        Right ((,,) (PlainResult (next - 1) value) next used));
+      PlainArgument a rest -> visit False a count (PlainOperator value rest);
+      PlainOperator f rest -> let { next = count + 1 } in
+        seq next (returnTo (SApp f value) next rest)
+    };
+    emit value cost count pending = let { next = count + cost } in seq next (returnTo value next pending);
+    reference source ref count pending = case lookupQualified ref env of {
+      Nothing -> emit source 1 count pending;
+      Just (QualifiedKnown known []) -> emit (referenceExpr known) 2 count pending;
       _ -> fallback
     };
-    plain function expr count done = case expr of {
-      SApp f a -> plain True f count (\left afterFunction ->
-        plain False a afterFunction (\right afterArgument -> advance afterArgument 1 (SApp left right) done));
-      SCallSite label _ inner -> if function then plain True inner count done
+    -- A source location on the function never needs its label or span.
+    -- A primitive consumes one identity before the argument is visited.
+    application f a count pending = case f of {
+      SCallSite _ _ inner -> application inner a count pending;
+      SPrimitive _ -> let { next = count + 1 } in
+        seq next (visit False a next (PlainOperator f pending));
+      _ -> visit True f count (PlainArgument a pending)
+    };
+    visit function expr count pending = case expr of {
+      SApp f a -> application f a count pending;
+      SCallSite label _ inner -> if function then visit True inner count pending
         else if eqString label "an expression type signature" && managedAnnotation inner
-        then fallback else plain False inner count done;
-      SGlobal i hint -> ref (DeclRef i hint) count done;
-      SVar n -> if eqString n "$MLF.Stack.callStack" then fallback else ref (LexicalRef n) count done;
-      SIntLit _ -> advance count 1 expr done;
-      SDoubleLit _ -> advance count 1 expr done;
-      SStringLit _ -> advance count 1 expr done;
-      SBoolLit _ -> advance count 1 expr done;
-      SPrimitive _ -> advance count 1 expr done;
-      SConstructor _ -> advance count 1 expr done;
+        then fallback else visit False inner count pending;
+      SGlobal i hint -> reference expr (DeclRef i hint) count pending;
+      SVar n -> if eqString n "$MLF.Stack.callStack" then fallback
+        else reference expr (LexicalRef n) count pending;
+      SIntLit _ -> emit expr 1 count pending; SDoubleLit _ -> emit expr 1 count pending;
+      SStringLit _ -> emit expr 1 count pending; SBoolLit _ -> emit expr 1 count pending;
+      SPrimitive _ -> emit expr 1 count pending; SConstructor _ -> emit expr 1 count pending;
       _ -> fallback
-    };
-    finish lowered count = Fresh (\first used -> let { next = first + count } in
-      Right ((,,) (PlainResult (next - 1) lowered) next used))
+    }
   } in case body of {
-    SApp _ _ -> plain False body 0 finish;
-    _ -> fallback
+    SApp f a -> application f a 0 PlainRoot; _ -> fallback
   };
   planQualifiedFunction :: Maybe ((,) String SourceSpan) ->
     Dependency.ValueScopes ([] ((,) EvidenceRole String)) -> DataEnv -> Map String Info -> Int ->
