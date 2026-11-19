@@ -820,6 +820,23 @@ knownConstructorFoldChecks = do
     T.Nothing -> pure ()
     _ -> fail "duplicate recursive field in constructor fold"
 
+-- A checked open fragment with no composable proofs can retain its
+-- original body up to the absolute wire depth and work limits.
+openGeometryChecks = do
+  let depth = W.maxDepth W.defaultLimits
+      wrap count t = foldr (\_ child -> W.VNode 8 [child]) t [1..count]
+      normal = W.VInt 0
+      proof = W.VNode 58 [W.VNode 50 [], W.VNode 58 [W.VNode 50 [], W.VNode 50 []]]
+      observe = fmapHost . Source.finalTreeGeometry depth False
+      fmapHost T.Nothing = []
+      fmapHost (T.Just x) = [x]
+  check "deep proof-free open body" [False] (observe (wrap 1024 normal))
+  check "nested proof below a deep constructor" [True] (observe (wrap 1024 proof))
+  check "final geometry honors the wire depth limit" [] (observe (wrap depth normal))
+  let shared glyph = wrap 300 (W.VNode 8 (replicate 40 (W.VText (H.literal (replicate 65536 glyph)))))
+  check "deep open bodies charge every UTF-8 occurrence" [[False], []]
+    (map (observe . shared) ['x', '😀'])
+
 protectionChecks = do
   let chain = [(show i,[show (i+1)]) | i <- [0..126::Int]] ++ [("127",[])]
       diamond = [("join",["left","right"]),("left",["import"]),("right",["import"]),
@@ -1239,5 +1256,6 @@ main = do
   typedClassChecks
   signedDataChecks
   knownConstructorFoldChecks
+  openGeometryChecks
   signedConstructorChecks
   putStrLn "1032 ordered SCC and reach comparisons, query DAG and package controls passed"

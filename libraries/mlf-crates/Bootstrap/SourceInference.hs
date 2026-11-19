@@ -552,7 +552,8 @@ module Bootstrap.SourceInference where {
   -- one bounded scan. Shared/deep inputs still use the exact DAG planner.
   smallFinalValue :: Wire.Value -> Maybe Bool;
   smallFinalValue = smallFinalTree False;
-  smallFinalTree stored raw = let {
+  smallFinalTree = finalTreeGeometry 256;
+  finalTreeGeometry depthLimit stored raw = let {
     limits = Wire.defaultLimits;
     -- Bound expanded nodes independently of text bytes. A symbol can occupy
     -- many bytes while contributing only one node and one symbol.
@@ -566,7 +567,7 @@ module Bootstrap.SourceInference where {
     scalars = min ((nodes - 1) / 4) (Wire.maxSymbolBytes limits / 4);
     chargeText = \text available -> let { bytes = stringUtf8Length text } in
         if stringLength text > scalars || bytes > available then Nothing else Just (available - bytes)
-  } in finalGeometryWith stored chargeText (min 256 (Wire.maxDepth limits)) [(,,) 1 False [raw]] nodes work False;
+  } in finalGeometryWith stored chargeText (min depthLimit (Wire.maxDepth limits)) [(,,) 1 False [raw]] nodes work False;
   -- Preserve the scalar-weighted budget of the existing task-list entry point.
   smallFinalTasks pending remaining maxDepth nested = let {
     chargeText = \text available -> let { count = stringLength text } in
@@ -1799,13 +1800,17 @@ module Bootstrap.SourceInference where {
       }
     }
   };
+  -- Open fragments use the explicit geometry stack only to prove identity.
+  -- A possible proof edit still goes through the graph finalizer. The local
+  -- proof editor for standalone source objects retains its shallow bound.
   canonicalOpen object = let {
-    ordinary = case smallFinalValue (Open.bodyValue object) of {
+    geometry = finalTreeGeometry (Wire.maxDepth Wire.defaultLimits);
+    ordinary = case geometry False (Open.bodyValue object) of {
       Just False -> Right object; _ -> canonicalOpenPlanned object
     }
   } in case Open.storageValue object of {
     Nothing -> ordinary;
-    Just stored -> case smallFinalTree True stored of { Just False -> Right object; _ -> ordinary }
+    Just stored -> case geometry True stored of { Just False -> Right object; _ -> ordinary }
   };
   canonicalOpenPlanned object = do {
     plan <- Wire.prepareGraphPlan Wire.defaultLimits [Open.bodyValue object];
