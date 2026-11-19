@@ -464,18 +464,22 @@ module Bootstrap.OpenFragment
       }
     } in seq value (IM.insert i value prior);
     rows = IM.foldlWithKey add IM.empty table;
-    fill row remaining done = case row of {
-      LinkFixed term -> done term remaining;
-      LinkHole -> case remaining of {
-        (:) (Structure.PatternRun count start step) rest -> let { next = start + step } in
-          seq next (done (XIntTerm start) (if count == 1 then rest
-            else (:) (Structure.PatternRun (count - 1) next step) rest));
+    -- Keep the preceding literal's run count. Inspect it only at the next
+    -- hole or at end of input, just as the tail of a consumed run is demanded.
+    fill row previous start step runs done = case row of {
+      LinkFixed term -> done term previous start step runs;
+      LinkHole -> let { take count value delta following = let { next = value + delta } in
+          seq next (done (XIntTerm value) count next delta following)
+      } in if previous == 1 then case runs of {
+        (:) (Structure.PatternRun count first delta) following -> take count first delta following;
         [] -> Nothing
-      };
-      LinkChildren f a -> fill f remaining (\left rest ->
-        fill a rest (\right tail -> done (XApp left right) tail))
+      } else take (previous - 1) start step runs;
+      LinkChildren f a -> fill f previous start step runs (\left rest value delta following ->
+        fill a rest value delta following (\right count next stride tail ->
+          done (XApp left right) count next stride tail))
     }
-  } in fill (IM.get root rows) runs (\term rest -> if null rest then Just term else Nothing);
+  } in fill (IM.get root rows) 1 0 0 runs (\term previous _ _ following ->
+    if previous == 1 && null following then Just term else Nothing);
   mapLinkedTerm name variable source view = let {
     ordinary = Separate.mapTerm name variable source;
     child = mapLinkedTerm name variable
