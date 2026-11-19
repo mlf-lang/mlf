@@ -212,7 +212,27 @@ module Bootstrap.X.Check where {
       _ -> ordinary
     }
   };
-  inferApplications ds env applications term =
+  -- For a constructor with no supplied type arguments, the declaration and
+  -- result are fixed throughout this checking scope. Keep its ordinary checks
+  -- and share the result selected by the exact constructor key.
+  constructorApplication ds env name ((,) d ctor) = let {
+    instantiate arguments = do {
+      ensure (L.length arguments == L.length (D.datatypeParameters d))
+        ("constructor type argument arity mismatch: " ++ name);
+      actualKinds <- L.mapM (T.kindOf ds env) arguments;
+      ensure (X.equalList eqKind actualKinds (L.map L.snd (D.datatypeBinders d)))
+        "constructor type argument kind mismatch";
+      let { parameters = M.fromList compareString (L.zip (D.datatypeParameters d) arguments) };
+      fields <- L.mapM (T.instantiateField parameters) (D.constructorFields ctor);
+      return (L.foldr XArrow (XCon (D.datatypeName d) arguments) fields)
+    };
+    bare = instantiate []
+  } in \arguments -> case arguments of { [] -> bare; _ -> instantiate arguments };
+  inferApplications ds env applications = let {
+    constructors = case ds of { DataEnv _ cs _ ->
+      checkedLookup compareString (constructorApplication ds (typeEnv env)) cs }
+  } in inferWithConstructors ds env applications constructors;
+  inferWithConstructors ds env applications constructors term =
     case term of {
       XVarTerm x ->
         case M.lookup X.compareName x (termEnv env) of {
@@ -228,8 +248,8 @@ module Bootstrap.X.Check where {
         };
       XApp f a ->
         do {
-          ft <- inferApplications ds env applications f;
-          at <- inferApplications ds env applications a;
+          ft <- inferWithConstructors ds env applications constructors f;
+          at <- inferWithConstructors ds env applications constructors a;
           case ft of {
             XArrow domain result ->
               if T.alphaEq domain at then Right result else Left "application type mismatch";
@@ -250,7 +270,7 @@ module Bootstrap.X.Check where {
           Just ((,,) ty valid arguments) -> checkedVariableApplication ds (typeEnv env) ty valid arguments p
         };
         _ -> do {
-          source <- inferApplications ds env applications t;
+          source <- inferWithConstructors ds env applications constructors t;
           checkComputationScoped ds (typeEnv env) p source
         }
       };
@@ -293,28 +313,13 @@ module Bootstrap.X.Check where {
             }
           }
         };
-      XConstructor c arguments ->
-        do {
-          boundValueShared1 <- D.lookupConstructor ds c;
-          case boundValueShared1 of {
-            (,) d ctor ->
-              do {
-                ensure (L.length arguments == L.length (D.datatypeParameters d))
-                  ("constructor type argument arity mismatch: " ++ c);
-                actualKinds <- L.mapM (T.kindOf ds (typeEnv env)) arguments;
-                ensure (X.equalList eqKind actualKinds (L.map L.snd (D.datatypeBinders d)))
-                  "constructor type argument kind mismatch";
-                let {
-                  parameters = M.fromList compareString (L.zip (D.datatypeParameters d) arguments)
-                };
-                fields <- L.mapM (T.instantiateField parameters) (D.constructorFields ctor);
-                return (L.foldr XArrow (XCon (D.datatypeName d) arguments) fields)
-              }
-          }
-        };
+      XConstructor c arguments -> do {
+        instantiate <- D.requireConstructor c (constructors c);
+        instantiate arguments
+      };
       XCase scrutinee result alternatives ->
         do {
-          st <- inferApplications ds env applications scrutinee;
+          st <- inferWithConstructors ds env applications constructors scrutinee;
           termType ds (typeEnv env) result;
           owner <- D.checkAlternatives ds (L.map shape alternatives);
           parameters <- caseParameters ds st owner;

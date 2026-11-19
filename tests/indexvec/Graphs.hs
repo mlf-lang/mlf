@@ -30,6 +30,7 @@ import qualified Bootstrap.InferenceUnit as Inference
 import qualified Bootstrap.OpenFragment as Open
 import qualified Bootstrap.Separate as Separate
 import qualified Bootstrap.LLVM.Optimize as Optimize
+import qualified Bootstrap.X.Check as XCheck
 import qualified Bootstrap.X.Pretty as Pretty
 import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Type as XT
@@ -764,6 +765,18 @@ signedConstructorChecks = do
         check "signed constructor export" True (XT.alphaEq ty original)
         _ <- checked (Independent.checkClosed (Open.closedTerm actual))
         pure ()
+  dataEnv <- checked (Data.validateDeclarations ds)
+  let xt = T.XCon "Int" []
+      leaf = T.XApp (T.XConstructor "Tip" []) (T.XIntTerm 4)
+      branch x y = T.XApp (T.XApp (T.XConstructor "Fork" []) x) y
+      resultType (T.Left e) = Left (H.unpack e)
+      resultType (T.Right ty) = Right (H.unpack (Pretty.prettyType ty))
+  forM_ [foldr branch leaf (replicate 129 leaf),branch leaf (T.XIntTerm 4),
+         T.XConstructor "Tip" [xt],T.XConstructor "Box" [],T.XConstructor "Box" [xt],
+         T.XApp (T.XConstructor "missing" []) (T.XConstructor "Box" [])] $ \expr ->
+    check "constructor instantiation agrees with independent xMLF checking"
+      (resultType (Independent.inferIn dataEnv XCheck.emptyEnv expr))
+      (resultType (XCheck.inferIn dataEnv XCheck.emptyEnv expr))
   forM_ [(tree, fork), (T.SArrow int tree, T.SConstructor "Tip"),
          (T.SArrow tree tree, construct "Fork" [tip])] $ \(result, rhs) -> do
     direct <- checked (Inference.signedApplicationGroup [] ds (rows result rhs))

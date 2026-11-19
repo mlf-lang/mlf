@@ -176,8 +176,9 @@ module Bootstrap.Data where {
       Just d -> Right d
     };
   lookupConstructor :: DataEnv -> String -> Either String ((,) DataDecl ConstructorDecl);
-  lookupConstructor (DataEnv _ cs _) n =
-    case M.lookup compareString n cs of {
+  lookupConstructor (DataEnv _ cs _) n = requireConstructor n (M.lookup compareString n cs);
+  requireConstructor :: forall a. String -> Maybe a -> Either String a;
+  requireConstructor n found = case found of {
       Nothing -> Left ("unknown data constructor: " ++ n);
       Just c -> Right c
     };
