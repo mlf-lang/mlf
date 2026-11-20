@@ -1684,6 +1684,21 @@ fragmentFingerprintChecks = do
     fragment <- right (Open.check env [(variable,ty)] body)
     check "repeated Unicode names retain the scalar-framed fingerprint"
       (H.unpack (Separate.fingerprint (Separate.pack fields))) (H.unpack (Open.fingerprint fragment))
+  let a = T.XTyVar 16
+      b = T.XTyVar 17
+      poly = T.XForall a T.XBot (T.XForall b T.XBot (T.XArrow ty ty))
+      op = T.XName 19 "変換😀"
+      operand = T.XVarTerm arg
+      ground t = T.XThen (T.XInner (T.XBottom (T.XCon t []))) T.XElim
+      f label first second = T.XTypeApp (T.XVarTerm (T.XName 19 label)) (T.XThen (ground first) (ground second))
+      uses = take 131 (cycle [f "変換😀" "Int" "Bool", f "変換😀" "Int" "Bool", f "alias" "Bool" "Int"])
+      body = T.XLet result (foldr T.XApp operand uses) (T.XConstructor "()" [])
+      ps = Separate.pack [Separate.pack ["19","変換😀",Pretty.prettyType (Separate.normalType poly)],
+                          Separate.pack ["0","arg:λ","Int"]]
+      expected = Separate.fingerprint (Separate.pack [Separate.pack [], ps, Pretty.prettyTerm body, exports])
+  actual <- right (Open.check env [(op,poly),(arg,ty)] body)
+  check "repeated operator uses retain proof text, hint spelling and right-child parentheses"
+    (H.unpack expected) (H.unpack (Open.fingerprint actual))
 
 applicationPatternChecks = do
   let named text fields = W.VNode 82 [W.VText text,W.VNode 1 fields]

@@ -275,6 +275,49 @@ module Bootstrap.OpenFragment
   -- The fingerprint frames each field with its Unicode scalar length. Hash
   -- successive pages of pretty-printer output while counting that length,
   -- then prepend the length with the same polynomial composition as pack.
+  -- Match the first ground type application in an operator position. Its
+  -- variable spelling and proof must agree at every later occurrence. The
+  -- depth and name limits bound the single saved piece of printer output.
+  fingerprintApplicationChunks term = let {
+    ordinary = Pretty.termChunks 0 term [];
+    proofShape depth proof = if depth > 5 then Nothing else case proof of {
+      XThen a b -> case proofShape (depth + 1) a of {
+        Nothing -> Nothing;
+        Just left -> case proofShape (depth + 1) b of {
+          Nothing -> Nothing;
+          Just right -> Just (\value -> case value of {
+            XThen x y -> left x && right y; _ -> False
+          })
+        }
+      };
+      XInner (XBottom (XCon ty [])) -> if stringLength ty > 64 then Nothing
+        else Just (\value -> case value of {
+          XInner (XBottom (XCon name [])) -> eqString ty name; _ -> False
+        });
+      XElim -> Just (\value -> case value of { XElim -> True; _ -> False });
+      _ -> Nothing
+    };
+    -- The canonical printer reads the name hint before the binder ID and
+    -- the operator before its argument. Keep that order even on a miss.
+    select depth head = if depth > 8 then ordinary else case head of {
+      XApp f _ -> select (depth + 1) f;
+      XTypeApp (XVarTerm (XName identity hint)) proof -> if stringLength hint > 512 then ordinary
+        else seq identity (case proofShape 0 proof of {
+          Nothing -> ordinary;
+          Just sameProof -> let {
+            spelling = concatStringList (Pretty.termChunks 0 head []);
+            chunks prec node rest = case node of {
+              XApp f a -> Pretty.parenthesized (prec > 1)
+                (\tail -> chunks 1 f ((:) " " (chunks 2 a tail))) rest;
+              XTypeApp (XVarTerm (XName i label)) other -> if eqString hint label && identity == i && sameProof other
+                then (:) spelling rest else Pretty.termChunks prec node rest;
+              _ -> Pretty.termChunks prec node rest
+            }
+          } in chunks 0 term []
+        });
+      _ -> ordinary
+    }
+  } in case term of { XApp f _ -> select 1 f; _ -> ordinary };
   termEncoding term = let {
     -- Long repeated chunks, such as qualified names, have the same length
     -- and polynomial contribution at every occurrence. Bound the number
@@ -308,7 +351,7 @@ module Bootstrap.OpenFragment
         } in flush page count a b (reuse next encoded)
       })
     }
-  } in consume (Pretty.termChunks 0 term []) [] 128 M.empty 0 0 0;
+  } in consume (fingerprintApplicationChunks term) [] 128 M.empty 0 0 0;
   -- Between two literal slots each scalar is fixed by the application table.
   -- Summarize these strings once, including the parentheses on right children.
   data StampText = StampText Separate.FingerprintEncoding |
