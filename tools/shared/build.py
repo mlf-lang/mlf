@@ -33,6 +33,12 @@ BUILTIN_VERIFICATION_HELPERS = ('tools/shared/builtin_prelude_identity.py',
                                 'tools/shared/verify_builtin_prelude.py')
 
 
+def optimization_flags(level):
+    if level == '2':
+        return ['-O2', '-fstatic-argument-transformation']
+    return ['-O' + level]
+
+
 def executable_link_flags(name, optimization):
     # The compiler's larger nursery reduces copying of short-lived syntax trees.
     if name == 'emlf':
@@ -657,7 +663,7 @@ def main():
 
     roots = [str((ROOT / value).resolve()) for value in manifest['source_roots']]
     flags = ['-XHaskell2010', '-package-env', '-', '-clear-package-db', '-global-package-db',
-             '-no-user-package-db', '-hide-all-packages', '-O' + options.optimization,
+             '-no-user-package-db', '-hide-all-packages', *optimization_flags(options.optimization),
              *DEMAND_FLAGS, '-i', *['-i' + root for root in roots],
              '-odir', output / 'objects', '-hidir', output / 'objects']
     for package in PACKAGES:

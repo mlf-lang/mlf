@@ -24,6 +24,10 @@
       "2812caad746141ddb82c21a5dfdc779f1c33ae383ccd08aaa496ebecf8046a51",
       "123a0ccc5d59af9844a0615cc8d7b5c50d8c41c04fbeae23be08e2f1d11c0fe6"
     ],
+    "cabal.project": [
+      "d31917fa5dd1ba84d53f1961d5e8f6629474d92b53c7b9f2176d3f4b03da047a",
+      "469976f96966cb836f7de0873b49edeb5c29489da4d30f17731bdb28b14affcf"
+    ],
     "host/ghc/MLF/Host/Base.hs": [
       "b324805ea2d62b3aaccf3c49e973b7839f952b164bcbe4cc37bf483b07518116",
       "113adea9442bc4dbe98eb19bf744eed8bf0069d0b6cbb8b60fc248e1f41e971c"
@@ -262,7 +266,7 @@
     ],
     "tools/shared/build.py": [
       "3ac387f43f4ce6261a94fd514da2108d7dce607867bab2a4267bb73918b1de1f",
-      "681805e30aaea8e2be68bbaaabb8e8386c7d9c338029ef8fee30bafe8178b189"
+      "77d85f92cb6de37d6f81c5daa3e99135d1890fb0220a213f929ac0e93da2e968"
     ],
     "tools/shared/test_direct.py": [
       "138b387bbcff0f8bb717a3c7d7906337e9942d32f621ea963ca320d8d5ddd85e",
@@ -2673,6 +2677,21 @@
       "predecessor": "6390b28a2f372eb59865927fba1c0a2ba8663931",
       "predecessor_manifest_sha256": "674805760eae659f63d1b663ab30b4d49d2515768b22c59eea64b24c97fb9a89",
       "predecessor_tree": "c7c2e2d7569c8dfe403f868e9164757f3e168d6c"
+    },
+    {
+      "changes": {
+        "cabal.project": [
+          "d31917fa5dd1ba84d53f1961d5e8f6629474d92b53c7b9f2176d3f4b03da047a",
+          "469976f96966cb836f7de0873b49edeb5c29489da4d30f17731bdb28b14affcf"
+        ],
+        "tools/shared/build.py": [
+          "681805e30aaea8e2be68bbaaabb8e8386c7d9c338029ef8fee30bafe8178b189",
+          "77d85f92cb6de37d6f81c5daa3e99135d1890fb0220a213f929ac0e93da2e968"
+        ]
+      },
+      "predecessor": "fdc0e96ef7985e316df92ecea38ffe0f664d67a5",
+      "predecessor_manifest_sha256": "a67cd54ac8bc4d0bb7ad693254bf287ecc37e7a363dd8e706a920d687dc4f1f7",
+      "predecessor_tree": "277e66b4286d81b0fc7f611028364883fb7d26c7"
     }
   ],
   "format": "pr43-reconciliation-source-migration-v1",
