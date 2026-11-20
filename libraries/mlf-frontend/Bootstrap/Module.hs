@@ -1219,7 +1219,10 @@ module Bootstrap.Module where {
     SIntPattern n -> Right (R.IntPattern n); SStringPattern s -> Right (R.StringPattern s);
     SBoolPattern b -> Right (R.BoolPattern b)
   };
-  resolveExpr bindings env expression = resolveBound bindings env Set.empty
+  resolveExpr = resolveExprUsing resolveBound;
+  resolveFileExpr = resolveExprUsing (resolveBoundUsing
+    (resolveApplicationWith R.fileLeaf R.fileApplication (resolvedSiteWith R.fileCallSite) (Just M.empty)));
+  resolveExprUsing resolve bindings env expression = resolve bindings env Set.empty
     (if Surface.surfaceCore expression then expression else Desugar.desugarDo expression);
   entryExpr crate entry = let { source = resolvedSource entry } in
     moduleEntryExpr (resolvedCrateBindings crate) (moduleIdentity source)
@@ -1249,22 +1252,23 @@ module Bootstrap.Module where {
   -- ordinary resolver admits constructor spellings as well as variables.
   -- Keep their namespaces separate, and start fresh under every binder.
   resolveApplication = resolveApplicationIn Nothing;
-  resolveApplicationIn constructorNames child function argument = let {
+  resolveApplicationIn = resolveApplicationWith id R.App resolvedCallSite;
+  resolveApplicationWith leaf apply site constructorNames child function argument = let {
     -- Pass the updated spelling tables to the next operand. A failing child
     -- returns immediately, before its enclosing call site or later operand.
     term cache@((,) variables constructors) value finish = let {
-      ordinary = bindEither (child value) (\resolved -> finish resolved cache);
+      ordinary = bindEither (child value) (\resolved -> finish (leaf resolved) cache);
       remember name table replace = case M.lookup compareString name table of {
         Just resolved -> finish resolved cache;
         Nothing -> do {
-          resolved <- child value;
-          let { next = if M.size table < 64 then replace (M.insert compareString name resolved table) else cache };
+          result <- child value;
+          let { resolved = leaf result; next = if M.size table < 64 then replace (M.insert compareString name resolved table) else cache };
           finish resolved next
         }
       }
     } in case value of {
       SApp f a -> both cache f a finish;
-      SCallSite display loc b -> term cache b (\body next -> finish (resolvedCallSite display loc body) next);
+      SCallSite display loc b -> term cache b (\body next -> finish (site display loc body) next);
       SVar n -> remember n variables (\names -> (,) names constructors);
       SConstructor n -> case constructors of {
         Just names -> remember n names (\next -> (,) variables (Just next));
@@ -1273,14 +1277,16 @@ module Bootstrap.Module where {
       _ -> ordinary
     };
     both cache f a finish = term cache f (\left afterFunction ->
-      term afterFunction a (\right afterArgument -> finish (R.App left right) afterArgument))
+      term afterFunction a (\right afterArgument -> finish (apply left right) afterArgument))
   } in both ((,) M.empty constructorNames) function argument (\body _ -> Right body);
-  resolvedCallSite display loc value =
+  resolvedCallSite = resolvedSiteWith R.CallSite;
+  resolvedSiteWith wrap display loc value =
     if eqString display "an expression type signature" && not (managedResolved value)
-    then value else R.CallSite display loc value;
+    then value else wrap display loc value;
   resolveBound :: Bindings -> Interface -> Set String -> SExpr -> Either String (R.Expr Declaration);
-  resolveBound bindings env bound expression = let {
-    walk = resolveBound bindings env; child = walk bound; pat = resolvePattern bindings env;
+  resolveBound = resolveBoundUsing (resolveApplicationIn (Just M.empty));
+  resolveBoundUsing application bindings env bound expression = let {
+    walk = resolveBoundUsing application bindings env; child = walk bound; pat = resolvePattern bindings env;
     under ps = Set.union compareString bound (Set.fromList compareString (concatMap Surface.patternVariables ps))
   } in case expression of {
     SVar name ->
@@ -1305,7 +1311,7 @@ module Bootstrap.Module where {
       ty <- resolveOptionalAnnotation bindings env a;
       mapEither (R.Lam n ty) (walk (Set.insert compareString n bound) b)
     };
-    SApp a b -> resolveApplicationIn (Just M.empty) child a b;
+    SApp a b -> application child a b;
     SLet n a b -> do { v <- child a; mapEither (R.Let n v) (walk (Set.insert compareString n bound) b) };
     SAnn a t -> do { v <- child a; mapEither (R.Ann v) (resolveAnnotation bindings env t) };
     SSignature a t -> do { v <- child a; mapEither (R.Signature v) (resolveAnnotation bindings env t) };
@@ -1430,7 +1436,8 @@ module Bootstrap.Module where {
       head <- mapM (resolveType names env) (instanceHead inst);
       Right (R.Instance (instanceVariables inst) context name head methods)
     };
-  renameModule names local env source = do {
+  renameModule = renameModuleWith resolveExpr;
+  renameModuleWith readExpr names local env source = do {
     ds <- mapM (renameDatatype names local env) (sourceDatatypes source);
     cs <- mapM (renameClass names local env) (sourceClasses source);
     instances <- mapM (renameInstance (Lexer.isSharedSyntax (sourceSyntax source)) names env) (sourceInstances source);
@@ -1438,10 +1445,10 @@ module Bootstrap.Module where {
       entity <- lookupEntity Terms original local;
       i <- termId names entity;
       a <- resolveOptionalAnnotation names env annotation;
-      mapEither (Dependency.Bound i a) (resolveExpr names env expression)
+      mapEither (Dependency.Bound i a) (readExpr names env expression)
     }) (sourceValues source);
     body <- case sourceBody source of {
-      Nothing -> Right Nothing; Just expression -> mapEither Just (resolveExpr names env expression)
+      Nothing -> Right Nothing; Just expression -> mapEither Just (readExpr names env expression)
     };
     Right (Renamed (bindingSymbols names) ds cs instances values body)
   };
@@ -1476,7 +1483,9 @@ module Bootstrap.Module where {
   -- Run the original strict selectors after the namespace fixed point. This
   -- preserves private-name, missing-member and conflicting-export diagnostics.
   resolveOneWith = resolveModuleUsing (\_ source env _ renamed -> Right (Resolved source env renamed));
-  resolveModuleUsing complete mode names localMap exports source =
+  resolveModuleUsing = resolveModuleWith renameModule;
+  resolveFileModuleUsing = resolveModuleWith (renameModuleWith resolveFileExpr);
+  resolveModuleWith rename complete mode names localMap exports source =
     do {
       local <-
         case M.lookup compareString (moduleIdentity source) localMap of {
@@ -1491,7 +1500,7 @@ module Bootstrap.Module where {
       validateSharedIdentities source env exported;
       renamed <-
         mapLeft (\message -> (sourcePath source ++ (": " ++ message)))
-          (renameModule names local env source);
+          (rename names local env source);
       complete names source env exported renamed
     };
   -- External-only modules are leaf vertices. Publish only owners from the

@@ -2,7 +2,12 @@
 {-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
-module Bootstrap.Resolved where {
+module Bootstrap.Resolved
+  (Expr(Global, Local, CallStack, Constructor, Prim, IntLit, DoubleLit, BoolLit, StringLit,
+        Lam, App, Let, Ann, Signature, Case, Equations, LetRec, SourceDefinition, CallSite, SharedBind),
+   Pattern(..), Class(..), Instance(..), references, exprRefs, patternRefs,
+   namedExpr, indexedExpr, projectExpr, namedPattern, indexedPattern, projectPattern,
+   namedClass, namedInstance, fileLeaf, fileApplication, fileCallSite) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
@@ -19,7 +24,7 @@ module Bootstrap.Resolved where {
     Equations ([] ((,) ([] (Pattern d)) (Expr d))) |
     LetRec ([] ((,,) String RecursiveMode (Expr d))) (Expr d) |
     SourceDefinition (Expr d) | CallSite String SourceSpan (Expr d) |
-    SharedBind (Pattern d) (Expr d) (Expr d) (Expr d) (Expr d);
+    SharedBind (Pattern d) (Expr d) (Expr d) (Expr d) (Expr d) | SlotFree SExpr;
   data Pattern d =
     ConstructorPattern String ([] (Maybe String)) | DefaultPattern (Maybe String) |
     NestedPattern String ([] (Pattern d)) | AnnotatedPattern String SAnnotation |
@@ -29,13 +34,30 @@ module Bootstrap.Resolved where {
   data Class d = Class String ([] ((,) String Kind)) ([] SPredicate) ([] ((,) (V.Index d) SType));
   data Instance d = Instance ([] ((,) String Kind)) ([] SPredicate) String ([] SType) ([] ((,) (V.Index d) (Expr d)));
 
+  -- File resolution can retain one projection when both operands are
+  -- independent of declaration slots. Only these constructors can make
+  -- SlotFree. A binding, pattern or global stays on the ordinary route.
+  fileLeaf term = case term of {
+    Local name -> SlotFree (SVar name); CallStack -> SlotFree (SVar "$MLF.Stack.callStack");
+    Constructor name -> SlotFree (SConstructor name); Prim p -> SlotFree (SPrimitive p);
+    IntLit n -> SlotFree (SIntLit n); DoubleLit n -> SlotFree (SDoubleLit n);
+    BoolLit b -> SlotFree (SBoolLit b); StringLit text -> SlotFree (SStringLit text);
+    _ -> term
+  };
+  fileApplication f a = case f of {
+    SlotFree left -> case a of { SlotFree right -> SlotFree (SApp left right); _ -> App f a };
+    _ -> App f a
+  };
+  fileCallSite name span value = case value of {
+    SlotFree body -> SlotFree (SCallSite name span body); _ -> CallSite name span value
+  };
   -- Only global leaves (including implicit pattern operations) contribute
   -- declaration edges. Thread the tail to avoid copying application spines.
   references :: forall d. Expr d -> [] (V.Index d);
   references term = exprRefs term [];
   exprRefs :: forall d. Expr d -> [] (V.Index d) -> [] (V.Index d);
   exprRefs term rest = case term of {
-    Global i -> (:) i rest;
+    SlotFree _ -> rest; Global i -> (:) i rest;
     Local _ -> rest; CallStack -> rest; Constructor _ -> rest; Prim _ -> rest;
     IntLit _ -> rest; DoubleLit _ -> rest; BoolLit _ -> rest; StringLit _ -> rest;
     Lam _ _ body -> exprRefs body rest;
@@ -63,7 +85,7 @@ module Bootstrap.Resolved where {
   -- The global and pattern projections are fixed for the entire traversal.
   projectExpr global pattern = let {
     child term = case term of {
-      Global i -> global i; Local n -> SVar n; CallStack -> SVar "$MLF.Stack.callStack";
+      SlotFree value -> value; Global i -> global i; Local n -> SVar n; CallStack -> SVar "$MLF.Stack.callStack";
       Constructor n -> SConstructor n; Prim p -> SPrimitive p;
       IntLit n -> SIntLit n; DoubleLit n -> SDoubleLit n; BoolLit b -> SBoolLit b; StringLit s -> SStringLit s;
       Lam n annotation b -> SLam n annotation (child b);

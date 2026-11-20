@@ -328,7 +328,7 @@ module Bootstrap.Crate where {
       reach = Modules.crateReach selected original;
       result = CompilationModules bindings units reach
     } in seq (M.foldlWithKeyStrict (\_ name reachable -> seq name (seq (Set.size reachable) ())) () reach) ((,) result (finish result));
-    run = Modules.resolveModuleRows (Modules.resolveModuleUsing capture) collect
+    run = Modules.resolveModuleRows (Modules.resolveFileModuleUsing capture) collect
   } in Modules.resolveWithTermKeyUsing run mode external definition definition sources);
   prepareCrateUsing resolve spec interfaces sources =
     do {

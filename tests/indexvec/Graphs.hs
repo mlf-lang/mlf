@@ -576,6 +576,15 @@ resolverChecks = do
     want <- mapM (describe (Modules.resolvedCrateBindings resolution)) fullRows
     got <- mapM (describe table) units
     check "file compilation preserves defining exports, slots and references" want got
+    let expressions tbl contents = let
+          salt index = H.literal ("other slot " ++ show (V.toInt index))
+          variant encode (D.Bound _ _ rhs) = H.unpack (CQ.encodeExpression (encode rhs))
+          spell = D.symbolName (Modules.bindingSymbols tbl)
+          in [(map (variant (R.namedExpr n)) (Modules.renamedBindings contents),
+               map (variant (R.indexedExpr n)) (Modules.renamedBindings contents)) | n <- [spell, salt]]
+    check "file application projections preserve declaration IDs, display policies and complete call sites"
+      [expressions (Modules.resolvedCrateBindings resolution) c | (_,_,c) <- fullRows]
+      [expressions table c | (_,_,c) <- units]
     check "file compilation preserves entry ownership and transitive imports"
       (H.unpack (Crate.preparedEntry full),reachable (Crate.preparedReach full))
       (H.unpack (Crate.entryName entryId),reachable reach)
