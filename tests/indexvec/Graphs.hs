@@ -532,6 +532,16 @@ resolverChecks = do
   check "a reused source location preserves variable and primitive wire tags"
     (Just ("P3loc" ++ concat (zipWith (++) (replicate 5 "a" ++ [""]) fields))) (encodeSite ordinaryCost)
   check "a combined source location still charges both ordinary nodes" Nothing (encodeSite (ordinaryCost-1))
+  let pairs = [T.SApp (site (T.SVar "x")) (T.SIntLit n) | n <- [1..6]]
+      withLiterals budget = case CrateGraph.packedOrigin location 0 budget (foldr1 T.SApp pairs) "loc" of
+        T.Nothing -> Nothing
+        T.Just value -> Just (H.unpack value)
+      expectedPairs = zipWith (\prefix loc -> prefix ++ "a" ++ loc ++ varX ++ "+")
+        (replicate 5 "a" ++ [""]) (firstSite : replicate 5 reuseSite)
+      allCosts = 11*25 + 6*(29+3+4*3 + 10+3 + 12)
+  check "a literal after an interned source leaf retains every preorder field"
+    (Just ("P5loc" ++ concat expectedPairs)) (withLiterals allCosts)
+  check "the final literal still needs its full ordinary byte charge" Nothing (withLiterals (allCosts-1))
   let capture (Crate.CompilationModules table units _) _ _ _ _ entry reach _ =
         (table,[(Crate.compilationName u,Crate.compilationExports u,Crate.compilationContents u) | u <- units],entry,reach)
       entities iface = [(H.unpack (Modules.owner e),H.unpack (Modules.spelling e),Modules.roleCode (Modules.role e)) |

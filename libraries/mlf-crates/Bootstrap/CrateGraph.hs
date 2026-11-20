@@ -489,6 +489,13 @@ module Bootstrap.CrateGraph where {
         if rest == 0 then (:) (V.at coordinateAlphabet (V.fromInt digit)) tail
         else (:) (V.at coordinateAlphabet (V.fromInt (orInt digit 64))) (bytes rest)
     } in bytes (xorInt (shiftLInt number 1) (shiftRInt number 63));
+    integerCost n = let { width = Storage.v2IntLength n } in 9 + width + (if width < 10 then 2 else 3);
+    integerField prior n tail = let { previous = case prior of { Just value -> value; Nothing -> 0 };
+      delta = n - previous
+    } in case delta of {
+      0 -> (:) "=" tail; 1 -> (:) "+" tail;
+      _ -> if delta == (-1) then (:) "-" tail else (:) "I" (coordinate delta tail)
+    };
     scan scope outer = let {
       collect budget pending chunks pages slots line column names locations constructors previousInteger = if budget < 0 then Nothing else case pending of {
       [] -> case outer of {
@@ -590,8 +597,18 @@ module Bootstrap.CrateGraph where {
             -- per existing location. Binders still supply their current name.
             reuse cached = let {
               single = next ((:) (locationFragment cached)) locations;
-              both leafCost fragment saved = collect (budget - cost - leafCost) rest
-                (\tail -> chunks ((:) fragment tail)) pages (slots - 2) sl sc table saved constructors previousInteger;
+              both leafCost fragment saved = let {
+                remaining = budget - cost - leafCost;
+                resume = collect remaining rest (\tail -> chunks ((:) fragment tail))
+                  pages (slots - 2) sl sc table saved constructors previousInteger
+              } in if slots < 3 || remaining < 0 then resume else case rest of {
+                -- A literal argument follows its function or an earlier argument
+                -- in preorder. Keep the page boundary and the ordinary node cost.
+                (:) (SIntLit n) more -> collect (remaining - integerCost n) more
+                  (\tail -> chunks ((:) fragment (integerField previousInteger n tail)))
+                  pages (slots - 3) sl sc table saved constructors (Just n);
+                _ -> resume
+              };
               leaf tag spelling overhead = case cached of {
                 CachedLocationLeaf _ previous name leafCost field ->
                   if eqString tag previous && eqString spelling name then both leafCost field locations else single;
@@ -633,16 +650,8 @@ module Bootstrap.CrateGraph where {
         -- The previous literal follows preorder across page and scope boundaries.
         -- Modular subtraction is reversible across both signed Int endpoints.
         -- Charge its ordinary decimal field before admitting the next node.
-        SIntLit n -> let {
-          previous = case previousInteger of { Just value -> value; Nothing -> 0 };
-          delta = n - previous;
-          emit tail = case delta of {
-            0 -> (:) "=" tail; 1 -> (:) "+" tail;
-            _ -> if delta == (-1) then (:) "-" tail else (:) "I" (coordinate delta tail)
-          };
-          width = Storage.v2IntLength n; cost = 9 + width + (if width < 10 then 2 else 3)
-        } in collect (budget - cost) rest (compose chunks emit) pages (slots - 1)
-             line column names locations constructors (Just n);
+        SIntLit n -> collect (budget - integerCost n) rest (compose chunks (integerField previousInteger n)) pages
+          (slots - 1) line column names locations constructors (Just n);
         _ -> case scope of {
           WrittenOrigin -> ordinary expr;
           SourceOrigin rank env depth types typeDepth ->
