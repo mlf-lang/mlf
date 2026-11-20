@@ -1250,22 +1250,21 @@ module Bootstrap.Module where {
   -- Keep their namespaces separate, and start fresh under every binder.
   resolveApplication = resolveApplicationIn Nothing;
   resolveApplicationIn constructorNames child function argument = let {
-    term cache@((,) variables constructors) value = let {
-      ordinary = mapEither (\resolved -> (,) resolved cache) (child value);
+    -- Pass the updated spelling tables to the next operand. A failing child
+    -- returns immediately, before its enclosing call site or later operand.
+    term cache@((,) variables constructors) value finish = let {
+      ordinary = bindEither (child value) (\resolved -> finish resolved cache);
       remember name table replace = case M.lookup compareString name table of {
-        Just resolved -> Right ((,) resolved cache);
+        Just resolved -> finish resolved cache;
         Nothing -> do {
           resolved <- child value;
           let { next = if M.size table < 64 then replace (M.insert compareString name resolved table) else cache };
-          Right ((,) resolved next)
+          finish resolved next
         }
       }
     } in case value of {
-      SApp f a -> both cache f a;
-      SCallSite display loc b -> do {
-        (,) body next <- term cache b;
-        Right ((,) (resolvedCallSite display loc body) next)
-      };
+      SApp f a -> both cache f a finish;
+      SCallSite display loc b -> term cache b (\body next -> finish (resolvedCallSite display loc body) next);
       SVar n -> remember n variables (\names -> (,) names constructors);
       SConstructor n -> case constructors of {
         Just names -> remember n names (\next -> (,) variables (Just next));
@@ -1273,12 +1272,9 @@ module Bootstrap.Module where {
       };
       _ -> ordinary
     };
-    both cache f a = do {
-      (,) left afterFunction <- term cache f;
-      (,) right afterArgument <- term afterFunction a;
-      Right ((,) (R.App left right) afterArgument)
-    }
-  } in mapEither fst (both ((,) M.empty constructorNames) function argument);
+    both cache f a finish = term cache f (\left afterFunction ->
+      term afterFunction a (\right afterArgument -> finish (R.App left right) afterArgument))
+  } in both ((,) M.empty constructorNames) function argument (\body _ -> Right body);
   resolvedCallSite display loc value =
     if eqString display "an expression type signature" && not (managedResolved value)
     then value else R.CallSite display loc value;

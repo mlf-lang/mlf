@@ -350,6 +350,15 @@ resolverChecks = do
       check "constructor lookup preserves a same-spelled local in an application"
         ["Tree.C","C","Tree.C"] (map H.unpack [first,variable,lastName])
     _ -> error "incorrect constructor or local resolution"
+  let reject _ = T.Left "unresolved operand"
+      seed = T.Just (M.singleton "C" (R.Global (V.fromInt 17)))
+      wrap = T.SCallSite "mark" (error "undemanded call-site span")
+  case Modules.resolveApplicationIn seed reject (wrap (T.SConstructor "C")) (T.SVar "missing") of
+    T.Left reason -> check "application resolution preserves the first operand error" "unresolved operand" (H.unpack reason)
+    _ -> error "unresolved application was accepted"
+  case Modules.resolveApplicationIn seed reject (T.SVar "missing") (error "later operand was forced") of
+    T.Left reason -> check "an unresolved function leaves its argument untouched" "unresolved operand" (H.unpack reason)
+    _ -> error "unresolved function was accepted"
   mods <- mapM parsed [("A","module A where\nvalue = 1\n"),("B","module B where\nvalue = 2\n"),
     ("Via","module Via (module A) where\nimport A\n"),
     ("Main",unlines ["module Main where","import qualified A as First","import qualified B as Second",
