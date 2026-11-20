@@ -168,8 +168,19 @@ queryChecks = do
   forM_ [CrateGraph.WrittenOrigin,source] $ \scope -> do
     check "prepared constructors retain definitions and references across pages" (Just bytes) (prepared scope budget expr)
     check "prepared constructors charge each occurrence" Nothing (prepared scope (budget-1) expr)
-    check "a prepared tree without constructors keeps its P3 key"
-      (Just "P3headeri1:7") (prepared scope 20 (T.SIntLit 7))
+    check "a prepared tree without pooled constructors or literals keeps its P3 key"
+      (Just "P3headerv") (fmap (take 9) (prepared scope 10000 (T.SVar "x")))
+    let literal n = T.SIntLit n
+        packed ns = prepared scope 10000 (foldr1 T.SApp (map literal ns))
+    check "prepared literals carry preorder deltas across applications"
+      (Just ("P5header" ++ "a=a+a-I" ++ [toEnum 64,toEnum 1]))
+      (packed [0,1,0,32])
+    check "the successor of the maximum signed integer wraps to the minimum"
+      (Just '+') (fmap last (packed [maxBound,minBound]))
+    check "an isolated integer still charges its signed decimal payload"
+      Nothing (prepared scope 31 (literal minBound))
+    check "a minimum signed literal fits at its exact ordinary budget"
+      True (case prepared scope 32 (literal minBound) of { Just _ -> True; Nothing -> False })
     let large = H.literal (replicate 4097 '葉')
     check "a constructor above the dictionary limit keeps its ordinary framing"
       (Just ("P3header" ++ field large)) (prepared scope (charge large) (T.SConstructor large))

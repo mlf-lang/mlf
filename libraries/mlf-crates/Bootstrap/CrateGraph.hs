@@ -18,6 +18,7 @@ module Bootstrap.CrateGraph where {
   import qualified Bootstrap.OpenFragment as Open;
   import qualified Bootstrap.Bitstream as W;
   import qualified Bootstrap.ArtifactStructure as A;
+  import qualified Bootstrap.ArtifactStorage as Storage;
   import qualified Bootstrap.X.Syntax as X;
   import qualified Bootstrap.X.Type as T;
   import qualified Bootstrap.X.Pretty as Pretty;
@@ -362,8 +363,9 @@ module Bootstrap.CrateGraph where {
   };
   -- A large application tree can repeat one file origin at every reference.
   -- P3 writes a preorder tree with delta coordinates and a bounded spelling
-  -- table. P4 also pools constructor names. In both formats an x leaf
-  -- carries the ordinary encoding of syntax outside the tables.
+  -- table. P4 also pools constructor names. P5 records the difference
+  -- between successive signed integer literals. Every version keeps the
+  -- ordinary encoding of syntax outside these tables in an x leaf.
   -- Debit the old wire size as we go. For each admitted subtree its child's
   -- decimal length and colon fit in nine bytes. An oversized original still
   -- enters the ordinary planner and receives the same limit diagnostic.
@@ -462,10 +464,6 @@ module Bootstrap.CrateGraph where {
         ((,) (V.at coordinateAlphabet (V.fromInt count)) bytes) names else names
     } in (,,) literal bytes table
   };
-  -- An Int has one to twenty signed decimal characters. The prefix is
-  -- part of the output page; the ordinary framed length still sets admission.
-  integerPositionPrefixes :: V.IndexVec Int String;
-  integerPositionPrefixes = V.fromList (map (\n -> "i" ++ showInt n ++ ":") (range 0 20));
   -- The same preorder writer accepts raw declarations or canonical syntax.
   -- Application children and source wrappers stay in their parent's scope.
   -- Save a continuation only where the projection changes, at binders or
@@ -487,20 +485,22 @@ module Bootstrap.CrateGraph where {
         else (:) (V.at coordinateAlphabet (V.fromInt (orInt digit 64))) (bytes rest)
     } in bytes (xorInt (shiftLInt number 1) (shiftRInt number 63));
     scan scope outer = let {
-      collect budget pending chunks pages slots line column names locations constructors = if budget < 0 then Nothing else case pending of {
+      collect budget pending chunks pages slots line column names locations constructors previousInteger = if budget < 0 then Nothing else case pending of {
       [] -> case outer of {
-        (:) ((,) previous items) more -> scan previous more budget items chunks pages slots line column names locations constructors;
+        (:) ((,) previous items) more -> scan previous more budget items chunks pages slots line column names locations constructors previousInteger;
         [] -> let {
           finalPages = if slots == pageNodes then pages else (:) (concatStringList (chunks [])) pages;
-          version = if M.size constructors == 0 then "P3" else "P4"
+          version = case previousInteger of {
+            Just _ -> "P5"; Nothing -> if M.size constructors == 0 then "P3" else "P4"
+          }
         } in Just (concatStringList ((:) version ((:) header (reverse finalPages))))
       };
       (:) expr rest -> if slots == 0 then let {
           page = concatStringList (chunks [])
-        } in seq page (collect budget pending id ((:) page pages) pageNodes line column names locations constructors) else let {
-        next cost emit items = collect (budget - cost) items (compose chunks emit) pages (slots - 1) line column names locations constructors;
+        } in seq page (collect budget pending id ((:) page pages) pageNodes line column names locations constructors previousInteger) else let {
+        next cost emit items = collect (budget - cost) items (compose chunks emit) pages (slots - 1) line column names locations constructors previousInteger;
         named tag spelling overhead = case positionSymbol spelling names of { (,,) code bytes table ->
-          collect (budget - overhead - bytes) rest (\tail -> chunks ((:) tag ((:) code tail))) pages (slots - 1) line column table locations constructors
+          collect (budget - overhead - bytes) rest (\tail -> chunks ((:) tag ((:) code tail))) pages (slots - 1) line column table locations constructors previousInteger
         };
         enter nested = scan nested (case rest of { [] -> outer; _ -> (:) ((,) scope rest) outer });
         ordinary value = let { text = Q.encodeExpression value } in
@@ -512,11 +512,11 @@ module Bootstrap.CrateGraph where {
           -- inspects the function. Stay within that page and budget.
           applied prefix spelling overhead = case positionSymbol spelling names of {
             (,,) code bytes table -> collect (budget - 25 - overhead - bytes) ((:) a rest)
-              (\tail -> chunks ((:) prefix ((:) code tail))) pages (slots - 2) line column table locations constructors
+              (\tail -> chunks ((:) prefix ((:) code tail))) pages (slots - 2) line column table locations constructors previousInteger
           }
         } in if slots < 2 || budget < 25 then single else case f of {
           SApp g b -> collect (budget - 50) ((:) g ((:) b ((:) a rest)))
-            (\tail -> chunks ((:) "aa" tail)) pages (slots - 2) line column names locations constructors;
+            (\tail -> chunks ((:) "aa" tail)) pages (slots - 2) line column names locations constructors previousInteger;
           SVar name -> applied "av" (case scope of {
             WrittenOrigin -> name; SourceOrigin _ env _ _ _ -> Q.canonicalReference env name
           }) 10;
@@ -535,7 +535,7 @@ module Bootstrap.CrateGraph where {
             fields = Separate.pack [local,Q.optional Q.encodeAnnotation (Separate.mapMaybeValue (Q.canonicalAnnotation types typeDepth) ann)];
             child = SourceOrigin rank (M.insert compareString n local env) (depth + 1) types typeDepth
           } in enter child (budget - 17 - stringUtf8Length fields) [b] (\tail -> chunks ((:) "l" ((:) fields tail)))
-            pages (slots - 1) line column names locations constructors
+            pages (slots - 1) line column names locations constructors previousInteger
         };
         SCallSite label span@(SourceSpan pkg mod file sl sc el ec) body -> case origin of {
           SourceSpan p m f _ _ _ _ -> if eqString pkg p && eqString mod m && eqString file f then case positionSymbol label names of { (,,) code nameBytes table -> let {
@@ -548,7 +548,7 @@ module Bootstrap.CrateGraph where {
             } in (:) (if short then "d" else "D") ((:) code startLine);
             cost = 29 + originBytes + nameBytes +
               positionBytes sl + positionBytes sc + positionBytes el + positionBytes ec;
-            next emit known = collect (budget - cost) ((:) body rest) (compose chunks emit) pages (slots - 1) sl sc table known constructors;
+            next emit known = collect (budget - cost) ((:) body rest) (compose chunks emit) pages (slots - 1) sl sc table known constructors previousInteger;
             offset = sc - column; width = ec - sc;
             -- Only back-references have a one-scalar spelling. Definitions
             -- include their framed text and always go through the general path.
@@ -576,7 +576,7 @@ module Bootstrap.CrateGraph where {
         -- Each use still consumes its full ordinary UTF-8 budget.
         SConstructor name -> seq scope (let {
           emit cost field saved = collect (budget - cost) rest (\tail -> chunks ((:) field tail))
-            pages (slots - 1) line column names locations saved
+            pages (slots - 1) line column names locations saved previousInteger
         } in case M.lookup compareString name constructors of {
           Just ((,) cost field) -> emit cost field constructors;
           Nothing -> if M.size constructors >= 32 || stringLength name > 4096 then ordinary expr else let {
@@ -586,21 +586,29 @@ module Bootstrap.CrateGraph where {
           } in emit cost ("C" ++ Separate.pack [name]) saved
         });
         SPrimitive p -> named "p" (Primitive.primitiveName p) 11;
+        -- The previous literal follows preorder across page and scope boundaries.
+        -- Modular subtraction is reversible across both signed Int endpoints.
+        -- Charge its ordinary decimal field before admitting the next node.
         SIntLit n -> let {
-          digits = showInt n; count = stringLength digits;
-          prefix = V.at integerPositionPrefixes (V.fromInt count);
-          framing = if count < 10 then 2 else 3
-        } in next (9 + framing + count) (\tail -> (:) prefix ((:) digits tail)) rest;
+          previous = case previousInteger of { Just value -> value; Nothing -> 0 };
+          delta = n - previous;
+          emit tail = case delta of {
+            0 -> (:) "=" tail; 1 -> (:) "+" tail;
+            _ -> if delta == (-1) then (:) "-" tail else (:) "I" (coordinate delta tail)
+          };
+          width = Storage.v2IntLength n; cost = 9 + width + (if width < 10 then 2 else 3)
+        } in collect (budget - cost) rest (compose chunks emit) pages (slots - 1)
+             line column names locations constructors (Just n);
         _ -> case scope of {
           WrittenOrigin -> ordinary expr;
           SourceOrigin rank env depth types typeDepth ->
             enter WrittenOrigin budget [Q.canonicalExpressionWith rank env depth types typeDepth expr]
-              chunks pages slots line column names locations constructors
+              chunks pages slots line column names locations constructors previousInteger
         }
       }
       }
     } in collect
-  } in scan initialScope [] initialBudget [tree] id [] pageNodes 0 0 M.empty IM.empty M.empty;
+  } in scan initialScope [] initialBudget [tree] id [] pageNodes 0 0 M.empty IM.empty M.empty Nothing;
   matchingSourceMembers original lowered = case (,) original lowered of {
     (,) [(,,) name annotation body] [(,,) other next candidate] ->
       templateNodesLeft 257 body <= 0 && eqString name other && eqMaybe E.eqSAnnotation annotation next &&
