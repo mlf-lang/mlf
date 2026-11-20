@@ -576,6 +576,18 @@ resolverChecks = do
       exprTree = R.SharedBind nested (R.Global own)
         (R.Equations [([nested],R.LetRec [("x",T.InferRecursive,R.Global own)] (R.Local "x"))])
         (R.Global method) (R.Global external)
+  let display i = H.literal ("hint-" ++ show (V.toInt i))
+      annotated = R.CallSite "lookup" (T.SourceSpan "pkg" "M" "source.hs" 2 3 2 9)
+        (R.Equations [([R.OverloadedStringPattern (T.ScalarString "α") method external],
+                       R.App (R.Global own) (R.Local "x"))])
+  case R.indexedExpr display annotated of
+    T.SCallSite "lookup" _ (T.SEquations [([T.SIndexedStringPattern _ (T.DeclRef eq eqName)
+          (T.DeclRef str strName)],T.SApp (T.SGlobal slot slotName) (T.SVar "x"))]) -> do
+      check "projected pattern and value slots preserve their identities"
+        (map V.toInt [method,external,own]) (map V.toInt [eq,str,slot])
+      check "projected display names come from the supplied name function"
+        (map (H.unpack . display) [method,external,own]) (map H.unpack [eqName,strName,slotName])
+    _ -> fail "resolved nested expression lost its source or overloaded pattern"
   check "nested, recursive and implicit edges read the actual leaves"
     (map V.toInt [method,external,own,method,external,own,method,external])
     (map V.toInt (R.references exprTree))

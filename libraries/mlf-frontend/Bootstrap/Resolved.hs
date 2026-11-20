@@ -60,19 +60,22 @@ module Bootstrap.Resolved where {
   namedExpr :: forall d. (V.Index d -> String) -> Expr d -> SExpr;
   namedExpr name = projectExpr (compose SVar name) (namedPattern name);
   indexedExpr name = projectExpr (\i -> SGlobal i (name i)) (indexedPattern name);
-  projectExpr global pattern term = let { child = projectExpr global pattern } in case term of {
-    Global i -> global i; Local n -> SVar n; CallStack -> SVar "$MLF.Stack.callStack";
-    Constructor n -> SConstructor n; Prim p -> SPrimitive p;
-    IntLit n -> SIntLit n; DoubleLit n -> SDoubleLit n; BoolLit b -> SBoolLit b; StringLit s -> SStringLit s;
-    Lam n annotation b -> SLam n annotation (child b);
-    App a b -> SApp (child a) (child b); Let n a b -> SLet n (child a) (child b);
-    Ann a t -> SAnn (child a) t; Signature a t -> SSignature (child a) t;
-    Case a arms -> SCase (child a) (map (\((,) p b) -> SAlternative (pattern p) (child b)) arms);
-    Equations rows -> SEquations (map (\((,) ps b) -> (,) (map pattern ps) (child b)) rows);
-    LetRec defs b -> SLetRec (map (\((,,) n mode x) -> (,,) n mode (child x)) defs) (child b);
-    SourceDefinition b -> SSourceDefinition (child b); CallSite n loc b -> SCallSite n loc (child b);
-    SharedBind p a b bind fail -> SSharedBind (pattern p) (child a) (child b) (child bind) (child fail)
-  };
+  -- The global and pattern projections are fixed for the entire traversal.
+  projectExpr global pattern = let {
+    child term = case term of {
+      Global i -> global i; Local n -> SVar n; CallStack -> SVar "$MLF.Stack.callStack";
+      Constructor n -> SConstructor n; Prim p -> SPrimitive p;
+      IntLit n -> SIntLit n; DoubleLit n -> SDoubleLit n; BoolLit b -> SBoolLit b; StringLit s -> SStringLit s;
+      Lam n annotation b -> SLam n annotation (child b);
+      App a b -> SApp (child a) (child b); Let n a b -> SLet n (child a) (child b);
+      Ann a t -> SAnn (child a) t; Signature a t -> SSignature (child a) t;
+      Case a arms -> SCase (child a) (map (\((,) p b) -> SAlternative (pattern p) (child b)) arms);
+      Equations rows -> SEquations (map (\((,) ps b) -> (,) (map pattern ps) (child b)) rows);
+      LetRec defs b -> SLetRec (map (\((,,) n mode x) -> (,,) n mode (child x)) defs) (child b);
+      SourceDefinition b -> SSourceDefinition (child b); CallSite n loc b -> SCallSite n loc (child b);
+      SharedBind p a b bind fail -> SSharedBind (pattern p) (child a) (child b) (child bind) (child fail)
+    }
+  } in child;
   namedPattern :: forall d. (V.Index d -> String) -> Pattern d -> SPattern;
   namedPattern name = projectPattern (\text eq from -> SOverloadedStringPattern text (name eq) (name from));
   indexedPattern name = projectPattern (\text eq from -> SIndexedStringPattern text (DeclRef eq (name eq)) (DeclRef from (name from)));
