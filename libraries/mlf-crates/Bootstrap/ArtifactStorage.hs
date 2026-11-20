@@ -376,7 +376,9 @@ module Bootstrap.ArtifactStorage where {
     }
   };
   v2DecimalLength :: Int -> Int;
-  v2DecimalLength value = if value < 10 then 1 else 1 + v2DecimalLength (quotInt value 10);
+  v2DecimalLength value = if value < 10 then 1 else if value < 100 then 2
+    else if value < 1000 then 3 else if value < 10000 then 4
+    else 4 + v2DecimalLength (quotInt value 10000);
   v2IntLength :: Int -> Int;
   v2IntLength value = if value >= 0 then v2DecimalLength value
     else if value == (-9223372036854775808) then 20

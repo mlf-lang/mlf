@@ -7,6 +7,7 @@ import Data.Bits (testBit)
 import Data.List (isInfixOf, nub, sort)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Bootstrap.ArtifactStorage as Storage
 import qualified Bootstrap.ArtifactStructure as Structure
 import qualified Bootstrap.Bitstream as W
 import qualified Bootstrap.Classes as Classes
@@ -1260,6 +1261,13 @@ lexicalRunChecks = do
     T.Left marks -> check "word consumers see the leading scalar and decimal consumers see the following scalar"
       "[('w',102,\"foo\"),('n',44,\"12\"),('p',0,\",\"),('n',-1,\"9\")]" (H.unpack marks)
     T.Right _ -> fail "custom token consumer did not finish"
+  let boundaries = [fromInteger (sign * (10^digits + offset)) |
+        sign <- [-1,1], digits <- [0..18 :: Int], offset <- [-1..1]]
+  forM_ (minBound:maxBound:boundaries) $ \value -> do
+    let signedWidth = fromIntegral (length (show value))
+    check "signed decimal render width matches its complete spelling" signedWidth (Storage.v2IntLength value)
+    check "unsigned render width preserves the single-digit domain below ten"
+      (if value < 0 then 1 else signedWidth) (Storage.v2DecimalLength value)
   let punctuation = "(),;[]{}" :: String
   forM_ punctuation $ \first -> forM_ punctuation $ \second -> do
     let source = H.literal ([first] ++ "{- {- x -} -}" ++ [second])
