@@ -9,6 +9,7 @@ module Bootstrap.X.Check where {
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.Data as D;
   import qualified Bootstrap.Primitive as P;
@@ -172,10 +173,14 @@ module Bootstrap.X.Check where {
   };
   closedPrimitiveTypes :: IntMap (Either String XType);
   closedPrimitiveTypes = IM.fromList (L.map (\p ->
-    (,) (P.primitiveCode p) (instantiateClosedPrimitive p)) P.allPrimitives);
+    (,) (P.primitiveCode p) (closedPrimitiveType p)) P.allPrimitives);
+  -- The primitive registry is in wire-code order. Compute each closed
+  -- signature on first demand and index it directly on subsequent checks.
   closedPrimitiveType :: Primitive -> Either String XType;
-  closedPrimitiveType p = IM.findWithDefault (instantiateClosedPrimitive p)
-    (P.primitiveCode p) closedPrimitiveTypes;
+  closedPrimitiveType = let {
+    results :: V.IndexVec Primitive (Either String XType);
+    results = V.fromList (L.map instantiateClosedPrimitive P.allPrimitives)
+  } in \p -> V.at results (V.fromInt (P.primitiveCode p));
   inferIn :: DataEnv -> XEnv -> XTerm -> Either String XType;
   inferIn ds env term = inferApplications ds env (scopeApplications ds env) term;
   checkedLookup :: forall k a b. (k -> k -> Int) -> (k -> a -> b) -> Map k a -> k -> Maybe b;

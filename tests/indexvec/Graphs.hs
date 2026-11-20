@@ -44,6 +44,7 @@ import qualified Tests.IndependentCheck as Independent
 import qualified Bootstrap.IndexVec as V
 import qualified Bootstrap.IntSet as I
 import qualified Bootstrap.Parser as Parser
+import qualified Bootstrap.Primitive as Primitives
 import qualified Bootstrap.Map as M
 import qualified Bootstrap.Module as Modules
 import qualified Bootstrap.Types as T
@@ -1430,6 +1431,22 @@ lexicalRunChecks = do
         (result (Parsec.pRun Parser.expr state)) parsed
       check "consecutive closures retain the delimiter for the enclosing declaration"
         (Right ([";","next"],True)) (fmap (\(_,tailTokens,consumed)->(tailTokens,consumed)) parsed)
+  let resultType answer = case answer of
+        T.Left why -> Left (H.unpack why)
+        T.Right ty -> Right (H.unpack (Pretty.prettyType ty))
+  forM_ (zip [0..] Primitives.allPrimitives) $ \(slot,p) -> do
+    check "primitive registry order agrees with its stable code" slot (Primitives.primitiveCode p)
+    case Structure.primitiveFromCode slot of
+      T.Right wire -> check "wire reader identifies the indexed primitive"
+        (H.unpack (Primitives.primitiveName wire)) (H.unpack (Primitives.primitiveName p))
+      T.Left why -> fail (H.unpack why)
+    check "indexed closed signature agrees with the independent checker"
+      (resultType (Independent.inferIn Data.emptyDataEnv XCheck.emptyEnv (T.XPrimitive p [])))
+      (resultType (XCheck.closedPrimitiveType p))
+  check "dense primitive table covers the wire registry" True
+    (case Structure.primitiveFromCode (fromIntegral (length Primitives.allPrimitives)) of
+      T.Left _ -> True
+      T.Right _ -> False)
   forM_ [Lexer.isDigit,Lexer.isHexDigit,Lexer.isIdentChar,Lexer.isOperator] $ \predicate ->
     forM_ [0..size] $ \i -> do
       let before = Lexer.Cursor i 12 19
