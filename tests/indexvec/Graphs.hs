@@ -1097,6 +1097,15 @@ lexicalRunChecks = do
          (H.literal (replicate 8193 'z'),"1740af352212ee326525f7bd044275adda2b46eb53128aca7c3e64b268121760")] $ \(text,expected) -> do
     digest <- CQ.sourceInputHash text
     check "immutable source UTF-8 SHA-256" expected (H.unpack digest)
+  let punctuation = "(),;[]{}" :: String
+  forM_ punctuation $ \first -> forM_ punctuation $ \second -> do
+    let source = H.literal ([first] ++ "{- {- x -} -}" ++ [second])
+    case Lexer.scanSourceTokens "delimiters" source of
+      T.Left err -> fail (H.unpack err)
+      T.Right (Lexer.Scanned ts end) -> check "single punctuation preserves its spelling and span across a nested comment"
+        ([([first],1,2),([second],15,16)],16)
+        ([(H.unpack (Lexer.tokenText t),Lexer.tokenColumn t,Lexer.tokenEndColumn t) | t <- ts],
+         Lexer.tokenColumn end)
   forM_ [Lexer.isDigit,Lexer.isHexDigit,Lexer.isIdentChar,Lexer.isOperator] $ \predicate ->
     forM_ [0..size] $ \i -> do
       let before = Lexer.Cursor i 12 19
