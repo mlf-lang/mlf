@@ -404,11 +404,14 @@ module Bootstrap.CrateGraph where {
   fitsPreparedFields slots budget fields = case remainingPreparedBytes slots budget fields of {
     Just _ -> True; Nothing -> False
   };
+  -- Frame each member subtree once. The inline evidence scope preserves the
+  -- ordinary field spelling used by the prepared-declaration fingerprint.
   preparedSyntax previous original lowered = let {
-    first = Q.list Q.encodeMember original;
+    members = Q.keyList (Q.memberKey Q.inlineScopeKey);
+    first = Q.renderKey M.empty (members original);
     fresh = let {
-      second = Q.list Q.encodeMember lowered;
-      key = Q.keyList (Q.memberKey Q.inlineScopeKey) lowered;
+      key = members lowered;
+      second = Q.renderKey M.empty key;
       cached = if smallPreparedKey key && stringLength second <= 65536
         then Just (LoweredSyntax lowered second) else Nothing
     } in (,,) first second cached

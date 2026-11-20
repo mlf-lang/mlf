@@ -221,6 +221,17 @@ queryChecks = do
     let large = H.literal (replicate 4097 '葉')
     check "a constructor above the dictionary limit keeps its ordinary framing"
       (Just ("P3header" ++ field large)) (prepared scope (charge large) (T.SConstructor large))
+  let spine depth = foldr (T.SApp . T.SConstructor) (T.SStringLit "尾:😀")
+          (take depth (cycle ["節", "λ:𐐀"]))
+      members body = [("表:λ", T.Nothing, body)]
+  forM_ [63, 256, 513] $ \depth -> do
+    let raw = members (T.SSourceDefinition (spine depth))
+        lowered = members (spine depth)
+        (a, b, retained) = CrateGraph.preparedSyntax T.Nothing raw lowered
+        expected = map (H.unpack . CQ.list CQ.encodeMember) [raw, lowered]
+    check "deep prepared members preserve recursive scalar framing" expected (map H.unpack [a,b])
+    check "oversized prepared members stay outside the lowered cache" True
+      (case retained of { T.Nothing -> True; T.Just _ -> False })
   let sha = H.literal (replicate 64 '1')
       other = H.literal (replicate 64 '2')
       node k reads = Q.QueryNode k sha reads T.Nothing
