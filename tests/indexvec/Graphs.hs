@@ -1126,6 +1126,19 @@ lexicalRunChecks = do
         ([([first],1,2),([second],15,16)],16)
         ([(H.unpack (Lexer.tokenText t),Lexer.tokenColumn t,Lexer.tokenEndColumn t) | t <- ts],
          Lexer.tokenColumn end)
+  let ctorEnv = Classes.QualifiedEnv M.empty (const T.Nothing)
+      ctor name = T.SConstructor name
+      here = T.SourceSpan "P" "M" "file.hs" 1 1 1 2
+      op = T.SCallSite (error "constructor function label") (error "function span") (ctor "Branch")
+      called = T.SApp (T.SApp op (T.SIntLit 2)) (T.SCallSite "b" here (ctor "Leaf"))
+      wanted = T.SApp (T.SApp (ctor "Branch") (T.SIntLit 2)) (ctor "Leaf")
+      lowerCtor = Classes.plainLambdaApplication ctorEnv called (Fresh.freshFail "unexpected fallback")
+  case Fresh.runFreshState lowerCtor 9 (Fresh.reservedNames ["old"]) of
+    T.Right (Classes.PlainResult node body,next,used) -> do
+      check "constructor applications preserve generated identities" (13,14) (node,next)
+      check "constructor applications preserve the original reservation" ["old"] (map H.unpack (S.toList used))
+      check "constructor application drops function and argument locations" True (Equality.eqSExprBits body wanted)
+    _ -> fail "constructor application with source locations"
   forM_ [Lexer.isDigit,Lexer.isHexDigit,Lexer.isIdentChar,Lexer.isOperator] $ \predicate ->
     forM_ [0..size] $ \i -> do
       let before = Lexer.Cursor i 12 19

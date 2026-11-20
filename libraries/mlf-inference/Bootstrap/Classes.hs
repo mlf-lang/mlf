@@ -1818,11 +1818,13 @@ module Bootstrap.Classes where {
       _ -> fallback
     };
     -- A source location on the function never needs its label or span.
-    -- A primitive consumes one identity before the argument is visited.
-    application f a count pending = case f of {
+    -- Primitive and constructor leaves each consume one identity.
+    application f a count pending = let {
+      leaf = let { next = count + 1 } in seq next (visit False a next (PlainOperator f pending))
+    } in case f of {
       SCallSite _ _ inner -> application inner a count pending;
-      SPrimitive _ -> let { next = count + 1 } in
-        seq next (visit False a next (PlainOperator f pending));
+      SPrimitive _ -> leaf;
+      SConstructor _ -> leaf;
       _ -> visit True f count (PlainArgument a pending)
     };
     visit function expr count pending = case expr of {
