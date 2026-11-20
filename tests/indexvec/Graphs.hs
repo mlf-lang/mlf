@@ -505,6 +505,22 @@ resolverChecks = do
     typed <- CrateGraph.hashPrepared ns original "" ["界"] >>= right
     wire <- CrateGraph.hashRebuiltValue fields >>= right
     check "large prepared text matches the admitted wire hash" (H.unpack wire) (H.unpack typed)
+  let location = T.SourceSpan "pkg" "M" "file" 2 1 2 2
+      site = T.SCallSite "x" location
+      leaves = [T.SVar "x",T.SVar "x",T.SVar "x",T.SPrimitive T.PAddInt,T.SVar "addInt",T.SVar "x"]
+      expression = foldr1 T.SApp (map site leaves)
+      encodeSite budget = case CrateGraph.packedOrigin location 0 budget expression "loc" of
+        T.Nothing -> Nothing
+        T.Just text -> Just (H.unpack text)
+      firstSite = "D" ++ [toEnum 127] ++ "1:x" ++ map toEnum [4,2,0,2]
+      reuseSite = "d" ++ map toEnum [0,0,2]
+      varX = "v" ++ [toEnum 0]
+      fields = zipWith (++) (firstSite:repeat reuseSite)
+        [varX,varX,varX,"p" ++ [toEnum 127] ++ "6:addInt","v" ++ [toEnum 1],varX]
+      ordinaryCost = 5*25 + 6*(29+3+4*3) + 4*(10+3) + (11+8) + (10+8)
+  check "a reused source location preserves variable and primitive wire tags"
+    (Just ("P3loc" ++ concat (zipWith (++) (replicate 5 "a" ++ [""]) fields))) (encodeSite ordinaryCost)
+  check "a combined source location still charges both ordinary nodes" Nothing (encodeSite (ordinaryCost-1))
   let capture (Crate.CompilationModules table units _) _ _ _ _ entry reach _ =
         (table,[(Crate.compilationName u,Crate.compilationExports u,Crate.compilationContents u) | u <- units],entry,reach)
       entities iface = [(H.unpack (Modules.owner e),H.unpack (Modules.spelling e),Modules.roleCode (Modules.role e)) |

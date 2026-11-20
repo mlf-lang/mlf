@@ -470,6 +470,10 @@ module Bootstrap.CrateGraph where {
   -- forms delegated to the general canonicalizer.
   data OriginScope = WrittenOrigin | SourceOrigin
     (V.Index Declaration -> V.Index Declaration) (Map String String) Int (Map String String) Int;
+  data CachedLocation = CachedLocation String | CachedLocationLeaf String String String Int String;
+  locationFragment cached = case cached of {
+    CachedLocation site -> site; CachedLocationLeaf site _ _ _ _ -> site
+  };
   packedOrigin = packedOriginIn WrittenOrigin;
   packedOriginIn initialScope origin originBytes initialBudget tree header = let {
     -- Joining bounded pages releases framed source locations as soon as their
@@ -554,12 +558,39 @@ module Bootstrap.CrateGraph where {
             -- include their framed text and always go through the general path.
             small = short && offset >= (0 - 64) && offset < 64 && width >= (0 - 64) && width < 64 &&
               stringLength code == 1;
-            key = (stringCodeAt code 0 * 128 + offset + 64) * 128 + width + 64
+            key = (stringCodeAt code 0 * 128 + offset + 64) * 128 + width + 64;
+            -- A resolved leaf immediately following this location has a stable
+            -- code once its spelling is interned. Keep at most one such pair
+            -- per existing location. Binders still supply their current name.
+            reuse cached = let {
+              single = next ((:) (locationFragment cached)) locations;
+              both leafCost fragment saved = collect (budget - cost - leafCost) rest
+                (\tail -> chunks ((:) fragment tail)) pages (slots - 2) sl sc table saved constructors previousInteger;
+              leaf tag spelling overhead = case cached of {
+                CachedLocationLeaf _ previous name leafCost field ->
+                  if eqString tag previous && eqString spelling name then both leafCost field locations else single;
+                CachedLocation site -> case M.lookup compareString spelling table of {
+                  Nothing -> single;
+                  Just ((,) leafCode bytes) -> let {
+                    leafCost = overhead + bytes;
+                    field = concatStringList [site,tag,leafCode];
+                    saved = IM.insert key (CachedLocationLeaf site tag spelling leafCost field) locations
+                  } in both leafCost field saved
+                }
+              }
+            } in if slots < 2 || budget < cost then single else case body of {
+              SVar name -> leaf "v" (case scope of { WrittenOrigin -> name;
+                SourceOrigin _ env _ _ _ -> Q.canonicalReference env name }) 10;
+              SPrimitive primitive -> leaf "p" (Primitive.primitiveName primitive) 11;
+              SGlobal i _ -> case scope of { WrittenOrigin -> single;
+                SourceOrigin rank _ _ _ _ -> leaf "v" (Q.ordinalToken (rank i)) 10 };
+              _ -> single
+            }
           } in if not small then next complete locations else case IM.lookup key locations of {
-            Just fragment -> next ((:) fragment) locations;
+            Just cached -> reuse cached;
             Nothing -> if IM.size locations >= 256 then next complete locations else let {
               fragment = concatStringList (complete [])
-            } in next ((:) fragment) (IM.insert key fragment locations)
+            } in next ((:) fragment) (IM.insert key (CachedLocation fragment) locations)
           } }
             else let { fields = Separate.pack [label,Q.encodeSourceSpan span] } in
               next (20 + stringUtf8Length fields) (\tail -> (:) "S" ((:) fields tail)) ((:) body rest)
