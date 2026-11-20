@@ -129,6 +129,14 @@ packageChecks = do
   let world = Modules.Entity "Prelude" "IOWorld" Modules.BuiltinType
       bridge = Modules.Entity "Prelude" "stToIO" (Modules.Primitive T.PSTToIO)
   check "IO world entities preserve existing generated name" (nameOf [user]) (nameOf [world,bridge,extra,user])
+  let frame fields = concat [show (length value) ++ ":" ++ value | value <- fields]
+      branches = [Modules.Entity "M" "葉:🌿" (Modules.Constructor "T"),
+                  Modules.Entity "M" "a" Modules.Value, Modules.Entity "M" "a" Modules.Value]
+      fields = [frame ["M","葉:🌿","constructor","T"],frame ["M","a","value",""],frame ["M","a","value",""]]
+      exportRows = [("界",branches),("A",[]),("界",[])]
+      expectedExports = frame [frame ["A",""],frame ["界",frame (sort fields)],frame ["界",""]]
+  check "canonical export rows preserve scalar framing, duplicate entities and same-owner order"
+    expectedExports (H.unpack (Artifact.encodeExports exportRows))
   let builtin ident modules = Artifact.CrateInterface ident [] modules [] [] [] [] [] [] [] "" "" []
       identityCheck iface = case Artifact.validateBuiltinOwnership iface of
         T.Left message -> Left (H.unpack message)

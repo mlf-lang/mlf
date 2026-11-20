@@ -155,7 +155,7 @@ module Bootstrap.CrateArtifact where {
       (map
          (\((,) n entities) ->
             Separate.pairEncoding
-              ((,) n (Separate.pack (map Separate.entityEncoding (sortEntities entities)))))
+              ((,) n (Separate.pack (sortStrings (map Separate.entityEncoding entities)))))
          (sortPairs es));
   encodeImports is =
     Separate.pack
