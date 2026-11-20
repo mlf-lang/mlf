@@ -281,12 +281,22 @@ module Bootstrap.Lexer where {
       NoSharedTokens -> do { validate checks; complete ordered end blocks };
       PlainSharedToken token rest -> finish end rest ((:) token ordered) checks blocks;
       PossibleLayoutWord token rest -> finish end rest ((:) token ordered) checks (braced token ordered blocks);
-      CheckedSharedToken token rest -> finish end rest ((:) token ordered)
-        (SharedTokenCheck token ordered checks) (braced token ordered blocks);
-      CapitalSharedToken token rest -> let { next = case ordered of {
-        (:) member _ -> let { name = tokenText member } in stringLength name > 0 && stringCodeAt name 0 == 46;
-        [] -> False
-      } } in finish end rest ((:) token ordered) (if next then SharedTokenCheck token ordered checks else checks) blocks
+      -- Only a token from the full-check branch can start with a dot.
+      -- While reversing it, schedule a preceding capital's qualification
+      -- check before this token's own check.
+      CheckedSharedToken token rest -> let {
+        following = (:) token ordered;
+        pending = SharedTokenCheck token ordered checks;
+        explicit = braced token ordered blocks
+      } in case rest of {
+        CapitalSharedToken prefix more -> let {
+          name = tokenText token;
+          startsDot = stringLength name > 0 && stringCodeAt name 0 == 46
+        } in finish end more ((:) prefix following)
+          (if startsDot then SharedTokenCheck prefix following pending else pending) explicit;
+        _ -> finish end rest following pending explicit
+      };
+      CapitalSharedToken token rest -> finish end rest ((:) token ordered) checks blocks
     };
     output = TokenOutput word number PlainSharedToken CheckedSharedToken
       (\history end -> finish end history [] NoSharedChecks True)

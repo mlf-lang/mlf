@@ -1280,6 +1280,11 @@ lexicalRunChecks = do
         T.Right input@(Lexer.Scanned tokens _) -> case Lexer.validateSharedTokens "lex" tokens of
           T.Left e -> T.Left e
           T.Right () -> T.Right input
+  forM_ ["A B.C", "A B .C", "A B. C", "A{- comment -}.C", "A\t.B", "A B.+",
+         "A 2bad C.D", "A B . C 2bad", "A B . C {- unclosed", "Ω.A B.", "A where { B.C }"] $ \input -> do
+    let sourceText = H.literal input
+    check "qualified names retain source-order diagnostics and token extents after capital words"
+      (scanned (checked sourceText)) (scanned (Lexer.scanValidatedSharedTokens "lex" sourceText))
   forM_ ["", " a界", " {- note -} again", " 1.bad", " {- open"] $ \suffix -> do
     let text = H.literal (wordsInFile ++ suffix)
     check "shared file scanner preserves prefix collisions, extents and first diagnostics"
