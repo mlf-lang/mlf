@@ -185,38 +185,61 @@ module Bootstrap.X.Check where {
   inferIn ds env term = inferApplications ds env (scopeApplications ds env) term;
   checkedLookup :: forall k a b. (k -> k -> Int) -> (k -> a -> b) -> Map k a -> k -> Maybe b;
   checkedLookup = M.lookupProjected;
+  data VariableInstantiation = InstantiatedType XType |
+    TypeApplications XType (String -> Maybe ((,) (Either String XType) (Either String VariableInstantiation)));
+  instantiationType state = case state of {
+    InstantiatedType ty -> ty;
+    TypeApplications ty _ -> ty
+  };
   scopeApplications ds env = let {
-    scheme _ ty = let {
+    types = typeEnv env;
+    cached ty = let {
       check name _ = let {
-        first = checkedComputationResult ds (typeEnv env) (XInner (XBottom (XCon name []))) ty;
-        result = do { middle <- first; checkedComputationResult ds (typeEnv env) XElim middle }
-      } in (,) first result;
+        first = checkedComputationResult ds types (XInner (XBottom (XCon name []))) ty;
+        eliminated = do {
+          middle <- first;
+          result <- checkedComputationResult ds types XElim middle;
+          Right (cached result)
+        }
+      } in (,) first eliminated;
       primitive = checkedLookup compareString check D.primitiveKinds;
       named = case ds of { DataEnv _ _ declared -> checkedLookup compareString check declared };
       arguments name = case primitive name of { Nothing -> named name; found -> found }
-    } in (,,) ty (wellFormedIn ds (typeEnv env) ty) arguments
+    } in case ty of {
+      XForall _ XBot _ -> TypeApplications ty arguments;
+      _ -> InstantiatedType ty
+    };
+    scheme _ ty = (,) (wellFormedIn ds types ty) (cached ty)
   } in checkedLookup X.compareName scheme (termEnv env);
-  -- The same variable and constructor in this environment receive the same
-  -- two checked results. Validate the source first and demand the first step
-  -- before inspecting the suffix, as in the ordinary computation checker.
-  checkedVariableApplication ds env source admitted arguments proof = do {
+  -- Each completed type application has its own lazy table for the next
+  -- argument. A composed proof checks its left side before examining its
+  -- right side, including when the first side fails. Each table belongs to
+  -- one variable, datatype environment and sequence of checked arguments.
+  checkedVariableApplication ds env admitted origin proof = do {
     admitted;
-    let { ordinary = checkedComputationResult ds env proof source };
-    case proof of {
-      XThen first following -> case source of {
-        XForall _ XBot _ -> case first of {
-          XInner (XBottom (XCon name [])) -> case arguments name of {
-            Nothing -> ordinary;
-            Just ((,) firstChecked eliminated) -> do {
-              middle <- firstChecked;
-              case following of { XElim -> eliminated; _ -> checkedComputationResult ds env following middle }
-            }
-          };
-          _ -> ordinary
+    result <- variableInstantiation ds env origin proof;
+    Right (instantiationType result)
+  };
+  variableInstantiation ds env state proof = let {
+    ordinary source computation = fmap InstantiatedType (checkedComputationResult ds env computation source)
+  } in case state of {
+    InstantiatedType ty -> ordinary ty proof;
+    TypeApplications ty arguments -> case proof of {
+      XThen first following -> case first of {
+        XThen _ _ -> do {
+          next <- variableInstantiation ds env state first;
+          variableInstantiation ds env next following
         };
-        _ -> ordinary
+        XInner (XBottom (XCon name [])) -> case arguments name of {
+          Nothing -> ordinary ty proof;
+          Just ((,) firstChecked eliminated) -> do {
+            middle <- firstChecked;
+            case following of { XElim -> eliminated; _ -> ordinary middle following }
+          }
+        };
+        _ -> ordinary ty proof
       };
-      _ -> ordinary
+      _ -> ordinary ty proof
     }
   };
   -- For a constructor with no supplied type arguments, the declaration and
@@ -274,7 +297,7 @@ module Bootstrap.X.Check where {
       XTypeApp t p -> case t of {
         XVarTerm name -> case applications name of {
           Nothing -> Left ("unbound term variable " ++ X.nameHint name);
-          Just ((,,) ty valid arguments) -> checkedVariableApplication ds (typeEnv env) ty valid arguments p
+          Just ((,) valid choices) -> checkedVariableApplication ds (typeEnv env) valid choices p
         };
         _ -> do {
           source <- inferWithConstructors ds env applications constructors t;

@@ -957,6 +957,30 @@ signedConstructorChecks = do
     check "constructor instantiation agrees with independent xMLF checking"
       (resultType (Independent.inferIn dataEnv XCheck.emptyEnv expr))
       (resultType (XCheck.inferIn dataEnv XCheck.emptyEnv expr))
+  let [a,b,c] = map T.XTyVar [60,61,62]
+      name = T.XName 8 "poly"
+      ty = foldr (\v body -> T.XForall v T.XBot body)
+        (T.XArrow (T.XVar a) (T.XArrow (T.XVar b) (T.XVar c))) [a,b,c]
+      env = T.XEnv M.empty (M.singleton name ty)
+      use p = T.XTypeApp (T.XVarTerm name) p
+      apply t = T.XThen (T.XInner (T.XBottom t)) T.XElim
+      args = [xt,T.XCon "Bool" [],T.XCon "Tree" [],T.XCon "Box" [],T.XCon "absent" []]
+  forM_ [(x,y,z) | x<-args,y<-args,z<-args] $ \(x,y,z) ->
+    forM_ [foldl1 T.XThen,foldr1 T.XThen] $ \group -> do
+      let term = use (group (map apply [x,y,z]))
+      check "successive type arguments retain checked types and the first diagnostic"
+        (resultType (Independent.inferIn dataEnv env term)) (resultType (XCheck.inferIn dataEnv env term))
+  let openConstructor = T.XCon "absent" []
+  check "an unregistered nullary type constructor has kind star" True
+    (case resultType (XCheck.inferIn dataEnv env (use (apply openConstructor))) of
+       Right _ -> True
+       Left _ -> False)
+  let failedPrefix = T.XThen (apply xt) (apply (T.XCon "IO" []))
+      wanted = resultType (Independent.inferIn dataEnv env (use failedPrefix))
+  check "malformed prefix is rejected" True (case wanted of Left _ -> True; Right _ -> False)
+  check "failed instantiation leaves its suffix undemanded" wanted
+    (resultType (XCheck.inferIn dataEnv env (use (T.XThen failedPrefix (error "forced proof suffix")))))
+
   forM_ [(tree, fork), (T.SArrow int tree, T.SConstructor "Tip"),
          (T.SArrow tree tree, construct "Fork" [tip])] $ \(result, rhs) -> do
     direct <- checked (Inference.signedApplicationGroup [] ds (rows result rhs))
