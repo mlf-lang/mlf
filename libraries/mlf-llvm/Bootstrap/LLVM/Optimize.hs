@@ -411,13 +411,17 @@ module Bootstrap.LLVM.Optimize where {
   };
   -- Each selected child is folded once. Keep an affine result in its checked
   -- Int representation until a different operation or the consumer needs a term.
+  oneConstructorField :: forall a. a -> Int -> Maybe a;
+  oneConstructorField value i = if i == 0 then Just value else Nothing;
+  twoConstructorFields :: forall a. a -> a -> Int -> Maybe a;
+  twoConstructorFields left right i = if i == 0 then Just left
+    else if i == 1 then Just right else Nothing;
   erasedConstructorFields apply current = case current of {
       XEConstructor tag -> apply tag 0 (\i -> L.at i []);
       XEApp fn right -> case fn of {
-        XEConstructor tag -> apply tag 1 (\i -> if i == 0 then Just right else Nothing);
+        XEConstructor tag -> apply tag 1 (oneConstructorField right);
         XEApp head left -> case head of {
-          XEConstructor tag -> apply tag 2 (\i -> if i == 0 then Just left
-            else if i == 1 then Just right else Nothing);
+          XEConstructor tag -> apply tag 2 (twoConstructorFields left right);
           XEApp _ _ -> case collectApplications [left,right] head of {
             (,) (XEConstructor tag) fields -> apply tag (L.length fields) (\i -> L.at i fields);
             _ -> Nothing
@@ -430,16 +434,32 @@ module Bootstrap.LLVM.Optimize where {
     };
   -- Type abstractions, instantiations and datatype scopes have no erased
   -- application node. Walk through them without evaluating their metadata.
+  skipTypeWrappers term = case term of {
+    XTypeAbs _ _ body -> skipTypeWrappers body;
+    XTypeApp body _ -> skipTypeWrappers body;
+    XWithData _ body -> skipTypeWrappers body;
+    _ -> term
+  };
   typedConstructorFields apply input = let {
-    collect args current = case current of {
-      XTypeAbs _ _ body -> collect args body;
-      XTypeApp body _ -> collect args body;
-      XWithData _ body -> collect args body;
+    -- Only wider applications need a list for indexed access to their fields.
+    collect args current = case skipTypeWrappers current of {
       XApp fn arg -> collect ((:) arg args) fn;
       XConstructor tag _ -> apply tag (L.length args) (\i -> L.at i args);
       _ -> Nothing
     }
-  } in collect [] input;
+  } in case skipTypeWrappers input of {
+    XConstructor tag _ -> apply tag 0 (\i -> L.at i []);
+    XApp fn right -> case skipTypeWrappers fn of {
+      XConstructor tag _ -> apply tag 1 (oneConstructorField right);
+      XApp head left -> case skipTypeWrappers head of {
+        XConstructor tag _ -> apply tag 2 (twoConstructorFields left right);
+        XApp rest prior -> collect [prior,left,right] rest;
+        _ -> Nothing
+      };
+      _ -> Nothing
+    };
+    _ -> Nothing
+  };
   foldKnownConstructor = foldConstructorUsing L.id erasedConstructorFields;
   foldTypedConstructor = foldConstructorUsing X.erase typedConstructorFields;
   foldConstructorUsing erase fields rules tree = let {
@@ -1865,10 +1885,7 @@ module Bootstrap.LLVM.Optimize where {
     XEApp fn arg -> ApplicationInput fn arg;
     _ -> OtherInput
   };
-  typedScope term = case term of {
-    XTypeAbs _ _ body -> typedScope body;
-    XTypeApp body _ -> typedScope body;
-    XWithData _ body -> typedScope body;
+  typedScope term = case skipTypeWrappers term of {
     XAbs name _ body -> LambdaInput name body;
     XLet name value body -> LetInput name value body;
     XLetRec [(,,) name _ rhs] body -> RecursiveInput name rhs body;

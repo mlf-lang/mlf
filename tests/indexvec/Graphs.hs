@@ -1041,6 +1041,22 @@ knownConstructorFoldChecks = do
         forM_ [("mlf.allocate.constructor",arity > 0),("mlf.construct.1",arity == 1),
                ("mlf.construct.2",arity == 2),("mlf.construct.wide",arity > 2)] $ \(symbol,needed) ->
           check ("LLVM emits " ++ symbol ++ " for its constructor arity") needed (defined symbol)
+  let evidence x = T.XWithData (error "unused data") (T.XTypeApp x (error "unused computation"))
+      tags h args = foldl (\f a -> evidence (T.XApp f a)) (evidence h) args
+      select n at term = Optimize.typedConstructorFields
+        (\_ count field -> if count == n then field at else T.Nothing) term
+  forM_ [0..5] $ \n -> do
+    let args = [T.XIntTerm (i+10) | i <- [0..n-1]]
+        term = tags (T.XConstructor "Wrapped" (error "unused type arguments")) args
+    forM_ [-1..n] $ \i -> case select n i term of
+      T.Just (T.XIntTerm v) -> check "typed constructor fields stay in application order"
+        True (i >= 0 && i < n && v == i+10)
+      T.Nothing -> check "typed constructor field bounds" True (i < 0 || i >= n)
+      _ -> fail "unexpected typed field"
+  let lazyPair = tags (T.XConstructor "Pair" []) [error "unused first field",T.XIntTerm 72]
+  case select 2 1 lazyPair of
+    T.Just (T.XIntTerm v) -> check "typed binary field leaves its neighbor lazy" 72 v
+    _ -> fail "missing second typed field"
   let sumRules = M.fromList H.v_compareString
         [("Tip",(2,Optimize.ReturnField 1)),("Fork",(2,Optimize.CombineFields T.PAddInt 0 1))]
       affine coefficient amount = prim T.PAddInt [prim T.PMulInt [v 19,T.XEInt coefficient],T.XEInt amount]
