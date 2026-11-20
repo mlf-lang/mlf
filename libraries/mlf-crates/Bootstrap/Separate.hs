@@ -11,6 +11,7 @@ module Bootstrap.Separate where {
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as Set;
   import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Classes as Classes;
@@ -62,8 +63,18 @@ module Bootstrap.Separate where {
       UnitObject _ term -> Checked.check term;
       CheckedUnitObject _ checked -> Right checked
     };
+  -- Each scalar ends in an underscore. Reuse that complete field for
+  -- ASCII identifiers while retaining decimal scalar spellings for Unicode.
+  encodedAscii :: V.IndexVec Int String;
+  encodedAscii = V.fromList (map (\code -> showInt code ++ "_") (range 0 127));
   encodedFrom :: String -> Int -> String;
-  encodedFrom text i = concatStringList (encodedChunks text i);
+  encodedFrom text start = let {
+    end = stringLength text;
+    fields i = if i >= end then [] else let {
+      code = stringCodeAt text i; rest = fields (i + 1)
+    } in if code < 128 then (:) (V.at encodedAscii (V.fromInt code)) rest
+      else (:) (showInt code) ((:) "_" rest)
+  } in concatStringList (fields start);
   encodedChunks text i = if i >= stringLength text then []
     else (:) (showInt (stringCodeAt text i)) ((:) "_" (encodedChunks text (i + 1)));
   -- Versioned, injective identifier components. The result has only ASCII

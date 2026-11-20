@@ -137,6 +137,11 @@ packageChecks = do
       expectedExports = frame [frame ["A",""],frame ["界",frame (sort fields)],frame ["界",""]]
   check "canonical export rows preserve scalar framing, duplicate entities and same-owner order"
     expectedExports (H.unpack (Artifact.encodeExports exportRows))
+  let suffixes = [(s, i) | s <- ["", "_z9", "\0a\DEL", "葉:🌿", "á"], i <- [0..length s+1]]
+      scalarSuffix s i = concatMap (\c -> show (fromEnum c) ++ "_") (drop i s)
+  check "legacy identifier suffixes encode Unicode scalar offsets"
+    [scalarSuffix s i | (s,i) <- suffixes]
+    [H.unpack (Separate.encodedFrom (H.literal s) (fromIntegral i)) | (s,i) <- suffixes]
   let builtin ident modules = Artifact.CrateInterface ident [] modules [] [] [] [] [] [] [] "" "" []
       identityCheck iface = case Artifact.validateBuiltinOwnership iface of
         T.Left message -> Left (H.unpack message)
