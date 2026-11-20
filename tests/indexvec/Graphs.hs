@@ -1366,6 +1366,13 @@ lexicalRunChecks = do
       check "typed identity maximum includes computations, type binders and pattern binders"
         (foldr max lower (I.toList (Separate.termIdentities typed I.empty)))
         (Separate.maximumTermIdentity lower typed)
+  let var ident = T.XTyVar ident
+      kindInput = T.XApply (T.XVar (var 9)) (T.XArrow (T.XVar (var 2)) (T.XVar (var 5)))
+      kindEnv = M.singleton (var 2) (T.XVar (var 2))
+  case XT.kindOf (T.DataEnv M.empty M.empty M.empty) kindEnv kindInput of
+    T.Left why -> check "kind resolution reports the first free variable in signed identity order"
+      "cyclic type environment" (H.unpack why)
+    _ -> fail "cyclic free-variable bound admitted"
   let ctorEnv = Classes.QualifiedEnv M.empty (const T.Nothing)
       ctor name = T.SConstructor name
       here = T.SourceSpan "P" "M" "file.hs" 1 1 1 2

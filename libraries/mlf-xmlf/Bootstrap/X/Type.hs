@@ -165,11 +165,24 @@ module Bootstrap.X.Type where {
       XBot -> Right Star;
       XBotKind k -> Right k;
       XCon name [] -> Right (D.constructorKind ds name 0);
-      _ -> do {
-        kinds <- L.mapM (kindBinding ds bounds S.empty) (S.toList (freeVars ty));
-        kindIn ds (M.fromDistinctAscList kinds) ty
-      }
+      _ -> kindFromVariables ds bounds S.empty ty
     };
+  -- The free-variable set already has distinct ordered keys. Resolve them
+  -- in ascending order so competing environment errors keep their priority.
+  kindFromVariables ds bounds seen ty = let {
+    resolve tree = case tree of {
+      MapEmpty -> Right M.empty;
+      MapNode size variable _ left right -> do {
+        before <- resolve left;
+        kind <- visitKind ds bounds seen variable;
+        after <- resolve right;
+        Right (M.node size variable kind before after)
+      }
+    }
+  } in case freeVars ty of { Set variables -> do {
+    kinds <- resolve variables;
+    kindIn ds kinds ty
+  } };
   kindBinding :: DataEnv ->
                  Map XTyVar XType -> Set XTyVar -> XTyVar -> Either String ((,) XTyVar Kind);
   kindBinding ds bounds seen a =
@@ -187,12 +200,7 @@ module Bootstrap.X.Type where {
              XBot -> Right Star;
              XBotKind k -> Right k;
              XCon name [] -> Right (D.constructorKind ds name 0);
-             _ -> do {
-               kinds <-
-                 L.mapM (kindBinding ds bounds (S.insert compareTyVar a seen))
-                   (S.toList (freeVars b));
-               kindIn ds (M.fromDistinctAscList kinds) b
-             }
+             _ -> kindFromVariables ds bounds (S.insert compareTyVar a seen) b
            }
          };
   kindIn :: DataEnv -> Map XTyVar Kind -> XType -> Either String Kind;
