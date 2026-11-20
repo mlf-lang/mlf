@@ -57,7 +57,7 @@ type ST = S.ST
 data STArray s a = STArray !Int (G.MutableArray# s a)
 -- Text is strict UTF-8 in the supported text-2 toolchain. String indices and
 -- lengths below count Unicode scalars, never bytes or UTF-16 code units.
-data String = String !T.Text !P.Int (Array.UArray P.Int P.Int)
+data String = String {-# UNPACK #-} !T.Text !P.Int (Array.UArray P.Int P.Int)
 mkText :: T.Text -> String
 mkText text = mkSizedText (T.length text) text
 mkSizedText :: P.Int -> T.Text -> String

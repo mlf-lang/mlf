@@ -1214,6 +1214,12 @@ lexicalRunChecks = do
     check "shared file scanner preserves prefix collisions, extents and first diagnostics"
       (scanned (checked text)) (scanned (Lexer.scanValidatedSharedTokens "lex" text))
   let section = Prim.stringSlice (H.literal "先😀\0終") 1 2
+  let indexed = H.literal (replicate 255 'x' ++ "界😀" ++ replicate 255 'y')
+      middle = H.v_stringSlice indexed 255 2
+      framed = H.v_packStringFields [middle,section]
+  check "hosted slices retain byte and scalar lengths across a Unicode index block"
+    (2,7,[30028,128512]) (H.v_stringLength middle,H.v_stringUtf8Length middle,map (H.v_stringCodeAt middle) [0,1])
+  check "framing consumes both hosted slices in order" ("2:界😀2:" ++ H.unpack section) (H.unpack framed)
   first <- Prim.byteArrayFromString section
   second <- Prim.byteArrayFromString section
   Prim.writeByteArray first 0 17
