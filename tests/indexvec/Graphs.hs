@@ -19,6 +19,7 @@ import qualified Bootstrap.Data as Data
 import qualified Bootstrap.Dependency as D
 import qualified Bootstrap.Desugar as Desugar
 import qualified Bootstrap.Fresh as Fresh
+import qualified Bootstrap.IntMap as IntMap
 import qualified Bootstrap.Layout as Layout
 import qualified Bootstrap.Lexer as Lexer
 import qualified Bootstrap.Parsec as Parsec
@@ -1250,6 +1251,15 @@ lexicalRunChecks = do
          (H.literal (replicate 8193 'z'),"1740af352212ee326525f7bd044275adda2b46eb53128aca7c3e64b268121760")] $ \(text,expected) -> do
     digest <- CQ.sourceInputHash text
     check "immutable source UTF-8 SHA-256" expected (H.unpack digest)
+  let mark tag code token xs = (tag,code,H.unpack (Lexer.tokenText token)):xs
+      sink = Lexer.TokenOutput (mark 'w') (mark 'n') (mark 'p' 0) (mark 'f' 0)
+        (\xs _ -> T.Left (H.literal (show (reverse xs))))
+      source = "foo 12,9"
+  case Lexer.collectTokensWith sink Lexer.scanSourceQuoted "sink" source (H.v_stringLength source)
+         IntMap.empty [] (Lexer.Cursor 0 3 9) of
+    T.Left marks -> check "word consumers see the leading scalar and decimal consumers see the following scalar"
+      "[('w',102,\"foo\"),('n',44,\"12\"),('p',0,\",\"),('n',-1,\"9\")]" (H.unpack marks)
+    T.Right _ -> fail "custom token consumer did not finish"
   let punctuation = "(),;[]{}" :: String
   forM_ punctuation $ \first -> forM_ punctuation $ \second -> do
     let source = H.literal ([first] ++ "{- {- x -} -}" ++ [second])

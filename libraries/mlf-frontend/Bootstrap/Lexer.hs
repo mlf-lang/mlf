@@ -303,30 +303,33 @@ module Bootstrap.Lexer where {
     identEnd i = if i >= size then i else let { c = stringCodeAt source i } in
       if letter c || isDigit c then identEnd (i + 1) else i;
     digitsEnd i = if i < size && isDigit (stringCodeAt source i) then digitsEnd (i + 1) else i;
+    -- The scanner supplies the scalar separately so a word or decimal
+    -- consumer receives all its arguments directly at each token.
+    punctuationAt _ token seen = punctuation token seen;
     loop i line column known seen = if i >= size then finish seen (Token "" line column line column)
       else let {
         c = stringCodeAt source i;
         next = i + 1;
         slow = collectFullTokenWith output quoted file source size known seen (Cursor i line column);
-        emit save end names spelling = let {
+        emit save scalar end names spelling = let {
           lastColumn = column + (end - i);
           token = Token spelling line column line lastColumn;
-          more = save token seen
+          more = save scalar token seen
         } in seq lastColumn (seq more (loop end line lastColumn names more));
-        found save end = case sharedSpelling source i end c known of { (,) spelling names -> emit save end names spelling };
+        found end = case sharedSpelling source i end c known of { (,) spelling names -> emit word c end names spelling };
         decimal = let { end = digitsEnd next; after = codeAt source size end } in
           if after == 46 || after == 69 || after == 101 ||
             (c == 48 && end == next && (after == 88 || after == 120 || after == 79 || after == 111))
-          then slow else emit (number after) end known (tokenSpelling source i end c);
+          then slow else emit number after end known (tokenSpelling source i end c);
         -- Dispatch supplies the immutable spelling directly. Only an opening
         -- brace needs lookahead, since it can introduce a block comment.
-        punct spelling = emit punctuation next known spelling
+        punct spelling = emit punctuationAt c next known spelling
       } in if c == 32 then let { colNext = column + 1 } in seq colNext (loop next line colNext known seen)
         else if c == 10 then let { rowNext = line + 1 } in seq rowNext (loop next rowNext 1 known seen)
         else if letter c then let { end = identEnd next } in
           if end < size && stringCodeAt source end >= 128 then slow
-          else if end == next then emit (word c) next known (V.at singleAsciiTokens (V.fromInt c))
-          else found (word c) end
+          else if end == next then emit word c next known (V.at singleAsciiTokens (V.fromInt c))
+          else found end
         else if isDigit c then decimal
         else case c of {
           40 -> punct "("; 41 -> punct ")"; 44 -> punct ","; 59 -> punct ";";
