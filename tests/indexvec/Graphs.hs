@@ -145,6 +145,15 @@ packageChecks = do
     (identityCheck (builtin "mlf:builtin-shared-haskell-v1:15" ["MLF.Primitive","Prelude"]))
   check "preceding builtin identity rejected" (Left "stale or forged builtin crate identity")
     (identityCheck (builtin "mlf:builtin-shared-haskell-v1:12" ["MLF.Primitive","Prelude"]))
+  let bogus = builtin "wrong" ["Prelude","MLF.Primitive"]
+      source = T.SourceModule "Shared.hs" (T.Just "Shared") T.Nothing [] [] [] [] [] T.Nothing T.SharedHaskellV1
+      noLoad _ = error "invalid dependency reached the loader or installer"
+      spec = Crate.CrateSpec "example" "" T.NoImplicitPrelude [] [] "cache" "prelude"
+  existing <- Crate.withPreludeLoading noLoad noLoad spec [source] [("bogus.mlfci",bogus)]
+  case (Artifact.validateInterface bogus,existing) of
+    (T.Left expected,T.Left actual) -> check "caller supplied Prelude metadata receives full validation"
+      (H.unpack expected) (H.unpack actual)
+    _ -> fail "invalid caller supplied Prelude metadata was accepted"
   check "incomplete current builtin rejected" (Left "builtin crate must own exactly Prelude and MLF.Primitive")
     (identityCheck (builtin "mlf:builtin-shared-haskell-v1:15" ["Prelude"]))
   let direct = M.fromList H.v_compareString

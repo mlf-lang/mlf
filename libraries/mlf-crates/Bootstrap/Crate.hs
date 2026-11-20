@@ -672,7 +672,9 @@ module Bootstrap.Crate where {
   };
   withPrelude = withPreludeUsing ensureBuiltin;
   withPreludeUsing = withPreludeLoading Artifact.loadInterfaces;
-  withPreludeLoading load install spec sources interfaces =
+  withPreludeLoading = withPreludeMetadata (\((,) path iface) ->
+    mapEither (\_ -> path) (Artifact.validateInterface iface));
+  withPreludeMetadata existing load install spec sources interfaces =
     if any
          (\source ->
             (Lexer.isSharedSyntax (Modules.sourceSyntax source) || any (\entry -> Modules.isBuiltinModule (Modules.importedModule entry))
@@ -685,8 +687,7 @@ module Bootstrap.Crate where {
                        (elem eqString "Prelude" (Artifact.crateModules iface) &&
                         elem eqString "MLF.Primitive" (Artifact.crateModules iface)))
                     interfaces of {
-               Just ((,) metadata iface) ->
-                 ioReturn (mapEither (\_ -> metadata) (Artifact.validateInterface iface));
+               Just entry -> ioReturn (existing entry);
                Nothing -> install (specPrelude spec)
              };
            case builtin of {

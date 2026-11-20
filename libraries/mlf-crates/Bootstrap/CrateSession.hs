@@ -199,9 +199,10 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   fileLayouts prepared = case filePlan prepared of {
     Just plan -> Source.planData plan; Nothing -> Inference.loweredData (fileLowered prepared)
   };
-  compileSourcesRetainedLoading load verifyAll install shareEncoding spec sources interfaces prefix =
+  compileSourcesRetainedLoading load = compileSourcesRetainedWith (withPreludeLoading load);
+  compileSourcesRetainedWith addPrelude verifyAll install shareEncoding spec sources interfaces prefix =
     do {
-      dependencies <- withPreludeLoading load install spec sources interfaces;
+      dependencies <- addPrelude install spec sources interfaces;
       case do {
              boundValueShared20 <- dependencies;
              case boundValueShared20 of {
@@ -370,11 +371,11 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
                         } of {
                      Left message -> ioReturn (Left message);
                      Right ((,) sources interfaces) ->
-                       -- Both source and dependency values originate in the
-                       -- parsers/decoders above, not caller-supplied lazy ASTs.
-                       -- Reuse this invocation's admitted dependency snapshot;
-                       -- the loader still admits any newly installed Prelude.
-                       compileSourcesRetainedLoading (Artifact.loadGraph [] interfaces)
+                       -- loadInterfaces admitted every existing metadata value. Keep
+                       -- that snapshot for inference and check any newly installed
+                       -- dependency through the same graph loader.
+                       compileSourcesRetainedWith (Crate.withPreludeMetadata (compose Right fst)
+                         (Artifact.loadGraph [] interfaces))
                          verifyAll install True normalized sources interfaces prefix
                    }
                  }
