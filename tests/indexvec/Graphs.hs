@@ -1714,6 +1714,26 @@ applicationPatternChecks = do
     expected <- encoded (W.encode limits 8 names)
     actual <- encoded (W.encodeAtoms Structure.termAtomShapes limits 8 names)
     check "named constructor atoms preserve bytes and resource diagnostics" expected actual
+  let v n = T.XTyVar n
+      ty n = T.XVar (v n)
+      groundScheme vars lastBound = foldr (\(i,lower) body -> T.XForall (v i) lower body)
+        (T.XArrow (ty 0) (T.XArrow (ty 1) (ty 0))) (zip vars [T.XBot,T.XBot,lastBound])
+      observe ty0 = case ty0 of
+        Inference.GroundVar i -> Left i
+        Inference.GroundArrow _ _ -> Right (0::Int)
+        Inference.GroundCon _ _ -> Right 1
+        Inference.GroundApply _ _ -> Right 2
+      view ground = case ground of
+        T.Left why -> Left (H.unpack why)
+        T.Right (body,slots,Inference.GroundState next known ranks serial) ->
+          Right (observe body,[(XT.tyVarId binder,observe ty0) | (binder,ty0)<-slots],next,IntMap.keys known,IntMap.toList ranks,serial)
+  forM_ [groundScheme [0,1,2] T.XBot,groundScheme [1,0,1] (T.XBotKind T.Star),
+         groundScheme [0,1,2] (ty 0),T.XVar (v 841)] $ \scheme -> do
+    let prepare = Inference.prepareGroundScheme scheme
+    forM_ [-3,0,8,4102] $ \start -> do
+      let state = Inference.GroundState start (IntMap.singleton 2 (Inference.GroundCon "Int" [])) (IntMap.singleton 2 3) 53
+      check "a prepared ground scheme preserves fresh identities and its starting environment"
+        (view (Inference.groundScheme M.empty [] state scheme)) (view (prepare state))
   let emptyChild = W.VNode 1 []
       unaryChild = W.VNode 11 [W.VInt 4]
       atomChild = W.VNode 82 [W.VText "A",emptyChild]

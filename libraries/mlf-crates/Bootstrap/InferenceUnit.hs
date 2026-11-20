@@ -618,6 +618,7 @@ module Bootstrap.InferenceUnit where {
   data GroundEvidence = GroundEvidence (GroundState -> [] ((,) XTyVar GroundType) -> Either String XComputation);
   data GroundBinding = GroundLocal XName GroundType | GroundImport XName XType |
     GroundQuantifiedImport XName XType GroundEvidence |
+    GroundPreparedImport (GroundState -> Either String ((,,) GroundTerm GroundType GroundState)) |
     GroundUnaryImport XName XType XTyVar GroundParameter GroundParameter;
   groundImport name scheme = let {
     general = GroundImport name scheme;
@@ -711,6 +712,49 @@ module Bootstrap.InferenceUnit where {
       groundScheme (M.insert T.compareTyVar v value variables) ((:) ((,) v value) reversed) following body
     };
     _ -> mapEither (\body -> (,,) body (reverse reversed) state) (groundType variables ty)
+  };
+  -- Resolve the local type-variable slots once for an imported scheme.
+  -- Within a prefix of bottom bounds, instantiation only reserves successive
+  -- identities. Both the arguments and the returned state keep those identity
+  -- advances lazy, just as repeated calls to groundFresh do.
+  prepareGroundScheme :: XType -> GroundState -> Either String ((,,) GroundType ([] ((,) XTyVar GroundType)) GroundState);
+  prepareGroundScheme source = let {
+    ordinary state = groundScheme M.empty [] state source;
+    collect count variables reversed ty = case ty of {
+      XForall variable bound body -> let {
+        next = collect (count + 1) (M.insert T.compareTyVar variable (GroundVar count) variables)
+          ((:) ((,) variable count) reversed) body
+      } in if count >= 32 then ordinary else case bound of {
+        XBot -> next; XBotKind _ -> next; _ -> ordinary
+      };
+      _ -> let {
+        checked = groundType variables ty;
+        slots = reverse reversed
+      } in if count == 0 then \state -> mapEither (\body -> (,,) body [] state) checked else
+        \state -> mapEither (\body -> let {
+          fresh slot = case state of {
+            GroundState start _ _ _ -> GroundVar (advanceIdentity start slot)
+          };
+          rebase shape = case shape of {
+            GroundVar slot -> fresh slot;
+            GroundArrow a b -> GroundArrow (rebase a) (rebase b);
+            GroundCon n [] -> shape;
+            GroundCon n args -> GroundCon n (map rebase args);
+            GroundApply f a -> GroundApply (rebase f) (rebase a)
+          };
+          arguments = map (\((,) v slot) -> (,) v (fresh slot)) slots;
+          next = case state of { GroundState start known ranks serial ->
+            GroundState (advanceIdentity start count) known ranks serial }
+        } in (,,) (rebase body) arguments next) checked
+    }
+  } in collect 0 M.empty [] source;
+  prepareGroundImport name ty = let {
+    prepare term = let { instantiate = prepareGroundScheme ty } in GroundPreparedImport (\state ->
+      mapEither (\((,,) actual arguments next) -> (,,) (term arguments) actual next) (instantiate state))
+  } in case groundImport name ty of {
+    GroundQuantifiedImport _ _ evidence -> prepare (GroundQuantifiedUse name evidence);
+    GroundImport _ _ -> prepare (GroundVariable name ty);
+    other -> other
   };
   -- A non-bottom bound can connect earlier quantifiers to a later argument.
   -- Project one possible closed instance with fresh variables now; sealing
@@ -807,6 +851,7 @@ module Bootstrap.InferenceUnit where {
   groundUse state binding = case binding of {
     Nothing -> Left "unknown ground variable";
     Just (GroundLocal name ty) -> Right ((,,) (GroundLiteral (XVarTerm name)) ty state);
+    Just (GroundPreparedImport instantiate) -> instantiate state;
     Just (GroundUnaryImport name ty _ _ _) -> groundUse state (Just (GroundImport name ty));
     Just (GroundQuantifiedImport name ty evidence) -> do {
       (,,) actual arguments next <- groundScheme M.empty [] state ty;
@@ -935,7 +980,7 @@ module Bootstrap.InferenceUnit where {
     (,) [(,) identity ((,,) name (Just annotation) _)] ((,) (SProgram declarations expression) _) -> do {
       expected <- monomorphicAnnotation annotation;
       let { entries = zip parameters (range 0 (length parameters - 1));
-        binding = \((,,) _ hint ty) serial -> groundImport (XName serial hint) ty;
+        binding = \((,,) _ hint ty) serial -> prepareGroundImport (XName serial hint) ty;
         globals = M.fromList compareInt (map (\((,) row@((,,) i _ _) serial) -> (,) (V.toInt i) (binding row serial)) entries);
         names = M.fromList compareString (map (\((,) row@((,,) _ n _) serial) -> (,) n (binding row serial)) entries);
         ps = map (\((,) ((,,) _ hint ty) serial) -> (,) (XName serial hint) ty) entries;
@@ -993,7 +1038,7 @@ module Bootstrap.InferenceUnit where {
       };
       _ -> Left "ground specialization requires a recursive group"
     };
-    let { bindings = append (map (\((,,) i n ty) -> (,,) i n (groundImport n ty)) imported)
+    let { bindings = append (map (\((,,) i n ty) -> (,,) i n (prepareGroundImport n ty)) imported)
             (map (\(GroundMember i n _ ty _) -> (,,) i n (GroundLocal n ty)) rows);
       globals = M.fromList compareInt (map (\((,,) i _ value) -> (,) i value) bindings);
       names = M.fromList compareString (map (\((,,) _ n value) -> (,) (X.nameHint n) value) bindings);
