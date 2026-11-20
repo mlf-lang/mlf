@@ -1756,6 +1756,37 @@ module Bootstrap.LLVM.Codegen where {
     XEApp (XEApp (XEConstructor name) a) b -> row name 2 [a,b];
     _ -> Nothing
   };
+  -- Compact words in successive rows can form one arithmetic progression per
+  -- field. Keep the last row and the backward strides so construction still
+  -- proceeds from the tail toward the head. Each step uses wrapping Int64.
+  data RowProgression = RowProgression Int ([] Int) ([] Int) XErased;
+  rowProgression :: Map String ((,) Int Int) -> String -> LiteralRow -> XErased -> Maybe RowProgression;
+  rowProgression cs name (LiteralRow tag first) rest = let {
+    next term = case term of {
+      XEApp (XEApp (XEConstructor cell) field) tail ->
+        if eqString cell name then case literalRow cs field of {
+          Just (LiteralRow other words) -> if other == tag then Just ((,) words tail) else Nothing;
+          Nothing -> Nothing
+        } else Nothing;
+      _ -> Nothing
+    };
+    follows stride last words = case (,,) stride last words of {
+      (,,) [dx] [x] [a] -> a + dx == x;
+      (,,) [dx,dy] [x,y] [a,b] -> a + dx == x && b + dy == y;
+      _ -> False
+    };
+    collect stride count last term = let {
+      finish = if count >= 8 then Just (RowProgression count last stride term) else Nothing
+    } in seq count (case next term of {
+      Just ((,) words tail) -> if follows stride last words
+        then collect stride (count + 1) words tail else finish;
+      Nothing -> finish
+    })
+  } in case next rest of {
+    Just ((,) second tail) -> if L.length first == L.length second then
+      collect (L.zipWith (-) first second) 2 second tail else Nothing;
+    Nothing -> Nothing
+  };
   literalConstructorField :: Map String ((,) Int Int) -> XErased -> Bool;
   literalConstructorField cs expression = case literalRow cs expression of {
     Just _ -> True; Nothing -> False
@@ -1768,7 +1799,14 @@ module Bootstrap.LLVM.Codegen where {
       if eqString name next then do {
         cs <- gets constructors;
         case literalRow cs field of {
-          Just row -> literalConstructorPrefix scope cs name tag ((,) field row) rest;
+          Just row@(LiteralRow rowTag _) -> case rowProgression cs name row rest of {
+            Just (RowProgression count words strides tail) -> do {
+              suffix <- thunk scope tail;
+              callConstructor ("@mlf.construct.strides." ++ showInt (L.length words))
+                (L.append (L.map number (L.append words strides)) [number count,number rowTag,number tag,pointer suffix])
+            };
+            Nothing -> literalConstructorPrefix scope cs name tag ((,) field row) rest
+          };
           Nothing -> ordinary
         }
       } else ordinary;
@@ -2108,35 +2146,45 @@ module Bootstrap.LLVM.Codegen where {
   constructorDefinitions needs = let {
     unaryRows = needs "@mlf.construct.rows.1";
     binaryRows = needs "@mlf.construct.rows.2";
-    unary = needs "@mlf.construct.1" || unaryRows;
-    binary = needs "@mlf.construct.2" || unaryRows || binaryRows;
+    unaryStride = needs "@mlf.construct.strides.1";
+    binaryStride = needs "@mlf.construct.strides.2";
+    unary = needs "@mlf.construct.1" || unaryRows || unaryStride;
+    binary = needs "@mlf.construct.2" || unaryRows || binaryRows || unaryStride || binaryStride;
     wide = needs "@mlf.construct.wide"
   } in if unary || binary || wide then L.concat [
     constructorAllocator, if unary then unaryConstructor else [],
     if binary then binaryConstructor else [], if wide then wideConstructor else [],
-    if unaryRows then literalRowDefinition False else [], if binaryRows then literalRowDefinition True else []
+    if unaryRows then literalRowDefinition False False else [], if binaryRows then literalRowDefinition True False else [],
+    if unaryStride then literalRowDefinition False True else [], if binaryStride then literalRowDefinition True True else []
   ] else [];
-  -- The table contains immediate pointer bits in tail-to-head order. Rebuild
-  -- every row and every enclosing cell using the ordinary audited allocator.
-  -- Each call supplies at least eight rows of one saturated constructor.
-  literalRowDefinition :: Bool -> [] String;
-  literalRowDefinition binary = let { width = if binary then "2" else "1" } in L.concat [
-    ["define private ptr @mlf.construct.rows." ++ width ++
-       "(ptr %data, i64 %count, i64 %rowtag, i64 %celltag, ptr %tail) noinline {",
-     "entry:", "  br label %loop", "loop:",
-     "  %pos = phi ptr [ %data, %entry ], [ %next, %loop ]",
-     "  %n = phi i64 [ %count, %entry ], [ %left, %loop ]",
-     "  %suffix = phi ptr [ %tail, %entry ], [ %cell, %loop ]",
-     "  %x = load i64, ptr %pos, align 8",
-     "  %a = inttoptr i64 %x to ptr"],
-    if binary then [
-     "  %second = getelementptr i64, ptr %pos, i64 1",
-     "  %y = load i64, ptr %second, align 8",
-     "  %b = inttoptr i64 %y to ptr",
-     "  %row = call ptr @mlf.construct.2(i64 %rowtag, ptr %a, ptr %b)"]
+  -- Each iteration reconstructs one row and one enclosing cell with the same
+  -- audited allocators. A strided run supplies immediate words in registers.
+  literalRowDefinition :: Bool -> Bool -> [] String;
+  literalRowDefinition binary strided = let {
+    width = if binary then "2" else "1";
+    header = if strided then if binary then "strides.2(i64 %startx, i64 %starty, i64 %dx, i64 %dy"
+      else "strides.1(i64 %startx, i64 %dx" else "rows." ++ width ++ "(ptr %data"
+  } in L.concat [
+    ["define private ptr @mlf.construct." ++ header ++ ", i64 %count, i64 %rowtag, i64 %celltag, ptr %tail) noinline {",
+     "entry:", "  br label %loop", "loop:"],
+    if strided then L.append ["  %x = phi i64 [ %startx, %entry ], [ %nextx, %loop ]"]
+      (if binary then ["  %y = phi i64 [ %starty, %entry ], [ %nexty, %loop ]"] else [])
+    else ["  %pos = phi ptr [ %data, %entry ], [ %next, %loop ]"],
+    ["  %n = phi i64 [ %count, %entry ], [ %left, %loop ]",
+     "  %suffix = phi ptr [ %tail, %entry ], [ %cell, %loop ]"],
+    if strided then [] else ["  %x = load i64, ptr %pos, align 8"],
+    ["  %a = inttoptr i64 %x to ptr"],
+    if binary && L.not strided then [
+      "  %second = getelementptr i64, ptr %pos, i64 1",
+      "  %y = load i64, ptr %second, align 8"] else [],
+    if binary then ["  %b = inttoptr i64 %y to ptr",
+      "  %row = call ptr @mlf.construct.2(i64 %rowtag, ptr %a, ptr %b)"]
     else ["  %row = call ptr @mlf.construct.1(i64 %rowtag, ptr %a)"],
-    ["  %cell = call ptr @mlf.construct.2(i64 %celltag, ptr %row, ptr %suffix)",
-     "  %next = getelementptr i64, ptr %pos, i64 " ++ width,
+    ["  %cell = call ptr @mlf.construct.2(i64 %celltag, ptr %row, ptr %suffix)"],
+    if strided then L.append ["  %nextx = add i64 %x, %dx"]
+      (if binary then ["  %nexty = add i64 %y, %dy"] else [])
+    else ["  %next = getelementptr i64, ptr %pos, i64 " ++ width],
+    [
      "  %left = sub i64 %n, 1",
      "  %done = icmp eq i64 %left, 0",
      "  br i1 %done, label %exit, label %loop",

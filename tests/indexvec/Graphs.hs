@@ -1055,7 +1055,7 @@ knownConstructorFoldChecks = do
     _ -> fail "typed constructor field was lost"
   let literalTags = M.fromList H.v_compareString [("End",(40,0)),("Cell",(41,2)),("Row",(42,2))]
       make name fields = foldl T.XEApp (T.XEConstructor name) fields
-      row i = make "Row" [T.XEInt i, T.XEInt (i+3)]
+      row i = make "Row" [T.XEInt i, T.XEInt (i*i+3)]
       cell i rest = make "Cell" [row i, rest]
   forM_ [2,127,128,129,257] $ \size -> do
     let term = foldr cell (T.XEConstructor "End") [1..size]
@@ -1067,7 +1067,7 @@ knownConstructorFoldChecks = do
         check "closed constructor chunks are bounded and pass their tail explicitly"
           (fromIntegral size `div` 128) (length prefixes)
   let columns size = foldr cell (T.XEConstructor "End") [1..size]
-      expectedWords size = concat [[2*i+1, 2*(i+3)+1] | i <- reverse [1..size]]
+      expectedWords size = concat [[2*i+1, 2*(i*i+3)+1] | i <- reverse [1..size]]
   forM_ [7,8,31] $ \size -> case Codegen.generate literalTags (columns size) of
     T.Left err -> fail (H.unpack err)
     T.Right (_,chunks) -> do
@@ -1079,6 +1079,29 @@ knownConstructorFoldChecks = do
         (if size < 8 then 0 else 1) (length (filter (isInfixOf wordsIR) tables))
       check "the binary row loop is emitted only when used" (size >= 8)
         (any (isInfixOf "define private ptr @mlf.construct.rows.2(") linesIR)
+  let arithmetic i rest = make "Cell" [make "Row" [T.XEInt i,T.XEInt (3*i+1)],rest]
+  forM_ [7,8,31,129,513] $ \size -> do
+    let term = foldr arithmetic (T.XEConstructor "End") [1..size]
+    case Codegen.generate literalTags term of
+      T.Left err -> fail (H.unpack err)
+      T.Right (_,chunks) -> do
+        let ir = unlines (map H.unpack chunks)
+            args = "call ptr @mlf.construct.strides.2(i64 " ++ show (2*size+1) ++
+              ", i64 " ++ show (6*size+3) ++ ", i64 -2, i64 -6, i64 " ++ show size ++
+              ", i64 42, i64 41, ptr "
+        check "arithmetic rows retain tagged tail-to-head strides across chunks"
+          (size >= 8) (args `isInfixOf` ir)
+        check "an arithmetic run uses no table storage" False (" = private unnamed_addr constant [" `isInfixOf` ir)
+  let hi = 4611686018427387903
+      lo = -4611686018427387904
+      first = Codegen.LiteralRow 42 [2*(hi-1)+1, 1]
+      more = foldr (\n rest -> make "Cell" [make "Row" [T.XEInt n,T.XEInt 0],rest])
+        (T.XEConstructor "End") ([hi] ++ [lo..lo+5])
+  case Codegen.rowProgression literalTags "Cell" first more of
+    T.Just (Codegen.RowProgression count last steps (T.XEConstructor end)) ->
+      check "tagged progressions wrap between the signed compact Int boundaries"
+        (8, [2*(lo+5)+1,1], [-2,0], "End") (count,last,steps,H.unpack end)
+    _ -> fail "wrapping constructor progression"
   let wordView term = case Codegen.literalRow literalTags term of
         T.Just (Codegen.LiteralRow tag fields) -> Just (tag, fields)
         T.Nothing -> Nothing
