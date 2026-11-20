@@ -4,7 +4,7 @@ module Main where
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (forM_, unless)
 import Data.Bits (testBit)
-import Data.List (nub, sort)
+import Data.List (isInfixOf, nub, sort)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Bootstrap.ArtifactStructure as Structure
@@ -30,6 +30,7 @@ import qualified Bootstrap.QueryGraph as Q
 import qualified Bootstrap.InferenceUnit as Inference
 import qualified Bootstrap.OpenFragment as Open
 import qualified Bootstrap.Separate as Separate
+import qualified Bootstrap.LLVM.Codegen as Codegen
 import qualified Bootstrap.LLVM.Optimize as Optimize
 import qualified Bootstrap.X.Check as XCheck
 import qualified Bootstrap.X.Pretty as Pretty
@@ -967,6 +968,17 @@ knownConstructorFoldChecks = do
     (T.Just old,T.Just new) -> check "typed constructor fold keeps selected fields and skips type evidence"
       True (X.equalErased old new && X.equalErased new (prim T.PSubInt [T.XEInt 39,T.XEInt 17]))
     _ -> fail "typed constructor field was lost"
+  forM_ [0..4::Int] $ \arity -> do
+    let example = foldl T.XEApp (T.XEConstructor "Box") (replicate arity (T.XEInt 3))
+        table = M.singleton "Box" (31,fromIntegral arity)
+    case Codegen.generate table example of
+      T.Left message -> fail (H.unpack message)
+      T.Right (_,chunks) -> do
+        let ir = unlines (map H.unpack chunks)
+            defined symbol = ("define private ptr @" ++ symbol ++ "(") `isInfixOf` ir
+        forM_ [("mlf.allocate.constructor",arity > 0),("mlf.construct.1",arity == 1),
+               ("mlf.construct.2",arity == 2),("mlf.construct.wide",arity > 2)] $ \(symbol,needed) ->
+          check ("LLVM emits " ++ symbol ++ " for its constructor arity") needed (defined symbol)
   let sumRules = M.fromList H.v_compareString
         [("Tip",(2,Optimize.ReturnField 1)),("Fork",(2,Optimize.CombineFields T.PAddInt 0 1))]
       affine coefficient amount = prim T.PAddInt [prim T.PMulInt [v 19,T.XEInt coefficient],T.XEInt amount]

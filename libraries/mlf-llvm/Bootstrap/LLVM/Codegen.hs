@@ -64,7 +64,7 @@ module Bootstrap.LLVM.Codegen where {
              (L.concat
                 ((:) ((:) "declare ptr @mlf_thunk_new(ptr, i64)" runtimeDeclarations)
                    (args4
-                      (L.append allocationDefinition
+                      (L.append (constructorDefinitions (\symbol -> S.member compareString symbol (workers out)))
                          (L.append thunkAllocationDefinition forceDefinition))
                       aliasMetadata
                       (L.reverse (constants out))
@@ -2016,99 +2016,83 @@ module Bootstrap.LLVM.Codegen where {
   -- them at each construction site. Managed field parameters remain live
   -- across allocation until the initialized object contains those fields.
   allocationDefinition :: [] String;
-  allocationDefinition =
-    (:) "@mlf_constructor_pending = external global [33 x ptr]"
-      ((:) "declare ptr @mlf_constructor_allocate(i64, i64)"
-         ((:)
-            "define private ptr @mlf.allocate.constructor(i64 %identity, i64 %count, i64 %size) noinline {"
-            ((:) "entry:"
-               ((:) "  %small = icmp ule i64 %size, 256"
-                  ((:) "  br i1 %small, label %batch, label %slow"
-                     ((:) "batch:"
-                        ((:) "  %index = lshr i64 %size, 3"
-                           ((:)
-                              "  %slot = getelementptr [33 x ptr], ptr @mlf_constructor_pending, i64 0, i64 %index"
-                              ((:) "  %value = load ptr, ptr %slot, align 8"
-                                 ((:) "  %empty = icmp eq ptr %value, null"
-                                    ((:) "  br i1 %empty, label %slow, label %ready"
-                                       ((:) "ready:"
-                                          ((:) "  %next = load ptr, ptr %value, align 8"
-                                             ((:) "  store ptr %next, ptr %slot, align 8"
-                                                ((:) "  store i64 0, ptr %value, align 8"
-                                                   ((:) "  ret ptr %value"
-                                                      ((:) "slow:"
-                                                         ((:)
-                                                            "  %allocated = call ptr @mlf_constructor_allocate(i64 %identity, i64 %count)"
-                                                            ((:) "  ret ptr %allocated"
-                                                               ((:) "}"
-                                                                  ((:)
-                                                                     "define private ptr @mlf.construct.1(i64 %identity, ptr %a) noinline {"
-                                                                     ((:) "entry:"
-                                                                        ((:)
-                                                                           "  %value = call ptr @mlf.allocate.constructor(i64 %identity, i64 1, i64 24)"
-                                                                           ((:)
-                                                                              "  store i32 12, ptr %value, align 4"
-                                                                              ((:)
-                                                                                 "  %id = getelementptr i8, ptr %value, i64 8"
-                                                                                 ((:)
-                                                                                    "  store i64 %identity, ptr %id, align 8"
-                                                                                    ((:)
-                                                                                       "  %first = getelementptr i8, ptr %value, i64 16"
-                                                                                       ((:)
-                                                                                          "  store ptr %a, ptr %first, align 8"
-                                                                                          ((:)
-                                                                                             "  ret ptr %value"
-                                                                                             ((:)
-                                                                                                "}"
-                                                                                                ((:)
-                                                                                                   "define private ptr @mlf.construct.2(i64 %identity, ptr %a, ptr %b) noinline {"
-                                                                                                   ((:)
-                                                                                                      "entry:"
-                                                                                                      ((:)
-                                                                                                         "  %value = call ptr @mlf.allocate.constructor(i64 %identity, i64 2, i64 32)"
-                                                                                                         ((:)
-                                                                                                            "  store i32 13, ptr %value, align 4"
-                                                                                                            ((:)
-                                                                                                               "  %id = getelementptr i8, ptr %value, i64 8"
-                                                                                                               ((:)
-                                                                                                                  "  store i64 %identity, ptr %id, align 8"
-                                                                                                                  ((:)
-                                                                                                                     "  %first = getelementptr i8, ptr %value, i64 16"
-                                                                                                                     ((:)
-                                                                                                                        "  store ptr %a, ptr %first, align 8"
-                                                                                                                        ((:)
-                                                                                                                           "  %second = getelementptr i8, ptr %value, i64 24"
-                                                                                                                           ((:)
-                                                                                                                              "  store ptr %b, ptr %second, align 8"
-                                                                                                                              ((:)
-                                                                                                                                 "  ret ptr %value"
-                                                                                                                                 ((:)
-                                                                                                                                    "}"
-                                                                                                                                    ((:)
-                                                                                                                                       "define private ptr @mlf.construct.wide(i64 %identity, i64 %count) noinline {"
-                                                                                                                                       ((:)
-                                                                                                                                          "entry:"
-                                                                                                                                          ((:)
-                                                                                                                                             "  %fields = mul i64 %count, 8"
-                                                                                                                                             ((:)
-                                                                                                                                                "  %size = add i64 %fields, 24"
-                                                                                                                                                ((:)
-                                                                                                                                                   "  %value = call ptr @mlf.allocate.constructor(i64 %identity, i64 %count, i64 %size)"
-                                                                                                                                                   ((:)
-                                                                                                                                                      "  store i32 28, ptr %value, align 4"
-                                                                                                                                                      ((:)
-                                                                                                                                                         "  %id = getelementptr i8, ptr %value, i64 8"
-                                                                                                                                                         ((:)
-                                                                                                                                                            "  store i64 %identity, ptr %id, align 8"
-                                                                                                                                                            ((:)
-                                                                                                                                                               "  %arity = getelementptr i8, ptr %value, i64 16"
-                                                                                                                                                               ((:)
-                                                                                                                                                                  "  store i64 %count, ptr %arity, align 8"
-                                                                                                                                                                  ((:)
-                                                                                                                                                                     "  ret ptr %value"
-                                                                                                                                                                     ((:)
-                                                                                                                                                                        "}"
-                                                                                                                                                                        []))))))))))))))))))))))))))))))))))))))))))))))))))))));
+  allocationDefinition = constructorDefinitions (\_ -> True);
+  constructorDefinitions :: (String -> Bool) -> [] String;
+  constructorDefinitions needs = let {
+    unary = needs "@mlf.construct.1";
+    binary = needs "@mlf.construct.2";
+    wide = needs "@mlf.construct.wide"
+  } in if unary || binary || wide then L.concat [
+    constructorAllocator, if unary then unaryConstructor else [],
+    if binary then binaryConstructor else [], if wide then wideConstructor else []
+  ] else [];
+  constructorAllocator :: [] String;
+  constructorAllocator = [
+    "@mlf_constructor_pending = external global [33 x ptr]",
+    "declare ptr @mlf_constructor_allocate(i64, i64)",
+    "define private ptr @mlf.allocate.constructor(i64 %identity, i64 %count, i64 %size) noinline {",
+    "entry:",
+    "  %small = icmp ule i64 %size, 256",
+    "  br i1 %small, label %batch, label %slow",
+    "batch:",
+    "  %index = lshr i64 %size, 3",
+    "  %slot = getelementptr [33 x ptr], ptr @mlf_constructor_pending, i64 0, i64 %index",
+    "  %value = load ptr, ptr %slot, align 8",
+    "  %empty = icmp eq ptr %value, null",
+    "  br i1 %empty, label %slow, label %ready",
+    "ready:",
+    "  %next = load ptr, ptr %value, align 8",
+    "  store ptr %next, ptr %slot, align 8",
+    "  store i64 0, ptr %value, align 8",
+    "  ret ptr %value",
+    "slow:",
+    "  %allocated = call ptr @mlf_constructor_allocate(i64 %identity, i64 %count)",
+    "  ret ptr %allocated",
+    "}"
+  ];
+  unaryConstructor :: [] String;
+  unaryConstructor = [
+    "define private ptr @mlf.construct.1(i64 %identity, ptr %a) noinline {",
+    "entry:",
+    "  %value = call ptr @mlf.allocate.constructor(i64 %identity, i64 1, i64 24)",
+    "  store i32 12, ptr %value, align 4",
+    "  %id = getelementptr i8, ptr %value, i64 8",
+    "  store i64 %identity, ptr %id, align 8",
+    "  %first = getelementptr i8, ptr %value, i64 16",
+    "  store ptr %a, ptr %first, align 8",
+    "  ret ptr %value",
+    "}"
+  ];
+  binaryConstructor :: [] String;
+  binaryConstructor = [
+    "define private ptr @mlf.construct.2(i64 %identity, ptr %a, ptr %b) noinline {",
+    "entry:",
+    "  %value = call ptr @mlf.allocate.constructor(i64 %identity, i64 2, i64 32)",
+    "  store i32 13, ptr %value, align 4",
+    "  %id = getelementptr i8, ptr %value, i64 8",
+    "  store i64 %identity, ptr %id, align 8",
+    "  %first = getelementptr i8, ptr %value, i64 16",
+    "  store ptr %a, ptr %first, align 8",
+    "  %second = getelementptr i8, ptr %value, i64 24",
+    "  store ptr %b, ptr %second, align 8",
+    "  ret ptr %value",
+    "}"
+  ];
+  wideConstructor :: [] String;
+  wideConstructor = [
+    "define private ptr @mlf.construct.wide(i64 %identity, i64 %count) noinline {",
+    "entry:",
+    "  %fields = mul i64 %count, 8",
+    "  %size = add i64 %fields, 24",
+    "  %value = call ptr @mlf.allocate.constructor(i64 %identity, i64 %count, i64 %size)",
+    "  store i32 28, ptr %value, align 4",
+    "  %id = getelementptr i8, ptr %value, i64 8",
+    "  store i64 %identity, ptr %id, align 8",
+    "  %arity = getelementptr i8, ptr %value, i64 16",
+    "  store i64 %count, ptr %arity, align 8",
+    "  ret ptr %value",
+    "}"
+  ];
   -- Only positive capture counts up to 28 reach this helper. They use the
   -- same rounded, traced allocation class as gc_malloc; captures start clear.
   -- The slow path handles initialization, refill and debug allocations.
