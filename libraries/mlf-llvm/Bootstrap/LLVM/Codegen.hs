@@ -1734,21 +1734,31 @@ module Bootstrap.LLVM.Codegen where {
     };
   -- A compact constructor with immediate fields is closed and total. Its
   -- allocation can be delayed until its parent consumes the value.
-  literalConstructorField :: Map String ((,) Int Int) -> XErased -> Bool;
-  literalConstructorField cs expression = let {
-    arity name count = case M.lookup compareString name cs of {
-      Just ((,) _ n) -> n == count; Nothing -> False
+  data LiteralRow = LiteralRow Int ([] Int);
+  literalRow :: Map String ((,) Int Int) -> XErased -> Maybe LiteralRow;
+  literalRow cs expression = let {
+    word field = case field of {
+      XEInt n -> if N.smallBounds ((,) n n) then Just (2 * n + 1) else Nothing;
+      XEBool b -> Just (if b then 6 else 2);
+      XEConstructor name -> case M.lookup compareString name cs of {
+        Just ((,) tag 0) -> Just (tag * 8 + 4); _ -> Nothing
+      };
+      _ -> Nothing
     };
-    immediateField field = case field of {
-      XEInt n -> N.smallBounds ((,) n n);
-      XEBool _ -> True;
-      XEConstructor name -> arity name 0;
-      _ -> False
+    row name arity fields = case M.lookup compareString name cs of {
+      Just ((,) tag n) -> if arity == n then do {
+        words <- L.mapM word fields; Just (LiteralRow tag words)
+      } else Nothing;
+      Nothing -> Nothing
     }
   } in case expression of {
-    XEApp (XEConstructor name) a -> arity name 1 && immediateField a;
-    XEApp (XEApp (XEConstructor name) a) b -> arity name 2 && immediateField a && immediateField b;
-    _ -> False
+    XEApp (XEConstructor name) a -> row name 1 [a];
+    XEApp (XEApp (XEConstructor name) a) b -> row name 2 [a,b];
+    _ -> Nothing
+  };
+  literalConstructorField :: Map String ((,) Int Int) -> XErased -> Bool;
+  literalConstructorField cs expression = case literalRow cs expression of {
+    Just _ -> True; Nothing -> False
   };
   constructFields :: Map XName CGBinding -> String -> Int -> [] XErased -> Build String;
   constructFields scope name tag args = let {
@@ -1757,8 +1767,10 @@ module Bootstrap.LLVM.Codegen where {
     [field, rest@(XEApp (XEApp (XEConstructor next) _) _)] ->
       if eqString name next then do {
         cs <- gets constructors;
-        if literalConstructorField cs field
-        then literalConstructorPrefix scope cs name tag field rest else ordinary
+        case literalRow cs field of {
+          Just row -> literalConstructorPrefix scope cs name tag ((,) field row) rest;
+          Nothing -> ordinary
+        }
       } else ordinary;
     _ -> ordinary
   };
@@ -1766,28 +1778,47 @@ module Bootstrap.LLVM.Codegen where {
   -- stays live only until the following cell. Outline full chunks as functions
   -- of the tail alone; the caller builds an arbitrary lazy tail exactly once.
   literalConstructorPrefix :: Map XName CGBinding -> Map String ((,) Int Int) ->
-    String -> Int -> XErased -> XErased -> Build String;
+    String -> Int -> (,) XErased LiteralRow -> XErased -> Build String;
   literalConstructorPrefix scope cs name tag first rest = let {
     capacity = 128;
-    prepend tail field = do {
-      head <- thunk M.empty field;
-      constructorValue tag [head, tail]
+    prepend tail ((,) field _) = do {
+      value <- thunk M.empty field;
+      constructorValue tag [value, tail]
+    };
+    emitRows tail fields = case fields of {
+      (:) ((,) _ (LiteralRow rowTag firstWords)) _ ->
+        let {
+          width = L.length firstWords;
+          same ((,) _ (LiteralRow other words)) = rowTag == other && L.length words == width;
+          columns ((,) _ (LiteralRow _ words)) = words
+        } in if L.not (L.null (L.drop 7 fields)) && L.all same fields then do {
+          table <- fresh "@mlf.literal.rows.";
+          let { words = L.concatMap columns fields; count = L.length fields };
+          let { declaration = L.concatStrings [table," = private unnamed_addr constant [",
+            showInt (count * width)," x i64] [",L.intercalate ", " (L.map number words),"], align 8"] };
+          modify (\state -> withConstants ((:) declaration (constants state)) state);
+          callConstructor ("@mlf.construct.rows." ++ showInt width)
+            [pointer table,number count,number rowTag,number tag,pointer tail]
+        } else L.foldM prepend tail fields;
+      [] -> cgPure tail
     };
     collect remaining fields chunks term =
       if remaining == 0 then do {
         symbol <- fresh "@mlf.constructor.prefix.";
-        definition symbol ["ptr %tail"] (L.foldM prepend "%tail" fields);
+        definition symbol ["ptr %tail"] (emitRows "%tail" fields);
         collect capacity [] ((:) symbol chunks) term
       } else let {
         finish = do {
           tail <- thunk scope term;
-          suffix <- L.foldM prepend tail fields;
+          suffix <- emitRows tail fields;
           L.foldM (\value symbol -> call symbol [pointer value]) suffix chunks
         }
       } in case term of {
         XEApp (XEApp (XEConstructor next) field) tail ->
-          if eqString name next && literalConstructorField cs field
-          then collect (remaining - 1) ((:) field fields) chunks tail else finish;
+          if eqString name next then case literalRow cs field of {
+            Just row -> collect (remaining - 1) ((:) ((,) field row) fields) chunks tail;
+            Nothing -> finish
+          } else finish;
         _ -> finish
       }
   } in collect (capacity - 1) [first] [] rest;
@@ -2075,13 +2106,42 @@ module Bootstrap.LLVM.Codegen where {
   allocationDefinition = constructorDefinitions (\_ -> True);
   constructorDefinitions :: (String -> Bool) -> [] String;
   constructorDefinitions needs = let {
-    unary = needs "@mlf.construct.1";
-    binary = needs "@mlf.construct.2";
+    unaryRows = needs "@mlf.construct.rows.1";
+    binaryRows = needs "@mlf.construct.rows.2";
+    unary = needs "@mlf.construct.1" || unaryRows;
+    binary = needs "@mlf.construct.2" || unaryRows || binaryRows;
     wide = needs "@mlf.construct.wide"
   } in if unary || binary || wide then L.concat [
     constructorAllocator, if unary then unaryConstructor else [],
-    if binary then binaryConstructor else [], if wide then wideConstructor else []
+    if binary then binaryConstructor else [], if wide then wideConstructor else [],
+    if unaryRows then literalRowDefinition False else [], if binaryRows then literalRowDefinition True else []
   ] else [];
+  -- The table contains immediate pointer bits in tail-to-head order. Rebuild
+  -- every row and every enclosing cell using the ordinary audited allocator.
+  -- Each call supplies at least eight rows of one saturated constructor.
+  literalRowDefinition :: Bool -> [] String;
+  literalRowDefinition binary = let { width = if binary then "2" else "1" } in L.concat [
+    ["define private ptr @mlf.construct.rows." ++ width ++
+       "(ptr %data, i64 %count, i64 %rowtag, i64 %celltag, ptr %tail) noinline {",
+     "entry:", "  br label %loop", "loop:",
+     "  %pos = phi ptr [ %data, %entry ], [ %next, %loop ]",
+     "  %n = phi i64 [ %count, %entry ], [ %left, %loop ]",
+     "  %suffix = phi ptr [ %tail, %entry ], [ %cell, %loop ]",
+     "  %x = load i64, ptr %pos, align 8",
+     "  %a = inttoptr i64 %x to ptr"],
+    if binary then [
+     "  %second = getelementptr i64, ptr %pos, i64 1",
+     "  %y = load i64, ptr %second, align 8",
+     "  %b = inttoptr i64 %y to ptr",
+     "  %row = call ptr @mlf.construct.2(i64 %rowtag, ptr %a, ptr %b)"]
+    else ["  %row = call ptr @mlf.construct.1(i64 %rowtag, ptr %a)"],
+    ["  %cell = call ptr @mlf.construct.2(i64 %celltag, ptr %row, ptr %suffix)",
+     "  %next = getelementptr i64, ptr %pos, i64 " ++ width,
+     "  %left = sub i64 %n, 1",
+     "  %done = icmp eq i64 %left, 0",
+     "  br i1 %done, label %exit, label %loop",
+     "exit:", "  ret ptr %cell", "}"]
+  ];
   constructorAllocator :: [] String;
   constructorAllocator = [
     "@mlf_constructor_pending = external global [33 x ptr]",

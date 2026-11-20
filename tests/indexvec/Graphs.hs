@@ -1066,6 +1066,26 @@ knownConstructorFoldChecks = do
             prefixes = filter (isInfixOf "define private ptr @mlf.constructor.prefix.") bodies
         check "closed constructor chunks are bounded and pass their tail explicitly"
           (fromIntegral size `div` 128) (length prefixes)
+  let columns size = foldr cell (T.XEConstructor "End") [1..size]
+      expectedWords size = concat [[2*i+1, 2*(i+3)+1] | i <- reverse [1..size]]
+  forM_ [7,8,31] $ \size -> case Codegen.generate literalTags (columns size) of
+    T.Left err -> fail (H.unpack err)
+    T.Right (_,chunks) -> do
+      let linesIR = lines (unlines (map H.unpack chunks))
+          tables = filter (isInfixOf " = private unnamed_addr constant [") linesIR
+          wordsIR = "[" ++ concat (zipWith (++) ("" : repeat ", ")
+                    ["i64 " ++ show word | word <- expectedWords size]) ++ "], align 8"
+      check "homogeneous rows use their exact tagged words in construction order"
+        (if size < 8 then 0 else 1) (length (filter (isInfixOf wordsIR) tables))
+      check "the binary row loop is emitted only when used" (size >= 8)
+        (any (isInfixOf "define private ptr @mlf.construct.rows.2(") linesIR)
+  let wordView term = case Codegen.literalRow literalTags term of
+        T.Just (Codegen.LiteralRow tag fields) -> Just (tag, fields)
+        T.Nothing -> Nothing
+  check "mixed compact tags keep their immediate pointer bits" (Just (42,[6,324]))
+    (wordView (make "Row" [T.XEBool True,T.XEConstructor "End"]))
+  check "signed compact boundaries encode exactly" (Just (42,[minBound+1,maxBound]))
+    (wordView (make "Row" [T.XEInt (-4611686018427387904),T.XEInt 4611686018427387903]))
   let permitted = Codegen.literalConstructorField literalTags
   forM_ [(True,row 1),(True,make "Row" [T.XEConstructor "End",T.XEBool False]),
          (False,make "Row" [T.XEInt maxBound,T.XEInt 0]),(False,make "Row" [T.XEInt 1]),
