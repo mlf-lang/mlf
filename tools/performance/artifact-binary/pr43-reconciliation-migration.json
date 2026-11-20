@@ -70,7 +70,7 @@
     ],
     "libraries/mlf-crates/Bootstrap/CrateGraph.hs": [
       "52b0fcf312aec770515980f78d0ee44e1f29e248c496468536f44f20495880ee",
-      "dab925a71fb85b3b51c74cae58b3df1c12693e6ecd26696342ae51dcb878bd18"
+      "72c10466c93f9963951e2469cc8c132dd6432f7e77ec2a8205df6f79b3ed9e88"
     ],
     "libraries/mlf-crates/Bootstrap/CrateQuery.hs": [
       "504c1da39204fa87c67c2ba1c9ab8e0914b3c41f81f170b85dd7076e0ead9748",
@@ -226,7 +226,7 @@
     ],
     "mlf.lock": [
       "5f7f58dece7a251711a3da2b78ba42502bd25554672bbbeaf8bf95abbc469077",
-      "a4b018c571ce1fe931346419eaf7e77d947f5b07708555f9654b331299e2551f"
+      "f261fff83a4e1186ef6e773692a14004bd3d214f6b24757c710b217ee77dd5e3"
     ],
     "runtime/mlf_build_runner_hash.h": [
       "cbbdfd06eb43324dceef594e42b21621559df3e3d4e91d62f2b73e2b04d9e778",
@@ -2457,6 +2457,21 @@
       "predecessor": "9ed3b541bee1510ee10d42cda2ad84ec36ee1b37",
       "predecessor_manifest_sha256": "fe20474131856daf87055a1a0920ae83b3cf0c9daf17b0b3d1c61a874fe8dd9c",
       "predecessor_tree": "9cd154c67ba4fe110bcccb6e2f8bc0f020ab3571"
+    },
+    {
+      "changes": {
+        "libraries/mlf-crates/Bootstrap/CrateGraph.hs": [
+          "dab925a71fb85b3b51c74cae58b3df1c12693e6ecd26696342ae51dcb878bd18",
+          "72c10466c93f9963951e2469cc8c132dd6432f7e77ec2a8205df6f79b3ed9e88"
+        ],
+        "mlf.lock": [
+          "a4b018c571ce1fe931346419eaf7e77d947f5b07708555f9654b331299e2551f",
+          "f261fff83a4e1186ef6e773692a14004bd3d214f6b24757c710b217ee77dd5e3"
+        ]
+      },
+      "predecessor": "96d34d9f8e81d3ed3e80d8a1f4c3bb6a4ab0be54",
+      "predecessor_manifest_sha256": "41fbfd1f1121071e302b7076d95fc8e07eaa680c5696e9ffd8122aa6dad1cc85",
+      "predecessor_tree": "ec479d5dd8cc690ba8caed972c637e9ea73c6b16"
     }
   ],
   "format": "pr43-reconciliation-source-migration-v1",

@@ -763,12 +763,14 @@ module Bootstrap.CrateGraph where {
       else smallPreparedTexts (nodes - 1) (scalars - n) rest
   };
   hashPrepared names original lowered metadata = let {
-    -- Visit in preparedTree order, charging its root, version and name-list nodes first.
-    -- Charge the metadata-list container after both syntax fields. The largest generated
-    -- frame uses one marker, two counts and fewer than 259 length prefixes of
-    -- six scalars. The small tree and its length-framed text both fit in 80000 bytes.
+    -- At most 256 tree nodes and 256 framed fields. A scalar costs at most
+    -- four UTF-8 bytes. The marker, two decimal counts and all field prefixes
+    -- fit in 4096 bytes (at most nine bytes per prefix). Under compact limits
+    -- these bounds admit both the ordinary wire tree and the framed digest.
+    -- Smaller limit configurations retain the 65536-byte text budget.
+    scalarLimit = if compactPreparedLimits then (preparedFieldLimit - 4096) / 4 else 16384;
     small = smallRebuiltLimits W.defaultLimits &&
-      case smallPreparedTexts 253 (16384 - stringLength preparedVersion) names of {
+      case smallPreparedTexts 253 (scalarLimit - stringLength preparedVersion) names of {
         Nothing -> False;
         Just ((,) left scalars) -> case smallPreparedTexts left scalars [original,lowered] of {
           Nothing -> False; Just ((,) more budget) ->

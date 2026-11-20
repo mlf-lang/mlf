@@ -473,6 +473,15 @@ resolverChecks = do
   headerLib <- parsed ("HeaderLib","module HeaderLib (value) where\nvalue :: Int\nvalue = 4\nprivate = 8\n")
   headerVia <- parsed ("HeaderVia","module HeaderVia (module L) where\nimport HeaderLib as L\n")
   headerMain <- parsed ("Main","module Main (main) where\nimport HeaderVia\nmain = value\n")
+  let preparedInput count = H.v_concatStringList (replicate count "λ😀:0")
+  forM_ [(0,4095),(250,4096),(251,16385)] $ \(names,blocks) -> do
+    let ns = replicate names "λ"
+        original = preparedInput blocks
+        fields = W.VNode 421 [W.VText "prepared-declarations-1",Structure.toList W.VText ns,
+          W.VText original,W.VText "",Structure.toList W.VText ["界"]]
+    typed <- CrateGraph.hashPrepared ns original "" ["界"] >>= right
+    wire <- CrateGraph.hashRebuiltValue fields >>= right
+    check "large prepared text matches the admitted wire hash" (H.unpack wire) (H.unpack typed)
   let capture (Crate.CompilationModules table units _) _ _ _ _ entry reach _ =
         (table,[(Crate.compilationName u,Crate.compilationExports u,Crate.compilationContents u) | u <- units],entry,reach)
       entities iface = [(H.unpack (Modules.owner e),H.unpack (Modules.spelling e),Modules.roleCode (Modules.role e)) |
