@@ -1652,10 +1652,14 @@ module Bootstrap.Bitstream (
   getChildIds :: Int -> Int -> Int -> [] Int -> Read ([] Int);
   getChildIds width parent remaining acc =
     if remaining == 0 then returnRead (reverse acc) else do {
-      index <- getBits width;
-      checkRead (index < parent) "binary node has a forward, cyclic, or out-of-range reference";
+      index <- getChildId width parent;
       getChildIds width parent (remaining - 1) ((:) index acc)
     };
+  getChildId width parent = do {
+    index <- getBits width;
+    checkRead (index < parent) "binary node has a forward, cyclic, or out-of-range reference";
+    returnRead index
+  };
   getEntry :: Limits -> Int -> Int -> Int -> Int -> Int -> Read Entry;
   getEntry limits nodeWidth symbolWidth parent symbols remainingEdges = do {
     kind <- getBits 2;
@@ -1670,8 +1674,16 @@ module Bootstrap.Bitstream (
       arity <- getNat remainingEdges;
       remaining <- remainingBits;
       checkRead (arity <= remaining / nodeWidth) "truncated binary child references";
-      children <- getChildIds nodeWidth parent arity [];
-      returnRead (ENode tag children)
+      -- Short nodes can build the final list in wire order. Each reference
+      -- must pass its backward bound before reading the following field.
+      let { child = getChildId nodeWidth parent };
+      case arity of {
+        0 -> returnRead (ENode tag []);
+        1 -> do { a <- child; returnRead (ENode tag [a]) };
+        2 -> do { a <- child; b <- child; returnRead (ENode tag [a,b]) };
+        3 -> do { a <- child; b <- child; c <- child; returnRead (ENode tag [a,b,c]) };
+        _ -> do { children <- getChildIds nodeWidth parent arity []; returnRead (ENode tag children) }
+      }
     }
   };
   buildChildren :: Limits -> IntMap Parsed -> [] Int -> [] Value -> Int -> Int -> Either String ((,,) ([] Value) Int Int);

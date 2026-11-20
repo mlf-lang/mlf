@@ -1747,6 +1747,20 @@ applicationPatternChecks = do
   pure ()
 
 main = do
+  childBytes <- Prim.newByteArray 4 0
+  forM_ (zip [0..] [224,134,1,102]) $ \(i,b) -> Prim.writeByteArray childBytes i b
+  let readChildren end = case W.getEntry W.defaultLimits 3 1 5 1 3 of
+        W.Read action -> do
+          outcome <- action (W.Cursor childBytes 5 end)
+          pure $ case outcome of
+            T.Right (W.ENode tag children,W.Cursor _ after _) -> Right (tag,children,after)
+            T.Left msg -> Left (H.unpack msg)
+            _ -> error "expected a binary node"
+  check "unaligned short node retains child order and consumes each field" (Right (13,[4,1,3],32)) =<< readChildren 32
+  check "child section length is checked before its fields" (Left "truncated binary child references") =<< readChildren 31
+  Prim.writeByteArray childBytes 3 126
+  check "short node rejects its forward second child"
+    (Left "binary node has a forward, cyclic, or out-of-range reference") =<< readChildren 32
   -- Corrupt a symbol in a full frame. The integrity error takes precedence
   -- over the invalid UTF-8, including when the caller supplies a text hint.
   forM_ [24,900,1300] $ \width -> do
