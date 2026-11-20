@@ -1370,6 +1370,14 @@ lexicalRunChecks = do
       check "constructor applications preserve the original reservation" ["old"] (map H.unpack (S.toList used))
       check "constructor application drops function and argument locations" True (Equality.eqSExprBits body wanted)
     _ -> fail "constructor application with source locations"
+  let deferred = T.SLet "v" (error "unused binding") (error "unused body")
+      primitive = T.SCallSite (error "unused function label") here (T.SPrimitive T.PAddInt)
+      partial = T.SApp (T.SApp primitive deferred) (error "second operand before fallback")
+  case Fresh.runFreshState (Classes.plainLambdaApplication ctorEnv partial (Fresh.freshFail "ordinary planner"))
+                           9 (Fresh.reservedNames []) of
+    T.Left why -> check "binary class planning observes an unsupported first operand before the second"
+      "ordinary planner" (H.unpack why)
+    _ -> fail "unsupported first operand bypassed the ordinary planner"
   let text = H.literal "F (A (B (C x))) y; next"
       result (Parsec.PSuccess tree (Parsec.ParseState _ rest _ _ _ _) consumed) =
         Right (H.unpack (CQ.encodeExpression tree),map (H.unpack . Lexer.tokenText) rest,consumed)

@@ -1802,12 +1802,14 @@ module Bootstrap.Classes where {
   -- and one or two identities per leaf. Preserve the same root and next
   -- identity, while reserving them together for a complete lambda body.
   data PlainContinuation = PlainRoot | PlainArgument SExpr PlainContinuation |
-    PlainOperator SExpr PlainContinuation;
+    PlainOperator SExpr PlainContinuation | PlainFirst SExpr SExpr PlainContinuation;
   plainLambdaApplication env body fallback = let {
     returnTo value count pending = case pending of {
       PlainRoot -> Fresh (\first used -> let { next = first + count } in
         Right ((,,) (PlainResult (next - 1) value) next used));
       PlainArgument a rest -> visit False a count (PlainOperator value rest);
+      PlainFirst f second rest -> let { next = count + 1 } in
+        seq next (visit False second next (PlainOperator (SApp f value) rest));
       PlainOperator f rest -> let { next = count + 1 } in
         seq next (returnTo (SApp f value) next rest)
     };
@@ -1819,10 +1821,22 @@ module Bootstrap.Classes where {
     };
     -- A source location on the function never needs its label or span.
     -- Primitive and constructor leaves each consume one identity.
+    -- A binary primitive or constructor can carry the second argument in
+    -- the first argument's frame. Visit both operands in source order.
+    binary f first second count pending = let {
+      leaf = let { next = count + 1 } in
+        seq next (visit False first next (PlainFirst f second pending))
+    } in case f of {
+      SCallSite _ _ inner -> binary inner first second count pending;
+      SPrimitive _ -> leaf;
+      SConstructor _ -> leaf;
+      _ -> application f first count (PlainArgument second pending)
+    };
     application f a count pending = let {
       leaf = let { next = count + 1 } in seq next (visit False a next (PlainOperator f pending))
     } in case f of {
       SCallSite _ _ inner -> application inner a count pending;
+      SApp operator first -> binary operator first a count pending;
       SPrimitive _ -> leaf;
       SConstructor _ -> leaf;
       _ -> visit True f count (PlainArgument a pending)
