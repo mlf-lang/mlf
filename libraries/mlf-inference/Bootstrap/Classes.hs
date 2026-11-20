@@ -523,7 +523,7 @@ module Bootstrap.Classes where {
           };
           let {
             used =
-              append (Desugar.allNames body)
+              Desugar.reservedExpressionNames body
                 (append
                    (concatMap
                       (\i -> concatMap (\((,) _ e) -> Desugar.allNames e) (instanceMethods i))
@@ -542,7 +542,7 @@ module Bootstrap.Classes where {
                                     (classMethods d))))
                          declarations)))
           };
-      runFresh used (action base classes)
+      runFreshFrom used (action base classes)
     };
   -- Same class/instance validation and Fresh reservation as the existing whole
   -- program route, but stop before source evidence applications are expanded.

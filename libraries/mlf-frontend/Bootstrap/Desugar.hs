@@ -58,6 +58,30 @@ module Bootstrap.Desugar where {
     SWanted n candidates -> (:) n (foldr (\candidate more -> (:) (snd candidate) more) rest candidates);
     _ -> rest
   };
+  -- Class initialization needs a set of spellings. Consume application
+  -- operands and their enclosing binders directly in the same order as
+  -- allNames, leaving uncommon forms to its ordinary name enumeration.
+  reservedExpressionNames expression following = let {
+    visit state term = case term of {
+      SApp f a -> let { next = visit state f } in seq next (visit next a);
+      SCallSite _ _ value -> visit state value;
+      SSourceDefinition value -> visit state value; SDeclScope _ value -> visit state value;
+      SVar name -> reserveName state name; SGlobal _ name -> reserveName state name;
+      SConstructor name -> reserveName state name;
+      SPrimitive _ -> state; SIntLit _ -> state; SBoolLit _ -> state;
+      SStringLit _ -> state; SDoubleLit _ -> state;
+      SLam name _ value -> let { next = reserveName state name } in seq next (visit next value);
+      SLet name value body -> let {
+        named = reserveName state name; next = seq named (visit named value)
+      } in seq next (visit next body);
+      SLetRec defs body -> let {
+        definition prior ((,,) name _ value) = let { named = reserveName prior name } in seq named (visit named value);
+        next = foldlStrict definition state defs
+      } in seq next (visit next body);
+      _ -> foldlStrict reserveName state (allNames term)
+    };
+    initial = visit NoNames expression
+  } in seq initial (finishedNames (foldlStrict reserveName initial following));
   definitionNamesBefore ((,,) n _ expr) rest = (:) n (namesBefore expr rest);
   statementNames :: SStatement -> [] String;
   statementNames statement = statementNamesBefore statement [];

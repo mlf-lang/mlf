@@ -1281,6 +1281,21 @@ lexicalRunChecks = do
     T.Left marks -> check "word consumers see the leading scalar and decimal consumers see the following scalar"
       "[('w',102,\"foo\"),('n',44,\"12\"),('p',0,\",\"),('n',-1,\"9\")]" (H.unpack marks)
     T.Right _ -> fail "custom token consumer did not finish"
+  let nameTree T.MapEmpty = []
+      nameTree (T.MapNode n key () l r) = (n,H.unpack key) : nameTree l ++ [(-1,"")] ++ nameTree r
+      namesOf (T.Set t) = nameTree t
+      app = foldr1 T.SApp (map T.SVar ["a","b","b","c","a","r0","r1","λ"])
+      term = T.SLet "a" app (T.SLetRec [("k",T.InferRecursive,app)] (T.SVar "k"))
+      method = T.SLam "r2" T.Nothing (T.SVar "r3")
+      suffix = T.SInstanceDecl [] [] "K" [] [("method",method)]
+      unwrapNames (T.Left why) = fail (H.unpack why)
+      unwrapNames (T.Right value) = pure value
+      namesAction = do
+        next <- Fresh.freshName "r"
+        Fresh.Fresh (\n used -> T.Right ((H.unpack next,n,namesOf used),n,used))
+  expectedNames <- unwrapNames (Fresh.runFresh (Desugar.allNames term ++ Desugar.allNames method) namesAction)
+  classNames <- unwrapNames (Classes.withValidatedClasses T.Nothing S.empty M.empty T.Nothing [] [] [suffix] term (\_ _ -> namesAction))
+  check "class initialization preserves the reserved tree, spelling collisions and fresh count" expectedNames classNames
   let boundaries = [fromInteger (sign * (10^digits + offset)) |
         sign <- [-1,1], digits <- [0..18 :: Int], offset <- [-1..1]]
   forM_ (minBound:maxBound:boundaries) $ \value -> do
