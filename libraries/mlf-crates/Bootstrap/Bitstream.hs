@@ -60,7 +60,7 @@ module Bootstrap.Bitstream (
   collectRoots, decode, decodeChecked, decodeTables,
   Graph, GraphNode(..), decodeGraph, decodeGraphWithText, decodeGraphWithGate,
   firstShortTextMatches, graphRoots, graphNodeCount, lookupGraphNode,
-  ResourceStats, planMeasured, planGraph, GraphPlan, prepareGraphPlan, realizeGraphPlan, graphNodeDepth, graphResourceStats, graphExpandedWork,
+  ResourceStats, planMeasured, planGraph, GraphPlan, prepareGraphPlan, prepareGraphPlanWithAtoms, realizeGraphPlan, graphNodeDepth, graphResourceStats, graphExpandedWork,
   resourceBytes, resourceNodes, resourceEdges, resourceSymbols,
   resourceSymbolBytes, resourceDepth, resourceMaxSymbolBytes,
   resourceExpandedNodes, resourceExpandedTextBytes, resourceExpandedWork) where {
@@ -190,14 +190,21 @@ module Bootstrap.Bitstream (
     else internNodeKey entry keys;
   -- Descriptors name common generated shapes. A hit reuses only a
   -- completely admitted node with the same tags and scalar payloads.
-  data AtomShapes = AtomShapes Int Int Int Int Int | NamedAtomShapes Int Int Int Int Int Int;
+  data AtomShapes = AtomShapes Int Int Int Int Int | NamedAtomShapes Int Int Int Int Int Int |
+    WithGroundProofTags AtomShapes Int Int Int Int Int;
+  data ProofAtoms = NoProofAtoms | ProofAtoms Int Int Int Int Int (Maybe ((,,) String Int Int));
   data NamedAtoms = NoNamedAtoms | NamedAtoms Int (Map String ((,) Int Int));
   data AtomIds = NoAtomIds | AtomIds Int Int Int Int Int
-    (Maybe ((,) Int Int)) (IntMap ((,,) String Int Int)) NamedAtoms;
+    (Maybe ((,) Int Int)) (IntMap ((,,) String Int Int)) NamedAtoms ProofAtoms;
   emptyAtomIds shapes = case shapes of {
-    AtomShapes n pair p opcode empty -> AtomIds n pair p opcode empty Nothing IM.empty NoNamedAtoms;
+    AtomShapes n pair p opcode empty -> AtomIds n pair p opcode empty Nothing IM.empty NoNamedAtoms NoProofAtoms;
     NamedAtomShapes n pair p opcode empty named ->
-      AtomIds n pair p opcode empty Nothing IM.empty (NamedAtoms named M.empty)
+      AtomIds n pair p opcode empty Nothing IM.empty (NamedAtoms named M.empty) NoProofAtoms;
+    WithGroundProofTags other thenTag inner bottom ctor elim -> case emptyAtomIds other of {
+      AtomIds n pair p opcode empty prim names named _ -> AtomIds n pair p opcode empty prim names named
+        (ProofAtoms thenTag inner bottom ctor elim Nothing);
+      NoAtomIds -> NoAtomIds
+    }
   };
   -- A hash narrows structural lookup; it never establishes equality. Exact
   -- collisions use the original balanced map, so even deliberately colliding
@@ -459,9 +466,9 @@ module Bootstrap.Bitstream (
     };
   rememberAtom tag children index saved = case saved of {
     NoAtomIds -> saved;
-    AtomIds nameTag namePair primTag opcodeTag emptyTag prim names named -> let {
-      save primitive bindings atoms = AtomIds nameTag namePair primTag opcodeTag emptyTag primitive bindings atoms
-    } in if tag == primTag then case children of {
+    AtomIds nameTag namePair primTag opcodeTag emptyTag prim names named proofs -> let {
+      save primitive bindings atoms = AtomIds nameTag namePair primTag opcodeTag emptyTag primitive bindings atoms proofs;
+      ordinary = if tag == primTag then case children of {
         [VNode inner [VInt code],VNode tailTag []] -> if inner == opcodeTag && tailTag == emptyTag
           then save (Just ((,) code index)) names named else saved;
         _ -> saved
@@ -477,6 +484,19 @@ module Bootstrap.Bitstream (
         };
         NoNamedAtoms -> saved
       }
+    } in case proofs of {
+      ProofAtoms thenTag inner bottom ctor elim _ -> if tag /= thenTag then ordinary else case children of {
+        [first,end] -> case proofField inner bottom ctor first of {
+          Just ((,) text args) -> if atomEmpty emptyTag args && atomEmpty elim end then
+            AtomIds nameTag namePair primTag opcodeTag emptyTag prim names named
+              (ProofAtoms thenTag inner bottom ctor elim (Just ((,,) text (stringUtf8Length text) index)))
+            else ordinary;
+          Nothing -> ordinary
+        };
+        _ -> ordinary
+      };
+      NoProofAtoms -> ordinary
+    }
   };
   -- A miss follows ordinary planning. Keeping the shape tests separate also
   -- preserves its demand order on an ill-formed nested value: check the tag,
@@ -499,10 +519,27 @@ module Bootstrap.Bitstream (
     };
     _ -> Nothing
   };
+  -- A ground argument is encoded as Then (Inner (Bottom (Con name []))) Elim.
+  -- Return the name and its still-lazy argument-list node. The writer must
+  -- account for the UTF-8 payload before it can examine either trailing node.
+  proofField inner bottom ctor first = let {
+    child expected value next = case value of {
+      VNode tag args -> if tag /= expected || tag < 0 || tag > 2147483647 then Nothing else case args of {
+        [field] -> next field; _ -> Nothing
+      };
+      _ -> Nothing
+    }
+  } in child inner first (\p -> child bottom p (\ty -> case ty of {
+    VNode tag fields -> if tag /= ctor || tag < 0 || tag > 2147483647 then Nothing else case fields of {
+      [field,args] -> case field of { VText name -> Just ((,) name args); _ -> Nothing };
+      _ -> Nothing
+    };
+    _ -> Nothing
+  }));
   tryAtom limits depth tag children stack rest state@(PlanState _ (Nodes _ _ count edges saved _) work) ordinary =
     case saved of {
       NoAtomIds -> ordinary rest;
-      AtomIds nameTag namePair primitiveTag opcodeTag emptyTag primitive names named -> let {
+      AtomIds nameTag namePair primitiveTag opcodeTag emptyTag primitive names named proofs -> let {
         isNamed = case named of { NamedAtoms namedTag _ -> tag == namedTag; NoNamedAtoms -> False };
         available = maxExpandedWork limits - work;
         -- Even a miss must be able to admit three descendants, four distinct
@@ -541,17 +578,38 @@ module Bootstrap.Bitstream (
             NoNamedAtoms -> ordinary rest
           };
           _ -> remember
+        };
+        -- Check room for the whole shape before looking into it. Only an
+        -- already admitted name may skip the six descendant node charges.
+        tryProof inner bottom ctor elim previous = case children of {
+          [first,end] -> case proofField inner bottom ctor first of {
+            Nothing -> ordinary rest;
+            Just ((,) name args) -> case previous of {
+              Nothing -> remember;
+              Just ((,,) expected bytes index) -> if bytes > available - 6 then ordinary rest
+                else if not (eqString expected name) then remember
+                else if atomEmpty emptyTag args && atomEmpty elim end then reuse (6 + bytes) index
+                else ordinary rest
+            }
+          };
+          _ -> ordinary rest
+        };
+        ordinaryAtoms = if (tag /= primitiveTag && tag /= nameTag && not isNamed) || not enoughRoom then ordinary rest else do {
+          let { cap = min (maxEdges limits) (maxExpandedWork limits - 1) };
+          arity <- boundedLength cap children;
+          if tag == primitiveTag && arity == 2 then case children of {
+            [first,second] -> usePrimitive first second; _ -> ordinary rest
+          } else if tag == nameTag && arity == 1 then case children of {
+            [first] -> useName first; _ -> ordinary rest
+          } else if isNamed && arity == 2 then case children of {
+            [first,second] -> useNamed first second; _ -> ordinary rest
+          } else ordinary rest
         }
-      } in if (tag /= primitiveTag && tag /= nameTag && not isNamed) || not enoughRoom then ordinary rest else do {
-        let { cap = min (maxEdges limits) (maxExpandedWork limits - 1) };
-        arity <- boundedLength cap children;
-        if tag == primitiveTag && arity == 2 then case children of {
-          [first,second] -> usePrimitive first second; _ -> ordinary rest
-        } else if tag == nameTag && arity == 1 then case children of {
-          [first] -> useName first; _ -> ordinary rest
-        } else if isNamed && arity == 2 then case children of {
-          [first,second] -> useNamed first second; _ -> ordinary rest
-        } else ordinary rest
+      } in case proofs of {
+        ProofAtoms thenTag inner bottom ctor elim previous -> if tag == thenTag &&
+          depth <= maxDepth limits - 4 && available >= 6 && maxNodes limits - count >= 7 &&
+          maxEdges limits - edges >= 6 then tryProof inner bottom ctor elim previous else ordinaryAtoms;
+        NoProofAtoms -> ordinaryAtoms
       }
     };
   -- Explicit tasks keep valid deep ASTs off the language call stack. Work
@@ -1399,8 +1457,11 @@ module Bootstrap.Bitstream (
   -- supply the exact tables subsequently used for canonical graph admission.
   data GraphPlan = GraphPlan Limits Tables;
   prepareGraphPlan :: Limits -> [] Value -> Either String GraphPlan;
-  prepareGraphPlan limits roots = do {
-    tables <- plan limits roots;
+  prepareGraphPlan = prepareGraphWith NoAtomIds;
+  prepareGraphPlanWithAtoms :: AtomShapes -> Limits -> [] Value -> Either String GraphPlan;
+  prepareGraphPlanWithAtoms shapes = prepareGraphWith (emptyAtomIds shapes);
+  prepareGraphWith initial limits roots = do {
+    tables <- planWith initial limits roots;
     geometry <- layout limits tables;
     seq geometry (Right (GraphPlan limits tables))
   };

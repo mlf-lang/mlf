@@ -1832,7 +1832,7 @@ module Bootstrap.SourceInference where {
     Just stored -> case geometry True stored of { Just False -> Right object; _ -> ordinary }
   };
   canonicalOpenPlanned object = do {
-    plan <- Wire.prepareGraphPlan Wire.defaultLimits [Open.bodyValue object];
+    plan <- Wire.prepareGraphPlanWithAtoms Structure.termAtomShapes Wire.defaultLimits [Open.bodyValue object];
     graph <- Wire.realizeGraphPlan plan;
     identity <- case Wire.graphRoots graph of { [root] -> Right root; _ -> Left "open raw root count" };
     normalized <- finalSyntaxRun graph [FinalVisit identity (FinalTerm (Open.body object))] []

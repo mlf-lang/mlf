@@ -1691,6 +1691,28 @@ applicationPatternChecks = do
     expected <- encoded (W.encode limits 8 names)
     actual <- encoded (W.encodeAtoms Structure.termAtomShapes limits 8 names)
     check "named constructor atoms preserve bytes and resource diagnostics" expected actual
+  let argument ty = Structure.toXComputation (T.XThen (T.XInner (T.XBottom (T.XCon ty []))) T.XElim)
+      intArg = argument "Int"
+      wideArg = argument "型λ😀"
+      proofs = [intArg,intArg,W.VNode 58 [intArg,wideArg],wideArg,intArg]
+      badProof = W.VNode 58 [W.VNode 53 [W.VNode 51 [W.VNode 44 [W.VText "Int",W.VNode 1 []]]],
+                             W.VNode (-1) (error "forced children of invalid proof tag")]
+      graphWork plan = case plan of
+        T.Left message -> Left (H.unpack message)
+        T.Right admitted -> case W.realizeGraphPlan admitted of
+          T.Left message -> Left (H.unpack message)
+          T.Right graph -> case W.graphExpandedWork graph of
+            T.Left message -> Left (H.unpack message)
+            T.Right work -> Right (W.graphRoots graph,W.graphNodeCount graph,work)
+  forM_ [W.defaultLimits,W.Limits 2048 8 128 256 64 128 16 32,
+         W.Limits 2048 8 128 256 64 128 4 1024] $ \limits ->
+    forM_ [proofs,proofs ++ [badProof]] $ \roots -> do
+      direct <- encoded (W.encode limits 8 roots)
+      actual <- encoded (W.encodeAtoms Structure.termAtomShapes limits 8 roots)
+      check "ground type proof preserves wire bytes and first failed limit" direct actual
+      check "ground type proof preserves DAG roots, distinct nodes and expanded work"
+        (graphWork (W.prepareGraphPlan limits roots))
+        (graphWork (W.prepareGraphPlanWithAtoms Structure.termAtomShapes limits roots))
   let right (T.Right value) = pure value
       right (T.Left message) = fail (H.unpack message)
       rejected (T.Left _) = True
