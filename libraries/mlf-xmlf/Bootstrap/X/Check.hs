@@ -65,6 +65,8 @@ module Bootstrap.X.Check where {
   -- composition passes its checked result to the next computation.
   checkedComputationResult ds env p source = case p of {
     XRefl -> Right source;
+    -- Inst-Bot already checks the target kind against its bottom source.
+    XBottom _ -> computeResult ds env p source;
     XThen first second -> do {
       middle <- checkedComputationResult ds env first source;
       checkedComputationResult ds env second middle

@@ -1380,6 +1380,15 @@ lexicalRunChecks = do
     (map XT.tyVarId (S.toList (XT.freeVars boundInventory)))
   check "all type variables include negative binders" [-2,3,5]
     (map XT.tyVarId (S.toList (XT.allVars boundInventory)))
+  let higherBottom = T.KArrow T.Star T.Star
+      kindData = T.DataEnv M.empty M.empty (M.singleton "F" higherBottom)
+      toConstructor = T.XBottom (T.XCon "F" [])
+  case XCheck.checkComputationIn kindData M.empty toConstructor (T.XBotKind higherBottom) of
+    T.Right (T.XCon name []) -> check "Inst-Bot preserves its higher-kinded target" "F" (H.unpack name)
+    _ -> fail "higher-kinded Inst-Bot rejected"
+  case XCheck.checkComputationIn kindData M.empty toConstructor (T.XBotKind T.Star) of
+    T.Left message -> check "Inst-Bot reports incompatible target kinds" "Inst-Bot kind mismatch" (H.unpack message)
+    _ -> fail "incompatible Inst-Bot target kind admitted"
   let ctorEnv = Classes.QualifiedEnv M.empty (const T.Nothing)
       ctor name = T.SConstructor name
       here = T.SourceSpan "P" "M" "file.hs" 1 1 1 2
