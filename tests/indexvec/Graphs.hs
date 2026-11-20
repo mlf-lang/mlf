@@ -10,6 +10,7 @@ import qualified Data.Set as Set
 import qualified Bootstrap.ArtifactStorage as Storage
 import qualified Bootstrap.ArtifactStructure as Structure
 import qualified Bootstrap.Bitstream as W
+import qualified Bootstrap.BuiltinPreludeLiteral as BuiltinLiteral
 import qualified Bootstrap.Classes as Classes
 import qualified Bootstrap.Compiler as Compiler
 import qualified Bootstrap.Crate as Crate
@@ -1222,6 +1223,25 @@ lexicalRunChecks = do
   check "hosted slices retain byte and scalar lengths across a Unicode index block"
     (2,7,[30028,128512]) (H.v_stringLength middle,H.v_stringUtf8Length middle,map (H.v_stringCodeAt middle) [0,1])
   check "framing consumes both hosted slices in order" ("2:界😀2:" ++ H.unpack section) (H.unpack framed)
+  let rawImage = replicate 1023 65 ++ [0,128,255,127] ++ replicate 33 32 ++ [129]
+      patches = replicate 31 'a' ++ ['\64','\65','\1','a','\3']
+  raw <- Prim.newByteArray (fromIntegral (length rawImage)) 0
+  forM_ (zip [0..] rawImage) $ \(i,v) -> Prim.writeByteArray raw i v
+  (low,ops) <- BuiltinLiteral.compilerImageFields raw (fromIntegral (length rawImage))
+  check "sparse builtin image patches across a page" patches (H.unpack ops)
+  let open = BuiltinLiteral.openCompilerImage (low,ops) >>= \result -> case result of
+        T.Right bytes -> pure bytes
+        T.Left why -> fail (H.unpack why)
+  firstImage <- open
+  otherImage <- open
+  Prim.writeByteArray firstImage 0 99
+  imageLength <- Prim.lengthByteArray otherImage
+  octets <- mapM (Prim.readByteArray otherImage) [0..imageLength-1]
+  check "each installation owns all expected builtin image octets" rawImage octets
+  invalid <- BuiltinLiteral.openCompilerImage ("123","a")
+  case invalid of
+    T.Left "invalid compiler image" -> pure ()
+    _ -> fail "unfinished builtin skip"
   first <- Prim.byteArrayFromString section
   second <- Prim.byteArrayFromString section
   Prim.writeByteArray first 0 17

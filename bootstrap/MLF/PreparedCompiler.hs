@@ -276,11 +276,25 @@ module MLF.PreparedCompiler
     Left message -> ioReturn (Left message);
     Right object -> do {
       images <- Literal.imageTexts object;
-      ioReturn (do {
-        pair <- images;
-        ensure (eqString (fst pair) Builtin.interfaceImage && eqString (snd pair) Builtin.objectImage)
-          "prepared Prelude binary images differ from fresh complete preparation"
-      })
+      case images of {
+        Left message -> ioReturn (Left message);
+        Right ((,) meta unit) -> let {
+          check encoded fields = do {
+            expected <- decodeCompilerImage encoded;
+            actual <- Literal.openCompilerImage fields;
+            case (,) expected actual of {
+              (,) (Right a) (Right b) -> Storage.sameBytes a b;
+              _ -> ioReturn False
+            }
+          };
+          error = "prepared Prelude binary images differ from fresh complete preparation"
+        } in if not (eqString meta Builtin.interfaceImage && eqString unit Builtin.objectImage)
+          then ioReturn (Left error) else do {
+            iface <- check meta Builtin.interfaceOctets;
+            body <- if iface then check unit Builtin.objectOctets else ioReturn False;
+            ioReturn (ensure (iface && body) error)
+          }
+      }
     }
   };
   -- Only the fixed generator's physically verified images enter this route.
@@ -307,7 +321,8 @@ module MLF.PreparedCompiler
       }
     };
   compilerPreludeImages = do {
-    first <- decodeCompilerImage Builtin.interfaceImage; second <- decodeCompilerImage Builtin.objectImage;
+    first <- Literal.openCompilerImage Builtin.interfaceOctets;
+    second <- Literal.openCompilerImage Builtin.objectOctets;
     ioReturn (do { meta <- first; body <- second; Right ((,) meta body) })
   };
   decodeCompilerImage text = if stringLength text > 2796204
