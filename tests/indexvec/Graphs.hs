@@ -21,6 +21,7 @@ import qualified Bootstrap.Desugar as Desugar
 import qualified Bootstrap.Fresh as Fresh
 import qualified Bootstrap.Layout as Layout
 import qualified Bootstrap.Lexer as Lexer
+import qualified Bootstrap.Parsec as Parsec
 import qualified Bootstrap.Resolved as R
 import qualified Bootstrap.SourceEquality as Equality
 import qualified Bootstrap.SourceInference as Source
@@ -1208,6 +1209,19 @@ lexicalRunChecks = do
       check "constructor applications preserve the original reservation" ["old"] (map H.unpack (S.toList used))
       check "constructor application drops function and argument locations" True (Equality.eqSExprBits body wanted)
     _ -> fail "constructor application with source locations"
+  let text = H.literal "F (A (B (C x))) y; next"
+      result (Parsec.PSuccess tree (Parsec.ParseState _ rest _ _ _ _) consumed) =
+        Right (H.unpack (CQ.encodeExpression tree),map (H.unpack . Lexer.tokenText) rest,consumed)
+      result (Parsec.PFailure why _ consumed) = Left (H.unpack why,consumed)
+  case Lexer.scanSourceTokens "group.hs" text of
+    T.Left why -> fail (H.unpack why)
+    T.Right (Lexer.Scanned tokens eof) -> do
+      let state=Parsec.ParseState "group.hs" tokens eof T.SharedHaskellV1 "Owner" "pkg"
+          parsed=result (Parsec.pRun (Parser.equationExpressionWith True) state)
+      check "nested equation groups preserve the full grammar's application and source spans"
+        (result (Parsec.pRun Parser.expr state)) parsed
+      check "consecutive closures retain the delimiter for the enclosing declaration"
+        (Right ([";","next"],True)) (fmap (\(_,tailTokens,consumed)->(tailTokens,consumed)) parsed)
   forM_ [Lexer.isDigit,Lexer.isHexDigit,Lexer.isIdentChar,Lexer.isOperator] $ \predicate ->
     forM_ [0..size] $ \i -> do
       let before = Lexer.Cursor i 12 19

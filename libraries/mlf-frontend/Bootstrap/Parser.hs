@@ -640,6 +640,16 @@ module Bootstrap.Parser where {
     ParseState file tokens end SharedHaskellV1 owner packageName -> let {
       finish body rest = PSuccess body (ParseState file rest end SharedHaskellV1 owner packageName) True;
       appendAtom prior atom = case prior of { Nothing -> atom; Just f -> SApp f atom };
+      -- Several nested applications can end at consecutive closing tokens.
+      -- Collapse these frames directly, retaining the first following token.
+      close known groups body remaining = case groups of {
+        [] -> Nothing;
+        (:) parent outer -> let { next = appendAtom parent body } in seq next (case remaining of {
+          (:) (Token name _ _ _ _) more -> if eqString name ")" then close known outer next more
+            else scan known outer (Just next) remaining;
+          [] -> finishAt outer (Just next) []
+        })
+      };
       scan known groups current remaining = case remaining of {
         [] -> finishAt groups current remaining;
         (:) (Token name sl sc el ec) more -> let {
@@ -647,10 +657,8 @@ module Bootstrap.Parser where {
           code = if size > 0 then stringCodeAt name 0 else (-1);
           put names atom = let { next = appendAtom current atom } in seq next (scan names groups (Just next) more)
         } in if size == 1 && code == 40 then scan known ((:) current groups) Nothing more
-          else if size == 1 && code == 41 then case (,) current groups of {
-            (,) (Just body) ((:) parent outer) -> let { next = appendAtom parent body } in
-              seq next (scan known outer (Just next) more);
-            _ -> Nothing
+          else if size == 1 && code == 41 then case current of {
+            Just body -> close known groups body more; Nothing -> Nothing
           } else if size == 1 && (code == 59 || code == 125) then finishAt groups current remaining
           else if (code >= 97 && code <= 122) || (scanned && code >= 65 && code <= 90) then let {
             lower = code >= 97;
