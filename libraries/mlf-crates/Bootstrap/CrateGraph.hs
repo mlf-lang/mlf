@@ -470,6 +470,7 @@ module Bootstrap.CrateGraph where {
   -- forms delegated to the general canonicalizer.
   data OriginScope = WrittenOrigin | SourceOrigin
     (V.Index Declaration -> V.Index Declaration) (Map String String) Int (Map String String) Int;
+  data PreparedConstructor = PreparedConstructor Int String String String;
   data CachedLocation = CachedLocation String | CachedLocationLeaf String String String Int String;
   locationFragment cached = case cached of {
     CachedLocation site -> site; CachedLocationLeaf site _ _ _ _ -> site
@@ -506,6 +507,25 @@ module Bootstrap.CrateGraph where {
         named tag spelling overhead = case positionSymbol spelling names of { (,,) code bytes table ->
           collect (budget - overhead - bytes) rest (\tail -> chunks ((:) tag ((:) code tail))) pages (slots - 1) line column table locations constructors previousInteger
         };
+        -- An application and its constructor occupy consecutive preorder nodes.
+        -- Keep the ordinary charge for each and reuse their encoded prefix.
+        constructor name leading items = seq scope (let {
+          charge = 25 * leading;
+          withPrefix text = case leading of { 0 -> text; 1 -> "a" ++ text; _ -> "aa" ++ text };
+          emit cost field saved = collect (budget - charge - cost) items
+            (\tail -> chunks ((:) field tail)) pages (slots - leading - 1) line column names locations saved previousInteger
+        } in case M.lookup compareString name constructors of {
+          Just (PreparedConstructor cost bare unary binary) ->
+            emit cost (case leading of { 0 -> bare; 1 -> unary; _ -> binary }) constructors;
+          Nothing -> let {
+            text = Q.encodeExpression (SConstructor name); cost = stringUtf8Length text
+          } in if M.size constructors >= 32 || stringLength name > 4096
+            then emit cost (withPrefix ("x" ++ Separate.pack [text])) constructors
+            else let {
+              code = "c" ++ V.at coordinateAlphabet (V.fromInt (M.size constructors));
+              saved = M.insert compareString name (PreparedConstructor cost code ("a" ++ code) ("aa" ++ code)) constructors
+            } in emit cost (withPrefix ("C" ++ Separate.pack [name])) saved
+        });
         enter nested = scan nested (case rest of { [] -> outer; _ -> (:) ((,) scope rest) outer });
         ordinary value = let { text = Q.encodeExpression value } in
           next (stringUtf8Length text) (\tail -> (:) "x" ((:) (Separate.pack [text]) tail)) rest
@@ -519,8 +539,14 @@ module Bootstrap.CrateGraph where {
               (\tail -> chunks ((:) prefix ((:) code tail))) pages (slots - 2) line column table locations constructors previousInteger
           }
         } in if slots < 2 || budget < 25 then single else case f of {
-          SApp g b -> collect (budget - 50) ((:) g ((:) b ((:) a rest)))
-            (\tail -> chunks ((:) "aa" tail)) pages (slots - 2) line column names locations constructors previousInteger;
+          SApp g b -> let {
+            args = (:) b ((:) a rest);
+            pair = collect (budget - 50) ((:) g args) (\tail -> chunks ((:) "aa" tail))
+              pages (slots - 2) line column names locations constructors previousInteger
+          } in if slots < 3 || budget < 50 then pair else case g of {
+            SConstructor name -> constructor name 2 args; _ -> pair
+          };
+          SConstructor name -> constructor name 1 ((:) a rest);
           SVar name -> applied "av" (case scope of {
             WrittenOrigin -> name; SourceOrigin _ env _ _ _ -> Q.canonicalReference env name
           }) 10;
@@ -602,20 +628,7 @@ module Bootstrap.CrateGraph where {
           SourceOrigin rank _ _ _ _ -> named "v" (Q.ordinalToken (rank i)) 10;
           WrittenOrigin -> ordinary expr
         };
-        -- The first 32 eligible constructors are defined by C and a framed
-        -- name. A subsequent c carries the zero-based slot as an ASCII scalar.
-        -- Each use still consumes its full ordinary UTF-8 budget.
-        SConstructor name -> seq scope (let {
-          emit cost field saved = collect (budget - cost) rest (\tail -> chunks ((:) field tail))
-            pages (slots - 1) line column names locations saved previousInteger
-        } in case M.lookup compareString name constructors of {
-          Just ((,) cost field) -> emit cost field constructors;
-          Nothing -> if M.size constructors >= 32 || stringLength name > 4096 then ordinary expr else let {
-            text = Q.encodeExpression expr; cost = stringUtf8Length text;
-            code = "c" ++ V.at coordinateAlphabet (V.fromInt (M.size constructors));
-            saved = M.insert compareString name ((,) cost code) constructors
-          } in emit cost ("C" ++ Separate.pack [name]) saved
-        });
+        SConstructor name -> constructor name 0 rest;
         SPrimitive p -> named "p" (Primitive.primitiveName p) 11;
         -- The previous literal follows preorder across page and scope boundaries.
         -- Modular subtraction is reversible across both signed Int endpoints.

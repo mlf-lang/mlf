@@ -170,6 +170,15 @@ queryChecks = do
     check "prepared constructors charge each occurrence" Nothing (prepared scope (budget-1) expr)
     check "a prepared tree without pooled constructors or literals keeps its P3 key"
       (Just "P3headerv") (fmap (take 9) (prepared scope 10000 (T.SVar "x")))
+    let ctor = T.SConstructor "C"
+        unary = T.SApp ctor ctor
+        binary = T.SApp (T.SApp ctor unary) ctor
+        cost = 3*25 + 4*charge "C"
+        ref = "c" ++ [toEnum 0]
+    check "unary and binary constructor fields retain preorder and dictionary slots"
+      (Just ("P4header" ++ "aaC1:C" ++ "a" ++ ref ++ ref ++ ref)) (prepared scope cost binary)
+    check "grouped constructor fields charge every application and every occurrence"
+      Nothing (prepared scope (cost-1) binary)
     let literal n = T.SIntLit n
         packed ns = prepared scope 10000 (foldr1 T.SApp (map literal ns))
     check "prepared literals carry preorder deltas across applications"
