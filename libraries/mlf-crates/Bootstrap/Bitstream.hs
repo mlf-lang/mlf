@@ -1809,98 +1809,15 @@ module Bootstrap.Bitstream (
   decodeGraphWithText :: [] String -> Limits -> Int -> ByteArray -> IO (Either String Graph);
   decodeGraphWithText hints limits schema bytes = catchIOError (decodeGraphChecked hints limits schema bytes)
     (\error -> ioReturn (Left ("binary decode IO failure: " ++ textFromChars (ioeGetErrorString error))));
-  -- A small symbol section can be validated, decoded and fed to CRC32 in
-  -- one forward pass. Cap all speculative allocations BEFORE the integrity
-  -- gate. We never allocate the node graph until the entire CRC matches.
-  -- A declined scan takes the original checksum-first reader (also retaining
-  -- its exact malformed-input diagnostics). No second read on valid symbols.
-  scanSymbolLength :: IntArray -> ByteArray -> Int -> Int -> Int -> Int -> Int -> Int -> IO (Maybe ((,,) Int Int Int));
-  scanSymbolLength table bytes end pos limit shift value crc =
-    if pos == end || shift > 28 then ioReturn Nothing else do {
-      byte <- readByteArray bytes pos;
-      let { bits = andInt byte 127; next = orInt value (shiftLInt bits shift) };
-      if next > limit || (byte < 128 && shift > 0 && bits == 0) then ioReturn Nothing else do {
-        updated <- advanceCRC table crc byte;
-        if byte < 128 then ioReturn (Just ((,,) next (pos + 1) updated))
-        else seq updated (scanSymbolLength table bytes end (pos + 1) limit (shift + 7) next updated)
-      }
-    };
-  scanContinuation :: IntArray -> ByteArray -> Int -> Int -> Int -> Int -> IO (Maybe ((,) Int Int));
-  scanContinuation table bytes pos left code crc =
-    if left == 0 then ioReturn (Just ((,) code crc)) else do {
-      byte <- readByteArray bytes pos;
-      if byte < 128 || byte > 191 then ioReturn Nothing else do {
-        updated <- advanceCRC table crc byte;
-        let { next = orInt (shiftLInt code 6) (andInt byte 63) };
-        seq updated (seq next (scanContinuation table bytes (pos + 1) (left - 1) next updated))
-      }
-    };
-  scanSymbolText :: IntArray -> ByteArray -> Int -> Int -> Int -> [] Char -> IO (Maybe ((,) String Int));
-  scanSymbolText table bytes end pos crc chars =
-    if pos == end then ioReturn (Just ((,) (textFromChars (reverse chars)) crc)) else do {
-      byte <- readByteArray bytes pos;
-      updated <- advanceCRC table crc byte;
-      if byte < 128 then seq updated
-        (scanSymbolText table bytes end (pos + 1) updated ((:) (charFromCode byte) chars))
-      else let { width = utf8Width byte } in
-        if width == 0 || width > end - pos then ioReturn Nothing else do {
-          tail <- scanContinuation table bytes (pos + 1) (width - 1) (utf8Lead byte width) updated;
-          case tail of {
-            Just ((,) code next) -> if canonicalScalar width code
-              then scanSymbolText table bytes end (pos + width) next ((:) (charFromCode code) chars)
-              else ioReturn Nothing;
-            Nothing -> ioReturn Nothing
-          }
-        }
-    };
-  scanSymbolTable :: Limits -> IntArray -> ByteArray -> Int -> Int -> Int -> Int -> Int -> Int ->
-    Map String Int -> IntMap Symbol -> IO (Maybe ((,) (IntMap Symbol) Int));
-  scanSymbolTable limits table bytes end count index pos total crc names symbols =
-    if index == count then ioReturn (if pos == end then Just ((,) symbols crc) else Nothing)
-    else do {
-      prefix <- scanSymbolLength table bytes end pos (maxSymbolBytes limits) 0 0 crc;
-      case prefix of {
-        Nothing -> ioReturn Nothing;
-        Just ((,,) size start next) ->
-          if size > end - start || size > maxTotalSymbolBytes limits - total then ioReturn Nothing
-          else do {
-            decoded <- scanSymbolText table bytes (start + size) start next [];
-            case decoded of {
-              Nothing -> ioReturn Nothing;
-              Just ((,) text updated) -> case intern compareString text names of {
-                Found _ -> ioReturn Nothing;
-                Inserted fill -> let { following = fill index; entries = IM.insert index (Symbol text size) symbols } in
-                  seq following (seq entries (scanSymbolTable limits table bytes end count (index + 1)
-                    (start + size) (total + size) updated following entries))
-              }
-            }
-          }
-      }
-    };
+  -- The header bounds the complete input, including its four-byte checksum
+  -- field. Check integrity before allocating symbol or node tables. Public
+  -- prefix checksums can also operate on a portion of a larger byte array.
   checkedGraphTables :: [] String -> Limits -> Int -> ByteArray -> Int -> Layout -> Int -> IO (Either String Graph);
-  checkedGraphTables hints limits aggregate bytes size geometry expectedCRC =
-    let { original = \ignored -> do {
-      actual <- checksum bytes size;
-      if actual /= expectedCRC then ioReturn (Left "binary checksum mismatch")
-      else decodeGraphTables hints limits aggregate bytes geometry
-    } } in case geometry of {
-      Layout _ count length _ nodeOffset _ _ _ _ _ _ _ ->
-        if not (null hints) || size < 1024 || count == 0 || count > 1024 || length > 65536
-        then original () else do {
-          table <- newIntArray 256 0;
-          buildCRCTable table 0;
-          header <- crcRange table bytes 80 0 4294967295;
-          scanned <- scanSymbolTable limits table bytes nodeOffset count 0 80 0 header M.empty IM.empty;
-          case scanned of {
-            Nothing -> original ();
-            Just ((,) symbols partial) -> do {
-              actual <- checksumBytes table bytes size nodeOffset partial;
-              if actual /= expectedCRC then ioReturn (Left "binary checksum mismatch")
-              else decodeDenseNodesAndRoots limits aggregate bytes geometry symbols
-            }
-          }
-        }
-    };
+  checkedGraphTables hints limits aggregate bytes size geometry expectedCRC = seq hints (do {
+    actual <- if size >= 1024 then byteArrayCRC32 bytes 76 4 else checksum bytes size;
+    if actual /= expectedCRC then ioReturn (Left "binary checksum mismatch")
+    else decodeGraphTables hints limits aggregate bytes geometry
+  });
   decodeGraphChecked :: [] String -> Limits -> Int -> ByteArray -> IO (Either String Graph);
   decodeGraphChecked hints limits schema bytes =
     decodeGraphAfterHeader hints limits schema (\_ _ -> ioReturn (Right ())) bytes;

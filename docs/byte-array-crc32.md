@@ -14,5 +14,7 @@ identity or authentication mechanism; SHA-256 content addresses are unchanged.
 The primitive was introduced at code 134 with the `/14` builtin interface and
 `mlf-primitive-135-v10` ABI. Its code remains 134 in the later
 [field-framing ABI](string-fields.md). The binary wire checksum and file format are unchanged.
-Only the encoder's private completed-plan path uses the bulk operation; public
-prefix-length checksum and raw bit writers retain their existing behavior.
+The encoder checks completed plans with the bulk operation. The decoder also uses it
+on complete frames of at least 1,024 bytes after header and schema admission,
+before it reads symbol and node tables. The public prefix checksum accepts a
+length within a larger array.

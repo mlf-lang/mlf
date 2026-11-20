@@ -1493,6 +1493,27 @@ applicationPatternChecks = do
   pure ()
 
 main = do
+  -- Corrupt a symbol in a full frame. The integrity error takes precedence
+  -- over the invalid UTF-8, including when the caller supplies a text hint.
+  forM_ [24,900,1300] $ \width -> do
+    let spelling = H.literal (replicate width 'q')
+        requireGraph action = action >>= \value -> case value of
+          T.Right graph -> pure graph
+          T.Left msg -> fail (H.unpack msg)
+    bytes <- W.encode W.defaultLimits 7 [W.VText spelling] >>= \encoded -> case encoded of
+      T.Right value -> pure value
+      T.Left msg -> fail (H.unpack msg)
+    let offset = if width < 128 then 81 else 82
+    graph <- requireGraph (W.decodeGraphWithText [spelling] W.defaultLimits 7 bytes)
+    case W.lookupGraphNode graph (head (W.graphRoots graph)) of
+      T.Right (W.GText value) -> check "decoded symbol across integrity threshold" (H.unpack spelling) (H.unpack value)
+      _ -> fail "expected decoded symbol"
+    Prim.writeByteArray bytes offset 255
+    forM_ [[],[spelling]] $ \hints -> do
+      result <- W.decodeGraphWithText hints W.defaultLimits 7 bytes
+      case result of
+        T.Left msg -> check "complete frame checksum precedes symbol decoding" "binary checksum mismatch" (H.unpack msg)
+        T.Right _ -> fail "accepted corrupted symbol bytes"
   let chain = [("v" ++ show i,["v" ++ show (i+1)]) | i <- [0..24 :: Int]]
       wide = [("top",map fst chain)] ++ chain
       duplicate = [("z",["a"]),("a",["missing","a","a"]),("z",["other"])]
