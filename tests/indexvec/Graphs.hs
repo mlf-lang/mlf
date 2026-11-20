@@ -1000,6 +1000,15 @@ importConventionChecks = do
     (observe (T.XForall a (T.XArrow (T.XCon "MLFStackEvidence" []) int) (prefix "DB" (T.XVar a))))
 
 orderedSyntaxChecks = do
+  let marker = "$MLF.Infix."
+      suffixes = ["","x","λ","界.with.𐀀",marker,"\0name"]
+      negatives = [take k marker ++ [ch] ++ drop (k+1) marker
+                  | (k,actual) <- zip [0..] marker, ch <- ['a','.', '界'], ch /= actual]
+  forM_ suffixes $ \suffix -> do
+    check "infix lexical name projects the complete scalar suffix" suffix
+      (H.unpack (D.lexicalValueName (H.literal (marker ++ suffix))))
+    forM_ negatives $ \other -> check "non-matching lexical names retain their full spelling" (other ++ suffix)
+      (H.unpack (D.lexicalValueName (H.literal (other ++ suffix))))
   let i = V.fromInt 4
       ref (T.LexicalRef n) = (Nothing,H.unpack n)
       ref (T.DeclRef j n) = (Just (V.toInt j),H.unpack n)

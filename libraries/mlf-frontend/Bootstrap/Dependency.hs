@@ -17,7 +17,11 @@ module Bootstrap.Dependency where {
   -- Edges point from a declaration to the declarations it needs. Namespace
   -- imports and type observations deliberately do not become value SCC edges.
   data Observation = Observation ([] TermRef) ([] String) ([] String) ([] String);
-  lexicalValueName name = if stringLength name >= 11 && eqString (stringSlice name 0 11) "$MLF.Infix." then stringSlice name 11 (stringLength name - 11) else name;
+  lexicalValueName name = let {
+    prefix = "$MLF.Infix."; width = stringLength prefix; size = stringLength name;
+    matches i = i == width ||
+      (stringCodeAt name i == stringCodeAt prefix i && matches (i + 1))
+  } in if size >= width && matches 0 then stringSlice name width (size - width) else name;
   valueRefs (Observation values _ _ _) = values;
   valueNames observation = map termRefName (valueRefs observation);
   expressionNamedReads expression = mapMaybe (\ref -> case ref of {
