@@ -1197,6 +1197,14 @@ openGeometryChecks = do
   let shared glyph = wrap 300 (W.VNode 8 (replicate 40 (W.VText (H.literal (replicate 65536 glyph)))))
   check "deep open bodies charge every UTF-8 occurrence" [[False], []]
     (map (observe . shared) ['x', '😀'])
+  let charge text remaining = if H.unpack text == "reject" then T.Nothing else T.Just (remaining-1)
+      cursor frames n w = fmapHost (Source.finalGeometryUsing False False charge 12 frames n w False)
+      frames = [(1,False,[W.VInt 7,W.VNode 4 [W.VText "ok",W.VNode 58 []],W.VInt 1]),
+                (3,True,[W.VNode 58 []])]
+  check "geometry resumes the remaining root and charges every sibling"
+    [[],[True],[]] [cursor frames 5 10,cursor frames 6 7,cursor frames 6 6]
+  check "a rejected child precedes its unevaluated sibling list" []
+    (cursor [(1,False,W.VNode 4 [W.VText "reject"] : error "premature sibling demand")] 32 32)
 
 protectionChecks = do
   let chain = [(show i,[show (i+1)]) | i <- [0..126::Int]] ++ [("127",[])]

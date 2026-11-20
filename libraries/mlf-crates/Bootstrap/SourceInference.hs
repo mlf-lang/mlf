@@ -626,29 +626,41 @@ module Bootstrap.SourceInference where {
     [] ((,,) Int Bool ([] Wire.Value)) -> Int -> Int -> Bool -> Maybe Bool;
   finalGeometryTasks = finalGeometryWith False;
   finalGeometryWith = finalGeometryUsing False;
+  -- A cursor points directly into the current constructor's child list.
+  -- Only descending into a nonempty constructor saves its remaining siblings.
+  data GeometryFrame = GeometrySiblings Int Bool ([] Wire.Value) GeometryFrame |
+    GeometryRoots ([] ((,,) Int Bool ([] Wire.Value)));
   finalGeometryUsing spines stored chargeText maxDepth = let {
-    visit pending nodes work nested = case pending of {
+    resume pending nodes work nested = case pending of {
+      GeometrySiblings depth parentThen fields rest -> visit depth parentThen fields rest nodes work nested;
+      GeometryRoots roots -> start roots nodes work nested
+    };
+    start roots nodes work nested = case roots of {
       [] -> Just nested;
-      (:) ((,,) depth parentThen values) rest -> case values of {
-        [] -> visit rest nodes work nested;
-        (:) value more -> if nodes <= 0 || work <= 0 || depth > maxDepth then Nothing else let {
-          tail = (:) ((,,) depth parentThen more) rest; left = nodes - 1; next = work - 1
-        } in case value of {
-          Wire.VText text -> case chargeText text next of {
-            Nothing -> Nothing; Just available -> visit tail left available nested
-          };
-          Wire.VNode tag children -> if stored && tag == 86 then case applicationGeometryUsing spines children chargeText nodes work of {
-            Just ((,,) height size cost) -> if height > maxDepth - depth + 1 then Nothing
-              else visit tail (nodes - size) (work - cost) nested;
-            Nothing -> Nothing
-          } else if tag < 0 || tag > 2147483647 then Nothing else let {
-            changed = nested || (parentThen && tag == 58)
-          } in seq changed (visit ((:) ((,,) (depth + 1) (tag == 58) children) tail) left next changed);
-          _ -> visit tail left next nested
-        }
+      (:) ((,,) depth parentThen fields) rest -> visit depth parentThen fields (GeometryRoots rest) nodes work nested
+    };
+    visit depth parentThen fields rest nodes work nested = case fields of {
+      [] -> resume rest nodes work nested;
+      (:) value more -> if nodes <= 0 || work <= 0 || depth > maxDepth then Nothing else let {
+        left = nodes - 1; next = work - 1
+      } in case value of {
+        Wire.VText text -> case chargeText text next of {
+          Nothing -> Nothing; Just available -> visit depth parentThen more rest left available nested
+        };
+        Wire.VNode tag children -> if stored && tag == 86 then case applicationGeometryUsing spines children chargeText nodes work of {
+          Just ((,,) height size cost) -> if height > maxDepth - depth + 1 then Nothing
+            else visit depth parentThen more rest (nodes - size) (work - cost) nested;
+          Nothing -> Nothing
+        } else if tag < 0 || tag > 2147483647 then Nothing else let {
+          changed = nested || (parentThen && tag == 58)
+        } in seq changed (case children of {
+          [] -> visit depth parentThen more rest left next changed;
+          _ -> visit (depth + 1) (tag == 58) children (GeometrySiblings depth parentThen more rest) left next changed
+        });
+        _ -> visit depth parentThen more rest left next nested
       }
     }
-  } in visit;
+  } in start;
   -- On the certified small domain the only rewriting operation is still the
   -- same depth-aware XThen forest. Atom heights and child identities are local
   -- to each computation; header, datatype and unrelated term nodes cannot
