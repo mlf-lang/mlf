@@ -22,6 +22,7 @@ CLASSES_SUCCESSORS = (
     '6f1bc8e923c6333d20f38b421ae43672fa0721c3',
     'b7caa275f2b1b90718e5da59152c8ccf9b96d538',
     '629f0c52164ab2211c638e9499caf6ab7b30121e',
+    '1eaafe6174076500ac97aa1d6b3dbf9ea68959ee',
 )
 PINS = {
  'test_direct.py':'a46bd66949e81c5761dff3446201640837ec8f68',
