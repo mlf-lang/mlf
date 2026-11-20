@@ -1254,22 +1254,27 @@ module Bootstrap.Module where {
   resolveApplication = resolveApplicationIn Nothing;
   resolveApplicationIn = resolveApplicationWith id R.App resolvedCallSite;
   resolveApplicationWith leaf apply = resolveApplicationsWith leaf apply (\f a b -> apply (apply f a) b);
+  data ApplicationContext a = ApplicationDone |
+    ApplySite String SourceSpan (ApplicationContext a) |
+    ResolveArgument SExpr (ApplicationContext a) | ApplyArgument a (ApplicationContext a) |
+    ResolvePairLeft SExpr SExpr (ApplicationContext a) |
+    ResolvePairRight a SExpr (ApplicationContext a) | ApplyPair a a (ApplicationContext a);
   resolveApplicationsWith leaf apply applyPair site constructorNames child function argument = let {
     -- Pass the updated spelling tables to the next operand. A failing child
     -- returns immediately, before its enclosing call site or later operand.
-    term cache@((,) variables constructors) value finish = let {
-      ordinary = bindEither (child value) (\resolved -> finish (leaf resolved) cache);
+    term cache@((,) variables constructors) value context = let {
+      ordinary = bindEither (child value) (\resolved -> resume context (leaf resolved) cache);
       remember name table replace = case M.lookup compareString name table of {
-        Just resolved -> finish resolved cache;
+        Just resolved -> resume context resolved cache;
         Nothing -> do {
           result <- child value;
           let { resolved = leaf result; next = if M.size table < 64 then replace (M.insert compareString name resolved table) else cache };
-          finish resolved next
+          resume context resolved next
         }
       }
     } in case value of {
-      SApp f a -> both cache f a finish;
-      SCallSite display loc b -> term cache b (\body next -> finish (site display loc body) next);
+      SApp f a -> both cache f a context;
+      SCallSite display loc b -> term cache b (ApplySite display loc context);
       SVar n -> remember n variables (\names -> (,) names constructors);
       SConstructor n -> case constructors of {
         Just names -> remember n names (\next -> (,) variables (Just next));
@@ -1277,14 +1282,22 @@ module Bootstrap.Module where {
       };
       _ -> ordinary
     };
-    both cache f a finish = case f of {
-      SApp operator first -> term cache operator (\callee afterOperator ->
-        term afterOperator first (\left afterFirst -> term afterFirst a
-          (\right afterSecond -> finish (applyPair callee left right) afterSecond)));
-      _ -> term cache f (\left afterFunction ->
-        term afterFunction a (\right afterArgument -> finish (apply left right) afterArgument))
+    both cache f a context = case f of {
+      SApp operator left -> term cache operator (ResolvePairLeft left a context);
+      _ -> term cache f (ResolveArgument a context)
+    };
+    -- A frame holds the operands still needed in this scope. The same
+    -- resolver supplies the projection and child functions at every step.
+    resume context value cache = case context of {
+      ApplicationDone -> Right value;
+      ApplySite display loc outer -> resume outer (site display loc value) cache;
+      ResolveArgument a outer -> term cache a (ApplyArgument value outer);
+      ApplyArgument f outer -> resume outer (apply f value) cache;
+      ResolvePairLeft left right outer -> term cache left (ResolvePairRight value right outer);
+      ResolvePairRight f right outer -> term cache right (ApplyPair f value outer);
+      ApplyPair f left outer -> resume outer (applyPair f left value) cache
     }
-  } in both ((,) M.empty constructorNames) function argument (\body _ -> Right body);
+  } in both ((,) M.empty constructorNames) function argument ApplicationDone;
   resolvedCallSite = resolvedSiteWith R.CallSite;
   resolvedSiteWith wrap display loc value =
     if eqString display "an expression type signature" && not (managedResolved value)

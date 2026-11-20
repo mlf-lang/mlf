@@ -376,6 +376,18 @@ resolverChecks = do
       check "constructor lookup preserves a same-spelled local in an application"
         ["Tree.C","C","Tree.C"] (map H.unpack [first,variable,lastName])
     _ -> error "incorrect constructor or local resolution"
+  let project = Modules.resolveApplicationsWith id
+        (\a b -> 10:a++b) (\f a b -> 20:f++a++b) (\_ _ b -> 30:b) T.Nothing
+        (\t -> case t of T.SIntLit i -> T.Right [i]; _ -> T.Left "unknown leaf")
+      wrapped = T.SCallSite "kept" (error "unused location")
+  case project (T.SApp (T.SIntLit 1) (wrapped (T.SIntLit 2)))
+               (T.SApp (T.SIntLit 3) (T.SIntLit 4)) of
+    T.Right values -> check "application resolution honors custom unary, binary and site projections"
+      [20,1,30,2,10,3,4] values
+    T.Left why -> fail (H.unpack why)
+  case project (T.SApp (T.SIntLit 1) (T.SVar "absent")) (error "unused right operand") of
+    T.Left why -> check "binary resolution stops after its first argument fails" "unknown leaf" (H.unpack why)
+    T.Right _ -> fail "unknown left argument resolved"
   let reject _ = T.Left "unresolved operand"
       seed = T.Just (M.singleton "C" (R.Global (V.fromInt 17)))
       wrap = T.SCallSite "mark" (error "undemanded call-site span")
