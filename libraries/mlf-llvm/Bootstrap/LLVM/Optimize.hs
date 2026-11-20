@@ -412,23 +412,37 @@ module Bootstrap.LLVM.Optimize where {
   -- Each selected child is folded once. Keep an affine result in its checked
   -- Int representation until a different operation or the consumer needs a term.
   foldKnownConstructor rules tree = let {
-    visit current = case applications current of {
-      (,) (XEConstructor tag) args -> case M.lookup compareString tag rules of {
-        Just ((,) arity rule) -> if arity /= L.length args then Nothing else case rule of {
-          ReturnField index -> fmap ConstructorTerm (L.at index args);
-          CombineFields primitive first second -> do {
-            left <- L.at first args >>= visit;
-            right <- L.at second args >>= visit;
-            let { applied = ConstructorTerm (XEApp (XEApp (XEPrimitive primitive)
-                    (constructorTerm left)) (constructorTerm right)) };
-            Just (case primitive of {
-              PAddInt -> L.fromMaybe applied (addIntSummands ConstructorSum
-                (constructorSummand left) (constructorSummand right));
-              _ -> applied
-            })
-          }
+    apply tag count field = case M.lookup compareString tag rules of {
+      Just ((,) arity rule) -> if arity /= count then Nothing else case rule of {
+        ReturnField index -> fmap ConstructorTerm (field index);
+        CombineFields primitive first second -> do {
+          left <- field first >>= visit;
+          right <- field second >>= visit;
+          let { applied = ConstructorTerm (XEApp (XEApp (XEPrimitive primitive)
+                  (constructorTerm left)) (constructorTerm right)) };
+          Just (case primitive of {
+            PAddInt -> L.fromMaybe applied (addIntSummands ConstructorSum
+              (constructorSummand left) (constructorSummand right));
+            _ -> applied
+          })
+        }
+      };
+      Nothing -> Nothing
+    };
+    visit current = case current of {
+      XEConstructor tag -> apply tag 0 (\i -> L.at i []);
+      XEApp fn right -> case fn of {
+        XEConstructor tag -> apply tag 1 (\i -> if i == 0 then Just right else Nothing);
+        XEApp head left -> case head of {
+          XEConstructor tag -> apply tag 2 (\i -> if i == 0 then Just left
+            else if i == 1 then Just right else Nothing);
+          XEApp _ _ -> case collectApplications [left,right] head of {
+            (,) (XEConstructor tag) fields -> apply tag (L.length fields) (\i -> L.at i fields);
+            _ -> Nothing
+          };
+          _ -> Nothing
         };
-        Nothing -> Nothing
+        _ -> Nothing
       };
       _ -> Nothing
     }

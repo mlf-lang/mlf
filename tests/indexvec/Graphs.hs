@@ -941,6 +941,19 @@ knownConstructorFoldChecks = do
         T.Nothing -> pure ()
         _ -> fail "unspecified subtree collapsed"
     _ -> fail "missing recursive constructor fold"
+  let select count index values = Optimize.foldKnownConstructor
+        (M.singleton "Box" (count,Optimize.ReturnField index))
+        (foldl T.XEApp (T.XEConstructor "Box") values)
+  forM_ [0..4] $ \size -> do
+    let values = take size (map T.XEInt [10..])
+    forM_ [-1..size] $ \index -> case select (fromIntegral size) (fromIntegral index) values of
+      T.Just (T.XEInt value) -> check "constructor field index follows source order"
+        True (index >= 0 && index < size && value == fromIntegral (index+10))
+      T.Nothing -> check "out-of-range constructor field" True (index < 0 || index >= size)
+      _ -> fail "unexpected constructor field"
+    case select (fromIntegral size+1) (error "unused index") (replicate size (error "unused field")) of
+      T.Nothing -> pure ()
+      _ -> fail "wrong constructor arity accepted"
   let sumRules = M.fromList H.v_compareString
         [("Tip",(2,Optimize.ReturnField 1)),("Fork",(2,Optimize.CombineFields T.PAddInt 0 1))]
       affine coefficient amount = prim T.PAddInt [prim T.PMulInt [v 19,T.XEInt coefficient],T.XEInt amount]
