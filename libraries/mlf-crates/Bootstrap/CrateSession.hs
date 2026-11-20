@@ -254,7 +254,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
       protected = M.fromList compareString (concatMap (compose Artifact.crateProtection snd) interfaces) };
     compiled <- if Query.validSourceContextDigest compiler
       then case plan of {
-        Just source -> CrateGraph.compile verify (specIdentity spec) compiler directory imported protected source;
+        Just source -> CrateGraph.compileFile verify (specIdentity spec) compiler directory imported protected source;
         Nothing -> CrateGraph.compileLoweredIn (fileLowered prepared) verify (specIdentity spec) compiler directory imported
       }
       else ioReturn (Left "cannot fingerprint query graph compiler");

@@ -853,7 +853,9 @@ module Bootstrap.CrateGraph where {
   rawValueWith :: (W.Value -> String -> String -> Open.Fragment -> W.Value) -> [] ((,) String String) -> String -> Open.Fragment -> W.Value;
   rawValueWith encode references group fragment = encode
     (A.toList (A.toPair A.toText A.toText) references) "raw" group fragment;
-  compile verify crateId compilerHash cacheDir imports protected originalPlan =
+  compile = compileWithData Q.requiredDataIn;
+  compileFile = compileWithData Q.requiredFileDataIn;
+  compileWithData selectData verify crateId compilerHash cacheDir imports protected originalPlan =
     case do {
       (,) plan open <- Source.protectedQueryPlan originalPlan protected;
       inventory <- Q.prepareData (Source.planData plan);
@@ -863,7 +865,7 @@ module Bootstrap.CrateGraph where {
       Right ((,,,) plan inventory checked steps)
     } of {
       Left e -> ioReturn (Left e);
-      Right ((,,,) plan inventory checked steps) -> start verify crateId compilerHash cacheDir
+      Right ((,,,) plan inventory checked steps) -> startWithData selectData verify crateId compilerHash cacheDir
         "source" inventory (Source.planData plan) checked steps
     };
   -- The already-lowered fallback has no unsigned-root evidence finalization.
@@ -913,7 +915,8 @@ module Bootstrap.CrateGraph where {
   } of { Left e -> ioReturn (Left e); Right ((,,) inventory checked steps) ->
     start verify crateId compilerHash cacheDir "lowered" inventory datatypes checked steps
   };
-  start verify crateId compilerHash cacheDir flavor inventory datatypes contracts groups = do {
+  start = startWithData Q.requiredDataIn;
+  startWithData selectData verify crateId compilerHash cacheDir flavor inventory datatypes contracts groups = do {
         statistics <- G.profile;
         graphStarted <- G.clock statistics;
         auditSetting <- getEnv "MLF_QUERY_SEMANTIC_AUDIT";
@@ -922,12 +925,13 @@ module Bootstrap.CrateGraph where {
         case started of { Left e -> ioReturn (Left e); Right session -> do {
           let { initial = case contracts of { Source.CheckedContracts _ indexed _ -> indexed } };
           G.elapsed statistics 0 graphStarted;
-          runGroups verify (eqString auditSetting "1") crateId inventory initial ((,) Nothing Nothing) groups
+          runGroupsUsing selectData verify (eqString auditSetting "1") (Separate.compactOpenGroupName crateId) inventory initial ((,) Nothing Nothing) groups
             (State session contracts (InferenceCaches M.empty M.empty M.empty Nothing Nothing) [] 0 0 [] statistics)
         } }
     };
   runGroups verify audit crateId = runGroupsWithOwner verify audit (Separate.compactOpenGroupName crateId);
-  runGroupsWithOwner verify audit groupName inventory initial scopeHashes groups state = case groups of {
+  runGroupsWithOwner = runGroupsUsing Q.requiredDataIn;
+  runGroupsUsing selectData verify audit groupName inventory initial scopeHashes groups state = case groups of {
     [] -> ioReturn (Right state);
     (:) ((,) owners prepare) rest -> case state of {
       State session contracts (InferenceCaches contexts templates payloads contractHash preparedCache) objects inferred reused reports statistics ->
@@ -935,7 +939,7 @@ module Bootstrap.CrateGraph where {
         case bindEither (prepare contracts) (Source.slotPrepared contracts owners) of {
           Left e -> ioReturn (Left e);
           Right ((,) slots prepared) -> do {
-            let { declarations = Q.requiredDataIn inventory (Source.groupMembers prepared)
+            let { declarations = selectData inventory (Source.groupMembers prepared)
                     (append (Source.groupBindings prepared) (Source.groupCandidateBindings prepared));
               group = groupName names;
               rawKey = groupKey InferQuery slots };
@@ -1067,7 +1071,7 @@ module Bootstrap.CrateGraph where {
                                     evidenceReads delta reads afterInputs };
                                 case supplied of { Left e -> ioReturn (Left e); Right ((,) next nextContractHash) -> do {
                                     G.elapsed statistics 3 finishStarted;
-                                    runGroupsWithOwner verify audit groupName inventory initial ((,) inventoryHash scopeHash) rest
+                                    runGroupsUsing selectData verify audit groupName inventory initial ((,) inventoryHash scopeHash) rest
                                       (State next (Source.publishContracts contracts delta) (InferenceCaches currentContexts nextTemplates nextPayloads nextContractHash nextPreparedCache)
                                         ((:) ((,,) group final (map fst delta)) objects)
                                         (inferred + if hit then 0 else 1) (reused + if hit then 1 else 0)

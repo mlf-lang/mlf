@@ -307,6 +307,18 @@ datatypeChecks = do
       check "shared component selected once, in lexical order" ["A","B","Z"]
         (names (CQ.requiredDataIn inventory [] [("x",T.XCon "Z" []),("y",T.XCon "B" [])]))
       check "unrelated datatype roots" [] (names (CQ.requiredDataIn inventory [] [("x",T.XCon "External" [])]))
+      let select expr schemes = names (CQ.requiredFileDataIn inventory [("value",T.Nothing,expr)] schemes)
+          a = T.SAnnotation [] (T.SCon "Unused" [])
+          leaf = T.SConstructor "MkA"
+          alt = T.SAlternative (T.SNestedPattern "MkZ" [T.SConstructorPattern "MkB" []]) leaf
+      check "file datatype roots include annotated binders and nested constructor patterns"
+        ["A","B","Unused","Z"] (select (T.SLam "x" (T.Just a) (T.SCase (T.SVar "x") [alt])) [])
+      check "repeated application constructors select each reachable layout once"
+        ["A","B"] (select (T.SApp leaf (T.SApp (T.SConstructor "MkB") leaf)) [("p",T.XCon "External" [])])
+      check "indexed wanted evidence selects its dictionary datatype"
+        ["A","B","Unused"] (select (T.SWantedRefs "Unused" []) [("p",T.XCon "B" [])])
+      check "ordinary term names cannot introduce file datatype roots"
+        [] (select (T.SApp (T.SVar "MkZ") (T.SVar "Unused")) [])
 
 -- Inspect the resolver's actual numeric edges before any graph is built.
 -- Two aliases reach one declaration, an identically spelled import reaches

@@ -722,27 +722,58 @@ module Bootstrap.CrateQuery where {
       XForall _ a b -> append (xTypeNames a) (xTypeNames b);
       _ -> []
     };
-  requiredDataIn (TypeInventory graph constructors closures) members schemes =
-    let {
-      observations = map Dependency.observeDeclaration members
-    } in
-    let {
-      direct = concatMap Dependency.typeNames observations
-    } in
-    let {
-      owners =
-        catMaybes
-          (map (\n -> M.lookup compareString n constructors)
-             (concatMap Dependency.constructorNames observations))
-    } in
-    let {
-      roots = append direct (append owners (concatMap (\((,) _ ty) -> xTypeNames ty) schemes))
-    } in
-    let {
-      ids = mapMaybe (Dependency.graphId graph) roots;
-      needed = IS.unions (map (V.at closures) ids);
-      nodes = Dependency.graphNodes graph
-    } in map (\i -> V.at nodes (V.fromInt i)) (IS.toAscList needed);
+  -- File members have already been resolved. Only types and constructor owners
+  -- can reach datatype layouts. Keep one copy of each spelling as we traverse
+  -- application spines, and use the ordinary observation for other scoped forms.
+  fileMemberDataRoots members = let {
+    remember seen name = if S.member compareString name seen then seen else S.insert compareString name seen;
+    include seen observed = foldlStrict remember seen (Dependency.typeNames observed);
+    collect ((,) knownTypes knownConstructors) ((,,) _ annotation body) = let {
+      visit expression pending types constructors = let {
+        next ts cs = case pending of {
+          [] -> (,) ts cs;
+          (:) item more -> visit item more ts cs
+        };
+        annotated observation inner = let { ts = include types observation } in
+          seq ts (visit inner pending ts constructors)
+      } in case expression of {
+        SApp f a -> visit f ((:) a pending) types constructors;
+        SCallSite _ _ inner -> visit inner pending types constructors;
+        SSourceDefinition inner -> visit inner pending types constructors;
+        SDeclScope _ inner -> visit inner pending types constructors;
+        SLam _ a inner -> annotated (Dependency.observeOptional a) inner;
+        SAnn inner a -> annotated (Dependency.observeAnnotation a) inner;
+        SSignature inner a -> annotated (Dependency.observeAnnotation a) inner;
+        SChecked ty inner -> annotated (Dependency.observeType ty) inner;
+        SLet _ rhs inner -> visit rhs ((:) inner pending) types constructors;
+        SConstructor name -> let { cs = remember constructors name } in seq cs (next types cs);
+        SVar _ -> next types constructors; SGlobal _ _ -> next types constructors;
+        SPrimitive _ -> next types constructors; SIntLit _ -> next types constructors;
+        SBoolLit _ -> next types constructors; SStringLit _ -> next types constructors;
+        SDoubleLit _ -> next types constructors;
+        _ -> let { observed = Dependency.observeExpression expression; ts = include types observed;
+          cs = foldlStrict remember constructors (Dependency.constructorNames observed)
+        } in seq ts (seq cs (next ts cs))
+      };
+      initial = include knownTypes (Dependency.observeOptional annotation)
+    } in seq initial (visit body [] initial knownConstructors)
+  } in case foldlStrict collect ((,) S.empty S.empty) members of {
+    (,) types constructors -> (,) (S.toList types) (S.toList constructors)
+  };
+  requiredDataIn inventory members schemes = let {
+    observations = map Dependency.observeDeclaration members
+  } in selectDataRoots inventory (concatMap Dependency.typeNames observations)
+    (concatMap Dependency.constructorNames observations) schemes;
+  requiredFileDataIn inventory members schemes = case fileMemberDataRoots members of {
+    (,) types constructors -> selectDataRoots inventory types constructors schemes
+  };
+  selectDataRoots (TypeInventory graph owners closures) types constructors schemes = let {
+    fromConstructors = mapMaybe (\name -> M.lookup compareString name owners) constructors;
+    roots = append types (append fromConstructors (concatMap (\((,) _ ty) -> xTypeNames ty) schemes));
+    ids = mapMaybe (Dependency.graphId graph) roots;
+    needed = IS.unions (map (V.at closures) ids);
+    nodes = Dependency.graphNodes graph
+  } in map (\i -> V.at nodes (V.fromInt i)) (IS.toAscList needed);
   requiredData :: [] DataDecl ->
                   [] ((,,) String (Maybe SAnnotation) SExpr) ->
                   [] ((,) String XType) -> Either String ([] DataDecl);
