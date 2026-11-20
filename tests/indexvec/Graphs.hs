@@ -1699,6 +1699,26 @@ applicationPatternChecks = do
     expected <- encoded (W.encode limits 8 names)
     actual <- encoded (W.encodeAtoms Structure.termAtomShapes limits 8 names)
     check "named constructor atoms preserve bytes and resource diagnostics" expected actual
+  let groundBinder n = T.XTyVar n
+      bottom n body = T.XForall (groundBinder n) T.XBot body
+      groundInt = Inference.GroundCon "Int" []
+      groundBool = Inference.GroundCon "Bool" []
+      arguments = zip (map groundBinder [0,1,2]) [groundInt,groundBool,Inference.GroundArrow groundInt groundBool]
+      evidenceState = Inference.GroundState 0 IntMap.empty IntMap.empty 5
+      groundResult result = case result of
+        T.Left msg -> pure (Left (H.unpack msg))
+        T.Right proof -> encoded (W.encode W.defaultLimits 8 [Structure.toXComputation proof])
+      ret = T.XArrow (T.XVar (groundBinder 0)) (T.XVar (groundBinder 2))
+      sets = [arguments,take 2 arguments,arguments++[(groundBinder 1,groundInt)],
+              reverse arguments,[(groundBinder 0, Inference.GroundVar 34)]]
+  forM_ [bottom 0 (bottom 1 (bottom 2 ret)),
+         bottom 0 (T.XForall (groundBinder 1) (T.XVar (groundBinder 0)) (bottom 2 ret)),
+         bottom 0 (bottom 1 (bottom 1 ret))] $ \scheme -> do
+    let Inference.GroundEvidence cached = Inference.prepareGroundEvidence scheme
+    forM_ sets $ \inventory -> do
+      expected <- groundResult (Inference.groundEvidence evidenceState scheme inventory)
+      actual <- groundResult (cached evidenceState inventory)
+      check "ground binding preserves evidence bytes, shadowing and dependent bounds" expected actual
   let applyArg label = T.XThen (T.XInner (T.XBottom (T.XCon label []))) T.XElim
       balanced [p] = p
       balanced ps = let (a,b) = splitAt (length ps `div` 2) ps in T.XThen (balanced a) (balanced b)

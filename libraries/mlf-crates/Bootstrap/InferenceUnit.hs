@@ -615,7 +615,9 @@ module Bootstrap.InferenceUnit where {
   -- A unary scheme can pass its fresh type argument straight from an operand
   -- to the result. The wrapper, if present, must contain exactly that variable.
   data GroundParameter = GroundBare | GroundWrapped String;
+  data GroundEvidence = GroundEvidence (GroundState -> [] ((,) XTyVar GroundType) -> Either String XComputation);
   data GroundBinding = GroundLocal XName GroundType | GroundImport XName XType |
+    GroundQuantifiedImport XName XType GroundEvidence |
     GroundUnaryImport XName XType XTyVar GroundParameter GroundParameter;
   groundImport name scheme = let {
     general = GroundImport name scheme;
@@ -629,6 +631,7 @@ module Bootstrap.InferenceUnit where {
       (,) (Just input) (Just output) -> GroundUnaryImport name scheme variable input output;
       _ -> general
     };
+    XForall _ XBot (XForall _ _ _) -> GroundQuantifiedImport name scheme (prepareGroundEvidence scheme);
     _ -> general
   };
   groundParameter shape value = case shape of {
@@ -643,6 +646,7 @@ module Bootstrap.InferenceUnit where {
     }
   };
   data GroundTerm = GroundLiteral XTerm | GroundVariable XName XType ([] ((,) XTyVar GroundType)) |
+    GroundQuantifiedUse XName GroundEvidence ([] ((,) XTyVar GroundType)) |
     GroundPrimitive Primitive ([] GroundType) | GroundLambda XName GroundType GroundTerm |
     GroundApplication GroundTerm GroundTerm;
   groundFresh (GroundState next known ranks serial) =
@@ -746,6 +750,40 @@ module Bootstrap.InferenceUnit where {
     (,) _ [] -> Right XRefl;
     _ -> Left "ground quantifier inventory changed"
   };
+  -- The prefix of an imported scheme belongs to the binding. A closed
+  -- argument cannot capture or rename any of its later binders. Substitute
+  -- a closed non-bottom constructor once per prefix to expose the same
+  -- quantifiers and bottom bounds, including the original free-variable
+  -- checks. A dependent bound still needs the actual substitutions.
+  prepareGroundEvidence :: XType -> GroundEvidence;
+  prepareGroundEvidence scheme = let {
+    specialize argument source = case source of {
+      XForall v _ body -> T.substitute v argument body;
+      _ -> source
+    };
+    prepare shape = case shape of {
+      XForall v bound body -> let {
+        next = prepare (T.substitute v (XCon "" []) body)
+      } in \source state arguments -> case arguments of {
+        [] -> Right XRefl;
+        (:) ((,) expected variable) rest -> do {
+          ensure (T.tyVarId v == T.tyVarId expected) "ground quantifier identity changed";
+          argument <- groundClosed state variable;
+          let { ordinary = groundEvidence state source arguments;
+                first = XThen (XInner (XBottom argument)) XElim };
+          case bound of {
+            XBot -> case body of {
+              XForall _ _ _ -> mapEither (X.compose first) (next (specialize argument source) state rest);
+              XArrow _ _ -> case rest of { [] -> Right first; _ -> ordinary };
+              _ -> ordinary
+            };
+            _ -> ordinary
+          }
+        }
+      };
+      _ -> \source state arguments -> groundEvidence state source arguments
+    }
+  } in GroundEvidence (prepare scheme scheme);
   groundClosedProof :: XType -> XType -> Either String XComputation;
   groundClosedProof source target = if T.alphaEq source target then Right XRefl else case source of {
     XBot -> Right (XBottom target);
@@ -761,6 +799,7 @@ module Bootstrap.InferenceUnit where {
     GroundLiteral value -> Right value;
     GroundVariable name scheme arguments -> mapEither (X.instantiate (XVarTerm name))
       (groundEvidence state scheme arguments);
+    GroundQuantifiedUse name (GroundEvidence evidence) arguments -> mapEither (X.instantiate (XVarTerm name)) (evidence state arguments);
     GroundPrimitive primitive arguments -> mapEither (XPrimitive primitive) (traverseEither (groundClosed state) arguments);
     GroundLambda name ty body -> do { actual <- groundClosed state ty; value <- groundSeal state body; Right (XAbs name actual value) };
     GroundApplication f a -> do { x <- groundSeal state f; y <- groundSeal state a; Right (XApp x y) }
@@ -769,6 +808,10 @@ module Bootstrap.InferenceUnit where {
     Nothing -> Left "unknown ground variable";
     Just (GroundLocal name ty) -> Right ((,,) (GroundLiteral (XVarTerm name)) ty state);
     Just (GroundUnaryImport name ty _ _ _) -> groundUse state (Just (GroundImport name ty));
+    Just (GroundQuantifiedImport name ty evidence) -> do {
+      (,,) actual arguments next <- groundScheme M.empty [] state ty;
+      Right ((,,) (GroundQuantifiedUse name evidence arguments) actual next)
+    };
     Just (GroundImport name ty) -> do {
       (,,) actual arguments next <- groundScheme M.empty [] state ty;
       Right ((,,) (GroundVariable name ty arguments) actual next)
