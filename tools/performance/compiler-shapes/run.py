@@ -8,7 +8,7 @@ import random
 import shutil
 import subprocess
 import sys
-import types
+import command_runner
 import generate as G
 import query_cache as Q
 import worker
@@ -86,8 +86,7 @@ def main():
     if args.cohort_output_gib <= 0:
         parser.error('--cohort-output-gib must be positive')
     out=args.output.resolve(); out.mkdir(parents=True,exist_ok=False)
-    hp=ROOT/'tools/performance/a1-private-index/helper.py'
-    H=types.ModuleType('unchanged_resource_helper');H.__file__=str(hp);exec(compile(hp.read_bytes(),str(hp),'exec'),H.__dict__)
+    H=command_runner.load_helper()
     setup=H.load(args.setup.resolve()); H.require(setup['complete'],'qualified fixed dependencies')
     H.require(setup.get('endpoint')==args.endpoint,'setup belongs to endpoint profile '+str(setup.get('endpoint'))
               +', not '+args.endpoint)
@@ -106,7 +105,7 @@ def main():
             schedule.append({'case':case['id'],'position':position,'lane':lane})
     if args.interleave_pairs:
         schedule=interleave_pairs(schedule,repeats,rng)
-    inputs={str(p.resolve()):H.sha(p) for p in [args.setup,hp,HERE/'run.py',HERE/'worker.py',HERE/'generate.py',
+    inputs={str(p.resolve()):H.sha(p) for p in [args.setup,Path(H.__file__),HERE/'command_runner.py',HERE/'bench.py',HERE/'run.py',HERE/'worker.py',HERE/'generate.py',
         HERE/'matrix.json',HERE/'query_cache.py',Q.SHARED/'artifact_binary_reference.py',
         Q.SHARED/'test_query_index.py',Q.SHARED/'artifact_binary_open.py',
         Path(setup['producer'])/'receipt.json',Path(setup['producer'])/'bin/emlf',

@@ -844,7 +844,7 @@ class GraphReaderPinTests(unittest.TestCase):
                       any(isinstance(target, ast.Name) and target.id == 'inputs'
                           for target in node.targets))
         pinned = [node.value for node in ast.walk(inputs) if isinstance(node, ast.Constant)]
-        for name in ['test_query_index.py', 'artifact_binary_open.py']:
+        for name in ['test_query_index.py', 'artifact_binary_open.py', 'command_runner.py', 'bench.py']:
             self.assertIn(name, pinned)
 
 

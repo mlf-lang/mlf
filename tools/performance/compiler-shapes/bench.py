@@ -24,6 +24,8 @@ import json
 import subprocess
 import sys
 
+import command_runner
+
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 
@@ -32,11 +34,15 @@ def registry():
     return json.loads((HERE / 'matrix.json').read_text())
 
 
-def run(argv):
-    print('+ ' + ' '.join(str(value) for value in argv), flush=True)
-    result = subprocess.run([str(value) for value in argv], cwd=ROOT)
-    if result.returncode:
-        raise SystemExit(result.returncode)
+def run(argv, *, recorder=False):
+    argv = [str(value) for value in argv]
+    print('+ ' + ' '.join(argv), flush=True)
+    if recorder:
+        status = command_runner.run_recorder(argv, ROOT)
+    else:
+        status = subprocess.run(argv, cwd=ROOT).returncode
+    if status:
+        raise SystemExit(status)
 
 
 def measured_endpoint(name):
@@ -116,7 +122,7 @@ def command_prepare(args):
     if args.clang:
         argv += ['--clang', args.clang]
     measured_endpoint(args.endpoint)
-    run(argv)
+    run(argv, recorder=True)
     return setup / 'setup.json'
 
 
@@ -145,7 +151,7 @@ def command_run(args, setup=None):
         argv += ['--family', family]
     for size in sizes:
         argv += ['--size', str(size)]
-    run(argv)
+    run(argv, recorder=True)
     return output
 
 
