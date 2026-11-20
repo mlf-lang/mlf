@@ -7,7 +7,7 @@ module Bootstrap.Resolved
         Lam, App, Let, Ann, Signature, Case, Equations, LetRec, SourceDefinition, CallSite, SharedBind),
    Pattern(..), Class(..), Instance(..), references, exprRefs, patternRefs,
    namedExpr, indexedExpr, projectExpr, namedPattern, indexedPattern, projectPattern,
-   namedClass, namedInstance, fileLeaf, fileApplication, fileCallSite) where {
+   namedClass, namedInstance, fileLeaf, fileApplication, fileApplicationPair, fileCallSite) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
@@ -47,6 +47,17 @@ module Bootstrap.Resolved
   fileApplication f a = case f of {
     SlotFree left -> case a of { SlotFree right -> SlotFree (SApp left right); _ -> App f a };
     _ -> App f a
+  };
+  -- A saturated binary application needs just the outer closed projection.
+  -- Preserve the inner App when either of its operands carries a declaration.
+  fileApplicationPair f a b = case f of {
+    SlotFree operator -> case a of {
+      SlotFree first -> let { partial = SApp operator first } in case b of {
+        SlotFree second -> SlotFree (SApp partial second); _ -> App (SlotFree partial) b
+      };
+      _ -> App (App f a) b
+    };
+    _ -> App (App f a) b
   };
   fileCallSite name span value = case value of {
     SlotFree body -> SlotFree (SCallSite name span body); _ -> CallSite name span value

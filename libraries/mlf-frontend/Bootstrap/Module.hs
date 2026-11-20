@@ -1221,7 +1221,7 @@ module Bootstrap.Module where {
   };
   resolveExpr = resolveExprUsing resolveBound;
   resolveFileExpr = resolveExprUsing (resolveBoundUsing
-    (resolveApplicationWith R.fileLeaf R.fileApplication (resolvedSiteWith R.fileCallSite) (Just M.empty)));
+    (resolveApplicationsWith R.fileLeaf R.fileApplication R.fileApplicationPair (resolvedSiteWith R.fileCallSite) (Just M.empty)));
   resolveExprUsing resolve bindings env expression = resolve bindings env Set.empty
     (if Surface.surfaceCore expression then expression else Desugar.desugarDo expression);
   entryExpr crate entry = let { source = resolvedSource entry } in
@@ -1253,7 +1253,8 @@ module Bootstrap.Module where {
   -- Keep their namespaces separate, and start fresh under every binder.
   resolveApplication = resolveApplicationIn Nothing;
   resolveApplicationIn = resolveApplicationWith id R.App resolvedCallSite;
-  resolveApplicationWith leaf apply site constructorNames child function argument = let {
+  resolveApplicationWith leaf apply = resolveApplicationsWith leaf apply (\f a b -> apply (apply f a) b);
+  resolveApplicationsWith leaf apply applyPair site constructorNames child function argument = let {
     -- Pass the updated spelling tables to the next operand. A failing child
     -- returns immediately, before its enclosing call site or later operand.
     term cache@((,) variables constructors) value finish = let {
@@ -1276,8 +1277,13 @@ module Bootstrap.Module where {
       };
       _ -> ordinary
     };
-    both cache f a finish = term cache f (\left afterFunction ->
-      term afterFunction a (\right afterArgument -> finish (apply left right) afterArgument))
+    both cache f a finish = case f of {
+      SApp operator first -> term cache operator (\callee afterOperator ->
+        term afterOperator first (\left afterFirst -> term afterFirst a
+          (\right afterSecond -> finish (applyPair callee left right) afterSecond)));
+      _ -> term cache f (\left afterFunction ->
+        term afterFunction a (\right afterArgument -> finish (apply left right) afterArgument))
+    }
   } in both ((,) M.empty constructorNames) function argument (\body _ -> Right body);
   resolvedCallSite = resolvedSiteWith R.CallSite;
   resolvedSiteWith wrap display loc value =

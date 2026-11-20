@@ -602,6 +602,14 @@ resolverChecks = do
     check "file application projections preserve declaration IDs, display policies and complete call sites"
       [expressions (Modules.resolvedCrateBindings resolution) c | (_,_,c) <- fullRows]
       [expressions table c | (_,_,c) <- units]
+    let operands = [R.fileLeaf (R.Local "x"), R.fileLeaf (R.IntLit 5), R.Global (V.fromInt 8),
+                    R.Lam "x" T.Nothing (R.Global (V.fromInt 13))]
+        display i = H.literal ("slot " ++ show (V.toInt i))
+        observe rhs = (map V.toInt (R.references rhs), H.unpack (CQ.encodeExpression (R.namedExpr display rhs)),
+                       H.unpack (CQ.encodeExpression (R.indexedExpr display rhs)))
+        triples apply = [observe (apply f a b) | f <- operands, a <- operands, b <- operands]
+    check "saturated file applications preserve partial applications and reference order"
+      (triples (\f a b -> R.fileApplication (R.fileApplication f a) b)) (triples R.fileApplicationPair)
     check "file compilation preserves entry ownership and transitive imports"
       (H.unpack (Crate.preparedEntry full),reachable (Crate.preparedReach full))
       (H.unpack (Crate.entryName entryId),reachable reach)
