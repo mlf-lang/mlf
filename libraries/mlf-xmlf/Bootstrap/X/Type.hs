@@ -15,29 +15,28 @@ module Bootstrap.X.Type where {
     if (tyVarId a < tyVarId b) then (0 - 1) else if (tyVarId a == tyVarId b) then 0 else 1;
   equalTyVar a b = (tyVarId a == tyVarId b);
   freeVars :: XType -> Set XTyVar;
-  freeVars ty =
-    case ty of {
-      XVar a -> S.singleton a;
-      XBot -> S.empty;
-      XBotKind _ -> S.empty;
-      XArrow a b -> S.union compareTyVar (freeVars a) (freeVars b);
-      XCon _ ts -> L.foldr (S.union compareTyVar) S.empty (L.map freeVars ts);
-      XApply f a -> S.union compareTyVar (freeVars f) (freeVars a);
-      XForall a bound body ->
-        S.union compareTyVar (freeVars bound) (S.delete compareTyVar a (freeVars body))
-    };
+  freeVars = typeVariableSet (\variable bound body ->
+    unionVariables bound (seq body (M.delete compareTyVar variable body)));
   allVars :: XType -> Set XTyVar;
-  allVars ty =
-    case ty of {
-      XVar a -> S.singleton a;
-      XBot -> S.empty;
-      XBotKind _ -> S.empty;
-      XArrow a b -> S.union compareTyVar (allVars a) (allVars b);
-      XCon _ ts -> L.foldr (S.union compareTyVar) S.empty (L.map allVars ts);
-      XApply f a -> S.union compareTyVar (allVars f) (allVars a);
-      XForall a bound body ->
-        S.insert compareTyVar a (S.union compareTyVar (allVars bound) (allVars body))
-    };
+  allVars = typeVariableSet (\variable bound body ->
+    let { both = unionVariables bound body } in seq both (M.insert compareTyVar variable () both));
+  -- Set union evaluates the left inventory before the right one. Preserve
+  -- that order on partially defined types and delayed constructor arguments.
+  unionVariables left right = seq left (seq right (M.union compareTyVar left right));
+  -- Both inventories use the same ordered tree. Keep the binder operation
+  -- explicit and wrap the finished tree once, at the public set boundary.
+  typeVariableSet :: (XTyVar -> Map XTyVar () -> Map XTyVar () -> Map XTyVar ()) -> XType -> Set XTyVar;
+  typeVariableSet quantify ty = let {
+    variables term = case term of {
+      XVar a -> M.singleton a ();
+      XBot -> M.empty;
+      XBotKind _ -> M.empty;
+      XArrow a b -> unionVariables (variables a) (variables b);
+      XCon _ arguments -> L.foldr (\argument rest -> unionVariables (variables argument) rest) M.empty arguments;
+      XApply f a -> unionVariables (variables f) (variables a);
+      XForall a bound body -> quantify a (variables bound) (variables body)
+    }
+  } in S.wrap (variables ty);
   freshNegative :: Set XTyVar -> Int -> XTyVar;
   freshNegative used i =
     if S.member compareTyVar (XTyVar i) used then freshNegative used (L.advanceIdentity i (-1)) else XTyVar i;

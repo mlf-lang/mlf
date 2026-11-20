@@ -1373,6 +1373,13 @@ lexicalRunChecks = do
     T.Left why -> check "kind resolution reports the first free variable in signed identity order"
       "cyclic type environment" (H.unpack why)
     _ -> fail "cyclic free-variable bound admitted"
+  let variable n = T.XVar (T.XTyVar n)
+      boundInventory = T.XForall (T.XTyVar 5) (variable 5)
+        (T.XForall (T.XTyVar (-2)) (variable 3) (T.XArrow (variable (-2)) (variable 5)))
+  check "free type variables include a quantifier's own free bound" [3,5]
+    (map XT.tyVarId (S.toList (XT.freeVars boundInventory)))
+  check "all type variables include negative binders" [-2,3,5]
+    (map XT.tyVarId (S.toList (XT.allVars boundInventory)))
   let ctorEnv = Classes.QualifiedEnv M.empty (const T.Nothing)
       ctor name = T.SConstructor name
       here = T.SourceSpan "P" "M" "file.hs" 1 1 1 2
