@@ -306,7 +306,8 @@ module Bootstrap.Bitstream (
   };
   data PlanState = PlanState SymbolState NodeState Int;
   data Tables = Tables ([] Symbol) ([] Entry) ([] Int) Int Int Int Int;
-  data EncodeTask = EncodeValues Int ([] Value) | EncodeOne Int Value | EncodeClose Int Int | EncodeRemember Int ([] Value);
+  data EncodeTask = EncodeValues Int ([] Value) | EncodeOne Int Value | EncodeClose Int Int | EncodeRemember Int ([] Value) |
+    EncodeRight Int Int Value | EncodePair Int Int;
   charge :: Limits -> Int -> PlanState -> Either String PlanState;
   charge limits amount (PlanState symbols nodes work) =
     if amount < 0 || amount > maxExpandedWork limits - work
@@ -364,7 +365,7 @@ module Bootstrap.Bitstream (
     else case intern compareString text names of {
       Found ((,) bytes nodeId) -> do {
         next <- charge limits bytes (PlanState (Symbols names symbols count total) nodes work);
-        planTasks limits tasks ((:) nodeId stack) next
+        planId limits tasks stack nodeId next
       };
       Inserted following -> do {
         ensure (count < maxSymbols limits) "binary symbol count limit exceeded";
@@ -381,7 +382,7 @@ module Bootstrap.Bitstream (
         let { nextNodeCount = nodeCount + 1;
           nextNodes = pushNode keys (EText count) entries nextNodeCount edges saved pages };
         case charged of { PlanState _ _ nextWork ->
-          seq nextNodeCount (planTasks limits tasks ((:) nodeCount stack)
+          seq nextNodeCount (planId limits tasks stack nodeCount
             (PlanState nextSymbols nextNodes nextWork)) }
       }
     };
@@ -391,7 +392,7 @@ module Bootstrap.Bitstream (
     Either String ((,) ([] Int) PlanState);
   planEntry limits tasks stack entry state@(PlanState symbols (Nodes keys entries count edges saved pages) work) =
     case internPlanned entry keys count entries pages of {
-      ExistingNode index -> planTasks limits tasks ((:) index stack) state;
+      ExistingNode index -> planId limits tasks stack index state;
       MissingNode following -> do {
         ensure (count < maxNodes limits) "binary node count limit exceeded";
         let { arity = entryEdges entry };
@@ -401,7 +402,7 @@ module Bootstrap.Bitstream (
           nextEdges = edges + arity;
           nextNodes = pushNode (following count) entry entries nextCount nextEdges saved pages
         };
-        seq nextCount (seq nextEdges (planTasks limits tasks ((:) count stack)
+        seq nextCount (seq nextEdges (planId limits tasks stack count
           (PlanState symbols nextNodes work)))
       }
     };
@@ -549,7 +550,7 @@ module Bootstrap.Bitstream (
         remember = ordinary ((:) (EncodeRemember tag children) rest);
         reuse amount index = do {
           next <- charge limits amount state;
-          planTasks limits rest ((:) index stack) next
+          planId limits rest stack index next
         };
         usePrimitive first second = case primitive of {
           Nothing -> remember;
@@ -617,7 +618,13 @@ module Bootstrap.Bitstream (
   planTasks :: Limits -> [] EncodeTask -> [] Int -> PlanState -> Either String ((,) ([] Int) PlanState);
   planTasks limits tasks stack state = case tasks of {
     [] -> Right ((,) stack state);
-    (:) task rest -> case task of {
+    (:) task rest -> let {
+      -- An atom remembered by the ordinary scheduler leaves its ID on the stack.
+      resume = case stack of {
+        (:) index remaining -> planId limits tasks remaining index state;
+        [] -> Left "binary encoder internal reference stack underflow"
+      }
+    } in case task of {
       EncodeRemember tag children -> case (,) stack state of {
         (,) ((:) index _) (PlanState symbols (Nodes keys entries count edges saved pages) work) -> let {
           atoms = rememberAtom tag children index saved
@@ -643,33 +650,46 @@ module Bootstrap.Bitstream (
           (,) children remaining -> planEntry limits rest remaining (ENode tag children) state
         }
       };
-      EncodeOne depth value -> do {
-        ensure (depth <= maxDepth limits) "binary graph depth limit exceeded";
-        charged <- charge limits 1 state;
-        case value of {
-          VNode tag children -> do {
-            ensure (tag >= 0 && tag <= 2147483647) "binary constructor tag out of range";
-            let { childrenWith following = let {
-              cap = min (maxEdges limits) (maxExpandedWork limits - 1);
-              walk arity = planTasks limits ((:) (EncodeValues (depth + 1) children)
-                ((:) (EncodeClose tag arity) following)) stack charged;
-              child = EncodeOne (depth + 1)
-            } in if cap < 2 then do { arity <- boundedLength cap children; walk arity }
-              else case children of {
-                [] -> planEntry limits following stack (ENode tag []) charged;
-                [a] -> planTasks limits ((:) (child a) ((:) (EncodeClose tag 1) following)) stack charged;
-                [a,b] -> planTasks limits ((:) (child a) ((:) (child b)
-                  ((:) (EncodeClose tag 2) following))) stack charged;
-                (:) _ ((:) _ ((:) _ more)) -> if cap == 2 then Left "binary list count limit exceeded"
-                  else do { arity <- boundedLengthAt cap 3 more; walk arity }
-              }
-            } in tryAtom limits depth tag children stack rest charged childrenWith
-          };
-          VText text -> planText limits rest stack text charged;
-          VInt valueInt -> planEntry limits rest stack (EInt valueInt) charged;
-          VBits bits -> planEntry limits rest stack (EBits bits) charged
-        }
-      }
+      EncodeOne depth value -> planOne limits depth value rest stack state;
+      EncodeRight _ _ _ -> resume;
+      EncodePair _ _ -> resume
+    }
+  };
+  -- For a binary node, the admitted left ID travels with its pending close.
+  -- Each child still enters the depth, work and atom checks in source order.
+  planId :: Limits -> [] EncodeTask -> [] Int -> Int -> PlanState -> Either String ((,) ([] Int) PlanState);
+  planId limits tasks stack index state = case tasks of {
+    (:) (EncodeRight depth tag right) rest ->
+      planOne limits depth right ((:) (EncodePair tag index) rest) stack state;
+    (:) (EncodePair tag left) rest -> planEntry limits rest stack (ENode tag [left,index]) state;
+    (:) (EncodeClose tag 1) rest -> planEntry limits rest stack (ENode tag [index]) state;
+    _ -> planTasks limits tasks ((:) index stack) state
+  };
+  planOne :: Limits -> Int -> Value -> [] EncodeTask -> [] Int -> PlanState -> Either String ((,) ([] Int) PlanState);
+  planOne limits depth value rest stack state = do {
+    ensure (depth <= maxDepth limits) "binary graph depth limit exceeded";
+    charged <- charge limits 1 state;
+    case value of {
+      VNode tag children -> do {
+        ensure (tag >= 0 && tag <= 2147483647) "binary constructor tag out of range";
+        let { childrenWith following = let {
+          cap = min (maxEdges limits) (maxExpandedWork limits - 1);
+          walk arity = planTasks limits ((:) (EncodeValues (depth + 1) children)
+            ((:) (EncodeClose tag arity) following)) stack charged
+        } in if cap < 2 then do { arity <- boundedLength cap children; walk arity }
+          else case children of {
+            [] -> planEntry limits following stack (ENode tag []) charged;
+            [a] -> planOne limits (depth + 1) a ((:) (EncodeClose tag 1) following) stack charged;
+            [a,b] -> planOne limits (depth + 1) a
+              ((:) (EncodeRight (depth + 1) tag b) following) stack charged;
+            (:) _ ((:) _ ((:) _ more)) -> if cap == 2 then Left "binary list count limit exceeded"
+              else do { arity <- boundedLengthAt cap 3 more; walk arity }
+          }
+        } in tryAtom limits depth tag children stack rest charged childrenWith
+      };
+      VText text -> planText limits rest stack text charged;
+      VInt valueInt -> planEntry limits rest stack (EInt valueInt) charged;
+      VBits bits -> planEntry limits rest stack (EBits bits) charged
     }
   };
 

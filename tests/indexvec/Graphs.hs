@@ -1714,6 +1714,38 @@ applicationPatternChecks = do
     expected <- encoded (W.encode limits 8 names)
     actual <- encoded (W.encodeAtoms Structure.termAtomShapes limits 8 names)
     check "named constructor atoms preserve bytes and resource diagnostics" expected actual
+  let emptyChild = W.VNode 1 []
+      unaryChild = W.VNode 11 [W.VInt 4]
+      atomChild = W.VNode 82 [W.VText "A",emptyChild]
+      branchChild = W.VNode 72 [atomChild,unaryChild]
+      testRoots = [W.VNode 13 [branchChild,unaryChild,emptyChild,atomChild,branchChild],branchChild,emptyChild]
+      expectedTables = W.Tables [W.Symbol "A" 1]
+        [W.EText 0,W.ENode 1 [],W.ENode 82 [0,1],W.EInt 4,W.ENode 11 [3],
+         W.ENode 72 [2,4],W.ENode 13 [5,4,1,2,5]] [6,5,1] 1 7 3 10
+  expectedLayout <- case W.layout W.defaultLimits expectedTables of
+    T.Left why -> fail (H.unpack why)
+    T.Right layout -> pure layout
+  expectedWire <- encoded (W.encodeTables 8 expectedLayout expectedTables)
+  case expectedWire of
+    Left why -> fail why
+    Right _ -> pure ()
+  forM_ [W.encode W.defaultLimits 8 testRoots,
+         W.encodeRootsWithAtoms Structure.termAtomShapes W.defaultLimits 30 8 testRoots] $ \action -> do
+    bytes <- encoded action
+    check "binary children retain left-to-right IDs across unary, wide and repeated atom parents"
+      expectedWire bytes
+  tooSmall <- encoded (W.encodeRootsWithAtoms Structure.termAtomShapes W.defaultLimits 29 8 testRoots)
+  check "repeated atoms and root references consume exact expanded work"
+    (Left "binary expanded-work limit exceeded") tooSmall
+  let underDepth = W.Limits 1024 8 32 64 12 12 1 8
+      underWork = W.Limits 1024 8 32 64 12 12 8 3
+      defer = error "forced a field after its limiting failure"
+  forM_ [(underDepth,W.VNode 72 [defer,defer],"binary graph depth limit exceeded"),
+         (underWork,W.VNode 72 [W.VNode 9 [W.VInt 1],defer],"binary expanded-work limit exceeded"),
+         (W.defaultLimits,W.VNode 72 [W.VNode (-1) defer,defer],"binary constructor tag out of range")] $
+    \(limits,value,why) -> do
+      failed <- encoded (W.encode limits 8 [value])
+      check "binary planning returns its leftmost limit before later field demand" (Left why) failed
   let groundBinder n = T.XTyVar n
       bottom n body = T.XForall (groundBinder n) T.XBot body
       groundInt = Inference.GroundCon "Int" []
