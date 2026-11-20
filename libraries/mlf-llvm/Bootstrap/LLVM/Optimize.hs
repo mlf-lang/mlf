@@ -350,7 +350,7 @@ module Bootstrap.LLVM.Optimize where {
   -- remain distinct underneath nested lambdas, patterns and recursive groups.
   data FoldBranch = ReturnField Int | CombineFields Primitive Int Int;
   data UnaryConstructorUse = BuildsField String | SelectsField String |
-    FoldsConstructors (Map String ((,) Int FoldBranch));
+    FoldsConstructors (Map String ((,) Int FoldBranch)) | ComposesFunctions | TranslatesBy Int;
   unaryConstructorUse term = case term of {
     XEAbs name (XEApp (XEConstructor constructor) (XEVar field)) ->
       if eqName name field then Just (BuildsField constructor) else Nothing;
@@ -482,10 +482,42 @@ module Bootstrap.LLVM.Optimize where {
       Nothing -> Nothing
     }
   } in fmap constructorTerm (visit tree);
+  -- The identity pass has already resolved erased coercions and local aliases
+  -- in the RHS. Record composition only for the exact three-binder body.
+  checkedFunctionUse known rhs = case rhs of {
+    XEVar name -> M.lookup compareName name known;
+    XEAbs outer (XEAbs inner (XEAbs input (XEApp (XEVar f) (XEApp (XEVar g) (XEVar x))))) ->
+      if eqName outer f && eqName inner g && eqName input x &&
+         L.not (eqName outer inner || eqName outer input || eqName inner input)
+      then Just ComposesFunctions else Nothing;
+    XEAbs name (XEVar result) -> if eqName name result then Just (TranslatesBy 0) else Nothing;
+    XEAbs _ _ -> case iterationStep rhs of {
+      Just (IntegerTranslation amount) -> Just (TranslatesBy amount);
+      _ -> unaryConstructorUse rhs
+    };
+    _ -> Nothing
+  };
+  -- Only a saturated composition becomes f (g x). Each callback and the
+  -- argument stay in the same demand position, even for a partial callback.
+  -- Consecutive integer translations add in the language's wrapping Int ring.
+  applyComposed known function argument = case function of {
+    XEApp (XEApp (XEVar name) outer) inner -> case M.lookup compareName name known of {
+      Just ComposesFunctions -> applyComposed known outer (applyComposed known inner argument);
+      _ -> XEApp function argument
+    };
+    XEVar name -> case M.lookup compareName name known of {
+      Just (TranslatesBy amount) -> case argument of {
+        XEApp (XEApp (XEPrimitive PAddInt) base) (XEInt offset) -> translated (amount + offset) base;
+        _ -> translated amount argument
+      };
+      _ -> XEApp function argument
+    };
+    _ -> XEApp function argument
+  };
   checkedIdentities known expression = case expression of {
     XELet name value body -> do {
       rhs <- constructorIdentities known value;
-      let { following = case unaryConstructorUse rhs of {
+      let { following = case checkedFunctionUse known rhs of {
         Just role -> M.insert compareName name role known; Nothing -> known
       } };
       result <- checkedIdentities following body;
@@ -519,6 +551,10 @@ module Bootstrap.LLVM.Optimize where {
       };
       XEApp (XEApp (XEPrimitive PAddInt) left) right ->
         freshPure (L.fromMaybe term (combineIntSummands left right));
+      XEApp function argument -> case function of {
+        XEApp (XEApp (XEVar _) _) _ -> freshPure (applyComposed known function argument);
+        _ -> reduceIdentity term
+      };
       _ -> reduceIdentity term
     }
   };

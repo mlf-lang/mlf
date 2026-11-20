@@ -118,10 +118,51 @@ checkUnaryConstructors = do
     case result (close 9 different) of Left _ -> True; _ -> False)
  putStrLn "PASS unary constructor and selector, binding scopes, mismatches and field demand"
 
+checkComposition env = do
+ let app = T.XEApp
+     lam i = T.XEAbs (n i)
+     compose = lam 20 (lam 21 (lam 22 (app (v 20) (app (v 21) (v 22)))))
+     reversed = lam 20 (lam 21 (lam 22 (app (v 21) (app (v 20) (v 22)))))
+     identity = lam 24 (v 24)
+     step k = lam 25 (prim T.PAddInt [v 25,T.XEInt k])
+     times k = lam 26 (prim T.PMulInt [v 26,T.XEInt k])
+     scope definition amount = T.XELet (n 1) definition . T.XELet (n 2) (step amount) . T.XELet (n 3) identity
+     pair f g = app (app (v 1) f) g
+     early term = lastBody (fst (C.runFresh (C.checkedIdentities M.empty term) 1000))
+     outcome term = case R.integer (R.evaluate env (R.REnv M.empty) term) of
+       T.Left message -> Left (B.unpack message)
+       T.Right value -> Right value
+     check label wanted term = forM_ [term,C.optimizeChecked term] $ \version ->
+       need label (outcome version == wanted)
+     poison message = prim T.PPanic [T.XEString message]
+ forM_ [1,3,32] $ \depth -> forM_ [minBound,-7,0,1,maxBound] $ \amount -> do
+   let call arg = scope compose amount (app (iterate (pair (v 2)) (v 3) !! depth) arg)
+       total = fromIntegral depth * amount
+       expected = if total==0 then v 9 else prim T.PAddInt [v 9,T.XEInt total]
+   need "fully applied composition folds before repeated substitution" (X.equalErased (early (call (v 9))) expected)
+   forM_ [minBound,-1,0,7,maxBound] $ \x ->
+     check "wrapped composed callbacks" (Right (x+total)) (call (T.XEInt x))
+ let invoke definition = scope definition 3 (app (pair (v 2) (times 2)) (T.XEInt 4))
+ check "noncommuting callbacks keep their order" (Right 11) (invoke compose)
+ check "a reversed definition keeps its own order" (Right 14) (invoke reversed)
+ check "a shadowing definition keeps its meaning" (Right 14)
+   (scope compose 3 (T.XELet (n 1) reversed (app (pair (v 2) (times 2)) (T.XEInt 4))))
+ let failure = poison "input"
+     use f g = scope compose 1 (app (pair f g) failure)
+ check "a lazy outer callback can discard both inner expressions" (Right 37)
+   (use (lam 27 (T.XEInt 37)) (poison "inner"))
+ check "the outer function is demanded first" (Left "outer") (use (poison "outer") (poison "inner"))
+ check "the inner function can be the first error" (Left "inner") (use (v 2) (poison "inner"))
+ check "canceling translations still demand the input" (Left "input") (use (v 2) (step (-1)))
+ check "an unsaturated composition stays a function" (Right 41)
+   (scope compose 1 (prim T.PSeq [pair (poison "outer") (poison "inner"),T.XEInt 41]))
+
+
 main = do
  env <- case D.validateDeclarations [] of T.Right e -> pure e; T.Left e -> fail (B.unpack e)
  checkIntSums env
  checkUnaryConstructors
+ checkComposition env
  let eval = R.evaluate env (R.REnv M.empty)
      integer t = case R.integer (eval t) of T.Right x -> pure x; T.Left e -> fail (B.unpack e)
  forM_ [1,2,17] $ \count -> forM_ [minBound,maxBound,-3,0,1] $ \amount ->
