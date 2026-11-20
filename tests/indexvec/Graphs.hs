@@ -1310,6 +1310,12 @@ lexicalRunChecks = do
       namesAction = do
         next <- Fresh.freshName "r"
         Fresh.Fresh (\n used -> T.Right ((H.unpack next,n,namesOf used),n,used))
+  let signedTerm = T.SAnn (T.SSignature (T.SChecked (error "unused checked type") term)
+                            (error "unused signature")) (error "unused annotation")
+      following = ["r0","r2","尾"]
+  check "name reservation traverses signed bodies in ordinary order"
+    (namesOf (Fresh.reservedNames (Desugar.allNames signedTerm ++ following)))
+    (namesOf (Desugar.reservedExpressionNames signedTerm following))
   expectedNames <- unwrapNames (Fresh.runFresh (Desugar.allNames term ++ Desugar.allNames method) namesAction)
   classNames <- unwrapNames (Classes.withValidatedClasses T.Nothing S.empty M.empty T.Nothing [] [] [suffix] term (\_ _ -> namesAction))
   check "class initialization preserves the reserved tree, spelling collisions and fresh count" expectedNames classNames

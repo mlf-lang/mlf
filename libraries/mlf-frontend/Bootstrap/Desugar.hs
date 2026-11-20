@@ -66,6 +66,8 @@ module Bootstrap.Desugar where {
       SApp f a -> let { next = visit state f } in seq next (visit next a);
       SCallSite _ _ value -> visit state value;
       SSourceDefinition value -> visit state value; SDeclScope _ value -> visit state value;
+      SAnn value _ -> visit state value; SSignature value _ -> visit state value;
+      SChecked _ value -> visit state value;
       SVar name -> reserveName state name; SGlobal _ name -> reserveName state name;
       SConstructor name -> reserveName state name;
       SPrimitive _ -> state; SIntLit _ -> state; SBoolLit _ -> state;
