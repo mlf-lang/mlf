@@ -398,26 +398,41 @@ module Bootstrap.LLVM.Optimize where {
     };
     _ -> Nothing
   };
-  -- Every demanded subtree must have a known saturated constructor. Each
-  -- field is substituted at most once, and unused fields remain unevaluated.
-  foldKnownConstructor rules tree = case applications tree of {
-    (,) (XEConstructor tag) args -> case M.lookup compareString tag rules of {
-      Just ((,) arity rule) -> if arity /= L.length args then Nothing else case rule of {
-        ReturnField index -> L.at index args;
-        CombineFields primitive first second -> do {
-          left <- L.at first args >>= foldKnownConstructor rules;
-          right <- L.at second args >>= foldKnownConstructor rules;
-          let { apply = XEApp (XEApp (XEPrimitive primitive) left) right };
-          Just (case primitive of {
-            PAddInt -> L.fromMaybe apply (combineIntSummands left right);
-            _ -> apply
-          })
-        }
-      };
-      Nothing -> Nothing
-    };
-    _ -> Nothing
+  data ConstructorValue = ConstructorTerm XErased | ConstructorSum XName Int Int;
+  constructorTerm value = case value of {
+    ConstructorTerm term -> term;
+    ConstructorSum name scale offset -> affineIntTerm name scale offset
   };
+  constructorSummand value = case value of {
+    ConstructorTerm term -> intSummand term;
+    -- Inspecting a previously rendered summand forces its translation first,
+    -- then its choice of a variable or a multiplication.
+    ConstructorSum name scale offset -> seq offset (seq scale (Just ((,,) name scale offset)))
+  };
+  -- Each selected child is folded once. Keep an affine result in its checked
+  -- Int representation until a different operation or the consumer needs a term.
+  foldKnownConstructor rules tree = let {
+    visit current = case applications current of {
+      (,) (XEConstructor tag) args -> case M.lookup compareString tag rules of {
+        Just ((,) arity rule) -> if arity /= L.length args then Nothing else case rule of {
+          ReturnField index -> fmap ConstructorTerm (L.at index args);
+          CombineFields primitive first second -> do {
+            left <- L.at first args >>= visit;
+            right <- L.at second args >>= visit;
+            let { applied = ConstructorTerm (XEApp (XEApp (XEPrimitive primitive)
+                    (constructorTerm left)) (constructorTerm right)) };
+            Just (case primitive of {
+              PAddInt -> L.fromMaybe applied (addIntSummands ConstructorSum
+                (constructorSummand left) (constructorSummand right));
+              _ -> applied
+            })
+          }
+        };
+        Nothing -> Nothing
+      };
+      _ -> Nothing
+    }
+  } in fmap constructorTerm (visit tree);
   checkedIdentities known expression = case expression of {
     XELet name value body -> do {
       rhs <- constructorIdentities known value;
@@ -1123,17 +1138,18 @@ module Bootstrap.LLVM.Optimize where {
     XEApp (XEApp (XEPrimitive PAddInt) (XEInt offset)) value -> withOffset value offset;
     _ -> withOffset term 0
   };
-  combineIntSummands :: XErased -> XErased -> Maybe XErased;
-  combineIntSummands left right = case intSummand left of {
-    Just ((,,) name factor offset) -> case intSummand right of {
-      Just ((,,) other otherFactor otherOffset) -> if eqName name other then let {
-        scale = factor + otherFactor;
-        value = if scale == 1 then XEVar name else XEApp (XEApp (XEPrimitive PMulInt) (XEVar name)) (XEInt scale)
-      } in Just (translated (offset + otherOffset) value) else Nothing;
+  affineIntTerm name scale offset = translated offset (if scale == 1 then XEVar name
+    else XEApp (XEApp (XEPrimitive PMulInt) (XEVar name)) (XEInt scale));
+  addIntSummands create left right = case left of {
+    Just ((,,) name factor offset) -> case right of {
+      Just ((,,) other otherFactor otherOffset) -> if eqName name other
+        then Just (create name (factor + otherFactor) (offset + otherOffset)) else Nothing;
       Nothing -> Nothing
     };
     Nothing -> Nothing
   };
+  combineIntSummands :: XErased -> XErased -> Maybe XErased;
+  combineIntSummands left right = addIntSummands affineIntTerm (intSummand left) (intSummand right);
   rewriteUsed :: UseTree -> Fresh UseTree;
   rewriteUsed tree =
     case useChildren tree of {
@@ -1826,8 +1842,7 @@ module Bootstrap.LLVM.Optimize where {
     XEAbs name body -> XEAbs name (foldScopedFields (M.delete compareName name facts) body);
     XEApp function argument -> let {
       affine = case affineField facts expression of {
-        Just ((,,) name factor offset) -> translated offset
-          (if factor == 1 then XEVar name else XEApp (XEApp (XEPrimitive PMulInt) (XEVar name)) (XEInt factor));
+        Just ((,,) name factor offset) -> affineIntTerm name factor offset;
         Nothing -> expression
       }
     } in if M.null facts then expression else case function of {

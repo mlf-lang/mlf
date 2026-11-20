@@ -919,6 +919,17 @@ knownConstructorFoldChecks = do
         T.Nothing -> pure ()
         _ -> fail "unspecified subtree collapsed"
     _ -> fail "missing recursive constructor fold"
+  let sumRules = M.fromList H.v_compareString
+        [("Tip",(2,Optimize.ReturnField 1)),("Fork",(2,Optimize.CombineFields T.PAddInt 0 1))]
+      affine coefficient amount = prim T.PAddInt [prim T.PMulInt [v 19,T.XEInt coefficient],T.XEInt amount]
+      subjectAt a b = pair (leaf (affine a 13)) (pair (leaf (affine b (-7))) (leaf (v 19)))
+  forM_ [(0,0),(2,-3),(maxBound,1),(minBound,-1)] $ \(a,b) -> do
+    let scale = a+b+1
+        scaled = if scale == 1 then v 19 else prim T.PMulInt [v 19,T.XEInt scale]
+    case Optimize.foldKnownConstructor sumRules (subjectAt a b) of
+      T.Just value -> check "wrapped affine constructor fold retains the input binder and exact offset"
+        True (X.equalErased value (prim T.PAddInt [scaled,T.XEInt 6]))
+      _ -> fail "known constructor fold was missed"
   case Optimize.constructorFold (n 1) (rule [base, step 6 6]) of
     T.Nothing -> pure ()
     _ -> fail "duplicate recursive field in constructor fold"
