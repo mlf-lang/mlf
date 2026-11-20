@@ -222,8 +222,11 @@ module Bootstrap.Separate where {
   -- lexical occurrence. Keep its original source spans and untouched
   -- operands. General callers retain the original lazy tree mapping.
   renameParsedPlain env expression = let {
+    -- A lexical name has one replacement in this scope. Keep its variable
+    -- leaf with the lookup result so every occurrence can share both.
+    replacement = M.lookupProjected compareString (\_ name -> SVar name) env;
     changed term = case term of {
-      SVar name -> if managedIntrinsicName name then Nothing else mapOptional SVar (M.lookup compareString name env);
+      SVar name -> if managedIntrinsicName name then Nothing else replacement name;
       SCallSite label span body -> mapOptional (SCallSite label span) (changed body);
       SApp f a -> case changed f of {
         Nothing -> mapOptional (SApp f) (changed a);

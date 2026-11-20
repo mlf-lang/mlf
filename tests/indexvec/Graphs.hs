@@ -1287,6 +1287,13 @@ lexicalRunChecks = do
   check "UTF8 array snapshots preserve a slice and embedded NUL" [240,159,152,128,0]
     =<< mapM (Prim.readByteArray second) [0..4]
   check "mutating a UTF8 array preserves the input string" "😀\0" (H.unpack section)
+  let replacements = M.fromList H.v_compareString [("x","inside"),("$MLF.Stack.callStack","hidden")]
+      nativeStack = T.SVar "$MLF.Stack.callStack"
+      application v = T.SApp (T.SApp v nativeStack) (T.SCallSite "x" span v)
+        where span = T.SourceSpan "pkg" "Owner" "source.hs" 1 2 1 3
+  check "repeated lexical replacements keep managed references and call sites"
+    True (Equality.eqSExprBits (application (T.SVar "inside"))
+      (Separate.renameParsedPlain replacements (application (T.SVar "x"))))
   let prefix = "separateLocal"
   forM_ [0,1,7,256] $ \offset ->
     forM_ ["",prefix,prefix ++ "0","separateLoca","separateLocλ","x" ++ prefix] $ \word -> do
