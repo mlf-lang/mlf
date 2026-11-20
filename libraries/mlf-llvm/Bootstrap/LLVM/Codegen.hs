@@ -1725,16 +1725,72 @@ module Bootstrap.LLVM.Codegen where {
             case constructor of {
               (,) tag arity ->
                 if (L.length args == arity)
-                then do {
-                       fields <- L.mapM (thunk scope) args;
-                       constructorValue tag fields
-                     }
+                then constructFields scope c tag args
                 else genericApplication scope expression
             }
           };
         _ -> genericApplication scope expression
       }
     };
+  -- A compact constructor with immediate fields is closed and total. Its
+  -- allocation can be delayed until its parent consumes the value.
+  literalConstructorField :: Map String ((,) Int Int) -> XErased -> Bool;
+  literalConstructorField cs expression = let {
+    arity name count = case M.lookup compareString name cs of {
+      Just ((,) _ n) -> n == count; Nothing -> False
+    };
+    immediateField field = case field of {
+      XEInt n -> N.smallBounds ((,) n n);
+      XEBool _ -> True;
+      XEConstructor name -> arity name 0;
+      _ -> False
+    }
+  } in case expression of {
+    XEApp (XEConstructor name) a -> arity name 1 && immediateField a;
+    XEApp (XEApp (XEConstructor name) a) b -> arity name 2 && immediateField a && immediateField b;
+    _ -> False
+  };
+  constructFields :: Map XName CGBinding -> String -> Int -> [] XErased -> Build String;
+  constructFields scope name tag args = let {
+    ordinary = do { fields <- L.mapM (thunk scope) args; constructorValue tag fields }
+  } in case args of {
+    [field, rest@(XEApp (XEApp (XEConstructor next) _) _)] ->
+      if eqString name next then do {
+        cs <- gets constructors;
+        if literalConstructorField cs field
+        then literalConstructorPrefix scope cs name tag field rest else ordinary
+      } else ordinary;
+    _ -> ordinary
+  };
+  -- Emit a run of closed fields from its tail toward its head, so each field
+  -- stays live only until the following cell. Outline full chunks as functions
+  -- of the tail alone; the caller builds an arbitrary lazy tail exactly once.
+  literalConstructorPrefix :: Map XName CGBinding -> Map String ((,) Int Int) ->
+    String -> Int -> XErased -> XErased -> Build String;
+  literalConstructorPrefix scope cs name tag first rest = let {
+    capacity = 128;
+    prepend tail field = do {
+      head <- thunk M.empty field;
+      constructorValue tag [head, tail]
+    };
+    collect remaining fields chunks term =
+      if remaining == 0 then do {
+        symbol <- fresh "@mlf.constructor.prefix.";
+        definition symbol ["ptr %tail"] (L.foldM prepend "%tail" fields);
+        collect capacity [] ((:) symbol chunks) term
+      } else let {
+        finish = do {
+          tail <- thunk scope term;
+          suffix <- L.foldM prepend tail fields;
+          L.foldM (\value symbol -> call symbol [pointer value]) suffix chunks
+        }
+      } in case term of {
+        XEApp (XEApp (XEConstructor next) field) tail ->
+          if eqString name next && literalConstructorField cs field
+          then collect (remaining - 1) ((:) field fields) chunks tail else finish;
+        _ -> finish
+      }
+  } in collect (capacity - 1) [first] [] rest;
   primitiveApplication :: Map XName CGBinding -> Primitive -> [] XErased -> Build String;
   primitiveApplication scope p args =
     do {

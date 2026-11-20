@@ -1053,6 +1053,25 @@ knownConstructorFoldChecks = do
     (T.Just old,T.Just new) -> check "typed constructor fold keeps selected fields and skips type evidence"
       True (X.equalErased old new && X.equalErased new (prim T.PSubInt [T.XEInt 39,T.XEInt 17]))
     _ -> fail "typed constructor field was lost"
+  let literalTags = M.fromList H.v_compareString [("End",(40,0)),("Cell",(41,2)),("Row",(42,2))]
+      make name fields = foldl T.XEApp (T.XEConstructor name) fields
+      row i = make "Row" [T.XEInt i, T.XEInt (i+3)]
+      cell i rest = make "Cell" [row i, rest]
+  forM_ [2,127,128,129,257] $ \size -> do
+    let term = foldr cell (T.XEConstructor "End") [1..size]
+    case Codegen.generate literalTags term of
+      T.Left err -> fail (H.unpack err)
+      T.Right (_,chunks) -> do
+        let bodies = lines (unlines (map H.unpack chunks))
+            prefixes = filter (isInfixOf "define private ptr @mlf.constructor.prefix.") bodies
+        check "closed constructor chunks are bounded and pass their tail explicitly"
+          (fromIntegral size `div` 128) (length prefixes)
+  let permitted = Codegen.literalConstructorField literalTags
+  forM_ [(True,row 1),(True,make "Row" [T.XEConstructor "End",T.XEBool False]),
+         (False,make "Row" [T.XEInt maxBound,T.XEInt 0]),(False,make "Row" [T.XEInt 1]),
+         (False,make "Unknown" [T.XEInt 1,T.XEInt 2]),
+         (False,make "Row" [v 17, T.XEInt 2])] $ \(expected,term) ->
+    check "only closed compact constructor fields can be postponed" expected (permitted term)
   forM_ [0..4::Int] $ \arity -> do
     let example = foldl T.XEApp (T.XEConstructor "Box") (replicate arity (T.XEInt 3))
         table = M.singleton "Box" (31,fromIntegral arity)
