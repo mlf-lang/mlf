@@ -1691,6 +1691,23 @@ applicationPatternChecks = do
     expected <- encoded (W.encode limits 8 names)
     actual <- encoded (W.encodeAtoms Structure.termAtomShapes limits 8 names)
     check "named constructor atoms preserve bytes and resource diagnostics" expected actual
+  let applyArg label = T.XThen (T.XInner (T.XBottom (T.XCon label []))) T.XElim
+      balanced [p] = p
+      balanced ps = let (a,b) = splitAt (length ps `div` 2) ps in T.XThen (balanced a) (balanced b)
+      canonicalBytes phi change = encoded (W.encode W.defaultLimits 8
+        [Structure.toXComputation (case change of T.Nothing -> phi; T.Just p -> p)])
+  forM_ [2,3,4,5,7,16,31,64] $ \n ->
+    forM_ [foldl1 T.XThen,foldr1 T.XThen,balanced] $ \group -> do
+      let proof = group (take n (cycle (map applyArg ["Int","型😀","Bool"])))
+      case (Source.rewriteProof proof,Source.groundProofEdit proof) of
+        (T.Right baseline,T.Just fast) -> do
+          expected <- canonicalBytes proof baseline
+          actual <- canonicalBytes proof fast
+          check "ground instantiations have the graph finalizer's exact grouping and argument order" expected actual
+        _ -> fail "expected a bounded sequence of complete ground arguments"
+  case Source.groundProofEdit (T.XThen T.XRefl (T.XThen T.XRefl T.XRefl)) of
+    T.Nothing -> pure ()
+    _ -> fail "an unsupported nested proof requires ordinary graph finalization"
   let argument ty = Structure.toXComputation (T.XThen (T.XInner (T.XBottom (T.XCon ty []))) T.XElim)
       intArg = argument "Int"
       wideArg = argument "型λ😀"
