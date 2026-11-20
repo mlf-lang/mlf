@@ -1278,6 +1278,17 @@ fragmentFingerprintChecks = do
       tree n = add (tree (n-1)) (tree (n-1))
       parameters = Separate.pack [Separate.pack ["0", "arg:λ", "Int"]]
       exports = Separate.pack [Separate.pack ["結果😀", "Int"]]
+  let decl value = T.XLet (T.XName 9 "export") value (T.XConstructor "()" [])
+      occurrence i hint = T.XVarTerm (T.XName i hint)
+      inputs = [(T.XName 1 "param",ty),(T.XName 2 "param",ty)]
+      spelling (T.XName i hint) = (i,H.unpack hint)
+  inputsUsed <- right (Open.check env inputs (decl (add (occurrence 2 "first")
+    (add (occurrence 1 "second") (occurrence 2 "again")))))
+  check "checked fragment uses retain first occurrence order, identities and display hints"
+    [(2,"first"),(1,"second")] (map spelling (Open.usedParameters inputsUsed))
+  case Open.check env (take 1 inputs) (decl (add (occurrence 1 "seen") (occurrence 3 "missing"))) of
+    T.Left why -> check "a later unbound read still fails independent checking" "unbound term variable missing" (H.unpack why)
+    T.Right _ -> fail "accepted an unknown parameter after the last declared input"
   forM_ [0..8 :: Int] $ \depth -> do
     let body = T.XLet result (tree depth) (T.XConstructor "()" [])
         fields = [Separate.pack [], parameters, Pretty.prettyTerm body, exports]

@@ -498,7 +498,11 @@ module Bootstrap.OpenFragment
      Separate.encodingText (Separate.pack (map (\((,) n ty) -> Separate.pack [showInt (X.nameId n), X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) ps)),
      summary,
      Separate.encodingText (Separate.pack (map (\((,) n ty) -> Separate.pack [X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) bs))]);
-  make env ps term bs = checkedFragment env ps term bs (Boundary.nubNames (Boundary.freeNames term));
+  -- The independent checker admits free term variables only from ps. Once
+  -- every parameter has appeared, the remaining term cannot add another use.
+  -- Keep the first occurrence itself, including its diagnostic name hint.
+  make env ps term bs = checkedFragment env ps term bs
+    (take (length ps) (Boundary.nubNames (Boundary.freeNames term)));
   -- Hints are labels, never binder identities. This transformation starts from
   -- an opaque checked fragment and changes every occurrence consistently. It
   -- preserves the environment, all IDs, types, evidence and free-use inventory;
