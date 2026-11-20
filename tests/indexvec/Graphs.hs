@@ -954,6 +954,19 @@ knownConstructorFoldChecks = do
     case select (fromIntegral size+1) (error "unused index") (replicate size (error "unused field")) of
       T.Nothing -> pure ()
       _ -> fail "wrong constructor arity accepted"
+  let hiddenType = error "erasure evaluated a type annotation"
+      hidden value = T.XTypeApp (T.XWithData (error "erasure evaluated declarations") value) hiddenType
+      ttag name = foldl (\f a -> hidden (T.XApp (hidden f) a)) (T.XConstructor name [])
+      keep a = ttag "One" [error "unused constructor field",a]
+      foldFields = M.fromList H.v_compareString
+        [("One",(2,Optimize.ReturnField 1)),("Both",(2,Optimize.CombineFields T.PSubInt 1 0))]
+      tree = ttag "Both" [keep (hidden (T.XIntTerm 17)),keep (T.XIntTerm 39)]
+      typedResult = Optimize.foldTypedConstructor foldFields tree
+      original = Optimize.foldKnownConstructor foldFields (X.erase tree)
+  case (original,typedResult) of
+    (T.Just old,T.Just new) -> check "typed constructor fold keeps selected fields and skips type evidence"
+      True (X.equalErased old new && X.equalErased new (prim T.PSubInt [T.XEInt 39,T.XEInt 17]))
+    _ -> fail "typed constructor field was lost"
   let sumRules = M.fromList H.v_compareString
         [("Tip",(2,Optimize.ReturnField 1)),("Fork",(2,Optimize.CombineFields T.PAddInt 0 1))]
       affine coefficient amount = prim T.PAddInt [prim T.PMulInt [v 19,T.XEInt coefficient],T.XEInt amount]

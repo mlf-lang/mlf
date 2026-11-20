@@ -411,25 +411,7 @@ module Bootstrap.LLVM.Optimize where {
   };
   -- Each selected child is folded once. Keep an affine result in its checked
   -- Int representation until a different operation or the consumer needs a term.
-  foldKnownConstructor rules tree = let {
-    apply tag count field = case M.lookup compareString tag rules of {
-      Just ((,) arity rule) -> if arity /= count then Nothing else case rule of {
-        ReturnField index -> fmap ConstructorTerm (field index);
-        CombineFields primitive first second -> do {
-          left <- field first >>= visit;
-          right <- field second >>= visit;
-          let { applied = ConstructorTerm (XEApp (XEApp (XEPrimitive primitive)
-                  (constructorTerm left)) (constructorTerm right)) };
-          Just (case primitive of {
-            PAddInt -> L.fromMaybe applied (addIntSummands ConstructorSum
-              (constructorSummand left) (constructorSummand right));
-            _ -> applied
-          })
-        }
-      };
-      Nothing -> Nothing
-    };
-    visit current = case current of {
+  erasedConstructorFields apply current = case current of {
       XEConstructor tag -> apply tag 0 (\i -> L.at i []);
       XEApp fn right -> case fn of {
         XEConstructor tag -> apply tag 1 (\i -> if i == 0 then Just right else Nothing);
@@ -445,6 +427,39 @@ module Bootstrap.LLVM.Optimize where {
         _ -> Nothing
       };
       _ -> Nothing
+    };
+  -- Type abstractions, instantiations and datatype scopes have no erased
+  -- application node. Walk through them without evaluating their metadata.
+  typedConstructorFields apply input = let {
+    collect args current = case current of {
+      XTypeAbs _ _ body -> collect args body;
+      XTypeApp body _ -> collect args body;
+      XWithData _ body -> collect args body;
+      XApp fn arg -> collect ((:) arg args) fn;
+      XConstructor tag _ -> apply tag (L.length args) (\i -> L.at i args);
+      _ -> Nothing
+    }
+  } in collect [] input;
+  foldKnownConstructor = foldConstructorUsing L.id erasedConstructorFields;
+  foldTypedConstructor = foldConstructorUsing X.erase typedConstructorFields;
+  foldConstructorUsing erase fields rules tree = let {
+    visit current = fields apply current;
+    apply tag count field = case M.lookup compareString tag rules of {
+      Just ((,) arity rule) -> if arity /= count then Nothing else case rule of {
+        ReturnField index -> fmap (\x -> ConstructorTerm (erase x)) (field index);
+        CombineFields primitive first second -> do {
+          left <- field first >>= visit;
+          right <- field second >>= visit;
+          let { applied = ConstructorTerm (XEApp (XEApp (XEPrimitive primitive)
+                  (constructorTerm left)) (constructorTerm right)) };
+          Just (case primitive of {
+            PAddInt -> L.fromMaybe applied (addIntSummands ConstructorSum
+              (constructorSummand left) (constructorSummand right));
+            _ -> applied
+          })
+        }
+      };
+      Nothing -> Nothing
     }
   } in fmap constructorTerm (visit tree);
   checkedIdentities known expression = case expression of {
@@ -1841,38 +1856,64 @@ module Bootstrap.LLVM.Optimize where {
     } in body (S.singleton parameter) value;
     _ -> Nothing
   };
-  foldScopedFields facts expression = case expression of {
-    XELet name value body -> let {
-      following = case scopedUnaryUse value of {
-        Just role -> M.insert compareName name role facts;
-        Nothing -> M.delete compareName name facts
-      }
-    } in XELet name (foldScopedFields facts value) (foldScopedFields following body);
-    XELetRec [(,) name rhs] body -> case constructorFold name rhs of {
-      Just rules -> XELetRec [(,) name rhs]
-        (foldScopedFields (M.insert compareName name (FoldsConstructors rules) facts) body);
-      Nothing -> expression
-    };
-    XEAbs name body -> XEAbs name (foldScopedFields (M.delete compareName name facts) body);
-    XEApp function argument -> let {
-      affine = case affineField facts expression of {
-        Just ((,,) name factor offset) -> affineIntTerm name factor offset;
-        Nothing -> expression
-      }
-    } in if M.null facts then expression else case function of {
-      XEVar name -> case M.lookup compareName name facts of {
-        Just (FoldsConstructors rules) -> L.fromMaybe expression (foldKnownConstructor rules argument);
+  data ScopedInput a = OtherInput | LambdaInput XName a |
+    LetInput XName a a | RecursiveInput XName a a | ApplicationInput a a;
+  erasedScope term = case term of {
+    XEAbs name body -> LambdaInput name body;
+    XELet name value body -> LetInput name value body;
+    XELetRec [(,) name rhs] body -> RecursiveInput name rhs body;
+    XEApp fn arg -> ApplicationInput fn arg;
+    _ -> OtherInput
+  };
+  typedScope term = case term of {
+    XTypeAbs _ _ body -> typedScope body;
+    XTypeApp body _ -> typedScope body;
+    XWithData _ body -> typedScope body;
+    XAbs name _ body -> LambdaInput name body;
+    XLet name value body -> LetInput name value body;
+    XLetRec [(,,) name _ rhs] body -> RecursiveInput name rhs body;
+    XApp fn arg -> ApplicationInput fn arg;
+    _ -> OtherInput
+  };
+  foldScopedFields = foldScopedUsing erasedScope L.id foldKnownConstructor;
+  eraseScopedFields = foldScopedUsing typedScope X.erase foldTypedConstructor;
+  -- Follow declaration scopes on the input representation. A successful
+  -- constructor fold only erases fields that survive in the resulting term.
+  foldScopedUsing inspect erase foldArgument = let {
+    visit facts expression = let { original = erase expression } in case inspect expression of {
+      LetInput name value body -> let {
+        following = case scopedUnaryUse (erase value) of {
+          Just role -> M.insert compareName name role facts;
+          Nothing -> M.delete compareName name facts
+        }
+      } in XELet name (visit facts value) (visit following body);
+      RecursiveInput name value body -> let { rhs = erase value } in case constructorFold name rhs of {
+        Just rules -> XELetRec [(,) name rhs]
+          (visit (M.insert compareName name (FoldsConstructors rules) facts) body);
+        Nothing -> original
+      };
+      LambdaInput name body -> XEAbs name (visit (M.delete compareName name facts) body);
+      ApplicationInput fn arg -> let {
+        affine = case affineField facts original of {
+          Just ((,,) name factor offset) -> affineIntTerm name factor offset;
+          Nothing -> original
+        }
+      } in if M.null facts then original else case erase fn of {
+        XEVar name -> case M.lookup compareName name facts of {
+          Just (FoldsConstructors rules) -> L.fromMaybe original (foldArgument rules arg);
+          _ -> affine
+        };
         _ -> affine
       };
-      _ -> affine
-    };
-    _ -> expression
-  };
+      OtherInput -> original
+    }
+  } in visit;
   -- This extra algebraic pass is for finite checked programs. Its rewrites
   -- introduce no binders and preserve evaluation of the single input value.
-  -- Keep the raw and exact legacy-pass interfaces available independently.
-  optimizeChecked expression = optimizeOwnedWith (optimizeOwnedUsing (checkedIdentities M.empty))
-    (simplifyIterations M.empty (simplifyTranslations M.empty (foldScopedFields M.empty expression)));
+  optimizeChecked expression = optimizeAfterFields (foldScopedFields M.empty expression);
+  optimizeCheckedTerm term = optimizeAfterFields (eraseScopedFields M.empty term);
+  optimizeAfterFields expression = optimizeOwnedWith (optimizeOwnedUsing (checkedIdentities M.empty))
+    (simplifyIterations M.empty (simplifyTranslations M.empty expression));
   -- A translation evaluates its one Int input once and adds a constant in
   -- the language's wrapping Int64 ring. Retain every unknown/effectful body.
   -- Summaries follow resolved binder identities and never cross shadowing.

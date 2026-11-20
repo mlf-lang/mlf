@@ -130,7 +130,7 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
            constructors = entryConstructors declarations
          } in
          let {
-           optimized = Optimize.optimizeChecked (X.erase term)
+           optimized = Optimize.optimizeCheckedTerm term
          } in
          let {
            lowered = Wrappers.optimize declarations constructors optimized
