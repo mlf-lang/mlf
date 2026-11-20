@@ -63,7 +63,7 @@ def main():
                    output / 'Main.o', output / 'Corpus.o', *objects, build / 'host.o', build / 'supervisor.o',
                    '-o', output / 'host-controls'])
         runner.run('host-controls', [output / 'host-controls'],
-                   expected=b'Prepared syntax controls: 10042 checks; 53 syntax variants\n')
+                   expected=b'Prepared syntax controls: 10061 checks; 53 syntax variants\n')
         include = ['-i', ROOT / 'libraries/mlf-foundation', '-i', ROOT / 'libraries/mlf-crates',
                    '-i', ROOT / 'libraries/mlf-language-core']
         emitted = runner.run('emit-native', [build / 'bin/emlf', *include, '--emit-llvm-gc', portable], timeout=300)
@@ -97,7 +97,7 @@ def main():
                 raise ValueError('input changed: ' + path)
         authenticate_build(receipt, build / 'bin')
         record['complete'] = True
-        print('PASS prepared syntax: 10042 host checks; ' + json.dumps(record['vector_counts'], sort_keys=True))
+        print('PASS prepared syntax: 10061 host checks; ' + json.dumps(record['vector_counts'], sort_keys=True))
     except BaseException as error:
         record['error'] = {'type': type(error).__name__, 'message': str(error)}
         raise

@@ -300,6 +300,21 @@ relativeChecks check = do
       typed = T.SAnn (T.SVar "r") (T.SAnnotation [] (T.STVar "a"))
       rawPoly = source typed
       loweredPoly = stmt (T.SChecked bound (plain typed))
+  let constructorTree wrap end = foldr
+        (\n tail -> T.SApp (T.SApp (T.SConstructor "節:λ") (wrap n (T.SIntLit n))) tail)
+        (T.SConstructor end) [0..95]
+      locEmpty = T.SourceSpan "" "" "" 1 2 1 5
+      locForeign = T.SourceSpan "包" "模" "別:😀" 3 5 6 8
+      located pick n e = T.SCallSite "讀:λ" (pick n) e
+      bareTable = constructorTree (\_ e -> e) "終"
+      checkedTable e = stmt (T.SChecked (T.SCon "Items" []) e)
+  forM_ [const locEmpty, const locForeign, \n -> if even n then locEmpty else locForeign] $ \pick -> do
+    let original = stmt (constructorTree (located pick) "終")
+    assertPair original (checkedTable bareTable)
+    verifyEntry "constructor-headed source with local and external spans"
+      original (checkedTable bareTable) True
+  verifyEntry "a changed constructor tail retains its own lowered field"
+    (stmt bareTable) (checkedTable (constructorTree (\_ e -> e) "異")) False
   verifyEntry "bare" a naked True
   verifyEntry "checked" a (wrapped (T.SCon "Int" [])) True
   check "raw polymorphic pair demonstrates the changed type scope" (not (rejects rawPoly loweredPoly))

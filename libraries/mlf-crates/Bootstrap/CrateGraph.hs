@@ -357,6 +357,9 @@ module Bootstrap.CrateGraph where {
     SCallSite _ span _ -> Just span;
     SLam _ _ e -> preparedLocation (fuel - 1) e;
     SApp f _ -> preparedLocation (fuel - 1) f;
+    -- A constructor can head a large tree without a recorded call site.
+    -- An empty origin still preserves each foreign span in full.
+    SConstructor _ -> Just (SourceSpan "" "" "" 0 0 0 0);
     SDeclScope _ e -> preparedLocation (fuel - 1) e;
     SChecked _ e -> preparedLocation (fuel - 1) e;
     _ -> Nothing
