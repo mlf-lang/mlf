@@ -950,7 +950,7 @@ module Bootstrap.SourceInference where {
     XTerm -> [] ((,,) EvidenceRole String XType) -> Either String ([] Boundary.Candidate);
   candidateParameters parameters term candidates =
     let {
-      first = 1 + foldl max 0 (IS.toList (Separate.termIdentities term IS.empty))
+      first = 1 + Separate.maximumTermIdentity 0 term
     } in
     traverseEither
       (\((,) ordinal ((,,) role name ty)) -> do {

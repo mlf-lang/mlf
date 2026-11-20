@@ -1357,6 +1357,15 @@ lexicalRunChecks = do
         ([([first],1,2),([second],15,16)],16)
         ([(H.unpack (Lexer.tokenText t),Lexer.tokenColumn t,Lexer.tokenEndColumn t) | t <- ts],
          Lexer.tokenColumn end)
+  let identityBody a b c = T.XCase (T.XTypeApp (T.XIntTerm 0) (T.XHyp (T.XTyVar a)))
+        (T.XForall (T.XTyVar b) T.XBot (T.XVar (T.XTyVar b)))
+        [T.XAlternative (T.XConstructorPattern "K" [T.Just (T.XName c "p")]) (T.XBoolTerm True)]
+  forM_ [identityBody minBound (-7) 0,identityBody 2 maxBound 91,identityBody 9 8 7,
+         T.XWithData (error "unobserved datatype declarations") (T.XIntTerm 3)] $ \typed ->
+    forM_ [minBound,-1,0,47,maxBound] $ \lower ->
+      check "typed identity maximum includes computations, type binders and pattern binders"
+        (foldr max lower (I.toList (Separate.termIdentities typed I.empty)))
+        (Separate.maximumTermIdentity lower typed)
   let ctorEnv = Classes.QualifiedEnv M.empty (const T.Nothing)
       ctor name = T.SConstructor name
       here = T.SourceSpan "P" "M" "file.hs" 1 1 1 2

@@ -1390,57 +1390,66 @@ module Bootstrap.Separate where {
   -- Dense renumbering also handles valid object IDs near the parser's Int64
   -- limit. Adding an offset to original IDs would overflow that wire format.
   typeIdentities :: XType -> IntSet -> IntSet;
-  typeIdentities ty seen =
+  typeIdentities = foldTypeIdentities IS.insert;
+  foldTypeIdentities :: forall a. (Int -> a -> a) -> XType -> a -> a;
+  foldTypeIdentities add ty seen =
     case ty of {
-      XVar (XTyVar a) -> IS.insert a seen;
-      XArrow a b -> typeIdentities b (typeIdentities a seen);
-      XCon _ ts -> foldl (\acc t -> typeIdentities t acc) seen ts;
-      XApply a b -> typeIdentities b (typeIdentities a seen);
+      XVar (XTyVar a) -> add a seen;
+      XArrow a b -> foldTypeIdentities add b (foldTypeIdentities add a seen);
+      XCon _ ts -> foldl (\acc t -> foldTypeIdentities add t acc) seen ts;
+      XApply a b -> foldTypeIdentities add b (foldTypeIdentities add a seen);
       XForall (XTyVar a) bound b ->
-        typeIdentities b (typeIdentities bound (IS.insert a seen));
+        foldTypeIdentities add b (foldTypeIdentities add bound (add a seen));
       _ -> seen
     };
   computationIdentities :: XComputation -> IntSet -> IntSet;
-  computationIdentities p seen =
+  computationIdentities = foldComputationIdentities IS.insert;
+  foldComputationIdentities :: forall a. (Int -> a -> a) -> XComputation -> a -> a;
+  foldComputationIdentities add p seen =
     case p of {
-      XBottom t -> typeIdentities t seen;
-      XHyp (XTyVar a) -> IS.insert a seen;
-      XInner q -> computationIdentities q seen;
-      XOuter (XTyVar a) q -> computationIdentities q (IS.insert a seen);
-      XIntro (XTyVar a) -> IS.insert a seen;
-      XIntroKind (XTyVar a) _ -> IS.insert a seen;
-      XThen a b -> computationIdentities b (computationIdentities a seen);
+      XBottom t -> foldTypeIdentities add t seen;
+      XHyp (XTyVar a) -> add a seen;
+      XInner q -> foldComputationIdentities add q seen;
+      XOuter (XTyVar a) q -> foldComputationIdentities add q (add a seen);
+      XIntro (XTyVar a) -> add a seen;
+      XIntroKind (XTyVar a) _ -> add a seen;
+      XThen a b -> foldComputationIdentities add b (foldComputationIdentities add a seen);
       _ -> seen
     };
   termIdentities :: XTerm -> IntSet -> IntSet;
-  termIdentities term seen =
+  termIdentities = foldTermIdentities IS.insert;
+  foldTermIdentities :: forall a. (Int -> a -> a) -> XTerm -> a -> a;
+  foldTermIdentities add term seen =
     case term of {
-      XVarTerm n -> IS.insert (X.nameId n) seen;
-      XAbs n ty b -> termIdentities b (typeIdentities ty (IS.insert (X.nameId n) seen));
-      XApp a b -> termIdentities b (termIdentities a seen);
+      XVarTerm n -> add (X.nameId n) seen;
+      XAbs n ty b -> foldTermIdentities add b (foldTypeIdentities add ty (add (X.nameId n) seen));
+      XApp a b -> foldTermIdentities add b (foldTermIdentities add a seen);
       XTypeAbs (XTyVar a) bound b ->
-        termIdentities b (typeIdentities bound (IS.insert a seen));
-      XTypeApp a p -> computationIdentities p (termIdentities a seen);
-      XLet n a b -> termIdentities b (termIdentities a (IS.insert (X.nameId n) seen));
+        foldTermIdentities add b (foldTypeIdentities add bound (add a seen));
+      XTypeApp a p -> foldComputationIdentities add p (foldTermIdentities add a seen);
+      XLet n a b -> foldTermIdentities add b (foldTermIdentities add a (add (X.nameId n) seen));
       XLetRec bs b ->
-        termIdentities b
+        foldTermIdentities add b
           (foldl
              (\acc ((,,) n t a) ->
-                termIdentities a (typeIdentities t (IS.insert (X.nameId n) acc)))
+                foldTermIdentities add a (foldTypeIdentities add t (add (X.nameId n) acc)))
              seen
              bs);
-      XPrimitive _ ts -> foldl (\acc t -> typeIdentities t acc) seen ts;
-      XConstructor _ ts -> foldl (\acc t -> typeIdentities t acc) seen ts;
+      XPrimitive _ ts -> foldl (\acc t -> foldTypeIdentities add t acc) seen ts;
+      XConstructor _ ts -> foldl (\acc t -> foldTypeIdentities add t acc) seen ts;
       XCase a t bs ->
         foldl
           (\acc (XAlternative p b) ->
-             termIdentities b
-               (foldl (\ids n -> IS.insert (X.nameId n) ids) acc (X.patternNames p)))
-          (typeIdentities t (termIdentities a seen))
+             foldTermIdentities add b
+               (foldl (\ids n -> add (X.nameId n) ids) acc (X.patternNames p)))
+          (foldTypeIdentities add t (foldTermIdentities add a seen))
           bs;
-      XWithData _ b -> termIdentities b seen;
+      XWithData _ b -> foldTermIdentities add b seen;
       _ -> seen
     };
+  -- Checking an identity bound needs only a maximum. Use the same visit
+  -- order and binder, pattern, type and computation coverage as relocation.
+  maximumTermIdentity lower term = foldTermIdentities (\identity previous -> max previous identity) term lower;
   freshObject serial term =
     let {
       ids = IS.toList (termIdentities term IS.empty)

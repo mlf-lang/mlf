@@ -14,7 +14,7 @@
   "changes": {
     "bootstrap/MLF/BuiltinPreludeData.hs": [
       "91b2dee48f06af0432c7d2e81372d3a51d223c0e91ff22eab6e132559b4e3211",
-      "9fb0de336d649aa586cb5ab3ceabd148117bce1a3bf666ffce0096ec12d00ec8"
+      "92d180b628e6a4b75d0917ceb14da3bfb805da36d918949df80f5dfb75a5c22d"
     ],
     "bootstrap/MLF/Entry/BuiltinPrelude.hs": [
       "66a9f4ccbdac21123fb721f0e2aa13b506e4b55d6c25642e829d2c6ec1b4fd2a",
@@ -62,7 +62,7 @@
     ],
     "libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs": [
       "e8f69d41475c332991f122c765f79cc11cddf708044db859846818dc26ade920",
-      "914b6a56f6185bacee12c0d2b8bd0002de3d2869efedad160bc2e53974a7160a"
+      "9a0ce32d9ce0b4138a73f4baa4c25ea596e89a3ba2ee6f4c3f43bd63623d6bee"
     ],
     "libraries/mlf-crates/Bootstrap/BuiltinPreludeLiteral.hs": [
       "f3bad10172df0e35b36fc5926cbbfe688e2c6e6603761823d96baee5769e6357",
@@ -102,7 +102,7 @@
     ],
     "libraries/mlf-crates/Bootstrap/Separate.hs": [
       "1b3d1d917d86ffa5fc9e8de8cfe9becb1a6faa7e115842b0b2286cc2907343ba",
-      "f5ced4fb73f9ff03cf729a41390f33c32442ac6fd08aa294288bd8f161615af7"
+      "ce94d32b70be45973db72453804776388154501195230aef465035e226320c57"
     ],
     "libraries/mlf-crates/Bootstrap/SourceEquality.hs": [
       "806297f22ce1d35a02b6db393ecc18771e571a08f13665f981e509358525c6f8",
@@ -110,7 +110,7 @@
     ],
     "libraries/mlf-crates/Bootstrap/SourceInference.hs": [
       "19076e1521695b68a8eed8ba97305498bd863ed7f5602898cd2c34bdf1a40593",
-      "2af129954d9bdef95b73158a013b318495cc77834fa5c2b0f6a2e4ce526f350a"
+      "a1315f408c7845e652f2f61fede28fe45ca038c4fb420fbcb6597debc0574829"
     ],
     "libraries/mlf-foundation/Bootstrap/Fresh.hs": [
       "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d",
@@ -238,7 +238,7 @@
     ],
     "mlf.lock": [
       "5f7f58dece7a251711a3da2b78ba42502bd25554672bbbeaf8bf95abbc469077",
-      "fd018fddbd492144eb3bfa4d87ec2ca2fcc83439091053a8abd29203844edc66"
+      "1fe7acf7a001bffc5ccbf1ad31cf7dd6b505b1105bdbc8058bb6eaad92094cf0"
     ],
     "runtime/mlf_build_runner_hash.h": [
       "cbbdfd06eb43324dceef594e42b21621559df3e3d4e91d62f2b73e2b04d9e778",
@@ -3031,6 +3031,33 @@
       "predecessor": "e0eb96ab65d377a9776e741ad28a16ee3ee9fa07",
       "predecessor_manifest_sha256": "f6dc403850e02f33edabba309da1d410ad61663a365e7694efbcf6268190ca17",
       "predecessor_tree": "1afb0eddf1d51ab6771e0081d90cf0a1ef810739"
+    },
+    {
+      "changes": {
+        "bootstrap/MLF/BuiltinPreludeData.hs": [
+          "9fb0de336d649aa586cb5ab3ceabd148117bce1a3bf666ffce0096ec12d00ec8",
+          "92d180b628e6a4b75d0917ceb14da3bfb805da36d918949df80f5dfb75a5c22d"
+        ],
+        "libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs": [
+          "914b6a56f6185bacee12c0d2b8bd0002de3d2869efedad160bc2e53974a7160a",
+          "9a0ce32d9ce0b4138a73f4baa4c25ea596e89a3ba2ee6f4c3f43bd63623d6bee"
+        ],
+        "libraries/mlf-crates/Bootstrap/Separate.hs": [
+          "f5ced4fb73f9ff03cf729a41390f33c32442ac6fd08aa294288bd8f161615af7",
+          "ce94d32b70be45973db72453804776388154501195230aef465035e226320c57"
+        ],
+        "libraries/mlf-crates/Bootstrap/SourceInference.hs": [
+          "2af129954d9bdef95b73158a013b318495cc77834fa5c2b0f6a2e4ce526f350a",
+          "a1315f408c7845e652f2f61fede28fe45ca038c4fb420fbcb6597debc0574829"
+        ],
+        "mlf.lock": [
+          "fd018fddbd492144eb3bfa4d87ec2ca2fcc83439091053a8abd29203844edc66",
+          "1fe7acf7a001bffc5ccbf1ad31cf7dd6b505b1105bdbc8058bb6eaad92094cf0"
+        ]
+      },
+      "predecessor": "76a8d2ec27bbdc4c56dbe816785a40626916c8c9",
+      "predecessor_manifest_sha256": "fc1032496eb7619944646b9cea86bf7610dc227c9ea14396088c5b6ce1dabed9",
+      "predecessor_tree": "176c5f7c9947b7ba3a42a4ba4cf316e9c13e3aa3"
     }
   ],
   "format": "pr43-reconciliation-source-migration-v1",
