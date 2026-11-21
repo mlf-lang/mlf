@@ -604,12 +604,12 @@ module Tests.TupleList where {
                                                                                                          "[1..3]"))
                                                                                                    ((:)
                                                                                                       (leaf
-                                                                                                         "tuple-list/focused/malformed-5b61207c2061203c2d20625d"
-                                                                                                         "malformed [a | a <- b]"
+                                                                                                         "tuple-list/focused/malformed-5b61207c2061203c2d205d"
+                                                                                                         "malformed [a | a <- ]"
                                                                                                          "parse-rejection"
                                                                                                          (parseRejected
-                                                                                                            "malformed [a | a <- b]"
-                                                                                                            "[a | a <- b]"))
+                                                                                                            "malformed [a | a <- ]"
+                                                                                                            "[a | a <- ]"))
                                                                                                       ((:)
                                                                                                          (leaf
                                                                                                             "tuple-list/focused/malformed-61203a"
@@ -620,22 +620,22 @@ module Tests.TupleList where {
                                                                                                                "a :"))
                                                                                                          ((:)
                                                                                                             (leaf
-                                                                                                               "tuple-list/focused/ranges-have-a-targeted-diagnostic"
-                                                                                                               "ranges have a targeted diagnostic"
+                                                                                                               "tuple-list/focused/bounded-ranges-report-the-unsupported-bound"
+                                                                                                               "bounded ranges report the unsupported bound"
                                                                                                                "diagnostic"
                                                                                                                (parseDiagnostic
-                                                                                                                  "ranges have a targeted diagnostic"
+                                                                                                                  "bounded ranges report the unsupported bound"
                                                                                                                   "[1..3]"
-                                                                                                                  "list ranges are not supported"))
+                                                                                                                  "tuple-list.emlf:1:5: unexpected 3; expected ]"))
                                                                                                             ((:)
                                                                                                                (leaf
-                                                                                                                  "tuple-list/focused/comprehensions-have-a-targeted-diagnostic"
-                                                                                                                  "comprehensions have a targeted diagnostic"
+                                                                                                                  "tuple-list/focused/missing-generator-expression-retains-source-position"
+                                                                                                                  "missing generator expression retains source position"
                                                                                                                   "diagnostic"
                                                                                                                   (parseDiagnostic
-                                                                                                                     "comprehensions have a targeted diagnostic"
-                                                                                                                     "[a | a <- b]"
-                                                                                                                     "list comprehensions are not supported"))
+                                                                                                                     "missing generator expression retains source position"
+                                                                                                                     "[a | a <- ]"
+                                                                                                                     "tuple-list.emlf:1:11:"))
                                                                                                                ((:)
                                                                                                                   (leaf
                                                                                                                      "tuple-list/focused/tuple-arity-has-a-targeted-diagnostic"

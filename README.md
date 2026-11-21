@@ -1200,8 +1200,17 @@ means `List A`. List and tuple types also work in datatype fields, for example
 matches a nonempty list and binds its tail. Cons patterns associate right and
 bind less tightly than constructor application. Parenthesize cons patterns in
 function or lambda parameters. Nested patterns and do-bind patterns use the
-same ordinary pattern compiler. List comprehensions and ranges are outside this
-version's scope and have explicit rejection diagnostics.
+same ordinary pattern compiler.
+
+The `shared-haskell-v1` profile supports list comprehensions such as
+`[x * 2 | Just x <- values, x > 0]`. Generators run from left to right, skip
+elements that fail to match their pattern, and scope their bindings over later
+qualifiers and the result expression. Boolean guards and `let` qualifiers are
+supported. Shared sources also accept lazy open-ended `Int` ranges `[start ..]`
+and `[start, next ..]`. A range stops at the `Int` boundary in its direction of
+travel, and a zero step repeats the start. The `MLF.Primitive` operator `$`
+groups to the right with precedence 0. Legacy `.emlf` retains its existing
+collection and operator syntax.
 
 MLF already uses `:` for annotations. To preserve valid existing annotations,
 an expression's single colon retains that meaning when its complete right side

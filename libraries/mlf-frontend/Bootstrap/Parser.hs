@@ -19,6 +19,10 @@ module Bootstrap.Parser where {
     SharedBind SPattern SExpr SourceSpan |
     SharedThen SExpr |
     SharedLet ([] ((,,) String (Maybe SAnnotation) SExpr));
+  data ListQualifier =
+    ListGenerator SPattern SExpr |
+    ListGuard SExpr |
+    ListLet ([] ((,,) String (Maybe SAnnotation) SExpr));
   data Value =
     Signature String SAnnotation | Equation String ([] SPattern) (Maybe SAnnotation) SExpr;
   reservedWords :: [] String;
@@ -601,7 +605,7 @@ module Bootstrap.Parser where {
   expr :: Parser SExpr;
   expr = do {
     located <- pWithSpan (do {
-      e <- pBySyntax sharedBindExpr disjunction;
+      e <- pBySyntax sharedApplyExpr disjunction;
       pOption ((,) e False) (do {
         annotationSymbol;
         a <- annotation;
@@ -1048,8 +1052,7 @@ module Bootstrap.Parser where {
                                     (sourceTupleValue (SConstructor "()")
                                        (\name fields -> foldl SApp (SConstructor name) fields))) [])))))))
          ((:)
-            (pMap (foldr sourceConsExpression (SConstructor "[]"))
-               (pThen (pToken "[") (pBefore (collectionItems "]" expr) (pToken "]"))))
+            sharedListExpression
             ((:) doExpr
                ((:) (pBySyntax (pMap (\b -> SConstructor (sharedSourceName (if b then "True" else "False"))) booleanLiteral) (pMap SBoolLit booleanLiteral))
                   ((:) (pMap SDoubleLit doubleLiteral)
@@ -1060,6 +1063,82 @@ module Bootstrap.Parser where {
                               ((:) (pThen (pNot (pTry operatorReference)) (pMap (\name -> SConstructor (sharedSourceName name)) upperReference)) [])))))))));
   sourceConsExpression :: SExpr -> SExpr -> SExpr;
   sourceConsExpression a b = SApp (SApp (SConstructor ":") a) b;
+  -- Open-ended source ranges enumerate machine Ints. Stop at the last
+  -- representable element, including when the last step would overflow.
+  openRange :: SExpr -> Maybe SExpr -> SExpr;
+  openRange first second = let {
+    item = SVar "$rangeItem";
+    empty = SConstructor "[]";
+    lastInt = SIntLit 9223372036854775807;
+    recur = SApp (SVar "$rangeLoop");
+    loop start body = SLetRec [("$rangeLoop", InferRecursive, SLam "$rangeItem" Nothing body)]
+      (recur start)
+  } in case second of {
+    Nothing -> loop first
+      (conditional (primitive2 PEqInt item lastInt)
+        (sourceConsExpression item empty)
+        (sourceConsExpression item (recur (primitive2 PAddInt item (SIntLit 1)))));
+    Just next -> let {
+      toInteger = SApp (SPrimitive PIntToInteger);
+      start = SVar "$rangeStart";
+      step = SVar "$rangeStep";
+      descending = SVar "$rangeDescending";
+      firstInt = SIntLit (0 - 9223372036854775807 - 1);
+      pastBound = conditional descending
+        (primitive2 PLtInteger item (toInteger firstInt))
+        (primitive2 PLtInteger (toInteger lastInt) item)
+    } in
+      SLet "$rangeStart" (toInteger first)
+        (SLet "$rangeStep" (primitive2 PSubInteger (toInteger next) start)
+          (SLet "$rangeDescending" (primitive2 PLtInteger step (toInteger (SIntLit 0)))
+            (loop start (conditional pastBound empty
+              (sourceConsExpression (SApp (SPrimitive PIntegerToInt) item)
+                (recur (primitive2 PAddInteger item step)))))))
+  };
+  sharedListExpression :: Parser SExpr;
+  sharedListExpression = pBetween (pToken "[") (pToken "]") (pChoice
+    (pThen (pLook (pToken "]")) (pPure (SConstructor "[]")))
+    (do {
+      first <- expr;
+      pChoices [
+        pThen (pToken "|") (do {
+          qualifiers <- pSepBy1 listQualifier (pToken ",");
+          pEither (lowerListQualifiers qualifiers (sourceConsExpression first (SConstructor "[]")))
+        }),
+        pMap (\_ -> openRange first Nothing) (pToken ".."),
+        pThen (pToken ",") (do {
+          second <- collectionElement "]" expr;
+          pChoice (pMap (\_ -> openRange first (Just second)) (pToken ".."))
+            (pMap (foldr sourceConsExpression (SConstructor "[]"))
+              (pMap (\rest -> first : second : rest) (collectionRest "]" expr)))
+        }),
+        pPure (sourceConsExpression first (SConstructor "[]"))]
+    }));
+  listQualifier :: Parser ListQualifier;
+  listQualifier = pChoices [
+    pBind (pTry (pBefore patternP (pToken "<-"))) (\pattern -> pMap (ListGenerator pattern) expr),
+    pTry (do {
+      pToken "let";
+      values <- valueBlock;
+      pLook (pChoice (pToken ",") (pToken "]"));
+      pPure (ListLet values)
+    }),
+    pMap ListGuard expr];
+  -- Use the wired list Monad and the same pattern lowering as shared do.
+  -- A refutable generator skips the element using an empty list fallback.
+  lowerListQualifiers :: [] ListQualifier -> SExpr -> Either String SExpr;
+  lowerListQualifiers qualifiers result = case qualifiers of {
+    [] -> Right result;
+    (:) qualifier rest -> do {
+      continuation <- lowerListQualifiers rest result;
+      case qualifier of {
+        ListGenerator pattern source -> Right (SSharedBind pattern source continuation
+          (SVar "$MLF.Primitive.>>=") (SConstructor "[]"));
+        ListGuard condition -> Right (conditional condition continuation (SConstructor "[]"));
+        ListLet values -> Surface.bindValues values continuation
+      }
+    }
+  };
   legacyAtom :: Parser SExpr;
   legacyAtom =
     pChoices
@@ -1102,16 +1181,19 @@ module Bootstrap.Parser where {
            else if eqString next ","
                 then do {
                        pToken ",";
-                       end <- pState;
-                       if eqString (tokenText (stateToken end)) closing
-                       then pFail "trailing comma or missing collection element"
-                       else pPure ();
-                       value <- item;
+                       value <- collectionElement closing item;
                        rest <- collectionRest closing item;
                        pPure ((:) value rest)
                      }
                 else pPure []
     };
+  collectionElement :: forall a. String -> Parser a -> Parser a;
+  collectionElement closing item = do {
+    end <- pState;
+    if eqString (tokenText (stateToken end)) closing
+    then pFail "trailing comma or missing collection element"
+    else item
+  };
   sourceTupleName :: Int -> Parser String;
   sourceTupleName arity =
     if arity >= 2 && arity <= 64
@@ -1763,6 +1845,8 @@ module Bootstrap.Parser where {
                     (SVar (sourceOperatorName operator))) a) b)
     }
   };
+  sharedApplyExpr :: Parser SExpr;
+  sharedApplyExpr = pChainr sharedBindExpr (sharedOperatorParser ["$"]);
   sharedBindExpr :: Parser SExpr;
   sharedBindExpr = pChainl sharedOrExpr (sharedOperatorParser ((:) ">>=" ((:) ">>" [])));
   sharedOrExpr :: Parser SExpr;

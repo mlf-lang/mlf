@@ -390,10 +390,10 @@ module Tests.TupleListLegacy where {
            ((:) "(,a)"
               ((:) "[a,]"
                     ((:) "[,a]"
-                       ((:) "[a" ((:) "[1..3]" ((:) "[a | a <- b]" ((:) "a :" []))))))));
-      parseDiagnostic "ranges have a targeted diagnostic" "[1..3]" "list ranges are not supported";
-      parseDiagnostic "comprehensions have a targeted diagnostic" "[a | a <- b]"
-        "list comprehensions are not supported";
+                       ((:) "[a" ((:) "[1..3]" ((:) "[a | a <- ]" ((:) "a :" []))))))));
+      parseDiagnostic "bounded ranges report the unsupported bound" "[1..3]" "tuple-list.emlf:1:5: unexpected 3; expected ]";
+      parseDiagnostic "missing generator expression retains source position" "[a | a <- ]"
+        "tuple-list.emlf:1:11:";
       parseDiagnostic "tuple arity has a targeted diagnostic" (tupleSource 65 "a")
         "tuple arity must be between 2 and 64";
       parseDiagnostic "malformed list retains exact source position" "[1,\n ]"

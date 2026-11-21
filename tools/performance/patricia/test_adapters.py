@@ -1744,8 +1744,8 @@ class BinarySourceBoundaryTests(unittest.TestCase):
 
     def test_reviewed_source_repairs_project_all_declared_owners(self):
         binary = migration.binary_contract()
-        # The DeclId repairs remain independently authenticated. Formatter
-        # compatibility subsequently changes Layout only among these owners;
+        # The DeclId repairs remain independently authenticated. Formatter and list
+        # expression support subsequently change Layout only among these owners;
         # prove that exact overlap instead of treating the live bytes as DeclId.
         repairs = binary.previous
         names = ('Bootstrap.Layout', 'Package.Benchmark', 'Package.Verification', 'Tests.CompilerTests')
@@ -1754,7 +1754,7 @@ class BinarySourceBoundaryTests(unittest.TestCase):
                          & set(binary.changes), {layout})
         self.assertEqual(binary.changes[layout], [
             '2d728d0dedebb05abe620095abe0f03999e3a8e00fca845faf47036fc81178de',
-            'b64c7f09bdf23a9652baa1fbd74729287dac243fd5a3801fbbc83e6abe5f58c8',
+            'c73e29528cf92ba525b3f9a40e4bbf54f73f7c211917721c48f9ccc63636ba60',
         ])
         for module in names:
             path = binary.value['module_paths'][module]

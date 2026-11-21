@@ -27,11 +27,11 @@ module MLF.Primitive
   , asyncStep, asyncEnqueue, asyncDelay, asyncWait
   , orInt, xorInt, shiftLInt, shiftRInt, unsignedShiftRInt, countLeadingZerosInt, countTrailingZerosInt, popCountInt, intToInteger, integerToInt, addInteger, subInteger, mulInteger, quotInteger, remInteger, eqInteger, ltInteger, showInteger, readInteger, integerToDouble, unsignedLtInt
   , implementationHost, bind, negate, otherwise
-  , (+), (-), (*), (/), (%), (<), (<=), (>), (>=), (++), (&&), (||)
+  , ($), (+), (-), (*), (/), (%), (<), (<=), (>), (>=), (++), (&&), (||)
   ) where
 
 import qualified Prelude as P
-import Prelude (Functor(..), Applicative(..), Monad(..), Eq(..), Char, IOError)
+import Prelude (Functor(..), Applicative(..), Monad(..), Eq(..), Char, IOError, ($))
 import Control.Monad.Fail (MonadFail(..))
 import qualified Control.Monad.ST as HostST
 import GHC.Exts (RealWorld)

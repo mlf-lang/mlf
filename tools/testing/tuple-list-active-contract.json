@@ -36,10 +36,10 @@
     "tuple-list/focused/malformed-5b2c615d",
     "tuple-list/focused/malformed-5b61",
     "tuple-list/focused/malformed-5b312e2e335d",
-    "tuple-list/focused/malformed-5b61207c2061203c2d20625d",
+    "tuple-list/focused/malformed-5b61207c2061203c2d205d",
     "tuple-list/focused/malformed-61203a",
-    "tuple-list/focused/ranges-have-a-targeted-diagnostic",
-    "tuple-list/focused/comprehensions-have-a-targeted-diagnostic",
+    "tuple-list/focused/bounded-ranges-report-the-unsupported-bound",
+    "tuple-list/focused/missing-generator-expression-retains-source-position",
     "tuple-list/focused/tuple-arity-has-a-targeted-diagnostic",
     "tuple-list/focused/malformed-list-retains-exact-source-position",
     "tuple-list/focused/constructor-cons-before-bar",
@@ -111,9 +111,9 @@
     "tuple-list/focused/explicit-custom-unit-remains-available"
   ],
   "source_sha256": {
-    "tests/Tests/TupleList.hs": "2ff183466ff22c3627aa58f0b73d9503ef1dc979f7b0e9c1f7744cd9933996f8",
+    "tests/Tests/TupleList.hs": "4d8ceb5ddee0ae9981659402c1c490ff00e0dc50264ba344af0d30ca96c760ae",
     "tests/MLF/Entry/TupleList.hs": "e817f6037216da8cff7d615e617adcccd58bf687b6e9dacc3155ad8e4a9f6bd8",
-    "tests/Tests/TupleListLegacy.hs": "60176aca5512cf858f1c5fcde5819741a28073b4b504049a301a54f0492ab6b0"
+    "tests/Tests/TupleListLegacy.hs": "295f480509cb670133578781ce7daafa265bc28fe37c4a47a4b6e5170bd2b3a7"
   },
   "reviewed_case_delta_sha256": "4ff7882b0ee7a372938ee3bf13212ec962b6eaff21cb530b7e50b0241326f2d6"
 }

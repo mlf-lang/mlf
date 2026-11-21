@@ -838,7 +838,9 @@ module Bootstrap.Lexer where {
   sharedIdentifierFirst :: Int -> Bool;
   sharedIdentifierFirst c = (((c >= 65) && (c <= 90)) || ((c >= 97) && (c <= 122)));
   sharedValueOperators :: [] String;
-  sharedValueOperators = (:) ("+") ((:) ("-") ((:) ("*") ((:) ("/") ((:) ("%") ((:) ("++") ((:) ("==") ((:) ("/=") ((:) ("<") ((:) ("<=") ((:) (">") ((:) (">=") ((:) ("&&") ((:) ("||") ((:) (">>=") ((:) (">>") ((:) ("<*>") ((:) ("<$") ((:) ("*>") ((:) ("<*") ([]))))))))))))))))))));
+  sharedValueOperators =
+    ["$", "+", "-", "*", "/", "%", "++", "==", "/=", "<", "<=", ">", ">=",
+     "&&", "||", ">>=", ">>", "<*>", "<$", "*>", "<*"];
   sharedPunctuation :: [] String;
   sharedPunctuation = append ((:) "@" ((:) "~" ((:) "[" ((:) "]" ((:) ":" sharedValueOperators))))) ((:) ("::") ((:) ("->") ((:) ("<-") ((:) ("=>") ((:) ("=") ((:) ("|") ((:) (".") ((:) ("..") ((:) ("\\") ((:) ("(") ((:) (")") ((:) ("{") ((:) ("}") ((:) (";") ((:) (",") ((:) ("_") ([])))))))))))))))));
   sharedQualifiedOperator text =
@@ -888,7 +890,7 @@ module Bootstrap.Lexer where {
     };
   -- Cache consumers must bind this semantic identity as well as raw source bytes.
   frontendSemanticVersion :: String;
-  frontendSemanticVersion = "mlf-frontend/shared-haskell-v1/8";
+  frontendSemanticVersion = "mlf-frontend/shared-haskell-v1/9";
   builtinInterfaceVersion :: String;
-  builtinInterfaceVersion = "mlf-primitive/shared-haskell-v1/13"
+  builtinInterfaceVersion = "mlf-primitive/shared-haskell-v1/14"
 }
