@@ -16,6 +16,8 @@ cd -- "$root"
 case $(uname -s) in Linux) ulimit -s unlimited ;; Darwin) ;; *) echo 'Task language runner supports Linux and macOS.' >&2; exit 2 ;; esac
 timeout_seconds=${MLF_ASYNC_COMMAND_TIMEOUT:-600}
 case $timeout_seconds in ''|*[!0-9]*|0) echo 'MLF_ASYNC_COMMAND_TIMEOUT must be positive.' >&2; exit 2 ;; esac
+source_compile_seconds=${MLF_ASYNC_SOURCE_COMPILE_TIMEOUT:-$timeout_seconds}
+case $source_compile_seconds in ''|*[!0-9]*|0) echo 'MLF_ASYNC_SOURCE_COMPILE_TIMEOUT must be positive.' >&2; exit 2 ;; esac
 command_pid= watchdog_pid=
 labels=()
 fail() { echo "Async.Task: $*; evidence: $work" >&2; exit 1; }
@@ -31,7 +33,10 @@ trap 'exit 143' TERM
 run() {
  local label=$1 status=0 limit=$timeout_seconds
  shift
- case $label in *.interpreter|*.llvm) if [ "$limit" -gt 45 ]; then limit=45; fi ;; esac
+ case $label in
+  *.compile) limit=$source_compile_seconds ;;
+  *.interpreter|*.llvm) if [ "$limit" -gt 45 ]; then limit=45; fi ;;
+ esac
  labels+=("$label")
  "$@" < /dev/null > "$work/$label.stdout" 2> "$work/$label.stderr" &
  command_pid=$!

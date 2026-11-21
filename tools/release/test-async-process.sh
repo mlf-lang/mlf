@@ -19,6 +19,8 @@ cd -- "$root"
 case $(uname -s) in Linux) ulimit -s unlimited ;; Darwin) ;; *) printf '%s\n' 'This shell language-parity runner supports Linux and macOS.' >&2; exit 2 ;; esac
 timeout_seconds=${MLF_ASYNC_COMMAND_TIMEOUT:-600}
 case $timeout_seconds in ''|*[!0-9]*|0) printf '%s\n' 'MLF_ASYNC_COMMAND_TIMEOUT must be a positive number of seconds.' >&2; exit 2 ;; esac
+source_compile_seconds=${MLF_ASYNC_SOURCE_COMPILE_TIMEOUT:-$timeout_seconds}
+case $source_compile_seconds in ''|*[!0-9]*|0) printf '%s\n' 'MLF_ASYNC_SOURCE_COMPILE_TIMEOUT must be a positive number of seconds.' >&2; exit 2 ;; esac
 started=$SECONDS
 command_pid=
 watchdog_pid=
@@ -43,6 +45,7 @@ run() {
   local label=$1 status=0 limit=$timeout_seconds
   shift
   case $label in
+    compile|panic.compile) limit=$source_compile_seconds ;;
     interpreter|llvm|panic.interpreter|panic.llvm|panic.*.reaped)
       if [ "$limit" -gt 60 ]; then limit=60; fi ;;
   esac
