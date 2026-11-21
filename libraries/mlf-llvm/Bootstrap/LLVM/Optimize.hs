@@ -1561,7 +1561,10 @@ module Bootstrap.LLVM.Optimize where {
         constructorValue = case useTerm value of {
           XEApp _ _ -> smallValue (useTerm value); _ -> False
         } } in
-      if uses == 1 && constructorValue then freshPure (queueSubstitution name [value] 1 pending)
+      -- The RHS has already been normalized. An unused binding costs no
+      -- fresh names and leaves the effective body and its queued copies intact.
+      if uses == 0 then freshPure pending
+      else if uses == 1 && constructorValue then freshPure (queueSubstitution name [value] 1 pending)
       else if uses < 2 || L.not (branchesToFreeValues value) then delayOwnedLet name value pending
       else let {
         retained = PendingBody (useLet name value body) replacements

@@ -1469,6 +1469,19 @@ constructorSubstitutionChecks = do
   forM_ [unused,repeated,nonAtom] $ \term ->
     check "constructor fallback retains ordinary multiplicity and effects" (0,True) (test term)
 
+  -- Dead declarations between queued substitutions still normalize their RHS.
+  -- Inlining the RHS callback consumes a fresh identity before the dead let drops.
+  let callback = T.XEAbs (name 220) (var 220)
+      deadRhs = T.XELet (name 221) callback (T.XEApp (var 222) (var 221))
+      interrupted = T.XELet (name 5) (ctor 5)
+        (T.XELet (name 210) deadRhs (T.XELet (name 6) (ctor 6) (pair (var 5) (var 6))))
+  check "unused declarations preserve queued substitutions and fresh order"
+    (2,True) (test interrupted)
+  -- Losing a pending queue is harmless for an isolated dead let, so verify
+  -- both preservation above and the binding's removal when the tail is one variable.
+  check "unused normalized RHS leaves a variable continuation"
+    (0,True) (test (T.XELet (name 210) deadRhs (var 211)))
+
 -- Compare each emitted callback's capture set to a fresh traversal. Include
 -- repeated open-term identities and transitive captures through static workers.
 lambdaCaptureChecks = do
