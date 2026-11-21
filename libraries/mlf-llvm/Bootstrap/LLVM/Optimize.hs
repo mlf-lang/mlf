@@ -535,7 +535,48 @@ module Bootstrap.LLVM.Optimize where {
   };
   constructorIdentities known expression = if M.null known
     then identities expression else constructorApplications known expression;
-  constructorApplications known expression = do {
+  -- Inspect only partial applications built from checked composition roles
+  -- and variables. Their ordinary child pass preserves the input syntax and
+  -- seed. Callback roles are needed only when the erased result is demanded.
+  translationChain :: Map XName UnaryConstructorUse -> XErased -> Maybe (Maybe Int);
+  translationChain known function = let {
+    amount name = case M.lookup compareName name known of {
+      Just (TranslatesBy n) -> Just n; _ -> Nothing
+    };
+    combine outer rest = case amount outer of {
+      Just first -> case rest of {
+        Just later -> Just (seq later (first + later)); Nothing -> Nothing
+      };
+      Nothing -> Nothing
+    };
+    walk operator = case operator of {
+      XEApp (XEApp (XEVar name) (XEVar outer)) inner -> case M.lookup compareName name known of {
+        Just ComposesFunctions -> case walk inner of {
+          Just rest -> Just (combine outer rest); Nothing -> Nothing
+        };
+        _ -> Nothing
+      };
+      XEVar name -> Just (amount name);
+      _ -> Nothing
+    }
+  } in walk function;
+  constructorApplications known expression = Fresh (\seed -> let {
+    ordinary = runFresh (ordinaryConstructorApplications known expression) seed
+  } in case expression of {
+    XEApp function@(XEApp (XEApp (XEVar _) _) _) argument -> case translationChain known function of {
+      Just summary -> let {
+        result = case summary of {
+          Just amount -> translated amount argument;
+          Nothing -> applyComposed known function argument
+        }
+      } in case argument of {
+        XEVar _ -> (,) result seed; XEInt _ -> (,) result seed; _ -> ordinary
+      };
+      Nothing -> ordinary
+    };
+    _ -> ordinary
+  });
+  ordinaryConstructorApplications known expression = do {
     term <- children (constructorApplications known) expression;
     case term of {
       XEApp (XEVar function) argument -> case M.lookup compareName function known of {

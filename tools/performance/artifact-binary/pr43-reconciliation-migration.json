@@ -210,7 +210,7 @@
     ],
     "libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs": [
       "4cc34c817a9e12dd77e2f27ebae98aa4d977c5247d741668bad1a86b898bba1f",
-      "ed113f4fe363d36d3492d33f347b57124761874b129f09a65ebcece4ef509cc1"
+      "b66d196f9e838ca4f42eabacae481b6e94f8ba9e03aaeefc15d2398c66aec9c0"
     ],
     "libraries/mlf-package-core/Package/Build.hs": [
       "9df00f9622c9a1acafc2d6068980dadf56cafd33886c644b5bffb995a84152d8",
@@ -238,7 +238,7 @@
     ],
     "mlf.lock": [
       "5f7f58dece7a251711a3da2b78ba42502bd25554672bbbeaf8bf95abbc469077",
-      "2e6dce3ddb39dd92b1fcfe8f6bdb33bb7724f0a8002e8d7733b13fa1938687a8"
+      "5daf27fe2b31df7e6d341d9964c0cb29c84b099374326cb51ec773150a9c8e23"
     ],
     "runtime/mlf_build_runner_hash.h": [
       "cbbdfd06eb43324dceef594e42b21621559df3e3d4e91d62f2b73e2b04d9e778",
@@ -3627,6 +3627,21 @@
       "predecessor": "c48b2770ee0dfbc8bd1da35d5838e2b742b01152",
       "predecessor_manifest_sha256": "14cf3eb9ebdd6b9968e41a1474b1bdac4642addf4798e891d8726b16e484b517",
       "predecessor_tree": "00eac5e5eac798cef30968b33aa7f9b19df4e9e6"
+    },
+    {
+      "changes": {
+        "libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs": [
+          "ed113f4fe363d36d3492d33f347b57124761874b129f09a65ebcece4ef509cc1",
+          "b66d196f9e838ca4f42eabacae481b6e94f8ba9e03aaeefc15d2398c66aec9c0"
+        ],
+        "mlf.lock": [
+          "2e6dce3ddb39dd92b1fcfe8f6bdb33bb7724f0a8002e8d7733b13fa1938687a8",
+          "5daf27fe2b31df7e6d341d9964c0cb29c84b099374326cb51ec773150a9c8e23"
+        ]
+      },
+      "predecessor": "6786fa19da94880185c7471e56485bd9cfd1a519",
+      "predecessor_manifest_sha256": "1cfb5fc7ed7db299f1d4d9475ce6dbfd174a88c98d26886f90171dce5640cfb8",
+      "predecessor_tree": "3997d3065d1df4b565fc7d4e3ab3dcd6ed6d548a"
     }
   ],
   "format": "pr43-reconciliation-source-migration-v1",

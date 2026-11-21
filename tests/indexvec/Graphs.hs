@@ -1092,6 +1092,19 @@ knownConstructorFoldChecks = do
         T.Nothing -> pure ()
         _ -> fail "unspecified subtree collapsed"
     _ -> fail "missing recursive constructor fold"
+  do
+    let fn i=T.XName i "operator"
+        ref i=T.XEVar (fn i)
+        pair h t=T.XEApp (T.XEApp (ref 22) (ref h)) t
+        table=M.fromList Optimize.compareName [(fn 22,Optimize.ComposesFunctions),
+          (fn 30,Optimize.TranslatesBy maxBound),(fn 31,Optimize.TranslatesBy 1)]
+        chain=pair 30 (pair 31 (ref 31))
+        result=T.XEApp (T.XEApp (T.XEPrimitive T.PAddInt) (ref 45)) (T.XEInt (minBound+1))
+        (optimized,seed)=Optimize.runFresh (Optimize.constructorApplications table (T.XEApp chain (ref 45))) 78
+    check "verified composition chain preserves its binder and wrapping offset"
+      (True,78) (X.equalErased result optimized,seed)
+    check "unknown callback keeps ordinary composition semantics" True
+      (case Optimize.translationChain table (pair 99 (ref 31)) of T.Just T.Nothing->True;_->False)
   let select count index values = Optimize.foldKnownConstructor
         (M.singleton "Box" (count,Optimize.ReturnField index))
         (foldl T.XEApp (T.XEConstructor "Box") values)
