@@ -675,7 +675,7 @@ module Bootstrap.Classes where {
         freshLift (traverseEither (\entry -> dictionaryDecl infos (snd entry)) entries);
       ds <- freshLift (D.validateDeclarations (append datatypes dictionaries));
       checkedInstances <- freshLift (traverseEither (validateInstance ds infos) instances);
-      freshLift (checkOverlap checkedInstances);
+      freshLift (checkValidatedOverlap checkedInstances);
       names <-
         case config of {
           Nothing -> mapM (\inst -> freshName "instanceDictionary") checkedInstances;
@@ -1531,26 +1531,77 @@ module Bootstrap.Classes where {
         };
       _ -> Left "instance heads must be monotypes"
     };
+  checkOverlapPair name left right = do {
+    xs <- left;
+    ys <- right;
+    ensure (not (overlap M.empty (zip xs ys))) ("overlapping instances for " ++ name)
+  };
+  -- The raw entry point checks a prefix on demand. An overlap can precede
+  -- an invalid or undefined remainder supplied by a caller.
   checkOverlap :: [] SInstanceDecl -> Either String ();
-  checkOverlap instances =
-    case instances of {
+  checkOverlap instances = case instances of {
+    [] -> Right ();
+    (:) a rest -> do {
+      let { name = instanceClass a };
+      traverseEither (\b ->
+        if eqString name (instanceClass b)
+        then checkOverlapPair name (traverseEither (headType "left:") (instanceHead a))
+               (traverseEither (headType "right:") (instanceHead b))
+        else Right ()) rest;
+      checkOverlap rest
+    }
+  };
+  -- Distinct rigid constructors at the left end of an application spine
+  -- cannot unify. A variable there can absorb an application of any arity.
+  overlapRoot :: InstanceHead -> Maybe String;
+  overlapRoot ty = case ty of {
+    HVar _ -> Nothing;
+    HCon name args -> case args of {
+      (:) f ((:) _ []) -> if eqString name "@" then overlapRoot f else Just name;
+      _ -> Just name
+    }
+  };
+  -- All later rows, rows with a flexible first head, and rigid rows by root.
+  data OverlapClass a = OverlapClass ([] a) ([] a) (Map String ([] a));
+  checkValidatedOverlap :: [] SInstanceDecl -> Either String ();
+  checkValidatedOverlap instances = let {
+    emptyClass = OverlapClass [] [] M.empty;
+    check name left alternatives = case alternatives of {
       [] -> Right ();
-      (:) a rest ->
-        do {
-          traverseEither
-            (\b ->
-               if not (eqString (instanceClass a) (instanceClass b))
-               then Right ()
-               else do {
-                      xs <- traverseEither (headType "left:") (instanceHead a);
-                      ys <- traverseEither (headType "right:") (instanceHead b);
-                      ensure (not (overlap M.empty (zip xs ys)))
-                        ("overlapping instances for " ++ instanceClass a)
-                    })
-            rest;
-          checkOverlap rest
-        }
+      (:) ((,) _ right) rest -> do {
+        checkOverlapPair name left right;
+        check name left rest
+      }
     };
+    -- Build the suffix index backwards, then execute checks in the original
+    -- left-to-right order. Merge rigid and wildcard rows by declaration order
+    -- so that an overlap and a malformed head retain their original priority.
+    build order index checks remaining = case remaining of {
+      [] -> foldEither (\_ result -> result) () checks;
+      (:) inst rest -> let {
+        name = instanceClass inst;
+        left = traverseEither (headType "left:") (instanceHead inst);
+        right = traverseEither (headType "right:") (instanceHead inst);
+        row = (,) order right;
+        root = case right of {
+          Right ((:) first _) -> overlapRoot first;
+          _ -> Nothing
+        };
+        next candidates updated = let { newIndex = M.insert compareString name updated index } in
+          seq order (seq candidates (seq newIndex (build (order - 1) newIndex
+            ((:) (check name left candidates) checks) rest)))
+      } in case M.findWithDefault compareString emptyClass name index of {
+        OverlapClass allRows wild rigid -> case root of {
+          Nothing -> next allRows (OverlapClass ((:) row allRows) ((:) row wild) rigid);
+          Just key -> let {
+            matching = M.findWithDefault compareString [] key rigid;
+            candidates = mergeBy (\a b -> compareInt (fst a) (fst b)) matching wild
+          } in next candidates (OverlapClass ((:) row allRows) wild
+            (M.insert compareString key ((:) row matching) rigid))
+        }
+      }
+    }
+  } in build 0 M.empty [] (reverse instances);
   eqHead :: InstanceHead -> InstanceHead -> Bool;
   eqHead a b =
     case a of {

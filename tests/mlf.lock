@@ -337,7 +337,7 @@
         "Tests/TestSourceCache.emlf": "6cf362b91f6a87ad23d138b6f54fc1ff89e989a87694eef6431128a90a01d197",
         "Tests/TestSources.hs": "f68293bcdd472babf62ff3ef201325af451079186290ea91efe1c0cb30d7893f",
         "Tests/Text.emlf": "78df805a93b05bc54ec586388b0e0e45c17bfe48c4fa09a1396ef2707cd6789a",
-        "Tests/Typeclasses.emlf": "6ceda8fff5517eb7a916e98ad9e9177e6a436c886f6120b1e1269e8ece57d48d",
+        "Tests/Typeclasses.emlf": "60e3403f091203d8a41081ce163e0e8c5bd51d8870a37e773354c56908f73d13",
         "shared/Tests/BuildReceipts.hs": "05a0d967492413b3fa68055202c7821c08355ede167ea264be1ad992b6d9b1c0",
         "shared/Tests/IndependentCheck.hs": "64800f6cf21e0d6dae65c02491ec4a56ce6a3f21056d73cd12c9693b45451757",
         "shared/Tests/IndependentType.hs": "04ce5f659b2a515cb89c32cbb5d3889545f90b91faae806f1792c1f48c794642"
