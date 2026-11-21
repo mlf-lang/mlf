@@ -1800,6 +1800,50 @@ knownConstructorFoldChecks = do
 -- the two polymorphic operations cancel or inspecting their implementations.
 data CallTrace = Calls String | TraceFunction (CallTrace -> CallTrace)
 
+segmentedContinuationChecks = do
+  let checked (T.Left message) = fail (H.unpack message)
+      checked (T.Right value) = pure value
+      int = T.XCon "Int" []
+      name i = T.XName i "same"
+      callback = name 0
+      input = name 1
+      owner = name 2
+      callbackAt value = T.XApp (T.XVarTerm callback) value
+      chain count seed = foldr (\i tail -> callbackAt (T.XAbs (name i) int tail)) seed [4..count+3]
+      declaration rhs = T.XLet owner (T.XAbs input int rhs) (T.XConstructor "()" [])
+      callbackTy = T.XArrow (T.XArrow int int) int
+      ps = [(callback,callbackTy)]
+      applied body seed = T.XApp
+        (T.XAbs callback callbackTy (T.XApp body (T.XIntTerm seed)))
+        (T.XAbs (name 3) (T.XArrow int int) (T.XApp (T.XVarTerm (name 3)) (T.XIntTerm 29)))
+      -- The last callback reads the first callback's parameter. Its helper
+      -- must stay within that first lambda, even when every hint is equal.
+      captured = callbackAt (T.XAbs (name 64) int (chain 10 (T.XVarTerm (name 64))))
+  env <- checked (Open.environment [])
+  original <- checked (Open.check env ps (declaration captured))
+  term <- case Source.segmentCheckedContinuations 3 original of
+    T.Nothing -> fail "missed checked callback chain"
+    T.Just t -> pure t
+  compact <- checked (Open.normalize original term)
+  let run fragment = case Open.body fragment of
+        T.XLet _ rhs _ -> checked (Runtime.integer (Runtime.evaluate (Open.dataEnvironment env)
+          (Runtime.REnv M.empty) (X.erase (applied rhs 83))))
+        _ -> fail "changed declaration form"
+  run original >>= check "ordinary continuation scope" 29
+  run compact >>= check "segmentation preserves a captured callback parameter" 29
+  rechecked <- checked (Source.canonicalCheckedOpen original)
+  check "a previously admitted continuation keeps its fingerprint"
+    (H.unpack (Open.fingerprint original)) (H.unpack (Open.fingerprint rechecked))
+  deep <- checked (Open.check env ps (declaration (chain 8200 (T.XVarTerm input))))
+  case W.planGraph W.defaultLimits [Open.bodyValue deep] of
+    T.Left e | H.unpack e == "binary graph depth limit exceeded" -> pure ()
+    _ -> fail "unsegmented continuation should exceed the ordinary graph depth"
+  bounded <- checked (Source.canonicalCheckedOpen deep)
+  _ <- checked (Open.audit bounded)
+  graph <- checked (W.planGraph W.defaultLimits [Open.bodyValue bounded])
+  stats <- checked (W.graphResourceStats graph)
+  unless (W.resourceDepth stats < 1024) (fail "checked continuation still has an unbounded spine")
+
 factoredCallChecks = do
   let checked (T.Left e) = fail (H.unpack e)
       checked (T.Right value) = pure value
@@ -3113,5 +3157,6 @@ main = do
   constructorSubstitutionChecks
   openGeometryChecks
   factoredCallChecks
+  segmentedContinuationChecks
   signedConstructorChecks
   putStrLn "1032 ordered SCC and reach comparisons, query DAG and package controls passed"

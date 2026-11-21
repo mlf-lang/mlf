@@ -2135,14 +2135,73 @@ module Bootstrap.SourceInference where {
     };
     _ -> Nothing
   };
-  factorOversizedOpen object message = case factorCheckedCalls object of {
-    Nothing -> Left message;
-    Just term -> do {
+  -- Move an existing lambda to a single-use local let at its original scope
+  -- or higher. The call position receives the new variable: the callback
+  -- body still executes on each application. Never move a definition across
+  -- a binder it reads. Type abstractions and all other constructs stop the
+  -- descent, so type binders cannot be captured by floating a continuation.
+  data ContinuationFrame = ContinuationArgument XTerm | ContinuationLambda XName XType |
+    ContinuationLet XName XTerm;
+  -- The two read sets contain original lexical IDs for the current term
+  -- and its pending helpers. Fresh helper references need no capture check.
+  -- A new helper can refer to earlier ones, so close their lets in reverse.
+  data ContinuationPart = ContinuationPart XTerm IntSet Int ([] ((,) XName XTerm)) IntSet Int Bool;
+  segmentContinuation width first term = let {
+    free t = IS.fromList (map X.nameId (Boundary.freeNames t));
+    close defs tail = foldlStrict (\body ((,) name rhs) -> XLet name rhs body) tail defs;
+    collect left value frames = if left <= 0 then Nothing else let {
+      more child frame = collect (left - 1) child ((:) frame frames)
+    } in case value of {
+      XApp f x -> more x (ContinuationArgument f);
+      XAbs n ty body -> more body (ContinuationLambda n ty);
+      XLet n rhs body -> more body (ContinuationLet n rhs);
+      _ -> restore frames (ContinuationPart value (free value) 1 [] IS.empty first False)
+    };
+    restore frames (ContinuationPart body names depth defs captured serial changed) = case frames of {
+      [] -> if changed then Just (close defs body) else Nothing;
+      (:) frame rest -> let {
+        step value refs height rows scope next did = seq height (seq refs
+          (restore rest (ContinuationPart value refs height rows scope next did)));
+        under binder done = if IS.member (X.nameId binder) captured
+          then done (close defs body) (IS.delete (X.nameId binder) (IS.union names captured)) [] IS.empty
+          else done body (IS.delete (X.nameId binder) names) defs captured
+      } in case frame of {
+        ContinuationArgument f -> step (XApp f body) (IS.union (free f) names)
+          (depth + 1) defs captured serial changed;
+        ContinuationLet n rhs -> under n (\inner vars rows scope ->
+          step (XLet n rhs inner) (IS.union (free rhs) vars) (depth + 1) rows scope serial changed);
+        ContinuationLambda n ty -> under n (\inner vars rows scope -> let {
+          fun = XAbs n ty inner
+        } in if depth < width then step fun vars (depth + 1) rows scope serial changed
+          else if serial >= 9223372036854775807 then Nothing else let {
+            helper = XName serial "continuation";
+            reads = IS.union vars scope
+          } in seq reads (step (XVarTerm helper) IS.empty 1 ((:) ((,) helper fun) rows) reads (serial + 1) True))
+      }
+    }
+  } in if width < 2 then Nothing else collect (Wire.maxNodes Wire.defaultLimits) term [];
+  segmentCheckedContinuations width object = case Open.body object of {
+    XLet owner rhs rest -> let {
+      latest = foldlStrict (\n ((,) ref ty) -> Separate.foldTypeIdentities max ty (max n (X.nameId ref)))
+        (Separate.maximumTermIdentity 0 (Open.body object)) (Open.parameters object);
+      first = if latest >= 9223372036854775806 then 9223372036854775807 else latest + 1
+    } in mapOptional (\result -> XLet owner result rest) (segmentContinuation width first rhs);
+    _ -> Nothing
+  };
+  factorOversizedOpen object message = let {
+    validate term = do {
       compact <- Open.normalize object term;
       ensure (eqList (eqPair X.equalName Type.alphaEq) (Open.bindings object) (Open.bindings compact))
         "factored open fragment changed exported types";
       canonicalOpenPlanned compact
     }
+  } in case factorCheckedCalls object of {
+    Just term -> validate term;
+    Nothing -> if not (eqString message "binary graph depth limit exceeded") then Left message
+      else case segmentCheckedContinuations 512 object of {
+        Nothing -> Left message;
+        Just term -> mapLeft (\_ -> message) (validate term)
+      }
   };
   canonicalOpen = canonicalOpenUsing False Open.storageValue;
   canonicalCheckedOpen = canonicalOpenUsing True Open.checkedStorageValue;
