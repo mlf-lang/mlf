@@ -1,6 +1,5 @@
 """Resource accounting and recorder cancellation for the serial shape commands."""
 from contextlib import contextmanager
-import os
 from pathlib import Path
 import signal
 import subprocess
@@ -84,10 +83,7 @@ def load_helper():
     def checked_group(pgid):
         rows = original_group(pgid)
         if _received and any(not row['state'].startswith('Z') for row in rows):
-            try:
-                os.killpg(pgid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
+            helper.kill_group(pgid, members=original_group)
         return rows
 
     class Runner(helper.Runner):

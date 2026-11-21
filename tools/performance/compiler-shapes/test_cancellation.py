@@ -140,10 +140,7 @@ class RecorderCancellation(unittest.TestCase):
                     recorder.kill()
                     recorder.wait(timeout=5)
                 if (root / 'group').exists():
-                    try:
-                        os.killpg(int((root / 'group').read_text()), signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
+                    H.kill_group(int((root / 'group').read_text()))
 
     def test_public_launcher_cancels_its_recorder(self):
         for command in ('run', 'prepare', 'all', 'all-ready'):
