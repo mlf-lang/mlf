@@ -43,6 +43,13 @@
     "stress",
     "release"
   ],
+  "external_adapters": [
+    "tests/external-suites.json",
+    "tools/testing/language-suites.json",
+    "tools/testing/backend-native-suites.json",
+    "tools/release/test-suites.json",
+    "tools/performance/phase1-test-suites.json"
+  ],
   "campaigns": {
     "unit": [
       "regex",

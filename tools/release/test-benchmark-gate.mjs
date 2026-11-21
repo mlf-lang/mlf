@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {appendFileSync} from 'node:fs';
 import {verify, workloads} from './verify-benchmarks.mjs';
 const digest = 'a'.repeat(64);
 const metric = {wall_seconds:1,cpu_seconds:1,peak_rss_bytes:1024,exit_code:0,timed_out:false,interrupted:false,termination_signal:0};
@@ -11,11 +12,14 @@ const fixture = {
    binary_samples:Array.from({length:7},()=>Object.fromEntries(['c','baseline','mlf'].map(language=>[language,{binary_sha256:digest,artifacts_sha256:{'program.ll':digest,'runtime.o':digest,'program.o':digest}}])))})),
  performance_checks:workloads.flatMap(benchmark=>['compilation','runtime'].map(dimension=>({benchmark,dimension,maximum_ratio:dimension==='compilation'?3:2,passed:true,mlf_over_c:1})))
 };
-verify(fixture,manifest);
-let count=1;
+const checks = [['benchmark-gate-controls/canonical-report', () => verify(fixture,manifest)]];
 function reject(label, mutate) {
- const report=structuredClone(fixture), inputs=structuredClone(manifest); mutate(report,inputs);
- assert.throws(()=>verify(report,inputs),undefined,label); count++;
+ const id = 'benchmark-gate-controls/' + label.replaceAll(' ', '-').toLowerCase();
+ checks.push([id, () => {
+   const report=structuredClone(fixture), inputs=structuredClone(manifest);
+   mutate(report,inputs);
+   assert.throws(()=>verify(report,inputs),undefined,label);
+ }]);
 }
 for (const state of ['running','failed','preparing',undefined]) reject(`reject ${state}`,r=>r.status=state);
 reject('nine selected workloads',r=>r.workload_selection.pop());
@@ -40,4 +44,31 @@ reject('native failed check',r=>r.performance_checks[0].passed=false);
 reject('native relaxed check',r=>r.performance_checks[0].maximum_ratio=5);
 reject('native ratio exceeds limit',r=>r.performance_checks[0].mlf_over_c=3.01);
 reject('ratio inconsistent with samples',r=>r.performance_checks[0].mlf_over_c=2);
-console.log(`${count} benchmark gate checks passed.`);
+const registered = process.env.MLF_TEST_SUITE === 'benchmark-gate-controls';
+const exact = registered ? process.env.MLF_TEST_EXACT : undefined;
+const selected = exact ? checks.filter(([id]) => id === exact) : checks;
+const ids = selected.map(([id]) => id);
+assert.ok(ids.length && ids.length === new Set(ids).size, 'unknown or duplicate benchmark gate control');
+if (process.argv.includes('--framework-list')) {
+ console.log(JSON.stringify(ids));
+} else {
+ const events = registered && process.env.MLF_TEST_EVENTS;
+ const emit = entry => {
+   if (events) appendFileSync(events, JSON.stringify(entry) + '\n');
+ };
+ emit({plan: ids});
+ let passed = 0;
+ for (const [id, run] of selected) {
+   emit({start:id});
+   try {
+     run();
+     passed++;
+     emit({id,status:'pass'});
+   } catch (error) {
+     console.error(error);
+     emit({id,status:'fail',detail:String(error)});
+   }
+ }
+ console.log(`${passed} benchmark gate checks passed.`);
+ if (passed !== selected.length) process.exitCode = 1;
+}

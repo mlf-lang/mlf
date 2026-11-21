@@ -102,10 +102,14 @@ class PublishedMappingControls(unittest.TestCase):
         raw = history.historical_bytes(original, 'runtime/mlf_build_runner.c')
         self.assertEqual(hashlib.sha256(raw).hexdigest(), expected)
         workflow = (history.ROOT / '.github/workflows/ci.yml').read_text()
-        self.assertIn(history.REVISIONS[original][0], workflow)
-        self.assertIn(expected, workflow)
-        self.assertIn("Assert-Release $rejected 'Regression unexpectedly accepted the pre-fix runner'", workflow)
-        self.assertIn("Assert-Release ($result.complete -eq $true -and $result.exit_code -eq 126)", workflow)
+        registry = (history.ROOT / 'tools/testing/backend-native-suites.json').read_text()
+        adapter = (history.ROOT / 'tools/release/test-windows-long-path.ps1').read_text()
+        self.assertIn('tools/testing/run.py windows-long-path', workflow)
+        self.assertIn('tools/release/test-windows-long-path.ps1', registry)
+        self.assertIn(history.REVISIONS[original][0], adapter)
+        self.assertIn(expected, adapter)
+        self.assertIn("Assert-Release $rejected 'Regression unexpectedly accepted the pre-fix runner'", adapter)
+        self.assertIn("Assert-Release ($result.complete -eq $true -and $result.exit_code -eq 126)", adapter)
 
 class SquashTransportControls(HistoryReferenceControls):
     def setUp(self):

@@ -31,12 +31,16 @@ main work unions = do
   H.assert (S.eqList eqString (J.getStrings "ids" (S.head records)) ((:) "int-set/union-sorted-list" [])) "migrated case ID changed"
   let result = S.index records 1
   H.assert (eqString (J.getText "name" "" result) "size-biased set unions agree with independent sorted lists") "migrated case label changed"
-  selected <- check directory unions "exact" (O.words "--exact int-set/union-sorted-list --tag oracle --format json") 0
-  H.assert (eqString selected text) "focused selection changed the migrated case"
-  categorized <- check directory unions "classified" (O.words "--category standard-library --technique property-based --technique differential --format json") 0
-  H.assert (eqString categorized text) "category or technique selection changed the migrated case"
-  metadata <- check directory unions "metadata" (O.words "--group runtime-library --level component --input exhaustive --oracle independent-reference --purpose conformance --format json") 0
-  H.assert (eqString metadata text) "separate metadata selectors changed the migrated case"
+  let listing = O.words "--list --format json"
+  listed <- check directory unions "inventory" listing 0
+  inventory <- H.right (J.parse listed)
+  H.assert (S.eqList eqString (S.map (J.getText "id" "") (J.values (J.get "cases" inventory))) ((:) "int-set/union-sorted-list" [])) "migrated inventory changed"
+  selected <- check directory unions "exact" (S.append listing (O.words "--exact int-set/union-sorted-list --tag oracle")) 0
+  H.assert (eqString selected listed) "focused selection changed the migrated case"
+  categorized <- check directory unions "classified" (S.append listing (O.words "--category standard-library --technique property-based --technique differential")) 0
+  H.assert (eqString categorized listed) "category or technique selection changed the migrated case"
+  metadata <- check directory unions "metadata" (S.append listing (O.words "--group runtime-library --level component --input exhaustive --oracle independent-reference --purpose conformance")) 0
+  H.assert (eqString metadata listed) "separate metadata selectors changed the migrated case"
   check directory unions "oracle-missing" (O.words "--oracle fixed-point") 2
   check directory unions "category-missing" (O.words "--category compiler-components") 2
   check directory unions "technique-missing" (O.words "--technique fixed-point") 2
@@ -46,7 +50,10 @@ main work unions = do
   -- Exercise that real directory independently of the campaign runner's cwd.
   current <- canonicalPath "."
   checkout <- fileExists (current ++ "/tests/mlf-package.json")
-  code <- O.exec (if checkout then current ++ "/tests" else current) ((:) self []) "" (directory ++ "/package-cwd.stdout") (directory ++ "/package-cwd.stderr") 120
+  parentCoverage <- getEnv "MLF_TEST_COVERAGE_REPORT"
+  unsetEnv "MLF_TEST_COVERAGE_REPORT"
+  code <- O.exec (if checkout then current ++ "/tests" else current) ((:) self (O.words "--exact framework/catalog-contracts")) "" (directory ++ "/package-cwd.stdout") (directory ++ "/package-cwd.stderr") 120
+  if eqString parentCoverage "" then return () else setEnv "MLF_TEST_COVERAGE_REPORT" parentCoverage
   H.assert (code == 0) "framework failed from the tests package directory"
   packageOutput <- readFile (directory ++ "/package-cwd.stdout")
   H.assert (H.contains "Test catalog classification and selection contracts passed" packageOutput) "package-directory launch omitted catalog contracts"

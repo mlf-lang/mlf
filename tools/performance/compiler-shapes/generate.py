@@ -241,17 +241,20 @@ def expected_output(family, size, argument):
     return f'{expected(family, size, argument)}\n'
 
 
-def generate(out, sizes=None, families=None):
-    out = Path(out); out.mkdir(parents=True, exist_ok=False)
-    cases = []
+def coordinates(sizes=None, families=None):
     if sizes is None:
         sizes = REGISTRY['matrices']['default']['sizes']
     selected = REGISTRY['matrices']['default']['families'] if families is None else list(families)
     unknown = [f for f in selected if f != 'baseline' and f not in FAMILIES]
     if unknown:
         raise ValueError('unknown families: ' + ', '.join(unknown))
-    pairs = [(family, n) for family in selected for n in ((0,) if family == 'baseline' else sizes)]
-    for family, n in pairs:
+    return [(family, n) for family in selected for n in ((0,) if family == 'baseline' else sizes)]
+
+
+def generate(out, sizes=None, families=None):
+    out = Path(out); out.mkdir(parents=True, exist_ok=False)
+    cases = []
+    for family, n in coordinates(sizes, families):
         identity = f'{family}-{n}'
         directory = out/identity; directory.mkdir()
         source = directory/'Main.hs'; source.write_text(program(family,n))

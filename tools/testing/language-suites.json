@@ -1,0 +1,344 @@
+{
+  "figure12-direct": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_figure12_direct.py"
+    ],
+    "kind": "events",
+    "prefix": "figure12-direct/",
+    "list_args": [
+      "--list"
+    ],
+    "exact": true
+  },
+  "source-smoke": {
+    "command": [
+      "tools/release/source-smoke.sh"
+    ],
+    "kind": "events",
+    "ids": [
+      "source-smoke/polymorphic-let",
+      "source-smoke/impredicative-self-application",
+      "source-smoke/monomorphic-mismatch",
+      "source-smoke/invalid-universal-annotation",
+      "source-smoke/malformed-before-effects"
+    ]
+  },
+  "direct-candidate": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_direct_candidate_successor.py"
+    ],
+    "kind": "receipt",
+    "prefix": "direct-candidate/",
+    "receipt": {
+      "output": "--output",
+      "cases": "commands",
+      "inventory": [
+        "async-task",
+        "async-task-processes",
+        "async-task-wait-graph",
+        "async-process",
+        "async-process-panic",
+        "panic-child-reaped",
+        "shared-frontend-frontend",
+        "shared-frontend-native-first",
+        "shared-frontend-native-second",
+        "build-receipts",
+        "ordered-map",
+        "bulk-crc",
+        "query-json",
+        "byte-array-copy",
+        "utf8-length",
+        "parser-satisfy",
+        "candidate-selection",
+        "metadata-receipt"
+      ],
+      "id": "name",
+      "verdict": "state",
+      "verdict_equals": "passed",
+      "omit_if_verdict": [
+        "running"
+      ],
+      "ignore": [
+        "process-fixture",
+        "task-fixture"
+      ]
+    }
+  },
+  "recursive-managed": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_recursive_managed.py"
+    ],
+    "kind": "receipt",
+    "prefix": "recursive-managed/",
+    "receipt": {
+      "output": "--output",
+      "cases": "passing_inventory",
+      "inventory": [
+        "raw managed recursion first signed",
+        "raw managed recursion first mixed",
+        "raw managed recursion last signed",
+        "raw managed recursion last mixed",
+        "managed method with direct helper scope",
+        "managed method with unsigned helper scope",
+        "managed method with signed helper scope",
+        "standalone explicit qualified interface coercionOrdinary",
+        "standalone explicit qualified interface signatureOrdinary",
+        "standalone explicit qualified interface coercionFirst",
+        "standalone explicit qualified interface signatureFirst",
+        "standalone explicit qualified interface coercionLast",
+        "standalone explicit qualified interface signatureLast",
+        "standalone located managed expression consumedFirst",
+        "standalone copied managed expression consumedFirst",
+        "standalone located managed expression consumedLast",
+        "standalone copied managed expression consumedLast",
+        "signed self recursion managed-first",
+        "mixed signed/unsigned recursion managed-first",
+        "signed self recursion managed-last",
+        "mixed signed/unsigned recursion managed-last",
+        "parsed managed expression consumedFirst",
+        "parsed managed expression consumedLast",
+        "source recursive singleton/mutual and qualified successor contracts"
+      ]
+    }
+  },
+  "parameter-field-graph": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_parameter_field_graph.py"
+    ],
+    "kind": "receipt",
+    "prefix": "parameter-field-graph/",
+    "receipt": {
+      "output": "--output",
+      "cases": "passing_inventory",
+      "inventory": [
+        "rigid root-local quantifier is eligible",
+        "authored copy map and full expected graph",
+        "original nodes and captured skolem remain unchanged",
+        "indexed materialization matches authored graph and rebuilt indexes",
+        "sealed case and shared step evaluator agree",
+        "flexible same-shape lower bound remains shared",
+        "abstract rigid skolem remains shared",
+        "inert constant-bound prefix remains shared",
+        "nested-rank-only quantifier remains shared",
+        "flexible bottom remains shared",
+        "rigid bottom copies exactly its root",
+        "missing non-Gen and replayed destinations reject",
+        "internally captured nominal skolem is never copied",
+        "invalid later descriptor rejects the whole case",
+        "malformed binder cycle rejects before traversal",
+        "high alias fresh-counter forgery rejects",
+        "no-op case does not conceal malformed indexes",
+        "higher-kinded local variables preserve kind and identity sharing"
+      ]
+    }
+  },
+  "source-field-layouts": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_source_field_layouts.py"
+    ],
+    "kind": "receipt",
+    "prefix": "source-field-layouts/",
+    "receipt": {
+      "output": "--output",
+      "cases": "passing_inventory",
+      "inventory": [
+        "fresh producer ownData has exactly canonical Int field",
+        "source plan uses identical canonical ownData",
+        "legacy lowering recipe uses identical canonical ownData",
+        "producer source SCC cache is cold",
+        "producer public and lowered layouts agree exactly",
+        "construction, constructor-as-value and extraction have canonical contracts",
+        "producer targets pass production/frozen/roundtrip/erasure",
+        "producer warm source cache reuses every fragment",
+        "producer cold/warm objects are byte-identical",
+        "saved producer preserves exact canonical layout",
+        "actual fallback query route has cold/warm reuse",
+        "fallback public/lowered layouts remain canonical",
+        "fallback constructor and extraction schemes equal source SCC schemes",
+        "fallback targets pass production/frozen/roundtrip/erasure and warm parity",
+        "metadata-only consumer uses unchanged imported layout",
+        "consumer source SCC cache has cold/warm reuse",
+        "consumer cold/warm bytes and imported schemes remain exact",
+        "saved producer/consumer link, check, roundtrip and erase to 42",
+        "manual legacy import retains quantified constructor contract",
+        "manual legacy class signature and dictionary preserve dead quantifier",
+        "mixed source boundary normalizes only its fresh local declaration",
+        "mixed fallback recipe also retains exact imported dictionary and datatype",
+        "mixed exact-context source cache has cold/warm reuse",
+        "mixed owned artifact does not re-export or rewrite imported layouts",
+        "legacy selector entry adaptation rejects instead of rewriting checked ABI",
+        "legacy/local saved library links with both exact checked layouts",
+        "mixed fallback query route has cold/warm reuse",
+        "mixed fallback preserves legacy ABI through checked library linking",
+        "imported metadata, semantic fingerprint and class ABI remain byte-exact",
+        "ordinary imported-selector entry adaptation succeeds with exact checked ABI",
+        "fresh-source canonicalizer validates original ill-kinded fields",
+        "fresh-source canonicalizer validates original checked context",
+        "checked-layout key retains dead quantifiers",
+        "quantified header / canonical payload: exact cache context rejects",
+        "quantified header / canonical payload: encoded cache rejects",
+        "quantified header / canonical payload: expected cache metadata rejects opposite layout",
+        "quantified header / canonical payload: pooled object rejects",
+        "quantified header / canonical payload: linker rejects exact header/payload mismatch",
+        "quantified header / canonical payload: source/lowered metadata mismatch rejects",
+        "canonical header / quantified payload: exact cache context rejects",
+        "canonical header / quantified payload: encoded cache rejects",
+        "canonical header / quantified payload: expected cache metadata rejects opposite layout",
+        "canonical header / quantified payload: pooled object rejects",
+        "canonical header / quantified payload: linker rejects exact header/payload mismatch",
+        "canonical header / quantified payload: source/lowered metadata mismatch rejects",
+        "fresh source class parser retains leading and nested dead method forall",
+        "fresh source class own header is canonical before planning",
+        "fresh source class plan dictionary is canonical before cache keys",
+        "fresh source class fallback dictionary uses the same canonical contract",
+        "fresh source class producer cold/warm artifacts are byte-identical",
+        "fresh source class emitted header dictionary and selector schemes agree",
+        "fresh source class saved producer preserves canonical ABI",
+        "fresh source class metadata-only consumer retains canonical imported dictionary",
+        "fresh source class consumer cold/warm artifacts are byte-identical",
+        "fresh source class saved method applications check and evaluate to 42"
+      ]
+    }
+  },
+  "common-calls": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_common_calls.py"
+    ],
+    "kind": "receipt",
+    "prefix": "common-calls/",
+    "receipt": {
+      "output": "--output",
+      "cases": "checks",
+      "inventory": [
+        "identical-outer-vector",
+        "different-identity-same-hint",
+        "inner-lambda-variable",
+        "separate-inner-lambdas",
+        "inner-let-variable",
+        "inner-recursive-variable",
+        "inner-case-variable",
+        "outer-variable-under-lambdas",
+        "single-use-forwarding",
+        "escaping-bare-function",
+        "seq-observes-function",
+        "partial-application",
+        "oversaturated-application",
+        "literal-argument-conservative",
+        "computed-argument-conservative",
+        "non-lambda-rhs",
+        "exact-two-parameter-vector",
+        "reversed-parameter-vector",
+        "self-argument-refused",
+        "exact-lazy-contraction",
+        "raw-unused-bottom-laziness",
+        "raw-earlier-failure-order",
+        "raw-fresh-arrays-each-execution"
+      ]
+    }
+  },
+  "callback-sharing": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_callback_sharing.py"
+    ],
+    "kind": "receipt",
+    "prefix": "callback-sharing/",
+    "receipt": {
+      "output": "--output",
+      "cases": "checks",
+      "inventory": [
+        "capture alpha equivalence",
+        "capture order differs",
+        "argument alpha equivalence",
+        "argument presence differs",
+        "capture count differs",
+        "clear mode differs",
+        "primitive mode differs",
+        "static worker differs",
+        "implicit worker capture slots differ",
+        "unused capture identity is irrelevant",
+        "case binders alpha equivalence",
+        "double signed zero distinct",
+        "string token boundary exact",
+        "global identity same hint differs",
+        "primitive identities differ",
+        "local let alpha equivalence",
+        "bound worker refused",
+        "worker argument refused",
+        "recursive group refused",
+        "ignored pattern field differs",
+        "branch order differs",
+        "reuses completed callback",
+        "one definition per distinct key",
+        "small worker retains inline choice",
+        "large worker bounds cloning",
+        "large numeric worker stays inline",
+        "collecting numeric worker stays ordinary",
+        "kernel anchors reach whole cycle",
+        "kernel anchors match per-root traversal",
+        "saturated nested workers need no closure",
+        "partial nested workers retain closure",
+        "escaping and oversaturated workers retain closures",
+        "branched peer tail transfer",
+        "self or different ABI keeps inline choice",
+        "specialized or straight line calls keep inline choice"
+      ]
+    }
+  },
+  "guest-framework": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_guest_framework.py"
+    ],
+    "kind": "receipt",
+    "prefix": "guest-framework/",
+    "receipt": {
+      "output": "--output",
+      "cases": "commands",
+      "inventory": [
+        "foundation",
+        "framework",
+        "standard-class",
+        "implicit-standard-class",
+        "distinct-custom-class"
+      ],
+      "id": "label",
+      "verdict": "complete"
+    }
+  },
+  "guest-state-laws": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_guest_state_laws.py"
+    ],
+    "kind": "receipt",
+    "prefix": "guest-state-laws/",
+    "receipt": {
+      "output": "--output",
+      "cases": "commands",
+      "inventory": [
+        "graph-build-positive",
+        "graph-build-negative",
+        "oracle-traversal-positive",
+        "oracle-traversal-negative"
+      ],
+      "id": "label",
+      "verdict": "complete"
+    }
+  }
+}

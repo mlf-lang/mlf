@@ -2,6 +2,7 @@
 # Mock/control-only regression for the bootstrap orchestration. The fake tools
 # below never compile or execute MLF; this is not language/runtime qualification.
 set -euo pipefail
+. "$(dirname -- "$0")/test-events.sh" release-async-bootstrap
 root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 work=$(mktemp -d "${TMPDIR:-/tmp}/mlf-async-bootstrap-test.XXXXXXXX")
 trap 'rm -rf "$work"' EXIT
@@ -106,13 +107,18 @@ export MLF_COMPILER="$TEST_SEED_COMPILER" MLF_PACKAGE_MANAGER="$TEST_SEED_MANAGE
 export MLF_ASYNC_BOOTSTRAP_DIR="$work/build" CC="$work/clang"
 : > "$TEST_INVOCATIONS"
 : > "$TEST_RUNNER_INPUTS"
+release_begin release/async-bootstrap/old-manager-rejection
 status=0
 "$TEST_SEED_MANAGER" --compiler "$work/extended-compiler" > "$work/rejection.out" 2> "$work/rejection.err" || status=$?
 test "$status" -eq 86
 grep -F 'unknown interface primitive' "$work/rejection.err" >/dev/null
+release_pass
+release_begin release/async-bootstrap/failed-transition
 status=0
 TEST_FAIL_STAGE2=1 "$project/scripts/bootstrap-async.sh" > "$work/first.out" 2> "$work/first.err" || status=$?
 test "$status" -eq 77
+release_pass
+release_begin release/async-bootstrap/retry-and-repeat
 "$project/scripts/bootstrap-async.sh" > "$work/retry.out" 2> "$work/retry.err"
 "$project/scripts/bootstrap-async.sh" > "$work/repeat.out" 2> "$work/repeat.err"
 test "$(wc -l < "$TEST_INVOCATIONS" | tr -d ' ')" -eq 9
@@ -121,6 +127,8 @@ for line in 1 2 3; do
   test "$first" = "$(sed -n "$((line + 3))p" "$TEST_INVOCATIONS")"
   test "$first" = "$(sed -n "$((line + 6))p" "$TEST_INVOCATIONS")"
 done
+release_pass
+release_begin release/async-bootstrap/isolated-bridge
 test "$(cut -d '|' -f 4 "$TEST_INVOCATIONS" | head -3 | tr '\n' ' ')" = 'emlf mlfpkg emlf '
 test "$(sed -n '1p' "$TEST_INVOCATIONS" | cut -d '|' -f 2)" != "$(sed -n '3p' "$TEST_INVOCATIONS" | cut -d '|' -f 2)"
 test "$(sort -u "$TEST_RUNNER_INPUTS" | wc -l | tr -d ' ')" -eq 1
@@ -129,5 +137,6 @@ test -s "$work/build/compilers.sha256"
 test -s "$work/build/manager.sha256"
 test -x "$(cat "$work/build/manager.path")"
 test -s "$work/build/source-identity.txt"
+release_pass
 printf '%s\n' 'PASS mock/control bootstrap transition: manager replacement, stable retry, isolated bridge, frozen adjacent runner.'
 printf '%s\n' 'This control test does not qualify MLF compilers, interpreter behavior, or native runtime parity.'

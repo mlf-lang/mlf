@@ -8,6 +8,11 @@ function Read-ReleaseJson([string]$Path) {
 function Write-ReleaseJson([string]$Path, $Value) {
     [IO.File]::WriteAllText($Path, ($Value | ConvertTo-Json -Depth 30) + "`n", [Text.UTF8Encoding]::new($false))
 }
+function Write-ReleaseTestEvent([string]$Suite, [string]$CaseId, [string]$Status, $Detail) {
+    if ($env:MLF_TEST_SUITE -ne $Suite -or !$env:MLF_TEST_EVENTS) { return }
+    $event = @{id=$CaseId;status=$Status;detail=$Detail} | ConvertTo-Json -Depth 8 -Compress
+    [IO.File]::AppendAllText($env:MLF_TEST_EVENTS, $event + "`n", [Text.UTF8Encoding]::new($false))
+}
 function Assert-Release($Condition, [string]$Message) {
     if (!$Condition) { throw $Message }
 }

@@ -37,13 +37,13 @@ jobs:
           echo "$RUNNER_TEMP/ormolu" >> "$GITHUB_PATH"
       - name: Test runner failure guards
         run: |
-          python3 -B tools/shared/test_formatter_compatibility_controls.py
-          python3 -O -B tools/shared/test_formatter_compatibility_controls.py
-          python3 -B tools/shared/test_source_prologue.py
-          python3 -O -B tools/shared/test_source_prologue.py
-          python3 -B tools/testing/test_manifest_snapshot.py
+          python3 -B tools/testing/run.py python-shared-formatter-compatibility-controls
+          python3 -B tools/testing/run.py python-shared-formatter-compatibility-controls --python-optimization
+          python3 -B tools/testing/run.py python-shared-source-prologue
+          python3 -B tools/testing/run.py python-shared-source-prologue --python-optimization
+          python3 -B tools/testing/run.py python-testing-manifest-snapshot
       - name: Format isolated copies and compare current parser ASTs
-        run: python3 -B tools/shared/test_formatter_compatibility.py --output .mlf-build/formatter-compatibility
+        run: python3 -B tools/testing/run.py formatter-compatibility -- --output .mlf-build/formatter-compatibility
       - name: Preserve receipts and diagnostics
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6

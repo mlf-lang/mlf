@@ -1,18 +1,24 @@
 module Tests.CoreCrates where
 import Bootstrap.Types
+import qualified Tests.CoreRegistry as Registry
 import qualified Bootstrap.Std as S
 import qualified Tests.OptimizerUses as OptimizerUses
 import qualified Tests.CrateCodegen as CrateCodegen
-import Tests.CrateQueries (crateQueryTests)
+import Tests.CrateQueries (crateQueryTests, canonicalKeyLabel, canonicalKeyAssertions)
 import qualified Tests.StrictWrappers as StrictWrappers
 import qualified Tests.CheckedEmission as CheckedEmission
 
-families : [] ((,) String ([] ((,) String (IO ()))))
+incrementalQueries : [] ((,) String Registry.Action)
+incrementalQueries = S.map (\((,) label action) ->
+ if eqString label canonicalKeyLabel then (,) label (Registry.Recoverable canonicalKeyAssertions)
+ else (,) label (Registry.Isolated action)) (S.drop 7 crateQueryTests)
+
+families : [] ((,) String ([] ((,) String Registry.Action)))
 families =
- (:) ((,) "core/optimizer-uses" OptimizerUses.suite)
- ((:) ((,) "core/crate-codegen" CrateCodegen.suite)
- ((:) ((,) "core/declaration-queries" (S.take 7 crateQueryTests))
- ((:) ((,) "core/incremental-crate-cache" (S.drop 7 crateQueryTests))
- ((:) ((,) "core/strict-wrappers" StrictWrappers.suite)
- ((:) ((,) "core/checked-emission" CheckedEmission.suite)
+ (:) ((,) "core/optimizer-uses" (Registry.recoverable OptimizerUses.suite))
+ ((:) ((,) "core/crate-codegen" (Registry.isolated CrateCodegen.suite))
+ ((:) ((,) "core/declaration-queries" (Registry.isolated (S.take 7 crateQueryTests)))
+ ((:) ((,) "core/incremental-crate-cache" incrementalQueries)
+ ((:) ((,) "core/strict-wrappers" (Registry.isolated StrictWrappers.suite))
+ ((:) ((,) "core/checked-emission" (Registry.isolated CheckedEmission.suite))
  [])))))

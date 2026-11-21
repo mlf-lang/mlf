@@ -390,83 +390,90 @@ module Test.Runner where {
            (showInt successes ++
             (",\"failed\":" ++ (showInt (S.length results - successes) ++ "}"))))))))));
   run :: [] String -> [] C.Case -> IO Int;
-  -- Replace a previous report before actions run. A crash leaves an incomplete
-  -- start record; only a returned run may publish a complete summary.
-  -- Compare actual IDs to the plan, not merely their counts.
-  run args cases =
+  run = runObserved (\_ -> ioReturn ());
+  runObserved :: (Result -> IO ()) -> [] String -> [] C.Case -> IO Int;
+  runObserved observe args cases =
     case plan args cases of {
       Left error ->
         do {
           putErr ("test: " ++ (error ++ "\n"));
           ioReturn 2
         };
-      Right ((,) options selected) ->
-        do {
-          let {
-            total = S.length cases
-          };
-          let {
-            count = S.length selected
-          };
-          if listing options
-          then do {
-                 let {
-                   inventory =
-                     (prefix "inventory" ++
-                      (selectionFields total count ++
-                       (",\"cases\":[" ++
-                        (S.intercalate ","
-                           (S.map (\entry -> ("{" ++ (descriptor entry ++ "}"))) selected) ++
-                         "]}"))))
-                 };
-                 saveReport options (inventory ++ "\n");
-                 if json options
-                 then putStrLn inventory
-                 else S.mapM_ (\entry -> putStrLn (C.id entry ++ ("  " ++ C.name entry))) selected;
-                 ioReturn 0
-               }
-          else do {
-                 let {
-                   start =
-                     (prefix "start" ++
-                      (selectionFields total count ++
-                       (",\"ids\":" ++ (strings (S.map C.id selected) ++ "}"))))
-                 };
-                 saveReport options (start ++ "\n");
-                 if json options then putStrLn start else ioReturn ();
-                 results <-
-                   executeWith
-                     (\result ->
-                        putStrLn (if json options then resultJson result else resultText result))
-                     selected;
-                 let {
-                   failures = S.length (S.filter (\result -> S.not (passed result)) results)
-                 };
-                 let {
-                   exact =
-                     case Registry.exactInventory (S.map C.id selected)
-                            (S.map identity results) of {
-                       Right () -> True;
-                       Left _ -> False
-                     }
-                 };
-                 let {
-                   summary = summaryJsonFor total selected results
-                 };
-                 saveReport options
-                   (S.intercalate "\n"
-                      ((:) start (S.append (S.map resultJson results) ((:) summary []))) ++
-                    "\n");
-                 if json options
-                 then putStrLn summary
-                 else putStrLn
-                        (showInt count ++
-                         (" checks; " ++
-                          (showInt failures ++
-                           (" failures (" ++ (scope total count ++ " inventory)")))));
-                 ioReturn (if (exact && (failures == 0)) then 0 else 1)
-               }
-        }
+      Right ((,) options selected) -> runOptionsObserved observe options cases selected
+    };
+  runOptions :: Options -> [] C.Case -> [] C.Case -> IO Int;
+  runOptions = runOptionsObserved (\_ -> ioReturn ());
+  -- Selection adapters pass a validated projection of the full inventory.
+  -- Replace a stale report before running and check exact result identities.
+  runOptionsObserved :: (Result -> IO ()) -> Options -> [] C.Case -> [] C.Case -> IO Int;
+  runOptionsObserved observe options cases selected =
+    do {
+      let {
+        total = S.length cases
+      };
+      let {
+        count = S.length selected
+      };
+      if listing options
+      then do {
+             let {
+               inventory =
+                 (prefix "inventory" ++
+                  (selectionFields total count ++
+                   (",\"cases\":[" ++
+                    (S.intercalate ","
+                       (S.map (\entry -> ("{" ++ (descriptor entry ++ "}"))) selected) ++
+                     "]}"))))
+             };
+             saveReport options (inventory ++ "\n");
+             if json options
+             then putStrLn inventory
+             else S.mapM_ (\entry -> putStrLn (C.id entry ++ ("  " ++ C.name entry))) selected;
+             ioReturn 0
+           }
+      else do {
+             let {
+               start =
+                 (prefix "start" ++
+                  (selectionFields total count ++
+                   (",\"ids\":" ++ (strings (S.map C.id selected) ++ "}"))))
+             };
+             saveReport options (start ++ "\n");
+             if json options then putStrLn start else ioReturn ();
+             results <-
+               executeWith
+                 (\result -> do {
+                    putStrLn (if json options then resultJson result else resultText result);
+                    observe result
+                  })
+                 selected;
+             let {
+               failures = S.length (S.filter (\result -> S.not (passed result)) results)
+             };
+             let {
+               exact =
+                 case Registry.exactInventory (S.map C.id selected)
+                        (S.map identity results) of {
+                   Right () -> True;
+                   Left _ -> False
+                 }
+             };
+             let {
+               summary = summaryJsonFor total selected results
+             };
+             saveReport options
+               (S.intercalate "\n"
+                  ((:) start (S.append (S.map resultJson results) ((:) summary []))) ++
+                "\n");
+             if json options
+             then putStrLn summary
+             else putStrLn
+                    (showInt count ++
+                     (" checks; " ++
+                      (showInt failures ++
+                       (" failures (" ++ (scope total count ++ " inventory)")))));
+             ioReturn (if (exact && (failures == 0)) then 0 else 1)
+           }
     };
   saveReport options text =
     if eqString (report options) "" then ioReturn () else writeFile (report options) text;

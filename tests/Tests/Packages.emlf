@@ -1,5 +1,7 @@
 -- Black-box local package tests: invoke the native MLF manager, never an installer.
 module Tests.Packages where
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
 import qualified Tests.Coverage as Coverage
 import qualified Bootstrap.Std as S
@@ -10,6 +12,7 @@ import qualified Package.Build as B
 import qualified Package.Manifest as M
 import qualified Tests.Basic as H
 import qualified Tests.Basic as Sys
+import qualified Test.Assert as A
 
 data Context = Context String String String String Bool
 work (Context a _ _ _ _) = a
@@ -54,13 +57,13 @@ dependencyPathShapes = do
  let absolute = (:) "/cache/unit.mlfci" ((:) "C:/cache with spaces/unit.mlfci" ((:) "d:\\cache\\unit.mlfco" ((:) "\\\\server\\share\\unit.mlfci" ((:) "//server/share/unit.mlfco" []))))
  S.mapM_ (\path -> do
   let proof = receipt path
-  H.assert (B.validDependencyShape proof) ("absolute dependency path rejected: " ++ path)
-  merged <- H.right (B.mergeDependencyProof proof proof)
-  H.assert (J.equal proof merged) "dependency proof changed its exact path") absolute
+  A.assert (B.validDependencyShape proof) ("absolute dependency path rejected: " ++ path)
+  merged <- A.right (\message -> message) (B.mergeDependencyProof proof proof)
+  A.assert (J.equal proof merged) "dependency proof changed its exact path") absolute
  let relative = (:) "" ((:) "cache/unit.mlfci" ((:) "./cache/unit.mlfci" ((:) "C:cache/unit.mlfci" ((:) "\\cache\\unit.mlfci" ((:) "1:/cache/unit.mlfci" [])))))
  S.mapM_ (\path -> do
-  H.assert (S.not (B.validDependencyShape (receipt path))) ("relative dependency path accepted: " ++ path)
-  case B.mergeDependencyProof J.empty (receipt path) of {Left _ -> ioReturn (); Right _ -> H.fail "relative path entered a dependency proof"}) relative
+  A.assert (S.not (B.validDependencyShape (receipt path))) ("relative dependency path accepted: " ++ path)
+  case B.mergeDependencyProof J.empty (receipt path) of {Left _ -> A.succeed (); Right _ -> A.fail "relative path entered a dependency proof"}) relative
 -- The result belongs to the action that produced it even after another
 -- worker records a different cache hit. Reports merge only when requested by
 -- the coordinator, in the order supplied rather than completion order.
@@ -168,17 +171,19 @@ publicationTransactions directory = do
   H.assert (eqString actual ("new " ++ name)) ("committed publication recovery reverted " ++ name)) (O.words "alpha beta companion.dll added")
  unrelated <- readFile (bin ++ "/unrelated")
  H.assert (eqString unrelated "old unrelated") "publication transaction changed an unrelated file"
-integration : IO ()
-integration = Sys.withScratch (\dir -> do
- dependencyPathShapes
- isolatedActionResults dir
- publicationTransactions dir
- root <- canonicalPath "."
+-- The control cases share one run directory. The distinct cold/warm,
+-- incremental, fresh and corruption sequences retain their original paths.
+withContext action = Sys.withScratch (\dir -> do
  manager <- getEnv "MLF_PACKAGE_MANAGER"
  compiler <- getEnv "MLF_BOOTSTRAP_COMPILER"
- O.run "" ((:) "/bin/cp" ((:) "-R" ((:) (root ++ "/examples/packages") ((:) (dir ++ "/app") []))))
  windows <- O.isWindows
- let c = Context dir manager compiler (dir ++ "/build output") windows
+ action (Context dir manager compiler (dir ++ "/build output") windows))
+
+buildCases : Context -> String -> IO ()
+buildCases c root = do
+ let dir = work c
+ let selectedCompiler = compiler c
+ O.run "" ((:) "/bin/cp" ((:) "-R" ((:) (root ++ "/examples/packages") ((:) (dir ++ "/app") []))))
  expect c ((:) "build" []) true ""
  initial <- report c
  H.assert (S.all (\row -> S.not (J.getBool "cached" true row)) (J.values (J.get "builds" initial))) "first package build reused an artifact"
@@ -253,7 +258,7 @@ integration = Sys.withScratch (\dir -> do
  runBinary c "Hello, local packages!\n"
  checkDependencyReceipts (output c ++ "/cache/" ++ J.getText "key" "" (buildRow "crate message/0.1.0/library" initial) ++ "/dependency-files.json")
  passed "outer cache validates and repairs the shared Prelude dependency closure"
- O.copy compiler (exe c (dir ++ "/other compiler"))
+ O.copy selectedCompiler (exe c (dir ++ "/other compiler"))
  expect c ((:) "--compiler" ((:) (exe c (dir ++ "/other compiler")) ((:) "build" []))) true ""
  alternate <- report c
  H.assert (S.all (\row -> S.any (\kind -> eqString (J.getText "kind" "" row) kind) ((:) "runtime object" ((:) "LLVM object" ((:) "native link" []))) || S.not (J.getBool "cached" true row)) (J.values (J.get "builds" alternate))) "compiler path did not affect crate cache"
@@ -294,11 +299,6 @@ integration = Sys.withScratch (\dir -> do
  H.assert (S.not (J.getBool "complete" true failure) && J.equal (J.get "exit_code" (S.last (J.values (J.get "commands" failure)))) (J.num 17)) "command failure swallowed"
  passed "external test exit status is propagated"
  extraCases c root
- crateCases c
- nonEntryBodyCase c
- pgoCase c
- sharedCacheCases c root
- putStrLn "29 package integration cases passed")
 sharedCacheCases parent root = do
  let directory = work parent ++ "/shared cache checks"
  O.mkdir directory

@@ -1,0 +1,125 @@
+{
+  "compiler-shapes": {
+    "kind": "events",
+    "prefix": "compiler-shapes/",
+    "command": ["python3", "-B", "tools/performance/compiler-shapes/bench.py"],
+    "list_args": ["--framework-list"],
+    "exact": true
+  },
+  "compiler-shapes-correctness": {
+    "kind": "events",
+    "prefix": "compiler-shapes/",
+    "command": ["python3", "-B", "tools/performance/compiler-shapes/run.py", "--pilot"],
+    "list_args": ["--framework-list"],
+    "exact": true
+  },
+  "compiler-shapes-installed": {
+    "kind": "events",
+    "prefix": "compiler-shapes-installed/",
+    "command": ["python3", "-B", "tools/performance/compiler-shapes/installed.py"],
+    "list_args": ["--framework-list"],
+    "exact": true
+  },
+  "compiler-shapes-contract": {
+    "kind": "unittest",
+    "prefix": "compiler-shapes/contract/",
+    "command": ["python3", "-B", "tools/performance/compiler-shapes/test_contract.py"],
+    "exact": true
+  },
+  "compiler-shapes-sweep": {
+    "kind": "unittest",
+    "prefix": "compiler-shapes/sweep/",
+    "command": ["python3", "-B", "tools/performance/compiler-shapes/test_sweep.py"],
+    "exact": true
+  },
+  "compiler-shapes-cancellation": {
+    "kind": "unittest",
+    "prefix": "compiler-shapes/cancellation/",
+    "command": ["python3", "-B", "tools/performance/compiler-shapes/test_cancellation.py"],
+    "exact": true,
+    "allow_skip": true
+  },
+  "compiler-shapes-data-shapes": {
+    "kind": "unittest",
+    "prefix": "compiler-shapes/data-shapes/",
+    "command": ["python3", "-B", "tools/performance/compiler-shapes/test_data_shapes.py"],
+    "exact": true
+  },
+  "compiler-shapes-rank-shapes": {
+    "kind": "unittest",
+    "prefix": "compiler-shapes/rank-shapes/",
+    "command": ["python3", "-B", "tools/performance/compiler-shapes/test_rank_shapes.py"],
+    "exact": true
+  },
+  "compiler-shapes-fit-growth": {
+    "kind": "unittest",
+    "prefix": "compiler-shapes/fit-growth/",
+    "command": ["python3", "-B", "tools/performance/compiler-shapes/test_fit_growth.py"],
+    "exact": true
+  },
+  "benchmark-game": {
+    "kind": "events",
+    "prefix": "benchmark-game/",
+    "command": ["tools/release/run-benchmarks.sh"],
+    "list_args": ["--framework-list"]
+  },
+  "application-benchmarks": {
+    "kind": "events",
+    "prefix": "benchmark-game/",
+    "command": ["python3", "-B", "tools/dev.py", "bench", "apps"],
+    "list_args": ["--framework-list"],
+    "exact": true
+  },
+  "application-benchmarks-installed": {
+    "kind": "events",
+    "prefix": "benchmark-installed/",
+    "command": ["python3", "-B", "tools/bench/native-default.py"],
+    "list_args": ["--framework-list"],
+    "exact": true
+  },
+  "benchmark-gate-controls": {
+    "kind": "events",
+    "prefix": "benchmark-gate-controls/",
+    "command": ["node", "tools/release/test-benchmark-gate.mjs"],
+    "list_args": ["--framework-list"],
+    "exact": true
+  },
+  "benchmark-transition-controls": {
+    "kind": "unittest",
+    "prefix": "benchmark-transition/",
+    "command": ["python3", "-B", "tools/release/test_benchmark_transition.py"],
+    "exact": true
+  },
+  "benchmark-provenance": {
+    "kind": "events",
+    "prefix": "benchmark-provenance/",
+    "command": ["tools/release/check-benchmark-provenance.sh"],
+    "list_args": ["--framework-list"],
+    "exact": true
+  },
+  "benchmark-reconciliation": {
+    "kind": "unittest",
+    "prefix": "benchmark-reconciliation/",
+    "command": ["python3", "-B", "tools/performance/artifact-binary/test_pr43_reconciliation.py"],
+    "exact": true
+  },
+  "benchmark-predecessor-declid": {
+    "kind": "events",
+    "prefix": "benchmark-predecessor/declid/",
+    "command": ["python3", "-B", "tools/performance/artifact-binary/replay_reconciliation_predecessors.py", "declid"],
+    "list_args": ["--framework-list"],
+    "exact": true
+  },
+  "benchmark-predecessor-main": {
+    "kind": "events",
+    "prefix": "benchmark-predecessor/main/",
+    "command": ["python3", "-B", "tools/performance/artifact-binary/replay_reconciliation_predecessors.py", "main"],
+    "list_args": ["--framework-list"],
+    "exact": true
+  },
+  "benchmark-migration-contract": {
+    "kind": "exit",
+    "ids": ["benchmark-migration/manifest-and-driver-contract"],
+    "command": ["python3", "-B", "tools/bench/check-migration.py"]
+  }
+}

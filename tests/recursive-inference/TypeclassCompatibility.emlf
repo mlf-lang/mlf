@@ -1,5 +1,11 @@
 module Main where
 import Bootstrap.Types
-import qualified Bootstrap.Std as S
-import Tests.Typeclasses (typeclassTests)
-main = S.mapM_ (\((,) label action) -> do { putStrLn label; action }) typeclassTests
+import qualified Package.OS as O
+import qualified Test.Runner as Runner
+import qualified Tests.CoreRegistry as Registry
+import Tests.Typeclasses (typeclassCases)
+
+main : IO ()
+main = case Registry.registerFamily "core-language" false ((,) "core/typeclasses" (Registry.recoverable typeclassCases)) of
+ Left error -> O.fatal error
+ Right entries -> Runner.main entries

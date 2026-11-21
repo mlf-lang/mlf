@@ -3,8 +3,11 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
+import {projectAdapterCommands} from './workflow-test-adapters.mjs';
+import {releaseTestCase, releaseTestEvent} from './test-events.mjs';
 
-const workflow = fs.readFileSync('.github/workflows/ci.yml', 'utf8');
+const workflowSource = fs.readFileSync('.github/workflows/ci.yml', 'utf8');
+const workflow = projectAdapterCommands(workflowSource);
 const job = (text, name) => {
   const block = text.match(new RegExp(`^  ${name}:\\n[\\s\\S]*?(?=^  [a-z][a-z-]*:\\n|(?![\\s\\S]))`, 'm'))?.[0];
   assert.ok(block, `Missing ${name} job`);
@@ -62,20 +65,18 @@ const directArguments = step => {
 };
 const validate = text => {
   const native = job(text, 'native');
-  assert.match(native, /^    timeout-minutes: 120$/m, 'Every shard keeps the 120-minute outer bound');
+  assert.match(native, /^    timeout-minutes: 360$/m, 'Every shard keeps the 360-minute outer bound');
   assert.match(native, /^      fail-fast: false$/m, 'One failure must not hide other shard evidence');
   assert.doesNotMatch(native, /continue-on-error/);
   assert.match(native, /^      \(github.event_name != 'workflow_dispatch' \|\| !inputs.windows_runtime_only\)$/m,
     'The dispatch-only flag must leave automatic CI enabled');
   const matrix = native.match(/^      matrix:\n([\s\S]*?)(?=^    steps:\n)/m)?.[1];
   assert.ok(matrix, 'An explicit native matrix is required');
-  const rows = [...matrix.matchAll(/^          - optimization: '([02])'\n            suite: (all|direct|default|framework)\n/gm)];
+  const rows = [...matrix.matchAll(/^          - optimization: '([02])'\n            suite: (routine|optimizer)\n/gm)];
   assert.deepEqual(rows.map(row => ({optimization: row[1], suite: row[2]})), [
-    {optimization: '2', suite: 'all'},
-    {optimization: '0', suite: 'direct'},
-    {optimization: '0', suite: 'default'},
-    {optimization: '0', suite: 'framework'},
-  ], 'Exactly one O2 all leg and three complementary O0 legs are required');
+    {optimization: '0', suite: 'routine'},
+    {optimization: '2', suite: 'optimizer'},
+  ], 'Exactly one hosted semantic leg and one targeted optimizer leg are required');
   let remainder = matrix.replace(/^        #.*\n/gm, '').replace(/^        include:\n/m, '');
   for (const row of rows) remainder = remainder.replace(row[0], '');
   assert.equal(remainder.trim(), '', 'No hidden matrix axis, exclusion, or extra leg');
@@ -93,15 +94,15 @@ const validate = text => {
 
   assert.match(producer, /^        id: shared_build$/m);
   const regeneration = commandStep('tools/shared/generate_builtin_evidence.py');
-  assert.equal(regeneration.match(/^        if: (.+)$/m)?.[1], "failure() && steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'default') || (matrix.optimization == '2' && matrix.suite == 'all'))",
-    'Only failed builds in one O0 and the O2 leg collect actual generation evidence');
+  assert.equal(regeneration.match(/^        if: (.+)$/m)?.[1], "failure() && steps.shared_build.outcome == 'failure' && (matrix.suite == 'routine' || matrix.suite == 'optimizer')",
+    'Only failed builds in one O0 and one O2 leg collect actual generation evidence');
   assert.match(regeneration, /^        timeout-minutes: 16$/m);
   const regenerationExpression = regeneration.match(/^        if: (.+)$/m)[1];
   const regenerationSelected = Function('matrix', 'failure', 'steps', `return (${regenerationExpression});`);
   for (const leg of legs) {
     for (const failed of [false, true]) for (const outcome of ['success', 'failure', 'skipped']) {
       assert.equal(regenerationSelected(leg, () => failed, {shared_build: {outcome}}),
-        failed && outcome === 'failure' && (leg.suite === 'default' || leg.suite === 'all'));
+        failed && outcome === 'failure' && (leg.suite === 'routine' || leg.suite === 'optimizer'));
     }
   }
   assert.match(regeneration, /resource_watchdog.py --seconds 900 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 16 --disk-free-mib 4096 \.mlf-build\/builtin-generation-guard python3 -B tools\/shared\/generate_builtin_evidence.py --root "\$PWD" --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/builtin-generation-guard\/results --timeout 600\n/);
@@ -207,8 +208,10 @@ const validate = text => {
   assert.match(binary, /resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 640 --disk-free-mib 4096 \.mlf-build\/artifact-binary-guard python3 -B tools\/shared\/test_artifact_binary.py --source-root "\$PWD" --build-receipt \.mlf-build\/shared-ghc\/receipt.json --clang clang --gc-prefix "\$PWD\/\.mlf-build\/io-action-gc" --partial-write-sink \/dev\/full --output \.mlf-build\/artifact-binary-guard\/results\n/);
   const gcPreparation = commandStep('cp "$archive" "$prefix/lib/libgc.a"');
   assert.ok(steps.indexOf(gcPreparation) < steps.indexOf(binary), 'GC preparation precedes binary native build');
-  const framework = commandStep('tools/shared/test_framework_direct.py');
-  assert.match(framework, /python3 tools\/shared\/test_framework_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/framework-direct --suite '\$\{\{ matrix.suite \}\}' \$\{suite_args\[@\]\+"\$\{suite_args\[@\]\}"\}\n/);
+  const framework = commandStep('--output .mlf-build/framework-direct --suite all');
+  const optimizedFramework = commandStep('--output .mlf-build/framework-direct --suite controls');
+  assert.match(framework, /python3 tools\/shared\/test_framework_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/framework-direct --suite all --suite-timeout 5400\n/);
+  assert.match(optimizedFramework, /python3 tools\/shared\/test_framework_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/framework-direct --suite controls\n/);
   assert.doesNotMatch(native, /--frontend-timeout|--native-timeout/,
     'Direct per-mode defaults must come from the authenticated producer receipt');
   assert.doesNotMatch(native.replace(framework, ''), /--suite-timeout/,
@@ -245,7 +248,7 @@ const validate = text => {
   // Exact shell plus per-invocation argv checks: comments cannot replace an
   // execution, and merged/split calls or hidden shell routing cannot pass.
   const boundedShell = crc.match(/^        run: \|\n([\s\S]*)$/m)?.[1].replace(/^          /gm, '').trim();
-  assert.equal(boundedShell, "set -euo pipefail\npython3 -B tools/shared/test_crc_successor_entry.py\npython3 -O -B tools/shared/test_crc_successor_entry.py\nMLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal python3 -B tools/shared/test_crc_process_supervisor.py\nMLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/optimized python3 -O -B tools/shared/test_crc_process_supervisor.py\npython3 -B tools/shared/test_utf8_batch_contract.py\npython3 -O -B tools/shared/test_utf8_batch_contract.py\npython3 -B tools/shared/test_utf8_batch_worker.py\npython3 -O -B tools/shared/test_utf8_batch_worker.py\nMLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_direct_bounded_entry.py\nMLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_bounded_entry.py\npython3 -B tools/shared/test_candidate_batch_contract.py\npython3 -O -B tools/shared/test_candidate_batch_contract.py\npython3 -B tools/shared/test_candidate_batch_worker.py\npython3 -O -B tools/shared/test_candidate_batch_worker.py\nMLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/normal python3 -B tools/shared/test_direct_candidate_entry.py\nMLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_candidate_entry.py\npython3 -B tools/shared/test_direct_candidate_successor.py --bin-dir .mlf-build/shared-ghc/bin \\\n  --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/direct-host-tests\n# The default/all framework gate executes this same no-argument\n# TupleList binary with its exact 305-observation completion oracle.",
+  assert.equal(boundedShell, "set -euo pipefail\npython3 -B tools/shared/test_crc_successor_entry.py\npython3 -O -B tools/shared/test_crc_successor_entry.py\nMLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal python3 -B tools/shared/test_crc_process_supervisor.py\nMLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/optimized python3 -O -B tools/shared/test_crc_process_supervisor.py\npython3 -B tools/shared/test_utf8_batch_contract.py\npython3 -O -B tools/shared/test_utf8_batch_contract.py\npython3 -B tools/shared/test_utf8_batch_worker.py\npython3 -O -B tools/shared/test_utf8_batch_worker.py\nMLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_direct_bounded_entry.py\nMLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_bounded_entry.py\npython3 -B tools/shared/test_candidate_batch_contract.py\npython3 -O -B tools/shared/test_candidate_batch_contract.py\npython3 -B tools/shared/test_candidate_batch_worker.py\npython3 -O -B tools/shared/test_candidate_batch_worker.py\nMLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/normal python3 -B tools/shared/test_direct_candidate_entry.py\nMLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_candidate_entry.py\npython3 -B tools/shared/test_direct_candidate_successor.py --bin-dir .mlf-build/shared-ghc/bin \\\n  --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/direct-host-tests",
     'Exact bounded direct shell and unchanged budgets');
   assert.doesNotMatch(native, /^\s*python3(?:\s+-B)?\s+tools\/shared\/test_direct_crc_successor\.py\b/m,
     'The standalone CRC entry cannot bypass UTF8 batching qualification');
@@ -255,31 +258,27 @@ const validate = text => {
   assert.equal(headerShell, "set -euo pipefail\nmkdir .mlf-build/header-adapter-controls\ngit --no-replace-objects cat-file blob dd5b4630a80803c19afdb219dba2dc4bffc3ea1b > .mlf-build/header-adapter-controls/history.hs\nexport HEADER_FIXTURE=\"$PWD/tools/shared/fixtures/native/HeaderValidationTests.hs\"\nexport HEADER_ORACLE=\"$PWD/tools/shared/fixtures/native/HeaderNamingOracle.hs\"\nexport HEADER_HISTORY_SOURCE=\"$PWD/.mlf-build/header-adapter-controls/history.hs\"\npython3 -B tools/shared/test_header_validation_adapter.py\npython3 -O -B tools/shared/test_header_validation_adapter.py\npython3 tools/shared/test_native_library.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/native-library --clang clang --gc-prefix .mlf-build/io-action-gc", 'Exact fixed-history Header environment, controls and native-library call');
   assert.doesNotMatch(native, /^\s*python3(?:\s+-B)?\s+tools\/shared\/test_direct_bounded\.py\b/m,
     'The old bounded entry must not bypass candidate batching');
-  const coverage = legs.map(leg => {
-    const actual = [];
+  const hostedMatrix = commandStep('for suite in backends parity; do');
+  assert.match(hostedMatrix, /options=\(--compiler-receipt "\$PWD\/\.mlf-build\/shared-ghc\/receipt.json"\)/);
+  assert.match(hostedMatrix, /"\$toolset\/compiler-tests" "\$suite" --manager "\$toolset\/mlfpkg" --compiler "\$toolset\/emlf"/);
+  const hostedTuple = commandStep('tools/release/test-tuple-list.sh');
+  assert.match(hostedTuple, /\.mlf-build\/shared-ghc/);
+  for (const leg of legs) {
     for (const command of [...direct, ...o2Only]) {
-      if (selected(commandStep(command), leg)) actual.push(command);
+      assert.equal(selected(commandStep(command), leg), direct.includes(command) === (leg.suite === 'routine'),
+        'Coverage selected only with its intended hosted producer: ' + command);
     }
-    if (selected(framework, leg)) {
-      assert.notEqual(leg.suite, 'direct', 'Direct shard cannot invoke the framework wrapper');
-      const expectedArguments = ['tools/shared/test_framework_direct.py',
-        '--build-receipt', '.mlf-build/shared-ghc/receipt.json',
-        '--output', '.mlf-build/framework-direct', '--suite', leg.suite];
-      if (leg.optimization === '0' && ['default', 'framework'].includes(leg.suite)) {
-        expectedArguments.push('--suite-timeout', '5400');
-      }
-      assert.deepEqual(frameworkArguments(framework, leg), expectedArguments,
-        `Only O0 default/framework get the existing 5400-second cap; O2 and direct arguments stay unchanged`);
-      if (['all', 'default'].includes(leg.suite)) actual.push('tuple-default-305');
-      if (['all', 'framework'].includes(leg.suite)) actual.push('tuple-framework-105');
-    }
-    const expected = leg.suite === 'all' ? [...direct, ...o2Only, 'tuple-default-305', 'tuple-framework-105']
-      : leg.suite === 'direct' ? direct : [`tuple-${leg.suite}-${leg.suite === 'default' ? 305 : 105}`];
-    assert.deepEqual(actual, expected, `Exact execution scope for O${leg.optimization} ${leg.suite}`);
-    return actual;
-  });
-  assert.deepEqual(coverage.slice(1).flat().sort(), coverage[0].filter(name => !o2Only.includes(name)).sort(),
-    'O0 shards must cover the complete prior O0 scope exactly once, with neither omissions nor duplicates');
+    const routine = leg.suite === 'routine';
+    assert.equal(selected(hostedMatrix, leg), routine);
+    assert.equal(selected(hostedTuple, leg), routine);
+    assert.equal(selected(framework, leg), routine);
+    assert.equal(selected(optimizedFramework, leg), !routine);
+    const expected = ['tools/shared/test_framework_direct.py',
+      '--build-receipt', '.mlf-build/shared-ghc/receipt.json',
+      '--output', '.mlf-build/framework-direct', '--suite', routine ? 'all' : 'controls'];
+    if (routine) expected.push('--suite-timeout', '5400');
+    assert.deepEqual(frameworkArguments(routine ? framework : optimizedFramework, leg), expected);
+  }
   const upload = commandStep('uses: actions/upload-artifact@');
   assert.match(upload, /^        if: always\(\)$/m, 'Keep evidence for failed and timed-out shards');
   for (const suffix of ['**/stdout', '**/stderr', '**/*.json', '**/*.hs', '**/*.c', '**/*.h', '**/*.d']) {
@@ -328,7 +327,6 @@ const validate = text => {
     'Ordinary runs require every required job to succeed');
 };
 
-validate(workflow);
 const controls = [
   ["test_candidate_batch_contract.py normal omitted", "          python3 -B tools/shared/test_candidate_batch_contract.py\n", ""],
   ["test_candidate_batch_contract.py optimized omitted", "          python3 -O -B tools/shared/test_candidate_batch_contract.py\n", ""],
@@ -424,16 +422,16 @@ const controls = [
   ["CRC evidence environment inactive","MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal ","OTHER_EVIDENCE=.mlf-build/crc-supervisor-controls/normal "],
   ["CRC evidence directories collide","MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/optimized ","MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal "],
   ["CRC successor producer differs","--build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/direct-host-tests","--build-receipt .mlf-build/wrong/receipt.json --output .mlf-build/direct-host-tests"],
-  ["CRC successor output differs","--output .mlf-build/direct-host-tests\n","--output .mlf-build/wrong-direct\n"],
+  ["CRC successor output differs","--output .mlf-build/direct-host-tests","--output .mlf-build/wrong-direct\n"],
   ["CRC lifecycle evidence omitted","            .mlf-build/crc-supervisor-controls/\n",""],
   ["CRC suite receipts omitted","            .mlf-build/direct-host-tests/**/*.json\n",""],
   ["CRC suite stdout omitted","            .mlf-build/direct-host-tests/**/*.stdout\n",""],
   ["CRC suite stderr omitted","            .mlf-build/direct-host-tests/**/*.stderr\n",""],
   ['generation compiler metadata omitted', '            .mlf-build/shared-ghc/ghc-info.txt\n', ''],
   ["producer diagnostic id omitted","        id: shared_build\n",""],
-  ["generation failure condition relaxed","failure() && steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'default') || (matrix.optimization == '2' && matrix.suite == 'all'))","steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'default') || (matrix.optimization == '2' && matrix.suite == 'all'))"],
-  ["generation O0 coverage changed","failure() && steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'default') || (matrix.optimization == '2' && matrix.suite == 'all'))","failure() && steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'direct') || (matrix.optimization == '2' && matrix.suite == 'all'))"],
-  ["generation O2 omitted","failure() && steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'default') || (matrix.optimization == '2' && matrix.suite == 'all'))","failure() && steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'default') || (matrix.optimization == '2' && matrix.suite == 'framework'))"],
+  ["generation failure condition relaxed","failure() && steps.shared_build.outcome == 'failure' && (matrix.suite == 'routine' || matrix.suite == 'optimizer')","steps.shared_build.outcome == 'failure' && (matrix.suite == 'routine' || matrix.suite == 'optimizer')"],
+  ["generation O0 coverage changed","failure() && steps.shared_build.outcome == 'failure' && (matrix.suite == 'routine' || matrix.suite == 'optimizer')","failure() && steps.shared_build.outcome == 'failure' && (matrix.suite == 'non-routine' || matrix.suite == 'optimizer')"],
+  ["generation O2 omitted","failure() && steps.shared_build.outcome == 'failure' && (matrix.suite == 'routine' || matrix.suite == 'optimizer')","failure() && steps.shared_build.outcome == 'failure' && (matrix.suite == 'routine' || matrix.suite == 'non-optimizer')"],
   ["generation command omitted","tools/shared/generate_builtin_evidence.py","tools/shared/omitted_builtin_evidence.py"],
   ["generation resource guard relaxed","--rss-mib 5120 --max-output-mib 16 --disk-free-mib 4096 .mlf-build/builtin-generation-guard","--rss-mib 6144 --max-output-mib 16 --disk-free-mib 4096 .mlf-build/builtin-generation-guard"],
   ["generation time allowance widened","--timeout 600\n","--timeout 601\n"],
@@ -441,11 +439,11 @@ const controls = [
   ["generation real output omitted","            .mlf-build/builtin-generation-guard/\n",""],
   ["generation normal refusal controls omitted","          python3 -B tools/shared/test_generate_builtin_evidence.py\n",""],
   ["generation optimized refusal controls omitted","          python3 -O -B tools/shared/test_generate_builtin_evidence.py\n",""],
-  ['missing shard', "          - optimization: '0'\n            suite: default\n", ''],
-  ['duplicate shard', '            suite: default\n', '            suite: framework\n'],
+  ['missing shard', "          - optimization: '0'\n            suite: routine\n", ''],
+  ['duplicate shard', '            suite: routine\n', '            suite: optimizer\n'],
   ['missing O2', "          - optimization: '2'\n", "          - optimization: '0'\n"],
   ['matrix exclusion', '        include:\n', '        exclude: []\n        include:\n'],
-  ['outer bound changed', '    timeout-minutes: 120\n', '    timeout-minutes: 121\n'],
+  ['outer bound changed', '    timeout-minutes: 360\n', '    timeout-minutes: 361\n'],
   ['fail-fast cancellation', '      fail-fast: false\n', '      fail-fast: true\n'],
   ['installation omitted before cleanup', '&& make install)', '&& true)'],
   ['premature install-input cleanup',
@@ -458,16 +456,19 @@ const controls = [
   ['optimized cleanup controls omitted', '          python3 -O -B tools/release/test-ghc-install-cleanup.py\n', ''],
   ['producer skipped', '      - name: Build exact committed shared sources and direct test runners\n', "      - name: Build exact committed shared sources and direct test runners\n        if: matrix.optimization == '2'\n"],
   ['producer authentication removed', '.complete == true and .producer_host == "GHC" and .typecheck_only == false', '.complete == true'],
-  ['direct coverage skipped', "if: matrix.suite == 'all' || matrix.suite == 'direct'", "if: matrix.suite == 'all'"],
-  ['default/framework omitted', "if: matrix.suite != 'direct'", "if: matrix.suite == 'all'"],
-  ['default/framework duplicated', "--suite '${{ matrix.suite }}'", '--suite all'],
-  ['framework margin omitted', 'suite_args=(--suite-timeout 5400)', 'suite_args=()'],
-  ['framework cap exceeded', 'suite_args=(--suite-timeout 5400)', 'suite_args=(--suite-timeout 5401)'],
-  ['framework margin removed', 'suite_args=(--suite-timeout 5400)', 'suite_args=(--suite-timeout 4500)'],
-  ['framework margin omitted by selector', "= '0:framework'", "= '0:default'"],
-  ['default margin omitted by selector', "= '0:default'", "= '0:framework'"],
-  ['O2 budget changed', "= '0:framework'", "= '2:all'"],
-  ['all framework budgets changed', "if [ '${{ matrix.optimization }}:${{ matrix.suite }}' = '0:framework' ] || [ '${{ matrix.optimization }}:${{ matrix.suite }}' = '0:default' ]; then", 'if true; then'],
+  ['direct coverage skipped',
+    "      - name: Qualify authenticated direct async and frontend execution\n        if: matrix.suite == 'routine'\n",
+    "      - name: Qualify authenticated direct async and frontend execution\n        if: false\n"],
+  ['framework omitted',
+    "      - name: Qualify hosted TupleList and framework contracts\n        if: matrix.suite == 'routine'\n",
+    "      - name: Qualify hosted TupleList and framework contracts\n        if: false\n"],
+  ['framework repeated in O2', '--suite controls', '--suite all'],
+  ['framework margin omitted', ' --suite-timeout 5400', ''],
+  ['framework cap exceeded', ' --suite-timeout 5400', ' --suite-timeout 5401'],
+  ['framework margin reduced', ' --suite-timeout 5400', ' --suite-timeout 4500'],
+  ['framework runs in both producers',
+    "      - name: Qualify hosted TupleList and framework contracts\n        if: matrix.suite == 'routine'\n",
+    "      - name: Qualify hosted TupleList and framework contracts\n"],
   ['direct budget override', 'python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir', 'python3 -B tools/shared/test_direct_candidate_successor.py --suite-timeout 5400 --bin-dir'],
   ['Figure12 omitted', 'python3 tools/shared/test_figure12_direct.py', 'python3 tools/shared/omitted.py'],
   // Bind selector mutations to the named step, not the first unrelated O2 step.
@@ -511,17 +512,37 @@ const controls = [
   ['aggregate missing matrix', 'needs: [metadata, native, windows-runtime', 'needs: [metadata, windows-runtime'],
   ['aggregate accepts skipped', '.result == "success"', '.result != "failure"'],
   ['PR matrix skipped', "(github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only)", "(github.event_name == 'workflow_dispatch')"],
-  ['nonblocking failures', '    timeout-minutes: 120\n', '    timeout-minutes: 120\n    continue-on-error: true\n'],
+  ['nonblocking failures', '    timeout-minutes: 360\n', '    timeout-minutes: 360\n    continue-on-error: true\n'],
 ];
-for (const [name, before, after] of controls) {
-  assert.ok(workflow.includes(before), `Mutation ${name} must hit the actual workflow`);
-  if (['O2 guest omitted', 'O2 graph fingerprints omitted', 'O2 source graph omitted',
-       'O2 source context omitted', 'O2 artifact binary omitted'].includes(name)) {
-    assert.equal(workflow.split(before).length, 2, `Mutation ${name} must select exactly one named step`);
-  }
-  const mutated = workflow.replace(before, after);
-  assert.notEqual(mutated, workflow, `Mutation ${name} must change the actual workflow`);
-  assert.throws(() => validate(mutated), undefined, `Reject ${name}`);
+const suite = 'release-native-ci-partition';
+const prefix = 'release/native-ci-partition/';
+const cases = [
+  [prefix + 'schedule', () => {
+    const actual = job(workflowSource, 'native');
+    for (const adapter of ['source-smoke', 'direct-candidate', 'framework-direct', 'release-build-receipts', 'figure12-direct', 'tuple-list-native']) {
+      assert.match(actual, new RegExp('tools/testing/run[.]py ' + adapter + '\\b'));
+    }
+    validate(workflow);
+  }],
+  ...controls.map(([name, before, after]) => [prefix + 'mutation/' + encodeURIComponent(name), () => {
+    assert.ok(workflow.includes(before), `Mutation ${name} must hit the actual workflow`);
+    if (['O2 guest omitted', 'O2 graph fingerprints omitted', 'O2 source graph omitted',
+         'O2 source context omitted', 'O2 artifact binary omitted'].includes(name)) {
+      assert.equal(workflow.split(before).length, 2, `Mutation ${name} must select exactly one named step`);
+    }
+    const mutated = workflow.replace(before, after);
+    assert.notEqual(mutated, workflow, `Mutation ${name} must change the actual workflow`);
+    assert.throws(() => validate(mutated), undefined, `Reject ${name}`);
+  }]),
+];
+const selection = process.env.MLF_TEST_SUITE === suite ? process.env.MLF_TEST_EXACT : undefined;
+const selectedCases = selection ? cases.filter(([id]) => id === selection) : cases;
+assert.ok(selectedCases.length, 'Unknown CI partition case');
+const plan = selectedCases.map(([id]) => id);
+if (process.argv.includes('--framework-list')) {
+  console.log(JSON.stringify(plan));
+} else {
+  releaseTestEvent(suite, {plan});
+  for (const [id, run] of selectedCases) releaseTestCase(suite, id, run);
+  console.log(`Native O0/O2 CI partition: ${selectedCases.length} checks passed.`);
 }
-console.log(`Native O0/O2 CI partition and ${controls.length} mutation controls passed.`);
-

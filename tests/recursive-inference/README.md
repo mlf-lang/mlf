@@ -38,7 +38,7 @@ never substitutes a simpler source. Build and run it using an existing completed
 shared build (and its already-installed GHC), from the repository root:
 
 ```sh
-python3 tests/recursive-inference/run_saved_crate_host.py \
+python3 -B tools/testing/run.py recursive-saved-crate -- \
   --compiler-build .mlf-build/qualified-final-O2 \
   --build-dir .mlf-build/qualified-host-crate-audited
 ```
@@ -78,19 +78,17 @@ all six direct-module checks, but was deliberately interrupted (exit 130) while
 compiling its first saved-crate builtin prelude, after this exact host route
 passed. The host result is **not** represented as completion of that guest run.
 
-`RecursiveModuleCompatibility.emlf` preserves the combined legacy route: live
-inventory discovery, the exported canonical-query assertion, and the same six
-module plus six crate actions. Run it with the same compiler source roots as
+`RecursiveModuleCompatibility.emlf` registers the inventory assertion, the
+canonical query assertion, and the six module and six crate actions with the
+shared framework. The query, module, and crate actions keep their Core IDs. Run it with the same compiler source roots as
 the discovery command, add `-i tests/recursive-inference`, and set
 `MLF_TEST_WORK` to an existing writable project-local absolute directory. It
 can be very slow because the compiler is interpreted while producing builtin
 crate artifacts. This driver does not invoke program execution/native tests.
 
-`TypeclassCompatibility.emlf` is the byte-identical maintained copy of the
-five-line harness used for the final 78-action class compatibility run. Run it
-with `emlf --run` and the shared source roots (excluding `host/ghc`) as above.
-It selects the existing `Tests.Typeclasses.typeclassTests` list unchanged; it
-adds no test IDs and does not invoke the native campaign.
+`TypeclassCompatibility.emlf` runs the `core/typeclasses` registry through
+the guest compiler. Run it with `emlf --run` and the shared source roots above.
+It retains the typeclass labels and IDs from Core.
 
 ## PR22 canonical-source integration
 

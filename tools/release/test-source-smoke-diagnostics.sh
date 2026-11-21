@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Exercise supervision and retained diagnostics without running a real compiler.
 set -euo pipefail
+. "$(dirname -- "$0")/test-events.sh" release-source-smoke-diagnostics
 scripts=$(cd -- "$(dirname -- "$0")" && pwd)
 scratch=$(mktemp -d)
 cleanup() {
@@ -122,6 +123,7 @@ s/^\(  sleep 2 &\)\(.*\)$/\1\
  \2/
 SED
 for mode in success timeout progress telemetry; do
+  release_begin "release/source-smoke-diagnostics/$mode"
   export TEST_SMOKE_MODE=$mode
   cp "$scripts/source-smoke.sh" "$checkout/tools/release/source-smoke.sh"
   if [ "$mode" = timeout ]; then
@@ -166,5 +168,6 @@ for mode in success timeout progress telemetry; do
     fi
   fi
   printf 'PASS source smoke diagnostics: %s\n' "$mode"
+  release_pass
 done
 printf '4 source smoke diagnostic checks passed\n'

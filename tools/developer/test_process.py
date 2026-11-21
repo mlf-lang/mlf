@@ -1,5 +1,6 @@
 """Process-level checks for the developer build launcher."""
 import os
+import json
 from pathlib import Path
 import shutil
 import signal
@@ -59,6 +60,23 @@ def check_tools_fixture(root, script):
     tools = root / 'tools'
     suite = tools / 'developer'
     suite.mkdir(parents=True)
+    framework = tools / 'testing'
+    framework.mkdir()
+    for module in ('run.py', 'receipt_adapter.py'):
+        shutil.copyfile(SCRIPT.parents[1] / 'testing' / module, framework / module)
+    (root / 'tests').mkdir()
+    (root / 'tests/test-catalog.json').write_text(json.dumps({
+        'external_adapters': ['tools/developer/fixture-suites.json'],
+    }))
+    names = ('commands', 'process')
+    (suite / 'fixture-suites.json').write_text(json.dumps({
+        f'release-developer-{name}': {
+            'command': ['python3', '-B', f'tools/developer/test_{name}.py'],
+            'kind': 'exit',
+            'ids': [f'fixture/{name}'],
+        }
+        for name in names
+    }))
     shutil.copyfile(SCRIPT.parents[1] / 'dev.py', tools / 'dev.py')
     shutil.copyfile(process.__file__, suite / 'process.py')
     (suite / 'test_commands.py').write_text(script)

@@ -4,6 +4,7 @@
 set -euo pipefail
 test "$#" -eq 2 || { echo 'Usage: test-async-task.sh COMPILER OUTPUT-DIRECTORY' >&2; exit 2; }
 root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
+. "$root/tools/testing/native-events.sh"
 compiler=$(cd -- "$(dirname -- "$1")" && pwd)/$(basename -- "$1")
 test -x "$compiler"
 mkdir -p -- "$2"
@@ -25,7 +26,7 @@ cleanup() {
  if [ -n "$watchdog_pid" ]; then kill "$watchdog_pid" 2>/dev/null || true; fi
  if [ -n "$command_pid" ]; then kill "$command_pid" 2>/dev/null || true; fi
 }
-trap cleanup EXIT
+trap 'status=$?; cleanup; mlf_case_cleanup "$status"' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 run() {
@@ -50,14 +51,14 @@ run() {
  wait "$watchdog_pid" 2>/dev/null || true
  watchdog_pid=
  printf '%s\n' "$status" > "$work/$label.status"
- test ! -e "$work/$label.timed-out" || fail "$label timed out"
+ test ! -e "$work/$label.timed-out" || { mlf_case_result timeout "$status"; fail "$label timed out"; }
  return "$status"
 }
 success() { local label=$1; run "$@" || fail "$label failed"; test ! -s "$work/$label.stderr" || fail "$label emitted diagnostics"; }
 record_inputs() {
  local destination=$1 file
  printf '{}\n' > "$destination"
- for file in "$fixtures"/* "$root/tools/release/test-async-task.sh" "$root/tools/release/check_async_abi.py" "$root/tests/async-process/fixture.c" \
+ for file in "$fixtures"/* "$root/tools/release/test-async-task.sh" "$root/tools/release/check_async_abi.py" "$root/tools/testing/native-events.sh" "$root/tests/async-process/fixture.c" \
   "$root/libraries/mlf-foundation/Bootstrap/Types.hs" "$root/libraries/mlf-foundation/Bootstrap/Std.hs" \
   "$root/libraries/mlf-async/Async/Task/Core.hs" "$root/libraries/mlf-async/Async/Task.hs" "$root/libraries/mlf-async/Async/Task/Internal.hs" \
   "$root/libraries/mlf-async/Async/Process.hs" "$root/libraries/mlf-async/Async/Process/Internal.hs" \
@@ -69,8 +70,12 @@ record_inputs() {
 record_inputs "$work/inputs.json"
 compiler_hash=$(sha256 "$compiler")
 include_args=(-i "$root/libraries/mlf-foundation" -i "$root/libraries/mlf-async")
+wanted=${MLF_TEST_EXACT:-}
+unset MLF_ASYNC_CASE
 
 for kind in opaque-fiber opaque-task opaque-internal-fiber opaque-internal-task mixed-fiber; do
+ mlf_case_selected "async-task/source-rejection/$kind" || continue
+ mlf_case_start "async-task/source-rejection/$kind"
  status=0
  run "$kind" "$compiler" "${include_args[@]}" "$fixtures/$kind.emlf" || status=$?
  test "$status" -eq 1 || fail "$kind expected rejection, got $status"
@@ -85,6 +90,7 @@ for kind in opaque-fiber opaque-task opaque-internal-fiber opaque-internal-task 
    grep -F 'String' "$work/$kind.stderr" >/dev/null || fail "$kind missing String diagnostic"
    grep -F 'Int' "$work/$kind.stderr" >/dev/null || fail "$kind missing Int diagnostic" ;;
  esac
+ mlf_case_result pass "$status"
  echo "PASS $kind rejection"
 done
 
@@ -106,6 +112,7 @@ success runtime "$clang" -O2 -std=c11 -Wall -Wextra -Werror "${cflags[@]}" -c "$
 
 export MLF_ASYNC_FIXTURE="$work/fixture"
 for suite in main processes wait-graph guards; do
+ case "$wanted" in ''|async-task/parity/"$suite/"*) ;; *) continue ;; esac
  args=("${include_args[@]}")
  type_oracle=io-unit.type
  case $suite in
@@ -114,6 +121,12 @@ for suite in main processes wait-graph guards; do
   wait-graph) entry=WaitGraph.emlf; oracle=wait-graph.stdout ;;
   guards) entry=Guards.emlf; oracle=guards.stdout; type_oracle=guards.type ;;
  esac
+ oracle_file="$fixtures/$oracle"
+ if [ -n "$wanted" ]; then
+  export MLF_ASYNC_CASE="${wanted##*/}"
+  oracle_file="$work/$suite.expected"
+  grep -Fx "PASS $MLF_ASYNC_CASE" "$fixtures/$oracle" > "$oracle_file" || fail "unknown $suite case"
+ fi
  success "$suite.compile" "$compiler" "${args[@]}" "$fixtures/$entry"
  success "$suite.check" "$compiler" --check "$work/$suite.compile.stdout"
  cmp "$fixtures/$type_oracle" "$work/$suite.check.stdout" || fail "$suite target type"
@@ -121,22 +134,28 @@ for suite in main processes wait-graph guards; do
  python3 -B "$root/tools/release/check_async_abi.py" "$work/$suite.emit.stdout" >/dev/null || fail "$suite lacks async ABI guard"
  success "$suite.link" "$clang" -O2 -Wno-override-module -x ir "$work/$suite.emit.stdout" -x none "$work/runtime.o" "${libs[@]}" -o "$work/$suite.native"
  for backend in interpreter llvm; do
+  prefix="async-task/parity/$suite/$backend"
+  case "$wanted" in ''|"$prefix/"*) ;; *) continue ;; esac
   mkdir "$work/$suite.$backend"
+  status=0
   export MLF_ASYNC_WORK="$work/$suite.$backend"
   if [ "$backend" = interpreter ]; then
-   success "$suite.$backend" "$compiler" --run-xmlf "$work/$suite.compile.stdout"
+   run "$suite.$backend" "$compiler" --run-xmlf "$work/$suite.compile.stdout" || status=$?
   else
-   success "$suite.$backend" "$work/$suite.native"
+   run "$suite.$backend" "$work/$suite.native" || status=$?
   fi
-  cmp "$fixtures/$oracle" "$work/$suite.$backend.stdout" || fail "$suite.$backend differs from literal oracle"
+  mlf_report_labeled_output "$prefix" "$oracle_file" "$work/$suite.$backend.stdout" "$status" || fail "$suite.$backend differs from literal oracle"
+  test "$status" -eq 0 && test ! -s "$work/$suite.$backend.stderr" || fail "$suite.$backend failed"
   echo "PASS $suite $backend"
  done
- cmp "$work/$suite.interpreter.stdout" "$work/$suite.llvm.stdout" || fail "$suite backend differences"
+ if [ -z "$wanted" ]; then
+  cmp "$work/$suite.interpreter.stdout" "$work/$suite.llvm.stdout" || fail "$suite backend differences"
+ fi
 done
 record_inputs "$work/inputs.final.json"
 cmp "$work/inputs.json" "$work/inputs.final.json" || fail 'source changed during run'
 test "$(sha256 "$compiler")" = "$compiler_hash" || fail 'compiler changed during run'
-test "${#labels[@]}" -eq 31 || fail 'command coverage changed'
+test -n "${MLF_TEST_EXACT:-}" || test "${#labels[@]}" -eq 31 || fail 'command coverage changed'
 printf '{}\n' > "$work/artifacts.json"
 for file in "$work/runtime.o" "$work/fixture" "$work/"*.native "$work/"*.compile.stdout "$work/"*.emit.stdout; do
  jq --arg path "$(basename "$file")" --arg hash "$(sha256 "$file")" '. + {($path):$hash}' "$work/artifacts.json" > "$work/artifacts.tmp"
@@ -150,11 +169,13 @@ for label in "${labels[@]}"; do
   mv "$work/observations.tmp" "$work/observations.json"
  done
 done
-jq -n --arg compiler_sha256 "$compiler_hash" --arg work "$work" \
+jq -n --arg exact "${MLF_TEST_EXACT:-}" --arg compiler_sha256 "$compiler_hash" --arg work "$work" \
  --arg core_sha256 "$(sha256 "$root/libraries/mlf-async/Async/Task/Core.hs")" \
  --slurpfile inputs "$work/inputs.json" --slurpfile observations "$work/observations.json" --slurpfile artifacts "$work/artifacts.json" \
- '{complete:true,cases:31,source_rejections:5,backends:["interpreter","llvm"],whitebox_cases:6,
+ '{complete:($exact == ""),cases:31,source_rejections:5,backends:["interpreter","llvm"],whitebox_cases:6,
  compiler_sha256:$compiler_sha256,work:$work,whitebox_source_sha256:$core_sha256,whitebox_source:"libraries/mlf-async/Async/Task/Core.hs",
  inputs:$inputs[0],observations:$observations[0],artifacts:$artifacts[0]}' > "$output/result.tmp"
 mv "$output/result.tmp" "$output/result.json"
-echo 'Async.Task language parity passed: 31 contracts (6 white-box), 5 source rejections.'
+if [ -z "${MLF_TEST_EXACT:-}" ]; then
+ echo 'Async.Task language parity passed: 31 contracts (6 white-box), 5 source rejections.'
+fi

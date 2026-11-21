@@ -1,5 +1,6 @@
 module Main where
 import Bootstrap.Types
+import qualified Bootstrap.Std as S
 import qualified Async.Task.Core as I
 import qualified Async.Process as P
 
@@ -128,9 +129,15 @@ cleanupErrors = do
     _ -> exitWith 1
   putStrLn "PASS primary-and-cleanup-errors-retained"
 main = do
-  check self "PASS self-await-rejected"
-  check mutual "PASS mutual-wait-cycle-rejected"
-  cleanupErrors
-  nestedCleanup
-  ancestorStop
-  rootCancellation
+ selection <- getEnv "MLF_ASYNC_CASE"
+ let cases =
+  (:) ((,) "self-await-rejected" (check self "PASS self-await-rejected")) (
+  (:) ((,) "mutual-wait-cycle-rejected" (check mutual "PASS mutual-wait-cycle-rejected")) (
+  (:) ((,) "primary-and-cleanup-errors-retained" (cleanupErrors)) (
+  (:) ((,) "nested-late-cleanup-after-primary-and-parent-stop" (nestedCleanup)) (
+  (:) ((,) "synchronous-ancestor-stop-before-notification" (ancestorStop)) (
+  (:) ((,) "cancelled-root-signals-and-joins-sibling" (rootCancellation)) (
+  []))))))
+ if eqString selection "" || S.any (\entry -> eqString (S.fst entry) selection) cases then
+  S.mapM_ (\((,) label action) -> if eqString selection "" || eqString selection label then action else ioReturn ()) cases
+ else exitWith 2

@@ -53,7 +53,7 @@ class Preparation(unittest.TestCase):
             names = ['emlf', 'mlfpkg'] + ['fixture-' + str(i) for i in range(11)]
             for name in names:
                 (binaries / name).write_text(name)
-            self.producer = {'optimization': '2', 'outputs': {
+            self.producer = {'optimization': argv[argv.index('--optimization') + 1], 'outputs': {
                 name: self.auth.identified(binaries / name) for name in names}}
             (self.output / 'receipt.json').write_text(json.dumps(self.producer))
         elif label == 'runner-build':

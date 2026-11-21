@@ -200,10 +200,15 @@ module Tests.TupleList where {
       result <- compiled (Compiler.compile "tuple-list.emlf" source);
       checkResult label expected result
     };
-  evaluates :: String -> String -> Int -> A.Test ();
-  evaluates label source expected =
+  checkedCompilation :: String -> Either CompileError Compiler.Compilation -> A.Test ();
+  checkedCompilation label compilation = do {
+    result <- compiled compilation;
+    checkResult label int result
+  };
+  evaluates :: String -> Either CompileError Compiler.Compilation -> Int -> A.Test ();
+  evaluates label compilation expected =
     do {
-      result <- compiled (Compiler.compile "tuple-list.emlf" source);
+      result <- compiled compilation;
       let {
         term = Compiler.compiledTerm result
       };
@@ -892,105 +897,46 @@ module Tests.TupleList where {
                                                                               []))))))))))))))))))))))));
   runtimeCases :: [] C.Case;
   runtimeCases =
-    (:)
-      (leaf "tuple-list/focused/tuple-projection" "tuple projection" "independent-reference"
-         (accepted "tuple projection" (declarations ++ "case (40,2) of {(x,y) -> x+y}") int))
-      ((:)
-         (leaf "tuple-list/focused/tuple-projection-runtime" "tuple projection runtime"
-            "runtime-value"
-            (evaluates "tuple projection" (declarations ++ "case (40,2) of {(x,y) -> x+y}") 42))
-         ((:)
-            (leaf "tuple-list/focused/list-pattern-result" "list pattern result"
-               "independent-reference"
-               (accepted "list pattern result"
-                  (declarations ++ "case [20,22] of {[x,y] -> x+y; _ -> 0}")
-                  int))
-            ((:)
-               (leaf "tuple-list/focused/list-pattern-result-runtime" "list pattern result runtime"
-                  "runtime-value"
-                  (evaluates "list pattern result"
-                     (declarations ++ "case [20,22] of {[x,y] -> x+y; _ -> 0}")
-                     42))
-               ((:)
-                  (leaf "tuple-list/focused/cons-associativity-result" "cons associativity result"
-                     "independent-reference"
-                     (accepted "cons associativity result"
-                        (declarations ++ "case 20 : 22 : [] of {[x,y] -> x+y; _ -> 0}")
-                        int))
-                  ((:)
-                     (leaf "tuple-list/focused/cons-associativity-result-runtime"
-                        "cons associativity result runtime"
-                        "runtime-value"
-                        (evaluates "cons associativity result"
-                           (declarations ++ "case 20 : 22 : [] of {[x,y] -> x+y; _ -> 0}")
-                           42))
-                     ((:)
-                        (leaf "tuple-list/focused/tuple-ignored-field-stays-lazy"
-                           "tuple ignored field stays lazy"
-                           "independent-reference"
-                           (accepted "tuple ignored field stays lazy"
-                              (declarations ++
-                               "case (42, panic \"tuple field forced\") of {(x,_) -> x}")
-                              int))
-                        ((:)
-                           (leaf "tuple-list/focused/tuple-ignored-field-stays-lazy-runtime"
-                              "tuple ignored field stays lazy runtime"
-                              "runtime-value"
-                              (evaluates "tuple ignored field stays lazy"
-                                 (declarations ++
-                                  "case (42, panic \"tuple field forced\") of {(x,_) -> x}")
-                                 42))
-                           ((:)
-                              (leaf "tuple-list/focused/list-ignored-head-stays-lazy"
-                                 "list ignored head stays lazy"
-                                 "independent-reference"
-                                 (accepted "list ignored head stays lazy"
-                                    (declarations ++
-                                     "case [panic \"list head forced\",42] of {[_,x] -> x; _ -> 0}")
-                                    int))
-                              ((:)
-                                 (leaf "tuple-list/focused/list-ignored-head-stays-lazy-runtime"
-                                    "list ignored head stays lazy runtime"
-                                    "runtime-value"
-                                    (evaluates "list ignored head stays lazy"
-                                       (declarations ++
-                                        "case [panic \"list head forced\",42] of {[_,x] -> x; _ -> 0}")
-                                       42))
-                                 ((:)
-                                    (leaf "tuple-list/focused/cons-ignored-tail-stays-lazy"
-                                       "cons ignored tail stays lazy"
-                                       "independent-reference"
-                                       (accepted "cons ignored tail stays lazy"
-                                          (declarations ++
-                                           "case 42 : (panic \"list tail forced\") of {x : _ -> x; [] -> 0}")
-                                          int))
-                                    ((:)
-                                       (leaf
-                                          "tuple-list/focused/cons-ignored-tail-stays-lazy-runtime"
-                                          "cons ignored tail stays lazy runtime"
-                                          "runtime-value"
-                                          (evaluates "cons ignored tail stays lazy"
-                                             (declarations ++
-                                              "case 42 : (panic \"list tail forced\") of {x : _ -> x; [] -> 0}")
-                                             42))
-                                       ((:)
-                                          (leaf "tuple-list/focused/typed-recursive-list-traversal"
-                                             "typed recursive list traversal"
-                                             "independent-reference"
-                                             (accepted "typed recursive list traversal"
-                                                (declarations ++
-                                                 "sum : [Int] -> Int; sum [] = 0; sum (x : xs) = x + sum xs; main = sum [10,12,20];")
-                                                int))
-                                          ((:)
-                                             (leaf
-                                                "tuple-list/focused/typed-recursive-list-traversal-runtime"
-                                                "typed recursive list traversal runtime"
-                                                "runtime-value"
-                                                (evaluates "typed recursive list traversal"
-                                                   (declarations ++
-                                                    "sum : [Int] -> Int; sum [] = 0; sum (x : xs) = x + sum xs; main = sum [10,12,20];")
-                                                   42))
-                                             [])))))))))))));
+    let {
+      compileRuntime source = Compiler.compile "tuple-list.emlf" (declarations ++ source);
+      tupleProjection = compileRuntime "case (40,2) of {(x,y) -> x+y}";
+      listPatternResult = compileRuntime "case [20,22] of {[x,y] -> x+y; _ -> 0}";
+      consAssociativityResult = compileRuntime "case 20 : 22 : [] of {[x,y] -> x+y; _ -> 0}";
+      tupleIgnoredFieldStaysLazy = compileRuntime "case (42, panic \"tuple field forced\") of {(x,_) -> x}";
+      listIgnoredHeadStaysLazy = compileRuntime "case [panic \"list head forced\",42] of {[_,x] -> x; _ -> 0}";
+      consIgnoredTailStaysLazy = compileRuntime "case 42 : (panic \"list tail forced\") of {x : _ -> x; [] -> 0}";
+      typedRecursiveListTraversal = compileRuntime "sum : [Int] -> Int; sum [] = 0; sum (x : xs) = x + sum xs; main = sum [10,12,20];";
+    } in
+    -- Distinct oracles share the lazy, immutable result for each identical input.
+    (:) (leaf "tuple-list/focused/tuple-projection" "tuple projection"
+         "independent-reference" (checkedCompilation "tuple projection" tupleProjection)) (
+    (:) (leaf "tuple-list/focused/tuple-projection-runtime" "tuple projection runtime"
+         "runtime-value" (evaluates "tuple projection" tupleProjection 42)) (
+    (:) (leaf "tuple-list/focused/list-pattern-result" "list pattern result"
+         "independent-reference" (checkedCompilation "list pattern result" listPatternResult)) (
+    (:) (leaf "tuple-list/focused/list-pattern-result-runtime" "list pattern result runtime"
+         "runtime-value" (evaluates "list pattern result" listPatternResult 42)) (
+    (:) (leaf "tuple-list/focused/cons-associativity-result" "cons associativity result"
+         "independent-reference" (checkedCompilation "cons associativity result" consAssociativityResult)) (
+    (:) (leaf "tuple-list/focused/cons-associativity-result-runtime" "cons associativity result runtime"
+         "runtime-value" (evaluates "cons associativity result" consAssociativityResult 42)) (
+    (:) (leaf "tuple-list/focused/tuple-ignored-field-stays-lazy" "tuple ignored field stays lazy"
+         "independent-reference" (checkedCompilation "tuple ignored field stays lazy" tupleIgnoredFieldStaysLazy)) (
+    (:) (leaf "tuple-list/focused/tuple-ignored-field-stays-lazy-runtime" "tuple ignored field stays lazy runtime"
+         "runtime-value" (evaluates "tuple ignored field stays lazy" tupleIgnoredFieldStaysLazy 42)) (
+    (:) (leaf "tuple-list/focused/list-ignored-head-stays-lazy" "list ignored head stays lazy"
+         "independent-reference" (checkedCompilation "list ignored head stays lazy" listIgnoredHeadStaysLazy)) (
+    (:) (leaf "tuple-list/focused/list-ignored-head-stays-lazy-runtime" "list ignored head stays lazy runtime"
+         "runtime-value" (evaluates "list ignored head stays lazy" listIgnoredHeadStaysLazy 42)) (
+    (:) (leaf "tuple-list/focused/cons-ignored-tail-stays-lazy" "cons ignored tail stays lazy"
+         "independent-reference" (checkedCompilation "cons ignored tail stays lazy" consIgnoredTailStaysLazy)) (
+    (:) (leaf "tuple-list/focused/cons-ignored-tail-stays-lazy-runtime" "cons ignored tail stays lazy runtime"
+         "runtime-value" (evaluates "cons ignored tail stays lazy" consIgnoredTailStaysLazy 42)) (
+    (:) (leaf "tuple-list/focused/typed-recursive-list-traversal" "typed recursive list traversal"
+         "independent-reference" (checkedCompilation "typed recursive list traversal" typedRecursiveListTraversal)) (
+    (:) (leaf "tuple-list/focused/typed-recursive-list-traversal-runtime" "typed recursive list traversal runtime"
+         "runtime-value" (evaluates "typed recursive list traversal" typedRecursiveListTraversal 42)) (
+    []))))))))))))));
   scopeCases :: [] C.Case;
   scopeCases =
     let {

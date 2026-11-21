@@ -3,10 +3,13 @@
 # verdicts or benchmark outputs, and never convert a failed limit into success.
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../.."
+if [ "${1:-}" = --framework-list ]; then
+  exec python3 -B tools/bench/framework_inventory.py
+fi
 test "$(uname -s):$(uname -m)" = Darwin:arm64
 . tools/release/native-environment.sh
 tools/release/shared-candidate.sh verify
-tools/release/check-benchmark-provenance.sh
+python3 -B tools/testing/run.py benchmark-provenance
 output=$PWD/.mlf-build/benchmark-game
 test ! -e "$output"
 mkdir -p "$output/timing/commands"

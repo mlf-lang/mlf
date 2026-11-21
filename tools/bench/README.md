@@ -104,7 +104,7 @@ not a compilation/runtime target PASS. Missing PCRE2 or any failed source,
 fixture, oracle or integrity check still stops the complete ten-workload gate.
 
 Static migration checks (no compilation or benchmark execution) are available as
-`python3 tools/bench/check-migration.py`; see [validation protocol](MIGRATION-VALIDATION.md).
+`python3 -B tools/testing/run.py benchmark-migration-contract`; see [validation protocol](MIGRATION-VALIDATION.md).
 
 Run from the repository root with a fresh output directory and no other builds
 or measured jobs running. An odd sample count of at least three is required.
@@ -326,7 +326,7 @@ report with compiler fingerprints and one independently checked executable at
 fresh output and no other measured work:
 
 ```sh
-python3 tools/bench/native-default.py \
+python3 -B tools/testing/run.py application-benchmarks-installed -- \
   --compiler /absolute/path/to/emlf \
   --install-receipt /absolute/path/to/native/receipt.json \
   --install-timing /absolute/path/to/install-timing.json \

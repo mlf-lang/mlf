@@ -43,6 +43,9 @@ module MLF.Tests.SharedFrontend where {
   import qualified Tests.IndependentCheck as Independent;
   import qualified Tests.IndependentType as IndependentType;
   import qualified MLF.Tests.ClassDemand as ClassDemandTests;
+  import qualified Test.Assert as A;
+  import qualified Test.Case as Case;
+  import qualified Test.Runner as Runner;
   prologue :: String;
   prologue =
     "-- mlf:syntax shared-haskell-v1\n{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}\n";
@@ -197,10 +200,7 @@ module MLF.Tests.SharedFrontend where {
   check name okay =
     if okay
     then ioReturn ()
-    else do {
-           putErr ("shared frontend failure: " ++ (name ++ "\n"));
-           exitWith 1
-         };
+    else ioError (userError (textToChars ("shared frontend failure: " ++ name)));
   -- Unsigned groups now pass parsing. The negative operator case belongs to
   -- module resolution: shadowed infix uses must still select the canonical
   -- primitive binding, independently of recursive signature availability.
@@ -2447,18 +2447,56 @@ module MLF.Tests.SharedFrontend where {
       Right _ -> checkFiles (i + 1) count
     }
   };
+  -- The old flags and frozen driver use these same case actions. The
+  -- grouped actions keep their existing source-sharing and exact banners.
+  recoverFrontend :: IO () -> A.Test ();
+  recoverFrontend action =
+    A.Test (catchIOError (do { action; ioReturn (Right ()) }) (\error ->
+      let { message = textFromChars (ioeGetErrorString error) } in
+      if recursiveStartsWith "shared frontend failure: " message
+      then ioReturn (Left (A.Failure message Nothing))
+      else ioError error));
+  frontendCase name label action =
+    Case.test ("shared-frontend/" ++ name) label ["family:shared-frontend"] (recoverFrontend action);
+  standard = [
+    frontendCase "frontend" "parser, declarations and recursive inference" frontendChecks,
+    frontendCase "native-first" "first native semantics group" nativeFirst,
+    frontendCase "native-second" "second native semantics group" nativeSecond
+  ];
+  frontendRegistry = append standard [
+    frontendCase "recursive-inference" "focused recursive inference" recursiveInferenceChecks,
+    frontendCase "formatter" "formatter grammar"
+      (do { formatterChecks; putStrLn "shared frontend: formatter checks passed" })
+  ];
+  argumentsFrom index count =
+    if index >= count then ioReturn []
+    else do {
+      arg <- getArg index;
+      rest <- argumentsFrom (index + 1) count;
+      ioReturn ((:) arg rest)
+    };
   main :: IO ();
   main = do {
     count <- getArgCount;
-    if count == 0 then do { frontendChecks; nativeFirst; nativeSecond }
-    else do {
-      mode <- getArg 0;
-      if eqString mode "--recursive-inference" then recursiveInferenceChecks
-      else if eqString mode "--formatter" then do { formatterChecks; putStrLn "shared frontend: formatter checks passed" }
-      else if eqString mode "--frontend" then frontendChecks
-      else if eqString mode "--native-first" then nativeFirst
-      else if eqString mode "--native-second" then nativeSecond
-      else checkFiles 0 count
+    args <- argumentsFrom 0 count;
+    case args of {
+      [] -> mapM_ (\entry -> A.orExit (Case.action entry)) standard;
+      (:) mode _ ->
+        let {
+          selects = startsRegistry mode;
+          legacy = if recursiveStartsWith "--" mode then find (\entry -> eqString (Case.id entry)
+            ("shared-frontend/" ++ (stringSlice mode 2 (stringLength mode - 2)))) frontendRegistry else Nothing
+        } in
+        if selects then do {
+          code <- Runner.run args frontendRegistry;
+          if code == 0 then ioReturn () else exitWith code
+        } else
+          case legacy of {
+            Just entry -> A.orExit (Case.action entry);
+            Nothing -> checkFiles 0 count
+          }
     }
-  }
+  };
+  startsRegistry mode =
+    elem eqString mode ["--list", "--exact", "--filter", "--tag", "--group", "--format", "--report"]
 }

@@ -9,7 +9,6 @@ import qualified Package.Benchmark as B
 import qualified Tests.Basic as H
 import qualified Tests.Bytes as Bytes
 import qualified Tests.NativeABI as ABI
-import qualified Tests.RegexRedux as RegexRedux
 check : String -> IO () -> IO ()
 check label action = do { action; Coverage.passed "harness" label; putStrLn ("PASS " ++ label) }
 rejectOutput : String -> Int -> String -> IO ()
@@ -17,12 +16,6 @@ rejectOutput name size wrong = H.assert (S.not (B.validateOutput name size (B.te
 firstReplace old new text = let pieces = O.split 10 text in O.replace old new text
 fixture : String -> J.Json -> J.Json
 fixture name manifest = S.fromMaybe (panic "missing benchmark workload") (S.find (\w -> eqString name (V.text "name" w)) (V.array "workloads" manifest))
-main : IO ()
-main = do
- manifest <- J.read "benchmarks/manifest.json"
- S.mapM_ (\((,) _ action) -> action) (cases manifest)
- RegexRedux.main
-
 -- Each entry retains the original check and action. The final CLI case also
 -- retains its unlabelled invalid-configuration controls before family completion.
 cases : J.Json -> [] ((,) String (IO ()))

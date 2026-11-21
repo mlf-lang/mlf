@@ -241,7 +241,13 @@ README
 # CHECKSUMS is explicitly excluded from the input list.
 # shellcheck disable=SC2094
 (cd "$bundle" && find . -type f ! -name CHECKSUMS | LC_ALL=C sort | while IFS= read -r file; do sha256 "$file"; done > CHECKSUMS)
-tools/release/smoke.sh "$bundle" | tee "$output/smoke.log"
+# Recovery can package older sources. Use the selected revision's own
+# smoke entry point if that revision predates the registry.
+if [ -f tools/testing/run.py ]; then
+  python3 -B tools/testing/run.py sdk-smoke-posix --report "$output/smoke-framework.json" -- "$bundle" | tee "$output/smoke.log"
+else
+  tools/release/smoke.sh "$bundle" | tee "$output/smoke.log"
+fi
 COPYFILE_DISABLE=1 tar -czf "$output/$name.tar.gz" -C "$output" "$name"
 (cd "$output" && sha256 "$name.tar.gz" > SHA256SUMS)
 printf 'Release package: %s/%s.tar.gz\n' "$output" "$name"

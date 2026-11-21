@@ -1,6 +1,7 @@
 /* Live native storage proof, intentionally independent of primitive numbers
  * for future Completion support. Uses the real MLF values, closures and GC. */
 #include "../../runtime/mlf_completion.h"
+#include "test_case_events.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -9,13 +10,14 @@ static MlfCompletionScope *reentrant_scope;
 static MlfCompletion *reentrant_cell;
 static void require(int condition, const char *message) {
     ++assertions;
-    if (!condition) { fprintf(stderr, "completion test: %s\n", message); exit(1); }
+    if (!condition) { fprintf(stderr, "completion test: %s\n", message); mlf_case_result("fail", 1); exit(1); }
 }
 static void expect(MlfCompletionStatus actual, MlfCompletionStatus wanted,
                    const char *message) {
     if (actual != wanted) {
         fprintf(stderr, "completion test: %s (status %d, expected %d)\n",
                 message, (int)actual, (int)wanted);
+        mlf_case_result("fail", 1);
         exit(1);
     }
     ++assertions;
@@ -256,13 +258,19 @@ static void bounded_timers(void) {
     mlf_completion_mature(scope, 100);
     expect(mlf_completion_dequeue(scope, &out), MLF_COMPLETION_CLOSED, "closed timer cannot fire");
 }
+static void run_case(const char *id, void (*action)(void)) {
+    if (!mlf_case_selected(id)) return;
+    mlf_case_start(id);
+    action();
+    mlf_case_result("pass", 0);
+}
 int main(void) {
-    bounded_timers();
-    mixed_gc_and_lazy();
-    once_and_bounds();
-    owner_teardown();
-    non_reentrant_dispatch();
-    remove_pending_and_reuse();
+    run_case("native-completion-cells/bounded-timers", bounded_timers);
+    run_case("native-completion-cells/mixed-gc-and-lazy", mixed_gc_and_lazy);
+    run_case("native-completion-cells/once-and-bounds", once_and_bounds);
+    run_case("native-completion-cells/owner-teardown", owner_teardown);
+    run_case("native-completion-cells/non-reentrant-dispatch", non_reentrant_dispatch);
+    run_case("native-completion-cells/remove-pending-and-reuse", remove_pending_and_reuse);
     printf("Native completion representation: %u checks, %u callbacks passed.\n", assertions, callbacks);
-    return 0;
+    return assertions ? 0 : 64;
 }

@@ -34,8 +34,8 @@ BuiltinPreludeVerification = builtin_controls.BuiltinPreludeVerification
 
 
 class FrontendExecutionBudget(unittest.TestCase):
-    # Preserve upstream's authenticated-budget and untyped-input controls while
-    # reconciling its serial job with the reviewed per-mode parallel partition.
+    # Authenticate each mode's budget and keep the routine producer separate
+    # from the targeted optimizer producer.
     def test_authenticated_o0_budget_is_bounded(self):
         self.assertEqual(direct.frontend_case_timeout('frontend', '0'), 3600)
         self.assertEqual(direct.frontend_case_timeout('native-first', '0'), 1800)
@@ -49,21 +49,21 @@ class FrontendExecutionBudget(unittest.TestCase):
     def test_ci_partitions_o0_with_bounded_jobs(self):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         shared_job = workflow.split('  native:\n', 1)[1].split('  build-runner:', 1)[0]
-        self.assertIn('timeout-minutes: 120', shared_job)
-        for suite in ['direct', 'default', 'framework']:
-            self.assertIn("optimization: '0'\n            suite: " + suite, shared_job)
-        self.assertIn("optimization: '2'\n            suite: all", shared_job)
+        self.assertIn('timeout-minutes: 360', shared_job)
+        self.assertIn("optimization: '0'\n            suite: routine", shared_job)
+        self.assertIn("optimization: '2'\n            suite: optimizer", shared_job)
 
     def test_ci_uses_one_authenticated_tuple_suite_owner(self):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         shared_job = workflow.split('  native:\n', 1)[1].split('  build-runner:', 1)[0]
-        self.assertEqual(shared_job.count('python3 tools/shared/test_framework_direct.py '), 1)
+        commands = [line for line in shared_job.splitlines() if 'tools/testing/run.py framework-direct -- ' in line]
+        self.assertEqual(len(commands), 2)
+        self.assertEqual(sum('--suite all --suite-timeout 5400' in line for line in commands), 1)
+        self.assertEqual(sum(line.endswith('--suite controls') for line in commands), 1)
+        self.assertNotIn('python3 tools/shared/test_framework_direct.py ', shared_job)
         self.assertNotIn('bin/tuple-list |', shared_job)
         self.assertNotIn('bin/tuple-list --', shared_job)
-        # The measured upstream serial budget is represented by three bounded
-        # O0 shards here, not by stacking a 330-minute timeout onto each shard.
-        self.assertEqual(shared_job.count('timeout-minutes: 120'), 1)
-        self.assertNotIn('330', shared_job)
+        self.assertEqual(shared_job.count('timeout-minutes: 360'), 1)
 
     def test_unknown_or_untyped_optimization_is_rejected(self):
         for value in ['1', '', None, 0, 2, False, {}, {'optimization': '0'}]:

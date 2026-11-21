@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Transport/provenance fault injection, not compiler qualification evidence.
 set -euo pipefail
+. "$(dirname -- "$0")/test-events.sh" release-shared-candidate
 scripts=$(cd -- "$(dirname -- "$0")" && pwd)
 scratch=$(mktemp -d)
 trap 'rm -rf -- "$scratch"' EXIT
@@ -69,19 +70,23 @@ for row in "emlf:$compiler_key:.mlf-build/build-report.json" "mlfpkg:$manager_ke
 done
 unset CPATH
 passed=0
-pass() { passed=$((passed + 1)); printf 'ok %d - %s\n' "$passed" "$1"; }
+pass() { passed=$((passed + 1)); printf 'ok %d - %s\n' "$passed" "$1"; release_pass; }
 reject() {
-  if tools/release/shared-candidate.sh verify > "$scratch/rejected.log" 2>&1; then printf 'Unexpected acceptance: %s\n' "$1" >&2; exit 1; fi
-  pass "$1"
+  release_begin "release/shared-candidate/$1"
+  if tools/release/shared-candidate.sh verify > "$scratch/rejected.log" 2>&1; then printf 'Unexpected acceptance: %s\n' "$2" >&2; false; fi
+  pass "$2"
 }
+release_begin "release/shared-candidate/export"
 tools/release/shared-candidate.sh export
 pass 'exports final-compiler runner and all producer proof files'
+release_begin "release/shared-candidate/verify"
 tools/release/shared-candidate.sh verify
 pass 'authentic candidate verifies'
 # Fresh transport hashes cannot authorize outputs different from the authentic
 # producer publication, even when the mutated cache stamp is self-consistent.
 for pair in "emlf:$compiler_key" "mlfpkg:$manager_key" "compiler-tests:$runner_key"; do
   name=${pair%%:*}; key=${pair#*:}
+  release_begin "release/shared-candidate/changed-publication/$name"
   cp ".mlf-build/bin/$name" "$scratch/unchanged-binary"
   cp ".mlf-build/cache/$key/artifact.json" "$scratch/unchanged-stamp"
   printf 'changed before export\n' >> ".mlf-build/bin/$name"
@@ -89,7 +94,7 @@ for pair in "emlf:$compiler_key" "mlfpkg:$manager_key" "compiler-tests:$runner_k
   jq --arg hash "$(sha256 ".mlf-build/bin/$name")" '.files.program=$hash' "$scratch/unchanged-stamp" > ".mlf-build/cache/$key/artifact.json"
   mv .mlf-build/shared-candidate "$scratch/valid-transport"
   if tools/release/shared-candidate.sh export > "$scratch/rejected.log" 2>&1; then
-    printf 'Export accepted changed original publication: %s\n' "$name" >&2; exit 1
+    printf 'Export accepted changed original publication: %s\n' "$name" >&2; false
   fi
   rm -rf .mlf-build/shared-candidate
   mv "$scratch/valid-transport" .mlf-build/shared-candidate
@@ -98,10 +103,11 @@ for pair in "emlf:$compiler_key" "mlfpkg:$manager_key" "compiler-tests:$runner_k
   cp "$scratch/unchanged-stamp" ".mlf-build/cache/$key/artifact.json"
   pass "changed original $name publication rejected before export"
 done
+release_begin "release/shared-candidate/missing-dependency-proof"
 mv ".mlf-build/cache/$runner_key/dependency-files.json" "$scratch/unchanged-dependencies"
 mv .mlf-build/shared-candidate "$scratch/valid-transport"
 if tools/release/shared-candidate.sh export > "$scratch/rejected.log" 2>&1; then
-  printf 'Export accepted missing runner dependency receipt\n' >&2; exit 1
+  printf 'Export accepted missing runner dependency receipt\n' >&2; false
 fi
 rm -rf .mlf-build/shared-candidate
 mv "$scratch/valid-transport" .mlf-build/shared-candidate
@@ -109,16 +115,17 @@ mv "$scratch/unchanged-dependencies" ".mlf-build/cache/$runner_key/dependency-fi
 pass 'missing executable dependency proof rejected before export'
 cp .mlf-build/shared-candidate/manifest.json "$scratch/manifest.json"
 printf 'changed\n' >> .mlf-build/bin/compiler-tests
-reject 'changed runner bytes rejected'
+reject runner-bytes 'changed runner bytes rejected'
 cp ".mlf-build/cache/$runner_key/program" .mlf-build/bin/compiler-tests
 printf 'changed\n' >> source.emlf
-reject 'stale runner source snapshot rejected'
+reject source-snapshot 'stale runner source snapshot rejected'
 printf 'source fixture\n' > source.emlf
-CPATH=changed tools/release/shared-candidate.sh verify > "$scratch/rejected.log" 2>&1 && exit 1
+release_begin "release/shared-candidate/environment"
+CPATH=changed tools/release/shared-candidate.sh verify > "$scratch/rejected.log" 2>&1 && false
 pass 'changed native environment rejected'
 for field in source platform root; do
   jq --arg field "$field" '.[$field] = "wrong"' "$scratch/manifest.json" > .mlf-build/shared-candidate/manifest.json
-  reject "wrong $field rejected"
+  reject "manifest/$field" "wrong $field rejected"
 done
 cp "$scratch/manifest.json" .mlf-build/shared-candidate/manifest.json
 report=.mlf-build/prerequisites/compiler-tests/build-report.json
@@ -127,31 +134,33 @@ jq '.toolchain.compiler.path = "/stale/bootstrap/compiler"' "$scratch/runner-rep
 # Re-sign the transport hashes to reach the semantic final-compiler guard.
 jq --arg path "$PWD/$report" --arg relative "$report" --arg hash "$(sha256 "$report")" \
   '.inputs[$path]=$hash | .files[$relative]=$hash | .campaign_runner.report_sha256=$hash' "$scratch/manifest.json" > .mlf-build/shared-candidate/manifest.json
-reject 'seed-built runner rejected even with matching transport hashes'
+reject seed-built-runner 'seed-built runner rejected even with matching transport hashes'
 cp "$scratch/runner-report.json" "$report"
 cp "$scratch/manifest.json" .mlf-build/shared-candidate/manifest.json
 jq '.scheduler_results[0].exit_code=7' "$scratch/runner-report.json" > "$report"
 jq --arg path "$PWD/$report" --arg relative "$report" --arg hash "$(sha256 "$report")" \
   '.inputs[$path]=$hash | .files[$relative]=$hash | .campaign_runner.report_sha256=$hash' "$scratch/manifest.json" > .mlf-build/shared-candidate/manifest.json
-reject 'failed scheduler rejected despite completed envelope and matching hashes'
+reject scheduler 'failed scheduler rejected despite completed envelope and matching hashes'
 cp "$scratch/runner-report.json" "$report"
 cp "$scratch/manifest.json" .mlf-build/shared-candidate/manifest.json
 printf 'changed\n' >> ".mlf-build/cache/$runner_key/dependency-files.json"
-reject 'changed dependency receipt rejected'
+reject dependency-receipt 'changed dependency receipt rejected'
 printf '{}\n' > ".mlf-build/cache/$runner_key/dependency-files.json"
 # Consumers start with transport only and cannot perform a local rebuild.
 mv .mlf-build/bin "$scratch/bin-backup"
 mv .mlf-build/cache "$scratch/cache-backup"
 rm .mlf-build/build-report.json .mlf-build/prerequisites/tests/build-report.json "$report"
+release_begin "release/shared-candidate/clean-import"
 tools/release/shared-candidate.sh import
 pass 'clean consumer imports original binary and build proof'
 export MLF_CI_SHARED_CANDIDATE=1
 export MLF_COMPILER="$PWD/.mlf-build/bin/emlf"
 export MLF_PACKAGE_MANAGER="$PWD/.mlf-build/bin/mlfpkg"
 export MLF_BUILD_RUNNER="$PWD/.mlf-build/bin/mlf-build-runner"
+release_begin "release/shared-candidate/consumer-campaign"
 tools/release/native-ci.sh unit > "$scratch/native-ci.log" 2>&1
 test "$(grep -c '^ran compiler-tests$' "$TEST_SHARED_CALLS")" = 1
 test "$(grep -c '^--locked plan$' "$TEST_SHARED_CALLS")" = 1
-! grep -q 'build --target' "$TEST_SHARED_CALLS"
+if grep -q 'build --target' "$TEST_SHARED_CALLS"; then false; fi
 pass 'consumer executes a fresh campaign without rebuilding runner'
 printf '%s shared candidate transport checks passed\n' "$passed"

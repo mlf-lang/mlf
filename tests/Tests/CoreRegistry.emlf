@@ -5,6 +5,7 @@ import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Test.Case as C
+import qualified Test.Assert as A
 
 -- Frozen label ownership from 8a3e69b165765931c3ff762379a78db9659b2cd8.
 -- IDs are explicit semantic constants, not indices, hashes or runtime slugs.
@@ -829,23 +830,39 @@ bindings =
   []))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
  [])))))))))))))))))))))))))))))))))))
 
+-- A value-returning assertion can run in a batch. An original IO action can
+-- terminate the process and is invoked only by a supervised exact worker.
+data Action = Recoverable (A.Test ()) | Isolated (IO ())
+recoverable : [] ((,) String (A.Test ())) -> [] ((,) String Action)
+recoverable = S.map (\((,) label body) -> (,) label (Recoverable body))
+isolated : [] ((,) String (IO ())) -> [] ((,) String Action)
+isolated = S.map (\((,) label body) -> (,) label (Isolated body))
+isIsolated : C.Case -> Bool
+isIsolated entry = S.elem eqString "adapter:isolated-process" (C.tags entry)
+
 familyBindings name = S.lookup eqString name bindings
 scope : String -> Bool -> C.Case -> C.Case
 scope target complete (C.Case identity label tags action) =
  C.Case identity label (S.append tags ((:) "logical-unit:core"
   ((:) ("physical-target:" ++ target) ((:) ("logical-scope:" ++ (if complete then "full" else "partial"))
-  ((:) "qualification:ineligible" ((:) "adapter:legacy-process" [])))))) action
+  ((:) "qualification:ineligible" []))))) action
 
-registerFamily : String -> Bool -> (,) String ([] ((,) String (IO ()))) -> Either String ([] C.Case)
+registerAction : String -> Bool -> String -> (,) String Action -> (,) String String -> C.Case
+registerAction target complete family ((,) label action) ((,) _ identity) =
+ let tags = (:) ("family:" ++ family) [] in
+ scope target complete (case action of
+  Recoverable body -> C.test identity label tags body
+  Isolated body -> C.fromIO identity ((:) "adapter:isolated-process" tags) ((,) label body))
+
+registerFamily : String -> Bool -> (,) String ([] ((,) String Action)) -> Either String ([] C.Case)
 registerFamily target complete ((,) family actions) = case familyBindings family of
  Nothing -> Left "core family has no reviewed leaf bindings"
  Just expected ->
   if S.not (S.eqList eqString (S.map S.fst actions) (S.map S.fst expected)) then
    Left ("core action labels differ from frozen family bindings: " ++ family)
-  else Right (S.map (\((,) label body) ->
-   let identity = S.fromMaybe (panic "validated core binding disappeared") (S.lookup eqString label expected) in
-   scope target complete (C.fromIO identity ((:) ("family:" ++ family) []) ((,) label body))) actions)
-register : String -> Bool -> [] ((,) String ([] ((,) String (IO ())))) -> Either String ([] C.Case)
+  else Right (S.map (\((,) action binding) -> registerAction target complete family action binding)
+               (S.zip actions expected))
+register : String -> Bool -> [] ((,) String ([] ((,) String Action))) -> Either String ([] C.Case)
 register target complete families = do
  rows <- S.mapM (registerFamily target complete) families
  Right (S.concat rows)

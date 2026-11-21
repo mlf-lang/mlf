@@ -137,7 +137,12 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+unset MLF_SOURCE_SMOKE_CASE_REPORT
 if [ "$mode" = direct-GHC-checkout-source ]; then
+  if [ "${MLF_TEST_SUITE:-}" = source-smoke ] && [ -n "${MLF_TEST_EVENTS:-}" ]; then
+    export MLF_SOURCE_SMOKE_CASE_REPORT="$build/tests.cases.jsonl"
+    : > "$MLF_SOURCE_SMOKE_CASE_REPORT"
+  fi
   command=("$seed" "$PWD/tests/pr-smoke" "$build")
 else
   command=("$seed" "${include_args[@]}" --run "$PWD/tests/PRQuickMain.emlf" -- "$PWD/tests/pr-smoke" "$build")
@@ -191,6 +196,28 @@ watchdog_pid=
 stop_background "$sampler_pid"
 sampler_pid=
 cat "$build/tests.log" "$build/tests.stderr.log"
+if [ "${MLF_TEST_SUITE:-}" = source-smoke ] && [ -n "${MLF_TEST_EVENTS:-}" ]; then
+  if [ -n "${MLF_SOURCE_SMOKE_CASE_REPORT:-}" ]; then
+    jq -c '
+      select(.schema_version == 1 and .event == "case") |
+      {id,status:(if .status == "passed" then "pass" else "fail" end),message}
+    ' "$MLF_SOURCE_SMOKE_CASE_REPORT" >> "$MLF_TEST_EVENTS"
+  else
+    # The guest compatibility runner has a text receipt. Import exact completed lines.
+    while IFS='|' read -r id line artifact; do
+      if grep -Fxq -- "PASS current-source $line" "$build/tests.log" &&
+         { [ -z "$artifact" ] || [ -s "$build/$artifact" ]; }; then
+        jq -cn --arg id "source-smoke/$id" '{id:$id,status:"pass"}' >> "$MLF_TEST_EVENTS"
+      fi
+    done <<'CASES'
+polymorphic-let|accepted polymorphic-let|polymorphic-let.xmlf
+impredicative-self-application|accepted impredicative-self-application|impredicative-self-application.xmlf
+monomorphic-mismatch|rejected monomorphic-mismatch|
+invalid-universal-annotation|rejected invalid-universal-annotation|
+malformed-before-effects|malformed target|
+CASES
+  fi
+fi
 if [ -e "$build/timed-out.log" ]; then
   cat "$build/timed-out.log" >&2
   if [ -e "$build/progress.log" ]; then

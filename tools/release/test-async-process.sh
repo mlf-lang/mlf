@@ -4,6 +4,7 @@
 set -euo pipefail
 test "$#" -eq 2 || { printf '%s\n' 'Usage: test-async-process.sh COMPILER OUTPUT-DIRECTORY' >&2; exit 2; }
 root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
+. "$root/tools/testing/native-events.sh"
 compiler=$(cd -- "$(dirname -- "$1")" && pwd)/$(basename -- "$1")
 test -x "$compiler" || { printf '%s\n' 'Candidate compiler is not executable.' >&2; exit 2; }
 mkdir -p -- "$2"
@@ -35,7 +36,7 @@ cleanup() {
   if [ -n "$watchdog_pid" ]; then kill "$watchdog_pid" 2>/dev/null || true; fi
   if [ -n "$command_pid" ]; then kill "$command_pid" 2>/dev/null || true; fi
 }
-trap cleanup EXIT
+trap 'status=$?; cleanup; mlf_case_cleanup "$status"' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 run() {
@@ -65,7 +66,7 @@ run() {
   wait "$watchdog_pid" 2>/dev/null || true
   watchdog_pid=
   printf '%s\n' "$status" > "$work/$label.status"
-  test ! -e "$work/$label.timed-out" || fail "$label timed out; see $work"
+  test ! -e "$work/$label.timed-out" || { mlf_case_result timeout "$status"; fail "$label timed out; see $work"; }
   return "$status"
 }
 success() {
@@ -74,11 +75,13 @@ success() {
   test ! -s "$work/$label.stderr" || fail "$label emitted unexpected diagnostics; see $work/$label.stderr"
 }
 include_args=(-i "$root/libraries/mlf-foundation" -i "$root/libraries/mlf-async")
+wanted=${MLF_TEST_EXACT:-}
+unset MLF_ASYNC_CASE
 
 record_inputs() {
   local destination=$1 file
   printf '{}\n' > "$destination"
-  for file in "$fixtures"/* "$root/tools/release/test-async-process.sh" "$root/tools/release/check_async_abi.py" \
+  for file in "$fixtures"/* "$root/tools/release/test-async-process.sh" "$root/tools/release/check_async_abi.py" "$root/tools/testing/native-events.sh" \
     "$root/libraries/mlf-foundation/Bootstrap/Types.hs" "$root/libraries/mlf-foundation/Bootstrap/Std.hs" \
     "$root/libraries/mlf-async/Async/Process.hs" "$root/libraries/mlf-async/Async/Process/Internal.hs" \
     "$root"/runtime/*; do
@@ -94,6 +97,8 @@ compiler_hash=$(sha256 "$compiler")
 # rejected name as well as status so an unrelated parser/import failure fails.
 for kind in handle scope; do
   label="opaque-$kind"
+  mlf_case_selected "async-process/source-rejection/$label" || continue
+  mlf_case_start "async-process/source-rejection/$label"
   status=0
   run "$label" "$compiler" "${include_args[@]}" "$fixtures/$label.emlf" || status=$?
   test "$status" -eq 1 || fail "$label returned $status, expected source rejection 1"
@@ -101,11 +106,13 @@ for kind in handle scope; do
   if [ "$kind" = handle ]; then constructor=ProcessHandle; else constructor=ProcessScope; fi
   grep -F "$constructor" "$work/$label.stderr" >/dev/null || fail "$label rejected for an unrelated reason"
   grep -Ei 'unknown|unbound|not (in scope|exported)|undefined|unresolved' "$work/$label.stderr" >/dev/null || fail "$label did not report inaccessible constructor"
+  mlf_case_result pass "$status"
   printf 'PASS opaque %s constructor\n' "$kind"
 done
 
 # GMP is conventional pkg-config discovery. Honor the repository's documented
 # explicit collector prefix when one is selected by a native bootstrap.
+case "$wanted" in ''|async-process/parity/*|async-process/panic-cleanup/*)
 read -r -a cflags <<< "$(pkg-config --cflags gmp)"
 read -r -a libs <<< "$(pkg-config --libs gmp)"
 if [ -n "${MLF_GC_PREFIX:-}" ]; then
@@ -121,6 +128,16 @@ libs+=(-lm -lpthread)
 if [ "$(uname -s)" = Linux ]; then libs+=(-ldl); fi
 success fixture "$clang" -O2 -std=c11 -Wall -Wextra -Werror "$fixtures/fixture.c" -o "$work/fixture"
 success runtime "$clang" -O2 -std=c11 -Wall -Wextra -Werror "${cflags[@]}" -c "$root/runtime/mlf_runtime.c" -o "$work/runtime.o"
+  ;;
+esac
+parity_cases=0 panic_cleanup_cases=0
+case "$wanted" in ''|async-process/parity/*)
+oracle_file="$fixtures/suite.stdout"
+if [ -n "$wanted" ]; then
+  export MLF_ASYNC_CASE="${wanted##*/}"
+  oracle_file="$work/suite.expected"
+  grep -Fx "PASS $MLF_ASYNC_CASE" "$fixtures/suite.stdout" > "$oracle_file" || fail 'unknown process case'
+fi
 success compile "$compiler" "${include_args[@]}" "$fixtures/Main.emlf"
 success check "$compiler" --check "$work/compile.stdout"
 cmp "$fixtures/io-unit.type" "$work/check.stdout" || fail 'checked target does not have type IO Unit'
@@ -129,26 +146,43 @@ python3 -B "$root/tools/release/check_async_abi.py" "$work/emit.stdout" >/dev/nu
 success link "$clang" -O2 -Wno-override-module -x ir "$work/emit.stdout" -x none "$work/runtime.o" "${libs[@]}" -o "$work/suite.native"
 export MLF_ASYNC_FIXTURE="$work/fixture"
 for backend in interpreter llvm; do
+  prefix="async-process/parity/$backend"
+  case "$wanted" in ''|"$prefix/"*) ;; *) continue ;; esac
   mkdir -- "$work/$backend"
+  status=0
   export MLF_ASYNC_WORK="$work/$backend"
   if [ "$backend" = interpreter ]; then
-    success "$backend" "$compiler" --run-xmlf "$work/compile.stdout"
+    run "$backend" "$compiler" --run-xmlf "$work/compile.stdout" || status=$?
   else
-    success "$backend" "$work/suite.native"
+    run "$backend" "$work/suite.native" || status=$?
   fi
-  cmp "$fixtures/suite.stdout" "$work/$backend.stdout" || fail "$backend differs from the literal oracle"
-  printf 'PASS %s: 13 Async.Process contracts\n' "$backend"
+  mlf_report_labeled_output "$prefix" "$oracle_file" "$work/$backend.stdout" "$status" || fail "$backend differs from the literal oracle"
+  test "$status" -eq 0 && test ! -s "$work/$backend.stderr" || fail "$backend failed"
+  if [ -z "$wanted" ]; then
+    printf 'PASS %s: 13 Async.Process contracts\n' "$backend"
+  fi
 done
-cmp "$work/interpreter.stdout" "$work/llvm.stdout" || fail 'backend observations differ'
+if [ -z "$wanted" ]; then
+  cmp "$work/interpreter.stdout" "$work/llvm.stdout" || fail 'backend observations differ'
+  parity_cases=13
+else
+  parity_cases=1
+fi
+  ;;
+esac
 
 # A panic bypasses the library's ordinary Either return. Interpreter error
 # cleanup and native fail() cleanup are independent paths, so execute both.
+case "$wanted" in ''|async-process/panic-cleanup/*)
+export MLF_ASYNC_FIXTURE="$work/fixture"
 success panic.compile "$compiler" "${include_args[@]}" "$fixtures/Panic.emlf"
 success panic.check "$compiler" --check "$work/panic.compile.stdout"
 cmp "$fixtures/io-unit.type" "$work/panic.check.stdout" || fail 'panic target does not have type IO Unit'
 success panic.emit "$compiler" --xmlf-to-llvm-io-gc "$work/panic.compile.stdout"
 success panic.link "$clang" -O2 -Wno-override-module -x ir "$work/panic.emit.stdout" -x none "$work/runtime.o" "${libs[@]}" -o "$work/panic.native"
 for backend in interpreter llvm; do
+  mlf_case_selected "async-process/panic-cleanup/$backend" || continue
+  mlf_case_start "async-process/panic-cleanup/$backend"
   mkdir -- "$work/$backend-panic"
   export MLF_ASYNC_WORK="$work/$backend-panic"
   status=0
@@ -161,14 +195,18 @@ for backend in interpreter llvm; do
   test ! -s "$work/panic.$backend.stdout" || fail "panic.$backend produced output before failure"
   grep -F 'async-scope-panic' "$work/panic.$backend.stderr" >/dev/null || fail "panic.$backend failed for an unrelated reason"
   success "panic.$backend.reaped" "$work/fixture" assert-gone "$MLF_ASYNC_WORK/panic.pid"
+  mlf_case_result pass "$status"
+  panic_cleanup_cases=1
   printf 'PASS %s panic cancel-and-join\n' "$backend"
 done
+  ;;
+esac
 
 record_inputs "$work/inputs.final.json"
 cmp "$work/inputs.json" "$work/inputs.final.json" || fail 'test inputs changed during execution'
 test "$(sha256 "$compiler")" = "$compiler_hash" || fail 'compiler changed during execution'
 printf '{}\n' > "$work/observations.json"
-test "${#command_labels[@]}" -eq 18 || fail 'command coverage changed'
+test -n "${MLF_TEST_EXACT:-}" || test "${#command_labels[@]}" -eq 18 || fail 'command coverage changed'
 for label in "${command_labels[@]}"; do
   for suffix in stdout stderr status; do
     file="$work/$label.$suffix"
@@ -176,15 +214,24 @@ for label in "${command_labels[@]}"; do
     mv "$work/observations.tmp" "$work/observations.json"
   done
 done
-jq -n --arg compiler_sha256 "$compiler_hash" --arg clang_sha256 "$(sha256 "$clang")" \
-  --arg target_sha256 "$(sha256 "$work/compile.stdout")" --arg runtime_object_sha256 "$(sha256 "$work/runtime.o")" \
-  --arg native_sha256 "$(sha256 "$work/suite.native")" --arg work "$work" \
+hash_if_present() { if [ -f "$1" ]; then sha256 "$1"; fi; }
+rejections=0
+for kind in handle scope; do
+  if [ -f "$work/opaque-$kind.status" ]; then rejections=$((rejections + 1)); fi
+done
+jq -n --arg exact "${MLF_TEST_EXACT:-}" --arg compiler_sha256 "$compiler_hash" --arg clang_sha256 "$(sha256 "$clang")" \
+  --arg target_sha256 "$(hash_if_present "$work/compile.stdout")" --arg runtime_object_sha256 "$(hash_if_present "$work/runtime.o")" \
+  --arg native_sha256 "$(hash_if_present "$work/suite.native")" --arg work "$work" \
+  --argjson parity "$parity_cases" --argjson panic_cleanup "$panic_cleanup_cases" --argjson rejections "$rejections" \
   --argjson seconds "$((SECONDS - started))" --argjson timeout_seconds "$timeout_seconds" \
   --slurpfile inputs "$work/inputs.json" --slurpfile observations "$work/observations.json" \
-  '{complete:true,cases:13,panic_cleanup_cases:1,source_rejections:2,backends:["interpreter","llvm"],
+  '{complete:($exact == ""),cases:$parity,panic_cleanup_cases:$panic_cleanup,source_rejections:$rejections,
+    backends:(if $parity > 0 or $panic_cleanup > 0 then ["interpreter","llvm"] else [] end),
     compiler_sha256:$compiler_sha256,clang_sha256:$clang_sha256,target_sha256:$target_sha256,
     runtime_object_sha256:$runtime_object_sha256,native_sha256:$native_sha256,
     work:$work,seconds:$seconds,timeout_seconds:$timeout_seconds,
     inputs:$inputs[0],observations:$observations[0]}' > "$output/result.tmp"
 mv "$output/result.tmp" "$output/result.json"
-printf 'Async.Process language parity passed: 13 contracts, panic cleanup, 2 opaque-constructor rejections.\n'
+if [ -z "${MLF_TEST_EXACT:-}" ]; then
+  printf 'Async.Process language parity passed: 13 contracts, panic cleanup, 2 opaque-constructor rejections.\n'
+fi

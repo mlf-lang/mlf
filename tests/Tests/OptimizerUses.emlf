@@ -1,4 +1,5 @@
 module Tests.OptimizerUses where
+import qualified Test.Assert as Assert
 -- Select the standard Monad used by the shared optimizer Fresh action.
 import Prelude hiding (Monad, return, bind)
 import MLF.Primitive (Monad, return, bind)
@@ -114,21 +115,21 @@ validCounts tree =
  let term = O.useTerm tree in let counts = O.useCounts tree in
  L.eqList O.eqName (M.keys counts) (Set.toList (O.free term)) &&
  L.all (\((,) variable count) -> count > 0 && count <= 2 && count == O.occurrences 2 variable term) (M.toList counts) && L.all validCounts (children tree)
-indices : IO ()
+indices : Assert.Test ()
 indices = L.mapM_ (\expression -> do
  let copied = L.fst (O.runFresh (O.copy M.empty expression) (1+O.maxIdentity expression))
  let tree = O.indexUses copied
- H.assert (validCounts tree) "initial free-use index differs from independent scans"
+ Assert.assert (validCounts tree) "initial free-use index differs from independent scans"
  let normalized = L.fst (O.runFresh (O.passUsed tree) (1+O.maxIdentity copied))
- H.assert (validCounts normalized) "rewritten free-use index differs from independent scans"
+ Assert.assert (validCounts normalized) "rewritten free-use index differs from independent scans"
  let direct = L.fst (O.runFresh (O.passRaw copied) (1+O.maxIdentity copied))
- H.assert (validCounts direct && X.equalErased (O.useTerm normalized) (O.useTerm direct)) "direct normalized index differs from the indexed-input traversal") cases
-differential : IO ()
+ Assert.assert (validCounts direct && X.equalErased (O.useTerm normalized) (O.useTerm direct)) "direct normalized index differs from the indexed-input traversal") cases
+differential : Assert.Test ()
 differential = L.mapM_ (\expression -> do
- H.assert (X.equalErased (O.optimize expression) (legacyOptimize expression)) "indexed optimizer differs from the legacy normalized tree or fresh identities"
+ Assert.assert (X.equalErased (O.optimize expression) (legacyOptimize expression)) "indexed optimizer differs from the legacy normalized tree or fresh identities"
  let unique = L.fst (O.runFresh (O.copy M.empty expression) (1 + O.maxIdentity expression))
- H.assert (A.sameFunctions (M.toList (A.analyze unique)) (M.toList (legacyAnalyze unique))) "cached worker inputs changed captures, demands, bodies, parameters, or identities") cases
-suite : [] ((,) String (IO ()))
+ Assert.assert (A.sameFunctions (M.toList (A.analyze unique)) (M.toList (legacyAnalyze unique))) "cached worker inputs changed captures, demands, bodies, parameters, or identities") cases
+suite : [] ((,) String (Assert.Test ()))
 suite = (:) ((,) "optimizer free-use indices agree with independent scoped scans" indices)
  ((:) ((,) "indexed optimizer agrees with legacy traversal and fresh identities" differential) [])
 

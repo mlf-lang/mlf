@@ -294,11 +294,11 @@ class WorkflowControls(unittest.TestCase):
         cls.step = matches[0]
 
     def test_one_existing_o2_only_native_gate_without_new_matrix_or_caps(self):
-        self.assertEqual(self.workflow.count('tools/shared/test_io_action_sharing.py'), 1)
+        self.assertEqual(self.workflow.count('tools/testing/run.py io-action-sharing -- '), 1)
         self.assertIn("        if: matrix.optimization == '2'\n", self.step)
         matrix = re.findall(r"          - optimization: '([02])'\n            suite: ([a-z]+)", self.job)
-        self.assertEqual(matrix, [('2', 'all'), ('0', 'direct'), ('0', 'default'), ('0', 'framework')])
-        self.assertIn('    timeout-minutes: 120\n', self.job)
+        self.assertEqual(matrix, [('0', 'routine'), ('2', 'optimizer')])
+        self.assertIn('    timeout-minutes: 360\n', self.job)
         self.assertNotIn('timeout-minutes:', self.step)
         self.assertNotIn('--run-timeout', self.step)
         self.assertNotIn('--build-timeout', self.step)
@@ -321,7 +321,7 @@ class WorkflowControls(unittest.TestCase):
             with self.subTest(command=command):
                 self.assertIn(command, self.step)
         self.assertLess(self.step.index('sudo apt-get install'), self.step.index('cp /usr/include/gc.h'))
-        self.assertLess(self.step.index('cp "$archive"'), self.step.index('python3 tools/shared/test_io_action_sharing.py'))
+        self.assertLess(self.step.index('cp "$archive"'), self.step.index('tools/testing/run.py io-action-sharing'))
 
     def test_evidence_and_metadata_controls_are_retained(self):
         for suffix in ['json', 'stdout', 'stderr', 'll', 'xmlf']:
@@ -331,7 +331,7 @@ class WorkflowControls(unittest.TestCase):
         self.assertIn('        if: always()\n', upload)
         self.assertIn('          include-hidden-files: true\n', upload)
         check = (gate.ROOT / 'tools/release/check.sh').read_text()
-        self.assertEqual(check.count('python3 tools/shared/test_io_action_sharing_controls.py'), 1)
+        self.assertEqual(check.count('run release-io-action-controls\n'), 1)
 
 
 if __name__ == '__main__':

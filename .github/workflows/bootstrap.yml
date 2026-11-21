@@ -38,7 +38,7 @@ jobs:
         run: |
           export MLF_GC_PREFIX="$(brew --prefix bdw-gc)"
           export PATH="$(brew --prefix llvm)/bin:$PATH"
-          tools/release/timed-bootstrap.sh
+          python3 -B tools/testing/run.py bootstrap-macos-native --
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
@@ -46,6 +46,7 @@ jobs:
           include-hidden-files: true
           retention-days: 30
           path: |
+            .mlf-build/test-framework/
             .mlf-build/bootstrap-stage1/build-report.json
             .mlf-build/bootstrap-stage1/manager-bootstrap/**/*.json
             .mlf-build/bootstrap-stage1/manager-bootstrap/**/*.sha256

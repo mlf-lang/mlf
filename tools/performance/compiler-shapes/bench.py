@@ -118,6 +118,18 @@ def command_list(args):
         print('  - ' + limit)
 
 
+def framework_list(argv):
+    import framework_results as framework
+    import generate
+    parser = argparse.ArgumentParser()
+    parser.add_argument('command', nargs='?', choices=('all', 'run', 'sweep'), default='sweep')
+    parser.add_argument('--matrix', default='default')
+    add_filters(parser)
+    args, _setup_options = parser.parse_known_args(argv)
+    _, families, sizes, baseline = resolve(args.matrix, args.family, args.size)
+    framework.list_cases(generate.coordinates(sizes, ['baseline', *families] if baseline else families))
+
+
 def prepare_setup(workdir, endpoint, producer, *, source=None, builtin_prefix=None,
                   build_builtin=False, ghc=None, clang=None):
     if not producer or bool(builtin_prefix) == build_builtin:
@@ -236,8 +248,15 @@ def command_sweep(args):
 
 
 def main():
+    if sys.argv[1:2] == ['--framework-list']:
+        framework_list(sys.argv[2:])
+        return
     if sys.argv[1:2] == ['installed']:
-        run([sys.executable, '-B', HERE / 'installed.py', *sys.argv[2:]])
+        if any(flag in sys.argv[2:] for flag in ('-h', '--help')):
+            run([sys.executable, '-B', HERE / 'installed.py', *sys.argv[2:]])
+        else:
+            run([sys.executable, '-B', ROOT / 'tools/testing/run.py', 'compiler-shapes-installed',
+                 '--', *sys.argv[2:]])
         return
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)

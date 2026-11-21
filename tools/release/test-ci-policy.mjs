@@ -2,9 +2,26 @@
 // make the PR/main/release split and full coverage executable review assertions.
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-import './test-native-ci-partition.mjs';
-const read = name => fs.readFileSync(`.github/workflows/${name}.yml`,'utf8');
+import {projectAdapterCommands} from './workflow-test-adapters.mjs';
+import {releaseTestEvent} from './test-events.mjs';
+
+const suite = 'release-ci-policy';
+let active;
+const begin = name => {
+  active = 'release/ci/' + name;
+  releaseTestEvent(suite, {start: active});
+};
+const pass = () => {
+  releaseTestEvent(suite, {id: active, status: 'pass'});
+  active = undefined;
+};
+process.on('uncaughtExceptionMonitor', error => {
+  if (active) releaseTestEvent(suite, {id: active, status: 'fail', detail: String(error)});
+});
+
+const read = name => projectAdapterCommands(fs.readFileSync(`.github/workflows/${name}.yml`,'utf8'));
 const ci=read('ci'), qualify=read('native-qualification'), release=read('platform-release');
+begin('concurrency');
 const concurrency = release.match(/^concurrency:\n(?:  #.*\n)*  group: \$\{\{ (.*) \}\}\n  cancel-in-progress: \$\{\{ (.*) \}\}$/m);
 assert.ok(concurrency, 'Release/rehearsal concurrency must be explicit');
 assert.equal(concurrency[1], "inputs.validation_only && format('platform-validation-{0}', github.ref) || format('platform-release-{0}', inputs.tag || github.sha)");
@@ -31,6 +48,8 @@ assert.notEqual(publishing('v0.3.0', 'a'.repeat(40)).group, publishing('v0.4.0',
 assert.notEqual(newRehearsal.group, publishing('v0.3.0', 'b'.repeat(40)).group);
 assert.deepEqual(publishing('', 'a'.repeat(40)), {group:`platform-release-${'a'.repeat(40)}`,cancel:false});
 assert.notEqual(publishing('', 'a'.repeat(40)).group, publishing('', 'b'.repeat(40)).group);
+pass();
+begin('required-checks');
 assert.match(ci,/concurrency:\n  group: ci-\$\{\{ github.workflow \}\}-\$\{\{ github.ref \}\}\n  cancel-in-progress: true/);
 assert.doesNotMatch(qualify,/^\s*concurrency:/m, 'The reusable workflow must not collide with its caller');
 assert.match(qualify,/MLF_TEST_BUILD_JOBS: '1'/);
@@ -68,6 +87,8 @@ assert.match(workflowJob(read('macos-dependencies'), 'consumer'), /^    needs: p
 const gate = ciJob('pr-gate');
 assert.ok(gate.includes("        if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci:skip')\n"));
 assert.ok(gate.includes(`      - name: Require every merge check to succeed\n        if: ${runPrTests}\n`));
+pass();
+begin('history');
 assert.match(ciJob('metadata'), /fetch-depth: 0/, 'Historical migration audits require full Git history');
 const requireHistoricalCheckouts = workflow => {
   const jobs = workflow.match(/^  [a-z][a-z-]*:\n[\s\S]*?(?=^  [a-z][a-z-]*:\n|(?![\s\S]))/gm) || [];
@@ -90,13 +111,15 @@ const requirePreparedHistory = (text, consumer) => {
 };
 const releaseChecks = fs.readFileSync('tools/release/check.sh', 'utf8');
 for (const [text, consumer] of [
-  [releaseChecks, 'tools/release/check-benchmark-provenance.sh'],
+  [releaseChecks, 'run benchmark-provenance'],
   [ciJob('native'), 'name: Install pinned direct-host GHC'],
 ]) {
   requirePreparedHistory(text, consumer);
   assert.throws(() => requirePreparedHistory(text.replace(historyPreparation, ''), consumer));
   assert.throws(() => requirePreparedHistory(text.replace(historyPreparation, '') + historyPreparation, consumer));
 }
+pass();
+begin('hosted-guest');
 assert.match(ciJob('native'), /python3 tools\/shared\/test_framework_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/framework-direct/);
 assert.match(ciJob('native'), /python3 tools\/shared\/test_figure12_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json/);
 assert.match(ciJob('native'), /\.mlf-build\/framework-direct\/\*\.json\*/);
@@ -108,6 +131,8 @@ assert.match(ciJob('native'), /\.mlf-build\/guest-state-laws\/\*\*\/\*\.log/);
 
 assert.match(ciJob('native'), /\.mlf-build\/figure12-direct\/\*\.json/);
 
+pass();
+begin('resource-and-output-bounds');
 // The integrated source gate is not the separate fixed-ref timing runner.
 const finiteGate = `      - name: Check finite P1-P3, A1 and F1 correctness
         if: matrix.optimization == '2'
@@ -165,6 +190,8 @@ assert.throws(() => verifyFiniteGate(ciJob('native').replace('.mlf-build/f1-inte
 assert.match(ciJob('native'), /f1-integrated-controls\/\*\*\/source\/Probe\.dump-\*/);
 assert.match(ciJob('native'), /f1-integrated-controls\/actual-source\/Separate\.dump-\*/);
 
+pass();
+begin('async-platforms');
 for (const name of ['build-runner','async-runtime','async-language']) {
   const job = ciJob(name);
   assert.ok(job, `Missing ${name} coverage`);
@@ -172,7 +199,8 @@ for (const name of ['build-runner','async-runtime','async-language']) {
   assert.match(job,/\["ubuntu-24.04", "macos-26"\]/);
   assert.match(job,/\|\| '\["ubuntu-24.04"\]'/);
 }
-assert.match(ciJob('build-runner'),/process-supervisor-tests/);
+assert.match(workflowJob(fs.readFileSync('.github/workflows/ci.yml', 'utf8'), 'build-runner'),
+  /tools\/testing\/run[.]py native-build-tools\b/);
 const asyncJob = ciJob('async-language');
 assert.match(asyncJob,/fetch-depth: 0/);
 assert.match(ci,/pull_request:\n    types: \[opened, synchronize, reopened, labeled, unlabeled\]/);
@@ -197,6 +225,8 @@ assert.doesNotMatch(asyncJob,/scripts\/bootstrap-async\.sh/);
 for (const command of ['tools/shared/prepare_async_ghc.py','tests/fixtures/async-completion/check.sh','tools/release/test-async-process.sh','tools/release/test-async-task.sh','tools/release/test-async-package.sh']) {
   assert.ok(ciJob('async-language').includes(command), `Missing ${command}`);
 }
+pass();
+begin('native-and-publishing');
 assert.doesNotMatch(ci,/contents: write|continue-on-error/);
 assert.doesNotMatch(qualify,/contents: write|continue-on-error/);
 assert.match(qualify,/group: \[unit, backends, parity, packages, self-host\]/);
@@ -214,4 +244,5 @@ const runner=fs.readFileSync('tools/release/run-benchmarks.sh','utf8');
 assert.match(runner,/"\$output\/results" 7 "\$clang" 3 2 \\\n/);
 assert.match(runner,/test "\$status" -eq 0/);
 assert.match(runner,/shared-candidate.sh verify/g);
+pass();
 console.log('PR/main/release workflow policy contracts passed.');

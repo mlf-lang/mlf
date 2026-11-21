@@ -38,7 +38,7 @@ class SharedTupleMigrationControls(unittest.TestCase):
         cls.sources = audit.verify_current_sources()
 
     def test_exact_reviewed_sources(self):
-        self.assertEqual(len(self.sources), 3)
+        self.assertEqual(len(self.sources), 2)
 
     def test_fourteen_semantic_mutants_rejected(self):
         mutants = shared_mutations(self.sources[audit.IMPLEMENTATION])
@@ -48,7 +48,7 @@ class SharedTupleMigrationControls(unittest.TestCase):
                 audit.verify_shared(audit.IMPLEMENTATION, mutant)
 
     def test_default_or_dispatcher_change_rejected(self):
-        for path in (audit.SOURCE, audit.LEGACY):
+        for path in (audit.SOURCE, audit.IMPLEMENTATION):
             with self.subTest(path=path), self.assertRaises(ValueError):
                 audit.verify_shared(path, self.sources[path] + '\n-- unreviewed change\n')
 
@@ -62,7 +62,7 @@ class SharedTupleMigrationControls(unittest.TestCase):
             for path, source in self.sources.items():
                 (root / path).parent.mkdir(parents=True, exist_ok=True)
                 (root / path).write_text(source)
-            (root / audit.FROZEN_SOURCE).write_text('-- stale duplicate')
+            (root / audit.LEGACY).write_text('-- stale duplicate')
             with self.assertRaisesRegex(ValueError, 'duplicate live'):
                 audit.verify_current_sources(root)
 

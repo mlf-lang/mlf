@@ -1,4 +1,6 @@
 module TestFrameworkMain where
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Package.OS as O
@@ -33,25 +35,36 @@ isolatedCases =
  ((:) (C.test "isolation/timeout" "nonterminating action" [] (A.liftIO spin))
  ((:) (C.test "isolation/noisy" "captured output" [] (cleanCase true))
  ((:) (C.test "isolation/clean" "continued with fresh state" [] (cleanCase false)) [])))))
+frameworkCases : String -> String -> [] C.Case
+frameworkCases directory unions =
+ (:) (C.test "framework/contracts" "assertion, expectation and receipt contracts" ((:) "pure" []) T.checks)
+ ((:) (C.test "framework/catalog-contracts" "catalog and family selection contracts" ((:) "pure" []) (do { CatalogChecks.checks; FamilyChecks.checks }))
+ ((:) (C.test "framework/coverage-validator" "independent structural coverage validation" ((:) "pure" []) CoverageChecks.checks)
+ ((:) (C.test "framework/cli-contracts" "CLI and isolated process contracts" ((:) "process" []) (do
+  A.assert (stringLength directory > 0 && stringLength unions > 0) "use --verify-cli WORK INT_SET_UNIONS to run real process contracts"
+  A.liftIO (CLI.main directory unions)
+  A.liftIO (ProcessChecks.main directory))) [])))
+
+recordFramework result =
+ if R.passed result then Coverage.passed "test-framework" (R.identity result) else return ()
+runFramework full args directory unions = do
+ let cases = frameworkCases directory unions
+ case R.plan args cases of
+  Left error -> do { putErr (error ++ "\n"); exitWith 2 }
+  Right ((,) options selected) ->
+   if R.listing options then do { code <- R.runOptions options cases selected; exitWith code }
+   else do
+    Coverage.begin "test-framework" (full && S.null (R.selectors options))
+    code <- R.runOptionsObserved recordFramework options cases selected
+    if code == 0 then Coverage.finish "test-framework" else exitWith code
+
 main : IO ()
 main = do
  args <- O.allArguments
  case args of
-  [] -> do { T.checks; CatalogChecks.main; FamilyChecks.main }
+  [] -> runFramework false (O.words "--tag pure") "" ""
   (:) "--legacy-fail-probe" [] -> case C.toLegacy (C.test "probe/legacy" "legacy failure" [] (A.fail "legacy assertion failure")) of { (,) _ action -> action }
-  (:) "--verify-cli" ((:) directory ((:) unions [])) -> do
-   Coverage.begin "test-framework" true
-   T.checks
-   Coverage.passed "test-framework" "framework/contracts"
-   CatalogChecks.main
-   FamilyChecks.main
-   Coverage.passed "test-framework" "framework/catalog-contracts"
-   CoverageChecks.main
-   Coverage.passed "test-framework" "framework/coverage-validator"
-   CLI.main directory unions
-   ProcessChecks.main directory
-   Coverage.passed "test-framework" "framework/cli-contracts"
-   Coverage.finish "test-framework"
+  (:) "--verify-cli" ((:) directory ((:) unions rest)) -> runFramework true rest directory unions
   (:) "--supervise" rest -> do { code <- P.run rest; exitWith code }
   (:) "--isolated-probe" rest -> do { code <- R.run rest isolatedCases; exitWith code }
   (:) "--discovery-crash-probe" _ -> exitWith 9
@@ -66,4 +79,4 @@ main = do
   (:) "--list-probe" rest -> do
    code <- R.run rest ((:) (C.test "probe/unexecuted" "listing must not execute" [] (A.liftIO (panic "listing executed an action" :: IO ()))) [])
    exitWith code
-  _ -> O.fatal "test-framework [--probe ARGS... | --list-probe --list ARGS...]"
+  _ -> runFramework false args "" ""

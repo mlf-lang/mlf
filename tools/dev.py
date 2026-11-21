@@ -12,6 +12,7 @@ from developer.process import run_build
 
 ROOT = Path(__file__).resolve().parents[1]
 SHAPES = ROOT / 'tools/performance/compiler-shapes'
+TEST_RUNNER = ROOT / 'tools/testing/run.py'
 
 
 def launch(argv):
@@ -66,19 +67,28 @@ def applications(args):
     return launch([driver, candidate, baseline, args.output, str(args.samples), clang, *options])
 
 
-def check_tools():
-    scripts = [ROOT / 'tools/developer/test_commands.py', ROOT / 'tools/developer/test_process.py']
+def check_tools(args):
+    suites = ['release-developer-commands', 'release-developer-process']
     if sys.platform in ('linux', 'darwin'):
-        scripts.extend(SHAPES / name for name in (
-            'test_contract.py', 'test_sweep.py', 'test_cancellation.py',
-            'test_data_shapes.py', 'test_rank_shapes.py',
-        ))
-    else:
+        suites.extend(('compiler-shapes-contract', 'compiler-shapes-sweep',
+                       'compiler-shapes-cancellation', 'compiler-shapes-data-shapes',
+                       'compiler-shapes-rank-shapes'))
+    elif not args.suite:
         print('The compiler-shape harness is tested on macOS and Linux.', flush=True)
-    for script in scripts:
+    if args.suite:
+        if args.suite not in suites:
+            raise SystemExit(f'Unknown check-tools suite for this host: {args.suite}')
+        suites = [args.suite]
+    elif args.exact:
+        raise SystemExit('--exact requires --suite')
+    options = ['--list'] if args.list else []
+    if args.exact:
+        options.extend(('--exact', args.exact))
+    for suite in suites:
         # The cancellation tests run their own supervised process groups. Give
         # their supervisors time to finish cleanup before killing the suite.
-        status = run_build(python(script), ROOT, cancellation_grace=2)
+        status = run_build(python(ROOT / 'tools/testing/run.py', '--inherit-process-group', suite, *options),
+                           ROOT, cancellation_grace=2)
         if status:
             return status
 
@@ -90,7 +100,11 @@ def main(argv):
     if argv[:2] == ['bench', 'shapes']:
         if len(argv) > 2 and argv[2] in ('list', 'growth'):
             return launch(python(SHAPES / 'bench.py', *argv[2:]))
-        return launch(python(SHAPES / 'bench.py', 'sweep', *argv[2:]))
+        if any(flag in argv[2:] for flag in ('-h', '--help')):
+            return launch(python(SHAPES / 'bench.py', 'sweep', *argv[2:]))
+        return launch(python(TEST_RUNNER, 'compiler-shapes', '--', 'sweep', *argv[2:]))
+    if argv[:3] == ['bench', 'apps', '--framework-list']:
+        return launch(python(ROOT / 'tools/bench/framework_inventory.py', *argv[3:]))
 
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='action', required=True)
@@ -102,7 +116,10 @@ def main(argv):
         command.add_argument('--timeout', type=int, default=21600 if name == 'test' else None,
                              help='timeout per build action, in seconds')
     commands.add_parser('build-host', help='GHC-hosted build (see build-host --help)')
-    commands.add_parser('check-tools', help='test the developer commands and compiler benchmark harness')
+    tools = commands.add_parser('check-tools', help='test developer commands and benchmark support')
+    tools.add_argument('--suite', help='select a registered developer or shape suite')
+    tools.add_argument('--list', action='store_true', help='list selected case IDs')
+    tools.add_argument('--exact', help='select one case in the chosen suite')
     bench = commands.add_parser('bench', help='compile shapes against GHC or benchmark native applications')
     suites = bench.add_subparsers(dest='suite', required=True)
     suites.add_parser('shapes', help='run the paired compiler sweep, or use shapes list or growth')
@@ -122,8 +139,10 @@ def main(argv):
     if args.action in ('build', 'test'):
         return package(args)
     if args.action == 'check-tools':
-        return check_tools()
-    return applications(args)
+        return check_tools(args)
+    if os.environ.get('MLF_TEST_SUITE') == 'application-benchmarks':
+        return applications(args)
+    return launch(python(TEST_RUNNER, 'application-benchmarks', '--', *argv[2:]))
 
 
 if __name__ == '__main__':

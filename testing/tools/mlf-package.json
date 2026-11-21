@@ -38,7 +38,9 @@
         "test-lifecycle"
       ],
       "command": [
-        "{bin:test-lifecycle}"
+        "{bin:test-lifecycle}",
+        "--report",
+        "{build}/lifecycle.cases.jsonl"
       ]
     }
   }

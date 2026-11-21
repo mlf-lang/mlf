@@ -10,9 +10,9 @@ Run on the qualified Linux x86_64 / GHC 9.14.1 environment:
 
 ```sh
 PATH=/workspace/shared/mlf-toolchain/bin:$PATH \
-python3 tests/shared-host/run.py \
+python3 -B tools/testing/run.py shared-host-adapter -- \
   /workspace/shared/mlf-ghcup/.ghcup/ghc/9.14.1/bin/ghc \
-  --gc-root /workspace/shared/mlf-toolchain/gc
+  --gc-root /workspace/shared/mlf-toolchain/gc --output .mlf-build/shared-host-adapter
 ```
 
 `--gc-root` is optional and must identify an existing BDWGC installation with

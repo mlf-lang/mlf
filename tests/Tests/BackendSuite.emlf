@@ -1,4 +1,6 @@
 module Tests.BackendSuite where
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Tests.Backends as B
@@ -24,6 +26,8 @@ import qualified Tests.StateRuntime as Sr
 import qualified Tests.HigherOrderSpecialization as Hi
 import qualified Package.OS as O
 import qualified Tests.Selection as Selection
+import qualified Test.Case as Case
+import qualified Test.Runner as Runner
 suite : B.Backends -> [] ((,) String (IO ()))
 suite backends = S.append (Wr.backendTests backends) (S.concat ((:) (Io.ioTests backends) ((:) (Pr.preludeTests backends) ((:) (Sn.snakeTests backends) ((:) (Ba.backendTests backends) ((:) (Na.nativeOptimizationTests backends) ((:) (Co.constructorProjectionTests backends) ((:) (Fo.forceReuseTests backends) ((:) (Bo.boolConditionTests backends) ((:) (En.environmentAccessTests backends) ((:) (St.strictFieldTests backends) ((:) (Nu.numericArrayTests backends) ((:) (By.byteArrayTests backends) ((:) (Dn.dnaTests backends) ((:) (Mo.moduleBackendTests backends) ((:) (Se.separateBackendTests backends) ((:) (Bs.bootstrapPrimitiveTests backends) ((:) (Sr.stateRuntimeTests backends) ((:) (Hi.higherOrderTests backends) [])))))))))))))))))))
 -- Each family is a contract boundary over existing fixture actions. Selection
@@ -83,31 +87,70 @@ validateSuite allCases = do
  let labels = S.map S.fst allCases
  H.assert (S.length allCases == 541) "preserved backend fixture coverage changed"
  H.assert (S.length labels == S.length (S.nubBy eqString labels)) "duplicate backend fixture labels"
-runCases backends cases = S.mapM_ (\((,) label action) -> B.inCase backends label (do { putStrLn label; action })) cases
+-- Escape semantic labels reversibly. Coordinates are local to a case, while
+-- the legacy global row indices remain in the compatibility receipt.
+caseId family label = family ++ "/" ++ S.concatMapString (\index ->
+ let code = stringCodeAt label index in
+ if H.isAlphaNum code || code == 45 || code == 46 then O.char label index
+ else "_" ++ showInt code ++ "_") (S.range 0 (stringLength label - 1))
+
+registry backends allCases entries =
+ let owners = S.concatMap (\((,) family cases) -> S.map (\entry -> (,) (S.fst entry) family) cases) entries in
+ S.map (\((,) label action) ->
+  let family = case S.lookup eqString label owners of { Just value -> value; Nothing -> panic "backend fixture has no family" } in
+  let identity = caseId family label in
+  Case.test identity label ((:) ("family:" ++ family) [])
+   (B.recoverCase (B.inRegisteredCase backends identity label (do { putStrLn label; action })))) allCases
+
+selectedCases cases args = case args of
+ (:) "--from" ((:) prefix []) -> do
+  options <- H.right (Runner.parse [])
+  let selected = S.dropWhile (\entry -> S.not (O.starts prefix (Case.name entry))) cases
+  H.assert (S.not (S.null selected)) ("unknown backend fixture prefix: " ++ prefix)
+  return ((,,) options selected Nothing)
+ (:) "--families" _ -> do
+  (,) _ names <- H.right (Selection.choose familyNames args)
+  options <- H.right (Runner.parse [])
+  let selected = S.filter (\entry -> S.any (\name -> S.elem eqString ("family:" ++ name) (Case.tags entry)) names) cases
+  return ((,,) options selected (Just names))
+ _ -> do
+  (,) options selected <- H.right (Runner.plan args cases)
+  let names = if S.null (Runner.selectors options) then Just familyNames else Nothing
+  return ((,,) options selected names)
+
 main : IO ()
 main = do
  args <- O.allArguments
- if Selection.listing args then putStr (S.unlines familyNames) else case args of
-  (:) "--from" ((:) prefix []) -> B.withBackends (\backends -> do
-   let allCases = suite backends
-   validateSuite allCases
-   let cases = S.dropWhile (\entry -> S.not (O.starts prefix (S.fst entry))) allCases
-   H.assert (S.not (S.null cases)) ("unknown backend fixture prefix: " ++ prefix)
-   runCases backends cases
-   count <- B.auditBackends backends
-   putStrLn (showInt (S.length cases) ++ " shared IO/prelude/backend fixtures; 0 failures"))
-  _ -> do
-   (,) full selected <- H.right (Selection.choose familyNames args)
-   Selection.begin "backends" full selected
-   B.withBackends (\backends -> do
-    let allCases = suite backends
-    let entries = families backends
-    validateSuite allCases
-    validateFamilies allCases entries
-    let labels = S.concatMap (\entry -> if S.elem eqString (S.fst entry) selected then S.map S.fst (S.snd entry) else []) entries
-    let cases = S.filter (\entry -> S.elem eqString (S.fst entry) labels) allCases
-    runCases backends cases
-    count <- if full then B.auditBackends backends else B.auditSelectedBackends backends
-    S.mapM_ (Selection.passed "backends") selected
-    putStrLn (showInt (S.length cases) ++ " shared IO/prelude/backend fixtures; 0 failures"))
-   Selection.finish "backends"
+ if Selection.listing args then putStr (S.unlines familyNames) else do
+  let allCases = suite B.inventoryContext
+  let entries = families B.inventoryContext
+  validateSuite allCases
+  validateFamilies allCases entries
+  let cases = registry B.inventoryContext allCases entries
+  (,,) options _ _ <- selectedCases cases args
+  if Runner.listing options then runRegistry B.inventoryContext cases args
+  else B.withBackends (\backends ->
+   runRegistry backends (registry backends (suite backends) (families backends)) args)
+
+runRegistry backends cases args = do
+ (,,) options selected selection <- selectedCases cases args
+ reported <- B.reportArgs (case args of
+  (:) "--from" _ -> []
+  (:) "--families" _ -> []
+  _ -> args)
+ reportOptions <- H.right (Runner.parse reported)
+ let wholeInvocation = case args of { (:) "--from" _ -> false; (:) "--families" _ -> false; _ -> true }
+ let full = S.length selected == S.length cases && S.null (Runner.selectors options) && wholeInvocation
+ if Runner.listing options then do
+  code <- Runner.runOptions reportOptions cases selected
+  if code == 0 then return () else exitWith code
+ else do
+  case selection of { Nothing -> return (); Just names -> Selection.begin "backends" full names }
+  code <- Runner.runOptions reportOptions cases selected
+  if code == 0 then do
+   _ <- if full then B.auditBackends backends else B.auditSelectedBackends backends
+   case selection of
+    Nothing -> return ()
+    Just names -> do { S.mapM_ (Selection.passed "backends") names; Selection.finish "backends" }
+   putStrLn (showInt (S.length selected) ++ " shared IO/prelude/backend fixtures; 0 failures")
+  else exitWith code

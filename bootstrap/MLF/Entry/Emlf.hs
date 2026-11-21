@@ -24,6 +24,7 @@ module MLF.Entry.Emlf where {
   import qualified Bootstrap.CrateSession as CrateSession;
   import qualified Bootstrap.CrateArtifact as CrateArtifact;
   import qualified Bootstrap.CrateCodegen as CrateCodegen;
+  import qualified Package.Json as J;
   data Command =
     PrintSource Bool |
     RunSource |
@@ -145,6 +146,7 @@ module MLF.Entry.Emlf where {
   };
   runArgs :: PreludeMode -> [] String -> [] String -> IO ();
   runArgs mode paths arguments = case arguments of {
+    ["--test-parity-batch", request] -> testParityBatch request;
     (:) "--compile-crate-to-llvm-gc" rest -> compileCrateLLVMCommand False rest;
     (:) "-Zincremental-verify-ich" ((:) "--compile-crate-to-llvm-gc" rest) -> compileCrateLLVMCommand True rest;
     (:) "-Zincremental-verify-ich" ((:) "--compile-crate" rest) -> compileCrateCommand True rest;
@@ -789,6 +791,56 @@ module MLF.Entry.Emlf where {
               }
           }
         }
+    };
+  -- Use the normal file compiler, printer and target checker with each row's
+  -- own import paths. Runtime effects still exercise the actual CLI children.
+  testParityBatch :: String -> IO ();
+  testParityBatch request =
+    do {
+      manifest <- J.read request;
+      L.mapM_ testParityRow (J.values manifest)
+    };
+  testParityRow :: J.Json -> IO ();
+  testParityRow row =
+    do {
+      let {
+        source = J.getText "source" "" row;
+        stem = J.getText "stem" "" row;
+        mode = if J.getBool "no_prelude" False row then NoImplicitPrelude else ImplicitPrelude;
+        paths = J.getStrings "include_dirs" row
+      };
+      compiled <- Prepared.compileFileWithPrelude mode paths source;
+      let {
+        result = case compiled of {
+          Left error -> (,,,) 1 (C.prettyError error ++ "\n") "" (Right "");
+          Right value ->
+            let {
+              target = "-- type: " ++ Prepared.sourceType value ++ "\n" ++
+                Pretty.prettyTerm (Prepared.compiledTerm value) ++ "\n";
+              checked = case Parse.parseTerm (stem ++ ".xmlf") target of {
+                Left error -> Left error;
+                Right term -> case Check.checkClosed term of {
+                  Left error -> Left error;
+                  Right ty -> Right (Pretty.prettyType ty ++ "\n")
+                }
+              }
+            } in (,,,) 0 "" target checked
+        }
+      };
+      case result of {
+        (,,,) status diagnostic target checked -> do {
+          writeFile (stem ++ ".xmlf") target;
+          writeFile (stem ++ ".stderr") diagnostic;
+          case checked of {
+            Left error -> do { writeFile (stem ++ ".self.err") (error ++ "\n"); writeFile (stem ++ ".self.out") "" };
+            Right ty -> do { writeFile (stem ++ ".self.err") ""; writeFile (stem ++ ".self.out") ty }
+          };
+          putStrLn (J.render (J.set "id" (J.get "id" row)
+            (J.set "compile_exit" (J.num status)
+              (J.set "candidate_check_exit"
+                (J.num (case checked of { Left _ -> 1; Right _ -> 0 })) J.empty))))
+        }
+      }
     };
   -- Native emission retains the normal source parser and diagnostics. The
   -- prepared adapter authenticates its fixed installation before producing

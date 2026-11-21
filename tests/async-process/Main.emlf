@@ -1,5 +1,6 @@
 module Main where
 import Bootstrap.Types
+import qualified Bootstrap.Std as S
 import qualified Bootstrap.Std as L
 import Async.Process
 
@@ -274,17 +275,23 @@ main = do
  helper <- getEnv "MLF_ASYNC_FIXTURE"
  work <- getEnv "MLF_ASYNC_WORK"
  assert (stringLength helper > 0 && stringLength work > 0) "fixture environment missing"
- capability
- dynamic helper work
- events helper work
- queue helper work
- retention helper work
- failureScope helper work
- closed helper work
- crossScope helper work
- timeouts helper work
- transport helper work
- inheritedEnvironment helper work
- logs helper work
- launchFailure work
- putStrLn "Async.Process: 13 interpreter/native contract cases passed"
+ selection <- getEnv "MLF_ASYNC_CASE"
+ let cases =
+  (:) ((,) "capability-v1" (capability)) (
+  (:) ((,) "dynamic-nonzero-repeat-await" (dynamic helper work)) (
+  (:) ((,) "event-exactly-once" (events helper work)) (
+  (:) ((,) "queued-cancel-and-bound" (queue helper work)) (
+  (:) ((,) "retained-bound" (retention helper work)) (
+  (:) ((,) "scope-left-cancel-and-join" (failureScope helper work)) (
+  (:) ((,) "normal-scope-join-closed-handle" (closed helper work)) (
+  (:) ((,) "cross-scope-handle" (crossScope helper work)) (
+  (:) ((,) "running-and-queued-timeout" (timeouts helper work)) (
+  (:) ((,) "transport-argv-env-cwd-stdin" (transport helper work)) (
+  (:) ((,) "inherited-environment-at-launch" (inheritedEnvironment helper work)) (
+  (:) ((,) "file-backed-large-logs" (logs helper work)) (
+  (:) ((,) "explicit-launch-failure" (launchFailure work)) (
+  [])))))))))))))
+ if eqString selection "" || S.any (\entry -> eqString (S.fst entry) selection) cases then
+  S.mapM_ (\((,) label action) -> if eqString selection "" || eqString selection label then action else ioReturn ()) cases
+ else exitWith 2
+ if eqString selection "" then putStrLn "Async.Process: 13 interpreter/native contract cases passed" else ioReturn ()

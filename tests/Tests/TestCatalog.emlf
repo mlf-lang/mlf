@@ -1,24 +1,26 @@
 module Tests.TestCatalog where
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Package.Json as J
 import qualified Package.OS as O
-import qualified Tests.Basic as H
+import qualified Test.Assert as A
 import qualified Tests.Catalog as C
 import qualified Tests.Coverage as Coverage
 import qualified Tests.CorePartitions as CorePartitions
 
-rejected : forall a. Either String a -> IO ()
-rejected value = case value of { Left _ -> return (); Right _ -> H.fail "invalid catalog, selection or partial coverage was accepted" }
+rejected : forall a. Either String a -> A.Test ()
+rejected value = case value of { Left _ -> return (); Right _ -> A.fail "invalid catalog, selection or partial coverage was accepted" }
 ids values = S.map C.identity values
 selected catalog arguments = do
- settings <- H.right (C.parse J.empty (O.words arguments))
- H.right (C.select catalog settings)
+ settings <- A.right (\message -> message) (C.parse J.empty (O.words arguments))
+ A.right (\message -> message) (C.select catalog settings)
 chosen catalog arguments expected = do
  values <- selected catalog arguments
- H.assert (S.eqList eqString (ids values) expected) ("catalog selection changed families or order: " ++ arguments)
+ A.assert (S.eqList eqString (ids values) expected) ("catalog selection changed families or order: " ++ arguments)
 notChosen catalog arguments = do
- settings <- H.right (C.parse J.empty (O.words arguments))
+ settings <- A.right (\message -> message) (C.parse J.empty (O.words arguments))
  rejected (C.select catalog settings)
 remove key object = J.Object (S.filter (\entry -> S.not (eqString (S.fst entry) key)) (J.items object))
 changeFamily name action catalog = J.set "families" (J.Array (S.map (\entry -> if eqString (C.identity entry) name then action entry else entry) (C.families catalog))) catalog
@@ -41,9 +43,9 @@ selectionChecks catalog = do
  chosen catalog "--campaign packages" packageIds
  chosen catalog "--campaign packages --unit package-distribution" ((:) "package-distribution/complete" [])
  unit <- selected catalog "--campaign unit"
- H.assert (S.eqList eqString (S.nubBy eqString (S.map C.unitName unit)) (O.words "regex harness test-framework core figure12")) "preserved unit campaign changed execution order"
- all <- H.right (C.select catalog J.empty)
- H.assert (S.eqList eqString (ids all) (ids (C.families catalog))) "empty settings lost full-campaign families"
+ A.assert (S.eqList eqString (S.nubBy eqString (S.map C.unitName unit)) (O.words "regex harness test-framework core figure12")) "preserved unit campaign changed execution order"
+ all <- A.right (\message -> message) (C.select catalog J.empty)
+ A.assert (S.eqList eqString (ids all) (ids (C.families catalog))) "empty settings lost full-campaign families"
  rejected (C.select catalog J.Null)
  S.mapM_ (\name -> do
   rejected (C.select catalog (J.set name J.Null J.empty))
@@ -54,7 +56,7 @@ selectionChecks catalog = do
   rejected (C.select catalog (J.set name (J.Array ((:) (J.num 1) [])) J.empty))) (O.words "inputs oracles purposes techniques families")
  S.mapM_ (\name -> do
   values <- selected catalog ("--group " ++ name)
-  H.assert (S.not (S.null values) && S.all (\entry -> eqString (J.getText "group" "" entry) name) values) "primary group selection leaked another group") (O.words "language code-generation runtime-library packages-build distribution bootstrap test-infrastructure")
+  A.assert (S.not (S.null values) && S.all (\entry -> eqString (J.getText "group" "" entry) name) values) "primary group selection leaked another group") (O.words "language code-generation runtime-library packages-build distribution bootstrap test-infrastructure")
  S.mapM_ (notChosen catalog) (S.append
   (S.map (\flag -> flag ++ " unknown") (O.words "--group --level --unit --campaign --input --oracle --purpose --technique"))
   ((:) "--family core/absent"
@@ -76,31 +78,31 @@ selectionChecks catalog = do
  rejected (C.parse J.empty ((:) "--campaign" ((:) "" [])))
  rejected (C.parse J.empty ((:) "--family" ((:) "" [])))
  let labels = C.tags (C.family catalog "core/hm-oracle")
- H.assert (C.sameSet labels (O.words "group:language level:integration input:exhaustive input:seeded-random oracle:independent-reference purpose:regression purpose:conformance") && C.unique labels) "family metadata lost independent namespaced axes"
+ A.assert (C.sameSet labels (O.words "group:language level:integration input:exhaustive input:seeded-random oracle:independent-reference purpose:regression purpose:conformance") && C.unique labels) "family metadata lost independent namespaced axes"
  let summary = C.selection catalog ((:) (C.family catalog "core/hm-oracle") [])
- H.assert (J.equal (J.get "granularity" summary) (J.str "verified-case-or-family") && S.eqList eqString (J.getStrings "units" summary) ((:) "core" []) && J.equal (J.get "tags" (S.head (J.values (J.get "families" summary)))) (J.stringArray labels)) "selection descriptor lost family metadata or execution ownership"
- format <- H.right (C.parse J.empty (O.words "--list --format json"))
- selector <- H.right (C.parse J.empty (O.words "--input exhaustive"))
- H.assert (S.not (C.hasSelection format) && C.hasSelection selector) "discovery formatting changed campaign scope"
+ A.assert (J.equal (J.get "granularity" summary) (J.str "verified-case-or-family") && S.eqList eqString (J.getStrings "units" summary) ((:) "core" []) && J.equal (J.get "tags" (S.head (J.values (J.get "families" summary)))) (J.stringArray labels)) "selection descriptor lost family metadata or execution ownership"
+ format <- A.right (\message -> message) (C.parse J.empty (O.words "--list --format json"))
+ selector <- A.right (\message -> message) (C.parse J.empty (O.words "--input exhaustive"))
+ A.assert (S.not (C.hasSelection format) && C.hasSelection selector) "discovery formatting changed campaign scope"
 
 batchChecks catalog = do
  let all = C.families catalog
  let batches = C.batches all
  let flattened = S.concatMap (\entry -> ids (S.snd entry)) batches
- H.assert (S.length batches == 10 && C.unique (S.map S.fst batches) && C.sameSet flattened (ids all) && C.unique flattened) "selection batches lose or repeat families"
- H.assert (S.length (S.filter (\entry -> eqString (S.fst entry) "backends" || eqString (S.fst entry) "port") batches) == 2) "backend and port receipts share an execution directory"
- H.assert (S.eqList eqString (S.map S.fst (C.batches (C.forCampaign catalog "packages"))) ((:) "packages" [])) "combined package phases would execute twice"
- H.assert (S.eqList eqString (S.map S.fst (C.batches (C.forUnit catalog "package-distribution"))) ((:) "package-distribution" [])) "single package phase was broadened"
+ A.assert (S.length batches == 10 && C.unique (S.map S.fst batches) && C.sameSet flattened (ids all) && C.unique flattened) "selection batches lose or repeat families"
+ A.assert (S.length (S.filter (\entry -> eqString (S.fst entry) "backends" || eqString (S.fst entry) "port") batches) == 2) "backend and port receipts share an execution directory"
+ A.assert (S.eqList eqString (S.map S.fst (C.batches (C.forCampaign catalog "packages"))) ((:) "packages" [])) "combined package phases would execute twice"
+ A.assert (S.eqList eqString (S.map S.fst (C.batches (C.forUnit catalog "package-distribution"))) ((:) "package-distribution" [])) "single package phase was broadened"
  let mixed = (:) (C.family catalog "core/hm-oracle") ((:) (C.family catalog "package-distribution/complete") ((:) (C.family catalog "package-integration/complete") []))
  let mixedBatches = C.batches mixed
- H.assert (S.eqList eqString (S.map S.fst mixedBatches) (O.words "core packages") && C.sameSet (S.concatMap (\entry -> ids (S.snd entry)) mixedBatches) (ids mixed)) "mixed-axis family batches changed selected work"
+ A.assert (S.eqList eqString (S.map S.fst mixedBatches) (O.words "core packages") && C.sameSet (S.concatMap (\entry -> ids (S.snd entry)) mixedBatches) (ids mixed)) "mixed-axis family batches changed selected work"
 
 corePartitionChecks catalog = do
  let reviewed = ids (C.forUnit catalog "core")
- H.right (CorePartitions.validate reviewed)
- H.assert (S.eqList eqString CorePartitions.targets (O.words "core-crates core-solver core-language core-modules")) "core physical target inventory changed"
- H.assert (S.length reviewed == 35 && C.sameSet (S.concatMap S.snd CorePartitions.partitions) reviewed) "core compilation shards changed logical families"
- H.right (CorePartitions.validateCompleted reviewed (S.concatMap S.snd CorePartitions.partitions))
+ A.right (\message -> message) (CorePartitions.validate reviewed)
+ A.assert (S.eqList eqString CorePartitions.targets (O.words "core-crates core-solver core-language core-modules")) "core physical target inventory changed"
+ A.assert (S.length reviewed == 35 && C.sameSet (S.concatMap S.snd CorePartitions.partitions) reviewed) "core compilation shards changed logical families"
+ A.right (\message -> message) (CorePartitions.validateCompleted reviewed (S.concatMap S.snd CorePartitions.partitions))
  rejected (CorePartitions.validateCompleted reviewed (S.tail reviewed))
  rejected (CorePartitions.validateCompleted reviewed (S.snoc reviewed (S.head reviewed)))
  rejected (CorePartitions.validateCompleted reviewed (S.snoc (S.init reviewed) "core/unknown"))
@@ -110,14 +112,14 @@ corePartitionChecks catalog = do
  rejected (CorePartitions.validate (S.snoc reviewed (S.head reviewed)))
  rejected (CorePartitions.validate (S.reverse reviewed))
  rejected (CorePartitions.validate (S.snoc (S.init reviewed) "core/unknown"))
- H.assert (S.eqList eqString (CorePartitions.selectedTargets (O.words "core/hm-oracle core/substring-adapter")) (O.words "core-language core-modules")) "focused core selection pulls unrelated compilation targets"
- H.assert (S.eqList eqString (CorePartitions.selectedTargets ((:) "core/graph-solver" [])) ((:) "core-solver" [])) "graph family does not select its independent closure"
- H.assert (S.eqList eqString (CorePartitions.selectedTargets reviewed) CorePartitions.targets) "full core selection omits a compilation target"
- H.assert (S.null (CorePartitions.selectedTargets []) && S.null (CorePartitions.forTarget "unknown")) "empty or unknown core target broadened work"
+ A.assert (S.eqList eqString (CorePartitions.selectedTargets (O.words "core/hm-oracle core/substring-adapter")) (O.words "core-language core-modules")) "focused core selection pulls unrelated compilation targets"
+ A.assert (S.eqList eqString (CorePartitions.selectedTargets ((:) "core/graph-solver" [])) ((:) "core-solver" [])) "graph family does not select its independent closure"
+ A.assert (S.eqList eqString (CorePartitions.selectedTargets reviewed) CorePartitions.targets) "full core selection omits a compilation target"
+ A.assert (S.null (CorePartitions.selectedTargets []) && S.null (CorePartitions.forTarget "unknown")) "empty or unknown core target broadened work"
  -- All four projections must be a disjoint exact cover of the reviewed actions,
  -- aliases and counted loops. The logical campaign/unit names remain untouched.
  let selected = S.concatMap (\((,) _ names) -> S.filter (\entry -> S.elem eqString (C.identity entry) names) (C.forUnit catalog "core")) CorePartitions.partitions
- H.assert (C.unique (ids selected) && C.sameSet (ids selected) reviewed && S.all (\entry -> eqString (C.unitName entry) "core") selected) "physical core sharding changed logical unit membership"
+ A.assert (C.unique (ids selected) && C.sameSet (ids selected) reviewed && S.all (\entry -> eqString (C.unitName entry) "core") selected) "physical core sharding changed logical unit membership"
 
 schemaChecks catalog = do
  S.mapM_ (\key -> do
@@ -152,13 +154,13 @@ schemaChecks catalog = do
  rejected (C.validate (changeEvidence "core/hm-oracle" (J.set "executions" (J.stringArray ((:) "repeated" ((:) "repeated" [])))) catalog))
  rejected (C.validate (changeEvidence "core/hm-oracle" (J.set "aliases" J.Null) catalog))
  rejected (C.validate (changeEvidence "core/hm-oracle" (J.set "metrics" J.Null) catalog))
- empty <- H.right (J.parse "{\"kind\":\"coverage\",\"executions\":[],\"aliases\":{},\"metrics\":{}}")
+ empty <- A.right (\message -> message) (J.parse "{\"kind\":\"coverage\",\"executions\":[],\"aliases\":{},\"metrics\":{}}")
  rejected (C.validate (changeFamily "core/hm-oracle" (J.set "evidence" empty) catalog))
  rejected (C.validate (changeEvidence "backends/strict-wrappers" (J.set "rows" (J.num 3)) catalog))
  -- Keep each family's labels/count consistent so this reaches the independent
  -- aggregate fixture guard, rather than failing the per-family schema check.
  let extraFixture = changeEvidence "backends/strict-wrappers" (\entry -> J.set "fixtures" (J.num 5) (J.set "labels" (J.stringArray (S.snoc (J.getStrings "labels" entry) "unreviewed backend fixture")) entry)) catalog
- H.assert (case C.validate extraFixture of { Left error -> eqString error "backend family partition changed"; Right _ -> False }) "backend fixture total accepted an unreviewed action"
+ A.assert (case C.validate extraFixture of { Left error -> eqString error "backend family partition changed"; Right _ -> False }) "backend fixture total accepted an unreviewed action"
  -- Preserve aggregate counts while forging a duplicate fixture label across families.
  let backendLabel = S.head (J.getStrings "labels" (J.get "evidence" (C.family catalog "backends/strict-wrappers")))
  rejected (C.validate (changeEvidence "backends/io-runtime" (\entry -> J.set "labels" (J.stringArray ((:) backendLabel (S.tail (J.getStrings "labels" entry)))) entry) catalog))
@@ -168,25 +170,25 @@ schemaChecks catalog = do
  rejected (C.validate (changeEvidence "self-host/complete" (J.set "rows" (J.num 1)) catalog))
 
 inventoryChecks catalog inventory = do
- H.right (C.validateInventory catalog inventory)
+ A.right (\message -> message) (C.validateInventory catalog inventory)
  -- Structural metadata may be well formed yet lie about reviewed executions.
  -- These mutations must pass schema validation and fail independent partitioning.
  let missing = J.set "families" (J.Array (S.filter (\entry -> S.not (eqString (C.identity entry) "core/optimizer-uses")) (C.families catalog))) catalog
- H.right (C.validate missing)
+ A.right (\message -> message) (C.validate missing)
  rejected (C.validateInventory missing inventory)
  let forgedCase = changeEvidence "core/optimizer-uses" (\entry -> J.set "executions" (J.stringArray ((:) "invented optimizer assertion" (S.tail (J.getStrings "executions" entry)))) entry) catalog
- H.right (C.validate forgedCase)
+ A.right (\message -> message) (C.validate forgedCase)
  rejected (C.validateInventory forgedCase inventory)
  let duplicateCase = changeEvidence "core/substring-adapter" (J.set "executions" (J.stringArray ((:) "independent ML typability oracle" []))) catalog
- H.right (C.validate duplicateCase)
+ A.right (\message -> message) (C.validate duplicateCase)
  rejected (C.validateInventory duplicateCase inventory)
  let forgedMetric = changeEvidence "core/substring-adapter" (J.set "metrics" (J.Object ((:) ((,) "substring-executed" (J.num 12)) []))) catalog
- H.right (C.validate forgedMetric)
+ A.right (\message -> message) (C.validate forgedMetric)
  rejected (C.validateInventory forgedMetric inventory)
  let duplicateMetric = changeEvidence "core/optimizer-uses" (J.set "metrics" (J.Object ((:) ((,) "substring-executed" (J.num 13)) []))) catalog
  rejected (C.validateInventory duplicateMetric inventory)
  let missingAlias = changeEvidence "figure12/complete" (J.set "aliases" J.empty) catalog
- H.right (C.validate missingAlias)
+ A.right (\message -> message) (C.validate missingAlias)
  rejected (C.validateInventory missingAlias inventory)
  let forgedAlias = changeEvidence "figure12/complete" (\entry -> J.set "aliases" (J.set "A12.1" (J.str "A12.2") (J.get "aliases" entry)) entry) catalog
  rejected (C.validateInventory forgedAlias inventory)
@@ -206,29 +208,29 @@ inventoryChecks catalog inventory = do
  rejected (C.validateInventory catalog (changeSuite "figure12" (\entry -> J.set "aliases" (J.set "A12.1" (J.str "A12.2") (J.get "aliases" entry)) entry) inventory))
  S.mapM_ (\name -> do
   let families = S.filter (\entry -> eqString (C.suiteName (C.unitName entry)) name) (C.coverageFamilies (C.families catalog))
-  H.assert (C.unique (C.combine "executions" families) && C.sameSet (C.combine "executions" families) (J.getStrings "executions" (suite inventory name))) ("coverage partition lost reviewed cases: " ++ name)
-  H.assert (J.equal (C.projection inventory name families) (suite inventory name)) ("full projection lost reviewed aliases or metrics: " ++ name)) (O.words "core harness regex figure12 test-framework packages")
+  A.assert (C.unique (C.combine "executions" families) && C.sameSet (C.combine "executions" families) (J.getStrings "executions" (suite inventory name))) ("coverage partition lost reviewed cases: " ++ name)
+  A.assert (J.equal (C.projection inventory name families) (suite inventory name)) ("full projection lost reviewed aliases or metrics: " ++ name)) (O.words "core harness regex figure12 test-framework packages")
  let source = C.combine "executions" (C.forUnit catalog "package-integration")
  let releases = C.combine "executions" (C.forUnit catalog "package-distribution")
- H.assert (S.length source == 51 && S.length releases == 28 && C.sameSet (S.append source releases) (J.getStrings "executions" (suite inventory "packages")) && C.unique (S.append source releases)) "package classification changed the reviewed 79-case inventory"
- substring <- H.right (J.parse "{\"executions\":[],\"aliases\":{},\"metrics\":{\"substring-executed\":13}}")
- H.assert (J.equal (C.projection inventory "core" ((:) (C.family catalog "core/substring-adapter") [])) substring) "metric-only family projection broadened coverage"
- hm <- H.right (J.parse "{\"executions\":[\"independent ML typability oracle\"],\"aliases\":{},\"metrics\":{\"hm-prescribed\":6712,\"hm-exhaustive\":1712,\"hm-generated\":5000,\"hm-distinct-generated\":4991,\"hm-executed\":6703,\"hm-typable\":2901}}")
- H.assert (J.equal (C.projection inventory "core" ((:) (C.family catalog "core/hm-oracle") [])) hm) "oracle family projection lost counted corpus oracles"
- H.assert (J.equal (C.projection inventory "core" ((:) (C.family forgedMetric "core/substring-adapter") [])) substring) "projection trusted forged metric values instead of the reviewed inventory"
+ A.assert (S.length source == 51 && S.length releases == 28 && C.sameSet (S.append source releases) (J.getStrings "executions" (suite inventory "packages")) && C.unique (S.append source releases)) "package classification changed the reviewed 79-case inventory"
+ substring <- A.right (\message -> message) (J.parse "{\"executions\":[],\"aliases\":{},\"metrics\":{\"substring-executed\":13}}")
+ A.assert (J.equal (C.projection inventory "core" ((:) (C.family catalog "core/substring-adapter") [])) substring) "metric-only family projection broadened coverage"
+ hm <- A.right (\message -> message) (J.parse "{\"executions\":[\"independent ML typability oracle\"],\"aliases\":{},\"metrics\":{\"hm-prescribed\":6712,\"hm-exhaustive\":1712,\"hm-generated\":5000,\"hm-distinct-generated\":4991,\"hm-executed\":6703,\"hm-typable\":2901}}")
+ A.assert (J.equal (C.projection inventory "core" ((:) (C.family catalog "core/hm-oracle") [])) hm) "oracle family projection lost counted corpus oracles"
+ A.assert (J.equal (C.projection inventory "core" ((:) (C.family forgedMetric "core/substring-adapter") [])) substring) "projection trusted forged metric values instead of the reviewed inventory"
  let packaged = C.projection inventory "packages" (C.forUnit catalog "package-distribution")
- H.assert (S.length (J.getStrings "executions" packaged) == 28 && C.sameSet (J.getStrings "executions" packaged) releases && S.null (J.items (J.get "metrics" packaged)) && S.null (J.items (J.get "aliases" packaged))) "one package phase projected another phase's work"
+ A.assert (S.length (J.getStrings "executions" packaged) == 28 && C.sameSet (J.getStrings "executions" packaged) releases && S.null (J.items (J.get "metrics" packaged)) && S.null (J.items (J.get "aliases" packaged))) "one package phase projected another phase's work"
 
-main : IO ()
-main = do
+checks : A.Test ()
+checks = do
  -- The framework's CLI probe also runs from tests/, so retain both cwd forms.
- directory <- canonicalPath "."
- nested <- fileExists (directory ++ "/tests/test-catalog.json")
+ directory <- A.liftIO (canonicalPath ".")
+ nested <- A.liftIO (fileExists (directory ++ "/tests/test-catalog.json"))
  let root = if nested then directory else O.parent directory
- catalog <- J.read (root ++ "/tests/test-catalog.json")
- inventory <- J.read (root ++ "/tests/golden/unit-inventory.json")
- H.right (C.validate catalog)
- H.assert (C.sameSet (J.getStrings "groups" catalog) (O.words "language code-generation runtime-library packages-build distribution bootstrap test-infrastructure")) "seven primary groups changed"
+ catalog <- A.liftIO (J.read (root ++ "/tests/test-catalog.json"))
+ inventory <- A.liftIO (J.read (root ++ "/tests/golden/unit-inventory.json"))
+ A.right (\message -> message) (C.validate catalog)
+ A.assert (C.sameSet (J.getStrings "groups" catalog) (O.words "language code-generation runtime-library packages-build distribution bootstrap test-infrastructure")) "seven primary groups changed"
  selectionChecks catalog
  batchChecks catalog
  corePartitionChecks catalog
@@ -236,8 +238,8 @@ main = do
  inventoryChecks catalog inventory
  -- Keep the original flat selection contract as a regression alongside the
  -- richer family/projection protocol checks in FamilySelectionChecks.
- expected <- H.right (J.parse "{\"schema_version\":1,\"suites\":{\"sample\":{\"executions\":[\"first\",\"second\"],\"aliases\":{},\"metrics\":{}}}}")
- H.right (Coverage.validateSelection expected "sample" ((:) "first" []) partial)
+ expected <- A.right (\message -> message) (J.parse "{\"schema_version\":1,\"suites\":{\"sample\":{\"executions\":[\"first\",\"second\"],\"aliases\":{},\"metrics\":{}}}}")
+ A.right (\message -> message) (Coverage.validateSelection expected "sample" ((:) "first" []) partial)
  rejected (Coverage.validate expected "sample" partial)
  rejected (Coverage.validateSelection expected "sample" ((:) "first" []) (O.replace "partial" "full" partial))
  rejected (Coverage.validateSelection expected "sample" ((:) "second" []) partial)
@@ -245,4 +247,4 @@ main = do
  rejected (Coverage.validateSelection expected "sample" (O.words "first first") partial)
  rejected (Coverage.validateSelection expected "sample" ((:) "absent" []) partial)
  rejected (Coverage.validateSelection expected "sample" [] partial)
- putStrLn "Test catalog classification and selection contracts passed"
+ A.liftIO (putStrLn "Test catalog classification and selection contracts passed")

@@ -55,7 +55,7 @@ jobs:
           SIZES: ${{ inputs.sizes }}
           REPEATS: ${{ inputs.repeats }}
         run: |
-          python3 -B tools/dev.py bench shapes --prune-build-products \
+          python3 -B tools/testing/run.py compiler-shapes --report .mlf-build/test-framework/compiler-shapes.json -- sweep --prune-build-products \
             --family "$FAMILIES" --size "$SIZES" --repeats "$REPEATS"
       - name: Show the human summary
         if: always()
@@ -72,6 +72,7 @@ jobs:
           include-hidden-files: true
           retention-days: 30
           path: |
+            .mlf-build/test-framework/
             .mlf-build/compiler-shapes/producer/receipt.json
             .mlf-build/compiler-shapes/summary.md
             .mlf-build/compiler-shapes/summary.csv

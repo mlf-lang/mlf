@@ -5,7 +5,6 @@ import qualified Package.OS as O
 import qualified Package.Json as J
 import qualified Tests.Basic as H
 import qualified Tests.Packages as P
-import qualified Tests.BuildScheduler as Scheduler
 
 integration : IO ()
 integration = H.withScratch (\directory -> do
@@ -37,5 +36,4 @@ integration = H.withScratch (\directory -> do
  -- Selecting a dependency never makes another dependency's namespace visible.
  writeFile (directory ++ "/app/Main.emlf") "module Main where\nimport Unrelated\nmain = printInt unused\n"
  P.expect c (O.words "build") false "selected direct dependency"
- Scheduler.integration
  putStrLn "1 target dependency integration test passed")

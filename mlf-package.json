@@ -44,8 +44,7 @@
       "modules": {
         "Tests.IndependentCheck": "tests/shared/Tests/IndependentCheck.hs",
         "Tests.IndependentType": "tests/shared/Tests/IndependentType.hs",
-        "Tests.TupleList": "tests/Tests/TupleList.hs",
-        "Tests.TupleListLegacy": "tests/Tests/TupleListLegacy.hs"
+        "Tests.TupleList": "tests/Tests/TupleList.hs"
       },
       "dependencies": [
         "mlf-crates",
@@ -108,7 +107,8 @@
         "mlf-developer-tools",
         "mlf-foundation",
         "mlf-frontend",
-        "mlf-package-core"
+        "mlf-package-core",
+        "mlf-test"
       ],
       "source-syntax": "shared-haskell-v1"
     },
@@ -136,8 +136,13 @@
         "emlf"
       ],
       "command": [
-        "bash",
-        "{root}/tools/release/test-tuple-list.sh",
+        "python3",
+        "-B",
+        "{root}/tools/testing/run.py",
+        "tuple-list-native",
+        "--report",
+        "{build}/tuple-list-runtime-framework.json",
+        "--",
         "{bin:emlf}",
         "{build}/tuple-list-runtime"
       ]

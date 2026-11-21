@@ -177,12 +177,17 @@ module Tests.Catalog where {
       ensure
         (keys
            (O.words
-              "schema_version granularity groups levels inputs oracles purposes profiles campaigns units families")
+              "schema_version granularity groups levels inputs oracles purposes profiles external_adapters campaigns units families")
            catalog &&
          J.equal (J.get "schema_version" catalog) (J.num 2))
         "invalid test catalog schema";
       ensure (J.equal (J.get "granularity" catalog) (J.str "verified-case-or-family"))
         "unsupported catalog granularity";
+      ensure
+        (stringList (J.get "external_adapters" catalog) &&
+         (S.not (S.null (J.getStrings "external_adapters" catalog)) &&
+          unique (J.getStrings "external_adapters" catalog)))
+        "invalid external adapter inventories";
       S.mapM_
         (\((,) field allowed) ->
            ensure

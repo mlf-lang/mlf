@@ -30,6 +30,9 @@
     },
     "mlf-crates": {
       "path": "../../libraries/mlf-crates"
+    },
+    "mlf-test": {
+      "path": "../../testing"
     }
   },
   "executables": {
@@ -43,7 +46,8 @@
         "mlf-interpreter",
         "mlf-xmlf",
         "mlf-crates",
-        "mlf-language-core"
+        "mlf-language-core",
+        "mlf-test"
       ],
       "modules": {
         "MLF.Tests.ClassDemand": "MLF/Tests/ClassDemand.hs",
@@ -109,7 +113,8 @@
         "mlf-foundation",
         "mlf-inference",
         "mlf-xmlf",
-        "mlf-language-core"
+        "mlf-language-core",
+        "mlf-test"
       ],
       "modules": {
         "Tests.IndependentCheck": "Tests/IndependentCheck.hs",

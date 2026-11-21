@@ -129,7 +129,7 @@ while keeping the two compilers adjacent. `all` prepares, runs and analyzes a
 cohort. A completed cohort can also be analyzed with `bench.py analyze`.
 
 ```sh
-python3 -B tools/performance/compiler-shapes/bench.py all \
+python3 -B tools/testing/run.py compiler-shapes -- all \
   --workdir .mlf-build/compiler-shapes --cohort wide-case-growth --interleave-pairs \
   --family baseline --family wide_case --size 8 --size 32 --size 128
 python3 tools/performance/compiler-shapes/fit_growth.py \

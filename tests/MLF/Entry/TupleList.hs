@@ -7,37 +7,34 @@ module MLF.Entry.TupleList where {
   import Bootstrap.Types;
   import qualified Test.Runner as Runner;
   import qualified Tests.TupleList as TupleList;
-  import qualified Tests.TupleListLegacy as Legacy;
-  -- Preserve the frozen default until executed equivalence is established.
-  -- Opt-in routes share the new leaf registry, never run both implementations.
+
   main :: IO ();
-  main =
-    do {
-      count <- getArgCount;
-      args <- Runner.arguments 0 count;
-      let {
-        matchValueShared1 = args
-      } in
-      case matchValueShared1 of {
-        (:) matchValueShared2 matchValueShared3 ->
-          if MLF.Primitive.eqString matchValueShared2 "--framework"
-          then let {
-                 rest = matchValueShared3
-               } in
-               finish rest
-          else if MLF.Primitive.eqString matchValueShared2 "--framework-list"
-               then let {
-                      rest = matchValueShared3
-                    } in
-                    finish ((:) "--list" rest)
-               else Legacy.main;
-        _ -> Legacy.main
-      }
+  main = do {
+    count <- getArgCount;
+    args <- Runner.arguments 0 count;
+    selected <- case args of {
+      [] -> do {
+        path <- getEnv "MLF_TUPLE_LIST_REPORT";
+        ioReturn (if eqString path "" then [] else (:) "--report" ((:) path []))
+      };
+      _ -> ioReturn (frameworkArgs args)
     };
-  finish :: [] String -> IO ();
-  finish args =
-    do {
-      code <- Runner.run args TupleList.cases;
-      if (code == 0) then ioReturn () else exitWith code
+    code <- Runner.run selected TupleList.cases;
+    if code == 0 then
+      case args of {
+        [] -> putStrLn "Tuple/list focused checks passed.";
+        _ -> ioReturn ()
+      }
+    else exitWith code
+  };
+
+  frameworkArgs :: [] String -> [] String;
+  frameworkArgs args =
+    case args of {
+      (:) flag rest ->
+        if eqString flag "--framework" then rest
+        else if eqString flag "--framework-list" then (:) "--list" rest
+        else args;
+      [] -> []
     }
 }

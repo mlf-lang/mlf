@@ -9,6 +9,7 @@ from pathlib import Path
 import analyze
 import bench
 import command_runner
+import framework_results as framework
 import provenance
 
 
@@ -67,7 +68,7 @@ def measure(folder, setup, row, args, repeats, reference):
     family, size = row['family'], row['size']
     argv = [sys.executable, '-B', bench.HERE / 'run.py', '--output', folder, '--setup', setup,
             '--cohort', folder.name, '--family', family, '--endpoint', args.endpoint,
-            '--repeats', repeats, '--interleave-pairs']
+            '--repeats', repeats, '--interleave-pairs', '--framework-child']
     if size:
         argv += ['--size', size]
     if args.cohort_output_gib is not None:
@@ -202,6 +203,11 @@ def run(args):
     cells = ([('baseline', 0)] if baseline else []) + [(f, n) for f in families for n in sizes]
     if not cells or len(set(cells)) != len(cells):
         raise SystemExit('sweep requires distinct family/size cells')
+    cells, ids = framework.select(cells)
+    if framework.active():
+        framework.events.plan(ids)
+    else:
+        ids = []
     if any((root / name).exists() for name in ('summary.csv', 'summary.md', 'cohorts')):
         raise SystemExit(f'choose a fresh sweep output directory: {root}')
     # Reserve the output before preparing inputs. Concurrent sweeps cannot both
@@ -225,6 +231,8 @@ def run(args):
             for family, size in cells]
     reference = {}
     for row in rows:
+        cell = (row['family'], row['size'])
+        framework.start(ids, cell, endpoint=args.endpoint, repeats=repeats)
         row['status'] = 'running'
         save_tables(root, rows, repeats, args.endpoint)
         folder = root / row['evidence']
@@ -236,6 +244,9 @@ def run(args):
         if args.prune_build_products and row['status'] == 'passed':
             row['pruned_files'], row['pruned_bytes'] = prune_products(folder)
             save_tables(root, rows, repeats, args.endpoint)
+        framework.result(ids, cell, 'pass' if row['status'] == 'passed' else 'fail',
+                         completed_pairs=row['completed_pairs'], lane=row['lane'], reason=row['reason'],
+                         receipt=str(root / row['evidence']))
     print(root / 'summary.md', flush=True)
     if any(row['status'] != 'passed' for row in rows):
         raise SystemExit(1)

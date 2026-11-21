@@ -5,6 +5,9 @@ import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Package.Json as J
 import qualified Tests.Helpers as H
+import qualified Test.Assert as A
+import qualified Test.Case as C
+import qualified Test.Runner as Runner
 import qualified Tests.CoreRegistry as Registry
 import qualified Tests.CorePartitions as Partitions
 import qualified Tests.Modules as Modules
@@ -18,18 +21,18 @@ missing expected actual = S.filter (\name -> S.not (S.elem eqString name actual)
 assertLabels label expected actual = do
   let absent = missing expected actual
   let extra = missing actual expected
-  H.assert (S.eqList eqString expected actual)
+  A.assert (S.eqList eqString expected actual)
     (label ++ ": missing=" ++ H.show absent ++ "; extra=" ++ H.show extra ++
      "; expected count=" ++ showInt (S.length expected) ++
      "; actual count=" ++ showInt (S.length actual) ++
      "; equal sets with differing sequence means order drift")
-  H.assert (S.length actual == S.length (S.nubBy eqString actual)) (label ++ ": duplicate labels")
+  A.assert (S.length actual == S.length (S.nubBy eqString actual)) (label ++ ": duplicate labels")
 
 catalogLabels catalog name = case S.find (\entry -> eqString (J.getText "id" "" entry) name) (J.values (J.get "families" catalog)) of
-  Nothing -> H.fail ("catalog lacks family " ++ name)
+  Nothing -> A.fail ("catalog lacks family " ++ name)
   Just entry -> return (J.strings (J.get "executions" (J.get "evidence" entry)))
 registryLabels name = case S.lookup eqString name Registry.bindings of
-  Nothing -> H.fail ("registry lacks family " ++ name)
+  Nothing -> A.fail ("registry lacks family " ++ name)
   Just entries -> return (S.map S.fst entries)
 checkActual catalog name cases = do
   let actual = S.map S.fst cases
@@ -37,18 +40,18 @@ checkActual catalog name cases = do
   expected <- catalogLabels catalog name
   assertLabels (name ++ " actual versus registry") registered actual
   assertLabels (name ++ " actual versus catalog") expected actual
-  putStrLn ("PASS retained list " ++ name ++ " count=" ++ showInt (S.length actual))
+  A.liftIO (putErr ("PASS retained list " ++ name ++ " count=" ++ showInt (S.length actual) ++ "\n"))
 countTarget catalog name expected = do
   families <- S.mapM (catalogLabels catalog) (Partitions.forTarget name)
   let actual = S.length (S.concat families)
-  H.assert (actual == expected) (name ++ ": expected=" ++ showInt expected ++ "; actual=" ++ showInt actual)
-  putStrLn ("PASS registry/catalog target " ++ name ++ " count=" ++ showInt actual)
+  A.assert (actual == expected) (name ++ ": expected=" ++ showInt expected ++ "; actual=" ++ showInt actual)
+  A.liftIO (putErr ("PASS registry/catalog target " ++ name ++ " count=" ++ showInt actual ++ "\n"))
 
-main : IO ()
-main = do
-  root <- canonicalPath "."
-  catalog <- J.read (root ++ "/tests/test-catalog.json")
-  inventory <- J.read (root ++ "/tests/golden/unit-inventory.json")
+inspect : A.Test ()
+inspect = do
+  root <- A.liftIO (canonicalPath ".")
+  catalog <- A.liftIO (J.read (root ++ "/tests/test-catalog.json"))
+  inventory <- A.liftIO (J.read (root ++ "/tests/golden/unit-inventory.json"))
   S.mapM_ (\((,) family entries) -> do
     expected <- catalogLabels catalog family
     assertLabels (family ++ " registry versus catalog") expected (S.map S.fst entries)) Registry.bindings
@@ -56,17 +59,22 @@ main = do
   let ids = S.concatMap (\((,) _ entries) -> S.map S.snd entries) Registry.bindings
   let golden = J.strings (J.get "executions" (J.get "core" (J.get "suites" inventory)))
   assertLabels "all registered labels versus golden" (S.sortBy compareString golden) (S.sortBy compareString labels)
-  H.assert (S.length labels == 746 && S.length ids == S.length (S.nubBy eqString ids)) "aggregate count or stable ID uniqueness changed"
-  checkActual catalog "core/modules" Modules.moduleTests
-  checkActual catalog "core/separate-compilation" Separate.separateTests
-  checkActual catalog "core/readability" Readability.readabilityTests
+  A.assert (S.length labels == 746 && S.length ids == S.length (S.nubBy eqString ids)) "aggregate count or stable ID uniqueness changed"
+  checkActual catalog "core/modules" Modules.moduleCases
+  checkActual catalog "core/separate-compilation" Separate.separateCases
+  checkActual catalog "core/readability" Readability.readabilityCases
   S.mapM_ (\((,) name cases) -> checkActual catalog name cases) SolverCases.families
-  H.assert (S.length SolverCases.graphTests == 4) "the phase-1 recursive export graph case is missing"
-  H.assert (S.length (S.concatMap S.snd SolverCases.families) == 34) "actual core-solver list did not justify 33 -> 34"
-  H.assert (S.length Modules.moduleTests == 83 && S.length Separate.separateTests == 86) "actual changed module lists did not justify two added checks"
+  A.assert (S.length SolverCases.graphTests == 4) "the phase-1 recursive export graph case is missing"
+  A.assert (S.length (S.concatMap S.snd SolverCases.families) == 34) "actual core-solver list did not justify 33 -> 34"
+  A.assert (S.length Modules.moduleCases == 83 && S.length Separate.separateCases == 86) "actual changed module lists did not justify two added checks"
   countTarget catalog "core-solver" 34
   countTarget catalog "core-language" 384
   countTarget catalog "core-crates" 27
   countTarget catalog "core-modules" 301
-  H.assert (34 + 384 + 27 + 301 == 746) "aggregate runner count derivation changed"
-  putStrLn "PASS discovery: 746 registered/catalog/golden labels, no missing or extra; actual changed lists agree; no test actions executed"
+  A.assert (34 + 384 + 27 + 301 == 746) "aggregate runner count derivation changed"
+
+registryCheck : C.Case
+registryCheck = C.test "recursive-inference/inventory" "746 registered/catalog/golden labels and actual partition lists agree" ((:) "oracle:reviewed-inventory" []) inspect
+
+main : IO ()
+main = Runner.main ((:) registryCheck [])

@@ -64,7 +64,7 @@ def main():
         parser.error('output must be separate from the read-only producer directory')
     output.mkdir(parents=True, exist_ok=False)
     record = {'format': 1, 'complete': False, 'full_native_unit': False,
-              'mode': 'authenticated-O2-recursive-managed-evidence', 'commands': []}
+              'mode': 'authenticated-O2-recursive-managed-evidence', 'commands': [], 'passing_inventory': []}
 
     def save():
         temporary = output / 'receipt.json.new'
@@ -146,6 +146,7 @@ def main():
                                 timeout=getattr(args, name + '_timeout'))
             verify_inventory(result.stdout, expected)
             record[name + '_checks'] = len(expected)
+            record['passing_inventory'].extend(expected)
             save()
 
         authenticate_build(receipt_path, producer_dir / 'bin')

@@ -8,6 +8,7 @@ module Tests.CompilerTests where {
   import Bootstrap.Types;
   import qualified Bootstrap.Std as S;
   import qualified Bootstrap.Map as Map;
+  import qualified Bootstrap.Set as Set;
   import qualified Package.OS as O;
   import qualified Package.Json as J;
   import qualified Package.Build as B;
@@ -20,6 +21,9 @@ module Tests.CompilerTests where {
   import qualified Tests.Catalog as Catalog;
   import qualified Tests.Selection as Selection;
   import qualified Tests.CorePartitions as CorePartitions;
+  import qualified Test.Assert as TestAssert;
+  import qualified Test.Case as TestCase;
+  import qualified Test.Runner as TestRunner;
   -- Build and execute native MLF tests; preserved oracle data and test-only
   -- checking modules remain independent of the candidate compiler.
   data TestContext = TestContext String String String ([] String) String String;
@@ -327,6 +331,39 @@ module Tests.CompilerTests where {
                       String -> [] String -> [] String -> Maybe J.Json -> IO ();
   suiteArgsChecked c target args expectations selected =
     suiteArgsEvidence c target args expectations selected Nothing;
+  caseReport :: String -> IO J.Json;
+  caseReport path =
+    do {
+      text <- readFile path;
+      rows <- case S.mapM J.parse (O.nonempty (O.lines text)) of {
+                Left message -> O.fatal (path ++ (": " ++ message));
+                Right value -> return value
+              };
+      O.require (S.length rows >= 3) (path ++ ": incomplete framework report");
+      let {
+        start = S.head rows;
+        summary = S.head (S.reverse rows);
+        observations = S.take (S.length rows - 2) (S.drop 1 rows);
+        planned = J.getStrings "ids" start;
+        actual = S.map (J.getText "id" "") observations
+      };
+      O.require
+        (eqString (J.getText "event" "" start) "start" &&
+         eqString (J.getText "event" "" summary) "summary" &&
+         S.all (\row -> J.equal (J.get "schema_version" row) (J.num 1)) rows &&
+         J.equal (J.get "complete" summary) (J.Boolean True) &&
+         J.equal (J.get "selected" summary) (J.num (S.length planned)) &&
+         J.equal (J.get "executed" summary) (J.num (S.length actual)) &&
+         J.equal (J.get "failed" summary) (J.num 0) &&
+         Catalog.unique planned && S.eqList eqString planned actual &&
+         S.all (\row -> eqString (J.getText "event" "" row) "case" &&
+                        eqString (J.getText "status" "" row) "passed") observations)
+        (path ++ ": framework report did not pass its exact plan");
+      digest <- fileDigest path;
+      return (J.set "case_report" (J.str path)
+               (J.set "case_report_sha256" (J.str digest)
+                  (J.set "framework_case_ids" (J.stringArray actual) J.empty)))
+    };
   suiteArgsEvidence :: TestContext ->
                        String ->
                        [] String -> [] String -> Maybe J.Json -> Maybe ([] String) -> IO ();
@@ -379,7 +416,16 @@ module Tests.CompilerTests where {
                unsetEnv "MLF_TEST_FAMILY_REPORT";
                return []
              };
-      capture c ((:) binary args) log;
+      let {
+        casePath = output c ++ ("/" ++ (target ++ ".cases.jsonl"));
+        legacyFamilyArgs = case args of { (:) "--families" _ -> True; _ -> False };
+        command = if structural && S.not legacyFamilyArgs then S.append args ((:) "--report" ((:) casePath [])) else args
+      };
+      if structural then do { writeFile casePath ""; setEnv "MLF_TEST_CASE_REPORT" casePath }
+      else unsetEnv "MLF_TEST_CASE_REPORT";
+      capture c ((:) binary command) log;
+      unsetEnv "MLF_TEST_CASE_REPORT";
+      cases <- if structural then caseReport casePath else ioReturn J.empty;
       currentBinaryHash <- fileDigest binary;
       O.require (eqString binaryHash currentBinaryHash)
         (target ++ ": test executable changed during validation");
@@ -444,7 +490,8 @@ module Tests.CompilerTests where {
         (J.set target
            (J.set "binary_sha256" (J.str binaryHash)
               (J.set "log_sha256" (J.str hash)
-                 (J.set "coverage" (J.stringArray expectations) evidence)))
+                 (J.set "coverage" (J.stringArray expectations)
+                    (J.Object (S.append (J.items cases) (J.items evidence))))))
            (J.getObject "suites" saved));
       putStr (O.drop (S.max 0 (stringLength text - 2000)) text)
     };
@@ -500,8 +547,14 @@ module Tests.CompilerTests where {
     do {
       saved <- J.read (report c);
       let {
-        identities = S.map Catalog.identity entries
+        identities = S.map Catalog.identity entries;
+        caseIds = S.concatMap
+          (\target -> J.getStrings "framework_case_ids" (J.get target (J.get "suites" saved)))
+          targets
       };
+      O.require (S.not (S.null caseIds) && Catalog.unique caseIds &&
+                 (S.not full || S.length caseIds == 759))
+        "Core physical registries did not form the reviewed case inventory";
       pieces <-
         S.mapM
           (\target ->
@@ -979,7 +1032,15 @@ module Tests.CompilerTests where {
                  }
              };
              if portFixtures then validatePreparedPortNames c selectedFixtures else ioReturn ();
+             let {
+               casePath = output c ++ ("/" ++ (abi ++ ".cases.jsonl"));
+               trackCases = S.not (eqString unit "") || expectedRows == 12 && S.not portFixtures
+             };
+             if trackCases then do { writeFile casePath ""; setEnv "MLF_TEST_CASE_REPORT" casePath }
+             else unsetEnv "MLF_TEST_CASE_REPORT";
              captureWithin c ((:) binary arguments) log (if portFixtures then 18000 else 14400);
+             unsetEnv "MLF_TEST_CASE_REPORT";
+             cases <- if trackCases then caseReport casePath else ioReturn J.empty;
              if portFixtures then validatePreparedPortNames c selectedFixtures else ioReturn ();
              unsetEnv "MLF_TEST_FAMILY_REPORT";
              if eqString unit ""
@@ -1074,7 +1135,7 @@ module Tests.CompilerTests where {
                  J.set "scope" (J.str (if S.isJust selected then "partial" else "full"))
                    (J.set "backend_names" (J.stringArray backendNames)
                       (J.Object
-                         (S.append (J.items rowEvidence)
+                         (S.append (S.append (J.items cases) (J.items rowEvidence))
                             (J.items
                                (B.info
                                   ((:)
@@ -1118,6 +1179,11 @@ module Tests.CompilerTests where {
   prSmoke c =
     do {
       transports c;
+      nativeTests c (O.words "int-set-unions test-framework figure12 pr-smoke");
+      suite c "figure12"
+        ((:) "43/43 expressions match regression expectations; 0 failures"
+           ((:) "41 distinct Figure12 executions"
+              ((:) "36 supplementary checks; 0 failures" [])));
       unions <- nativeTest c "int-set-unions";
       unionHash <- fileDigest unions;
       suiteArgs c "test-framework"
@@ -1132,11 +1198,7 @@ module Tests.CompilerTests where {
               ((:) ((,) "binary_sha256" (J.str unionHash)) [])));
       binary <- nativeTest c "pr-smoke";
       matrixSuite c binary False 12
-        ((:) "43/43 expressions match regression expectations; 0 failures"
-           ((:) "41 distinct Figure12 executions"
-              ((:) "36 supplementary checks; 0 failures"
-                 ((:) "4 independent target controls; 0 failures"
-                    ((:) "12 PR smoke backend fixtures; 0 failures" [])))));
+        ["4 independent target controls; 0 failures", "12 PR smoke backend fixtures; 0 failures"];
       smokePackage c
     };
   smokePackage :: TestContext -> IO ();
@@ -1507,25 +1569,52 @@ module Tests.CompilerTests where {
   -- The exported corpus prescribes acceptance, rejection phase/diagnostic,
   -- checked target type and (where applicable) exact output for both backends.
   parity :: TestContext -> IO ();
-  parity c =
+  parity c = parityWith c [];
+  parityWith :: TestContext -> [] String -> IO ();
+  parityWith c args =
+    case TestRunner.parse args of {
+      Left message -> O.fatal message;
+      Right options -> if TestRunner.listing options
+        then parityList c args
+        else parityCampaign c args
+    };
+  parityRows path =
     do {
-      checker <- nativeTest c "check-target";
+      source <- readFile path;
+      S.mapM (\line -> case J.parse line of {
+        Left error -> O.fatal error;
+        Right row -> return row
+      }) (O.nonempty (O.lines source))
+    };
+  parityList c args =
+    do {
+      let {
+        archive = root c ++ "/tests/golden/parity-seed.tar.gz";
+        manifest = output c ++ "/frozen-manifest.jsonl"
+      };
+      archiveHash <- fileDigest archive;
+      O.require (eqString archiveHash "ad64708fe76cad0f93af44d39e0a49b86e00b3ccaa621296fc4a43694e902ae8")
+        "frozen parity archive changed";
+      status <- O.exec (root c) ["tar", "-xOf", archive, "manifest.jsonl"] "" manifest (manifest ++ ".stderr") 60;
+      O.require (status == 0) "cannot read the frozen parity inventory";
+      manifestHash <- fileDigest manifest;
+      O.require (eqString manifestHash "c32f9fd7a57dbc9b5d792194ad70a81e62b4d64d5359f433bd65dc9c4072fa2d")
+        "frozen parity inventory changed";
+      rows <- parityRows manifest;
+      O.require (S.length rows == 7086) "preserved parity inventory changed";
+      record c "scope" (J.str "inventory");
+      code <- TestRunner.run args (S.map (\row -> parityEntry row (TestAssert.succeed ())) rows);
+      if code == 0 then return () else exitWith code
+    };
+  parityCampaign c args =
+    do {
+      nativeTests c (O.words "corpus check-target");
       exporter <- nativeTest c "corpus";
       let {
-        corpus = (output c ++ "/corpus")
+        corpus = output c ++ "/corpus"
       };
-      run c ((:) exporter ((:) corpus []));
-      source <- readFile (corpus ++ "/manifest.jsonl");
-      rows <-
-        S.mapM
-          (\line ->
-             case J.parse line of {
-               Left error -> O.fatal error;
-               Right value -> ioReturn value
-             })
-          (O.nonempty (O.lines source));
-      O.require (S.length (S.nubBy eqString (S.map (J.getText "id" "") rows)) == S.length rows)
-        "duplicate parity identities";
+      run c [exporter, corpus];
+      rows <- parityRows (corpus ++ "/manifest.jsonl");
       O.require (S.all (\row -> J.equal (J.get "schema_version" row) (J.num 1)) rows)
         "unsupported parity schema";
       S.mapM_
@@ -1573,64 +1662,175 @@ module Tests.CompilerTests where {
                 (stringLength (O.trim (J.getText "expected_error_contains" "" row)) > 0))))
            moduleRows)
         "module rejection lacks a prescribed phase or diagnostic";
-      flags <- nativeFlags c;
-      compileRuntime c flags False "runtime.o";
-      O.mkdir (output c ++ "/parity");
-      checkCrateCycleOracles c corpus checker rows;
-      shared <- parityLoop c corpus checker flags 0 Map.empty [] rows;
-      O.require
-        ((S.length shared == 11) &&
-         ((S.length (S.filter (\row -> O.starts "hm-generated-" (J.getText "id" "" row)) shared) ==
-           9) &&
-          (S.length (S.filter (\row -> O.starts "figure12-" (J.getText "id" "" row)) shared) == 2)))
-        "parity execution sharing changed";
       let {
-        accepted = S.length (S.filter (J.getBool "expected_accept" False) rows)
-      };
-      let {
-        runtime = S.length (S.filter (J.has "expected_stdout") rows)
+        accepted = S.length (S.filter (J.getBool "expected_accept" False) rows);
+        runtime = S.length (S.filter (J.has "expected_stdout") rows);
+        inventory = S.map (\row -> parityEntry row (TestAssert.succeed ())) rows
       };
       O.require ((S.length rows == 7086) && ((accepted == 3204) && (runtime == 80)))
         "preserved parity coverage changed";
-      hash <- fileDigest (corpus ++ "/manifest.jsonl");
-      let {
-        sourceCompilations = (S.length rows - S.length shared)
-      };
-      let {
-        sharedAccepted = S.length (S.filter (J.getBool "expected_accept" False) shared)
-      };
-      let {
-        details =
-          B.info
-            ((:) ((,) "source_compilations" (J.num sourceCompilations))
-               ((:) ((,) "shared_source_cases" (J.num (S.length shared)))
-                  ((:) ((,) "shared_cases" (J.Array shared))
-                     ((:)
-                        ((,) "independent_target_checks" (J.num ((accepted - sharedAccepted) + 2)))
-                        []))))
-      };
-      record c "parity"
-        (J.Object
-           (S.append (J.items details)
-              (J.items
-                 (B.info
-                    ((:) ((,) "cases" (J.num (S.length rows)))
-                       ((:) ((,) "accepted" (J.num accepted))
-                          ((:) ((,) "rejected" (J.num (S.length rows - accepted)))
-                             ((:) ((,) "runtime_rows" (J.num runtime))
-                                ((:) ((,) "runtime_executions" (J.num (runtime * 2)))
-                                   ((:) ((,) "manifest_sha256" (J.str hash)) []))))))))));
-      putStrLn
-        ("Parity: 7086 cases; " ++
-         (showInt sourceCompilations ++
-          (" source compilations; " ++
-           (showInt (S.length shared) ++ " identical input/oracle cases shared"))))
+      case TestRunner.plan args inventory of {
+        Left message -> O.fatal message;
+        Right ((,) options chosen) -> do {
+          let {
+            full = S.length chosen == S.length rows && S.null (TestRunner.selectors options);
+            selectedIds = Set.fromList compareString (S.map TestCase.id chosen);
+            selected = S.filter
+              (\row -> Set.member compareString (parityIdentity row) selectedIds)
+              rows
+          };
+          do {
+            let {
+              campaignArgs =
+                if eqString (TestRunner.report options) ""
+                then S.append args ((:) "--report" ((:) (output c ++ "/parity-report.jsonl") []))
+                else args
+            };
+            TestRunner.saveReport
+              (case TestRunner.parse campaignArgs of { Left message -> panic message; Right parsed -> parsed })
+              (TestRunner.prefix "start" ++ (TestRunner.selectionFields (S.length rows) (S.length chosen) ++
+                (",\"ids\":" ++ (TestRunner.strings (S.map TestCase.id chosen) ++ "}\n"))));
+            if full then return () else record c "scope" (J.str "partial");
+            O.mkdir (output c ++ "/parity");
+            (,,) targets canonical aliases <- parityPlan c corpus 0 Map.empty Map.empty [] [] selected;
+            if full
+            then O.require
+              (S.length aliases == 11 &&
+               S.length (S.filter (\row -> O.starts "hm-generated-" (J.getText "id" "" row)) aliases) == 9 &&
+               S.length (S.filter (\row -> O.starts "figure12-" (J.getText "id" "" row)) aliases) == 2)
+              "parity execution sharing changed"
+            else return ();
+            checker <- nativeTest c "check-target";
+            checkCrateCycleOracles c corpus checker rows selectedIds;
+            sourceResults <- parityBatch c "compile" (compiler c) "--test-parity-batch" targets;
+            checks <- S.mapM
+              (\target -> do {
+                writeFile (J.getText "stem" "" target ++ ".type") (J.getText "expected_type" "" target);
+                return target
+              })
+              (S.filter (parityShouldCheck sourceResults) targets);
+            checked <- parityBatch c "independent-check" checker "--batch" checks;
+            let {
+              selectedRuntime = S.length (S.filter (J.has "expected_stdout") selected)
+            };
+            flags <-
+              if selectedRuntime == 0 then return [] else do {
+                options <- nativeFlags c;
+                compileRuntime c options False "runtime.o";
+                return options
+              };
+            let {
+              actual = S.map (\row -> parityEntry row
+                (case Map.lookup compareString (parityIdentity row) canonical of {
+                   Nothing -> TestAssert.fail "case has no selected compilation";
+                   Just target -> parityCase c flags row target sourceResults checked
+                 })) rows
+            };
+            status <- TestRunner.run campaignArgs actual;
+            if status == 0 then return () else exitWith status;
+            manifestHash <- fileDigest (corpus ++ "/manifest.jsonl");
+            let {
+              selectedAccepted = S.length (S.filter (J.getBool "expected_accept" False) selected);
+              referenceChecks = S.length (S.filter (J.has "oracle_migration") selected);
+              stats = B.info
+                [ (,) "cases" (J.num (S.length selected))
+                , (,) "accepted" (J.num selectedAccepted)
+                , (,) "rejected" (J.num (S.length selected - selectedAccepted))
+                , (,) "runtime_rows" (J.num selectedRuntime)
+                , (,) "runtime_executions" (J.num (selectedRuntime * 2))
+                , (,) "source_compilations" (J.num (S.length targets))
+                , (,) "shared_source_cases" (J.num (S.length aliases))
+                , (,) "shared_cases" (J.Array aliases)
+                , (,) "independent_target_checks" (J.num (S.length checks + referenceChecks))
+                , (,) "manifest_sha256" (J.str manifestHash)
+                , (,) "case_report" (J.str (if eqString (TestRunner.report options) ""
+                     then output c ++ "/parity-report.jsonl" else TestRunner.report options))
+                ]
+            };
+            record c "parity" stats;
+            if TestRunner.json options then return () else
+              putStrLn ("Parity: " ++ (showInt (S.length selected) ++
+                (" cases; " ++ (showInt (S.length targets) ++
+                  (" source compilations; " ++ (showInt (S.length aliases) ++
+                    " identical input/oracle cases shared"))))))
+          }
+        }
+      }
     };
+  parityIdentity row = "parity/" ++ J.getText "id" "" row;
+  parityEntry row body =
+    TestCase.test (parityIdentity row) (J.getText "label" (parityIdentity row) row)
+      ["family:parity/" ++ J.getText "category" "" row] body;
+  parityPlan c corpus index byInput byId targets aliases rows = case rows of {
+    [] -> return ((,,) (S.reverse targets) byId (S.reverse aliases));
+    (:) row rest -> do {
+      let {
+        shareable = V.canShareParity row;
+        identity = parityIdentity row;
+        path = corpus ++ ("/" ++ J.getText "source_path" "" row)
+      };
+      source <- if shareable then readFile path else return "";
+      let {
+        key = V.parityExecutionKey row source
+      };
+      case if shareable then Map.lookup compareString key byInput else Nothing of {
+        Just target -> do {
+          sourceHash <- fileDigest path;
+          let {
+            alias = B.info
+              [ (,) "id" (J.get "id" row)
+              , (,) "index" (J.num index)
+              , (,) "canonical_id" (J.get "id" target)
+              , (,) "canonical_index" (J.get "index" target)
+              , (,) "source_sha256" (J.str sourceHash)
+              , (,) "expected_accept" (J.get "expected_accept" row)
+              ]
+          };
+          parityPlan c corpus (index + 1) byInput
+            (Map.insert compareString identity target byId) targets ((:) alias aliases) rest
+        };
+        Nothing -> do {
+          let {
+            target = J.set "stem" (J.str (output c ++ ("/parity/" ++ showInt index)))
+              (J.set "index" (J.num index)
+                (J.set "source" (J.str path)
+                  (J.set "include_dirs" (J.stringArray
+                    (S.map (\dir -> corpus ++ ("/" ++ dir)) (J.getStrings "include_dirs" row))) row)));
+            next = if shareable then Map.insert compareString key target byInput else byInput
+          };
+          parityPlan c corpus (index + 1) next (Map.insert compareString identity target byId)
+            ((:) target targets) aliases rest
+        }
+      }
+    }
+  };
+  parityBatch c stage binary flag rows =
+    if S.null rows then return Map.empty else do {
+      let {
+        stem = output c ++ ("/parity/" ++ stage);
+        request = stem ++ ".json"
+      };
+      J.write request (J.Array rows);
+      status <- O.exec (root c) [binary, flag, request] "" (stem ++ ".jsonl") (stem ++ ".stderr") 7200;
+      raw <- readFile (stem ++ ".jsonl");
+      results <- S.mapM (\line -> case J.parse line of {
+        Left message -> O.fatal (stage ++ (": " ++ message));
+        Right result -> return result
+      }) (O.nonempty (O.lines raw));
+      O.require (status == 0) (stage ++ (" batch exited " ++ (showInt status ++ ("; see " ++ stem))));
+      O.require (S.eqList eqString (S.map (J.getText "id" "") rows) (S.map (J.getText "id" "") results))
+        (stage ++ " batch changed, duplicated, or omitted case results");
+      return (Map.fromList compareString (S.map (\row -> (,) (J.getText "id" "" row) row) results))
+    };
+  parityShouldCheck compiled row =
+    J.getBool "expected_accept" False row &&
+      J.equal (J.get "compile_exit"
+        (S.fromMaybe J.empty (Map.lookup compareString (J.getText "id" "" row) compiled))) (J.num 0);
   -- The expected result is a fixed integer literal, never a type obtained from
   -- the candidate. Check both the reference xMLF and every emitted candidate
   -- target against the independently prescribed Int oracle.
-  checkCrateCycleOracles :: TestContext -> String -> String -> [] J.Json -> IO ();
-  checkCrateCycleOracles c corpus checker rows =
+  checkCrateCycleOracles :: TestContext -> String -> String -> [] J.Json -> Set String -> IO ();
+  checkCrateCycleOracles c corpus checker rows selected =
     do {
       O.require (S.length (S.filter (J.has "oracle_migration") rows) == 2)
         "unexpected parity oracle migrations";
@@ -1678,157 +1878,94 @@ module Tests.CompilerTests where {
                  1800;
              O.require (status == 0) "independent crate-cycle reference typing failed"
            })
-        ((:) ((,) "module-reject-000025" "Main -> A -> B -> A")
-           ((:) ((,) "module-reject-000026" "Main -> Main") []))
+        (S.filter (\entry -> Set.member compareString ("parity/" ++ S.fst entry) selected)
+          [ (,) "module-reject-000025" "Main -> A -> B -> A",
+            (,) "module-reject-000026" "Main -> Main" ])
     };
-  parityLoop :: TestContext ->
-                String ->
-                String ->
-                [] String ->
-                Int ->
-                Map String ((,) Int String) -> [] J.Json -> [] J.Json -> IO ([] J.Json);
-  parityLoop c corpus checker flags number seen shared rows =
-    case rows of {
-      [] -> ioReturn (S.reverse shared);
-      (:) row rest ->
-        do {
-          let {
-            shareable = V.canShareParity row
-          };
-          source <-
-            if shareable
-            then readFile (corpus ++ ("/" ++ J.getText "source_path" "" row))
-            else ioReturn "";
-          let {
-            key = V.parityExecutionKey row source
-          };
-          boundValueShared1 <-
-            case if shareable then Map.lookup compareString key seen else Nothing of {
-              Just ((,) canonicalIndex canonicalId) ->
-                do {
-                  sourceHash <- fileDigest (corpus ++ ("/" ++ J.getText "source_path" "" row));
-                  let {
-                    alias =
-                      B.info
-                        ((:) ((,) "id" (J.get "id" row))
-                           ((:) ((,) "index" (J.num number))
-                              ((:) ((,) "canonical_id" (J.str canonicalId))
-                                 ((:) ((,) "canonical_index" (J.num canonicalIndex))
-                                    ((:) ((,) "source_sha256" (J.str sourceHash))
-                                       ((:) ((,) "expected_accept" (J.get "expected_accept" row))
-                                          []))))))
-                  };
-                  ioReturn ((,) seen ((:) alias shared))
-                };
-              Nothing ->
-                do {
-                  parityCase c corpus checker flags number row;
-                  ioReturn
-                    ((,)
-                       (if shareable
-                        then Map.insert compareString key ((,) number (J.getText "id" "" row)) seen
-                        else seen)
-                       shared)
-                }
-            };
-          case boundValueShared1 of {
-            (,) next aliases ->
-              do {
-                if (remInt (number + 1) 100 == 0)
-                then putStrLn ("Parity: " ++ showInt (number + 1))
-                else ioReturn ();
-                parityLoop c corpus checker flags (number + 1) next aliases rest
-              }
-          }
-        }
-    };
-  parityCase :: TestContext -> String -> String -> [] String -> Int -> J.Json -> IO ();
-  parityCase c corpus checker flags number row =
+  parityCase c flags row target sourceResults checked =
+    let {
+      identity = J.getText "id" "" target;
+      stem = J.getText "stem" "" target;
+      compiled = S.fromMaybe J.empty (Map.lookup compareString identity sourceResults);
+      independent = S.fromMaybe J.empty (Map.lookup compareString identity checked);
+      accept = J.getBool "expected_accept" False row
+    } in
     do {
-      let {
-        stem = (output c ++ ("/parity/" ++ showInt number))
-      };
-      let {
-        prefix =
-          S.append
-            ((:) (compiler c)
-               (if J.getBool "no_prelude" False row then (:) "--no-prelude" [] else []))
-            (S.concatMap (\path -> (:) "-i" ((:) (corpus ++ ("/" ++ path)) []))
-               (J.getStrings "include_dirs" row))
-      };
-      let {
-        source = (corpus ++ ("/" ++ J.getText "source_path" "" row))
-      };
-      code <- O.exec (root c) (S.snoc prefix source) "" (stem ++ ".xmlf") (stem ++ ".stderr") 1800;
-      let {
-        accept = J.getBool "expected_accept" False row
-      };
-      error <- readFile (stem ++ ".stderr");
-      O.require (((code == 0) && accept) || ((code == 1) && S.not accept))
-        (J.getText "id" "" row ++ (": acceptance mismatch: " ++ error));
+      error <- TestAssert.liftIO (readFile (stem ++ ".stderr"));
+      TestAssert.assert (J.equal (J.get "compile_exit" compiled) (J.num (if accept then 0 else 1)))
+        ("acceptance mismatch: " ++ error);
       if accept
       then do {
-             writeFile (stem ++ ".type") (J.getText "expected_type" "" row);
-             checked <-
-               O.exec (root c) ((:) checker ((:) (stem ++ ".xmlf") ((:) (stem ++ ".type") [])))
-                 ""
-                 (stem ++ ".check.out")
-                 (stem ++ ".check.err")
-                 1800;
-             O.require (checked == 0) ("independent target check failed: " ++ stem);
-             checked <-
-               O.exec (root c) ((:) (compiler c) ((:) "--check" ((:) (stem ++ ".xmlf") []))) ""
-                 (stem ++ ".self.out")
-                 (stem ++ ".self.err")
-                 1800;
-             O.require (checked == 0) ("candidate target check failed: " ++ stem)
-           }
+        selfError <- TestAssert.liftIO (readFile (stem ++ ".self.err"));
+        independentError <- TestAssert.liftIO (readFile (stem ++ ".check.err"));
+        TestAssert.assert (J.equal (J.get "candidate_check_exit" compiled) (J.num 0))
+          ("candidate target check failed: " ++ selfError);
+        TestAssert.assert (J.equal (J.get "independent_check_exit" independent) (J.num 0))
+          ("independent target check failed: " ++ independentError)
+      }
       else do {
-             target <- readFile (stem ++ ".xmlf");
-             O.require (eqString target "") "rejected input emitted a target";
-             let {
-               phase = J.getText "expected_phase" "" row
-             };
-             let {
-               reason = J.getText "expected_error_contains" "" row
-             };
-             O.require (eqString phase "" || O.starts (phase ++ ":") error)
-               ("wrong rejection phase: " ++ stem);
-             O.require (eqString reason "" || contains reason error)
-               ("wrong rejection diagnostic: " ++ stem)
-           };
+        targetText <- TestAssert.liftIO (readFile (stem ++ ".xmlf"));
+        TestAssert.equal eqString (\text -> text) "rejected input emitted a target" "" targetText;
+        let {
+          phase = J.getText "expected_phase" "" row;
+          reason = J.getText "expected_error_contains" "" row
+        };
+        TestAssert.assert (eqString phase "" || O.starts (phase ++ ":") error)
+          ("wrong rejection phase: " ++ error);
+        TestAssert.assert (eqString reason "" || contains reason error)
+          ("wrong rejection diagnostic: " ++ error)
+      };
       if J.has "expected_stdout" row
       then do {
-             O.require accept "rejected corpus row has runtime expectation";
-             writeFile (stem ++ ".stdin") (J.getText "expected_stdin" "" row);
-             checkOutput c row (S.append prefix ((:) "--run" ((:) source []))) stem
-               "interpreter";
-             generated <-
-               O.exec (root c) (S.append prefix ((:) "--emit-llvm" ((:) source []))) ""
-                 (stem ++ ".ll")
-                 (stem ++ ".llvm.err")
-                 1800;
-             O.require (generated == 0) ("LLVM emission failed: " ++ stem);
-             binary <- O.executable (stem ++ ".native");
-             link c (stem ++ ".ll") ((:) (output c ++ "/runtime.o") []) flags binary [];
-             checkOutput c row ((:) binary []) stem "llvm"
-           }
-      else ioReturn ()
+        TestAssert.assert accept "rejected corpus row has runtime expectation";
+        let {
+          source = J.getText "source" "" target;
+          prefix = S.append
+            (if J.getBool "no_prelude" False row then [compiler c, "--no-prelude"] else [compiler c])
+            (S.concatMap (\path -> ["-i", path]) (J.getStrings "include_dirs" target))
+        };
+        TestAssert.liftIO (writeFile (stem ++ ".stdin") (J.getText "expected_stdin" "" row));
+        interpreter <- TestAssert.liftIO (parityOutput c row (S.append prefix ["--run", source]) stem "interpreter");
+        generated <- TestAssert.liftIO
+          (O.exec (root c) (S.append prefix ["--emit-llvm", source]) "" (stem ++ ".ll") (stem ++ ".llvm.err") 1800);
+        llvm <- if generated == 0
+          then do {
+            binary <- TestAssert.liftIO (O.executable (stem ++ ".native"));
+            linked <- TestAssert.liftIO (O.exec (root c)
+              (S.append (O.words "clang -O2 -Wno-override-module")
+                (S.append [stem ++ ".ll", output c ++ "/runtime.o"] (S.append flags ["-lm", "-o", binary])))
+              "" (stem ++ ".link.out") (stem ++ ".link.err") 1800);
+            if linked == 0 then TestAssert.liftIO (parityOutput c row [binary] stem "llvm")
+            else do {
+              diagnostics <- TestAssert.liftIO (readFile (stem ++ ".link.err"));
+              TestAssert.succeed (Just ("LLVM link failed: " ++ diagnostics))
+            }
+          }
+          else do {
+            diagnostics <- TestAssert.liftIO (readFile (stem ++ ".llvm.err"));
+            TestAssert.succeed (Just ("LLVM emission failed: " ++ diagnostics))
+          };
+        let {
+          errors = S.catMaybes [interpreter, llvm]
+        };
+        TestAssert.assert (S.null errors) (S.intercalate "; " errors)
+      }
+      else TestAssert.succeed ()
     };
-  checkOutput :: TestContext -> J.Json -> [] String -> String -> String -> IO ();
-  checkOutput c row argv stem backend =
+  parityOutput c row argv stem backend =
     do {
-      code <-
-        O.exec (root c) argv (stem ++ ".stdin") (stem ++ ("." ++ (backend ++ ".out")))
-          (stem ++ ("." ++ (backend ++ ".err")))
-          1800;
-      out <- readFile (stem ++ ("." ++ (backend ++ ".out")));
-      err <- readFile (stem ++ ("." ++ (backend ++ ".err")));
-      O.require
-        ((code == 0) &&
-         (eqString out (J.getText "expected_stdout" "" row) &&
-          eqString err (J.getText "expected_stderr" "" row)))
-        (backend ++ (" output/status mismatch: " ++ stem))
+      let {
+        outPath = stem ++ ("." ++ (backend ++ ".out"));
+        errPath = stem ++ ("." ++ (backend ++ ".err"))
+      };
+      code <- O.exec (root c) argv (stem ++ ".stdin") outPath errPath 1800;
+      out <- readFile outPath;
+      err <- readFile errPath;
+      return (if code == 0 && eqString out (J.getText "expected_stdout" "" row) &&
+                 eqString err (J.getText "expected_stderr" "" row)
+              then Nothing
+              else Just (backend ++ (" output/status mismatch (" ++
+                 (showInt code ++ ("); see " ++ (outPath ++ (" and " ++ errPath)))))))
     };
   findArtifact :: String -> String -> [] String -> IO String;
   findArtifact hash cache names =
@@ -1853,6 +1990,36 @@ module Tests.CompilerTests where {
           else findArtifact hash cache rest
         }
     };
+  selfHostEvents :: TestContext -> String;
+  selfHostEvents c = output c ++ "/self-host.events.jsonl";
+  selfHostEvent :: TestContext -> J.Json -> IO ();
+  selfHostEvent c event =
+    do {
+      suite <- getEnv "MLF_TEST_SUITE";
+      path <- getEnv "MLF_TEST_EVENTS";
+      let {
+        append = \target -> do {
+          present <- fileExists target;
+          previous <- if present then readFile target else ioReturn "";
+          writeFile target (previous ++ (J.render event ++ "\n"))
+        }
+      };
+      append (selfHostEvents c);
+      if eqString suite "self-host-native" && S.not (eqString path "")
+      then append path
+      else ioReturn ()
+    };
+  selfHostId :: String -> String;
+  selfHostId name = "self-host/posix/" ++ name;
+  selfHostStart :: TestContext -> String -> IO ();
+  selfHostStart c identity =
+    selfHostEvent c (B.info ((:) ((,) "start" (J.str (selfHostId identity))) []));
+  selfHostObservation :: TestContext -> String -> Bool -> J.Json -> IO ();
+  selfHostObservation c identity passed detail =
+    selfHostEvent c
+      (B.info ((:) ((,) "id" (J.str (selfHostId identity)))
+        ((:) ((,) "status" (J.str (if passed then "pass" else "fail")))
+          ((:) ((,) "detail" detail) []))));
   selfHost :: TestContext -> IO ();
   -- A shared store can contain equal native binaries from different LLVM
   -- inputs. Select the candidate's actual producer, not the first hash match.
@@ -1861,10 +2028,13 @@ module Tests.CompilerTests where {
       let {
         manager = packageManager c
       };
+      writeFile (selfHostEvents c) "";
+      selfHostStart c "candidate-provenance";
       hash <- fileDigest (compiler c);
       producer <-
         O.envDefault "MLF_BUILD_REPORT" (O.parent (O.parent (compiler c)) ++ "/build-report.json");
       present <- fileExists producer;
+      if present then ioReturn () else selfHostObservation c "candidate-provenance" False (J.str producer);
       O.require present "candidate package build report is missing";
       let {
         provenance = (output c ++ "/candidate-build-report.json")
@@ -1873,10 +2043,13 @@ module Tests.CompilerTests where {
       produced <- J.read provenance;
       graph <- M.load (root c ++ "/mlf-package.json");
       snapshot <- M.snapshot graph;
-      O.require
-        (eqString (J.getText "implementation" "" produced) "MLF" &&
-         J.equal snapshot (J.get "packages" produced))
-        "candidate build source provenance differs";
+      let {
+        authentic = J.getBool "complete" False produced &&
+          eqString (J.getText "implementation" "" produced) "MLF" &&
+          J.equal snapshot (J.get "packages" produced)
+      };
+      if authentic then ioReturn () else selfHostObservation c "candidate-provenance" False (J.str provenance);
+      O.require authentic "candidate build source provenance differs";
       let {
         cache = J.getText "cache_directory" (sharedCache c) produced
       };
@@ -1895,6 +2068,9 @@ module Tests.CompilerTests where {
               ((:) ((,) "key" (J.str (O.relative cache original)))
                  ((:) ((,) "build_report" (J.str provenance))
                     ((:) ((,) "build_report_sha256" (J.str provenanceHash)) [])))));
+      selfHostObservation c "candidate-provenance" True
+        (B.info ((:) ((,) "compiler_sha256" (J.str hash)) ((:) ((,) "build_report_sha256" (J.str provenanceHash)) [])));
+      selfHostStart c "native-toolchain";
       stamp <- J.read (original ++ "/artifact.json");
       let {
         inputs = J.get "inputs" stamp
@@ -1915,7 +2091,10 @@ module Tests.CompilerTests where {
         cc = J.get "clang" toolchain
       };
       ccHash <- fileDigest (J.getText "path" "" cc);
-      O.require (eqString ccHash (J.getText "sha256" "" cc)) "self-host native compiler changed";
+      let { sameClang = eqString ccHash (J.getText "sha256" "" cc) };
+      selfHostObservation c "native-toolchain" sameClang
+        (B.info ((:) ((,) "clang_sha256" (J.str ccHash)) ((:) ((,) "native_pgo" profile) [])));
+      O.require sameClang "self-host native compiler changed";
       let {
         profileArgs =
           if S.null (J.items profile)
@@ -1929,39 +2108,66 @@ module Tests.CompilerTests where {
       let {
         next = (output c ++ "/next-stage")
       };
+      selfHostStart c "fresh-rebuild";
       O.remove next;
       let {
         argv =
           (:) manager
-            ((:) "--timeout"
-               ((:) "21600"
-                  ((:) "--compiler"
-                     ((:) (compiler c)
-                        ((:) "--build-dir"
-                           ((:) next (S.append nativeArgs (O.words "build --target emlf"))))))))
+            (S.append (O.words "--timeout 21600 --compiler")
+             ((:) (compiler c)
+                ((:) "--build-dir"
+                   ((:) next
+                      ((:) "--cache-dir"
+                         ((:) (next ++ "/cache") (S.append nativeArgs (O.words "build --target emlf"))))))))
       };
       putStrLn ("+ " ++ S.intercalate " " argv);
       code <- O.exec (root c) argv "" "" "" 21600;
+      if code == 0 then ioReturn () else selfHostObservation c "fresh-rebuild" False
+        (B.info ((:) ((,) "exit_code" (J.num code)) []));
       O.require (code == 0) ("self-host compiler build failed (" ++ (showInt code ++ ")"));
       saved <- J.read (next ++ "/build-report.json");
-      O.require (J.getBool "complete" False saved) "next-stage package build incomplete";
+      let { complete = J.getBool "complete" False saved };
+      if complete then ioReturn () else selfHostObservation c "fresh-rebuild" False (J.str (next ++ "/build-report.json"));
+      O.require complete "next-stage package build incomplete";
       let {
         row =
           S.fromMaybe (panic "missing next compiler artifact")
             (S.find (\row -> eqString (J.getText "kind" "" row) "executable mlf-compiler:emlf")
                (J.values (J.get "builds" saved)))
       };
-      O.require (S.not (J.getBool "cached" True row)) "next compiler reused a previous build";
+      let { fresh = S.not (J.getBool "cached" True row) };
+      selfHostObservation c "fresh-rebuild" fresh
+        (B.info ((:) ((,) "build_report" (J.str (next ++ "/build-report.json"))) ((:) ((,) "cached" (J.get "cached" row)) [])));
+      O.require fresh "next compiler reused a previous build";
+      selfHostStart c "producer-chain";
+      managerHash <- fileDigest manager;
+      let {
+        producedBy = J.get "toolchain" saved;
+        bound = eqString hash (J.getText "sha256" "" (J.get "compiler" producedBy)) &&
+          eqString managerHash (J.getText "sha256" "" (J.get "manager" producedBy))
+      };
+      selfHostObservation c "producer-chain" bound producedBy;
+      O.require bound "next stage did not use the selected compiler and manager";
       let {
         ir = (next ++ ("/cache/" ++ (J.getText "key" "" row ++ "/program.ll")))
       };
+      selfHostStart c "llvm-fixed-point";
       old <- fileDigest (original ++ "/program.ll");
       new <- fileDigest ir;
-      O.require (eqString old new) "package self-build did not reach an LLVM fixed point";
+      let { llvmFixed = eqString old new };
+      selfHostObservation c "llvm-fixed-point" llvmFixed
+        (B.info ((:) ((,) "candidate_sha256" (J.str old)) ((:) ((,) "rebuilt_sha256" (J.str new)) [])));
+      O.require llvmFixed "package self-build did not reach an LLVM fixed point";
+      selfHostStart c "binary-fixed-point";
       binary <- fileDigest (next ++ "/bin/emlf");
-      O.require (eqString hash binary)
-        "package self-build did not reach a native binary fixed point";
       B.verifyPgo profile;
+      let { binaryFixed = eqString hash binary };
+      selfHostObservation c "binary-fixed-point" binaryFixed
+        (B.info ((:) ((,) "candidate_sha256" (J.str hash)) ((:) ((,) "rebuilt_sha256" (J.str binary)) [])));
+      O.require binaryFixed "package self-build did not reach a native binary fixed point";
+      eventsHash <- fileDigest (selfHostEvents c);
+      record c "self_host_cases"
+        (B.info ((:) ((,) "path" (J.str (selfHostEvents c))) ((:) ((,) "sha256" (J.str eventsHash)) [])));
       record c "native_pgo" profile;
       record c "fixed_point"
         (B.info
@@ -2148,7 +2354,9 @@ module Tests.CompilerTests where {
                          let {
                            flag = matchValueShared3
                          } in
-                         if Catalog.selector flag
+                         if eqString flag "--compiler-receipt"
+                         then options (J.set "compiler-receipt" (J.str value) configured) rest
+                         else if Catalog.selector flag
                          then do {
                                 next <-
                                   case Catalog.option configured flag value of {
@@ -2163,6 +2371,49 @@ module Tests.CompilerTests where {
               _ -> ioReturn ((,) configured remaining)
             }
           }
+      }
+    };
+  parityArguments args = case args of {
+    [] -> (,) [] [];
+    (:) "--list" rest -> case parityArguments rest of {
+      (,) config testArgs -> (,) config ((:) "--list" testArgs)
+    };
+    (:) flag ((:) value rest) -> case parityArguments rest of {
+      (,) config testArgs ->
+        if S.elem eqString flag (O.words "--exact --filter --tag --format --report")
+        then (,) config ((:) flag ((:) value testArgs))
+        else (,) ((:) flag ((:) value config)) testArgs
+    };
+    _ -> (,) args []
+  };
+  parityProducer c hash settings =
+    do {
+      identity <- query c [compiler c, "--implementation-identity"];
+      let {
+        path = J.getText "compiler-receipt" "" settings
+      };
+      if eqString path ""
+      then record c "parity_producer"
+        (B.info [(,) "identity" (J.str (O.trim identity)), (,) "compiler_sha256" (J.str hash)])
+      else do {
+        receipt <- J.read path;
+        let {
+          product = J.getObject "emlf" (J.getObject "outputs" receipt)
+        };
+        O.require (eqString (O.trim identity) "MLF/shared-haskell-v1 GHC" &&
+          J.getBool "complete" False receipt && S.not (J.getBool "typecheck_only" True receipt) &&
+          eqString (J.getText "producer_host" "" receipt) "GHC" &&
+          eqString (J.getText "optimization" "" receipt) "0" &&
+          eqString (J.getText "sha256" "" product) hash &&
+          eqString (J.getText "path" "" product) (compiler c))
+          "parity requires an authenticated GHC -O0 compiler";
+        receiptHash <- fileDigest path;
+        record c "parity_producer" (B.info
+          [ (,) "identity" (J.str (O.trim identity))
+          , (,) "compiler_sha256" (J.str hash)
+          , (,) "optimization" (J.str "0")
+          , (,) "build_receipt_sha256" (J.str receiptHash)
+          ])
       }
     };
   main :: [] String -> IO ();
@@ -2184,7 +2435,10 @@ module Tests.CompilerTests where {
                group = matchValueShared12
              } in
              do {
-               boundValueShared10 <- options J.empty rest;
+               let {
+                 split = if eqString group "parity" then parityArguments rest else (,) rest []
+               };
+               boundValueShared10 <- options J.empty (S.fst split);
                case boundValueShared10 of {
                  (,) settings remaining ->
                    do {
@@ -2319,7 +2573,10 @@ module Tests.CompilerTests where {
                                                 else if eqString group "pr-smoke"
                                                      then prSmoke c
                                                      else if eqString group "parity"
-                                                          then parity c
+                                                          then do {
+                                                            parityProducer c hash settings;
+                                                            parityWith c (S.snd split)
+                                                          }
                                                           else if O.starts "port-prepare-" group
                                                                then do {
                                                                       binary <- nativeTest c "port";
@@ -2344,7 +2601,10 @@ module Tests.CompilerTests where {
                      O.require (eqString buildRunnerHash currentBuildRunner)
                        "build runner changed during validation";
                      record c "complete" (J.Boolean True);
-                     putStrLn ("Compiler package " ++ (group ++ " passed"))
+                     if eqString group "parity" &&
+                       (case TestRunner.parse (S.snd split) of { Left _ -> False; Right options -> TestRunner.json options })
+                     then return ()
+                     else putStrLn ("Compiler package " ++ (group ++ " passed"))
                    }
                }
              };

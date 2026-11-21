@@ -1,4 +1,5 @@
 module Tests.Modules where
+import qualified Test.Assert as A
 import Bootstrap.Types
 import qualified Bootstrap.Dependency as Dependency
 import qualified Bootstrap.IndexVec as V
@@ -21,7 +22,8 @@ import qualified Tests.IndependentType as IndependentType
 import Bootstrap.X.Pretty (prettyTerm)
 import Tests.System
 import qualified Package.OS as O
-import Prelude hiding (listDirectory)
+import Prelude hiding (listDirectory, Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
 
 data ModuleRejection = ModuleRejection String ([] ((,) String String)) String Phase String
 sources : [] ((,) String String) -> Map String ((,) (String) (String))
@@ -30,8 +32,11 @@ sources = (S.compose Map.fromList (S.map (\((,) n s) -> ((,) n ((,) (H.append n 
 build : PreludeMode -> [] ((,) String String) -> String -> Either CompileError Compilation
 build mode libraries = (compileModulesWithPrelude mode (sources libraries) "Main.emlf")
 
+assertModule : PreludeMode -> [] ((,) String String) -> String -> A.Test Compilation
+assertModule mode libraries input = do { result <- (A.right H.show (build mode libraries input)); do { parsed <- (A.right H.show (XP.parseTerm "<module xMLF>" (prettyTerm (compiledTerm result)))); do { ty <- (A.right H.show (C.checkClosed parsed)); do { (A.assert (T.alphaEq ty (inferredType result)) "module target round trip changed type"); do { (A.assert (H.eq (X.erase parsed) (X.erase (compiledTerm result))) "module target round trip changed erasure"); (return result) } } } } }
+
 checkModule : PreludeMode -> [] ((,) String String) -> String -> IO Compilation
-checkModule mode libraries input = do { result <- (H.right (build mode libraries input)); do { parsed <- (H.right (XP.parseTerm "<module xMLF>" (prettyTerm (compiledTerm result)))); do { ty <- (H.right (C.checkClosed parsed)); do { (H.assert (T.alphaEq ty (inferredType result)) "module target round trip changed type"); do { (H.assert (H.eq (X.erase parsed) (X.erase (compiledTerm result))) "module target round trip changed erasure"); (return result) } } } } }
+checkModule mode libraries input = A.orExit (assertModule mode libraries input)
 
 -- Type-only fixtures never enter modulePrograms or a runtime campaign. The
 -- unsigned cycle below preserves the former rejection's exact divergent source.
@@ -54,24 +59,24 @@ qualifiedRecursiveModuleTyping = ModuleTyping "cross-module qualified recursion 
     [])))))
     "module Main where\nimport qualified A\nimport qualified B\nmain = let first : Bool = A.f 0 in (B.g true :: Bool)\n" (XCon "Bool" [])
 
-checkTypedModuleTarget : XType -> XTerm -> IO ()
-checkTypedModuleTarget expected term = do
-  current <- H.right (C.checkClosed term)
-  frozen <- H.right (Independent.checkClosed term)
-  H.assert (IndependentType.alphaEq current expected) "module current target has wrong prescribed type"
-  H.assert (IndependentType.alphaEq frozen expected) "module independent target has wrong prescribed type"
-  decoded <- H.right (XP.parseTerm "<type-only module xMLF>" (prettyTerm term))
-  currentRoundtrip <- H.right (C.checkClosed decoded)
-  frozenRoundtrip <- H.right (Independent.checkClosed decoded)
-  H.assert (IndependentType.alphaEq currentRoundtrip expected) "module current roundtrip has wrong prescribed type"
-  H.assert (IndependentType.alphaEq frozenRoundtrip expected) "module independent roundtrip has wrong prescribed type"
-  H.assert (X.equalErased (X.erase term) (X.erase decoded)) "module type-only roundtrip changed erasure"
+assertTypedModuleTarget : XType -> XTerm -> A.Test ()
+assertTypedModuleTarget expected term = do
+  current <- A.right H.show (C.checkClosed term)
+  frozen <- A.right H.show (Independent.checkClosed term)
+  A.assert (IndependentType.alphaEq current expected) "module current target has wrong prescribed type"
+  A.assert (IndependentType.alphaEq frozen expected) "module independent target has wrong prescribed type"
+  decoded <- A.right H.show (XP.parseTerm "<type-only module xMLF>" (prettyTerm term))
+  currentRoundtrip <- A.right H.show (C.checkClosed decoded)
+  frozenRoundtrip <- A.right H.show (Independent.checkClosed decoded)
+  A.assert (IndependentType.alphaEq currentRoundtrip expected) "module current roundtrip has wrong prescribed type"
+  A.assert (IndependentType.alphaEq frozenRoundtrip expected) "module independent roundtrip has wrong prescribed type"
+  A.assert (X.equalErased (X.erase term) (X.erase decoded)) "module type-only roundtrip changed erasure"
 
-checkModuleTyping : ModuleTyping -> (,) String (IO ())
+checkModuleTyping : ModuleTyping -> (,) String (A.Test ())
 checkModuleTyping (ModuleTyping name libraries source expected) = (,) ("modules typing: " ++ name) do
-  result <- checkModule ImplicitPrelude libraries source
-  H.assert (IndependentType.alphaEq (inferredType result) expected) "module inference has wrong prescribed type"
-  checkTypedModuleTarget expected (compiledTerm result)
+  result <- assertModule ImplicitPrelude libraries source
+  A.assert (IndependentType.alphaEq (inferredType result) expected) "module inference has wrong prescribed type"
+  assertTypedModuleTarget expected (compiledTerm result)
 
 numbers : [] ((,) String String)
 numbers = ((:) ((,) "Math.Numbers" (S.unlines ((:) "module Math.Numbers (inc, twice, factorial) where" ((:) "inc x = x + 1" ((:) "twice f x = f (f x)" ((:) "factorial : Int -> Int" ((:) "factorial 0 = 1" ((:) "factorial n = n * factorial (n-1)" ((:) "private = 99" []))))))))) [])
@@ -119,8 +124,8 @@ cyclicModulePrograms = (:)
 
 legacyModulePrograms = ((:) (Quint "selective and qualified imports" ImplicitPrelude numbers (S.unlines ((:) "module Main (main) where" ((:) "import Math.Numbers (inc)" ((:) "import qualified Math.Numbers as N (twice, factorial)" ((:) "main = do" ((:) "  printInt (N.twice inc 40)" ((:) "  printInt (N.factorial 6)" []))))))) "42\n720\n") ((:) (Quint "unnamed entry expression imports" ImplicitPrelude numbers "import Math.Numbers hiding (twice, factorial)\nprintInt (Math.Numbers.inc 41)\n" "42\n") ((:) (Quint "qualified types, fields and nested patterns" ImplicitPrelude box (S.unlines ((:) "module Main where" ((:) "import qualified Data.Box as B" ((:) "data Wrapped = Wrapped (B.Box Int)" ((:) "read : Wrapped -> Int" ((:) "read (Wrapped (B.Box x)) = x" ((:) "main = printInt (read (Wrapped (B.Box 42)))" []))))))) "42\n") ((:) (Quint "private names and constructor identities" ImplicitPrelude ((:) ((,) "A" "module A (Box(..), get) where\ndata Box = Box Int\nhelper x = x + 1\nget (Box x) = helper x\n") ((:) ((,) "B" "module B (Box(..), get) where\ndata Box = Box Int\nhelper x = x * 2\nget (Box x) = helper x\n") [])) "module Main where\nimport qualified A\nimport qualified B\nmain = printInt (A.get (A.Box 20) + B.get (B.Box 10))\n" "41\n") ((:) (Quint "diamond reexports preserve identity" ImplicitPrelude (H.append numbers ((:) ((,) "Left" "module Left (module N) where\nimport Math.Numbers as N\n") ((:) ((,) "Right" "module Right (inc) where\nimport Math.Numbers (inc)\n") []))) "module Main where\nimport Left\nimport Right\nmain = printInt (inc 41)\n" "42\n") ((:) (Quint "transitive empty imports carry instances and private helpers" ImplicitPrelude rendering "module Main where\nimport Facade\nmain = putStrLn (render 41)\n" "number: 42\n") ((:) (Quint "qualified class, hidden methods in instance declaration" ImplicitPrelude ((:) ((,) "Convert" "module Convert (Convert(convert)) where\nclass Convert a b where\n  convert : a -> b\n") ((:) ((,) "Conversions" (S.unlines ((:) "module Conversions () where" ((:) "import qualified Convert as C (Convert)" ((:) "instance C.Convert Int String where" ((:) "  convert = showInt" [])))))) [])) "module Main where\nimport qualified Convert as C\nimport Conversions ()\nmain = putStrLn (C.convert 42)\n" "42\n") ((:) (Quint "abstract datatype used by exported functions" ImplicitPrelude ((:) ((,) "Secret" "module Secret (Secret, make, reveal) where\ndata Secret = Secret Int\nmake = Secret\nreveal (Secret x) = x\n") []) "module Main where\nimport Secret\nanswer : Secret\nanswer = make 42\nmain = printInt (reveal answer)\n" "42\n") ((:) (Quint "local shadowing and self qualification" ImplicitPrelude numbers (S.unlines ((:) "module Main where" ((:) "import Math.Numbers (inc)" ((:) "answer = 42" ((:) "f inc = inc Main.answer" ((:) "main = printInt (let answer = 0 in f (\\x -> x))" [])))))) "42\n") ((:) (Quint "explicit qualified Prelude" ImplicitPrelude [] (S.unlines ((:) "module Main where" ((:) "import qualified Prelude as P" ((:) "main : P.IO ()" ((:) "main = P.bind (P.return 42) P.printInt" []))))) "42\n") ((:) (Quint "explicit Prelude with implicit import disabled" NoImplicitPrelude [] "module Main where\nimport Prelude (Monad(..), printInt)\nmain = do\n  x <- return 42\n  printInt x\n" "42\n") ((:) (Quint "hiding Prelude method for local definition" ImplicitPrelude [] "module Main where\nimport Prelude hiding (return)\nreturn x = x\nmain = do\n  printInt (return 42)\n  putStrLn \"done\"\n" "42\ndone\n") ((:) (Quint "module lexical scope protects imported do" ImplicitPrelude ((:) ((,) "Actions" "module Actions (action) where\naction = do\n  x <- return 42\n  printInt x\n") []) "module Main where\nimport Actions\nimport Prelude hiding (bind, return)\nbind x = x\nreturn x = 0\nmain = action\n" "42\n") ((:) (Quint "polymorphic Monad function across modules" ImplicitPrelude ((:) ((,) "Repeat" (S.unlines ((:) "module Repeat (twice) where" ((:) "twice : forall (m : * -> *) a. Monad m => m a -> m a" ((:) "twice action = do" ((:) "  action" ((:) "  action" []))))))) []) "module Main where\nimport Repeat\nmain = twice (putStrLn \"again\")\n" "again\nagain\n") ((:) (Quint "qualified Boolean constructor patterns" ImplicitPrelude [] "module Main where\nimport qualified Prelude as P\nmain = P.printInt (case P.True of\n  P.True -> 42\n  P.False -> 0)\n" "42\n") ((:) (Quint "internal name hygiene" ImplicitPrelude ((:) ((,) "A" "module A (moduleEntity0) where\nmoduleEntity0 moduleEntity1 = moduleEntity1 + 1\n") []) "module Main where\nimport A\nmoduleEntity2 = 41\nmain = printInt (moduleEntity0 moduleEntity2)\n" "42\n") ((:) (Quint "same method name from distinct classes" ImplicitPrelude ((:) ((,) "A" "module A where\nclass Show a where\n  show : a -> String\ninstance Show Int where\n  show = showInt\n") ((:) ((,) "B" "module B where\nclass Show a where\n  show : a -> String\ninstance Show Bool where\n  show b = if b then \"yes\" else \"no\"\n") [])) "module Main where\nimport qualified A\nimport qualified B\nmain = do\n  putStrLn (A.show 42)\n  putStrLn (B.show true)\n" "42\nyes\n") ((:) (Quint "instance may recursively use an exported helper" ImplicitPrelude ((:) ((,) "Count" (S.unlines ((:) "module Count (Count(..)) where" ((:) "class Count a where" ((:) "  count : a -> Int" ((:) "instance Count Int where" ((:) "  count = sumDown" ((:) "sumDown : Int -> Int" ((:) "sumDown 0 = 0" ((:) "sumDown n = n + sumDown (n-1)" [])))))))))) []) "module Main where\nimport Count\nmain = printInt (count 8)\n" "36\n") ((:) (Quint "bare primitive fallback without implicit Prelude" NoImplicitPrelude [] "module Main where\nmain = do\n  x <- ioReturn 42\n  printInt x\n" "42\n") ((:) (Quint "entry selects its own main" ImplicitPrelude ((:) ((,) "A" "module A where\nmain = printInt 0\nanswer = 42\n") []) "module Main where\nimport A\nmain = printInt answer\n" "42\n") ((:) (Quint "primitive fallback permits local definitions" NoImplicitPrelude [] "module Main where\naddInt x y = x - y\nmain = printInt (addInt 43 1)\n" "42\n") [])))))))))))))))))))))
 
-rejects : ModuleRejection -> (,) String (IO ())
-rejects (ModuleRejection label libraries input expected reason) = ((,) (H.append "modules rejection: " label) (case (build ImplicitPrelude libraries input) of { (Left err) -> (H.assert ((H.eq (phase err) expected) && (H.contains reason (diagnostic err))) (H.show err)); (Right result) -> (H.fail (H.append "unexpected acceptance: " (sourceType result))) }))
+rejects : ModuleRejection -> (,) String (A.Test ())
+rejects (ModuleRejection label libraries input expected reason) = ((,) (H.append "modules rejection: " label) (case (build ImplicitPrelude libraries input) of { (Left err) -> (A.assert ((H.eq (phase err) expected) && (H.contains reason (diagnostic err))) (H.show err)); (Right result) -> (A.fail (H.append "unexpected acceptance: " (sourceType result))) }))
 
 moduleRejections : ([] ( ModuleRejection ))
 moduleRejections = S.append legacyModuleRejections cyclicModuleRejections
@@ -143,68 +148,71 @@ cyclicModuleRejections = (:)
 
 legacyModuleRejections = ((:) (ModuleRejection "private function" numbers "module Main where\nimport Math.Numbers\nmain = private\n" ModuleResolution "not in scope: private") ((:) (ModuleRejection "qualified private function" numbers "module Main where\nimport qualified Math.Numbers as N\nmain = N.private\n" ModuleResolution "not in scope: N.private") ((:) (ModuleRejection "selected imports exclude others" numbers "import Math.Numbers (inc)\nfactorial 6" ModuleResolution "not in scope: factorial") ((:) (ModuleRejection "qualified-only is not unqualified" numbers "import qualified Math.Numbers\ninc 1" ModuleResolution "not in scope: inc") ((:) (ModuleRejection "alias replaces qualified module name" numbers "import Math.Numbers as N\nMath.Numbers.inc 1" ModuleResolution "not in scope: Math.Numbers.inc") ((:) (ModuleRejection "hiding also affects qualification" numbers "import Math.Numbers hiding (inc)\nMath.Numbers.inc 1" ModuleResolution "not in scope: Math.Numbers.inc") ((:) (ModuleRejection "unknown import selection" numbers "import Math.Numbers (missing)\n42" ModuleResolution "not in scope: missing") ((:) (ModuleRejection "unknown hidden name" numbers "import Math.Numbers hiding (missing)\n42" ModuleResolution "not in scope: missing") ((:) (ModuleRejection "private constructor" ((:) ((,) "A" "module A (Box, make) where\ndata Box = Box Int\nmake = Box\n") []) "import A\nBox 42" ModuleResolution "not in scope: Box") ((:) (ModuleRejection "type-only selective import" box "import Data.Box (Box)\nBox 42" ModuleResolution "not in scope: Box") ((:) (ModuleRejection "member belongs to selected type" box "import Data.Box (Box(Other))\n42" ModuleResolution "not a visible member") ((:) (ModuleRejection "private type annotation" ((:) ((,) "A" "module A (make) where\ndata Box = Box Int\nmake = Box\n") []) "import A\n(make 42 :: Box)" ModuleResolution "not in scope: Box") ((:) (ModuleRejection "hidden members cannot be reexported" ((:) ((,) "A" "module A (Box) where\ndata Box = Box Int\n") ((:) ((,) "B" "module B (Box(..)) where\nimport A\n") [])) "import B\nBox 42" ModuleResolution "not in scope: Box") ((:) (ModuleRejection "default exports exclude imports" ((:) ((,) "A" "module A where\nx = 1\n") ((:) ((,) "B" "module B where\nimport A\ny = x\n") [])) "import B\nx" ModuleResolution "not in scope: x") ((:) (ModuleRejection "transitive names are not imported" rendering "import Facade\nprefix" ModuleResolution "not in scope: prefix") ((:) (ModuleRejection "distinct imports are ambiguous" ((:) ((,) "A" "module A where\nx = 1\n") ((:) ((,) "B" "module B where\nx = 2\n") [])) "import A\nimport B\nx" ModuleResolution "ambiguous name x") ((:) (ModuleRejection "top-level import collision requires hiding" ((:) ((,) "A" "module A where\nx = 1\n") []) "module Main where\nimport A\nx = 2\nmain = x\n" ModuleResolution "ambiguous name x") ((:) (ModuleRejection "explicit reexport conflict" ((:) ((,) "A" "module A where\nx = 1\n") ((:) ((,) "B" "module B where\nx = 2\n") ((:) ((,) "Both" "module Both (A.x, B.x) where\nimport qualified A\nimport qualified B\n") []))) "import Both\n42" ModuleResolution "conflicting declarations or exports") ((:) (ModuleRejection "unknown module reexport" [] "module Main (module Missing) where\nmain = 42\n" ModuleResolution "unimported module") ((:) (ModuleRejection "qualified-only module reexport has no unqualified names" ((:) ((,) "A" "module A where\nx = 1\n") ((:) ((,) "B" "module B (module A) where\nimport qualified A\n") [])) "import B\nx" ModuleResolution "not in scope: x") ((:) (ModuleRejection "empty exports" ((:) ((,) "A" "module A () where\nx = 1\n") []) "import A\nx" ModuleResolution "not in scope: x") ((:) (ModuleRejection "missing module" [] "import Missing\n42" ModuleResolution "cannot find module Missing") ((:) (ModuleRejection "mismatched module header" ((:) ((,) "A" "module B where\nx = 1\n") []) "import A\n42" ModuleResolution "expected module A, found B") ((:) (ModuleRejection "unnamed library" ((:) ((,) "A" "x = 1\nmain = x\n") []) "import A\n42" ModuleResolution "expected module A, found an unnamed script") ((:) (ModuleRejection "cyclic import still checks invalid declarations" ((:) ((,) "A" "module A where\nimport B\nx = missing\n") ((:) ((,) "B" "module B where\nimport A\ny = 2\n") [])) "import A\n42" ModuleResolution "not in scope: missing") ((:) (ModuleRejection "self import still checks invalid declarations" [] "module Main where\nimport Main\nmain = missing\n" ModuleResolution "not in scope: missing") ((:) (ModuleRejection "module header followed by bare expression" [] "module Main where\n42\n" Parsing "declarations only") ((:) (ModuleRejection "imports must precede definitions" [] "module Main where\nmain = 42\nimport Prelude\n" Parsing "import") ((:) (ModuleRejection "definitions cannot be qualified" [] "module Main where\nA.f = 42\n" Parsing "named modules contain declarations only") ((:) (ModuleRejection "explicit empty Prelude removes value names" [] "module Main where\nimport Prelude ()\nmain = printInt 42\n" ModuleResolution "not in scope: printInt") ((:) (ModuleRejection "qualified Prelude suppresses implicit Prelude" [] "module Main where\nimport qualified Prelude as P\nmain = return 42\n" ModuleResolution "not in scope: return") ((:) (ModuleRejection "Prelude cannot be redefined" [] "module Prelude where\nmain = 42\n" ModuleResolution "built-in module") ((:) (ModuleRejection "ordinary Unit constructor is not builtin unit" [] "module Main where\ndata Foo = Unit\nmain : ()\nmain = Unit\n" Inference "type constructor mismatch") ((:) (ModuleRejection "primitive type cannot be redefined" [] "module Main where\ndata Int = Number\nmain = Number\n" ModuleResolution "primitive type") ((:) (ModuleRejection "unused private definitions still checked" ((:) ((,) "A" "module A (x) where\nx = 42\nbad = missing\n") []) "import A\nx" ModuleResolution "not in scope: missing") ((:) (ModuleRejection "export list cannot name missing value" [] "module Main (missing) where\nmain = 42\n" ModuleResolution "not in scope: missing") ((:) (ModuleRejection "recursive signature error names the source function" [] "module Main where\nloop : exists a. a -> a\nloop x = loop x\nmain = loop 0\n" ModuleResolution "Main.loop requires an explicit closed signature") ((:) (ModuleRejection "instance not visible in imported signed definition" ((:) ((,) "Render" "module Render where\nclass Render a where\n  render : a -> String\n") ((:) ((,) "Bad" "module Bad (text) where\nimport Render\ntext : String\ntext = render 42\n") ((:) ((,) "Orphan" "module Orphan () where\nimport Render\ninstance Render Int where\n  render = showInt\n") []))) "module Main where\nimport Bad\nimport Orphan ()\nmain = putStrLn text\n" Resolution "no instance or given constraint for Render.Render Int") ((:) (ModuleRejection "instance not visible in another instance" ((:) ((,) "A" "module A where\nclass First a where\n  first : a -> String\nclass Second a where\n  second : a -> String\n") ((:) ((,) "Bad" "module Bad () where\nimport A\ninstance First Int where\n  first n = second n\n") ((:) ((,) "Orphan" "module Orphan () where\nimport A\ninstance Second Int where\n  second = showInt\n") []))) "module Main where\nimport A\nimport Bad ()\nimport Orphan ()\nmain = putStrLn (first 42)\n" Resolution "no instance or given constraint for A.Second Int") [])))))))))))))))))))))))))))))))))))))))
 
-moduleTests : ([] ( (,) String (IO ()) ))
-moduleTests = S.append legacyModuleTests (S.append (S.map checkModuleTyping moduleTypings) crateResolutionTests)
+moduleCases : ([] ( (,) String (A.Test ()) ))
+moduleCases = S.append legacyModuleTests ((:) fileCase (S.append (S.map checkModuleTyping moduleTypings) crateResolutionTests))
 
-crateResolutionTests : [] ((,) String (IO ()))
+fileCase : (,) String (A.Test ())
+fileCase = (,) "modules: file loader, includes, hierarchy and errors" (A.liftIO fileTests)
+
+crateResolutionTests : [] ((,) String (A.Test ()))
 crateResolutionTests = (:)
   ((,) "crate namespaces resolve recursive declarations before inference" do
-    a <- H.right (parseModule "A.emlf" "module A where\nimport qualified B\nf = B.g\n")
-    b <- H.right (parseModule "B.emlf" "module B where\nimport qualified A\ng = A.f\n")
-    first <- H.right (resolveCrate NoImplicitPrelude Map.empty label ((:) a ((:) b [])))
-    second <- H.right (resolveCrate NoImplicitPrelude Map.empty label ((:) b ((:) a [])))
+    a <- A.right H.show (parseModule "A.emlf" "module A where\nimport qualified B\nf = B.g\n")
+    b <- A.right H.show (parseModule "B.emlf" "module B where\nimport qualified A\ng = A.f\n")
+    first <- A.right H.show (resolveCrate NoImplicitPrelude Map.empty label ((:) a ((:) b [])))
+    second <- A.right H.show (resolveCrate NoImplicitPrelude Map.empty label ((:) b ((:) a [])))
     let byName crate name = S.find (\entry -> H.eq (moduleIdentity (resolvedSource entry)) name) (resolvedCrateModules crate)
     let same name = case (,) (byName first name) (byName second name) of
           (,) (Just x) (Just y) -> eqInterface (resolvedScope x) (resolvedScope y)
           _ -> false
-    H.assert (same "A" && same "B") "module order changed resolved namespaces"
+    A.assert (same "A" && same "B") "module order changed resolved namespaces"
     let reachable = case Map.lookup "A" (resolvedCrateReach first) of {Nothing -> Set.empty; Just names -> names}
-    H.assert (Set.member compareString "A" reachable && Set.member compareString "B" reachable) "cyclic module reachability was incomplete")
+    A.assert (Set.member compareString "A" reachable && Set.member compareString "B" reachable) "cyclic module reachability was incomplete")
   ((:) ((,) "crate namespace resolution preserves external ownership and mangling" do
-    source <- H.right (parseModule "Local.emlf" "module Local where\nimport qualified Public as P\nf = P.x\n")
+    source <- A.right H.show (parseModule "Local.emlf" "module Local where\nimport qualified Public as P\nf = P.x\n")
     let external = Map.singleton "Public" (interface ((:) (Entity "upstream:Implementation" "x" Value) []))
     let mangle entity = if H.eq (owner entity) "upstream:Implementation" then "externalSymbol" else spelling entity
-    crate <- H.right (resolveCrate NoImplicitPrelude external mangle ((:) source []))
+    crate <- A.right H.show (resolveCrate NoImplicitPrelude external mangle ((:) source []))
     let modules = resolvedCrateModules crate
     -- Intrinsic evidence needs these two compiler modules even without an
     -- ordinary Prelude import. Keep their visibility separate from reach.
-    H.assert (S.eqList eqString (S.map (S.compose moduleIdentity resolvedSource) modules)
+    A.assert (S.eqList eqString (S.map (S.compose moduleIdentity resolvedSource) modules)
       ((:) "Prelude" ((:) "MLF.Primitive" ((:) "Local" [])))) "namespace resolution injected unexpected source modules"
     case S.filter (\entry -> H.eq (moduleIdentity (resolvedSource entry)) "Local") modules of
       (:) entry [] -> do
-        H.assert (Set.null (lookupEntities Terms "return" (resolvedScope entry))) "compiler intrinsic reach leaked ordinary Prelude visibility"
-        entity <- H.right (lookupEntity Terms "P.x" (resolvedScope entry))
-        H.assert (H.eq (owner entity) "upstream:Implementation" && H.eq (spelling entity) "x") "external entity lost its defining owner"
-        expected <- H.right (termId (resolvedCrateBindings crate) entity)
+        A.assert (Set.null (lookupEntities Terms "return" (resolvedScope entry))) "compiler intrinsic reach leaked ordinary Prelude visibility"
+        entity <- A.right H.show (lookupEntity Terms "P.x" (resolvedScope entry))
+        A.assert (H.eq (owner entity) "upstream:Implementation" && H.eq (spelling entity) "x") "external entity lost its defining owner"
+        expected <- A.right H.show (termId (resolvedCrateBindings crate) entity)
         let contents = resolvedContents entry
         let symbols = renamedSymbols contents
         case renamedBindings contents of
           (:) (Dependency.Bound local Nothing expression) [] -> case expression of
             R.CallSite _ _ (R.Global actual) -> do
-              H.assert (V.toInt actual == V.toInt expected && H.eq (Dependency.symbolName symbols local) "f" && H.eq (Dependency.symbolName symbols actual) "externalSymbol") "external declaration ID lost its metadata symbol"
-              H.assert (H.eq (R.namedExpr (Dependency.symbolName symbols) expression)
+              A.assert (V.toInt actual == V.toInt expected && H.eq (Dependency.symbolName symbols local) "f" && H.eq (Dependency.symbolName symbols actual) "externalSymbol") "external declaration ID lost its metadata symbol"
+              A.assert (H.eq (R.namedExpr (Dependency.symbolName symbols) expression)
                 (SCallSite "x" (SourceSpan "main" "Local" "Local.emlf" 3 5 3 8) (SVar "externalSymbol"))) "named projection lost reference provenance"
-            _ -> H.fail "external reference did not resolve to a declaration slot"
-          _ -> H.fail "external declaration changed the local binding inventory"
-      _ -> H.fail "namespace resolution lost or duplicated the local module")
+            _ -> A.fail "external reference did not resolve to a declaration slot"
+          _ -> A.fail "external declaration changed the local binding inventory"
+      _ -> A.fail "namespace resolution lost or duplicated the local module")
   ((:) ((,) "cyclic export fixed point is invariant under source order" do
-    a <- H.right (parseModule "A.emlf" "module A (T(..), seed, module B) where\nimport B\ndata T = MkT Int\nseed = 42\n")
-    b <- H.right (parseModule "B.emlf" "module B (module C) where\nimport C hiding (seed)\n")
-    c <- H.right (parseModule "C.emlf" "module C (module A) where\nimport A\n")
-    first <- H.right (resolveCrate NoImplicitPrelude Map.empty label ((:) a ((:) b ((:) c []))))
-    second <- H.right (resolveCrate NoImplicitPrelude Map.empty label ((:) c ((:) a ((:) b []))))
+    a <- A.right H.show (parseModule "A.emlf" "module A (T(..), seed, module B) where\nimport B\ndata T = MkT Int\nseed = 42\n")
+    b <- A.right H.show (parseModule "B.emlf" "module B (module C) where\nimport C hiding (seed)\n")
+    c <- A.right H.show (parseModule "C.emlf" "module C (module A) where\nimport A\n")
+    first <- A.right H.show (resolveCrate NoImplicitPrelude Map.empty label ((:) a ((:) b ((:) c []))))
+    second <- A.right H.show (resolveCrate NoImplicitPrelude Map.empty label ((:) c ((:) a ((:) b []))))
     let get crate name = case S.find (\entry -> H.eq (moduleIdentity (resolvedSource entry)) name) (resolvedCrateModules crate) of
-          Nothing -> H.fail ("missing resolved module " ++ name)
-          Just entry -> H.right (resolvedExports NoImplicitPrelude entry)
+          Nothing -> A.fail ("missing resolved module " ++ name)
+          Just entry -> A.right H.show (resolvedExports NoImplicitPrelude entry)
     S.mapM_ (\name -> do
       left <- get first name
       right <- get second name
-      H.assert (eqInterface left right) ("source order changed exports of " ++ name)) ((:) "A" ((:) "B" ((:) "C" [])))
+      A.assert (eqInterface left right) ("source order changed exports of " ++ name)) ((:) "A" ((:) "B" ((:) "C" [])))
     hidden <- get first "B"
-    H.assert (Set.null (lookupEntities Terms "seed" hidden)) "cyclic hiding leaked the excluded declaration"
-    H.assert (Set.size (lookupEntities Types "T" hidden) == 1 && Set.size (lookupEntities Terms "MkT" hidden) == 1) "recursive export fixed point lost a type member") []))
+    A.assert (Set.null (lookupEntities Terms "seed" hidden)) "cyclic hiding leaked the excluded declaration"
+    A.assert (Set.size (lookupEntities Types "T" hidden) == 1 && Set.size (lookupEntities Terms "MkT" hidden) == 1) "recursive export fixed point lost a type member") []))
 
-legacyModuleTests = (S.append (S.concatMap (\(Quint label mode libraries input _) -> ((:) ((,) (H.append "modules checking: " label) do { result <- (checkModule mode libraries input); (H.assert (T.alphaEq (inferredType result) (XCon "IO" ((:) (XCon "()" []) []))) (sourceType result)) }) [])) modulePrograms) (S.append (S.map rejects moduleRejections) ((:) ((,) "modules: original source type names" do { result <- (checkModule ImplicitPrelude box "import Data.Box\nBox 42"); (H.assert (H.contains "Data.Box.Box" (sourceType result)) (sourceType result)) }) ((:) ((,) "modules: unit syntax is intrinsic" do { result <- (checkModule ImplicitPrelude [] "module Main where\nimport Prelude ()\nmain : ()\nmain = ()\n"); (H.assert (H.eq (sourceType result) "()") (sourceType result)); nominal <- (checkModule ImplicitPrelude [] "module Main where\ndata Foo = Unit\nmain = Unit\n"); (H.assert (H.eq "Main.Foo" (sourceType nominal)) (sourceType nominal)) }) ((:) ((,) "modules: empty libraries and multiline headers" do { result <- (checkModule ImplicitPrelude ((:) ((,) "Empty" "module Empty () where\n") []) "module Main\n  (main)\n  where\n    import Empty ()\n    main = 42\n"); (H.assert (H.eq (sourceType result) "Int") (sourceType result)) }) ((:) ((,) "modules: explicit braces and layout parse identically" do { a <- (H.right (parseModule "Main.emlf" "module Main (main) where\nimport qualified Prelude as P\nmain = P.printInt 42\n")); do { b <- (H.right (parseModule "Main.emlf" "module Main (main) where { import qualified Prelude as P; main = P.printInt 42; }")); (H.assert (H.eq (H.layoutModule a) (H.layoutModule b)) (H.show ((,) a b))) } }) ((:) ((,) "modules: libraries can be parsed without main" do { m <- (H.right (parseModule "A.emlf" "module A where\nx = 42\n")); (H.assert ((H.eq (sourceModuleName m) (Just "A")) && (H.eq (sourceBody m) Nothing)) (H.show m)) }) ((:) ((,) "modules: unused imports do not cause value ambiguity" do { result <- (checkModule ImplicitPrelude ((:) ((,) "A" "module A where\nx = 1\n") ((:) ((,) "B" "module B where\nx = 2\n") [])) "import A\nimport B\n42"); (H.assert (H.eq (sourceType result) "Int") (sourceType result)) }) ((:) ((,) "modules: legacy compile path preserves checked output" do { a <- (H.right (compile "script.emlf" "main = do { printInt 42; return () };")); do { b <- (H.right (build ImplicitPrelude numbers "main = do { printInt 42; return () };")); (H.assert ((H.eq (compiledTerm a) (compiledTerm b)) && (H.eq (inferredType a) (inferredType b))) "unused source map changed compilation") } }) ((:) ((,) "modules: file loader, includes, hierarchy and errors" fileTests) []))))))))))
+legacyModuleTests = (S.append (S.concatMap (\(Quint label mode libraries input _) -> ((:) ((,) (H.append "modules checking: " label) do { result <- (assertModule mode libraries input); (A.assert (T.alphaEq (inferredType result) (XCon "IO" ((:) (XCon "()" []) []))) (sourceType result)) }) [])) modulePrograms) (S.append (S.map rejects moduleRejections) ((:) ((,) "modules: original source type names" do { result <- (assertModule ImplicitPrelude box "import Data.Box\nBox 42"); (A.assert (H.contains "Data.Box.Box" (sourceType result)) (sourceType result)) }) ((:) ((,) "modules: unit syntax is intrinsic" do { result <- (assertModule ImplicitPrelude [] "module Main where\nimport Prelude ()\nmain : ()\nmain = ()\n"); (A.assert (H.eq (sourceType result) "()") (sourceType result)); nominal <- (assertModule ImplicitPrelude [] "module Main where\ndata Foo = Unit\nmain = Unit\n"); (A.assert (H.eq "Main.Foo" (sourceType nominal)) (sourceType nominal)) }) ((:) ((,) "modules: empty libraries and multiline headers" do { result <- (assertModule ImplicitPrelude ((:) ((,) "Empty" "module Empty () where\n") []) "module Main\n  (main)\n  where\n    import Empty ()\n    main = 42\n"); (A.assert (H.eq (sourceType result) "Int") (sourceType result)) }) ((:) ((,) "modules: explicit braces and layout parse identically" do { a <- (A.right H.show (parseModule "Main.emlf" "module Main (main) where\nimport qualified Prelude as P\nmain = P.printInt 42\n")); do { b <- (A.right H.show (parseModule "Main.emlf" "module Main (main) where { import qualified Prelude as P; main = P.printInt 42; }")); (A.assert (H.eq (H.layoutModule a) (H.layoutModule b)) (H.show ((,) a b))) } }) ((:) ((,) "modules: libraries can be parsed without main" do { m <- (A.right H.show (parseModule "A.emlf" "module A where\nx = 42\n")); (A.assert ((H.eq (sourceModuleName m) (Just "A")) && (H.eq (sourceBody m) Nothing)) (H.show m)) }) ((:) ((,) "modules: unused imports do not cause value ambiguity" do { result <- (assertModule ImplicitPrelude ((:) ((,) "A" "module A where\nx = 1\n") ((:) ((,) "B" "module B where\nx = 2\n") [])) "import A\nimport B\n42"); (A.assert (H.eq (sourceType result) "Int") (sourceType result)) }) ((:) ((,) "modules: legacy compile path preserves checked output" do { a <- (A.right H.show (compile "script.emlf" "main = do { printInt 42; return () };")); do { b <- (A.right H.show (build ImplicitPrelude numbers "main = do { printInt 42; return () };")); (A.assert ((H.eq (compiledTerm a) (compiledTerm b)) && (H.eq (inferredType a) (inferredType b))) "unused source map changed compilation") } }) [])))))))))
 
 fileTests : IO ()
 fileTests = (withScratch (\directory -> (let { put : String -> String -> IO (); put path input = do { (createDirectoryIfMissing true (O.parent path)); (writeFile path input) } } in (let { includes = (O.join directory "libraries") } in (let { entry = (O.join (O.join directory "app") "Main.emlf") } in do { numberSource <- (S.maybe (H.fail "missing Numbers test source") return (S.lookup eqString "Math.Numbers" numbers)); do { (put (O.join (O.join includes "Math") "Numbers.emlf") numberSource); do { (put entry "module Main where\nimport Math.Numbers (inc)\nmain = inc 41\n"); do { good <- (bind (compileFile ((:) includes []) entry) (\value -> H.right value)); do { (H.assert (H.eq (sourceType good) "Int") (sourceType good)); do { unusedMissing <- (bind (compileFile ((:) (O.join directory "absent search root") ((:) includes [])) entry) (\value -> H.right value)); do { (H.assert (H.eq (sourceType unusedMissing) "Int") "unused missing search root changed compilation"); do { missing <- (compileFile [] entry); do { (case missing of { (Left err) -> (H.assert (H.contains "cannot find module Math.Numbers; searched" (diagnostic err)) (H.show err)); (Right _) -> (H.fail "module loaded outside search roots") }); do { (put (O.join (O.join includes "Math") "Main.emlf") "module Math.Main where\nimport Math.Numbers\nmain = inc 41\n"); do { _ <- (bind (compileFile [] (O.join (O.join includes "Math") "Main.emlf")) (\value -> H.right value)); do { ((H.forM_ ((:) entry ((:) (O.join (O.join includes "Math") "Numbers.emlf") []))) (\file -> (put file "module Wrong where\nmain = 42\n"))); do { (put entry "module Main where\nimport Math.Numbers\nmain = 42\n"); do { wrong <- (compileFile ((:) includes []) entry); do { (case wrong of { (Left err) -> (H.assert (H.contains "expected module Math.Numbers, found Wrong" (diagnostic err)) (H.show err)); (Right _) -> (H.fail "wrong file header accepted") }); do { absent <- (compileFile [] (O.join directory "Missing.emlf")); (case absent of { (Left err) -> (H.assert (H.eq (phase err) ModuleResolution) (H.show err)); (Right _) -> (H.fail "missing entry accepted") }) } } } } } } } } } } } } } } } })))))

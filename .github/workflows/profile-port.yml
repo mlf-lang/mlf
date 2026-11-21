@@ -63,33 +63,14 @@ jobs:
             --build-dir "$PWD/.mlf-build/port-profile" build --target port
           jq -e '.complete and ([.builds[].cached] | all)' .mlf-build/port-profile/build-report.json
       - name: Measure fresh preparation with every independent check
-        run: |
-          set -euo pipefail
-          mkdir -p .mlf-build/port-profile/measurement
-          target="$PWD/.mlf-build/port-profile/measurement/unit.xmlf"
-          test ! -e "$target" && test ! -e "$target.checks.json"
-          start=$(date +%s)
-          /usr/bin/time -l .mlf-build/port-profile/bin/port --prepare "$FIXTURE" "$target" \
-            > .mlf-build/port-profile/measurement/prepare.log \
-            2> .mlf-build/port-profile/measurement/time.log
-          end=$(date +%s)
-          cat .mlf-build/port-profile/measurement/prepare.log .mlf-build/port-profile/measurement/time.log
-          jq -e --arg fixture "$FIXTURE" '.fixture == $fixture and .entry_type == "IO Unit"' "$target.checks.json"
-          rss=$(awk '/maximum resident set size/ {print $1}' .mlf-build/port-profile/measurement/time.log)
-          jq -n --arg source "$SOURCE_COMMIT" --arg run "$CANDIDATE_RUN" --arg fixture "$FIXTURE" \
-            --arg divisor "$GC_FREE_SPACE_DIVISOR" --argjson start "$start" --argjson end "$end" --argjson rss "$rss" \
-            --arg port "$(shasum -a 256 .mlf-build/port-profile/bin/port | awk '{print $1}')" \
-            --arg target "$(shasum -a 256 "$target" | awk '{print $1}')" \
-            --arg checks "$(shasum -a 256 "$target.checks.json" | awk '{print $1}')" \
-            '{complete:true,source:$source,candidate_run:$run,fixture:$fixture,gc_free_space_divisor:$divisor,seconds:($end-$start),maximum_resident_bytes:$rss,port_sha256:$port,target_sha256:$target,checks_sha256:$checks}' \
-            > .mlf-build/port-profile/measurement/timing.json
-          tools/release/shared-candidate.sh verify
+        run: python3 -B tools/testing/run.py port-preparation-profile
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
           name: port-profile-${{ matrix.fixture }}-${{ matrix.divisor }}
           include-hidden-files: true
           path: |
+            .mlf-build/test-framework/
             .mlf-build/port-profile/measurement/*.json
             .mlf-build/port-profile/measurement/*.log
             .mlf-build/port-profile/build-report.json

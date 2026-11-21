@@ -3,6 +3,7 @@
  * Each scenario runs in a bounded child of the test harness, so a regression
  * cannot hang the entire suite. The same binary supplies a few child modes. */
 #include "build_runner_test_support.h"
+#include "test_case_events.h"
 #include "../../runtime/mlf_process_supervisor.h"
 #include <math.h>
 
@@ -772,13 +773,20 @@ static int tests(int argc, char **argv) {
                      (unsigned long long)(test_now() * 1000000.0));
     check(n >= 0 && (size_t)n < sizeof(scratch), "scratch path length"); test_mkdir(scratch);
     for (unsigned i = 0; i < sizeof(scenarios) / sizeof(scenarios[0]); ++i) {
+        char id[160];
+        int length = snprintf(id, sizeof(id), "native-process-supervisor/%s", scenarios[i].name);
+        check(length >= 0 && (size_t)length < sizeof(id), "scenario ID length");
+        if (!mlf_case_selected(id)) continue;
+        mlf_case_start(id);
         char *args[] = {(char *)self, "--case", (char *)scenarios[i].name, (char *)fixture, scratch, NULL};
         int result = test_wait(test_spawn(args), 45);
         if (result) {
+            mlf_case_result(result == 124 ? "timeout" : result >= 128 ? "crash" : "fail", result);
             fprintf(stderr, "process supervisor scenario %s failed with exit %d\n", scenarios[i].name, result); return 1;
         }
+        mlf_case_result("pass", result);
         printf("ok %s\n", scenarios[i].name); fflush(stdout); ++checks;
     }
-    printf("%u native process supervisor tests passed\n", checks); return 0;
+    printf("%u native process supervisor tests passed\n", checks); return checks ? 0 : 64;
 }
 TEST_MAIN(tests)

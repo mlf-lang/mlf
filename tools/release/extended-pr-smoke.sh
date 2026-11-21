@@ -35,12 +35,12 @@ test -x "$MLF_COMPILER" && test -x "$MLF_PACKAGE_MANAGER" && test -x "$runner"
   --compiler "$MLF_COMPILER" --runtime "$PWD/runtime/mlf_runtime.c" \
   --jobs 2 --timeout 1800 --build-dir "$build/tests/suite-build" \
   --cache-dir "$build/candidate/cache" build \
-  --target int-set-unions --target test-framework --target pr-smoke \
+  --target int-set-unions --target test-framework --target figure12 --target pr-smoke \
   2>&1 | tee "$build/tests-prebuild.log"
 jq -e '
   .complete == true and .implementation == "MLF" and
   ([.builds[] | select(.kind | startswith("executable mlf-tests:")) | .kind] | sort) ==
-    ["executable mlf-tests:int-set-unions","executable mlf-tests:pr-smoke","executable mlf-tests:test-framework"]
+    ["executable mlf-tests:figure12","executable mlf-tests:int-set-unions","executable mlf-tests:pr-smoke","executable mlf-tests:test-framework"]
 ' "$build/tests/suite-build/build-report.json" >/dev/null
 cp "$build/tests/suite-build/build-report.json" "$build/tests-prebuild-report.json"
 # Direct invocation avoids building another root generation just to run tests.

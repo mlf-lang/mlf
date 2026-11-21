@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Synthetic archives exercise platform selection and every existing pin gate.
 set -euo pipefail
+. "$(dirname -- "$0")/test-events.sh" release-fetch-seed
 cd -- "$(dirname -- "$0")/../.."
 root=$PWD
 scratch=$(mktemp -d)
@@ -43,24 +44,30 @@ for platform in macos-arm64 linux-x64; do
     printf 'MLF_SEED_MANAGER_SHA256=%s\n' "$(sha256 "$fixture/$package/libexec/mlfpkg")"
   } > "$pin"
   export TEST_SEED_FIXTURES="$fixture"
+  release_begin "release/seed-fetch/$platform/accepted"
   env -u MLF_SEED_PLATFORM GITHUB_ENV="$scratch/environment" tools/release/fetch-seed.sh "$scratch/success-$platform" "$pin" > "$scratch/result"
   grep -Fxq "MLF_COMPILER=$scratch/success-$platform/$package/libexec/emlf" "$scratch/environment"
   grep -Fq -- "--pattern $package.tar.gz --pattern SHA256SUMS" "$scratch/download.log"
   checks=$((checks + 1))
+  release_pass
   for field in ARCHIVE_SHA256 SOURCE_COMMIT COMPILER_SHA256 MANAGER_SHA256; do
+    release_begin "release/seed-fetch/$platform/$field"
     sed "s/^MLF_SEED_$field=.*/MLF_SEED_$field=wrong/" "$pin" > "$scratch/wrong.env"
     if env -u MLF_SEED_PLATFORM tools/release/fetch-seed.sh "$scratch/failure-$platform-$field" "$scratch/wrong.env" > "$scratch/failure.log" 2>&1; then
-      printf 'Seed verification accepted wrong %s for %s\n' "$field" "$platform" >&2; exit 1
+      printf 'Seed verification accepted wrong %s for %s\n' "$field" "$platform" >&2; false
     fi
     checks=$((checks + 1))
+    release_pass
   done
   printf 'PASS seed fetch: %s archive selection and four independent pin rejections\n' "$platform"
 done
 cp "$scratch/linux-x64.env" "$scratch/unsupported.env"
 printf 'MLF_SEED_PLATFORM=unsupported\n' >> "$scratch/unsupported.env"
+release_begin release/seed-fetch/unsupported-platform
 before=$(wc -l < "$scratch/download.log")
-if tools/release/fetch-seed.sh "$scratch/unsupported" "$scratch/unsupported.env" > "$scratch/failure.log" 2>&1; then exit 1; fi
+if tools/release/fetch-seed.sh "$scratch/unsupported" "$scratch/unsupported.env" > "$scratch/failure.log" 2>&1; then false; fi
 test "$(wc -l < "$scratch/download.log")" = "$before"
 grep -Fq 'Unsupported seed platform: unsupported' "$scratch/failure.log"
 checks=$((checks + 1))
+release_pass
 printf '%s seed fetch platform/pin checks passed.\n' "$checks"

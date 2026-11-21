@@ -702,11 +702,6 @@
       "module": "Tests.TupleList",
       "path": "tests/Tests/TupleList.hs",
       "role": "implementation"
-    },
-    {
-      "module": "Tests.TupleListLegacy",
-      "path": "tests/Tests/TupleListLegacy.hs",
-      "role": "implementation"
     }
   ],
   "executables": [

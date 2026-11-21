@@ -1,16 +1,26 @@
 #!/usr/bin/env python3
-"""Static Core opt-in registration/isolation controls; no semantic test runs."""
+"""Static Core registry and isolation controls; no semantic test runs."""
 import difflib
 import functools
 import hashlib
 import json
 import copy
+from collections import Counter
 from pathlib import Path
 import re
+import subprocess
 from history_refs import historical_bytes
 
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "8a3e69b165765931c3ff762379a78db9659b2cd8"
+PHASE_1_PARENT = "720dd649627fbf8b19c7447493a4fdf6fd05eb39"
+
+
+@functools.lru_cache(maxsize=None)
+def pre_cutover(path):
+    return subprocess.check_output(
+        ["git", "--no-replace-objects", "show", PHASE_1_PARENT + ":" + path], cwd=ROOT
+    ).decode("utf-8")
 
 
 # Reviewed source-only projection of the standard-core cutover. String contents,
@@ -215,7 +225,7 @@ def verify_frontend_helpers(current):
 
 
 def verify_frontend_controls():
-    current = source_text(FRONTEND_HELPERS_PATH)
+    current = pre_cutover(FRONTEND_HELPERS_PATH)
     verify_frontend_helpers(current)
     mutations = {
         "parse_stage": current.replace("case parseProgram file source of",
@@ -633,14 +643,65 @@ def verify_projection_controls():
     return len(mutations) + 2
 
 
+def verify_live_cutover(expected):
+    registry = source_text("tests/Tests/CoreRegistry.emlf")
+    runner_path = "tests/Tests/CoreRunner.emlf"
+    runner = source_text(runner_path)
+    require(list(actual_bindings(registry).items()) == list(expected.items()),
+            "live registry changed the ordered family and case bindings")
+    original = pre_cutover(runner_path)
+    triples = r'\(,,\) "(?:\\.|[^"\\])*" "(?:\\.|[^"\\])*" (?:true|false)'
+    require(re.findall(triples, original) == re.findall(triples, runner),
+            "live substring stimuli or oracle changed")
+    for marker in (
+        'S.append substrings entries',
+        'Runner.runOptionsObserved observe options entries runnable',
+        '_ -> dispatch target complete names entries args',
+        'exact && S.length selected == 1',
+        'setEnv "MLF_TEST_COVERAGE_REPORT" (directory ++ "/legacy-coverage.jsonl")',
+        'Process.classifyTyped total entry measured rawReport',
+        'Coverage.validateProjection inventory "core" (expectedCoverage inventory entry)',
+        'Coverage.metric "core" "substring-executed" (S.length substrings)',
+    ):
+        require(marker in runner, "live Core dispatch/evidence boundary changed: " + marker)
+    require("legacyMain" not in runner, "duplicate Core dispatcher is still live")
+    # Body ownership and inputs remain fixed while assertion transport changes.
+    literal = re.compile(r'"(?:\\.|[^"\\])*"')
+    for name in ("CoreCrates", "CoreSolver", "CoreLanguage", "CoreModules",
+                 "Computations", "Datatypes", "Typeclasses", "DoNotation", "SurfaceSyntax",
+                 "Guards", "Readability", "StateTypes", "GraphValidation", "OptimizerUses",
+                 "DenseNormalization", "SolverIndexAudit", "Modules", "Separate"):
+        path = f"tests/Tests/{name}.emlf"
+        frozen_literals = literal.findall(pre_cutover(path))
+        actual = literal.findall(source_text(path))
+        if name == "Computations":
+            require(actual[-1:] == ['"unexpected success"'], "missing typed rejection diagnostic")
+            actual = actual[:-1]
+        if name == "CoreModules":
+            # The shared generator counter replaces two identical suite arguments.
+            require(Counter(actual) == Counter(frozen_literals) - Counter(['"core"'])
+                    + Counter(['"MLF_TEST_CORE_JSON"', '"1"', '"\\n"']),
+                    "live Core generated-loop stimulus or adapter changed")
+        elif name in ("Modules", "Separate"):
+            # The file/path case label moved to its explicit adapter binding.
+            require(Counter(actual) == Counter(frozen_literals),
+                    "live Core module/crate stimulus changed: " + path)
+        else:
+            require(actual == frozen_literals, "live Core literal/oracle inventory changed: " + path)
+    helper = source_text(FRONTEND_HELPERS_PATH)
+    require(FRONTEND_HELPER_IMPORTS in helper and FRONTEND_HELPER_BODY in helper,
+            "live Core helper changed frontend provenance")
+
+
 def main():
     lexical_control = "List (Pair String Unit)\n-- List Pair Unit\n" + '\"List Pair Unit\" \'L\' {- List Pair Unit -} Listish List\''
     lexical_expected = "[] ((,) String ())\n-- List Pair Unit\n" + '\"List Pair Unit\" \'L\' {- List Pair Unit -} Listish List\''
     require(canonical_source(lexical_control) == lexical_expected,
             "canonical projection changed strings, comments, characters or unrelated names")
     expected = expected_bindings()
-    registry = source_text("tests/Tests/CoreRegistry.emlf")
-    runner = source_text("tests/Tests/CoreRunner.emlf")
+    verify_live_cutover(expected)
+    registry = pre_cutover("tests/Tests/CoreRegistry.emlf")
+    runner = pre_cutover("tests/Tests/CoreRunner.emlf")
     original = frozen("tests/Tests/CoreRunner.emlf")
     catalog = json.loads(source_text("tests/test-catalog.json"))
     inventory = json.loads(source_text("tests/golden/unit-inventory.json"))
@@ -773,9 +834,9 @@ def main():
             continue
         raise ValueError("historical policy accepted " + name)
     for path in ("tests/Tests/Core.emlf", "tests/Tests/CoreCrates.emlf", "tests/Tests/CoreSolver.emlf", "tests/Tests/CoreLanguage.emlf", "tests/Tests/CoreModules.emlf"):
-        verify_family_source(path, source_text(path), frozen(path))
+        verify_family_source(path, pre_cutover(path), frozen(path))
     solver_path = "tests/Tests/CoreSolver.emlf"
-    solver = source_text(solver_path)
+    solver = pre_cutover(solver_path)
     solver_original = frozen(solver_path)
     helper_start, helper_end = solver.index(RECURSION_HELPERS_START), solver.index(CORE_FAMILIES_START)
     solver_mutations = (
@@ -810,8 +871,8 @@ def main():
     frontend_mutations = verify_frontend_controls()
     verify_partition_provenance()
     projection_mutations = verify_projection_controls()
-    print(json.dumps({"kind": "static-core-opt-in-controls", "baseline": BASELINE,
-                      "family_count": len(expected), "legacy_actions": 739,
+    print(json.dumps({"kind": "static-core-cutover-controls", "baseline": BASELINE,
+                      "phase_1_parent": PHASE_1_PARENT, "family_count": len(expected), "legacy_actions": 739,
                       "registered_actions": 746, "retained_legacy_identities": 727,
                       "reviewed_identity_migrations": 12, "new_recursive_leaves": 3,
                       "cutover_identity_migrations": 8, "new_cutover_leaves": 4,

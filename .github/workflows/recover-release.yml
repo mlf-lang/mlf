@@ -96,6 +96,12 @@ jobs:
           name: release-macos-arm64
           path: .mlf-build/release/*.tar.gz
           retention-days: 30
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: sdk-smoke-macos-arm64
+          path: .mlf-build/release/smoke-framework*.json*
+          retention-days: 14
   publish:
     needs: [metadata, macos-package]
     runs-on: ubuntu-24.04

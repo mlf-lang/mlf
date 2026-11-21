@@ -45,7 +45,7 @@ for path in re.findall(r'libraries/[A-Za-z0-9_./-]+\.(?:hs|emlf)', entry):
     assert (ROOT / path).is_file(), 'missing runner integrity input: ' + path
 def check_mode_contract(source):
     # Source-shape guard only: native CLI refusal tests remain an execution gate.
-    options = source.split('checkOnly limits selected <- case options of', 1)[1].split(
+    options = source.split('cliCheckOnly limits selected <- case options of', 1)[1].split(
         '   O.require (B.validateLimits limits)', 1)[0]
     # Empty, singleton and two-or-more lists exhaust this options case. A final
     # wildcard is unreachable and is correctly rejected by the real compiler.
@@ -57,8 +57,11 @@ def check_mode_contract(source):
         '(:) option [] -> if eqString option "--check-only"',
         '"invalid workload selection"',
         '"check-only requires the complete canonical workload inventory"',
-        'if checkOnly then checkWorkload c else workload c',
-        'if checkOnly then [] else B.performanceChecks rows limits',
+        'result <- checkWorkload c work',
+        'result <- workload c work',
+        'let checks = B.performanceChecks (one result) limits',
+        'return ((,) result [])',
+        'S.concatMap S.snd observed',
         'if checkOnly then "correctness-passed"',
         'J.num (if checkOnly then 0 else n)',
         'J.set "performance_checked" (J.Boolean false)',

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Cancelling either watchdog sleep must not orphan a child or retain a pipe.
 set -euo pipefail
+. "$(dirname -- "$0")/test-events.sh" release-pr-smoke-cli-watchdog
 scripts=$(cd -- "$(dirname -- "$0")" && pwd)
 scratch=$(mktemp -d)
 cleanup() {
@@ -73,6 +74,7 @@ assert_stopped() {
   fi
 }
 for mode in initial grace; do
+  release_begin "release/pr-cli-watchdog/$mode"
   export TEST_CLI_MODE=$mode
   sed -f "$scratch/$mode.sed" "$scripts/pr-smoke-cli.sh" > "$checkout/tools/release/pr-smoke-cli.sh"
   grep -Fq '/bin/sh -c' "$checkout/tools/release/pr-smoke-cli.sh"
@@ -95,5 +97,6 @@ for mode in initial grace; do
   assert_stopped "$(cat "$scratch/compiler.pid")"
   while read -r pid seconds; do assert_stopped "$pid"; done < "$scratch/sleep-pids.log"
   printf 'PASS PR CLI watchdog: %s sleep cancellation\n' "$mode"
+  release_pass
 done
 printf '2 PR CLI watchdog checks passed\n'

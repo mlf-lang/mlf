@@ -1,0 +1,809 @@
+{
+  "artifact-binary-native": {
+    "kind": "receipt",
+    "prefix": "artifact-binary-native/",
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_artifact_binary.py"
+    ],
+    "receipt": {
+      "output": "--output",
+      "cases": "controls_commands"
+    }
+  },
+  "batch-replacement": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/batch-replacement/run.py"
+    ],
+    "kind": "receipt",
+    "prefix": "batch-replacement/",
+    "receipt": {
+      "output": "--output",
+      "cases": "checks"
+    }
+  },
+  "candidate-smoke-cli": {
+    "kind": "events",
+    "ids": [
+      "candidate-smoke-cli/source-accepted/polymorphic-let",
+      "candidate-smoke-cli/source-accepted/impredicative-self-application",
+      "candidate-smoke-cli/source-rejected/monomorphic-mismatch",
+      "candidate-smoke-cli/source-rejected/invalid-universal-annotation",
+      "candidate-smoke-cli/interpreter-and-llvm/unbounded-integers",
+      "candidate-smoke-cli/interpreter-and-llvm/lazy-closure-constructor",
+      "candidate-smoke-cli/interpreter-and-llvm/repeated-unicode-input",
+      "candidate-smoke-cli/malformed-target"
+    ],
+    "command": [
+      "bash",
+      "tools/release/pr-smoke-cli.sh"
+    ]
+  },
+  "candidate-smoke-packages": {
+    "kind": "events",
+    "ids": [
+      "candidate-smoke-packages/initial",
+      "candidate-smoke-packages/cached",
+      "candidate-smoke-packages/changed"
+    ],
+    "command": [
+      "bash",
+      "tools/release/pr-smoke-packages.sh"
+    ]
+  },
+  "contract-context": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/contract-context/run_controls.py"
+    ],
+    "kind": "receipt",
+    "prefix": "contract-context/",
+    "receipt": {
+      "output": "--output",
+      "cases": "checks",
+      "id": "optimization",
+      "inventory": [
+        "0",
+        "2"
+      ]
+    }
+  },
+  "datatype-context": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/datatype-context/run_controls.py"
+    ],
+    "kind": "receipt",
+    "prefix": "datatype-context/",
+    "receipt": {
+      "output": "--output",
+      "cases": "checks",
+      "id": "optimization",
+      "inventory": [
+        "0",
+        "2"
+      ]
+    }
+  },
+  "delayed-index": {
+    "kind": "receipt",
+    "prefix": "delayed-index/",
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/c3-delayed-index/run_controls.py"
+    ],
+    "receipt": {
+      "output": "--output",
+      "stdout": "run/stdout"
+    }
+  },
+  "framework-direct": {
+    "kind": "events",
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_framework_direct.py"
+    ],
+    "prefix": "framework-direct/",
+    "list_args": [
+      "--list-cases"
+    ],
+    "exact": true
+  },
+  "fresh-survivors": {
+    "kind": "receipt",
+    "prefix": "fresh-survivors/",
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/c3-survivors/run_controls.py"
+    ],
+    "receipt": {
+      "output": "--output",
+      "stdout": "run/stdout"
+    }
+  },
+  "indexvec": {
+    "kind": "events",
+    "prefix": "indexvec/",
+    "command": [
+      "python3",
+      "-B",
+      "tests/indexvec/run.py"
+    ],
+    "list_args": [
+      "--framework-list"
+    ]
+  },
+  "installed-native-library": {
+    "command": [
+      "python3",
+      "-B",
+      ".mlf-build/stdlib-default/sources/tools/shared/test_native_library.py"
+    ],
+    "kind": "receipt",
+    "prefix": "installed-native-library/",
+    "receipt": {
+      "output": "--output",
+      "cases": "native_cases_passed"
+    }
+  },
+  "int64-controls": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/int64/run_controls.py"
+    ],
+    "kind": "receipt",
+    "prefix": "int64-controls/",
+    "receipt": {
+      "output": "--output",
+      "cases": "checks"
+    }
+  },
+  "io-action-sharing": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_io_action_sharing.py"
+    ],
+    "kind": "receipt",
+    "prefix": "io-action-sharing/",
+    "receipt": {
+      "output": "--output",
+      "cases": "native_cases_passed"
+    }
+  },
+  "llp64-controls": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/int64/run_llp64.py"
+    ],
+    "kind": "receipt",
+    "prefix": "llp64-controls/",
+    "receipt": {
+      "output": "--output",
+      "cases": "checks"
+    }
+  },
+  "llvm-unicode-memory": {
+    "kind": "receipt",
+    "prefix": "llvm-unicode-memory/",
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/llvm-memory/run_controls.py"
+    ],
+    "receipt": {
+      "output": "--output",
+      "stdout": "run/stdout"
+    }
+  },
+  "map-policy": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/map-policy/run_controls.py"
+    ],
+    "kind": "receipt",
+    "prefix": "map-policy/",
+    "receipt": {
+      "output": "--output",
+      "cases": "worker.lanes",
+      "id": "optimization",
+      "verdict": "complete",
+      "inventory": [
+        "0",
+        "2"
+      ]
+    }
+  },
+  "native-library": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_native_library.py"
+    ],
+    "kind": "receipt",
+    "prefix": "native-library/",
+    "receipt": {
+      "output": "--output",
+      "cases": "native_cases_passed"
+    }
+  },
+  "owned-source-context": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/sparse-contracts/run_controls.py"
+    ],
+    "kind": "receipt",
+    "prefix": "owned-source-context/",
+    "receipt": {
+      "output": "--output",
+      "cases": "checks",
+      "id": "optimization",
+      "inventory": [
+        "0",
+        "2"
+      ]
+    }
+  },
+  "patricia-design": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/patricia/run_design_controls.py"
+    ],
+    "kind": "receipt",
+    "prefix": "patricia-design/",
+    "receipt": {
+      "output": "--output",
+      "cases": "checks"
+    }
+  },
+  "patricia-file-controls": {
+    "kind": "receipt",
+    "prefix": "patricia-file-controls/",
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/patricia/run_file_controls.py"
+    ],
+    "receipt": {
+      "output": "--output",
+      "cases": "routes.crate.file_cases",
+      "id": "name",
+      "verdict": "complete"
+    }
+  },
+  "patricia-fingerprint": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/patricia/run_fingerprint.py"
+    ],
+    "kind": "receipt",
+    "prefix": "patricia-fingerprint/",
+    "receipt": {
+      "output": "--output",
+      "cases": "checks",
+      "file": "checks/receipt.json"
+    }
+  },
+  "patricia-focused": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/patricia/run_controls.py"
+    ],
+    "kind": "receipt",
+    "prefix": "patricia-focused/",
+    "receipt": {
+      "output": "--output",
+      "cases": "checks"
+    }
+  },
+  "patricia-integrated": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/patricia/run_integrated.py"
+    ],
+    "kind": "receipt",
+    "prefix": "patricia-integrated/",
+    "receipt": {
+      "output": "--output",
+      "cases": "checks"
+    }
+  },
+  "patricia-native": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/patricia/run_native.py"
+    ],
+    "kind": "receipt",
+    "prefix": "patricia-native/",
+    "receipt": {
+      "output": "--output",
+      "cases": "checks"
+    }
+  },
+  "permission-view": {
+    "kind": "receipt",
+    "prefix": "permission-view/",
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/permission-view/run_controls.py"
+    ],
+    "receipt": {
+      "output": "--output",
+      "stdout": "run/stdout"
+    }
+  },
+  "port-preparation-profile": {
+    "kind": "events",
+    "prefix": "port-prepare/",
+    "command": [
+      "bash",
+      "tools/testing/profile-port.sh"
+    ],
+    "list_args": [
+      "--framework-list"
+    ],
+    "scope": "matrix-cell"
+  },
+  "private-projection-views": {
+    "kind": "receipt",
+    "prefix": "private-projection-views/",
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/full-compiler/run_controls.py"
+    ],
+    "receipt": {
+      "output": "--output",
+      "stdout": "run/stdout"
+    }
+  },
+  "python-artifact-binary-adapter-successor": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/artifact-binary/test_adapter_successor.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-artifact-binary-adapter-successor/",
+    "exact": true
+  },
+  "python-artifact-binary-p2-writer-bridge": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/artifact-binary/test_p2_writer_bridge.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-artifact-binary-p2-writer-bridge/",
+    "exact": true
+  },
+  "python-c3-delayed-index-private-owner-headers": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/c3-delayed-index/test_private_owner_headers.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-c3-delayed-index-private-owner-headers/",
+    "exact": true
+  },
+  "python-crate-query-graph-verify": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/crate-query-graph/test_verify.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-crate-query-graph-verify/",
+    "exact": true
+  },
+  "python-full-compiler-contract": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/full-compiler/test_contract.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-full-compiler-contract/",
+    "exact": true
+  },
+  "python-llvm-memory-contract": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/llvm-memory/test_contract.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-llvm-memory-contract/",
+    "exact": true
+  },
+  "python-map-policy-prepare-map-policy": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/map-policy/test_prepare_map_policy.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-map-policy-prepare-map-policy/",
+    "exact": true
+  },
+  "python-patricia-adapters": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/patricia/test_adapters.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-patricia-adapters/",
+    "exact": true
+  },
+  "python-patricia-design-controls": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/patricia/test_design_controls.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-patricia-design-controls/",
+    "exact": true
+  },
+  "python-patricia-fingerprint-core": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/patricia/test_fingerprint_core.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-patricia-fingerprint-core/",
+    "exact": true
+  },
+  "python-patricia-native-batches": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/patricia/test_native_batches.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-patricia-native-batches/",
+    "exact": true
+  },
+  "python-patricia-open-file-comparison": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/patricia/test_open_file_comparison.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-patricia-open-file-comparison/",
+    "exact": true
+  },
+  "python-patricia-open-file-controls": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/patricia/test_open_file_controls.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-patricia-open-file-controls/",
+    "exact": true
+  },
+  "python-release-ghc-install-cleanup": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/release/test-ghc-install-cleanup.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-release-ghc-install-cleanup/",
+    "exact": true
+  },
+  "python-shared-artifact-binary-modular": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_artifact_binary_modular.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-shared-artifact-binary-modular/",
+    "exact": true
+  },
+  "python-shared-candidate-batch-contract": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_candidate_batch_contract.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-shared-candidate-batch-contract/",
+    "exact": true
+  },
+  "python-shared-candidate-batch-worker": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_candidate_batch_worker.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-shared-candidate-batch-worker/",
+    "exact": true
+  },
+  "python-shared-crc-process-supervisor": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_crc_process_supervisor.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-shared-crc-process-supervisor/",
+    "exact": true
+  },
+  "python-shared-crc-successor-entry": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_crc_successor_entry.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-shared-crc-successor-entry/",
+    "exact": true
+  },
+  "python-shared-darwin-toolchain": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_darwin_toolchain.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-shared-darwin-toolchain/",
+    "exact": true
+  },
+  "python-shared-direct-bounded-entry": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_direct_bounded_entry.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-shared-direct-bounded-entry/",
+    "exact": true,
+    "allow_skip": true
+  },
+  "python-shared-direct-candidate-entry": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_direct_candidate_entry.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-shared-direct-candidate-entry/",
+    "exact": true,
+    "allow_skip": true
+  },
+  "python-shared-formatter-compatibility-controls": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_formatter_compatibility_controls.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-shared-formatter-compatibility-controls/",
+    "exact": true
+  },
+  "python-shared-generate-builtin-evidence": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_generate_builtin_evidence.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-shared-generate-builtin-evidence/",
+    "exact": true
+  },
+  "python-shared-header-validation-adapter": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_header_validation_adapter.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-shared-header-validation-adapter/",
+    "exact": true
+  },
+  "python-shared-prepare-async-ghc": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_prepare_async_ghc.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-shared-prepare-async-ghc/",
+    "exact": true
+  },
+  "python-shared-query-generation": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_query_generation.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-shared-query-generation/",
+    "exact": true
+  },
+  "python-shared-query-index": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_query_index.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-shared-query-index/",
+    "exact": true
+  },
+  "python-shared-source-prologue": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_source_prologue.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-shared-source-prologue/",
+    "exact": true
+  },
+  "python-shared-utf8-batch-contract": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_utf8_batch_contract.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-shared-utf8-batch-contract/",
+    "exact": true
+  },
+  "python-shared-utf8-batch-worker": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_utf8_batch_worker.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-shared-utf8-batch-worker/",
+    "exact": true
+  },
+  "python-testing-manifest-snapshot": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/testing/test_manifest_snapshot.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-testing-manifest-snapshot/",
+    "exact": true
+  },
+  "python-validation-reuse": {
+    "command": [
+      "python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tools/performance/validation-reuse",
+      "-p",
+      "test_*.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-validation-reuse/",
+    "exact": true
+  },
+  "query-graph-acceptance": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/crate-query-graph/verify.py"
+    ],
+    "kind": "receipt",
+    "prefix": "query-graph-acceptance/",
+    "receipt": {
+      "output": 1,
+      "cases": "recovery",
+      "file": "results.json",
+      "plan": "selected_cases"
+    }
+  },
+  "recursive-saved-crate": {
+    "kind": "receipt",
+    "prefix": "recursive-saved-crate/",
+    "command": [
+      "python3",
+      "-B",
+      "tests/recursive-inference/run_saved_crate_host.py"
+    ],
+    "receipt": {
+      "output": "--build-dir",
+      "file": "result.json",
+      "stdout": "run.log",
+      "stdout_sha256": "run_log.sha256",
+      "line_prefix": "PASS exact saved-crate fixture: ",
+      "inventory": [
+        "cyclic empty imports carry defining-module instances",
+        "instance not visible in imported signed definition",
+        "instance not visible in another instance",
+        "downstream orphan cannot leak into an import cycle",
+        "cross-module recursion infers unsigned cycle",
+        "cross-module qualified recursion generalizes shared exports"
+      ]
+    }
+  },
+  "shared-host-adapter": {
+    "kind": "receipt",
+    "prefix": "shared-host/",
+    "command": [
+      "python3",
+      "-B",
+      "tests/shared-host/run.py"
+    ],
+    "receipt": {
+      "output": "--output",
+      "cases": "steps",
+      "id": "name",
+      "verdict": "passed",
+      "complete_field": "passed",
+      "ignore_pattern": "(?:-build(?:-|$)|^ghc-version$)"
+    }
+  },
+  "source-context-cache": {
+    "kind": "receipt",
+    "prefix": "source-context-cache/",
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_source_context_cache.py"
+    ],
+    "receipt": {
+      "output": "--output",
+      "cases": "controls_commands"
+    }
+  },
+  "source-query-api": {
+    "kind": "receipt",
+    "prefix": "source-query-api/",
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/crate-query-graph/source_checks.py"
+    ],
+    "receipt": {
+      "output": 1,
+      "stdout": "checks.log"
+    }
+  },
+  "workflow-lint": {
+    "command": [
+      ".mlf-build/actionlint/actionlint",
+      "-shellcheck=",
+      "-pyflakes="
+    ],
+    "kind": "exit",
+    "ids": [
+      "workflow-lint/contract"
+    ]
+  }
+}

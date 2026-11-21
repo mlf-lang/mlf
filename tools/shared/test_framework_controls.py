@@ -27,12 +27,13 @@ CONTRACT = json.loads(CONTRACT_PATH.read_text())
 IDS = CONTRACT['framework_ids']
 COMMON = ['static-oracle-contract', 'compile-harness', 'c-host', 'c-supervisor',
           'link-harness', 'class-demand-IO-controls']
-FRAMEWORK = ['discovery', 'framework', 'exact-selection', 'reject-unknown',
+FRAMEWORK = ['discovery', 'exact-selection', 'reject-unknown',
              'reject-empty', 'reject-absent', 'report-write-failure']
 EXPECTED_DISPATCH = {
     'all': COMMON + ['default'] + FRAMEWORK,
     'default': COMMON + ['default'],
-    'framework': COMMON + FRAMEWORK,
+    'framework': COMMON + ['framework'] + FRAMEWORK,
+    'controls': COMMON + FRAMEWORK,
 }
 EXPECTED_ERRORS = {'reject-unknown': 2, 'reject-empty': 2,
                    'reject-absent': 2, 'report-write-failure': 1}
@@ -58,8 +59,8 @@ def successful_outputs():
             dict(schema_version=1, event='inventory', total=2, selected=2,
                  cases=[{'id': 'probe/fail'}, {'id': 'probe/after'}])
         ]) + HARNESS_MARKER,
-        'default': b''.join(b'PASS tuple/list fixture-' + str(i).encode() + b'\n'
-                            for i in range(305)) + b'Tuple/list focused checks passed.\n',
+        'default': b''.join(b'PASS ' + identity.encode() + b'  description\n'
+                            for identity in IDS) + b'Tuple/list focused checks passed.\n',
         'discovery': json_lines([dict(schema_version=1, event='inventory', total=105,
                                      selected=105, cases=[{'id': name} for name in IDS])]),
         'framework': json_lines(successful_rows(IDS, 'full')),
@@ -106,9 +107,9 @@ class MainFixture:
     def runner(self, root, output, record, save):
         assert root == ROOT and output == self.output
 
-        def run(label, command, *, status=0, timeout=120):
+        def run(label, command, *, status=0, timeout=120, overrides=None):
             command = list(map(str, command))
-            call = dict(name=label, argv=command, status=status, timeout_seconds=timeout)
+            call = dict(name=label, argv=command, status=status, timeout_seconds=timeout, overrides=overrides or {})
             self.events.append(label)
             self.calls.append(call)
             record['commands'].append(call)
@@ -122,6 +123,9 @@ class MainFixture:
             if label == 'framework':
                 report = Path(command[command.index('--report') + 1])
                 report.write_bytes(stdout if self.report_bytes is None else self.report_bytes)
+            if label == 'default':
+                report = Path(overrides['MLF_TUPLE_LIST_REPORT'])
+                report.write_bytes(self.outputs['framework'] if self.report_bytes is None else self.report_bytes)
             actual_status = self.returncodes.get(label, 0)
             call['exit_code'] = actual_status
             if actual_status != status:
@@ -177,16 +181,18 @@ class FrameworkMainControls(unittest.TestCase):
         self.assertEqual([call['name'] for call in fixture.calls], EXPECTED_DISPATCH['all'])
         calls = {call['name']: call for call in fixture.calls}
         self.assertEqual(calls['default']['argv'], [str(fixture.producer_dir / 'bin/tuple-list')])
+        self.assertEqual(calls['default']['overrides'],
+                         {'MLF_TUPLE_LIST_REPORT': str(fixture.output / 'framework-report.jsonl')})
         self.assertEqual(calls['static-oracle-contract']['argv'],
                          [sys.executable, str(ROOT / 'tools/testing/check_tuple_list_migration.py')])
         self.assertEqual(calls['class-demand-IO-controls']['argv'], [str(fixture.output / 'framework-direct')])
         self.assertEqual(receipt['selected_suites'], ['default', 'framework'])
-        self.assertEqual((receipt['default_checks'], receipt['framework_checks']), (305, 105))
+        self.assertEqual((receipt['default_checks'], receipt['framework_checks']), (105, 0))
         self.assertEqual(receipt['coverage_scope'], 'full')
 
-    def test_all_and_disjoint_shards_preserve_exact_union_and_shared_controls(self):
+    def test_aliases_and_controls_share_one_registry_execution(self):
         heavy = {}
-        for selection, counts in [('all', (305, 105)), ('default', (305, 0)), ('framework', (0, 105))]:
+        for selection, counts in [('all', (105, 0)), ('default', (105, 0)), ('framework', (0, 105)), ('controls', (0, 0))]:
             with self.subTest(selection=selection):
                 fixture = MainFixture(self)
                 receipt = fixture.execute('--suite', selection)
@@ -196,6 +202,8 @@ class FrameworkMainControls(unittest.TestCase):
                 self.assertTrue(receipt['complete'])
                 self.assertFalse(receipt['full_native_unit'])
                 self.assertEqual((receipt['default_checks'], receipt['framework_checks']), counts)
+                self.assertEqual(receipt['registry_checks'], sum(counts))
+                self.assertEqual(receipt['legacy_observations'], 305)
                 self.assertEqual(receipt['selected_suites'], ['default', 'framework'] if selection == 'all' else [selection])
                 self.assertEqual(receipt['coverage_scope'], 'full' if selection == 'all' else 'partition')
                 self.assertTrue(receipt['standard_class_demand_IO_controls'])
@@ -203,8 +211,8 @@ class FrameworkMainControls(unittest.TestCase):
                 self.assertEqual(receipt['exact_selection'], selection != 'default')
         self.assertEqual(heavy['default'], ['default'])
         self.assertEqual(heavy['framework'], ['framework'])
-        self.assertFalse(set(heavy['default']) & set(heavy['framework']))
-        self.assertEqual(heavy['all'], heavy['default'] + heavy['framework'])
+        self.assertEqual(heavy['all'], heavy['default'])
+        self.assertEqual(heavy['controls'], [])
 
     def test_producer_authentication_brackets_every_successful_partition(self):
         for selection in ('all', 'default', 'framework'):
@@ -219,7 +227,7 @@ class FrameworkMainControls(unittest.TestCase):
         receipt = fixture.execute()
         self.assertEqual(receipt['execution_budget'], 600)
         self.assertEqual({call['name']: call['timeout_seconds'] for call in fixture.calls
-                          if call['name'] in ('default', 'framework')}, {'default': 600, 'framework': 600})
+                          if call['name'] in ('default', 'framework')}, {'default': 600})
         self.assertTrue(all(call['timeout_seconds'] == 120 for call in fixture.calls
                             if call['name'] not in ('default', 'framework')))
 
@@ -244,7 +252,7 @@ class FrameworkMainControls(unittest.TestCase):
                 receipt = fixture.execute('--suite-timeout', str(budget))
                 self.assertEqual(receipt['execution_budget'], budget)
                 self.assertEqual([call['timeout_seconds'] for call in fixture.calls
-                                  if call['name'] in ('default', 'framework')], [budget, budget])
+                                  if call['name'] in ('default', 'framework')], [budget])
 
     def test_o0_framework_override_preserves_other_command_budgets_and_coverage(self):
         fixture = MainFixture(self, '0')
@@ -272,7 +280,7 @@ class FrameworkMainControls(unittest.TestCase):
         receipt = fixture.execute('--suite', 'default', '--suite-timeout', '5400')
         self.assertEqual(receipt['execution_budget'], 5400)
         self.assertEqual(receipt['selected_suites'], ['default'])
-        self.assertEqual((receipt['default_checks'], receipt['framework_checks']), (305, 0))
+        self.assertEqual((receipt['default_checks'], receipt['framework_checks']), (105, 0))
         self.assertEqual(fixture.events, ['authenticate', *EXPECTED_DISPATCH['default'], 'authenticate'])
         self.assertEqual({call['name']: call['timeout_seconds'] for call in fixture.calls},
                          {label: 5400 if label == 'default' else 120 for label in EXPECTED_DISPATCH['default']})
@@ -346,17 +354,18 @@ class FrameworkMainControls(unittest.TestCase):
                 self.assertEqual(fixture.events.count('authenticate'), 1)
 
     def test_default_missing_or_extra_observation_rejected(self):
-        for count in (304, 306):
-            with self.subTest(count=count):
-                fixture = MainFixture(self)
-                fixture.outputs['default'] = b'PASS tuple/list fixture\n' * count + b'Tuple/list focused checks passed.\n'
-                self.assert_failed(fixture, '--suite', 'default', message='legacy observation inventory')
+        for mutation in (lambda ids: ids[1:], lambda ids: ids + ids[:1], lambda ids: ids[::-1]):
+            fixture = MainFixture(self)
+            fixture.outputs['default'] = b''.join(
+                b'PASS ' + identity.encode() + b'\n' for identity in mutation(IDS)
+            ) + b'Tuple/list focused checks passed.\n'
+            self.assert_failed(fixture, '--suite', 'default', message='registry observation inventory')
 
     def test_default_missing_or_nonterminal_completion_marker_rejected(self):
         for mutation in (lambda data: data.rsplit(b'Tuple/list', 1)[0], lambda data: data + b'late output\n'):
             fixture = MainFixture(self)
             fixture.outputs['default'] = mutation(fixture.outputs['default'])
-            self.assert_failed(fixture, '--suite', 'default', message='legacy observation inventory')
+            self.assert_failed(fixture, '--suite', 'default', message='registry observation inventory')
 
     def test_harness_missing_marker_or_truncated_discovery_rejected_in_each_shard(self):
         for selection in ('default', 'framework'):
@@ -457,9 +466,9 @@ class FrameworkMainControls(unittest.TestCase):
         self.assertEqual(receipt['object_inputs'], fixture.producer['object_inputs'])
         for relative in ('tools/shared/test_framework_direct.py', 'tools/shared/test_direct.py',
                          'tools/testing/tuple-list-active-contract.json', 'tests/Tests/TupleList.hs',
-                         'tests/Tests/TupleListLegacy.hs', 'tests/MLF/Entry/TupleList.hs'):
+                         'tools/testing/events.py', 'tests/MLF/Entry/TupleList.hs'):
             self.assertEqual(receipt['inputs'][relative], hashlib.sha256((ROOT / relative).read_bytes()).hexdigest())
-        self.assertEqual(len(receipt['artifacts']), 4)
+        self.assertEqual(len(receipt['artifacts']), 5)
 
 
 if __name__ == '__main__':

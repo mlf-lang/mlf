@@ -22,23 +22,18 @@ lines on both paths, including recursion, tuple arities, do patterns and lazy
 fields. Its source and expected output are `fixtures/tuple-list-runtime.*`;
 logs and generated LLVM default to `.mlf-build/tuple-list-runtime/`.
 
-Pull requests require the small [compiler source smoke suite](../docs/ci.md):
-the verified seed interprets `PRQuickMain.emlf` against the checkout frontend and
-current/frozen target checkers through the split library roots, with two accepted
-cases, two source rejections and one malformed target. This does not build fresh
-tools or test current LLVM execution. Every push to `main` automatically runs all
-six complete Linux/macOS campaigns, the native Windows qualification and the
-full ten-workload Benchmark Game with seven samples and explicit 3x C compilation
-/ 2x C runtime gates. The eight direct CLI and three package/cache checks are
-preserved against the final macOS candidate. Manual CI with `full_validation`
-(or `self_host`) enabled runs the same graph. SDK packaging and publication are
-reserved for explicit release runs; no full-test or platform coverage is silently
-replaced by a smoke result. See [the CI policy](../docs/ci.md).
+The ordinary CI routine uses one GHC O0 producer for source smoke, direct-host
+checks, TupleList, Figure 12, parity and the interpreter/LLVM backend matrix.
+The optimizer profile retains its O2 checks and measured compiler-shape
+comparison. The Windows runtime and native C lifecycle jobs run their own
+platform adapters. Manual CI with `full_validation` or `self_host` enabled
+runs native qualification. Explicit release workflows also rehearse packaging
+and relocation. [CI policy](../docs/ci.md)
 
-The broader campaign remains available as `tools/release/native-ci.sh extended-pr-smoke`:
-framework/process contracts, Figure 12, four independent checker controls,
-12 interpreter/LLVM fixtures and package/cache checks. The six full root groups
-below retain their existing coverage.
+The expanded native smoke profile remains available as
+`tools/release/native-ci.sh extended-pr-smoke`. It checks the framework
+contracts, Figure 12, four independent target controls, 12 backend fixtures and
+package cache behavior. It uses the same Figure 12 registry as native unit.
 
 The local `mlf-tests` package preserves the original assertions, input corpora,
 runtime event traces, generated graph properties, and harness fault injections.
@@ -49,12 +44,14 @@ metadata. The six root commands remain full-qualification campaigns. Selected
 families share their execution unit's setup. Core uses four independent
 compilation targets while retaining the same logical execution unit.
 The test-owned `compiler-tests` runner is a private root executable; its sources
-live in `tests/CompilerTestsMain.emlf` and `Tests/CompilerTests.emlf`. It receives
+live in `tests/MLF/Entry/CompilerTests.hs` and `tests/Tests/CompilerTests.hs`. It receives
 the real package manager through `--manager`, keeps the existing six root groups
 and report paths, and fingerprints the manager and runner separately.
-The old Haskell/Python suites and Haskell compiler have been removed.
-No GHC, Cabal, or Python executable is needed. C fixtures live in `tests/native/`;
-benchmark baselines and golden oracle data remain unchanged.
+The shared source tree supplies both the GHC-hosted compiler and the native
+self-built compiler. Python dispatches specialized producers through the
+[external test catalog](external-suites.json). C fixtures live in `tests/native/`.
+The [Phase 1 handoff](../docs/test-migration-phase-1/README.md) records the
+coverage mappings and comparison commands.
 
 The reusable [`mlf-test` library](../testing/README.md) provides `Test.Case`,
 `Test.Assert` and `Test.Runner`. `int-set-unions` is the first focused runner

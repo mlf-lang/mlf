@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import subprocess
 from history_refs import historical_bytes
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -15,6 +16,7 @@ STAGED_IMPLEMENTATION = "tests/Tests/TupleList.emlf"
 SOURCE = "tests/MLF/Entry/TupleList.hs"
 IMPLEMENTATION = "tests/Tests/TupleList.hs"
 LEGACY = "tests/Tests/TupleListLegacy.hs"
+PHASE_1_PARENT = "720dd649627fbf8b19c7447493a4fdf6fd05eb39"
 
 # Reviewed against exact4d preimages through the unchanged one-time AST migrator.
 # Independently rerun: all51 AST roundtrips and literal inventories matched.
@@ -46,8 +48,9 @@ def active_contract():
     require(len(ids) == len(set(ids)) == contract["framework_count"] == 105,
             "reviewed active tuple inventory changed")
     require(contract["legacy_pass_count"] == 305, "reviewed legacy observation count changed")
-    require(set(contract["source_sha256"]) == {IMPLEMENTATION, SOURCE, LEGACY},
+    require(set(contract["source_sha256"]) == {IMPLEMENTATION, SOURCE},
             "active tuple source inventory changed")
+    require(contract["phase_1_parent"] == PHASE_1_PARENT, "Phase 1 archive revision changed")
     return contract
 
 
@@ -69,11 +72,11 @@ def verify_shared(path, source):
 
 def verify_current_sources(root=None):
     root = ROOT if root is None else root
-    paths = (IMPLEMENTATION, SOURCE, LEGACY)
+    paths = (IMPLEMENTATION, SOURCE)
     sources = {path: (root / path).read_bytes().decode("utf-8") for path in paths}
     for path, source in sources.items():
         verify_shared(path, source)
-    for removed in (FROZEN_SOURCE, STAGED_IMPLEMENTATION,
+    for removed in (FROZEN_SOURCE, STAGED_IMPLEMENTATION, LEGACY,
                     "tests/Tests/TupleListLegacy.emlf"):
         require(not (root / removed).exists(), "duplicate live implementation: " + removed)
     return sources
@@ -261,12 +264,15 @@ def main():
     shared_ids = re.findall(r'leaf\s+"([^"]+)"', sources[IMPLEMENTATION])
     contract = active_contract()
     require(shared_ids == contract["framework_ids"], "active ordered leaf inventory differs from reviewed contract")
-    # The separate native path is not replaced by focused interpreter checks.
-    for path in ("tools/release/test-tuple-list.sh", "tests/fixtures/tuple-list-runtime.emlf", "tests/fixtures/tuple-list-runtime.stdout"):
+    legacy = subprocess.check_output(["git", "--no-replace-objects", "show", f"{PHASE_1_PARENT}:{LEGACY}"], cwd=ROOT)
+    require(hashlib.sha256(legacy).hexdigest() == contract["baseline_legacy_sha256"],
+            "archived legacy TupleList source changed")
+    # Native fixture identity stays independent of the process adapter.
+    for path in ("tests/fixtures/tuple-list-runtime.emlf", "tests/fixtures/tuple-list-runtime.stdout"):
         require((ROOT / path).read_text() == frozen(path), f"native route changed: {path}")
     print(json.dumps({"kind": "static-source-preservation", "baseline": BASELINE,
                       "historical_leaf_ids": 90, "active_leaf_ids": contract["framework_count"],
-                      "active_legacy_observations": contract["legacy_pass_count"], "default_implementation": "legacy", "literal_calls_preserved": count,
+                      "active_legacy_observations": contract["legacy_pass_count"], "default_implementation": "framework", "literal_calls_preserved": count,
                       "oracle_helpers_preserved": 12, "mutation_controls": len(mutations),
                       "historical_shared_semantic_contract": REVIEWED_SHARED_SHA256,
                       "active_shared_semantic_contract": contract,

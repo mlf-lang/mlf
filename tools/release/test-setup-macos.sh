@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Exercise the real setup script without touching Homebrew or using the network.
 set -euo pipefail
+. "$(dirname -- "$0")/test-events.sh" release-setup-macos
 cd -- "$(dirname -- "$0")/../.."
 root=$PWD
 scratch=$(mktemp -d)
@@ -88,7 +89,8 @@ SH
 chmod +x "$scratch/bin/"*
 count=0
 run_case() {
-  local label=$1 expected=$2; shift 2
+  local case_id=$1 label=$2 expected=$3; shift 3
+  release_begin "release/macos-dependencies/$case_id"
   count=$((count + 1))
   local repetitions=1 profile=qualification roots="llvm gmp pkgconf bdw-gc" installed=6
   if [ "${1:-}" = benchmarks ]; then profile=benchmarks; roots="$roots lld pcre2"; installed=8; shift; fi
@@ -105,7 +107,7 @@ run_case() {
     "$@" bash "$work/tools/release/setup-macos.sh" "$profile" >> "$work/output" 2>&1 || status=$?
   done
   if { [ "$expected" = pass ] && [ "$status" != 0 ]; } || { [ "$expected" = fail ] && [ "$status" = 0 ]; }; then
-    cat "$work/output" >&2; printf 'FAIL %s (status %s)\n' "$label" "$status" >&2; exit 1
+    cat "$work/output" >&2; printf 'FAIL %s (status %s)\n' "$label" "$status" >&2; false
   fi
   if [ "$expected" = pass ]; then
     test "$(grep -Ec '^brew (reinstall|install) --force-bottle' "$work/commands")" = "$((installed * repetitions))"
@@ -117,25 +119,26 @@ run_case() {
     grep -q 'homebrew-core.git 842dec212e8602f00b8601f5791dbad263e22dd8$' "$work/commands"
   fi
   printf 'PASS macOS dependencies: %s\n' "$label"
+  release_pass
 }
-run_case 'fresh bottle closure, revision suffix and dirty image tap preservation' pass
-run_case 'repeated setup reuses owned tap and preserves the original once' pass repeat
-run_case 'ignore stale installed receipts and reinstall matching or newer bottles' pass MOCK_INSTALLED=1
-run_case 'benchmark closure includes pinned linker and PCRE2' pass benchmarks
-run_case 'benchmark closure rejects missing PCRE2 bottle' fail benchmarks MOCK_MISSING_BOTTLE=pcre2
-run_case 'developer machine rejected' fail GITHUB_ACTIONS=false
-run_case 'self-hosted runner rejected' fail RUNNER_ENVIRONMENT=self-hosted
-run_case 'Linux rejected' fail MOCK_OS=Linux
-run_case 'Intel rejected' fail MOCK_ARCH=x86_64
-run_case 'different macOS bottle platform rejected' fail MOCK_VERSION=27.0
-run_case 'nonstandard prefix rejected' fail MOCK_PREFIX=/usr/local
-run_case 'dirty owned formula checkout rejected' fail MOCK_DIRTY=1
-run_case 'unexpected formula remote rejected' fail MOCK_REMOTE=https://example.invalid/core.git
-run_case 'fetch failure stops installation' fail MOCK_FETCH_FAIL=1
-run_case 'checkout failure stops installation' fail MOCK_CHECKOUT_FAIL=1
-run_case 'wrong checked-out revision rejected' fail MOCK_COMMIT=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-run_case 'missing fixed bottle rejected' fail MOCK_MISSING_BOTTLE=llvm
-run_case 'unsafe dependency name rejected' fail MOCK_EXTRA_DEP=../escape
-run_case 'failed install is not reported as complete' fail MOCK_INSTALL_FAIL=llvm
-run_case 'wrong active keg rejected' fail MOCK_WRONG_KEG=llvm
+run_case fresh-bottle 'fresh bottle closure, revision suffix and dirty image tap preservation' pass
+run_case repeat-owned-tap 'repeated setup reuses owned tap and preserves the original once' pass repeat
+run_case stale-receipt 'ignore stale installed receipts and reinstall matching or newer bottles' pass MOCK_INSTALLED=1
+run_case benchmarks-closure 'benchmark closure includes pinned linker and PCRE2' pass benchmarks
+run_case missing-pcre2 'benchmark closure rejects missing PCRE2 bottle' fail benchmarks MOCK_MISSING_BOTTLE=pcre2
+run_case developer-host 'developer machine rejected' fail GITHUB_ACTIONS=false
+run_case self-hosted-runner 'self-hosted runner rejected' fail RUNNER_ENVIRONMENT=self-hosted
+run_case linux 'Linux rejected' fail MOCK_OS=Linux
+run_case intel 'Intel rejected' fail MOCK_ARCH=x86_64
+run_case bottle-platform 'different macOS bottle platform rejected' fail MOCK_VERSION=27.0
+run_case prefix 'nonstandard prefix rejected' fail MOCK_PREFIX=/usr/local
+run_case dirty-tap 'dirty owned formula checkout rejected' fail MOCK_DIRTY=1
+run_case remote 'unexpected formula remote rejected' fail MOCK_REMOTE=https://example.invalid/core.git
+run_case fetch-failure 'fetch failure stops installation' fail MOCK_FETCH_FAIL=1
+run_case checkout-failure 'checkout failure stops installation' fail MOCK_CHECKOUT_FAIL=1
+run_case commit 'wrong checked-out revision rejected' fail MOCK_COMMIT=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+run_case missing-bottle 'missing fixed bottle rejected' fail MOCK_MISSING_BOTTLE=llvm
+run_case unsafe-dependency 'unsafe dependency name rejected' fail MOCK_EXTRA_DEP=../escape
+run_case install-failure 'failed install is not reported as complete' fail MOCK_INSTALL_FAIL=llvm
+run_case wrong-keg 'wrong active keg rejected' fail MOCK_WRONG_KEG=llvm
 printf '%s pinned macOS dependency checks passed\n' "$count"

@@ -8,6 +8,7 @@ import random
 import shutil
 import sys
 import command_runner
+import framework_results as framework
 import generate as G
 import query_cache as Q
 import provenance
@@ -47,9 +48,12 @@ def interleave_pairs(schedule, repeats, rng):
 def main():
     data=registry()
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--setup',type=Path,required=True)
-    parser.add_argument('--output',type=Path,required=True)
+    listing = '--framework-list' in sys.argv[1:]
+    parser.add_argument('--framework-list',action='store_true')
+    parser.add_argument('--setup',type=Path,required=not listing)
+    parser.add_argument('--output',type=Path,required=not listing)
     parser.add_argument('--pilot',action='store_true')
+    parser.add_argument('--framework-child',action='store_true',help=argparse.SUPPRESS)
     parser.add_argument('--family',action='append',choices=G.FAMILIES+('baseline',))
     parser.add_argument('--size',action='append',type=int)
     parser.add_argument('--repeats',type=int,default=data['repeats'])
@@ -62,6 +66,19 @@ def main():
     args=parser.parse_args()
     if args.cohort_output_gib <= 0:
         parser.error('--cohort-output-gib must be positive')
+    sizes=args.size or ((8,) if args.pilot else tuple(data['sizes']))
+    if not all(0<n<=8192 for n in sizes):
+        parser.error('sizes must be bounded and positive')
+    cells = G.coordinates(sizes, args.family)
+    if args.framework_list:
+        framework.list_cases(cells, args.pilot)
+        return
+    cells, selected = framework.select(cells, args.pilot, exclude=args.framework_child)
+    if not cells or len(cells) != len(set(cells)):
+        parser.error('shape coordinates must be nonempty and distinct')
+    ids = selected if framework.active() and not args.framework_child else []
+    if ids:
+        framework.events.plan(ids)
     out=args.output.resolve(); out.mkdir(parents=True,exist_ok=False)
     H=command_runner.load_helper()
     setup=H.load(args.setup.resolve()); H.require(setup['complete'],'qualified fixed dependencies')
@@ -71,9 +88,9 @@ def main():
     auth=H.authenticate(Path(setup['producer']),Path(setup.get('source',ROOT)))
     repeats=1 if args.pilot else args.repeats
     H.require(repeats>=1,'positive repeats')
-    sizes=args.size or ((8,) if args.pilot else tuple(data['sizes']))
-    H.require(all(0<n<=8192 for n in sizes),'bounded positive sizes')
-    cases=G.generate(out/'sources',sizes=sizes,families=args.family)
+    sizes = list(dict.fromkeys(size for _, size in cells if size))
+    families = list(dict.fromkeys(family for family, _ in cells))
+    cases=G.generate(out/'sources',sizes=sizes,families=families)
     seed=data['seed']; rng=random.Random(seed); order=list(cases);rng.shuffle(order)
     schedule=[]
     for index,case in enumerate(order):
@@ -83,7 +100,7 @@ def main():
     if args.interleave_pairs:
         schedule=interleave_pairs(schedule,repeats,rng)
     inputs={str(p.resolve()):H.sha(p) for p in [args.setup,Path(H.__file__),HERE/'command_runner.py',HERE/'bench.py',HERE/'run.py',HERE/'worker.py',HERE/'generate.py',
-        HERE/'data_shapes.py',HERE/'rank_shapes.py',
+        HERE/'data_shapes.py',HERE/'rank_shapes.py',HERE/'framework_results.py',ROOT/'tools/testing/events.py',
         HERE/'matrix.json',HERE/'query_cache.py',HERE/'provenance.py',Q.SHARED/'artifact_binary_reference.py',
         Q.SHARED/'test_query_index.py',Q.SHARED/'artifact_binary_open.py',
         Path(setup['producer'])/'receipt.json',Path(setup['producer'])/'bin/emlf',
@@ -126,11 +143,14 @@ def main():
         'timing_boundary':'exact-child worker launch through wait4; common Python dispatcher included; preparation and validation excluded'}
     plan_path=out/'plan.json';H.save(plan_path,plan);plan_sha=H.sha(plan_path)
     scripts=out/'scripts';scripts.mkdir()
-    for name in ['run.py','worker.py','generate.py','data_shapes.py','rank_shapes.py','matrix.json','query_cache.py','provenance.py']:
+    for name in ['run.py','worker.py','generate.py','data_shapes.py','rank_shapes.py','matrix.json','query_cache.py','provenance.py','framework_results.py']:
         shutil.copy2(HERE/name,scripts/name)
+    shutil.copy2(ROOT/'tools/testing/events.py', scripts/'events.py')
     record={'complete':False,'plan_sha256':plan_sha,'runs':[],'failures':[]}; refs={};blocked=set()
     def save():H.save(out/'receipt.json',record)
     save();H.check_pins(inputs)
+    by_id = {case['id']: case for case in cases}
+    remaining = {case['id']: repeats * 2 for case in cases}
     with H.SerialLock(ROOT/'.mlf-build'):
         for index,item in enumerate(schedule):
             if item['case'] in blocked:continue
@@ -139,7 +159,11 @@ def main():
                 # the receipt so an incomplete cohort is self-describing.
                 record['stop_reason']='aggregate cohort output budget between legs';save()
                 raise RuntimeError(record['stop_reason'])
-            case=next(c for c in cases if c['id']==item['case']);lane=item['lane']
+            case=by_id[item['case']];lane=item['lane']
+            cell = (case['family'], case['size'])
+            if remaining[case['id']] == repeats * 2:
+                framework.start(ids, cell, args.pilot, endpoint=args.endpoint,
+                                oracle_inputs=case['inputs'], source_sha256=case['source_sha256'])
             leg=out/'legs'/f'{index:03d}-{case["id"]}-{lane}';leg.mkdir(parents=True)
             build=leg/'build';r={'case':case['id'],'position':item['position'],'lane':lane,'complete':False}
             try:
@@ -184,6 +208,12 @@ def main():
                     H.save(leg/'query-cache-inventory.json',{str(p.relative_to(query)):{'bytes':p.stat().st_size,'sha256':H.sha(p)} for p in sorted(query.rglob('*')) if p.is_file()})
                     Q.snapshot(query,build/'unit.queries',leg/'query-graph-evidence.json')
                     shutil.rmtree(query)
+            remaining[case['id']] -= 1
+            if case['id'] in blocked or not remaining[case['id']]:
+                framework.result(ids, cell, 'fail' if case['id'] in blocked else 'pass',
+                                 args.pilot, receipt=str(out/'receipt.json'),
+                                 legs_checked=repeats * 2 - remaining[case['id']],
+                                 **({'detail': r['error'], 'lane': lane} if 'error' in r else {}))
         H.check_pins(inputs)
         H.require(H.authenticate(Path(setup['producer']),Path(setup.get('source',ROOT)))==auth,'ordinary producer unchanged')
     record.update(complete=True,all_cases_passed=not blocked,failed_cases=sorted(blocked));save()

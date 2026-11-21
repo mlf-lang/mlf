@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import platform
 import statistics
@@ -13,6 +14,7 @@ import sys
 import time
 
 import generate
+from framework_results import events
 from prepare import prepare_host_package
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -31,6 +33,18 @@ LIMITS = {
     "process_tree_rss_bytes": 5 * GiB,
     "wall_seconds": 180,
 }
+WORKLOADS = ("dependency_chain", "flat_functions", "recursive_ring", "module_diamond", "compiler_unicode")
+
+
+def select_cases(names, size, edited):
+    cases = {name: f"{name}-{size}" + ("-edited" if edited else "") for name in names}
+    by_id = {f"compiler-shapes-installed/{kind}/{cell}": name
+             for name, cell in cases.items() for kind in ("correctness", "comparison")}
+    exact = os.environ.get("MLF_TEST_EXACT") if os.environ.get("MLF_TEST_SUITE") == "compiler-shapes-installed" else None
+    if exact:
+        require(exact in by_id, "unknown installed shape case: " + exact)
+        return {exact: by_id[exact]}
+    return by_id
 
 
 def require(ok, message):
@@ -212,8 +226,10 @@ def summarize(cases, samples, repeats, states):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    listing = "--framework-list" in sys.argv[1:]
+    parser.add_argument("--framework-list", action="store_true")
     for option in ("before", "after", "output"):
-        parser.add_argument("--" + option, type=Path, required=True)
+        parser.add_argument("--" + option, type=Path, required=not listing)
     parser.add_argument("--size", type=int, default=16)
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument(
@@ -223,6 +239,14 @@ def main():
     )
     args = parser.parse_args()
     require(args.size > 0 and args.repeats >= 3, "positive size and at least three rounds required")
+    identities = select_cases(("module_diamond",) if args.diamond_edit else WORKLOADS,
+                              args.size, args.diamond_edit)
+    if args.framework_list:
+        print(json.dumps(list(identities)))
+        return 0
+    report_cases = os.environ.get("MLF_TEST_SUITE") == "compiler-shapes-installed"
+    if report_cases:
+        events.plan(identities)
     out = args.output.resolve()
     out.mkdir(parents=True, exist_ok=False)
     producers = {k: installation(getattr(args, k)) for k in ("before", "after")}
@@ -239,6 +263,8 @@ def main():
 
     db = prepare_host_package(ghc, before / "sources", before, out / "host", run_setup)
     cases = workloads(out / "sources", args.size)
+    require(tuple(cases) == WORKLOADS, "installed shape case inventory differs")
+    cases = {name: case for name, case in cases.items() if name in identities.values()}
     edit = None
     states = ("fresh", "warm")
     if args.diamond_edit:
@@ -276,9 +302,17 @@ def main():
     dump(out / "plan.json", plan)
     results = {"plan_sha256": sha(out / "plan.json"), "samples": [], "complete": False}
     runner = resources.Runner(out, LIMITS)
+    started = set()
+    expected_per_case = args.repeats * len(states) * 3
+    by_case = {name: [] for name in cases}
     for item in schedule:
         lane, name, state, r = (item[k] for k in ("lane", "case", "state", "round"))
         case = cases[name]
+        if report_cases and name not in started:
+            for identity, workload in identities.items():
+                if workload == name:
+                    events.start(identity, endpoint=plan["endpoint"], repeats=args.repeats)
+            started.add(name)
         src = Path(case["directory"])
         dest = out / "legs" / name / str(r) / lane
         dest.mkdir(parents=True, exist_ok=True)
@@ -395,10 +429,17 @@ def main():
         except (OSError, ValueError, RuntimeError, KeyError, subprocess.SubprocessError) as exc:
             sample.update(passed=False, error=str(exc))
         results["samples"].append(sample)
+        by_case[name].append(sample)
         dump(out / "receipt.json", results)
         print(
             f"{name} {r} {state} {lane} {sample.get('wall_s', '-')} {sample.get('error', 'OK')}", flush=True
         )
+        if report_cases and len(by_case[name]) == expected_per_case:
+            failed = sum(not sample["passed"] for sample in by_case[name])
+            for identity, workload in identities.items():
+                if workload == name:
+                    events.result(identity, "fail" if failed else "pass", receipt=str(out / "receipt.json"),
+                                  states=list(states), failed=failed)
     results["complete"] = all(s["passed"] for s in results["samples"])
     results["summary"] = summarize(cases, results["samples"], args.repeats, states)
     dump(out / "receipt.json", results)

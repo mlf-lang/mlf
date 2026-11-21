@@ -2,11 +2,12 @@
  * a separate process. Gates establish overlap and dependency ordering without
  * assuming that a compiler completes within some arbitrary sleep interval. */
 #include "build_runner_test_support.h"
+#include "test_case_events.h"
 static const char *runner,*fixture;
 static char scratch[4096],plan_path[4096],result_path[4096];
 static unsigned checks;
 static void check(int condition,const char *message) {
-    if(!condition) { fprintf(stderr,"build runner test failed: %s\n",message); exit(1); }
+    if(!condition) { fprintf(stderr,"build runner test failed: %s\n",message); mlf_case_result("fail", 1); exit(1); }
 }
 static void join(char *out,size_t size,const char *directory,const char *name) { int n=snprintf(out,size,"%s/%s",directory,name); check(n>=0 && (size_t)n<size,"test path length"); }
 static void path(char *out,size_t size,const char *name) { join(out,size,scratch,name); }
@@ -177,11 +178,49 @@ static void binding(void) {
     f=begin("binding-two",1,0); char *two=finish(start(f),0);
     char *a=strstr(one,"\"plan_digest\":\""),*b=strstr(two,"\"plan_digest\":\""); check(a&&b,"plan digests"); a+=15; b+=15; check(strncmp(a,b,64)!=0,"plan digest binds invocation bytes"); free(one); free(two); ++checks;
 }
+static void protocol(void) {
+    char *version[]={(char *)runner,"--protocol-version",NULL};
+    check(test_wait(test_spawn(version),10)==0,"protocol capability"); ++checks;
+}
+static void runner_death(void) { crash(0); }
+static void coordinator_death(void) { crash(1); }
+static void run_case(const char *id, void (*action)(void)) {
+    if (!mlf_case_selected(id)) return;
+    mlf_case_start(id);
+    action();
+    mlf_case_result("pass", 0);
+}
 static int tests(int argc,char **argv) {
     if(argc!=4) return 64; runner=argv[1]; fixture=argv[2]; test_mkdir(argv[3]);
     int n=snprintf(scratch,sizeof(scratch),"%s/build-runner-%ld",argv[3],test_pid()); check(n>=0 && (size_t)n<sizeof(scratch),"scratch path"); test_mkdir(scratch);
-    char *version[]={(char *)runner,"--protocol-version",NULL}; check(test_wait(test_spawn(version),10)==0,"protocol capability"); ++checks;
-    diamond(); large_serial(); no_barrier(); failure(); active_failure(); successful_cleanup(); timeout(); crash(0); crash(1); cancellation(); unicode(); redirected_input(); nonce(); missing_tool(); for(unsigned i=0;i<6;++i) invalid(i); binding();
-    printf("%u native build runner tests passed\n",checks); return 0;
+    run_case("native-build-runner/protocol", protocol);
+    run_case("native-build-runner/diamond", diamond);
+    run_case("native-build-runner/eighty-serial-tasks", large_serial);
+    run_case("native-build-runner/no-level-barrier", no_barrier);
+    run_case("native-build-runner/fail-fast", failure);
+    run_case("native-build-runner/active-failure", active_failure);
+    run_case("native-build-runner/successful-cleanup", successful_cleanup);
+    run_case("native-build-runner/deadline", timeout);
+    run_case("native-build-runner/runner-death", runner_death);
+    run_case("native-build-runner/coordinator-death", coordinator_death);
+    run_case("native-build-runner/cancellation", cancellation);
+    run_case("native-build-runner/unicode-argv", unicode);
+    run_case("native-build-runner/redirected-input", redirected_input);
+    run_case("native-build-runner/invocation-nonce", nonce);
+    run_case("native-build-runner/missing-tool", missing_tool);
+    const char *invalid_cases[] = {
+        "native-build-runner/cycle", "native-build-runner/duplicate-id",
+        "native-build-runner/missing-dependency", "native-build-runner/duplicate-dependency",
+        "native-build-runner/trailing-bytes", "native-build-runner/truncated-plan"
+    };
+    for (unsigned i=0; i<sizeof(invalid_cases)/sizeof(invalid_cases[0]); ++i) {
+        if (!mlf_case_selected(invalid_cases[i])) continue;
+        mlf_case_start(invalid_cases[i]);
+        invalid(i);
+        mlf_case_result("pass", 0);
+    }
+    run_case("native-build-runner/plan-binding", binding);
+    printf("%u native build runner tests passed\n",checks);
+    return checks ? 0 : 64;
 }
 TEST_MAIN(tests)

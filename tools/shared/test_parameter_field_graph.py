@@ -60,6 +60,28 @@ def verify_result(returncode, stdout, stderr):
 
 
 def self_test():
+    import sys
+
+    sys.path.insert(0, str(ROOT / 'tools/testing'))
+    import events
+
+    def check(label, action):
+        identity = 'release/parameter-field-controls/' + label.lower().replace(' ', '-')
+        events.start(identity)
+        try:
+            action()
+        except Exception as error:
+            events.result(identity, 'fail', detail=str(error))
+            raise
+        events.result(identity, 'pass')
+
+    def rejects(action, label):
+        try:
+            action()
+        except ValueError:
+            return
+        raise AssertionError('accepted ' + label)
+
     # Fixed independent wire oracle, not generated from EXPECTED_CHECKS or the
     # Haskell fixture. Mutating the gate's inventory must not redefine success.
     fixed = b"""PASS rigid root-local quantifier is eligible
@@ -82,7 +104,7 @@ PASS no-op case does not conceal malformed indexes
 PASS higher-kinded local variables preserve kind and identity sharing
 field projection graph: passed (18 authored checks)
 """
-    verify_result(0, fixed, b'')
+    check('complete output', lambda: verify_result(0, fixed, b''))
     lines = fixed.splitlines(keepends=True)
     mutations = [
         ('missing observation', b''.join(lines[:-2] + lines[-1:])),
@@ -98,30 +120,19 @@ field projection graph: passed (18 authored checks)
         ('missing terminal newline', fixed[:-1]),
     ]
     for label, changed in mutations:
+        check(label, lambda: rejects(lambda: verify_result(0, changed, b''), label))
+    for label, status, stderr in [('nonzero-exit', 1, b''), ('signal', -9, b''), ('stderr', 0, b'warning\n')]:
+        check(label, lambda: rejects(lambda: verify_result(status, fixed, stderr), label))
+
+    def rejects_altered_inventory():
+        original = EXPECTED_CHECKS[:]
         try:
-            verify_result(0, changed, b'')
-        except ValueError:
-            pass
-        else:
-            raise AssertionError('accepted ' + label)
-    for status, stderr in [(1, b''), (-9, b''), (0, b'warning\n')]:
-        try:
-            verify_result(status, fixed, stderr)
-        except ValueError:
-            pass
-        else:
-            raise AssertionError('accepted bad exit status or stderr')
-    original = EXPECTED_CHECKS[:]
-    try:
-        EXPECTED_CHECKS.reverse()
-        try:
-            verify_inventory(fixed)
-        except ValueError:
-            pass
-        else:
-            raise AssertionError('mutated gate changed its own oracle')
-    finally:
-        EXPECTED_CHECKS[:] = original
+            EXPECTED_CHECKS.reverse()
+            rejects(lambda: verify_inventory(fixed), 'altered oracle inventory')
+        finally:
+            EXPECTED_CHECKS[:] = original
+
+    check('different-oracle', rejects_altered_inventory)
     print('parameter field graph runner: passed (16 fixed-output controls)')
 
 

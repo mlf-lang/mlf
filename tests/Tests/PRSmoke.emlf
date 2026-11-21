@@ -1,4 +1,6 @@
 module Tests.PRSmoke where
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Bootstrap.Compiler as C
@@ -11,9 +13,11 @@ import qualified Tests.BackendCases as Backend
 import qualified Tests.IOTests as IOTests
 import qualified Tests.NativeOptimization as Native
 import qualified Tests.StateRuntime as State
-import qualified Tests.Figure12Suite as Figure12
 import qualified Tests.IndependentCheck as Independent
 import qualified Tests.IndependentType as IndependentType
+import qualified Test.Assert as A
+import qualified Test.Case as Case
+import qualified Test.Runner as Runner
 
 -- Keep this selection explicit: missing, renamed or duplicate fixtures must
 -- fail the gate rather than silently reduce the number of exercised paths.
@@ -43,33 +47,54 @@ select backends = do
    (:) entry [] -> return entry
    _ -> H.fail ("missing or duplicate PR smoke fixture: " ++ label)) labels
 
-independentType : String -> XType -> IO ()
+independentType : String -> XType -> A.Test ()
 independentType source expected = do
- compiled <- H.right (C.compile "<PR smoke independent target>" source)
- term <- H.right (Parser.parseTerm "<PR smoke serialized target>" (Pretty.prettyTerm (C.compiledTerm compiled)))
- actual <- H.right (Independent.checkClosed term)
- H.assert (IndependentType.alphaEq actual expected) ("independent target type mismatch: " ++ Pretty.prettyType actual)
+ compiled <- A.right C.prettyError (C.compile "<PR smoke independent target>" source)
+ term <- A.right (\error -> error) (Parser.parseTerm "<PR smoke serialized target>" (Pretty.prettyTerm (C.compiledTerm compiled)))
+ actual <- A.right (\error -> error) (Independent.checkClosed term)
+ A.equal IndependentType.alphaEq Pretty.prettyType "independent target type" expected actual
 
-independentControls : IO ()
-independentControls = do
- independentType "\\x -> x" Figure12.identity
- independentType "let id = \\x -> x in if id true then id 42 else 0" (XCon "Int" [])
- independentType "putStrLn \"checked\"" (XCon "IO" ((:) (XCon "()" []) []))
- let malformed = XApp (XPrimitive PPutStrLn []) (XIntTerm 42)
- case Independent.checkClosed malformed of
-  Left error -> H.assert (H.contains "application type mismatch" error) error
-  Right _ -> H.fail "independent checker accepted a malformed target"
- putStrLn "4 independent target controls; 0 failures"
+control identity action = Case.test ("pr-smoke/target/" ++ identity) identity ((:) "family:pr-smoke/target" []) action
+identityType = XForall (XTyVar 0) XBot (XArrow (XVar (XTyVar 0)) (XVar (XTyVar 0)))
+
+independentControls =
+ (:) (control "polymorphic-identity" (independentType "\\x -> x" identityType))
+ ((:) (control "polymorphic-let" (independentType "let id = \\x -> x in if id true then id 42 else 0" (XCon "Int" [])))
+ ((:) (control "io-type" (independentType "putStrLn \"checked\"" (XCon "IO" ((:) (XCon "()" []) []))))
+ ((:) (control "malformed-before-effects"
+  (let malformed = XApp (XPrimitive PPutStrLn []) (XIntTerm 42) in
+   case Independent.checkClosed malformed of
+    Left error -> A.assert (H.contains "application type mismatch" error) error
+    Right _ -> A.fail "independent checker accepted a malformed target")) [])))
+
+backendIds = O.words "greeting-input-order signed-int-wrap lazy-branch repeated-io constructor-case captures-mutual-recursion lazy-partial-worker unicode-input nul state-snapshot repeated-read-action verify-before-effects"
+backendTag = "family:pr-smoke/backend"
+registry backends = do
+ actions <- select backends
+ let backendCases = S.map (\((,) name ((,) label action)) ->
+       let id = "pr-smoke/backend/" ++ name in
+       Case.test id label ((:) backendTag [])
+        (B.recoverCase (B.inRegisteredCase backends id label (do { putStrLn label; action }))))
+      (S.zip backendIds actions)
+ return (S.append independentControls backendCases)
 
 main : IO ()
 main = do
  args <- O.allArguments
- H.assert (S.null args) "pr-smoke accepts no filters"
- Figure12.main
- independentControls
- B.withBackends (\backends -> do
-  cases <- select backends
-  S.mapM_ (\((,) label action) -> B.inCase backends label (do { putStrLn label; action })) cases
-  count <- B.auditBackends backends
-  H.assert (count == 12) "PR smoke backend execution count changed"
-  putStrLn "12 PR smoke backend fixtures; 0 failures")
+ reported <- B.reportArgs args
+ inventory <- registry B.inventoryContext
+ (,) options selected <- H.right (Runner.plan reported inventory)
+ let backendCount = S.length (S.filter (\entry -> S.elem eqString backendTag (Case.tags entry)) selected)
+ if Runner.listing options || backendCount == 0 then do
+  code <- Runner.run reported inventory
+  if code == 0 then return () else exitWith code
+ else B.withBackends (\backends -> do
+  cases <- registry backends
+  code <- Runner.run reported cases
+  if code == 0 then do
+   count <- B.auditBackends backends
+   H.assert (count == backendCount) "PR smoke backend execution count changed"
+   if Runner.json options then return () else do
+    if S.length selected - backendCount == 4 then putStrLn "4 independent target controls; 0 failures" else return ()
+    putStrLn (showInt backendCount ++ " PR smoke backend fixtures; 0 failures")
+  else exitWith code)

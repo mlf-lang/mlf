@@ -1,4 +1,7 @@
 module Tests.CoreHelpers where
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
+import qualified Test.Assert as A
 import Bootstrap.Types
 import Bootstrap.Compiler
 import Bootstrap.Parser
@@ -53,19 +56,30 @@ choosePrefix : String
 choosePrefix = "let choose = ((\\x y -> x) : forall a. a -> a -> a) in let id = \\x -> x in "
 
 sameType : XType -> XType -> IO ()
-sameType actual expected = (H.assert (T.alphaEq actual expected) (H.append "expected " (H.append (prettyType expected) (H.append ", got " (prettyType actual)))))
+sameType actual expected = A.orExit (assertSameType actual expected)
 
 compileOK : String -> IO Compilation
-compileOK source = do { result <- (H.right (compile "<test>" source)); do { parsed <- (H.right (XP.parseTerm "<generated xMLF>" (prettyTerm (compiledTerm result)))); do { (H.assert (H.eq (X.erase parsed) (X.erase (compiledTerm result))) "printed output changed erasure"); do { ty <- (H.right (C.checkClosed parsed)); do { (sameType ty (inferredType result)); (return result) } } } } }
+compileOK source = A.orExit (assertCompiled source)
 
-hasType : String -> String -> XType -> (,) String (IO ())
-hasType label source ty = ((,) label (bind (compileOK source) (\r -> (sameType (inferredType r) ty))))
+assertSameType : XType -> XType -> A.Test ()
+assertSameType actual expected = (A.assert (T.alphaEq actual expected) (H.append "expected " (H.append (prettyType expected) (H.append ", got " (prettyType actual)))))
 
-accepts : String -> String -> (,) String (IO ())
-accepts label source = ((,) label (bind (compileOK source) (\ignored -> (return ()))))
+assertCompiled : String -> A.Test Compilation
+assertCompiled source = do { result <- (A.right H.show (compile "<test>" source)); do { parsed <- (A.right H.show (XP.parseTerm "<generated xMLF>" (prettyTerm (compiledTerm result)))); do { (A.assert (H.eq (X.erase parsed) (X.erase (compiledTerm result))) "printed output changed erasure"); do { ty <- (A.right H.show (C.checkClosed parsed)); do { (assertSameType ty (inferredType result)); (return result) } } } } }
 
-rejects : String -> String -> (,) String (IO ())
-rejects label source = ((,) label (case (compile "<test>" source) of { (Left (CompileError Inference _)) -> (return ()); (Left err) -> (H.fail (H.append "error at the wrong phase: " (H.show err))); (Right r) -> (H.fail (H.append "unexpected type: " (prettyType (inferredType r)))) }))
+hasType : String -> String -> XType -> (,) String (A.Test ())
+hasType label source ty = ((,) label (bind (assertCompiled source) (\r -> (assertSameType (inferredType r) ty))))
+
+accepts : String -> String -> (,) String (A.Test ())
+accepts label source = ((,) label (bind (assertCompiled source) (\ignored -> (return ()))))
+
+rejects : String -> String -> (,) String (A.Test ())
+rejects label source = ((,) label (case (compile "<test>" source) of { (Left (CompileError Inference _)) -> (return ()); (Left err) -> (A.fail (H.append "error at the wrong phase: " (H.show err))); (Right r) -> (A.fail (H.append "unexpected type: " (prettyType (inferredType r)))) }))
+
+requireRejection : forall e a. Either e a -> A.Test ()
+requireRejection value = case value of
+ Left _ -> A.succeed ()
+ Right _ -> A.fail "unexpected success"
 
 stripComputations : XTerm -> XTerm
 stripComputations t = (case t of { (XTypeApp a _) -> (stripComputations a); (XAbs n ty b) -> (XAbs n ty (stripComputations b)); (XApp a b) -> (XApp (stripComputations a) (stripComputations b)); (XTypeAbs a ty b) -> (XTypeAbs a ty (stripComputations b)); (XLet n a b) -> (XLet n (stripComputations a) (stripComputations b)); (XLetRec ds b) -> (XLetRec (S.concatMap (\((,,) n ty a) -> ((:) ((,,) n ty (stripComputations a)) [])) ds) (stripComputations b)); (XWithData ds b) -> (XWithData ds (stripComputations b)); (XCase a ty bs) -> (XCase (stripComputations a) ty (S.concatMap (\comprehension2 -> case comprehension2 of { (XAlternative p b) -> ((:) (XAlternative p (stripComputations b)) []); _ -> [] }) bs)); _ -> t })

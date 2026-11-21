@@ -55,7 +55,13 @@ class DeveloperCommands(unittest.TestCase):
             args = ['bench', 'apps', '--candidate', str(compiler), '--baseline', str(baseline),
                     '--output', str(directory / 'out'), '--driver-dir', str(directory / 'driver'),
                     '--clang', sys.executable, '--check-only']
-            with mock.patch.object(dev, 'run_build', return_value=0) as build, mock.patch.object(dev, 'launch') as launch:
+            with mock.patch.dict(os.environ, {'MLF_TEST_SUITE': ''}), mock.patch.object(dev, 'launch') as launch:
+                dev.main(args)
+                self.assertEqual(launch.call_args.args[0],
+                                 dev.python(dev.TEST_RUNNER, 'application-benchmarks', '--', *args[2:]))
+            environment = {'MLF_TEST_SUITE': 'application-benchmarks'}
+            with mock.patch.dict(os.environ, environment), \
+                 mock.patch.object(dev, 'run_build', return_value=0) as build, mock.patch.object(dev, 'launch') as launch:
                 dev.main(args)
             command, cwd = build.call_args.args
             self.assertEqual(cwd, dev.ROOT)
@@ -64,7 +70,8 @@ class DeveloperCommands(unittest.TestCase):
             self.assertEqual(launch.call_args.args[0][1:4], [compiler.resolve(), baseline.resolve(), directory / 'out'])
             self.assertEqual(launch.call_args.args[0][-1], '--check-only')
             self.assertEqual(Path.cwd(), dev.ROOT)
-            with mock.patch.object(dev, 'run_build', return_value=9), mock.patch.object(dev, 'launch') as launch:
+            with mock.patch.dict(os.environ, environment), \
+                 mock.patch.object(dev, 'run_build', return_value=9), mock.patch.object(dev, 'launch') as launch:
                 self.assertEqual(dev.main(args), 9)
             launch.assert_not_called()
 

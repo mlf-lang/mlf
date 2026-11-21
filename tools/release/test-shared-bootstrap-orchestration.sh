@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Control-only regression. These mock tools do not qualify a compiler or runtime.
 set -euo pipefail
+. "$(dirname -- "$0")/test-events.sh" release-shared-bootstrap-orchestration
 root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 work=$(mktemp -d "${TMPDIR:-/tmp}/mlf-shared-bootstrap.XXXXXXXX")
 trap 'rm -rf "$work"' EXIT
@@ -99,37 +100,51 @@ export MLF_SHARED_BOOTSTRAP_DIR="$work/build with spaces"
 export MLF_SHARED_BOOTSTRAP_CONTROL_ONLY=1
 run="$project/scripts/bootstrap-shared.sh"
 # Mock seeds are accepted only under explicit control mode, never as native evidence.
+release_begin release/shared-bootstrap-orchestration/mock-seed-rejected
 status=0
 MLF_SHARED_BOOTSTRAP_CONTROL_ONLY=0 "$run" --verify-seed-only > "$work/reject-mock.log" 2>&1 || status=$?
 test "$status" -eq 2
 grep -F 'unsupported wrapper' "$work/reject-mock.log" >/dev/null
 test ! -e "$TEST_CALLS"
+release_pass
+release_begin release/shared-bootstrap-orchestration/verify-only
 "$run" --verify-seed-only > "$work/verify-only.log" 2>&1
 jq -e '.complete == false and .phase == "seed-verified-only" and .control_only == true' "$MLF_SHARED_BOOTSTRAP_DIR/bootstrap.json" >/dev/null
 test ! -e "$TEST_CALLS"
+release_pass
+release_begin release/shared-bootstrap-orchestration/ghc-seed-rejected
 status=0
 TEST_SEED_GHC=1 "$run" > "$work/ghc-seed.log" 2>&1 || status=$?
 test "$status" -eq 2
 jq -e '.complete == false and .phase == "verify-seed"' "$MLF_SHARED_BOOTSTRAP_DIR/bootstrap.json" >/dev/null
 test ! -e "$TEST_CALLS"
+release_pass
+release_begin release/shared-bootstrap-orchestration/native-route
 "$run" > "$work/success.log" 2>&1
 jq -e '.complete == true and .fixed_point_qualified == false and .typed_completion_capability == true and .control_only == true and .seed_tools.compiler.kind == "mock-control-fixture" and .route == "mock-control/frozen-legacy-bridge/shared-source-native"' "$MLF_SHARED_BOOTSTRAP_DIR/bootstrap.json" >/dev/null
 test -x "$(cat "$MLF_SHARED_BOOTSTRAP_DIR/compiler.path")"
 test -x "$(cat "$MLF_SHARED_BOOTSTRAP_DIR/manager.path")"
 (cd /; shasum -a 256 -c "$MLF_SHARED_BOOTSTRAP_DIR/compilers.sha256" >/dev/null; shasum -a 256 -c "$MLF_SHARED_BOOTSTRAP_DIR/manager.sha256" >/dev/null)
 grep -F 'Forbidden native bootstrap dependency:' "$TEST_FORBIDDEN" >/dev/null
+release_pass
+release_begin release/shared-bootstrap-orchestration/failed-build-invalidates
 status=0
 TEST_FAIL=1 "$run" > "$work/failure.log" 2>&1 || status=$?
 test "$status" -eq 81
 jq -e '.complete == false and .phase == "current-shared-source" and .exit_code == 81' "$MLF_SHARED_BOOTSTRAP_DIR/bootstrap.json" >/dev/null
 test ! -e "$MLF_SHARED_BOOTSTRAP_DIR/compiler.path" && test ! -e "$MLF_SHARED_BOOTSTRAP_DIR/manager.path"
+release_pass
+release_begin release/shared-bootstrap-orchestration/retry
 "$run" > "$work/retry.log" 2>&1
 jq -e '.complete == true' "$MLF_SHARED_BOOTSTRAP_DIR/bootstrap.json" >/dev/null
 test "$(sort -u "$TEST_CALLS" | wc -l | tr -d ' ')" -eq 1
+release_pass
+release_begin release/shared-bootstrap-orchestration/source-mutation
 status=0
 TEST_MUTATE=1 "$run" > "$work/mutation.log" 2>&1 || status=$?
 test "$status" -ne 0
 jq -e '.complete == false and .phase == "verify-receipts"' "$MLF_SHARED_BOOTSTRAP_DIR/bootstrap.json" >/dev/null
 test ! -e "$MLF_SHARED_BOOTSTRAP_DIR/compiler.path" && test ! -e "$MLF_SHARED_BOOTSTRAP_DIR/manager.path"
+release_pass
 printf '%s\n' 'PASS shared bootstrap control: seed isolation, native-only path, both tools, truthful receipt, retry invalidation, source mutation rejection.'
 printf '%s\n' 'No real compiler, bridge build, native runtime or fixed point is qualified by this test.'

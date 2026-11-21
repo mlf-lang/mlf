@@ -5,15 +5,58 @@ import qualified Package.OS as O
 import qualified Tests.Packages as P
 import qualified Tests.PackageResolver as R
 import qualified Tests.TargetDependencies as D
+import qualified Tests.BuildScheduler as Scheduler
+import qualified Test.Case as C
+import qualified Test.Runner as Runner
+import qualified Bootstrap.Std as S
 import qualified Tests.PackageReleases as Releases
+integration tags label action = C.fromIO ("packages/" ++ tags) ((:) "mode:integration" []) ((,) label action)
+registry resolver build root = S.append (R.cases resolver)
+ [ C.test "packages/dependency-paths" "dependency proof path shapes" ((:) "mode:integration" []) P.dependencyPathShapes
+ , integration "build/isolated-action-results" "isolated build results and cache repair" (P.isolatedActionResults (P.work build))
+ , integration "build/publication-recovery" "transaction rollback and interrupted publication recovery" (P.publicationTransactions (P.work build))
+ , integration "build/local-cache" "package build, cache, compiler and collector selection" (P.buildCases build root)
+ , integration "build/checked-crate" "crate composition and incremental cache" (P.crateCases build)
+ , integration "build/non-entry-body" "library expression rejection" (P.nonEntryBodyCase build)
+ , integration "build/native-pgo" "native profile generation, reuse and invalidation" (P.pgoCase build)
+ , integration "build/shared-cache" "shared checked artifacts survive corruption, repair and movement" (P.sharedCacheCases build root)
+ , integration "target-dependencies" "target dependency integration" D.integration
+ , integration "scheduler" "build scheduler, independent coordinators and concurrent publication" Scheduler.integration
+ , C.fromIO "packages/checked-distribution" ((:) "mode:distribution" []) ((,) "checked package release and source-free consumption" Releases.main)
+ ]
+
+runPackages args = do
+ let dummyResolver = R.Resolver "" ""
+ let dummyBuild = P.Context "" "" "" "" false
+ let inventory = registry dummyResolver dummyBuild ""
+ case Runner.plan args inventory of
+  Left error -> do { putErr (error ++ "\n"); exitWith 2 }
+  Right ((,) options selected) ->
+   if Runner.listing options then do { code <- Runner.runOptions options inventory selected; exitWith code }
+   else do
+    let identities = S.map C.id selected
+    let anyPrefix prefix = S.any (O.starts prefix) identities
+    let withResolver action = if anyPrefix "packages/resolver/" then R.withResolver identities action else action dummyResolver
+    let withBuild action = if anyPrefix "packages/build/" then P.withContext action else action dummyBuild
+    Coverage.begin "packages" (S.null (Runner.selectors options))
+    root <- canonicalPath "."
+    code <- withResolver (\resolver -> withBuild (\build -> do
+     let cases = registry resolver build root
+     let chosen = S.filter (\entry -> S.elem eqString (C.id entry) identities) cases
+     Runner.runOptions options cases chosen))
+    if code == 0 then do
+     if S.all (\entry -> S.elem eqString (C.id entry) identities) (R.cases dummyResolver) then putStrLn "22 package resolver tests passed" else return ()
+     if S.all (\entry -> S.elem eqString entry identities) (O.words "packages/build/local-cache packages/build/checked-crate packages/build/non-entry-body packages/build/native-pgo packages/build/shared-cache") then putStrLn "29 package integration cases passed" else return ()
+     Coverage.finish "packages"
+    else exitWith code
+
 main : IO ()
 main = do
  args <- O.allArguments
  case args of
   (:) "--fail-command" [] -> exitWith 17
   (:) "--package-gc-check" ((:) prefix ((:) binary [])) -> P.checkGC prefix binary
-  (:) "--integration" [] -> do { Coverage.begin "packages" false; R.main; P.integration; D.integration; Coverage.finish "packages" }
-  (:) "--releases" [] -> do { Coverage.begin "packages" false; Releases.main; Coverage.finish "packages" }
+  (:) "--integration" rest -> runPackages (S.append (O.words "--tag mode:integration") rest)
+  (:) "--releases" rest -> runPackages (S.append (O.words "--tag mode:distribution") rest)
   (:) "release" _ -> Releases.githubFixture args
-  [] -> do { Coverage.begin "packages" true; R.main; P.integration; D.integration; Releases.main; Coverage.finish "packages" }
-  _ -> O.fatal "invalid package test arguments"
+  _ -> runPackages args

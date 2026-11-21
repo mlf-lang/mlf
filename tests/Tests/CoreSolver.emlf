@@ -3,6 +3,7 @@ module Tests.CoreSolver where
 import Prelude hiding (Monad, return, bind)
 import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
+import qualified Tests.CoreRegistry as Registry
 import qualified Bootstrap.Std as S
 import Bootstrap.Compiler
 import Bootstrap.Constraint (solve, generalization, skeleton)
@@ -17,6 +18,7 @@ import qualified Bootstrap.X.Type as XType
 import qualified Tests.GraphValidation as GraphValidation
 import qualified Tests.ComponentProjection as ComponentProjection
 import qualified Tests.IntSetUnions as IntSetUnions
+import qualified Test.Case as Case
 import qualified Tests.IndexEdges as IndexEdges
 import qualified Tests.ProjectionRanks as ProjectionRanks
 import qualified Tests.ProjectionChanges as ProjectionChanges
@@ -253,19 +255,19 @@ rejectedExportChecks = do
  let gap = Graph (NativeGraph.nodes original) (NativeGraph.links original) 10
  H.reject (NativeGraph.materializeExport 2 4 7 0 gap)
 
-families : [] ((,) String ([] ((,) String (IO ()))))
+families : [] ((,) String ([] ((,) String Registry.Action)))
 families =
- (:) ((,) "core/component-projection" ComponentProjection.suite)
- ((:) ((,) "core/int-set-unions" IntSetUnions.suite)
- ((:) ((,) "core/index-edges" IndexEdges.suite)
- ((:) ((,) "core/projection-ranks" ProjectionRanks.suite)
- ((:) ((,) "core/projection-changes" ProjectionChanges.suite)
- ((:) ((,) "core/solver-index-audit" SolverIndexAudit.suite)
- ((:) ((,) "core/dense-normalization" DenseNormalization.suite)
- ((:) ((,) "core/solver-allocation" SolverAllocation.suite)
- ((:) ((,) "core/graph-expansion" graphTests)
- ((:) ((,) "core/graph-validation" graphValidationTests)
- ((:) ((,) "core/graph-unification" graphUnificationTests)
- ((:) ((,) "core/graph-solver" graphSolverTests)
- ((:) ((,) "core/embedding-pruning" embeddingPruningTests)
+ (:) ((,) "core/component-projection" (Registry.isolated ComponentProjection.suite))
+ ((:) ((,) "core/int-set-unions" (Registry.recoverable (S.map (\entry -> (,) (Case.name entry) (Case.action entry)) IntSetUnions.cases)))
+ ((:) ((,) "core/index-edges" (Registry.isolated IndexEdges.suite))
+ ((:) ((,) "core/projection-ranks" (Registry.isolated ProjectionRanks.suite))
+ ((:) ((,) "core/projection-changes" (Registry.isolated ProjectionChanges.suite))
+ ((:) ((,) "core/solver-index-audit" (Registry.recoverable SolverIndexAudit.suite))
+ ((:) ((,) "core/dense-normalization" (Registry.recoverable DenseNormalization.suite))
+ ((:) ((,) "core/solver-allocation" (Registry.isolated SolverAllocation.suite))
+ ((:) ((,) "core/graph-expansion" (Registry.isolated graphTests))
+ ((:) ((,) "core/graph-validation" (Registry.recoverable graphValidationTests))
+ ((:) ((,) "core/graph-unification" (Registry.isolated graphUnificationTests))
+ ((:) ((,) "core/graph-solver" (Registry.isolated graphSolverTests))
+ ((:) ((,) "core/embedding-pruning" (Registry.isolated embeddingPruningTests))
  []))))))))))))

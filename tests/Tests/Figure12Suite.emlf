@@ -1,6 +1,7 @@
 module Tests.Figure12Suite where
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
-import qualified Tests.Coverage as Coverage
 import Bootstrap.Compiler
 import Tests.Figure12
 import qualified Bootstrap.Std as S
@@ -12,59 +13,86 @@ import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Type as T
 import qualified Package.OS as O
 import qualified Bootstrap.Map as Map
-checkOutput : Compilation -> IO ()
+import qualified Tests.Coverage as Coverage
+import qualified Test.Assert as A
+import qualified Test.Case as C
+import qualified Test.Runner as Runner
+
+checkOutput : Compilation -> A.Test ()
 checkOutput result = do
- parsed <- H.right (Parser.parseTerm "<Figure12 xMLF>" (prettyTerm (compiledTerm result)))
- ty <- H.right (Check.checkClosed parsed)
- H.assert (T.alphaEq ty (inferredType result)) "Figure12 target roundtrip changed type"
- H.assert (X.equalErased (X.erase parsed) (X.erase (compiledTerm result))) "Figure12 target roundtrip changed erasure"
-testCase : Case -> IO String
-testCase c = do
- source <- H.right (program c)
+ parsed <- A.right (\error -> error) (Parser.parseTerm "<Figure12 xMLF>" (prettyTerm (compiledTerm result)))
+ ty <- A.right (\error -> error) (Check.checkClosed parsed)
+ A.equal T.alphaEq prettyType "Figure12 target roundtrip changed type" (inferredType result) ty
+ A.assert (X.equalErased (X.erase parsed) (X.erase (compiledTerm result))) "Figure12 target roundtrip changed erasure"
+
+testCase : Case -> String -> A.Test String
+testCase c source =
  case compile ("<Figure12 " ++ caseId c ++ ">") source of
   Left err -> do
-   H.assert (S.not (expectedAcceptance c)) ("expected acceptance: " ++ prettyError err)
-   H.assert (H.eq (phase err) Inference) ("wrong rejection phase: " ++ prettyError err)
+   A.assert (S.not (expectedAcceptance c)) ("expected acceptance: " ++ prettyError err)
+   A.assert (H.eq (phase err) Inference) ("wrong rejection phase: " ++ prettyError err)
    let protected = S.elem eqString (caseId c) ((:) "A8" ((:) "E1a" []))
    let reason = if protected then "cannot raise a protected type variable" else "type constructor mismatch:"
-   H.assert (H.contains reason (diagnostic err)) ("wrong rejection reason: " ++ prettyError err)
-   if protected then return () else H.assert (H.contains "Con \"Bool\" []" (diagnostic err) && H.contains "Con \"Int\" []" (diagnostic err)) "expected Int/Bool conflict"
+   A.assert (H.contains reason (diagnostic err)) ("wrong rejection reason: " ++ prettyError err)
+   A.assert (protected || H.contains "Con \"Bool\" []" (diagnostic err) && H.contains "Con \"Int\" []" (diagnostic err)) "expected Int/Bool conflict"
    return "rejected"
   Right result -> do
-   H.assert (expectedAcceptance c) ("expected rejection: " ++ prettyType (inferredType result))
+   A.assert (expectedAcceptance c) ("expected rejection: " ++ prettyType (inferredType result))
    checkOutput result
    return "accepted; checked xMLF roundtrip"
-runTest : (,) String (IO String) -> IO ()
-runTest ((,) label action) = do { result <- action; Coverage.passed "figure12" label; putStrLn ("PASS " ++ label ++ "  " ++ result) }
-runCases : Map String ((,) String String) -> [] ((,) String String) -> [] Case -> IO ([] ((,) String String))
-runCases seen reused pending = case pending of
- [] -> return (S.reverse reused)
- (:) c rest -> do
-  source <- H.right (program c)
-  let key = (if expectedAcceptance c then "accept:" else "reject:") ++ source
-  case Map.lookup compareString key seen of
-   Just ((,) original result) -> do
-    Coverage.alias "figure12" (caseId c) original
-    putStrLn ("PASS " ++ caseId c ++ "  " ++ expression c ++ "  " ++ result ++ "; shared with " ++ original)
-    runCases seen ((:) ((,) (caseId c) original) reused) rest
-   Nothing -> do
-    result <- testCase c
-    Coverage.passed "figure12" (caseId c)
-    putStrLn ("PASS " ++ caseId c ++ "  " ++ expression c ++ "  " ++ result)
-    runCases (Map.insert compareString key ((,) (caseId c) result) seen) reused rest
-typed : String -> XType -> IO String
-typed source expected = do { result <- (H.right (compile "<Figure 12 type assertion>" source)); do { (checkOutput result); do { (H.assert (T.alphaEq (inferredType result) expected) (H.append "expected " (H.append (prettyType expected) (H.append ", got " (prettyType (inferredType result)))))); (return (prettyType (inferredType result))) } } }
+
+typed : String -> XType -> A.Test String
+typed source expected = do
+ result <- A.right prettyError (compile "<Figure 12 type assertion>" source)
+ checkOutput result
+ A.equal T.alphaEq prettyType "Figure12 principal type" expected (inferredType result)
+ return (prettyType (inferredType result))
 
 identity : XType
 identity = (XForall (XTyVar 0) XBot (XArrow (XVar (XTyVar 0)) (XVar (XTyVar 0))))
 
-typeChecks : ([] ( ((,) (String) (IO String)) ))
+typeChecks : ([] ( ((,) (String) (A.Test String)) ))
 -- A2 owns the choose-id principal bound and target roundtrip checks; Core's
 -- former byte-identical source and expected type no longer compile separately.
 typeChecks = ((:) ((,) "A1 principal type" (typed "\\x y -> y" (XForall (XTyVar 1) XBot (XForall (XTyVar 2) identity (XArrow (XVar (XTyVar 1)) (XVar (XTyVar 2))))))) ((:) ((,) "A2 principal type" (typed "let choose = ((\\x y -> x) : forall a. a -> a -> a) in let id = \\x -> x in choose id" (XForall (XTyVar 1) identity (XArrow (XVar (XTyVar 1)) (XVar (XTyVar 1)))))) ((:) ((,) "A4 inferred result bound" (typed "\\(x : forall a. a -> a) -> x x" (XForall (XTyVar 1) identity (XArrow identity (XVar (XTyVar 1)))))) ((:) ((,) "A4 admits paper signature" (typed "(\\(x : forall a. a -> a) -> x x) : (forall a. a -> a) -> (forall a. a -> a)" (XArrow identity identity))) []))))
-main : IO ()
-main = do
- Coverage.begin "figure12" true
+
+tagged identity label category body = C.test ("figure12/" ++ identity) label
+ ((:) ("family:figure12/" ++ category) []) (A.andThen body (\_ -> A.succeed ()))
+
+paperId name = "paper/" ++ name
+paperEntry c action = tagged (paperId (caseId c)) (caseId c) "paper" action
+
+-- The action closes over the pure compilation and its checks. An exact alias
+-- selection can run it alone, while a full run shares the same lazy value.
+paperCases seen inputs = case inputs of
+ [] -> (,) [] []
+ (:) ((,) c source) rest ->
+  let key = (if expectedAcceptance c then "accept:" else "reject:") ++ source in
+  case Map.lookup compareString key seen of
+   Just ((,) original action) ->
+    case paperCases seen rest of
+     (,) entries aliases -> (,) ((:) (paperEntry c action) entries) ((:) ((,) (caseId c) original) aliases)
+   Nothing ->
+    let action = testCase c source in
+    case paperCases (Map.insert compareString key ((,) (caseId c) action) seen) rest of
+     (,) entries aliases -> (,) ((:) (paperEntry c action) entries) aliases
+
+repairLabels = O.words "A11 C1a C1c"
+repair label =
+ let c = S.fromMaybe (panic "missing negative Figure12 case") (S.find (\c -> eqString label (caseId c)) cases) in
+ let expression = if eqString label "A11" then "k (\\(f : forall a. a -> a) -> pair (f 1) (f True)) xs" else if eqString label "C1a" then "\\(f : forall a. a -> a) -> pair (f 1) (f True)" else "g (\\(f : forall a. a -> a) -> pair (f 1) (f True))" in
+ let repaired = Case (caseId c) expression (paperAcceptance c) true (localSignatures c) in
+ tagged ("repair/" ++ label) (label ++ " explicit annotation control") "repair"
+  (A.andThen (A.right (\error -> error) (program repaired)) (testCase repaired))
+
+assumption index ((,) name signature) =
+ tagged ("assumption/" ++ showInt index) ("assumption " ++ name ++ " : " ++ signature) "assumption" (do
+  result <- A.right prettyError (compile "<signature control>" ("\\(" ++ name ++ " :: " ++ signature ++ ") -> " ++ name))
+  checkOutput result
+  return "checked")
+
+registry : IO ((,,) ([] C.Case) ([] ((,) String String)) Int)
+registry = do
  let names = S.map caseId cases
  let rows = S.nubBy eqString (S.map (\name -> H.stringTakeWhile (\c -> S.not (c == 46)) name) names)
  let wanted = S.concat ((:) (S.map (\i -> "A" ++ showInt i) (S.range 1 13)) ((:) (S.map (\i -> "B" ++ showInt i) (S.range 1 7)) ((:) (O.words "C1a C1b C1c C2") ((:) (S.concatMap (\i -> S.map (\suffix -> "E" ++ showInt i ++ suffix) ((:) "a" ((:) "b" []))) (S.range 1 5)) []))))
@@ -75,24 +103,53 @@ main = do
  let discrepancies = S.filter (\c -> S.not (H.eq (paperAcceptance c) (expectedAcceptance c))) cases
  H.assert (S.eqList eqString (S.map caseId discrepancies) ((:) "A8" [])) "Figure12 discrepancies changed"
  assumptions' <- H.right (S.mapM assumptions cases)
+ programs <- H.right (S.mapM program cases)
  let signatures = S.nubBy (S.eqPair eqString eqString) (S.concat assumptions')
- S.mapM_ (\((,) name signature) -> runTest ((,) ("assumption " ++ name ++ " : " ++ signature) (do
-  result <- H.right (compile "<signature control>" ("\\(" ++ name ++ " :: " ++ signature ++ ") -> " ++ name))
-  checkOutput result
-  return "checked"))) signatures
- S.mapM_ runTest typeChecks
- S.mapM_ (\label -> do
-  let c = S.fromMaybe (panic "missing negative Figure12 case") (S.find (\c -> eqString label (caseId c)) cases)
-  let expression = if eqString label "A11" then "k (\\(f : forall a. a -> a) -> pair (f 1) (f True)) xs" else if eqString label "C1a" then "\\(f : forall a. a -> a) -> pair (f 1) (f True)" else "g (\\(f : forall a. a -> a) -> pair (f 1) (f True))"
-  let repaired = Case (caseId c) expression (paperAcceptance c) true (localSignatures c)
-  runTest ((,) (label ++ " explicit annotation control") (testCase repaired))) (O.words "A11 C1a C1c")
- putStrLn "Figure12: 34 rows / 43 expressions; explicit-signature regression expectations"
- shared <- runCases Map.empty [] cases
- H.assert (S.eqList (S.eqPair eqString eqString) shared ((:) ((,) "A12.1" "A10.1") ((:) ((,) "E3a" "A12.2") []))) "Figure12 execution sharing changed"
- H.assert (S.length signatures + S.length typeChecks + 3 == 36) "Figure12 supplementary coverage changed"
- putStrLn "43/43 expressions match regression expectations; 0 failures"
- putStrLn "41 distinct Figure12 executions; 2 repeated paper labels share checked results"
- putStrLn "36 supplementary checks; 0 failures"
- Coverage.metric "figure12" "paper-rows" (S.length rows)
- Coverage.metric "figure12" "paper-expressions" (S.length names)
- Coverage.finish "figure12"
+ let planned = paperCases Map.empty (S.zip cases programs)
+ let paper = S.fst planned
+ let aliases = S.snd planned
+ H.assert (S.eqList (S.eqPair eqString eqString) aliases ((:) ((,) "A12.1" "A10.1") ((:) ((,) "E3a" "A12.2") []))) "Figure12 execution sharing changed"
+ H.assert (S.length signatures == 29 && S.length typeChecks == 4 && S.length repairLabels == 3) "Figure12 supplementary coverage changed"
+ let types = S.map (\((,) id ((,) label check)) -> tagged ("type/" ++ id) label "type" check)
+        (S.zip (O.words "A1-principal A2-principal A4-result A4-signature") typeChecks)
+ let supplementary = S.append (S.map (\((,) n sig) -> assumption n sig) (S.zip (S.range 0 28) signatures))
+        (S.append types (S.map repair repairLabels))
+ return ((,,) (S.append supplementary paper) aliases (S.length rows))
+
+run : [] String -> IO ()
+run args = do
+ (,,) entries aliases rows <- registry
+ case Runner.plan args entries of
+  Left _ -> do { code <- Runner.run args entries; exitWith code }
+  Right ((,) options selected) -> do
+   let full = S.length entries == S.length selected && S.null (Runner.selectors options)
+   if Runner.listing options then do
+    code <- Runner.run args entries
+    if code == 0 then return () else exitWith code
+   else do
+    Coverage.begin "figure12" full
+    code <- Runner.runObserved (observe aliases (S.map C.id selected)) args entries
+    if code == 0 then do
+     if full then do
+      Coverage.metric "figure12" "paper-rows" rows
+      Coverage.metric "figure12" "paper-expressions" (S.length cases)
+      if Runner.json options then return () else do
+       putStrLn "43/43 expressions match regression expectations; 0 failures"
+       putStrLn "41 distinct Figure12 executions; 2 repeated paper labels share checked results"
+       putStrLn "36 supplementary checks; 0 failures"
+     else return ()
+     Coverage.finish "figure12"
+    else exitWith code
+
+observe aliases selected result = case result of
+ Runner.Result entry (Right ()) ->
+  case S.lookup eqString (C.name entry) aliases of
+   Just original ->
+    if S.elem eqString ("figure12/" ++ paperId original) selected
+    then Coverage.alias "figure12" (C.name entry) original
+    else Coverage.passed "figure12" (C.name entry)
+   Nothing -> Coverage.passed "figure12" (C.name entry)
+ _ -> return ()
+
+main : IO ()
+main = do { args <- O.allArguments; run args }

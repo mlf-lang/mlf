@@ -1,8 +1,10 @@
 module Tests.CoverageChecks where
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Package.Json as J
-import qualified Tests.Basic as H
+import qualified Test.Assert as A
 import qualified Tests.Coverage as C
 
 -- Independent, literal fixtures: neither the reporter nor a candidate suite
@@ -14,17 +16,17 @@ change index f rows = S.map (\((,) i row) -> if i == index then f row else row) 
 without index rows = S.map S.snd (S.filter (\((,) i _) -> i /= index) (S.zip (S.range 0 (S.length rows - 1)) rows))
 rejected inventory text = case C.validate inventory "probe" text of
  Left _ -> return ()
- Right _ -> H.fail "damaged structural coverage evidence was accepted"
-main : IO ()
-main = do
- callbacks <- newIntArray 1 0
- completed <- C.count (\value -> do { before <- readIntArray callbacks 0; writeIntArray callbacks 0 (before + value) }) ((:) 2 ((:) 4 ((:) 8 []))) 0
- observed <- readIntArray callbacks 0
- H.assert (completed == 3 && observed == 14) "coverage counter skipped or repeated callback execution"
- inventory <- H.right (J.parse inventoryText)
- evidence <- H.right (C.parse reportText)
- accepted <- H.right (C.validate inventory "probe" reportText)
- H.assert (J.equal (J.get "executions" accepted) (J.num 2) && J.equal (J.get "aliases" accepted) (J.num 1) && J.equal (J.get "oracle-executed" (J.get "metrics" accepted)) (J.num 3)) "structural coverage result lost observed counts"
+ Right _ -> A.fail "damaged structural coverage evidence was accepted"
+checks : A.Test ()
+checks = do
+ callbacks <- A.liftIO (newIntArray 1 0)
+ completed <- A.liftIO (C.count (\value -> do { before <- readIntArray callbacks 0; writeIntArray callbacks 0 (before + value) }) ((:) 2 ((:) 4 ((:) 8 []))) 0)
+ observed <- A.liftIO (readIntArray callbacks 0)
+ A.assert (completed == 3 && observed == 14) "coverage counter skipped or repeated callback execution"
+ inventory <- A.right (\message -> message) (J.parse inventoryText)
+ evidence <- A.right (\message -> message) (C.parse reportText)
+ accepted <- A.right (\message -> message) (C.validate inventory "probe" reportText)
+ A.assert (J.equal (J.get "executions" accepted) (J.num 2) && J.equal (J.get "aliases" accepted) (J.num 1) && J.equal (J.get "oracle-executed" (J.get "metrics" accepted)) (J.num 3)) "structural coverage result lost observed counts"
  -- Missing, duplicate and substituted IDs still fail after making the summary
  -- agree with the damaged event stream: counts alone cannot certify coverage.
  let missing = change 4 (J.set "executions" (J.num 1)) (without 1 evidence)
@@ -56,4 +58,4 @@ main = do
  let changedSuite = J.set "executions" (J.stringArray ((:) "first" [])) (J.get "probe" (J.get "suites" inventory))
  let changedInventory = J.set "suites" (J.Object ((:) ((,) "probe" changedSuite) [])) inventory
  rejected changedInventory reportText
- putStrLn "Structural coverage validator contracts passed"
+ A.liftIO (putStrLn "Structural coverage validator contracts passed")
