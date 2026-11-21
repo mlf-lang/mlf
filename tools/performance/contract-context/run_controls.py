@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Contract encoding reuse against the complete frozen c1b802bd query encoder."""
 from pathlib import Path
-import argparse, hashlib, types
+import argparse, hashlib, sys, types
 
 ROOT=Path(__file__).resolve().parents[3]
 HERE=Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT / 'tools/testing'))
+from receipt_selection import select
 ORACLE=HERE.parent/'datatype-context'
 ORACLE_MANIFEST_SHA='20580b068f5bb9969ca96753dbfa1a0d568ce9ad102eedd8e416ce8d68d0c742'
 
@@ -15,7 +17,11 @@ def main():
     p.add_argument('--oracle-source',type=Path,
         help='optionally verify the frozen encoder against its complete historical checkout')
     p.add_argument('--output',type=Path,required=True)
-    a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=False)
+    a=p.parse_args()
+    options = ('0', '2')
+    chosen = select('contract-context/', options)
+    optimizations = options if chosen is None else (chosen,)
+    out=a.output.resolve();out.mkdir(parents=True,exist_ok=False)
     hp=ROOT/'tools/performance/a1-private-index/helper.py'
     H=types.ModuleType('guard');H.__file__=str(hp);exec(compile(hp.read_bytes(),str(hp),'exec'),H.__dict__)
     H.require(H.sha(ORACLE/'oracle.json')==ORACLE_MANIFEST_SHA,'fixed c1b802bd oracle identity')
@@ -46,7 +52,7 @@ def main():
             record['ordinary_object_producer']=auth;save()
             for rel in ['host/ghc/cbits/host.c','runtime/mlf_process_supervisor.c']:
                 H.require(H.sha(ROOT/rel)==H.sha(a.source/rel),'unchanged borrowed C object input')
-            for opt in ['0','2']:
+            for opt in optimizations:
                 label='O'+opt;objects=out/(label+'-objects');binary=out/(label+'-binary')
                 argv=[auth['ghc']['path'],'--make','-j1','-O'+opt,'-fpedantic-bottoms','-fno-state-hack',
                     '-Werror=incomplete-patterns','-Werror=incomplete-uni-patterns','-package-env','-',

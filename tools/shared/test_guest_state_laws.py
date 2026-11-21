@@ -15,6 +15,9 @@ import sys
 from test_direct import authenticate_build
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tools/testing'))
+from receipt_selection import identity, select
+
 WATCHDOG = ROOT/'tools/shared/resource_watchdog.py'
 FLAGS = ('MLF_GRAPH_BUILD_NEGATIVE', 'MLF_ORACLE_TRAVERSAL_NEGATIVE')
 CASES = (
@@ -127,13 +130,19 @@ def main():
     parser.add_argument('--build-receipt', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
+    labels = [label + suffix for label, *_ in CASES for suffix in ('-positive', '-negative')]
+    selected = select('guest-state-laws/', labels)
     receipt = args.build_receipt.resolve(strict=True)
     producer_dir = receipt.parent
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     record = {'complete': False, 'kind': 'actual-import-guest-state-laws', 'commands': [],
               'full_native_unit': False, 'native_or_llvm_output': False,
-              'per_stage_limits': LIMITS, 'expected_campaign_seconds_approximate': 90.5}
+              'per_stage_limits': LIMITS}
+    if selected:
+        record.update(scope='focused', selected_ids=[identity('guest-state-laws/', selected)])
+    else:
+        record['expected_campaign_seconds_approximate'] = 90.5
     def save():
         temporary = output/'receipt.json.tmp'
         temporary.write_text(json.dumps(record, indent=2)+'\n')
@@ -159,8 +168,10 @@ def main():
         results = {}
         for label, fixture, flag, roots, positive, negative in CASES:
             for failure in [False, True]:
+                stage = label + ('-negative' if failure else '-positive')
+                if selected and stage != selected:
+                    continue
                 unchanged(before, capture_inputs(ROOT, fixed))
-                stage = label+('-negative' if failure else '-positive')
                 directory = output/stage
                 directory.mkdir()
                 command = [str(compiler)]
@@ -199,8 +210,12 @@ def main():
         record.update(complete=True, inputs_unchanged=True, producer_and_objects_reauthenticated=True,
                       result_files=results, observed_campaign_seconds=sum(row['elapsed_seconds'] for row in record['commands']))
         save()
-        print(json.dumps({'complete': True, 'stages': 4, 'positive_law_checks': 18,
-                          'negative_controls': 2, 'full_native_unit': False}))
+        summary = {'complete': True, 'stages': len(record['commands']), 'full_native_unit': False}
+        if selected:
+            summary['selected_ids'] = record['selected_ids']
+        else:
+            summary.update(positive_law_checks=18, negative_controls=2)
+        print(json.dumps(summary))
     except BaseException as error:
         record['error'] = type(error).__name__+': '+str(error)
         save()

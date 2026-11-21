@@ -198,13 +198,17 @@ module QualifiedCrateHost where {
       ((:) "downstream orphan cannot leak into an import cycle"
       ((:) "cross-module recursion infers unsigned cycle"
       ((:) "cross-module qualified recursion generalizes shared exports" []))))) };
-    fixtures <- right (traverseEither (findFixture expressions) labels);
-    assert (length fixtures == 6) "host fixture selection is incomplete";
+    requested <- getEnv "MLF_RECURSIVE_SAVED_CRATE_LABEL";
+    let { full = eqString requested "";
+          selected = if full then labels else filter (eqString requested) labels };
+    fixtures <- right (traverseEither (findFixture expressions) selected);
+    assert (length fixtures == (if full then 6 else 1)) "host fixture selection is incomplete";
     root <- canonicalPath ".";
-    let { work = root ++ "/.mlf-build/qualified-host-crate-work" };
+    destination <- getEnv "MLF_RECURSIVE_SAVED_CRATE_WORK";
+    let { work = if eqString destination "" then root ++ "/.mlf-build/qualified-host-crate-work" else destination };
     made <- Query.cacheCommand ((:) "/bin/mkdir" ((:) "-p" ((:) (work ++ "/builtin") [])));
     assert (made == 0) "host fixture: cannot create builtin directory";
     foldM (\index fixture -> do { runFixture work index fixture; ioReturn (index + 1) }) 0 fixtures;
-    putStrLn "PASS all six exact saved-crate fixtures through GHC host; production/frozen/roundtrip/erasure checks preserved"
+    if full then putStrLn "PASS all six exact saved-crate fixtures through GHC host; production/frozen/roundtrip/erasure checks preserved" else ioReturn ()
   }
 }

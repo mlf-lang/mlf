@@ -12,13 +12,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import shutil
+import sys
 
 from build import DEMAND_FLAGS, EXHAUSTIVENESS_FLAGS, PACKAGES
 from test_direct import CommandRunner, authenticate_build, sha
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tools/testing'))
+from receipt_selection import identity, select
 FIXTURE = ROOT / 'tools/shared/fixtures/native/IOActionSharing.hs'
 SHAPES = [
     'exact bind action exposes single use',
@@ -63,36 +67,44 @@ CASES = [
     ('custom-sequence-override', '', 'overridden sequence', False),
     ('custom-sequence-ignores-first', '42\n', None, False),
 ]
+FRAMEWORK_CASES = tuple('shape: ' + label for label in SHAPES) + tuple(case[0] for case in CASES)
 FORMS = ['original', 'serialized', 'optimized-erased']
 BANNER = 'IO action sharing: passed (19 shape checks, 18 source cases, 3 execution forms)'
 
 
-def expected_inventory():
+def expected_inventory(shapes=SHAPES, cases=CASES, full=True):
     if len(SHAPES) != 19 or len(set(SHAPES)) != 19 or len(CASES) != 18:
         raise ValueError('authored regression inventory is inconsistent')
-    chunks = ['PASS shape: ' + label + '\n' for label in SHAPES]
-    for label, output, error, kernel in CASES:
+    chunks = ['PASS shape: ' + label + '\n' for label in shapes]
+    for label, output, error, kernel in cases:
         if kernel:
             chunks.append('PASS kernel: ' + label + '\n')
         for form in FORMS:
             chunks.extend(['BEGIN ' + label + '/' + form + '\n', output,
                            'OUTCOME ' + ('ok' if error is None else 'error: ' + error) + '\n'])
         chunks.append('PASS semantics: ' + label + '\n')
-    return (''.join(chunks) + BANNER + '\n').encode()
+    return (''.join(chunks) + (BANNER + '\n' if full else '')).encode()
 
 
-def verify_inventory(stdout):
-    if stdout != expected_inventory():
+def verify_inventory(stdout, expected=None):
+    if stdout != (expected if expected is not None else expected_inventory()):
         raise ValueError('regression completion inventory changed: ' + repr(stdout))
 
 
-def verify_artifact_inventory(work):
-    expected = sorted(label + suffix for label, *_ in CASES for suffix in ['.ll', '.xmlf'])
+def verify_artifact_inventory(work, cases=CASES):
+    expected = sorted(label + suffix for label, *_ in cases for suffix in ['.ll', '.xmlf'])
     if sorted(p.name for p in work.iterdir()) != expected:
         raise ValueError('emitted artifact inventory changed')
 
 
 def main():
+    prefix = os.environ.get('MLF_TEST_ID_PREFIX', 'io-action-sharing/')
+    if '--framework-list' in sys.argv[1:]:
+        print(json.dumps([identity(prefix, label) for label in FRAMEWORK_CASES]))
+        return
+    selection = select(prefix, FRAMEWORK_CASES)
+    shapes = SHAPES if selection is None else [selection.removeprefix('shape: ')] if selection.startswith('shape: ') else []
+    cases = [case for case in CASES if selection is None or selection == case[0]]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-receipt', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
@@ -113,7 +125,9 @@ def main():
     output.mkdir(parents=True, exist_ok=False)
     record = {'format': 1, 'complete': False, 'status': 'running',
               'scope': 'focused-io-action-sharing', 'compiler_modules_rebuilt': False,
-              'native_execution_requested': args.gc_prefix is not None,
+              'native_execution_requested': args.gc_prefix is not None and bool(cases),
+              'framework_selection': selection, 'framework_plan': [selection] if selection else list(FRAMEWORK_CASES),
+              'framework_cases_passed': [], 'native_cases_passed': [],
               'native_toolchain_closure_complete': False,
               'native_provenance_scope': 'selected Clang, runtime source and BDWGC inputs; system libraries not pinned',
               'full_corpus_qualification': False, 'performance_assertions': False,
@@ -154,6 +168,7 @@ def main():
                  ROOT / 'tools/shared/build.py', ROOT / 'host/ghc/cbits/host.c',
                  ROOT / 'runtime/mlf_process_supervisor.c', ROOT / 'runtime/mlf_runtime.c']
         paths.extend((ROOT / 'runtime').glob('*.h'))
+        paths.append(ROOT / 'tools/testing/receipt_selection.py')
         inputs = {str(p.resolve().relative_to(ROOT)): sha(p) for p in paths}
         record.update(producer_receipt=str(receipt_path),
                       producer_receipt_sha256=sha(receipt_path),
@@ -189,16 +204,23 @@ def main():
         artifacts.update({str(p): sha(p) for p in [executable, main_object, main_interface, *transports]})
         work = output / 'programs'
         work.mkdir()
-        result = runner.run('shape-and-semantics', [executable, work],
-                            expected=expected_inventory(), timeout=args.run_timeout)
-        verify_inventory(result.stdout)
-        verify_artifact_inventory(work)
+        command = [executable, work]
+        if selection:
+            command.extend(['--shape', shapes[0]] if shapes else ['--case', selection])
+        expected_output = expected_inventory(shapes, cases, full=selection is None)
+        result = runner.run('shape-and-semantics', command,
+                            expected=expected_output, timeout=args.run_timeout)
+        verify_inventory(result.stdout, expected_output)
+        verify_artifact_inventory(work, cases)
         artifacts.update({str(p): sha(p) for p in work.iterdir()})
-        record.update(shape_checks=SHAPES, source_cases=[c[0] for c in CASES],
-                      execution_forms=FORMS, independent_target_check=True,
-                      serialized_target_check=True, serialized_llvm_identical=True,
-                      restored_array_loop_kernels=2)
-        if args.gc_prefix is not None:
+        passed = record['framework_cases_passed']
+        passed.extend('shape: ' + label for label in shapes)
+        record.update(shape_checks=shapes, source_cases=[c[0] for c in cases],
+                      execution_forms=FORMS if cases else [], independent_target_check=bool(cases),
+                      serialized_target_check=bool(cases), serialized_llvm_identical=bool(cases),
+                      restored_array_loop_kernels=sum(case[-1] for case in cases))
+        save()
+        if args.gc_prefix is not None and cases:
             clang = Path(shutil.which(args.clang) or args.clang).resolve(strict=True)
             gc = args.gc_prefix.resolve(strict=True)
             archive = gc / 'lib/libgc.a'
@@ -208,7 +230,7 @@ def main():
             runner.run('compile-native-runtime', [clang, *common, '-c',
                        ROOT / 'runtime/mlf_runtime.c', '-o', runtime], timeout=args.build_timeout)
             artifacts[str(runtime)] = sha(runtime)
-            for label, expected, error, _ in CASES:
+            for label, expected, error, _ in cases:
                 binary = output / ('native-' + label)
                 runner.run('link-' + label, [clang, '-O2', '-Wno-override-module',
                            work / (label + '.ll'), runtime, archive, '-lgmp', '-lm',
@@ -219,9 +241,13 @@ def main():
                 if observed.stderr != wanted_error:
                     raise ValueError(label + ': native diagnostic changed')
                 artifacts[str(binary)] = sha(binary)
-            record['native_cases_passed'] = [c[0] for c in CASES]
+                record['native_cases_passed'].append(label)
+                passed.append(label)
+                save()
         else:
-            record['native_cases_passed'] = []
+            passed.extend(case[0] for case in cases)
+        if passed != record['framework_plan']:
+            raise ValueError('IO sharing exact result inventory changed')
         record.update(artifacts=artifacts, external_inputs=external)
         integrity()
         record.update(complete=True, status='passed')

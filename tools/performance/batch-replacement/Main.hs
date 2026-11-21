@@ -2,7 +2,8 @@
 module Main where
 
 import Prelude
-import Control.Monad (unless, forM_)
+import Control.Monad (unless, forM_, when)
+import System.Environment (getArgs)
 import Data.List (sort, group)
 import qualified Bootstrap.Types as T
 import qualified Bootstrap.Map as M
@@ -80,18 +81,23 @@ auditTree tree = do
   C.UseCase a bs -> a : map snd bs
 
 checkTerm :: String -> T.XErased -> IO ()
-checkTerm label term = do
+checkTerm = checkTermParts True True
+
+checkTermParts :: Bool -> Bool -> String -> T.XErased -> IO ()
+checkTermParts checkExact checkCounts label term = do
  let seed = L.maxIdentity term + 1000
      (legacy,legacySeed) = L.runFresh (L.passRaw term) seed
      (owned,ownedSeed) = C.runFresh (C.passOwnedRaw term) seed
      (public,publicSeed) = C.runFresh (C.passRaw term) seed
- ensure (label ++ ": pass exact tree/hints/seed") (exact (L.useTerm legacy) (C.useTerm owned) && legacySeed == ownedSeed)
- ensure (label ++ ": public legacy pass unchanged") (exact (L.useTerm legacy) (C.useTerm public) && legacySeed == publicSeed)
- auditTree owned
- let (legacyWork,lseed) = L.runFresh (L.optimizeWork term) seed
-     (ownedWork,cseed) = C.runFresh (C.optimizeOwnedWork term) seed
- ensure (label ++ ": optimizeWork exact tree/hints/seed") (exact legacyWork ownedWork && lseed == cseed)
- ensure (label ++ ": optimize exact tree/hints") (exact (L.optimize term) (C.optimizeOwned term))
+ when checkExact $ do
+  ensure (label ++ ": pass exact tree/hints/seed") (exact (L.useTerm legacy) (C.useTerm owned) && legacySeed == ownedSeed)
+  ensure (label ++ ": public legacy pass unchanged") (exact (L.useTerm legacy) (C.useTerm public) && legacySeed == publicSeed)
+ when checkCounts (auditTree owned)
+ when checkExact $ do
+  let (legacyWork,lseed) = L.runFresh (L.optimizeWork term) seed
+      (ownedWork,cseed) = C.runFresh (C.optimizeOwnedWork term) seed
+  ensure (label ++ ": optimizeWork exact tree/hints/seed") (exact legacyWork ownedWork && lseed == cseed)
+  ensure (label ++ ": optimize exact tree/hints") (exact (L.optimize term) (C.optimizeOwned term))
 
 -- All generated binders are globally distinct. Leaves deliberately reuse one
 -- spelling with several identities; structural equality cannot hide capture.
@@ -210,8 +216,8 @@ checkPending expected term = do
    L.DifferentCalls -> pure ()
    _ -> fail "effective pending witness did not imply legacy DifferentCalls"
 
-witnessChecks :: IO ()
-witnessChecks = do
+witnessChecks :: Bool -> Bool -> IO ()
+witnessChecks implication nonvacuity = do
  let target = n 1
      direct = app (v 1) [T.XEInt 0]
      cases = [direct,app direct [v 2],app direct [T.XEInt 3],app (v 1) [v 2,T.XEInt 3],
@@ -222,22 +228,24 @@ witnessChecks = do
               T.XECase direct [T.XErasedAlternative (T.XDefaultPattern (T.Just target)) direct],
               T.XECase (v 2) [T.XErasedAlternative (T.XConstructorPattern "Box" [T.Just target]) direct]]
      trees = cases ++ generated
- forM_ trees $ \term -> do
-  let owned = C.indexUses term
-      legacy = L.indexUses term
-  forM_ (S.toList (C.negativeCalls owned)) $ \name ->
-   forM_ [1..5] $ \arity -> case L.commonCalls name arity (L.useCounts legacy) legacy of
-    L.DifferentCalls -> pure ()
-    _ -> fail "negative witness implication"
- ensure "positive direct witness required" (S.member C.compareName target (C.negativeCalls (C.indexUses direct)))
- ensure "later-only nonvariable remains conservative" (not (S.member C.compareName target (C.negativeCalls (C.indexUses (app (v 1) [v 2,T.XEInt 3])))))
- ensure "lambda witness masking" (S.null (C.negativeCalls (C.indexUses (T.XEAbs target direct))))
- ensure "let witness masking" (S.null (C.negativeCalls (C.indexUses (T.XELet target (T.XEInt 0) direct))))
- ensure "recursive witness masking" (S.null (C.negativeCalls (C.indexUses (T.XELetRec [(target,direct)] direct))))
- let success = L.indexUses (app (v 1) [v 2])
- case L.commonCalls target 1 (L.useCounts success) success of
-  L.CommonCalls _ -> pure ()
-  _ -> fail "inverted witness mutation control requires actual legacy success"
+ when implication $ do
+  forM_ trees $ \term -> do
+   let owned = C.indexUses term
+       legacy = L.indexUses term
+   forM_ (S.toList (C.negativeCalls owned)) $ \name ->
+    forM_ [1..5] $ \arity -> case L.commonCalls name arity (L.useCounts legacy) legacy of
+     L.DifferentCalls -> pure ()
+     _ -> fail "negative witness implication"
+ when nonvacuity $ do
+  ensure "positive direct witness required" (S.member C.compareName target (C.negativeCalls (C.indexUses direct)))
+  ensure "later-only nonvariable remains conservative" (not (S.member C.compareName target (C.negativeCalls (C.indexUses (app (v 1) [v 2,T.XEInt 3])))))
+  ensure "lambda witness masking" (S.null (C.negativeCalls (C.indexUses (T.XEAbs target direct))))
+  ensure "let witness masking" (S.null (C.negativeCalls (C.indexUses (T.XELet target (T.XEInt 0) direct))))
+  ensure "recursive witness masking" (S.null (C.negativeCalls (C.indexUses (T.XELetRec [(target,direct)] direct))))
+  let success = L.indexUses (app (v 1) [v 2])
+  case L.commonCalls target 1 (L.useCounts success) success of
+   L.CommonCalls _ -> pure ()
+   _ -> fail "inverted witness mutation control requires actual legacy success"
 
 rawLaziness :: IO ()
 rawLaziness = do
@@ -296,57 +304,67 @@ ioSemantics = do
 
 main :: IO ()
 main = do
- iterationChecks
- forM_ (zip [0::Int ..] generated) $ \(i,t) -> checkTerm ("generated " ++ show i) t
- -- Reuse the authored source cases as inputs, but the oracle is the frozen
- -- baseline module and exact identity/hint/seed checks above.
- forM_ IOFixture.cases $ \(IOFixture.Case label body _ _) ->
-  case Compiler.compile (B.literal (label ++ ".hs")) (IOFixture.source body) of
-   T.Left err -> fail (B.unpack (Compiler.prettyError err))
-   T.Right result -> checkTerm ("authored IO " ++ label) (X.erase (Compiler.compiledTerm result))
- putStrLn "PASS exact-pass-optimize-seeds"
- putStrLn "PASS independent-counts"
- witnessChecks
- putStrLn "PASS witness-implication"
- putStrLn "PASS witness-nonvacuity"
- forM_ [2,16,128] $ \size -> do
-  checkPending size (independentChain size)
-  checkPending size (dependencyChain size)
-  checkTerm "independent chain" (independentChain size)
-  checkTerm "dependent chain" (dependencyChain size)
- putStrLn "PASS long-chain-admission"
- forM_ [2,3] $ \copies -> forM_ [2,16,128] $ \size -> do
-  checkPending size (polymorphicChain size copies)
-  checkTerm "polymorphic dependent chain with several instantiations" (polymorphicChain size copies)
- forM_ [4,7] $ \copies -> checkTerm "bounded multiple-copy fallback" (polymorphicChain 16 copies)
- putStrLn "PASS pending-materialization"
- let ordered = T.XELet (n 1) (ident 11) (T.XELet (n 2) (ident 12)
-                  (pair (app (v 1) [T.XEInt 1]) (app (v 2) [T.XEInt 2])))
-     (out,after) = C.runFresh (C.passOwned ordered) 100
-     expected = pair (app (ident 101) [T.XEInt 1]) (app (ident 100) [T.XEInt 2])
-     nativeHints t = case t of
-      T.XEAbs a b -> let T.XName i _ = a in T.XEAbs (T.XName i "native") (case b of T.XEVar _ -> T.XEVar (T.XName i "native"); _ -> b)
-      T.XEApp a b -> T.XEApp (nativeHints a) (nativeHints b)
-      _ -> t
- ensure "inner-before-outer explicit Fresh order" (exact out (nativeHints expected) && after == 102)
- putStrLn "PASS fresh-order"
- let large = T.XEAbs (n 40) (foldr pair (v 40) (replicate 50 (v 9)))
-     sparse rhs body = T.XELet (n 1) (ident 11) (T.XELet (n 2) rhs (T.XELet (n 3) (ident 13)
-                      (pair (app (v 1) [T.XEInt 0]) (pair body (app (v 3) [T.XEInt 0])))))
- forM_ [sparse (ident 12) (pair (app (v 2) [T.XEInt 0]) (app (v 2) [T.XEInt 1])),
-        sparse large (app (v 2) [T.XEInt 0]),
-        sparse (p T.PAddInt [T.XEInt 1,T.XEInt 2]) (v 2)] (checkTerm "sparse unsupported flush")
- putStrLn "PASS unsupported-contexts"
- let common = T.XELet (n 1) (T.XEAbs (n 11) (pair (v 11) (v 9))) (pair (app (v 1) [v 8]) (app (v 1) [v 8]))
- checkTerm "common success fallback" common
- let (cp,_) = C.runFresh (C.passPendingRaw common) 100
-     C.PendingBody _ replacements _ _ = cp
- ensure "common success uses unchanged immediate specialization" (M.null replacements)
- case C.useTerm (C.materializePending cp) of
-  T.XELet _ _ _ -> pure ()
-  _ -> fail "common success lost lazy let"
- putStrLn "PASS common-call-success-fallback"
- rawLaziness
- putStrLn "PASS public-raw-laziness"
- ioSemantics
- putStrLn "PASS io-lazy-semantics"
+ selected <- getArgs
+ let wanted label = null selected || label `elem` selected
+     announce label = when (wanted label) (putStrLn ("PASS " ++ label))
+     check label action = when (wanted label) (action >> announce label)
+     exactLabel = "exact-pass-optimize-seeds"
+     countsLabel = "independent-counts"
+     implication = "witness-implication"
+     nonvacuity = "witness-nonvacuity"
+     term = checkTermParts (wanted exactLabel) (wanted countsLabel)
+ check "checked-iteration-algebra-and-scopes" iterationChecks
+ when (wanted exactLabel || wanted countsLabel) $ do
+  forM_ (zip [0::Int ..] generated) $ \(i,t) -> term ("generated " ++ show i) t
+  -- The authored input is shared; the frozen baseline remains the oracle.
+  forM_ IOFixture.cases $ \(IOFixture.Case label body _ _) ->
+   case Compiler.compile (B.literal (label ++ ".hs")) (IOFixture.source body) of
+    T.Left err -> fail (B.unpack (Compiler.prettyError err))
+    T.Right result -> term ("authored IO " ++ label) (X.erase (Compiler.compiledTerm result))
+  announce exactLabel
+  announce countsLabel
+ when (wanted implication || wanted nonvacuity) $ do
+  witnessChecks (wanted implication) (wanted nonvacuity)
+  announce implication
+  announce nonvacuity
+ check "long-chain-admission" $ do
+  forM_ [2,16,128] $ \size -> do
+   checkPending size (independentChain size)
+   checkPending size (dependencyChain size)
+   checkTerm "independent chain" (independentChain size)
+   checkTerm "dependent chain" (dependencyChain size)
+ check "pending-materialization" $ do
+  forM_ [2,3] $ \copies -> forM_ [2,16,128] $ \size -> do
+   checkPending size (polymorphicChain size copies)
+   checkTerm "polymorphic dependent chain with several instantiations" (polymorphicChain size copies)
+  forM_ [4,7] $ \copies -> checkTerm "bounded multiple-copy fallback" (polymorphicChain 16 copies)
+ check "fresh-order" $ do
+  let ordered = T.XELet (n 1) (ident 11) (T.XELet (n 2) (ident 12)
+                   (pair (app (v 1) [T.XEInt 1]) (app (v 2) [T.XEInt 2])))
+      (out,after) = C.runFresh (C.passOwned ordered) 100
+      expected = pair (app (ident 101) [T.XEInt 1]) (app (ident 100) [T.XEInt 2])
+      nativeHints t = case t of
+       T.XEAbs a b -> let T.XName i _ = a in T.XEAbs (T.XName i "native") (case b of T.XEVar _ -> T.XEVar (T.XName i "native"); _ -> b)
+       T.XEApp a b -> T.XEApp (nativeHints a) (nativeHints b)
+       _ -> t
+  ensure "inner-before-outer explicit Fresh order" (exact out (nativeHints expected) && after == 102)
+ check "unsupported-contexts" $ do
+  let large = T.XEAbs (n 40) (foldr pair (v 40) (replicate 50 (v 9)))
+      sparse rhs body = T.XELet (n 1) (ident 11) (T.XELet (n 2) rhs (T.XELet (n 3) (ident 13)
+                       (pair (app (v 1) [T.XEInt 0]) (pair body (app (v 3) [T.XEInt 0])))))
+  forM_ [sparse (ident 12) (pair (app (v 2) [T.XEInt 0]) (app (v 2) [T.XEInt 1])),
+         sparse large (app (v 2) [T.XEInt 0]),
+         sparse (p T.PAddInt [T.XEInt 1,T.XEInt 2]) (v 2)] (checkTerm "sparse unsupported flush")
+ check "common-call-success-fallback" $ do
+  let common = T.XELet (n 1) (T.XEAbs (n 11) (pair (v 11) (v 9))) (pair (app (v 1) [v 8]) (app (v 1) [v 8]))
+  checkTerm "common success fallback" common
+  let (cp,_) = C.runFresh (C.passPendingRaw common) 100
+      C.PendingBody _ replacements _ _ = cp
+  ensure "common success uses unchanged immediate specialization" (M.null replacements)
+  case C.useTerm (C.materializePending cp) of
+   T.XELet _ _ _ -> pure ()
+   _ -> fail "common success lost lazy let"
+ check "public-raw-laziness" $ do
+  rawLaziness
+ check "io-lazy-semantics" $ do
+  ioSemantics

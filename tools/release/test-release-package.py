@@ -22,6 +22,39 @@ def file_identity(path):
     return status.st_ino, status.st_mtime_ns, status.st_size
 
 
+def test_rows(evidence, targets):
+    if (not isinstance(evidence, dict) or type(evidence.get('format')) is not int
+            or evidence['format'] != 1 or evidence.get('implementation') != 'MLF'
+            or type(evidence.get('complete')) is not bool):
+        raise ValueError('invalid package-manager build receipt')
+    rows = evidence.get('tests')
+    if not isinstance(rows, list):
+        raise ValueError('invalid package-manager test rows')
+
+    seen = set()
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            raise ValueError('invalid package-manager test row')
+        name = row.get('name')
+        if (not isinstance(name, str) or name not in targets or name in seen
+                or type(row.get('passed')) is not bool):
+            raise ValueError('unexpected package-manager test row')
+        seen.add(name)
+        if not row['passed']:
+            code = row.get('exit_code')
+            reason = row.get('reason')
+            diagnostic = row.get('diagnostic')
+            if (evidence['complete'] or index != len(rows) - 1
+                    or type(code) is not int or reason not in ('exit', 'stdout', 'stderr', 'capture')
+                    or (reason == 'exit' and code == 0)
+                    or (reason in ('stdout', 'stderr') and code != 0)
+                    or not isinstance(diagnostic, str) or not diagnostic):
+                raise ValueError('invalid failed package-manager test row')
+    if evidence['complete'] and seen != set(targets):
+        raise ValueError('complete package-manager receipt omitted a test target')
+    return rows
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--manifest', required=True, type=Path)
@@ -60,30 +93,28 @@ def main():
     if exact:
         command.extend(('--target', name))
     outcome = subprocess.run(command, check=False)
-    current = file_identity(receipt)
-    if current is None or current == previous:
-        print('package test adapter: no fresh build receipt', file=sys.stderr)
+    try:
+        current = file_identity(receipt)
+        if current is None or current == previous:
+            raise ValueError('no fresh build receipt')
+        raw = receipt.read_bytes()
+        event_path = os.environ.get('MLF_TEST_EVENTS')
+        retained = Path(event_path).with_suffix('.package-manager.json') if event_path else receipt
+        if retained != receipt:
+            # A following release export can overwrite this build directory's report.
+            retained.write_bytes(raw)
+        evidence = json.loads(raw)
+        rows = test_rows(evidence, tests)
+        for row in rows:
+            events.result(PREFIX + row['name'], 'pass' if row['passed'] else 'fail',
+                          detail=row, receipt=str(retained))
+    except (OSError, ValueError, TypeError) as error:
+        print(f'package test adapter: {error}', file=sys.stderr)
         return outcome.returncode or 1
 
-    raw = receipt.read_bytes()
-    event_path = os.environ.get('MLF_TEST_EVENTS')
-    retained = Path(event_path).with_suffix('.package-manager.json') if event_path else receipt
-    if retained != receipt:
-        # A following release export can overwrite build-report.json in this build directory.
-        retained.write_bytes(raw)
-    evidence = json.loads(raw)
-    if evidence.get('format') != 1 or evidence.get('implementation') != 'MLF':
-        raise ValueError('invalid package-manager build receipt')
-    rows = evidence.get('tests')
-    if not isinstance(rows, list):
-        raise ValueError('invalid package-manager test rows')
-    for row in rows:
-        if row['name'] not in tests or row.get('passed') is not True:
-            raise ValueError('unexpected package-manager test row')
-        events.result(PREFIX + row['name'], 'pass', detail=row, receipt=str(retained))
     if outcome.returncode:
         return outcome.returncode
-    return 0 if evidence.get('complete') is True and len(rows) == len(ids) else 1
+    return 0 if evidence['complete'] else 1
 
 
 if __name__ == '__main__':

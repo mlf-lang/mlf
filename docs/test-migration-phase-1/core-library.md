@@ -94,3 +94,39 @@ MLF_TEST_COVERAGE_REPORT="$PWD/.mlf-build/phase2/regex.coverage.jsonl" "$suites/
 ```
 
 In disposable checkouts, change the match offset for `regex/match/later-alternative` and introduce a discrepancy in the int-set reference comparison. Require the focused cases to fail and a full regex invocation to continue reporting later cases before returning nonzero. Compare pattern compile counts and immutable setup time separately from execution. Re-run the framework CLI contract in the unit campaign for exact, unknown and nonmatching selectors.
+
+## Receipt adapters for host and query controls
+
+These entries support discovery and stable exact selection. The focused report covers the requested ID. Specialized evidence retains the setup commands and subprocesses that were needed to reach it.
+
+| Entry | Coverage retained | Expected focused saving |
+| --- | --- | --- |
+| `shared-host-adapter` | Optimization, argument, locale, filesystem, cancellation and deliberate failure observations. The `--gc-root` cases retain platform compiler availability. | Only the selected fixture binary is built, and each binary is reused by its existing full-mode observations. |
+| `recursive-saved-crate` | Six exact, source-bound direct-module and saved/reloaded crate comparisons, including independent target and rejection oracles. | Builds one harness and executes one fixture pair. The builtin directory stays private to this invocation and is shared across the six fixtures in full mode. |
+| `query-graph-acceptance` | Existing `--case`, `--smoke`, recovery, and unfinished resume procedures, with source and binary identities. | One authored control and its original independent rebuilds or recovery steps. |
+| `source-query-api` | Existing graph, source, named source-change versions, copied-definition, session transaction and optional cross-executable formal observations. | Runs only the selected family or the selected version lineage. Earlier versions in the same lineage still establish the incremental state. |
+| `source-context-cache` | Forty full command IDs and the existing 29-command legacy mode, including independent live owner/lock probes, cold/warm cache oracles, and the concurrent pair. | Runs the phase's dependency chain. A lock-probe or concurrent control keeps both processes, a warm phase keeps its earlier cold run, and an unrelated cold, memo or window chain is omitted. |
+
+For Phase 2, use writable fresh subdirectories and existing source-matching GHC build receipts. Inspect both the framework report and producer receipts or sealed stdout, including prerequisites and observed failure status. The exact compiler/process counts and runtime savings remain unmeasured. If a prerequisite or a post-run oracle fails before a selected verdict is established, expect the outer command to fail and the selected case to remain incomplete.
+
+```sh
+runner=tools/testing/run.py
+mkdir -p .mlf-build/phase2/receipts
+python3 -B "$runner" shared-host-adapter --list
+python3 -B "$runner" shared-host-adapter --exact shared-host/contracts-O0 -- \
+  "$(command -v ghc)" --output .mlf-build/phase2/receipts/shared-host-one
+python3 -B "$runner" recursive-saved-crate --list
+python3 -B "$runner" recursive-saved-crate --exact recursive-saved-crate/cross-module-recursion-infers-unsigned-cycle -- \
+  --compiler-build .mlf-build/phase2/ghc-o0 --build-dir .mlf-build/phase2/receipts/crate-one
+python3 -B "$runner" query-graph-acceptance --list
+python3 -B "$runner" query-graph-acceptance --exact query-graph-acceptance/body -- \
+  .mlf-build/phase2/ghc-o0/bin/emlf .mlf-build/phase2/receipts/query-one
+python3 -B "$runner" source-query-api --list
+python3 -B "$runner" source-query-api --exact source-query-api/source-change-body-1 -- \
+  .mlf-build/phase2/ghc-o2/receipt.json .mlf-build/phase2/receipts/source-query-one
+python3 -B "$runner" source-context-cache --list -- --legacy-query-only
+python3 -B "$runner" source-context-cache --exact source-context-cache/lock-after-session -- \
+  --build-receipt .mlf-build/phase2/ghc-o0/receipt.json --output .mlf-build/phase2/receipts/context-one
+```
+
+Repeat the execution commands without `--exact` in fresh output directories. Use `--gc-root GC_PREFIX` with the shared-host list and execution on the provisioned native runner. Include `--interface BUILT_OBJECT` with the source-query list and execution in the existing cross-executable rehearsal. Run the source-context qualification inside its established outer resource guard. Compare grouped-oracle setup and elapsed time separately from the underlying probe, maintaining their existing process and cache freshness boundaries.

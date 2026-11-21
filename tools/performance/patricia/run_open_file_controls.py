@@ -226,7 +226,7 @@ def build_views(H, output, source, producer, auth, inputs, limits, run):
 
 
 def run_session_files(H, output, record, inputs, binaries, producer, source,
-                      auth, builtin, save, limits):
+                      auth, builtin, save, limits, *, selected=None):
     """Reuse the complete, already passed ordinary gate's exact sources/oracles."""
     output = output.resolve()
     baseline = record['routes']['crate']['file_cases']
@@ -235,9 +235,11 @@ def run_session_files(H, output, record, inputs, binaries, producer, source,
         H.require(H.sha(HERE.parent / 'c4-local-transaction' / relative) == digest,
                   'unchanged frozen C4 source: ' + relative)
     authored = H.load(fixture_path)
-    H.require(len(baseline) == authored['case_count'] == len(authored['cases']) == 9 and
+    H.require(authored['case_count'] == len(authored['cases']) == 9, 'original nine-case inventory')
+    cases = [case for case in authored['cases'] if selected is None or case['name'] == selected]
+    H.require(cases and len(baseline) == len(cases) and
               all(row['complete'] and row['actual_raw_artifact_bytes_equal']
-                  for row in baseline), 'the original nine-case raw byte gate passed first')
+                  for row in baseline), 'the selected ordinary raw byte gate passed first')
     for name, digest in Comparison.ORACLE_PINS.items():
         path = Comparison.ORACLE_DIRECTORY / name
         H.require(H.sha(path) == digest, 'fixed independent oracle: ' + name)
@@ -295,7 +297,7 @@ def run_session_files(H, output, record, inputs, binaries, producer, source,
                                     inputs, limits, run)
     comparison_root = output / 'compare-session'
     comparison_root.mkdir()
-    for index, (case, original) in enumerate(zip(authored['cases'], baseline)):
+    for case, original in zip(cases, baseline):
         H.require(case['name'] == original['name'], 'original ordered case inventory')
         expected = original['outcomes'][0]
         H.require(expected['side'] == 'base', 'original reference outcome')
@@ -420,7 +422,7 @@ def run_session_files(H, output, record, inputs, binaries, producer, source,
             row['cross_format_raw_bytes_equal'] = raw_files(closed_prefix) == cold_files
             row['same_format_fresh_fresh_and_warm_bytes_equal'] = True
             row['audited_open_complete_bytes_equal'] = True
-            if index == 0:
+            if case['name'] == authored['cases'][0]['name']:
                 native_negative_controls(H, output, folder, viewer, source,
                                          raw_files(closed_prefix), cold_files, run, rows, save)
         H.require(all(not os.path.lexists(path) for path in missing),
@@ -429,7 +431,7 @@ def run_session_files(H, output, record, inputs, binaries, producer, source,
         H.check_pins(immutable)
         row['complete'] = True
         save()
-    H.require(len(rows['file_cases']) == 9 and all(row['complete'] for row in rows['file_cases']),
-              'all nine retained session cases completed')
+    H.require(len(rows['file_cases']) == len(cases) and all(row['complete'] for row in rows['file_cases']),
+              'all planned session cases completed')
     rows['complete'] = True
     save()

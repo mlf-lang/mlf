@@ -18,6 +18,11 @@ import traceback
 import types
 
 HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[2]
+sys.path.insert(0, str(ROOT / 'tools/testing'))
+from receipt_selection import select
+
+OPTIMIZATIONS = (0, 2)
 PREPARE_SHA = '5865266da533d73ec291188799cad84105538d96efc374194e2130c031da80ce'
 FIXTURE_SHA = '30ccc1caeaec7de404a00c4432ebb92c1a5b52167291f060da08552d79522d72'
 DIRECT_BLOB = 'f0d20f78be7fa2835f76b7903735a1e47a080ce9'
@@ -141,6 +146,8 @@ m.worker(types.SimpleNamespace(source=pathlib.Path(sys.argv[3]), producer=pathli
 '''
 
 def worker(a):
+    chosen = select('map-policy/', OPTIMIZATIONS)
+    optimizations = OPTIMIZATIONS if chosen is None else (chosen,)
     source, producer, out = a.source.resolve(), a.producer.resolve(), a.output.resolve()
     record = {'complete': False, 'stage': 'authenticate', 'commands': [], 'lanes': [],
               'scope': 'fresh 15-module shared-GHC qualification; historical Map algorithms on current Int64/host base; not native/full-producer qualification',
@@ -273,7 +280,7 @@ def worker(a):
         require(ldd.is_file(), 'installed runtime inspection tool required')
         record['runtime_inspector'] = {'path': str(ldd), 'sha256': direct.sha(ldd)}
         known_runtime = {**auth['toolchain']['files'], **auth['installed_dependencies']['files']}
-        for opt in (0, 2):
+        for opt in optimizations:
             lane = out / ('o' + str(opt)); binary = lane / 'controls'
             run('build-o' + str(opt), [auth['ghc']['path'], *flags, '-O' + str(opt), '-odir', lane,
                 '-hidir', lane, '-stubdir', lane, out / 'c/host.o', out / 'c/supervisor.o', '-o', binary,
@@ -331,7 +338,8 @@ def worker(a):
                     'terminal command receipt changed or incomplete')
             validate_command_logs({key: row[key] for key in ('stdout_sha256', 'stderr_sha256', 'stdout_bytes', 'stderr_bytes')},
                                   log(row['name'], 'stdout').read_bytes(), log(row['name'], 'stderr').read_bytes())
-        record['complete'] = len(record['lanes']) == 2 and all(lane['complete'] for lane in record['lanes'])
+        record['complete'] = ([lane['optimization'] for lane in record['lanes']] == list(optimizations)
+                              and all(lane['complete'] for lane in record['lanes']))
         require(record['complete'], 'Map policy qualification failed; historical/current differences are not waived')
         record['stage'] = 'complete'
     except BaseException as error:
@@ -381,7 +389,8 @@ def main():
         require(sha((source / 'tools/shared/crc_process_supervisor.py').read_bytes()) == digest, 'supervisor source drift')
         require(sha(runner_path.read_bytes()) == runner_sha, 'public runner source drift')
         record['stage'] = 'complete'; record['complete'] = True
-        print('PASS source-bound Map maintenance successor: O0/O2; complete historical 24649/400/30; current content/invariants and 25 demand observations; exact step21 shape difference retained', flush=True)
+        opt_labels = '/'.join('O' + str(lane['optimization']) for lane in record['worker']['lanes'])
+        print(f'PASS source-bound Map maintenance successor: {opt_labels}; complete historical 24649/400/30; current content/invariants and 25 demand observations; exact step21 shape difference retained', flush=True)
     except BaseException as error:
         record.update(complete=False, error=repr(error), traceback=traceback.format_exc())
         raise

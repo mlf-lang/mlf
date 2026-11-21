@@ -149,6 +149,10 @@ def compose(original,crc,worker,pins):
     return original
 
 def main():
+    focused = None
+    if os.environ.get('MLF_TEST_EXACT'):
+        import direct_candidate_focus
+        focused = direct_candidate_focus.selected_label()
     worker_raw=(HERE/'candidate_batch_worker.py').read_bytes()
     worker=load(worker_raw,'candidate_bound_worker',HERE/'candidate_batch_worker.py')
     raws,pins=worker.snapshot()
@@ -157,7 +161,10 @@ def main():
     original_compose=bounded.compose
     def composite(original,crc,utf8_worker,utf8_pins):
         original=original_compose(original,crc,utf8_worker,utf8_pins)
-        return compose(original,crc,worker,pins)
+        original=compose(original,crc,worker,pins)
+        if focused:
+            original.main = lambda: direct_candidate_focus.run(original, focused)
+        return original
     bounded.compose=composite
     try:bounded.main()
     finally:bounded.compose=original_compose

@@ -113,11 +113,42 @@ latency are separate hypotheses.
   entry when the Phase 1 adapter is unavailable in the tag.
 
 
-## Remaining reporting limits
+## Receipt adapter discovery and package failures
 
-The checked-package manager currently writes a row only for a completed
-target. Its adapter retains prior observations and the process failure, but
-cannot give a failed or interrupted target a per-target verdict without a row.
-Some optimizer and host compatibility adapters import verified cases from a
-finished receipt. They do not have independent pre-run discovery or exact
-selection where the underlying engine exposes neither.
+All receipt-backed adapters now publish their case IDs before the producer
+builds or runs a test. The dispatcher reconciles each fresh receipt against
+that plan and rejects unknown IDs before starting a focused run. Exact
+selection runs the chosen check with its genuine prerequisites. Shared setup,
+ordered cache transitions and concurrent pairs retain the ordering and
+isolation their assertions measure. Prerequisite observations carry separate
+evidence when the producer records them.
+
+The package manager writes a failed row for an attempted test target before
+its original error exit. It records the failing backend or command, process
+status, diagnostics and raw capture paths when available. Earlier successful
+targets remain visible. Later targets and interruptions that produce no
+observation remain incomplete. Package-release workflows retain the manager
+receipt and raw target logs.
+
+Use these additional commands in Phase 2. Compare the intended ID with the
+recorded case and check the producer commands for omitted work.
+
+```sh
+python3 -B tools/testing/run.py datatype-context --list
+python3 -B tools/testing/run.py datatype-context --exact datatype-context/0 -- \
+  --producer "$P2/ghc-O2" --output "$P2/datatype-o0"
+python3 -B tools/testing/run.py query-graph-acceptance --list
+python3 -B tools/testing/run.py query-graph-acceptance --exact query-graph-acceptance/body -- \
+  "$P2/ghc-O2/bin/emlf" "$P2/query-body"
+python3 -B tools/testing/run.py package-release-tests --list -- --manifest "$PACKAGE_MANIFEST"
+python3 -B tools/testing/run.py package-release-tests --report "$P2/package-test-failure.json" -- \
+  --manifest "$BAD_PACKAGE_MANIFEST" --manager "$MLF_PACKAGE_MANAGER" \
+  --compiler "$MLF_COMPILER" --build-dir "$P2/package-test-failure"
+```
+
+Prepare `BAD_PACKAGE_MANIFEST` in a disposable fixture checkout with a valid
+lock and an intentionally wrong expected test output. Exercise a command
+exit, an interpreter or LLVM failure and a mismatched output. Confirm that a
+failed attempted target appears once and the release adapter returns the
+manager's original failure. Confirm that an interrupted or unattempted
+target remains incomplete.

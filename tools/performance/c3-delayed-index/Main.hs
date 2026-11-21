@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 import Prelude
-import Control.Monad (forM_,unless)
+import Control.Monad (forM_,unless,when)
+import System.Environment (getArgs)
 import Control.Exception (SomeException,try,evaluate,displayException)
 import Data.List (isInfixOf)
 import qualified MLF.Primitive as P
@@ -110,27 +111,35 @@ projectionSelection initial source target=P.runST $ do
           O.sameSetPhysical scopes oldScopes
         _->False
 
-fixture f@(Fixtures.Fixture label input source target admitted success literal)=do
+traceLabel = "63 physical graph/index/scope traces and legacy failure epochs"
+expansionLabel = "retained expansion descriptors and exact full component selection"
+reuseLabel = "repeated instances, reflexive equalities and literal fresh survivors"
+demandLabel = "8 demand, first-exception and unused-payload observations"
+
+fixture wanted (Fixtures.Fixture label input source target admitted success literal)=do
   initial<-O.right(label++" prepare") (S.prepare input)
   let one=legacy initial [Instance source target]
       next=candidate initial [Instance source target]
-  O.assert(label++" authored success/rejection") (isRight(traceResult one)==success)
-  compareTrace label one next
-  case (literal,traceResult next)of
-    (Just wanted,T.Right actual)->O.assert(label++" handwritten full graph literal")
-      (O.sameGraphLogical wanted(S.graph actual))
+  when (wanted traceLabel) $ do
+    O.assert(label++" authored success/rejection") (isRight(traceResult one)==success)
+    compareTrace label one next
+  when (wanted reuseLabel) $ case (literal,traceResult next)of
+    (Just expected,T.Right actual)->O.assert(label++" handwritten full graph literal")
+      (O.sameGraphLogical expected(S.graph actual))
     _->pure()
-  let a=expandedLegacy initial source target;b=expandedCandidate initial source target
-  case(a,b)of
-    (T.Right(r,cs,fs,x),T.Right(q,ds,gs,y))->do
-      O.assert(label++" original expanded descriptor") (r==q&&fs==gs&&O.sameMapPhysical(==)cs ds)
-      O.checkSolver(label++" original expanded helper physical state") True x y
-      if admitted then O.assert(label++" exact full expanded component selection")
-        (projectionSelection initial source target) else pure()
-    _->errorWithoutStackTrace(label++" unexpected expansion rejection")
-  compareTrace(label++" reused result trace")
-    (legacy initial [Instance source target,Equality[(target,target)],Instance source target])
-    (candidate initial [Instance source target,Equality[(target,target)],Instance source target])
+  when (wanted expansionLabel) $ do
+    let a=expandedLegacy initial source target;b=expandedCandidate initial source target
+    case(a,b)of
+      (T.Right(r,cs,fs,x),T.Right(q,ds,gs,y))->do
+        O.assert(label++" original expanded descriptor") (r==q&&fs==gs&&O.sameMapPhysical(==)cs ds)
+        O.checkSolver(label++" original expanded helper physical state") True x y
+        if admitted then O.assert(label++" exact full expanded component selection")
+          (projectionSelection initial source target) else pure()
+      _->errorWithoutStackTrace(label++" unexpected expansion rejection")
+  when (wanted reuseLabel) $
+    compareTrace(label++" reused result trace")
+      (legacy initial [Instance source target,Equality[(target,target)],Instance source target])
+      (candidate initial [Instance source target,Equality[(target,target)],Instance source target])
 
 metadata(T.Solver(T.Graph ns aliases next)parents bindings _)=
   next+sum(map fst(O.mapEntries ns))+sum(map fst(O.mapEntries aliases))+
@@ -177,13 +186,16 @@ partialControls=do
     O.assert "candidate preserves unused payload demand"(a==b)
 
 main=do
-  let originals=Fixtures.fixtures++Fixtures.additionalFixtures++Fixtures.renamedFixtures
+  selected <- getArgs
+  let wanted label = null selected || label `elem` selected
+      fixtureLabels = [traceLabel, expansionLabel, reuseLabel]
+      originals=Fixtures.fixtures++Fixtures.additionalFixtures++Fixtures.renamedFixtures
       shifted=[Fixtures.renameFixture("offset "++show offset)(+offset) f
         |offset<-[1,16,64,512,-512,2^48,-(2^48)],f<-take 5 Fixtures.fixtures]
-  O.assert "all authored/renamed fixture inventory"(length originals==28&&length shifted==35)
-  forM_ (originals++shifted) fixture
-  putStrLn "PASS 63 physical graph/index/scope traces and legacy failure epochs"
-  putStrLn "PASS retained expansion descriptors and exact full component selection"
-  putStrLn "PASS repeated instances, reflexive equalities and literal fresh survivors"
-  partialControls
-  putStrLn "PASS 8 demand, first-exception and unused-payload observations"
+  when (any wanted fixtureLabels) $ do
+    O.assert "all authored/renamed fixture inventory"(length originals==28&&length shifted==35)
+    forM_ (originals++shifted) (fixture wanted)
+    forM_ (filter wanted fixtureLabels) (putStrLn . ("PASS " ++))
+  when (wanted demandLabel) $ do
+    partialControls
+    putStrLn ("PASS " ++ demandLabel)

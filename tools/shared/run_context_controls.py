@@ -10,6 +10,7 @@ from the limitation merely because their files disappear or are overwritten.
 from pathlib import Path
 import argparse, hashlib, json, os, re, stat, subprocess, time, sys
 import fcntl, errno
+from runpy import run_path
 
 BINARY_HELPER_NAMES = ('artifact_binary_reference.py', 'artifact_binary_typed.py',
                        'artifact_structure_contract.json')
@@ -979,11 +980,11 @@ def session_window_audit(root, leaf, cold_snapshot):
             'scope': 'four actual Session compileSpecFile calls plus one all-hit public Query support call. Wholesale final is an envelope-negative witness; alpha-only real raw provenance poison is dual generic Right then actual PreparedRaw Left. No fake PreparedGroup or direct observed multi-entry worker reset count'}
 
 
-def run_added_window_controls(fixture, out, record, save, include_session=True):
+def run_added_window_controls(fixture, out, record, save, include_session=True, include_helper=True):
     window_cache = out / 'window-helper-cache'
     session_root = out / 'window-session-raw'
     session_cache = session_root / 'cache'
-    evidence = {'helper': {}}
+    evidence = {'helper': {}} if include_helper else {}
     if include_session:
         evidence['session_prepared_raw'] = {}
     record['context_read_window'] = evidence
@@ -1024,7 +1025,8 @@ def run_added_window_controls(fixture, out, record, save, include_session=True):
                      scope='ten real private carriers absent while owner holds both real locks; all entries from verified reads; not hostile-mutation or foundation hit-count evidence')
         save(); ack(b'WINDOW-RELEASED-ACK\n')
         return released_output + b'PASS window helper complete\n'
-    run_window_owned(fixture, out, record, save, 'window-helper', ['window-helper', window_cache], window_dialogue)
+    if include_helper:
+        run_window_owned(fixture, out, record, save, 'window-helper', ['window-helper', window_cache], window_dialogue)
     if not include_session:
         return window_cache, None
     def session_dialogue(owner, wait_marker, ack, row, started):
@@ -1047,7 +1049,7 @@ def run_added_window_controls(fixture, out, record, save, include_session=True):
         return released_output + b'PASS actual Session whole-final generic Left and alpha raw generic Right PreparedRaw Left; both repairs preserve final and raw bytes\n'
     run_window_owned(fixture, out, record, save, 'session-window-raw-final',
                      ['session-window-raw-final', session_cache, session_root], session_dialogue)
-    return window_cache, session_cache
+    return window_cache if include_helper else None, session_cache
 
 def canonical_session_builtin_pair(prefix):
     """Pin the already produced session-cold dependency; never generate/copy it here."""
@@ -1133,9 +1135,14 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument('--legacy-query-only', action='store_true',
                         help='Retain all legacy Query/codec controls; the graph CLI has its own session controls.')
+    parser.add_argument('--case', help='one control plus its required setup and paired processes')
     args = parser.parse_args()
-    drivers = ['query'] if args.legacy_query_only else ['query', 'session']
-    left_modes = ['legacy', 'source'] if args.legacy_query_only else ['legacy', 'source', 'session']
+    plan = run_path(str(Path(__file__).with_name('context_control_plan.py')))
+    expected = plan['commands_for'](args.legacy_query_only, args.case)
+    active = set(expected)
+    drivers = [kind for kind in ('query', 'session') if kind + '-cold' in active]
+    memo_drivers = [kind for kind in ('query', 'session') if 'memo-' + kind in active]
+    left_modes = [kind for kind in ('legacy', 'source', 'session') if 'left-' + kind in active]
     fixture, out = args.fixture.absolute(), args.output.absolute()
     require(fixture.is_file() and fixture.resolve() == fixture, "qualified regular fixture path")
     require(not out.exists() and out.parent.is_dir() and out.parent.resolve() == out.parent, "fresh real output")
@@ -1143,6 +1150,7 @@ def main():
     out.mkdir()
     record = {"complete": False, "fixture_sha256": digest(fixture.read_bytes()), "commands": [], "drivers": {},
               "legacy_query_only": args.legacy_query_only,
+              "selected_case": args.case, "planned_commands": expected,
               "binary_inspector_inputs": inspector_inputs,
               "format_migration": {
                   "default_query_context_schemas": [2, 1], "formal_interface_object_schemas": [3, 4],
@@ -1237,10 +1245,14 @@ def main():
             }
         return measured
     try:
-        helper = run("helper", ["helper", out / "helper-cache"])
-        require(helper.endswith(b"PASS helper CACHE1/CACHE2/CACHE3, complete-key and corrupt-input controls\n"), "helper terminal marker")
-        raw_final = run("raw-final", ["raw-final", out / "raw-final-cache"])
-        require(raw_final == b"PASS final payload cannot masquerade as raw source cache\n", "raw/final terminal marker")
+        if "helper" in active:
+            helper = run("helper", ["helper", out / "helper-cache"])
+            require(helper.endswith(b"PASS helper CACHE1/CACHE2/CACHE3, complete-key and corrupt-input controls\n"), "helper terminal marker")
+
+        if "raw-final" in active:
+            raw_final = run("raw-final", ["raw-final", out / "raw-final-cache"])
+            require(raw_final == b"PASS final payload cannot masquerade as raw source cache\n", "raw/final terminal marker")
+
         for kind in drivers:
             root = out / kind
             root.mkdir()
@@ -1255,6 +1267,14 @@ def main():
                     "before_live_probe": None, "after_live_probe": None}
                 save()
             require(cold["query_report"]["inferred_groups"] > 0 and cold["query_report"]["reused_groups"] == 0, "cold actually infers")
+            if kind == "query":
+                require(len(cold["cache"]["active_records"]) == 2 and len(cold["cache"]["reachable_contexts"]) == 1, "two groups share one context")
+            entry = {"sentinels": sentinels, "cold": cold}
+            record["drivers"][kind] = entry
+            save()
+            if kind + "-warm" not in active:
+                verify_sentinels(cache, sentinels)
+                continue
             warm = driver(kind, cache, root, "41", kind + "-warm")
             require(warm["query_report"]["inferred_groups"] == 0 and warm["query_report"]["reused_groups"] == cold["query_report"]["inferred_groups"], "warm actually hits")
             require(warm["artifact_sha256"] == cold["artifact_sha256"], "final artifacts exact cold/warm")
@@ -1263,16 +1283,22 @@ def main():
                 require(cold["cache"]["files"][n] == warm["cache"]["files"][n], "warm context unchanged")
             mixed = None
             before_change = warm
-            if kind == "query":
-                require(len(cold["cache"]["active_records"]) == 2 and len(cold["cache"]["reachable_contexts"]) == 1, "two groups share one context")
+            entry["warm"] = warm
+            if kind == "query" and "query-install-legacy" in active:
                 legacy = run("query-install-legacy", ["legacy-one", cache])
                 require(legacy == b"PASS fixture replaced one record with valid old CACHE1\n", "legacy injection marker")
                 mixed_before = snapshot(cache, [g["query_key"] for g in cold["query_report"]["groups"]])
-                mixed = driver(kind, cache, root, "41", "query-mixed-old-new")
-                require(mixed["query_report"]["inferred_groups"] == 0 and mixed["cache"]["legacy_records"], "valid legacy CACHE1 remains a hit")
-                for n in mixed["cache"]["legacy_records"]:
-                    require(mixed_before["files"][n] == mixed["cache"]["files"][n], "legacy hit not rewritten")
-                before_change = mixed
+                if "query-mixed-old-new" in active:
+                    mixed = driver(kind, cache, root, "41", "query-mixed-old-new")
+                    require(mixed["query_report"]["inferred_groups"] == 0 and mixed["cache"]["legacy_records"], "valid legacy CACHE1 remains a hit")
+                    for n in mixed["cache"]["legacy_records"]:
+                        require(mixed_before["files"][n] == mixed["cache"]["files"][n], "legacy hit not rewritten")
+                    before_change = mixed
+            entry.update(mixed_legacy=mixed, before_one_value_change=before_change)
+            save()
+            if kind + "-one-value-change" not in active:
+                verify_sentinels(cache, sentinels)
+                continue
             changed = driver(kind, cache, root, "42", kind + "-one-value-change")
             require(changed["query_report"]["inferred_groups"] == 1 and changed["query_report"]["reused_groups"] > 0, "one independent source change reinfers one group")
             require(changed["artifact_sha256"] != cold["artifact_sha256"],
@@ -1281,12 +1307,20 @@ def main():
             for name in unchanged_records:
                 require(before_change["cache"]["files"][name] == changed["cache"]["files"][name],
                         "unchanged active group preserves exact bytes, hash, allocation and timestamps")
-            stable = driver(kind, cache, root, "42", kind + "-changed-warm")
-            require(stable["query_report"]["inferred_groups"] == 0 and stable["artifact_sha256"] == changed["artifact_sha256"], "changed warm exact parity")
             for n in warm["cache"]["reachable_contexts"]:
                 require(warm["cache"]["files"][n] == changed["cache"]["files"][n], "one value change does not rewrite shared context")
+            entry.update(changed=changed,
+                         one_value_publication_delta=publication_delta(before_change["cache"], changed["cache"]))
+            save()
+            if kind + "-changed-warm" not in active:
+                verify_sentinels(cache, sentinels)
+                continue
+            stable = driver(kind, cache, root, "42", kind + "-changed-warm")
+            require(stable["query_report"]["inferred_groups"] == 0 and stable["artifact_sha256"] == changed["artifact_sha256"], "changed warm exact parity")
             repairs = []
-            for mutation in ["missing-context", "corrupt-context", "corrupt-record"]:
+            for mutation in plan['REPAIRS']:
+                if kind + '-' + mutation not in active:
+                    continue
                 current = snapshot(cache, [g["query_key"] for g in changed["query_report"]["groups"]])
                 if mutation != "corrupt-record":
                     target = cache / current["reachable_contexts"][0]
@@ -1311,11 +1345,10 @@ def main():
                 require(repaired["query_report"]["inferred_groups"] >= 1 and repaired["artifact_sha256"] == changed["artifact_sha256"], "corruption miss + exact reconstruction")
                 repairs.append({"mutation": mutation, "result": repaired})
             verify_sentinels(cache, sentinels)
-            record["drivers"][kind] = {"sentinels": sentinels, "cold": cold, "warm": warm, "mixed_legacy": mixed, "before_one_value_change": before_change,
-                "changed": changed, "changed_warm": stable,
-                "one_value_publication_delta": publication_delta(before_change["cache"], changed["cache"]), "repairs": repairs}
+            entry.update(changed_warm=stable, repairs=repairs)
             save()
-        no_query_scratch(out / "raw-final-cache")
+        if "raw-final" in active:
+            no_query_scratch(out / "raw-final-cache")
         lifecycle = {}
         record["scratch_lifecycle"] = lifecycle
         canonical_python = str(Path(sys.executable).resolve(strict=True))
@@ -1437,20 +1470,24 @@ def main():
             lifecycle["left-" + mode] = {"cache": physical_inventory(cache), "original_sentinels": sentinels,
                                           "diagnostic": {"path": str(message_path), "bytes": len(message), "sha256": digest(message)}}
             save()
-        empty_root = out / "empty-success"
-        empty_root.mkdir()
-        cache = empty_root / "cache"
-        sentinels = seed_cache(cache)
-        raw = run("empty-stale-success", ["empty-success", cache], timeout=60)
-        require(raw == b"PASS empty public plan cleans stale scratch\n", "empty cleanup marker")
-        no_query_scratch(cache)
-        verify_sentinels(cache, sentinels)
-        lifecycle["empty-success"] = {"cache": physical_inventory(cache), "original_sentinels": sentinels}
+        if "empty-stale-success" in active:
+            empty_root = out / "empty-success"
+            empty_root.mkdir()
+            cache = empty_root / "cache"
+            sentinels = seed_cache(cache)
+            raw = run("empty-stale-success", ["empty-success", cache], timeout=60)
+            require(raw == b"PASS empty public plan cleans stale scratch\n", "empty cleanup marker")
+            no_query_scratch(cache)
+            verify_sentinels(cache, sentinels)
+            lifecycle["empty-success"] = {"cache": physical_inventory(cache), "original_sentinels": sentinels}
+
         for name, mode, probe_name, marker in [
                 ("empty-directory-failure", "empty-directory-failure", "lock-after-empty-directory",
                  b"PASS directory scratch rejected without recursive deletion\n"),
                 ("cleanup-dual-failure", "cleanup-dual-failure", "lock-after-cleanup-dual",
                  b"PASS original Left and cleanup Left are both retained\n")]:
+            if name not in active:
+                continue
             root = out / name
             root.mkdir()
             cache = root / "cache"
@@ -1462,87 +1499,88 @@ def main():
             lifecycle[name] = {"cache": physical_inventory(cache), "original_sentinels": sentinels,
                                "scope": "public empty-plan tail" if mode == "empty-directory-failure" else "helper under explicit acquired/released lock"}
             save()
-        pair_root = out / "concurrent"
-        pair_root.mkdir()
-        cache = pair_root / "cache"
-        sentinels = seed_cache(cache)
-        stale = small_identity(cache / "query-key.new")
-        lock_path = cache / ".lock"
-        fd = os.open(lock_path, os.O_RDWR | getattr(os, "O_NOFOLLOW", 0))
-        children, handles, pair_rows = [], [], []
-        pair_error = None
-        started = time.monotonic()
-        try:
-            lock_stat = os.fstat(fd)
-            require((lock_stat.st_dev, lock_stat.st_ino) == (sentinels[".lock"]["device"], sentinels[".lock"]["inode"]), "holder exact lock inode")
-            fcntl.lockf(fd, fcntl.LOCK_EX)
-            for name in ["concurrent-a", "concurrent-b"]:
-                result_file = pair_root / (name + ".objects")
-                row = {"name": name, "argv": [str(fixture), "concurrent", str(cache), str(result_file)],
-                       "state": "running", "kind": "fixture", "timeout_seconds": 60}
-                record["commands"].append(row)
-                pair_rows.append(row)
-                stdout = (out / (name + ".stdout")).open("xb")
-                stderr = (out / (name + ".stderr")).open("xb")
-                handles.extend([stdout, stderr])
-                children.append(subprocess.Popen(row["argv"], cwd=out, env=os.environ.copy(), stdout=stdout, stderr=stderr))
-            save()
-            ready_deadline = time.monotonic() + 10
-            while True:
-                require(all(child.poll() is None for child in children), "cooperative child finished while parent holds lock")
-                ready = []
-                for row in pair_rows:
-                    with (out / (row["name"] + ".stdout")).open("rb") as stream:
-                        ready.append(stream.read(6) == b"READY\n")
-                if all(ready):
-                    break
-                require(time.monotonic() < ready_deadline, "both ready barriers within 10 seconds")
-                time.sleep(.01)
-            require(small_identity(cache / "query-key.new") == stale, "scratch modified through held lock")
+        if "concurrent-a" in active:
+            pair_root = out / "concurrent"
+            pair_root.mkdir()
+            cache = pair_root / "cache"
+            sentinels = seed_cache(cache)
+            stale = small_identity(cache / "query-key.new")
+            lock_path = cache / ".lock"
+            fd = os.open(lock_path, os.O_RDWR | getattr(os, "O_NOFOLLOW", 0))
+            children, handles, pair_rows = [], [], []
+            pair_error = None
+            started = time.monotonic()
+            try:
+                lock_stat = os.fstat(fd)
+                require((lock_stat.st_dev, lock_stat.st_ino) == (sentinels[".lock"]["device"], sentinels[".lock"]["inode"]), "holder exact lock inode")
+                fcntl.lockf(fd, fcntl.LOCK_EX)
+                for name in ["concurrent-a", "concurrent-b"]:
+                    result_file = pair_root / (name + ".objects")
+                    row = {"name": name, "argv": [str(fixture), "concurrent", str(cache), str(result_file)],
+                           "state": "running", "kind": "fixture", "timeout_seconds": 60}
+                    record["commands"].append(row)
+                    pair_rows.append(row)
+                    stdout = (out / (name + ".stdout")).open("xb")
+                    stderr = (out / (name + ".stderr")).open("xb")
+                    handles.extend([stdout, stderr])
+                    children.append(subprocess.Popen(row["argv"], cwd=out, env=os.environ.copy(), stdout=stdout, stderr=stderr))
+                save()
+                ready_deadline = time.monotonic() + 10
+                while True:
+                    require(all(child.poll() is None for child in children), "cooperative child finished while parent holds lock")
+                    ready = []
+                    for row in pair_rows:
+                        with (out / (row["name"] + ".stdout")).open("rb") as stream:
+                            ready.append(stream.read(6) == b"READY\n")
+                    if all(ready):
+                        break
+                    require(time.monotonic() < ready_deadline, "both ready barriers within 10 seconds")
+                    time.sleep(.01)
+                require(small_identity(cache / "query-key.new") == stale, "scratch modified through held lock")
+                verify_sentinels(cache, sentinels)
+                bound = lock_path.lstat()
+                require((bound.st_dev, bound.st_ino) == (lock_stat.st_dev, lock_stat.st_ino), "holder path still same lock")
+                fcntl.lockf(fd, fcntl.LOCK_UN)
+                for child in children:
+                    child.wait(timeout=max(.001, 60 - (time.monotonic() - started)))
+            except BaseException as error:
+                pair_error = error
+            finally:
+                fcntl.lockf(fd, fcntl.LOCK_UN)
+                os.close(fd)
+                for child in children:
+                    if child.poll() is None:
+                        child.kill()
+                    child.wait(timeout=5)
+                for handle in handles:
+                    handle.close()
+                for row, child in zip(pair_rows, children):
+                    row.update(exit_code=child.returncode, seconds=time.monotonic()-started, state="failed")
+                    for label in ["stdout", "stderr"]:
+                        path = out / (row["name"] + "." + label)
+                        hasher = hashlib.sha256()
+                        with path.open("rb") as stream:
+                            for block in iter(lambda: stream.read(65536), b""):
+                                hasher.update(block)
+                        row[label] = {"path": str(path), "bytes": path.stat().st_size, "sha256": hasher.hexdigest()}
+                save()
+            if pair_error is not None:
+                raise pair_error
+            reports, finals = [], []
+            for row in pair_rows:
+                require(row["exit_code"] == 0 and row["stderr"]["bytes"] == 0 and row["stdout"]["bytes"] <= 65536, "pair status/captures")
+                raw = Path(row["stdout"]["path"]).read_bytes()
+                require(raw.startswith(b"READY\n"), "pair ready marker")
+                reports.append(json.loads(raw[6:]))
+                finals.append(digest((pair_root / (row["name"] + ".objects")).read_bytes()))
+                row["state"] = "passed"
+            require(finals[0] == finals[1], "cooperative final artifacts identical")
+            require(sorted((r["inferred_groups"], r["reused_groups"]) for r in reports) == [(0, 2), (2, 0)],
+                    "same-cache pair serializes exactly one cold and one warm")
+            no_query_scratch(cache)
             verify_sentinels(cache, sentinels)
-            bound = lock_path.lstat()
-            require((bound.st_dev, bound.st_ino) == (lock_stat.st_dev, lock_stat.st_ino), "holder path still same lock")
-            fcntl.lockf(fd, fcntl.LOCK_UN)
-            for child in children:
-                child.wait(timeout=max(.001, 60 - (time.monotonic() - started)))
-        except BaseException as error:
-            pair_error = error
-        finally:
-            fcntl.lockf(fd, fcntl.LOCK_UN)
-            os.close(fd)
-            for child in children:
-                if child.poll() is None:
-                    child.kill()
-                child.wait(timeout=5)
-            for handle in handles:
-                handle.close()
-            for row, child in zip(pair_rows, children):
-                row.update(exit_code=child.returncode, seconds=time.monotonic()-started, state="failed")
-                for label in ["stdout", "stderr"]:
-                    path = out / (row["name"] + "." + label)
-                    hasher = hashlib.sha256()
-                    with path.open("rb") as stream:
-                        for block in iter(lambda: stream.read(65536), b""):
-                            hasher.update(block)
-                    row[label] = {"path": str(path), "bytes": path.stat().st_size, "sha256": hasher.hexdigest()}
-            save()
-        if pair_error is not None:
-            raise pair_error
-        reports, finals = [], []
-        for row in pair_rows:
-            require(row["exit_code"] == 0 and row["stderr"]["bytes"] == 0 and row["stdout"]["bytes"] <= 65536, "pair status/captures")
-            raw = Path(row["stdout"]["path"]).read_bytes()
-            require(raw.startswith(b"READY\n"), "pair ready marker")
-            reports.append(json.loads(raw[6:]))
-            finals.append(digest((pair_root / (row["name"] + ".objects")).read_bytes()))
-            row["state"] = "passed"
-        require(finals[0] == finals[1], "cooperative final artifacts identical")
-        require(sorted((r["inferred_groups"], r["reused_groups"]) for r in reports) == [(0, 2), (2, 0)],
-                "same-cache pair serializes exactly one cold and one warm")
-        no_query_scratch(cache)
-        verify_sentinels(cache, sentinels)
-        lifecycle["concurrent"] = {"reports": reports, "final_sha256": finals, "cache": physical_inventory(cache),
-                                     "original_sentinels": sentinels, "scope": "two cooperative POSIX lockf processes; READY is before query preparation, not proof of kernel lock wait; not adversarial TOCTOU/crash proof"}
+            lifecycle["concurrent"] = {"reports": reports, "final_sha256": finals, "cache": physical_inventory(cache),
+                                         "original_sentinels": sentinels, "scope": "two cooperative POSIX lockf processes; READY is before query preparation, not proof of kernel lock wait; not adversarial TOCTOU/crash proof"}
 
         # Additive invocation-local context memo controls. Original 31 commands,
         # owner-alive probes, concurrent pair and all their oracles remain above.
@@ -1658,10 +1696,11 @@ def main():
                                       "proof": "real verified state survives private context rename; empty state fails; finally restores original inode/bytes",
                                       "limits": "returned Bool is context branch only; PreparedRaw rejection is checked separately, not a reader-owned invalidation"}
             save()
-        run_memo_helper()
+        if "memo-helper" in active:
+            run_memo_helper()
         phases = ["cold", "warm", "mixed", "restored-warm", "corrupt-repair", "missing-repair"]
         expected_counts = [(2, 0), (0, 2), (0, 2), (0, 2), (1, 1), (1, 1)]
-        for kind in drivers:
+        for kind in memo_drivers:
             root = out / ("memo-" + kind)
             cache = root / "cache"
             raw = run("memo-" + kind, ["memo-" + kind, cache, root], timeout=60)
@@ -1704,141 +1743,163 @@ def main():
         publication = {}
         record["context_directory_publication"] = publication
         collision_cache = out / "context-directory-cache"
-        setup = run("context-directory-setup", ["context-directory-setup", collision_cache], timeout=60)
-        marker = re.fullmatch(rb"PASS context directory setup ([0-9a-f]{64})\n", setup)
-        require(marker is not None, "exact real context setup marker")
-        reference = marker.group(1).decode("ascii")
-        context_path = collision_cache / ("context-" + reference + ".mlfqc")
-        existing = collision_cache / "existing.mlfq"
-        existing_identity = small_identity(existing)
-        existing_query = binary_query(existing.read_bytes())
-        require(existing_query['reference'] == reference, "setup binary record really references observed context")
-        require(len(existing_query['compact']) == 8, "setup compact source key remains complete")
-        original_context_identity = publication_context_identity(context_path)
-        original_context = context_path.read_bytes()
-        binary_context(original_context, reference)
-        backup = collision_cache / "context.original"
-        sentinel = context_path / "retained-child"
+        if "context-directory-setup" in active:
+            setup = run("context-directory-setup", ["context-directory-setup", collision_cache], timeout=60)
+            marker = re.fullmatch(rb"PASS context directory setup ([0-9a-f]{64})\n", setup)
+            require(marker is not None, "exact real context setup marker")
+            reference = marker.group(1).decode("ascii")
+            context_path = collision_cache / ("context-" + reference + ".mlfqc")
+            existing = collision_cache / "existing.mlfq"
+            existing_identity = small_identity(existing)
+            existing_query = binary_query(existing.read_bytes())
+            require(existing_query['reference'] == reference, "setup binary record really references observed context")
+            require(len(existing_query['compact']) == 8, "setup compact source key remains complete")
+            original_context_identity = publication_context_identity(context_path)
+            original_context = context_path.read_bytes()
+            binary_context(original_context, reference)
+            backup = collision_cache / "context.original"
+            sentinel = context_path / "retained-child"
+            publication["setup"] = {"reference": reference, "record": existing_identity, "context": original_context_identity}
+            save()
 
-        def install_collision():
-            require(small_identity(existing) == existing_identity and
-                    publication_context_identity(context_path) == original_context_identity,
-                    "setup inputs stable before directory mutation")
-            require(not os.path.lexists(backup), "fresh context backup")
-            context_path.rename(backup)
-            context_path.mkdir()
-            with sentinel.open("xb") as stream:
-                stream.write(b"retain child of context destination directory\n")
-            return {"directory": publication_directory_identity(context_path),
-                    "sentinel": small_identity(sentinel), "existing_record": small_identity(existing),
-                    "context_backup": publication_context_identity(backup), "lock": small_identity(collision_cache / ".lock")}
+        if "context-directory-reject" in active:
+            def install_collision():
+                require(small_identity(existing) == existing_identity and
+                        publication_context_identity(context_path) == original_context_identity,
+                        "setup inputs stable before directory mutation")
+                require(not os.path.lexists(backup), "fresh context backup")
+                context_path.rename(backup)
+                context_path.mkdir()
+                with sentinel.open("xb") as stream:
+                    stream.write(b"retain child of context destination directory\n")
+                return {"directory": publication_directory_identity(context_path),
+                        "sentinel": small_identity(sentinel), "existing_record": small_identity(existing),
+                        "context_backup": publication_context_identity(backup), "lock": small_identity(collision_cache / ".lock")}
 
-        protected = with_publication_lock(collision_cache, install_collision)
-        publication["collision"] = {"reference": reference, "original_context": original_context_identity,
-                                    "protected_before": protected}
-        save()
-        rejected = run("context-directory-reject", ["context-directory-reject", collision_cache], timeout=60)
-        require(rejected == b"PASS context directory rejects new.mlfq\nPASS context directory rejects existing.mlfq\n",
-                "both exact public writer directory rejections")
+            protected = with_publication_lock(collision_cache, install_collision)
+            publication["collision"] = {"reference": reference, "original_context": original_context_identity,
+                                        "protected_before": protected}
+            save()
+            rejected = run("context-directory-reject", ["context-directory-reject", collision_cache], timeout=60)
+            require(rejected == b"PASS context directory rejects new.mlfq\nPASS context directory rejects existing.mlfq\n",
+                    "both exact public writer directory rejections")
 
-        def verify_collision():
-            actual = {"directory": publication_directory_identity(context_path),
-                      "sentinel": small_identity(sentinel), "existing_record": small_identity(existing),
-                      "context_backup": publication_context_identity(backup), "lock": small_identity(collision_cache / ".lock")}
-            require(actual == protected, "directory collision changed a protected identity")
-            require(actual["directory"]["children"] == ["retained-child"], "no context stage hidden in destination directory")
-            for leaf in ["new.mlfq", "new.mlfq.new", "existing.mlfq.new", "source-context.new"]:
-                require(not os.path.lexists(collision_cache / leaf), "rejected publication left " + leaf)
-            require(sorted(p.name for p in collision_cache.iterdir()) ==
-                    sorted([".lock", "existing.mlfq", "context.original", context_path.name]),
-                    "exact failed-publication cache node inventory")
-            return actual
+            def verify_collision():
+                actual = {"directory": publication_directory_identity(context_path),
+                          "sentinel": small_identity(sentinel), "existing_record": small_identity(existing),
+                          "context_backup": publication_context_identity(backup), "lock": small_identity(collision_cache / ".lock")}
+                require(actual == protected, "directory collision changed a protected identity")
+                require(actual["directory"]["children"] == ["retained-child"], "no context stage hidden in destination directory")
+                for leaf in ["new.mlfq", "new.mlfq.new", "existing.mlfq.new", "source-context.new"]:
+                    require(not os.path.lexists(collision_cache / leaf), "rejected publication left " + leaf)
+                require(sorted(p.name for p in collision_cache.iterdir()) ==
+                        sorted([".lock", "existing.mlfq", "context.original", context_path.name]),
+                        "exact failed-publication cache node inventory")
+                return actual
 
-        publication["collision"]["protected_after"] = with_publication_lock(collision_cache, verify_collision)
-        publication["collision"]["scope"] = "two real writeSourceCached calls reject; distinct attempted payload cannot create or replace record"
-        save()
+            publication["collision"]["protected_after"] = with_publication_lock(collision_cache, verify_collision)
+            publication["collision"]["scope"] = "two real writeSourceCached calls reject; distinct attempted payload cannot create or replace record"
+            save()
 
         stage_cache = out / "context-stage-cleanup-cache"
-        stage_cache.mkdir()
-        with (stage_cache / ".lock").open("xb"):
-            pass
-        stage = stage_cache / "source-context.new"
-        stage.mkdir()
-        stage_child = stage / "retained-child"
-        with stage_child.open("xb") as stream:
-            stream.write(b"must not recursively remove context staging directory\n")
-        stage_before = {"directory": publication_directory_identity(stage),
-                        "sentinel": small_identity(stage_child), "lock": small_identity(stage_cache / ".lock")}
-        publication["cleanup_failure"] = {"protected_before": stage_before,
-            "scope": "direct rejectSourceContextPublication helper error composition; not a natural directory after successful writeFile"}
-        save()
-        cleanup = run("context-stage-cleanup-failure", ["context-stage-cleanup-failure", stage_cache], timeout=60)
-        require(cleanup == b"PASS context staging directory preserves publication and cleanup errors\n",
-                "exact helper primary-plus-cleanup failure")
+        if "context-stage-cleanup-failure" in active:
+            stage_cache.mkdir()
+            with (stage_cache / ".lock").open("xb"):
+                pass
+            stage = stage_cache / "source-context.new"
+            stage.mkdir()
+            stage_child = stage / "retained-child"
+            with stage_child.open("xb") as stream:
+                stream.write(b"must not recursively remove context staging directory\n")
+            stage_before = {"directory": publication_directory_identity(stage),
+                            "sentinel": small_identity(stage_child), "lock": small_identity(stage_cache / ".lock")}
+            publication["cleanup_failure"] = {"protected_before": stage_before,
+                "scope": "direct rejectSourceContextPublication helper error composition; not a natural directory after successful writeFile"}
+            save()
+            cleanup = run("context-stage-cleanup-failure", ["context-stage-cleanup-failure", stage_cache], timeout=60)
+            require(cleanup == b"PASS context staging directory preserves publication and cleanup errors\n",
+                    "exact helper primary-plus-cleanup failure")
 
-        def verify_cleanup_failure():
-            actual = {"directory": publication_directory_identity(stage),
-                      "sentinel": small_identity(stage_child), "lock": small_identity(stage_cache / ".lock")}
-            require(actual == stage_before, "cleanup helper changed directory, child or lock identity")
-            require(sorted(p.name for p in stage_cache.iterdir()) == [".lock", "source-context.new"] and
-                    actual["directory"]["children"] == ["retained-child"], "no recursive cleanup or extra stage nodes")
-            return actual
+            def verify_cleanup_failure():
+                actual = {"directory": publication_directory_identity(stage),
+                          "sentinel": small_identity(stage_child), "lock": small_identity(stage_cache / ".lock")}
+                require(actual == stage_before, "cleanup helper changed directory, child or lock identity")
+                require(sorted(p.name for p in stage_cache.iterdir()) == [".lock", "source-context.new"] and
+                        actual["directory"]["children"] == ["retained-child"], "no recursive cleanup or extra stage nodes")
+                return actual
 
-        publication["cleanup_failure"]["protected_after"] = with_publication_lock(stage_cache, verify_cleanup_failure)
-        save()
+            publication["cleanup_failure"]["protected_after"] = with_publication_lock(stage_cache, verify_cleanup_failure)
+            save()
 
         # One new pure-API comparison mode; seed IO reads the fixed, real
         # writer output of this same K invocation, never an earlier campaign.
-        decoder_cache = out / "helper-cache"
-        seed_before = with_publication_lock(decoder_cache, lambda: decoder_seed_snapshot(decoder_cache))
-        differential = {"seed_before": seed_before, "expected_right": DECODER_DIFFERENTIAL_RIGHT,
-                        "expected_left": DECODER_DIFFERENTIAL_LEFT, "case_count": 63,
-                        "scope": "explicit legacy-only stateless decoder API differential against frozen P body; real binary seed IO is independently inspected, then fixture derives separate legacy in-memory seeds and their own legacy context SHA; all 63 full Right bytes and exact Left errors remain unchanged",
-                        "not_a_prepared_raw_or_performance_claim": True}
-        record["decoder_differential"] = differential
-        save()
-        try:
-            compared = run("decoder-differential", ["decoder-differential", decoder_cache], timeout=60)
-        finally:
-            # Preserve bounded seed post-evidence even on nonzero exit/timeout;
-            # an audit error is recorded without replacing the target error.
-            try:
-                differential["seed_after"] = with_publication_lock(decoder_cache, lambda: decoder_seed_snapshot(decoder_cache))
-                differential["seed_identity_unchanged"] = differential["seed_after"] == seed_before
-            except BaseException as seed_error:
-                differential["seed_audit_error"] = type(seed_error).__name__ + ": " + str(seed_error)
-                differential["seed_identity_unchanged"] = False
+        if "decoder-differential" in active:
+            decoder_cache = out / "helper-cache"
+            seed_before = with_publication_lock(decoder_cache, lambda: decoder_seed_snapshot(decoder_cache))
+            differential = {"seed_before": seed_before, "expected_right": DECODER_DIFFERENTIAL_RIGHT,
+                            "expected_left": DECODER_DIFFERENTIAL_LEFT, "case_count": 63,
+                            "scope": "explicit legacy-only stateless decoder API differential against frozen P body; real binary seed IO is independently inspected, then fixture derives separate legacy in-memory seeds and their own legacy context SHA; all 63 full Right bytes and exact Left errors remain unchanged",
+                            "not_a_prepared_raw_or_performance_claim": True}
+            record["decoder_differential"] = differential
             save()
-        require(len(DECODER_DIFFERENTIAL_RIGHT) == 6 and len(DECODER_DIFFERENTIAL_LEFT) == 57,
-                "fixed six valid and fifty-seven invalid differential subcases")
-        expected = "".join("PASS decoder differential " + label + " " + kind + "\n"
-                           for labels, kind in [(DECODER_DIFFERENTIAL_RIGHT, "Right"), (DECODER_DIFFERENTIAL_LEFT, "Left")]
-                           for label in labels) + "PASS decoder differential complete 63 cases\n"
-        require(compared == expected.encode("ascii"), "complete ordered decoder differential markers")
-        require(differential.get("seed_identity_unchanged") is True, "decoder comparison changed original helper cache identity")
-        differential["complete"] = True
-        save()
+            try:
+                compared = run("decoder-differential", ["decoder-differential", decoder_cache], timeout=60)
+            finally:
+                # Preserve bounded seed post-evidence even on nonzero exit/timeout;
+                # an audit error is recorded without replacing the target error.
+                try:
+                    differential["seed_after"] = with_publication_lock(decoder_cache, lambda: decoder_seed_snapshot(decoder_cache))
+                    differential["seed_identity_unchanged"] = differential["seed_after"] == seed_before
+                except BaseException as seed_error:
+                    differential["seed_audit_error"] = type(seed_error).__name__ + ": " + str(seed_error)
+                    differential["seed_identity_unchanged"] = False
+                save()
+            require(len(DECODER_DIFFERENTIAL_RIGHT) == 6 and len(DECODER_DIFFERENTIAL_LEFT) == 57,
+                    "fixed six valid and fifty-seven invalid differential subcases")
+            expected = "".join("PASS decoder differential " + label + " " + kind + "\n"
+                               for labels, kind in [(DECODER_DIFFERENTIAL_RIGHT, "Right"), (DECODER_DIFFERENTIAL_LEFT, "Left")]
+                               for label in labels) + "PASS decoder differential complete 63 cases\n"
+            require(compared == expected.encode("ascii"), "complete ordered decoder differential markers")
+            require(differential.get("seed_identity_unchanged") is True, "decoder comparison changed original helper cache identity")
+            differential["complete"] = True
+            save()
 
-        window_cache, session_raw_cache = run_added_window_controls(fixture, out, record, save,
-                                                                   include_session=not args.legacy_query_only)
-
-        cache_roots = [out / "helper-cache", out / "raw-final-cache", out / "raw-final-cache-inputs",
-                       *[out / kind / 'cache' for kind in drivers],
-                       *[out / ("left-" + mode) / "cache" for mode in left_modes],
-                       *[out / name / "cache" for name in ["empty-success", "empty-directory-failure", "cleanup-dual-failure", "concurrent"]]]
-        cache_roots += [out / "memo-helper-cache", *[out / ('memo-' + kind) / 'cache' for kind in drivers]]
-        cache_roots += [collision_cache, stage_cache]
-        cache_roots += [window_cache, *([session_raw_cache] if session_raw_cache is not None else [])]
+        if {"window-helper", "session-window-raw-final"} & active:
+            run_added_window_controls(fixture, out, record, save,
+                                      include_session="session-window-raw-final" in active,
+                                      include_helper="window-helper" in active)
+        cache_roots = []
+        if "helper" in active:
+            cache_roots.append(out / "helper-cache")
+        if "raw-final" in active:
+            cache_roots.extend((out / "raw-final-cache", out / "raw-final-cache-inputs"))
+        cache_roots.extend(out / kind / 'cache' for kind in drivers)
+        cache_roots.extend(out / ('left-' + mode) / 'cache' for mode in left_modes)
+        for case, directory in (("empty-stale-success", "empty-success"),
+                                ("empty-directory-failure", "empty-directory-failure"),
+                                ("cleanup-dual-failure", "cleanup-dual-failure"),
+                                ("concurrent-a", "concurrent")):
+            if case in active:
+                cache_roots.append(out / directory / 'cache')
+        if "memo-helper" in active:
+            cache_roots.append(out / "memo-helper-cache")
+        cache_roots.extend(out / ('memo-' + kind) / 'cache' for kind in memo_drivers)
+        for case, directory in (("context-directory-setup", "context-directory-cache"),
+                                ("context-stage-cleanup-failure", "context-stage-cleanup-cache"),
+                                ("window-helper", "window-helper-cache"),
+                                ("session-window-raw-final", "window-session-raw/cache")):
+            if case in active:
+                cache_roots.append(out / directory)
         record["all_cache_inventory"] = {str(root.relative_to(out)): physical_inventory(root) for root in cache_roots}
         allocated = sum(value["all_pathname_conservative_allocated_bytes"] for value in record["all_cache_inventory"].values())
         logical = sum(value["all_file_logical_bytes"] for value in record["all_cache_inventory"].values())
         record["all_cache_totals"] = {"logical": logical, "allocated": allocated, "cache_roots": len(cache_roots),
                                       "scope": "all selected private cache trees; includes every retained raw/backup/lock/rejected directory; build/capture evidence remains in outer root accounting"}
         require(logical <= 16 * 1024**2 and allocated <= 16 * 1024**2, "16 MiB complete cache budget")
-        require(len(record["commands"]) == (29 if args.legacy_query_only else 40), "fixed selected command inventory")
+        require([row['name'] for row in record['commands']] == expected, "fixed selected command inventory")
         require(all(digest(Path(path).read_bytes()) == expected for path, expected in inspector_inputs.items()),
                 'independent binary inspector input changed during controls')
-        if not args.legacy_query_only:
+        if "left-session" in active:
             dependency = record["left_session_builtin_dependency"]
             dependency["terminal_pair"] = canonical_session_builtin_pair(out / "session/builtin")
             require(dependency["terminal_pair"] == dependency["cold_pair"] == dependency["before_live_probe"] == dependency["after_live_probe"],

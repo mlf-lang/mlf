@@ -7,6 +7,18 @@ import re
 import unicodedata
 
 
+def unique_object(pairs):
+    value = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError(f"duplicate JSON key: {key}")
+        value[key] = item
+    return value
+
+
+def decode(raw):
+    return json.loads(raw, object_pairs_hook=unique_object)
+
 def source(root, spec, args):
     output = spec["output"]
     if isinstance(output, int):
@@ -46,11 +58,16 @@ def slug(value):
     return identity
 
 
-def import_results(path, before, spec, evidence, exit_code):
+def import_results(path, before, spec, evidence, exit_code, available, exact=None):
     after = fingerprint(path)
     if after is None or after == before:
         raise ValueError(f"missing or unchanged result receipt: {path}")
-    receipt = json.loads(path.read_text(encoding="utf-8"))
+    raw = path.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != after[3]:
+        raise ValueError(f"result receipt changed during import: {path}")
+    receipt = decode(raw)
+    if not isinstance(receipt, dict):
+        raise ValueError("invalid result receipt object")
     rules = spec["receipt"]
     complete = receipt.get(rules.get("complete_field", "complete")) is True
     evidence["adapter_receipt"] = {"path": str(path), "sha256": after[3]}
@@ -64,12 +81,20 @@ def import_results(path, before, spec, evidence, exit_code):
             if digest is not None and hashlib.sha256(raw).hexdigest() != digest:
                 raise ValueError("specialized report's stdout changed")
             prefix = rules.get("line_prefix", "PASS ")
-            cases = [line.removeprefix(prefix) for line in raw.decode("utf-8").splitlines()
-                     if line.startswith(prefix)]
+            cases = [line.rstrip("\r\n").removeprefix(prefix)
+                     for line in raw.decode("utf-8").splitlines(keepends=True)
+                     if line.startswith(prefix) and line.endswith("\n")]
     else:
         cases = field(receipt, rules["cases"], missing=[])
     if not isinstance(cases, list):
         raise ValueError("invalid result receipt inventory")
+    expected = evidence["expected_ids"]
+    expected_set = set(expected)
+    declared = receipt.get("selected_ids")
+    if declared is not None and (not isinstance(declared, list)
+                                 or len(declared) != len(expected)
+                                 or set(declared) != expected_set):
+        raise ValueError("producer selected IDs differ from the pre-run plan")
     results = evidence["results"]
     seen = set()
     observed = set()
@@ -81,6 +106,12 @@ def import_results(path, before, spec, evidence, exit_code):
         if identity in seen:
             raise ValueError(f"duplicate receipt observation: {identity}")
         seen.add(identity)
+        prerequisite = exact is not None and isinstance(case, dict) and case.get("prerequisite") is True
+        if prerequisite:
+            if identity in expected_set or identity not in available:
+                raise ValueError(f"invalid prerequisite case: {identity}")
+        elif identity not in expected_set:
+            raise ValueError(f"case outside the pre-run plan: {identity}")
         verdict = field(case, rules["verdict"], missing=None) if "verdict" in rules else True
         if verdict in rules.get("omit_if_verdict", []):
             evidence["started_ids"].append(identity)
@@ -89,20 +120,22 @@ def import_results(path, before, spec, evidence, exit_code):
             verdict = verdict == rules["verdict_equals"]
         if not isinstance(verdict, bool):
             raise ValueError(f"invalid receipt outcome: {identity}")
-        observed.add(identity)
-        results.append({"id": identity, "status": "pass" if verdict else "fail", "evidence": case})
-    if "inventory" in rules:
-        expected = [spec["prefix"] + slug(label) for label in rules["inventory"]]
-    elif "plan" in rules:
-        expected = [spec["prefix"] + slug(label) for label in receipt.get(rules["plan"], [])]
-    else:
-        # Here the specialized verifier's complete field seals its own
-        # generated inventory. A partial receipt cannot declare its plan.
-        expected = [entry["id"] for entry in results] if complete else []
-    if len(expected) != len(set(expected)):
-        raise ValueError("duplicate receipt plan IDs")
-    evidence["expected_ids"] = expected or None
-    if set(expected) != observed and complete:
-        raise ValueError("receipt result IDs differ from its selected inventory")
+        row = {"id": identity, "status": "pass" if verdict else "fail", "evidence": case}
+        if prerequisite:
+            evidence["prerequisite_results"].append(row)
+        else:
+            observed.add(identity)
+            results.append(row)
     evidence["missing_ids"] = [identity for identity in expected if identity not in observed]
-    return bool(expected) and complete and not evidence["missing_ids"] and exit_code == 0
+    if "plan" in rules:
+        authored = receipt.get(rules["plan"])
+        if authored is not None or complete:
+            if not isinstance(authored, list):
+                raise ValueError("missing or invalid receipt plan")
+            declared = [spec["prefix"] + slug(label) for label in authored]
+            if len(declared) != len(expected) or set(declared) != expected_set:
+                raise ValueError("receipt plan differs from pre-run discovery")
+    if complete and evidence["missing_ids"]:
+        raise ValueError("receipt omitted results from the pre-run plan")
+    prerequisites_passed = all(row["status"] == "pass" for row in evidence.get("prerequisite_results", []))
+    return complete and prerequisites_passed and not evidence["missing_ids"] and exit_code == 0

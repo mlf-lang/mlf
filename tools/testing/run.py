@@ -14,23 +14,11 @@ import tempfile
 import uuid
 
 import receipt_adapter
+from receipt_adapter import decode
 
 ROOT = Path(__file__).resolve().parents[2]
 CATALOG = ROOT / "tests/test-catalog.json"
 STATUSES = {"pass", "fail", "skip", "unsupported", "timeout", "crash", "cancelled"}
-
-
-def unique_object(pairs):
-    value = {}
-    for key, item in pairs:
-        if key in value:
-            raise ValueError(f"duplicate JSON key: {key}")
-        value[key] = item
-    return value
-
-
-def decode(text):
-    return json.loads(text, object_pairs_hook=unique_object)
 
 
 def ids_in(value, prefix=None):
@@ -83,9 +71,9 @@ def report(path, evidence):
             temporary.unlink(missing_ok=True)
 
 
-def argv_for(spec, extra, python_optimization):
-    command = list(spec["command"])
-    if kind_is_python(spec):
+def argv_for(spec, extra, python_optimization, *, inventory=False):
+    command = list(spec.get("list_command", spec["command"]) if inventory else spec["command"])
+    if command[0] in {"python", "python3"}:
         command[0] = sys.executable
         if python_optimization and "-O" not in command[1:]:
             command.insert(1, "-O")
@@ -93,10 +81,6 @@ def argv_for(spec, extra, python_optimization):
         target = next(i for i in range(1, len(command)) if command[i] == "-m" or not command[i].startswith("-"))
         command.insert(target, str(ROOT / "tools/testing/unittest_adapter.py"))
     return [*command, *extra]
-
-
-def kind_is_python(spec):
-    return spec["command"][0] in {"python", "python3"}
 
 
 def child_environment(suite, spec, exact, path=None):
@@ -113,23 +97,30 @@ def child_environment(suite, spec, exact, path=None):
     return env
 
 
-def discover(suite, spec, args, extra):
-    if spec["kind"] == "receipt" and "inventory" in spec["receipt"]:
-        inventory = [spec["prefix"] + receipt_adapter.slug(label) for label in spec["receipt"]["inventory"]]
-        return [identity for identity in inventory if args.exact is None or identity == args.exact]
+def discover(suite, spec, args, extra, capture=None):
+    receipt = spec["kind"] == "receipt"
+    if receipt and "list_args" not in spec and "inventory" in spec["receipt"]:
+        inventory = ids_in([spec["prefix"] + receipt_adapter.slug(label)
+                            for label in spec["receipt"]["inventory"]], spec["prefix"])
+        return inventory
     if "ids" in spec:
         return [args.exact] if args.exact else spec["ids"]
-    env = child_environment(suite, spec, args.exact)
+    # Receipt producers describe the available plan independently of the exact
+    # selector. Validate the selection here before dispatching any real work.
+    env = child_environment(suite, spec, None if receipt else args.exact)
     if spec["kind"] == "unittest":
         env["MLF_TEST_LIST"] = "1"
         command = argv_for(spec, extra, args.python_optimization)
     elif "list_args" in spec:
-        command = argv_for(spec, [*spec["list_args"], *extra], args.python_optimization)
+        command = argv_for(spec, [*spec["list_args"], *extra], args.python_optimization, inventory=True)
     else:
         raise ValueError(f"{suite} requires a running adapter to enumerate its plan")
-    result = subprocess.run(command, cwd=ROOT, env=env, stdout=subprocess.PIPE,
-                            encoding="utf-8", check=True)
-    return ids_in(decode(result.stdout), spec["prefix"])
+    if capture is None:
+        result = subprocess.run(command, cwd=ROOT, env=env, stdout=subprocess.PIPE, check=True)
+        output = result.stdout
+    else:
+        output = capture(command, env)
+    return ids_in(decode(output), spec["prefix"])
 
 
 def reconcile(path, spec, exact, evidence):
@@ -200,14 +191,6 @@ def execute(suite, spec, args, extra):
         "status": "running",
     }
     report(path, evidence)
-    if spec["kind"] == "receipt":
-        try:
-            receipt_path = receipt_adapter.source(ROOT, spec["receipt"], extra)
-            receipt_before = receipt_adapter.fingerprint(receipt_path)
-        except (OSError, ValueError, IndexError, KeyError) as error:
-            evidence.update(status="fail", launch_error=str(error))
-            report(path, evidence)
-            raise
     child = None
     interrupted = None
     owns_session = os.name == "posix" and not args.inherit_process_group
@@ -226,15 +209,47 @@ def execute(suite, spec, args, extra):
             except ProcessLookupError:
                 pass
 
+    def spawn(argv, environment, stdout=None):
+        nonlocal child
+        child = subprocess.Popen(argv, cwd=ROOT, env=environment,
+                                 stdout=stdout, start_new_session=owns_session)
+        if interrupted is not None:
+            forward(interrupted, None)
+        return child
+
+    def capture_inventory(argv, environment):
+        process = spawn(argv, environment, subprocess.PIPE)
+        output, _ = process.communicate()
+        if process.returncode:
+            raise subprocess.CalledProcessError(process.returncode, argv)
+        return output
+
     handlers = {}
     for signum in (signal.SIGINT, signal.SIGTERM):
         handlers[signum] = signal.signal(signum, forward)
     status = None
+    available = set()
+    receipt_path = None
+    setup_failed = False
     try:
-        child = subprocess.Popen(command, cwd=ROOT, env=env, start_new_session=owns_session)
-        if interrupted is not None:
-            forward(interrupted, None)
-        status = child.wait()
+        if spec["kind"] == "receipt":
+            try:
+                inventory = discover(suite, spec, args, extra, capture_inventory)
+                available = set(inventory)
+                if args.exact and args.exact not in available:
+                    raise ValueError(f"unknown case: {args.exact}")
+                evidence["expected_ids"] = [args.exact] if args.exact else inventory
+                evidence["missing_ids"] = evidence["expected_ids"].copy()
+                if args.exact:
+                    evidence["prerequisite_results"] = []
+                report(path, evidence)
+                receipt_path = receipt_adapter.source(ROOT, spec["receipt"], extra)
+                receipt_before = receipt_adapter.fingerprint(receipt_path)
+            except (OSError, ValueError, IndexError, KeyError, subprocess.CalledProcessError) as error:
+                evidence["launch_error"] = str(error)
+                setup_failed = True
+        if not setup_failed and interrupted is None:
+            status = spawn(command, env).wait()
     except OSError as error:
         evidence["launch_error"] = str(error)
     finally:
@@ -247,9 +262,11 @@ def execute(suite, spec, args, extra):
         evidence["interrupted"] = interrupted
     try:
         if spec["kind"] == "receipt":
-            evidence["complete"] = (
-                receipt_adapter.import_results(receipt_path, receipt_before, spec, evidence, status)
-                and interrupted is None)
+            if status is not None:
+                evidence["complete"] = (
+                    receipt_adapter.import_results(receipt_path, receipt_before, spec, evidence,
+                                                   status, available, args.exact)
+                    and interrupted is None)
         elif spec["kind"] == "exit" and status is not None and interrupted is None:
             evidence["results"].append({"id": selected[0],
                                         "status": "crash" if status < 0 else "pass" if status == 0 else "fail"})
@@ -271,6 +288,9 @@ def execute(suite, spec, args, extra):
         evidence["status"] = "interrupted" if interrupted is not None else "fail"
     report(path, evidence)
     print(f"{suite}: {evidence['status']} ({path})", file=sys.stderr)
+    if setup_failed and interrupted is None:
+        print(f"test: {evidence['launch_error']}", file=sys.stderr)
+        return 2
     if interrupted is not None:
         return 128 + interrupted
     if status:
@@ -313,8 +333,13 @@ def main(argv=None):
                 raise ValueError("this adapter keeps the original combined invocation")
         if args.list:
             inventory = discover(args.suite, spec, args, extra)
-            if args.exact and inventory != [args.exact]:
-                raise ValueError("adapter did not list the requested exact case")
+            if args.exact:
+                if spec["kind"] == "receipt":
+                    if args.exact not in inventory:
+                        raise ValueError(f"unknown case: {args.exact}")
+                    inventory = [args.exact]
+                elif inventory != [args.exact]:
+                    raise ValueError("adapter did not list the requested exact case")
             if args.report:
                 destination = Path(args.report).resolve()
                 destination.parent.mkdir(parents=True, exist_ok=True)

@@ -83,3 +83,30 @@ done
 ```
 
 Run baseline commands using the same flags and their direct scripts. Compare the old logs, nested receipts and CI job selection with the candidate's reports. In isolated copies, change the expected hosted source-rejection diagnostic, provide a malformed target contrary to its independent assertion, and force a hosted backend or optimized driver to exit unsuccessfully. Re-run the matching commands above and inspect which case IDs failed or remained incomplete. The hosted frontend and native PR smoke retain existing grouped subchecks inside several registered actions and direct receipt adapters keep their suite-level fixture boundaries. Exact leaf selection is available for the converted Figure 12, parity, PR smoke and source-smoke binaries. The supervised shell source-smoke and grouped receipt adapters keep their full native invocations. Verify that the existing bounded frontend and optimizer routes retain their original producer identities, command logs, compatible output and exit semantics.
+
+## Exact selection for receipt adapters
+
+All eight receipt adapters expose their existing IDs before execution through `tools/testing/run.py SUITE --list`. The selected case still uses the authenticated producer and independent oracle. The direct candidate adapter executes one existing frontend phase, supervised process check, or delegated control. It retains the frozen full route and uses the same CRC, UTF-8 and candidate worker supervisors for those exact selections. The panic reaping check executes the panic fixture as a prerequisite and keeps both results in the receipt. The mixed guest framework compiles its Foundation crate as a prerequisite for the selected dependent crate. The guest state-law adapter runs only the selected positive or negative process. The host-side graph and optimizer checks evaluate the selected assertion. Source-field layout checks build the needed checked source or legacy artifacts and preserve cold/warm pairs when the selected assertion compares them. The managed-recursion adapter skips unrelated lanes. Its source cache case keeps the existing cold/warm and linked-target controls.
+
+With `P2` and `HOST` from above, these commands exercise one case per adapter in Phase 2. Each focused result should name one selected test. Check the native receipts as well as the framework result to confirm only that case and its setup ran.
+
+```sh
+python3 -B tools/testing/run.py direct-candidate --list
+python3 -B tools/testing/run.py direct-candidate --exact direct-candidate/panic-child-reaped \
+  --report "$P2/direct-candidate-exact.json" -- --bin-dir "$HOST/bin" \
+  --build-receipt "$HOST/receipt.json" --output "$P2/direct-candidate-exact"
+language_case() {
+  suite=$1
+  id=$2
+  python3 -B tools/testing/run.py "$suite" --list --exact "$id"
+  python3 -B tools/testing/run.py "$suite" --exact "$id" --report "$P2/$suite-exact.json" -- \
+    --build-receipt "$P2/ghc-O2/receipt.json" --output "$P2/$suite-exact"
+}
+language_case recursive-managed recursive-managed/raw-managed-recursion-first-signed
+language_case parameter-field-graph parameter-field-graph/rigid-root-local-quantifier-is-eligible
+language_case source-field-layouts source-field-layouts/checked-layout-key-retains-dead-quantifiers
+language_case common-calls common-calls/raw-fresh-arrays-each-execution
+language_case callback-sharing callback-sharing/kernel-anchors-reach-whole-cycle
+language_case guest-framework guest-framework/distinct-custom-class
+language_case guest-state-laws guest-state-laws/graph-build-negative
+```

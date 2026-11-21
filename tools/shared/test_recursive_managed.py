@@ -9,12 +9,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 from build import DEMAND_FLAGS, EXHAUSTIVENESS_FLAGS, PACKAGES
 from test_direct import CommandRunner, authenticate_build, sha
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tools/testing'))
+from receipt_selection import identity, select
+
 FIXTURE = ROOT / 'tools/shared/fixtures/item4/RecursiveManagedEvidence.hs'
 RAW_CHECKS = [
     *['raw managed recursion ' + order + ' ' + mode
@@ -53,6 +57,7 @@ def main():
         parser.add_argument('--' + name + '-timeout', type=int, default=default,
                             help='Maximum seconds per ' + name + ' command.')
     args = parser.parse_args()
+    selected = select('recursive-managed/', [*RAW_CHECKS, *PARSED_CHECKS, *SOURCE_CHECKS])
     for name, _, maximum in limits:
         if not 1 <= getattr(args, name + '_timeout') <= maximum:
             parser.error(name + ' timeout must be between 1 and ' + str(maximum))
@@ -65,6 +70,9 @@ def main():
     output.mkdir(parents=True, exist_ok=False)
     record = {'format': 1, 'complete': False, 'full_native_unit': False,
               'mode': 'authenticated-O2-recursive-managed-evidence', 'commands': [], 'passing_inventory': []}
+
+    if selected:
+        record.update(scope='focused', selected_ids=[identity('recursive-managed/', selected)])
 
     def save():
         temporary = output / 'receipt.json.new'
@@ -142,6 +150,12 @@ def main():
                 ('raw', ['--raw'], RAW_CHECKS),
                 ('parsed', ['--parsed'], PARSED_CHECKS),
                 ('source', ['--source', fresh_cache], SOURCE_CHECKS)]:
+            if selected and selected not in expected:
+                continue
+            if selected:
+                expected = [selected]
+                if name != 'source':  # The source lane already has exactly one registered control.
+                    arguments = [*arguments, '--exact', selected]
             result = runner.run(name, [executable, *arguments],
                                 timeout=getattr(args, name + '_timeout'))
             verify_inventory(result.stdout, expected)
@@ -159,8 +173,9 @@ def main():
             raise ValueError('focused test artifacts changed during controls')
         record.update(complete=True, objects_verified_after=True,
                       production_and_independent_target_checks=True,
-                      target_roundtrip_and_erasure=True,
-                      source_contract_cold_warm_parity=True)
+                      target_roundtrip_and_erasure=True)
+        if not selected or selected in SOURCE_CHECKS:
+            record['source_contract_cold_warm_parity'] = True
     except BaseException as error:
         record['error'] = type(error).__name__ + ': ' + str(error)
         raise

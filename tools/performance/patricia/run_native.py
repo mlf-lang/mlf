@@ -3,11 +3,22 @@
 from pathlib import Path
 import argparse,json,random,shlex,shutil,subprocess,sys,types
 ROOT=Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT/'tools/testing'))
+from receipt_selection import inventory_json, select
+
+PREFIX = 'patricia-native/'
 
 # Fixed semantic partitions: every legacy action remains in its original order.
 # The large standalone entry point exhausted Linux's unchanged 6 GiB AS limit.
 BATCH_NAMES = ('map-basic', 'map-bulk', 'map-sorted', 'map-rank',
                'set-basic', 'set-sorted', 'rank-views', 'lazy-payloads')
+
+def modes(mode):
+    return ('standalone', 'installed') if mode == 'both' else (mode,)
+
+def case_labels(mode):
+    return ['ghc-good-run', 'ghc-bad-run',
+            *[f'{route}-{label}-run' for route in modes(mode) for label in (*BATCH_NAMES, 'bad')]]
 
 def fixture(batch=None):
     minimum=-(1<<63);maximum=(1<<63)-1;rng=random.Random(20261031)
@@ -110,22 +121,35 @@ def runtime_build_command(clang,source,output,cflags,runtime_source=None):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--producer',type=Path,required=True);p.add_argument('--source',type=Path,default=ROOT);p.add_argument('--output',type=Path,required=True);p.add_argument('--mode',choices=['standalone','installed','both'],default='standalone');p.add_argument('--clang',default='/usr/bin/clang');p.add_argument('--runtime-source',type=Path,help='Exact runtime C source; defaults to SOURCE/runtime/mlf_runtime.c')
-    a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=False);source=a.source.resolve();producer=a.producer.resolve()
+    listing = '--framework-list' in sys.argv[1:]
+    p.add_argument('--framework-list', action='store_true')
+    p.add_argument('--producer',type=Path,required=not listing);p.add_argument('--source',type=Path,default=ROOT);p.add_argument('--output',type=Path,required=not listing);p.add_argument('--mode',choices=['standalone','installed','both'],default='standalone');p.add_argument('--clang',default='/usr/bin/clang');p.add_argument('--runtime-source',type=Path,help='Exact runtime C source; defaults to SOURCE/runtime/mlf_runtime.c')
+    a=p.parse_args()
+    labels = case_labels(a.mode)
+    exact = select(PREFIX, labels)
+    planned = [exact] if exact is not None else labels
+    if a.framework_list:
+        print(inventory_json(PREFIX, planned))
+        return
+    out=a.output.resolve();out.mkdir(parents=True,exist_ok=False);source=a.source.resolve();producer=a.producer.resolve()
     runtime_source=(a.runtime_source if a.runtime_source is not None else source/'runtime/mlf_runtime.c').resolve()
     h=ROOT/'tools/performance/a1-private-index/helper.py';H=types.ModuleType('guard');H.__file__=str(h);exec(compile(h.read_bytes(),str(h),'exec'),H.__dict__);auth=H.authenticate(producer,source)
     scope=ROOT/'tools/performance/process-spawn/with_scope.py';limits=dict(address_space_per_process_bytes=6*1024**3,disk_free_floor_bytes=5*1024**3,host_available_floor_bytes=3*1024**3,process_tree_rss_bytes=5*1024**3,max_work_bytes=2*1024**3,wall_seconds=600)
     good,expected,bad,inventory=fixture();(out/'Main.hs').write_text(good);(out/'Bad.hs').write_text(bad);(out/'expected').write_bytes(expected)
     batches=[]
     for label in BATCH_NAMES:
+        if not any(f'{mode}-{label}-run' in planned for mode in modes(a.mode)):
+            continue
         text,wanted,_,_=fixture(label);directory=out/label;directory.mkdir()
         entry=directory/'Main.hs';entry.write_text(text);(directory/'expected').write_bytes(wanted)
         batches.append((label,entry,wanted))
-    H.require(b''.join(wanted for _,_,wanted in batches)==expected,'complete partitioned model output')
-    runtime_inputs=([runtime_source,*sorted((source/'runtime').glob('*.h'))] if a.mode in ['standalone','both'] else [])
-    pins={str(x):H.sha(x) for x in [*runtime_inputs,Path(__file__),h,scope,out/'Main.hs',out/'Bad.hs',out/'expected',
+    if exact is None:
+        H.require(b''.join(wanted for _,_,wanted in batches)==expected,'complete partitioned model output')
+    needs_standalone = any(label.startswith('standalone-') for label in planned)
+    runtime_inputs=([runtime_source,*sorted((source/'runtime').glob('*.h'))] if needs_standalone else [])
+    pins={str(x):H.sha(x) for x in [*runtime_inputs,Path(__file__),h,scope,ROOT/'tools/testing/receipt_selection.py',out/'Main.hs',out/'Bad.hs',out/'expected',
           *[path for _,entry,_ in batches for path in (entry,entry.parent/'expected')]]}
-    record={'complete':False,'purpose':'independent Python dict/set model and hand-authored demand probes, GHC and native LLVM execution','inputs':pins,'inventory':inventory,'checks':[],'mode':a.mode,'performance_samples':0,'limits':limits,'native_batches':[dict(name=label,output_lines=len(wanted.splitlines())) for label,_,wanted in batches]};save=lambda:H.save(out/'receipt.json',record)
+    record={'complete':False,'purpose':'independent Python dict/set model and hand-authored demand probes, GHC and native LLVM execution','inputs':pins,'inventory':inventory,'checks':[],'planned_checks':planned,'mode':a.mode,'performance_samples':0,'limits':limits,'native_batches':[dict(name=label,output_lines=len(wanted.splitlines())) for label,_,wanted in batches]};save=lambda:H.save(out/'receipt.json',record)
     def run(label,argv,status=0):return H.Runner(out,limits).run(argv,source,out/label,expected_exit=status)
     def check(label,binary,failure,wanted=expected):
         run(label,[binary],1 if failure else 0);stdout=(out/label/'stdout').read_bytes();stderr=(out/label/'stderr').read_bytes()
@@ -135,18 +159,24 @@ def main():
     save()
     try:
         with H.SerialLock(ROOT/'.mlf-build'):
-            objects=out/'objects';shutil.copytree(producer/'objects',objects);flags=[]
-            for token in auth['flags']:flags.append(str(objects) if token==str(producer/'objects') else token)
-            for failure in [False,True]:
-                name='bad' if failure else 'good';entry=out/('Bad.hs' if failure else 'Main.hs');binary=out/('ghc-'+name)
-                run('ghc-'+name+'-build',[auth['ghc']['path'],'--make','-j1',*flags,'-rtsopts=ignoreAll',entry,producer/'host.o',producer/'supervisor.o','-o',binary]);check('ghc-'+name+'-run',binary,failure)
-            if a.mode in ['standalone','both']:
+            if any(label.startswith('ghc-') for label in planned):
+                objects=out/'objects';shutil.copytree(producer/'objects',objects);flags=[]
+                for token in auth['flags']:flags.append(str(objects) if token==str(producer/'objects') else token)
+                for failure in [False,True]:
+                    name='bad' if failure else 'good'
+                    if 'ghc-'+name+'-run' not in planned:
+                        continue
+                    entry=out/('Bad.hs' if failure else 'Main.hs');binary=out/('ghc-'+name)
+                    run('ghc-'+name+'-build',[auth['ghc']['path'],'--make','-j1',*flags,'-rtsopts=ignoreAll',entry,producer/'host.o',producer/'supervisor.o','-o',binary]);check('ghc-'+name+'-run',binary,failure)
+            if needs_standalone:
                 cflags=shlex.split(subprocess.check_output(['pkg-config','--cflags','bdw-gc','gmp'],text=True));libs=shlex.split(subprocess.check_output(['pkg-config','--libs','bdw-gc','gmp'],text=True));runtime=out/'runtime.o'
                 run('runtime-build',runtime_build_command(a.clang,source,runtime,cflags,runtime_source))
-            for mode in (['standalone','installed'] if a.mode=='both' else [a.mode]):
+            for mode in modes(a.mode):
                 outputs=[]
                 for label,entry,wanted in [*batches,('bad',out/'Bad.hs',b'before\n')]:
                     failure=label=='bad';name=mode+'-'+label;binary=out/name
+                    if name+'-run' not in planned:
+                        continue
                     if mode=='standalone':
                         run(name+'-emit',[producer/'bin/emlf','-i',source/'libraries/mlf-foundation','--emit-llvm',entry]);ir=out/(name+'.ll');ir.write_bytes((out/(name+'-emit')/'stdout').read_bytes())
                         run(name+'-build',[a.clang,'-O2','-Wno-override-module',ir,runtime,*libs,'-lm','-lpthread','-o',binary])
@@ -155,7 +185,8 @@ def main():
                         receipt=H.load(build/'receipt.json');H.require(receipt['complete'] and receipt['fresh_user_compilation'] and receipt['llvm_jobs']==1 and receipt['stdlib_path']=='installed' and receipt['fixed_library_reused'],'installed generic standard-library reuse')
                     check(name+'-run',binary,failure,wanted)
                     if not failure:outputs.append((out/(name+'-run')/'stdout').read_bytes())
-                H.require(b''.join(outputs)==expected,'complete native output '+mode)
+                if exact is None:
+                    H.require(b''.join(outputs)==expected,'complete native output '+mode)
             H.check_pins(pins);H.require(H.authenticate(producer,source)==auth,'ordinary producer unchanged');record['complete']=True
     except BaseException as error:record['error']=repr(error);raise
     finally:save()

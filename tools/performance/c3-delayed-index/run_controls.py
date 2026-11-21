@@ -6,6 +6,7 @@ import hashlib
 import re
 import shutil
 import subprocess
+import sys
 import types
 
 ROOT=Path(__file__).resolve().parents[3]
@@ -47,7 +48,19 @@ def adapt_private_owner(raw,name,live_header):
     return changed
 
 
+sys.path.insert(0, str(ROOT / 'tools/testing'))
+from receipt_selection import inventory_json, select
+
+CASE_PREFIX = 'delayed-index/'
+
+
 def main():
+    checks = [line.removeprefix('PASS ') for line in EXPECTED.decode().splitlines()]
+    if sys.argv[1:2] == ['--framework-list']:
+        print(inventory_json(CASE_PREFIX, checks))
+        return
+    chosen = select(CASE_PREFIX, checks)
+    expected = EXPECTED if chosen is None else ('PASS ' + chosen + '\n').encode()
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--producer',type=Path,required=True)
     p.add_argument('--producer-source',type=Path,required=True)
@@ -139,14 +152,18 @@ def main():
             H.check_pins(original_objects)
             binary=out/'controls'
             run('link',[ghc,*flags,*sorted(objects.rglob('*.o')),producer/'host.o',producer/'supervisor.o','-o',binary])
-            run('run',[binary])
-            H.require((out/'run/stdout').read_bytes()==EXPECTED,'complete independent control inventory')
+            run('run',[binary, *([chosen] if chosen is not None else [])])
+            H.require((out/'run/stdout').read_bytes()==expected,'complete independent control inventory')
             H.require(not(out/'run/stderr').read_bytes(),'empty control stderr')
+            record['checks_log_sha256'] = H.sha(out / 'run/stdout')
             H.check_pins(pins)
             H.require(H.authenticate(producer,a.producer_source)==auth,'ordinary producer unchanged')
             record.update(complete=True,executable_sha256=H.sha(binary));save()
-            print(EXPECTED.decode(),end='',flush=True)
+            print(expected.decode(),end='',flush=True)
     except BaseException as error:
+        stdout = out / 'run/stdout'
+        if stdout.is_file():
+            record['checks_log_sha256'] = H.sha(stdout)
         record['error']=repr(error);save();raise
 
 

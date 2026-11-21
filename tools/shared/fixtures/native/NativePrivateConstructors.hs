@@ -16,7 +16,14 @@ right (T.Left x)=error(P.textToChars x)
 identity=P.textFromChars(replicate 64 'a')
 unit=T.XConstructor "()" []
 main=do
- [directory]<-getArgs
+ args<-getArgs
+ case args of
+  [directory] -> emit directory Nothing
+  [directory, label] | label `elem` ["private-identity", "private-escape-ignore", "private-escape-demand"] ->
+   emit directory (Just label)
+  _ -> fail "expected output directory and optional private-constructor label"
+
+emit directory selection = do
  let a=T.XTyVar 0; at=T.XVar a; double=T.XCon "Double" []
      idTy=T.XForall a T.XBot (T.XArrow at at)
      makeTy=T.XForall a T.XBot (T.XArrow (T.XArrow double at) at)
@@ -37,7 +44,8 @@ main=do
      observed=T.XApp(T.XApp(T.XPrimitive T.PEqDouble[])(T.XVarTerm field))(T.XDoubleTerm 4)
      demanded=T.XApp(T.XApp(T.XApp(T.XPrimitive T.PIfThenElse[ioUnit])observed)(output 1))(output 0)
  writeFile(directory++"/private-library.ll")(concatMap P.textToChars(right(N.emitLibrary layout linked)))
- forM_[("private-identity","ident",idTy,False),("private-escape-ignore","maker",makeTy,True),("private-escape-demand","maker",makeTy,False)] $ \(label,key,ty,ignored)->do
+ let candidates=[("private-identity","ident",idTy,False),("private-escape-ignore","maker",makeTy,True),("private-escape-demand","maker",makeTy,False)]
+ forM_ (filter (\(label,_,_,_) -> maybe True (== label) selection) candidates) $ \(label,key,ty,ignored)->do
   let selected=T.XName 20 key
       instantiate=T.XTypeApp(T.XVarTerm selected)(T.XThen (T.XInner (T.XBottom privateTy)) T.XElim)
       value=if key=="ident" then T.XApp instantiate(T.XApp(T.XConstructor "PrivateBoxValue"[])(T.XDoubleTerm 4)) else T.XApp instantiate(T.XConstructor "PrivateBoxValue"[])

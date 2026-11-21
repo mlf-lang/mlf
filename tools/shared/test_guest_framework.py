@@ -14,6 +14,9 @@ import sys
 from test_direct import authenticate_build
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tools/testing'))
+from receipt_selection import identity, select
+
 WATCHDOG = ROOT / 'tools/shared/resource_watchdog.py'
 STANDARD = '''module Standard where
 import Prelude hiding (Monad, return, bind)
@@ -127,6 +130,12 @@ def main():
     parser.add_argument('--build-receipt', required=True, type=Path)
     parser.add_argument('--output', required=True, type=Path)
     args = parser.parse_args()
+    class_controls = (
+        ('standard-class', 'Standard', STANDARD, 0),
+        ('implicit-standard-class', 'Legacy', IMPLICIT, 0),
+        ('distinct-custom-class', 'Distinct', DISTINCT, 1),
+    )
+    selected = select('guest-framework/', ['foundation', 'framework', *(row[0] for row in class_controls)])
     receipt = args.build_receipt.resolve(strict=True)
     producer_dir = receipt.parent
     output = args.output.resolve()
@@ -134,6 +143,8 @@ def main():
     record = {'complete': False, 'kind': 'actual-MLF-mixed-framework-source',
               'full_native_unit': False, 'full_manager_build': False,
               'native_or_llvm_output': False, 'commands': []}
+    if selected:
+        record.update(scope='focused', selected_ids=[identity('guest-framework/', selected)])
     def save():
         (output/'receipt.json').write_text(json.dumps(record, indent=2)+'\n')
     saved_files = {}
@@ -186,6 +197,8 @@ def main():
                 remember(path.with_suffix('.mlfco'))
             command = [str(compiler), '--compile-crate', str(spec), '-o', str(directory/'artifact/unit')]
             row = {'label': label, 'command': command, 'expected_exit': status, 'complete': False}
+            if selected and label != selected:
+                row['prerequisite'] = True
             record['commands'].append(row)
             save()
             supervised = [sys.executable, str(WATCHDOG), '--seconds', '900', '--address-space-mib', '3072',
@@ -223,25 +236,30 @@ def main():
                                              foundation_modules, [])
         for extension in ['mlfci', 'mlfco']:
             remember(builtin.with_suffix('.'+extension))
-        compile_crate('framework', framework['name']+'/'+framework['version']+'/library',
-                      framework_modules, [foundation_interface])
-        fixtures = output/'fixtures'
-        fixtures.mkdir()
-        for label, module, source, status in [('standard-class', 'Standard', STANDARD, 0),
-                                              ('implicit-standard-class', 'Legacy', IMPLICIT, 0),
-                                              ('distinct-custom-class', 'Distinct', DISTINCT, 1)]:
-            path = fixtures/(module+'.emlf')
-            path.write_text(source)
-            remember(path)
-            compile_crate(label, 'guest-class-control/'+label, [(module, path)], [foundation_interface], status)
+        if not selected or selected == 'framework':
+            compile_crate('framework', framework['name']+'/'+framework['version']+'/library',
+                          framework_modules, [foundation_interface])
+        controls = [row for row in class_controls if not selected or selected == row[0]]
+        if controls:
+            fixtures = output/'fixtures'
+            fixtures.mkdir()
+            for label, module, source, status in controls:
+                path = fixtures/(module+'.emlf')
+                path.write_text(source)
+                remember(path)
+                compile_crate(label, 'guest-class-control/'+label, [(module, path)], [foundation_interface], status)
         authenticate()
         require(before == {str(path): digest(path) for path in inputs}, 'source/tool inputs changed during gate')
         require(all(digest(path) == sha for path, sha in saved_files.items()), 'generated checked inputs or artifacts changed')
         record.update(complete=True, generated_files=saved_files, inputs_unchanged=True,
                       producer_reauthenticated=True, checked_artifacts_rehashed=True)
         save()
-        print(json.dumps({'complete': True, 'commands': len(record['commands']),
-                          'framework_modules': 14, 'full_native_unit': False}))
+        summary = {'complete': True, 'commands': len(record['commands']), 'full_native_unit': False}
+        if selected:
+            summary['selected_ids'] = record['selected_ids']
+        else:
+            summary['framework_modules'] = 14
+        print(json.dumps(summary))
     except BaseException as error:
         record['error'] = type(error).__name__+': '+str(error)
         save()

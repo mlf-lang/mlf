@@ -138,3 +138,72 @@ savings. The original fatal setup or subprocess errors may leave a started
 case with no result. The dispatcher must classify those runs as incomplete and
 retain the exact exit and legacy diagnostic. Direct invocation of low-level
 preparers and analyzers remains available for evidence tooling.
+
+## Focused Patricia and Int64 qualification
+
+The framework resolves available IDs from an authored inventory before running
+any compiled controls. Each receipt preserves the original case labels and
+records the selected inventory. Exact selection uses the same executable,
+oracle, and expectation as the full command, with just the prerequisite setup
+needed for that case.
+
+| Adapter | Legacy coverage carried into the framework | Focused execution |
+| --- | --- | --- |
+| `patricia-design` | Whole shared-source typecheck and the O0, O2 and narrow-O2 independent controls | One compilation and check, or the shared-source typecheck |
+| `patricia-file-controls` | Nine C4 fixtures through ordinary Crate and CrateSession. Both routes must finish for the shared case verdict | One original fixture across all its existing routes, including the native negative controls when selecting their original first case |
+| `patricia-fingerprint` | Frozen current O0, current O2 and actual Separate proofs | One original stage. Unchanged oracle and artifact checks remain in the selected stage |
+| `patricia-focused` | Six O0/O2 container, compiler and kind-routing controls and full compiler-source typecheck | One original compilation and execution, or the typecheck |
+| `patricia-integrated` | Twenty invocations across `p123`, `map-balance`, `graph`, `validation` and `builtin`, including negative lookup checks | One original module or one expected compile rejection within its existing variant |
+| `patricia-native` | GHC positive and rejected-payload checks plus eight semantic batches and a rejected-payload check per LLVM mode | One original GHC or LLVM invocation. Standalone runtime compilation occurs only when selected |
+| `int64-controls` | O0 and O2 host controls, 178 native direct/curried/UBSan observations, 46 interpreted-and-native legacy rows, program parity, compiler and existing checks | One existing process case or parity row, with oracle generation only when that case consumes it |
+| `llp64-controls` | Shared Windows-width probe and four LLVM host adapter checks. The optional reference-runtime comparison gets its own ID when requested | One shared width, ordinary/UBSan execution or reference-runtime equivalence case |
+
+Full profiles have the same execution count. Focused runs avoid unrelated
+compiler invocations and native workers. Compare observed build and run
+command files under the focused and full output directories in Phase 2.
+Historical source transformations, focused partial receipts, unchanged
+case IDs, and nonzero exits for rejected infrastructure should be checked
+through these commands. None has been executed in Phase 1.
+
+Set `PHASE2_PRODUCER` to the qualified O2 shared producer,
+`PHASE2_REFERENCE_SOURCE` and `PHASE2_REFERENCE_PRODUCER` to the matching
+reference checkout and build, and `PHASE2_GC_PREFIX` and
+`PHASE2_GMP_PREFIX` to the native dependency prefixes. On multiarch systems
+pass the static GC archive to Int64 using `--gc-library` as CI does.
+
+```sh
+for suite in patricia-design patricia-file-controls patricia-fingerprint patricia-focused \
+  patricia-integrated patricia-native int64-controls llp64-controls; do
+  python3 -B tools/testing/run.py "$suite" --list
+done
+python3 -B tools/testing/run.py patricia-design --exact patricia-design/O2-narrow \
+  -- --reference-source "$PHASE2_REFERENCE_SOURCE" --reference-producer "$PHASE2_REFERENCE_PRODUCER" \
+  --output .mlf-build/phase2-patricia-design-focused
+python3 -B tools/testing/run.py patricia-focused --exact patricia-focused/kind-routing-O0 \
+  -- --reference-source "$PHASE2_REFERENCE_SOURCE" --reference-producer "$PHASE2_REFERENCE_PRODUCER" \
+  --output .mlf-build/phase2-patricia-focused
+python3 -B tools/testing/run.py patricia-fingerprint --exact patricia-fingerprint/current-O2 \
+  -- --producer "$PHASE2_PRODUCER" --output .mlf-build/phase2-patricia-fingerprint-focused
+python3 -B tools/testing/run.py patricia-integrated --exact patricia-integrated/private-OpenSession \
+  -- --suite graph --producer "$PHASE2_PRODUCER" --output .mlf-build/phase2-patricia-private
+python3 -B tools/testing/run.py patricia-integrated -- \
+  --suite builtin --producer "$PHASE2_PRODUCER" --output .mlf-build/phase2-patricia-builtin
+python3 -B tools/testing/run.py patricia-file-controls --exact patricia-file-controls/missing-source-file \
+  -- --producer "$PHASE2_PRODUCER" --reference-source "$PHASE2_REFERENCE_SOURCE" \
+  --reference-producer "$PHASE2_REFERENCE_PRODUCER" --builtin-prefix .mlf-build/phase2-patricia-builtin/builtin \
+  --output .mlf-build/phase2-patricia-file-focused
+python3 -B tools/testing/run.py patricia-native --exact patricia-native/standalone-map-rank-run \
+  -- --mode standalone --producer "$PHASE2_PRODUCER" --output .mlf-build/phase2-patricia-native-focused
+python3 -B tools/testing/run.py int64-controls --exact int64-controls/rejection-ubsan-curried-0 \
+  -- --suite native --producer "$PHASE2_PRODUCER" --gc-prefix "$PHASE2_GC_PREFIX" \
+  --gmp-prefix "$PHASE2_GMP_PREFIX" --output .mlf-build/phase2-int64-rejection
+python3 -B tools/testing/run.py llp64-controls --exact llp64-controls/ubsan-curried \
+  -- --producer "$PHASE2_PRODUCER" --output .mlf-build/phase2-llp64-focused
+```
+
+Repeat each command with its exact selector removed and a fresh output to
+reconcile the full profile. Check the installed and both-mode Patricia
+inventories using `--list -- --mode installed` and `--list -- --mode both`.
+Compare legacy Int64 interpreter and LLVM logs for the same row and expected
+exit. LLP64 here forces the host GMP branch and retains the existing scope;
+the real Windows runtime remains covered by its Windows suite.

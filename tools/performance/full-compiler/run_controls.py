@@ -4,7 +4,7 @@ from pathlib import Path
 import hashlib,importlib.util
 HERE=Path(__file__).resolve().parent
 RETAINED=HERE.parent/'c3-delayed-index'
-PINS={'c3-delayed-index/Main.hs': '61545209bd6709a4cdd26fc0dd794b709bd74438b503520ed957f3f84db6b02e', 'c3-survivors/Main.hs': '711c186635228363792068cc80fae0ee0afffe0313f274caeab4d93a644efa09'}
+PINS={'c3-delayed-index/Main.hs': 'c761352b58d2f9f3fde1c702c686ff76289527e061331091fafddb34a4c1c6d9', 'c3-survivors/Main.hs': 'cd829eb6a8c7d1ef012bbda03edbaaffe07c2b596454fae4bf759fd7aa7a404b'}
 
 
 def main():
@@ -16,6 +16,7 @@ def main():
     driver.BASELINE='5172c4ade3b3141da2e64593c383892575b36699'
     driver.BASELINE_SHA='51aeddfb084faf84019db88c634d972f48eeecd597d8070c60f59c7402454df9'
     driver.HERE=HERE
+    driver.CASE_PREFIX='private-projection-views/'
     driver.EXPECTED+=('PASS 29160 independent sparse/wide signed fresh-delta models\n'
         'PASS exact unchanged/changed Node reuse and opaque delta payloads\n'
         'PASS 720 independent projection views and cached cardinalities\n'

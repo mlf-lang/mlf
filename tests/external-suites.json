@@ -9,8 +9,13 @@
     ],
     "receipt": {
       "output": "--output",
-      "cases": "controls_commands"
-    }
+      "cases": "controls_commands",
+      "plan": "framework_plan"
+    },
+    "exact": true,
+    "list_args": [
+      "--framework-list"
+    ]
   },
   "batch-replacement": {
     "command": [
@@ -23,7 +28,11 @@
     "receipt": {
       "output": "--output",
       "cases": "checks"
-    }
+    },
+    "exact": true,
+    "list_args": [
+      "--framework-list"
+    ]
   },
   "candidate-smoke-cli": {
     "kind": "events",
@@ -70,7 +79,8 @@
         "0",
         "2"
       ]
-    }
+    },
+    "exact": true
   },
   "datatype-context": {
     "command": [
@@ -88,7 +98,8 @@
         "0",
         "2"
       ]
-    }
+    },
+    "exact": true
   },
   "delayed-index": {
     "kind": "receipt",
@@ -100,8 +111,13 @@
     ],
     "receipt": {
       "output": "--output",
-      "stdout": "run/stdout"
-    }
+      "stdout": "run/stdout",
+      "stdout_sha256": "checks_log_sha256"
+    },
+    "exact": true,
+    "list_args": [
+      "--framework-list"
+    ]
   },
   "framework-direct": {
     "kind": "events",
@@ -126,8 +142,13 @@
     ],
     "receipt": {
       "output": "--output",
-      "stdout": "run/stdout"
-    }
+      "stdout": "run/stdout",
+      "stdout_sha256": "checks_log_sha256"
+    },
+    "exact": true,
+    "list_args": [
+      "--framework-list"
+    ]
   },
   "indexvec": {
     "kind": "events",
@@ -151,8 +172,18 @@
     "prefix": "installed-native-library/",
     "receipt": {
       "output": "--output",
-      "cases": "native_cases_passed"
-    }
+      "cases": "framework_cases_passed",
+      "plan": "framework_plan"
+    },
+    "exact": true,
+    "list_args": [
+      "--framework-list"
+    ],
+    "list_command": [
+      "python3",
+      "-B",
+      "tools/shared/test_native_library.py"
+    ]
   },
   "int64-controls": {
     "command": [
@@ -164,8 +195,13 @@
     "prefix": "int64-controls/",
     "receipt": {
       "output": "--output",
-      "cases": "checks"
-    }
+      "cases": "checks",
+      "plan": "planned_checks"
+    },
+    "exact": true,
+    "list_args": [
+      "--framework-list"
+    ]
   },
   "io-action-sharing": {
     "command": [
@@ -177,8 +213,13 @@
     "prefix": "io-action-sharing/",
     "receipt": {
       "output": "--output",
-      "cases": "native_cases_passed"
-    }
+      "cases": "framework_cases_passed",
+      "plan": "framework_plan"
+    },
+    "exact": true,
+    "list_args": [
+      "--framework-list"
+    ]
   },
   "llp64-controls": {
     "command": [
@@ -190,8 +231,13 @@
     "prefix": "llp64-controls/",
     "receipt": {
       "output": "--output",
-      "cases": "checks"
-    }
+      "cases": "checks",
+      "plan": "planned_checks"
+    },
+    "exact": true,
+    "list_args": [
+      "--framework-list"
+    ]
   },
   "llvm-unicode-memory": {
     "kind": "receipt",
@@ -203,8 +249,12 @@
     ],
     "receipt": {
       "output": "--output",
-      "stdout": "run/stdout"
-    }
+      "stdout": "run/stdout",
+      "inventory": [
+        "94 Unicode fixtures: every scalar, block-boundary slices, exact bounds errors"
+      ]
+    },
+    "exact": true
   },
   "map-policy": {
     "command": [
@@ -223,7 +273,8 @@
         "0",
         "2"
       ]
-    }
+    },
+    "exact": true
   },
   "native-library": {
     "command": [
@@ -235,8 +286,13 @@
     "prefix": "native-library/",
     "receipt": {
       "output": "--output",
-      "cases": "native_cases_passed"
-    }
+      "cases": "framework_cases_passed",
+      "plan": "framework_plan"
+    },
+    "exact": true,
+    "list_args": [
+      "--framework-list"
+    ]
   },
   "owned-source-context": {
     "command": [
@@ -254,7 +310,8 @@
         "0",
         "2"
       ]
-    }
+    },
+    "exact": true
   },
   "patricia-design": {
     "command": [
@@ -266,8 +323,13 @@
     "prefix": "patricia-design/",
     "receipt": {
       "output": "--output",
-      "cases": "checks"
-    }
+      "cases": "checks",
+      "plan": "planned_checks"
+    },
+    "exact": true,
+    "list_args": [
+      "--framework-list"
+    ]
   },
   "patricia-file-controls": {
     "kind": "receipt",
@@ -279,10 +341,13 @@
     ],
     "receipt": {
       "output": "--output",
-      "cases": "routes.crate.file_cases",
-      "id": "name",
-      "verdict": "complete"
-    }
+      "cases": "checks",
+      "plan": "planned_checks"
+    },
+    "exact": true,
+    "list_args": [
+      "--framework-list"
+    ]
   },
   "patricia-fingerprint": {
     "command": [
@@ -295,8 +360,13 @@
     "receipt": {
       "output": "--output",
       "cases": "checks",
-      "file": "checks/receipt.json"
-    }
+      "file": "checks/receipt.json",
+      "plan": "planned_checks"
+    },
+    "exact": true,
+    "list_args": [
+      "--framework-list"
+    ]
   },
   "patricia-focused": {
     "command": [
@@ -308,8 +378,13 @@
     "prefix": "patricia-focused/",
     "receipt": {
       "output": "--output",
-      "cases": "checks"
-    }
+      "cases": "checks",
+      "plan": "planned_checks"
+    },
+    "exact": true,
+    "list_args": [
+      "--framework-list"
+    ]
   },
   "patricia-integrated": {
     "command": [
@@ -321,8 +396,13 @@
     "prefix": "patricia-integrated/",
     "receipt": {
       "output": "--output",
-      "cases": "checks"
-    }
+      "cases": "checks",
+      "plan": "planned_checks"
+    },
+    "exact": true,
+    "list_args": [
+      "--framework-list"
+    ]
   },
   "patricia-native": {
     "command": [
@@ -334,8 +414,13 @@
     "prefix": "patricia-native/",
     "receipt": {
       "output": "--output",
-      "cases": "checks"
-    }
+      "cases": "checks",
+      "plan": "planned_checks"
+    },
+    "exact": true,
+    "list_args": [
+      "--framework-list"
+    ]
   },
   "permission-view": {
     "kind": "receipt",
@@ -347,8 +432,13 @@
     ],
     "receipt": {
       "output": "--output",
-      "stdout": "run/stdout"
-    }
+      "stdout": "run/stdout",
+      "stdout_sha256": "checks_log_sha256"
+    },
+    "exact": true,
+    "list_args": [
+      "--framework-list"
+    ]
   },
   "port-preparation-profile": {
     "kind": "events",
@@ -372,8 +462,13 @@
     ],
     "receipt": {
       "output": "--output",
-      "stdout": "run/stdout"
-    }
+      "stdout": "run/stdout",
+      "stdout_sha256": "checks_log_sha256"
+    },
+    "exact": true,
+    "list_args": [
+      "--framework-list"
+    ]
   },
   "python-artifact-binary-adapter-successor": {
     "command": [
@@ -723,10 +818,14 @@
     "prefix": "query-graph-acceptance/",
     "receipt": {
       "output": 1,
-      "cases": "recovery",
+      "cases": "framework_cases",
       "file": "results.json",
       "plan": "selected_cases"
-    }
+    },
+    "exact": true,
+    "list_args": [
+      "--framework-list"
+    ]
   },
   "recursive-saved-crate": {
     "kind": "receipt",
@@ -742,15 +841,12 @@
       "stdout": "run.log",
       "stdout_sha256": "run_log.sha256",
       "line_prefix": "PASS exact saved-crate fixture: ",
-      "inventory": [
-        "cyclic empty imports carry defining-module instances",
-        "instance not visible in imported signed definition",
-        "instance not visible in another instance",
-        "downstream orphan cannot leak into an import cycle",
-        "cross-module recursion infers unsigned cycle",
-        "cross-module qualified recursion generalizes shared exports"
-      ]
-    }
+      "plan": "selected_cases"
+    },
+    "exact": true,
+    "list_args": [
+      "--framework-list"
+    ]
   },
   "shared-host-adapter": {
     "kind": "receipt",
@@ -766,8 +862,13 @@
       "id": "name",
       "verdict": "passed",
       "complete_field": "passed",
-      "ignore_pattern": "(?:-build(?:-|$)|^ghc-version$)"
-    }
+      "ignore_pattern": "(?:-build(?:-|$)|^ghc-version$)",
+      "plan": "selected_cases"
+    },
+    "exact": true,
+    "list_args": [
+      "--framework-list"
+    ]
   },
   "source-context-cache": {
     "kind": "receipt",
@@ -779,8 +880,16 @@
     ],
     "receipt": {
       "output": "--output",
-      "cases": "controls_commands"
-    }
+      "cases": "framework_cases",
+      "plan": "selected_cases",
+      "id": "name",
+      "verdict": "state",
+      "verdict_equals": "passed"
+    },
+    "exact": true,
+    "list_args": [
+      "--framework-list"
+    ]
   },
   "source-query-api": {
     "kind": "receipt",
@@ -792,8 +901,14 @@
     ],
     "receipt": {
       "output": 1,
-      "stdout": "checks.log"
-    }
+      "stdout": "checks.log",
+      "plan": "selected_cases",
+      "stdout_sha256": "checks_log_sha256"
+    },
+    "exact": true,
+    "list_args": [
+      "--framework-list"
+    ]
   },
   "workflow-lint": {
     "command": [

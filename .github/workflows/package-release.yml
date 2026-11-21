@@ -96,6 +96,7 @@ jobs:
           include-hidden-files: true
           path: |
             .mlf-build/test-framework/
+            .mlf-build/package-export/tests/
             .mlf-build/package-manager-bootstrap/**/*.json
             .mlf-build/package-manager-bootstrap/**/*.sha256
             .mlf-build/package-manager-bootstrap/**/*.txt

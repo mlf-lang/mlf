@@ -4,7 +4,7 @@
 module Main where
 
 import Prelude
-import Control.Monad (foldM, forM_, unless)
+import Control.Monad (foldM, forM_, unless, when)
 import Data.List (isInfixOf)
 import System.Environment (getArgs)
 import System.IO (BufferMode(LineBuffering), hSetBuffering, stdout)
@@ -57,7 +57,7 @@ evaluate term = do
   expect "runtime evaluation"
     (Runtime.evaluate environment (Runtime.REnv Map.empty) (X.erase term))
 
-stackCase label source present absent = do
+stackCase selected label source present absent = when (maybe True (== label) selected) $ do
   putStrLn ("BEGIN " ++ label)
   compiled <- case Compiler.compile "RecursiveManagedEvidence.hs" (Host.literal (header ++ source)) of
     T.Left err -> error (label ++ ": " ++ Host.unpack (Compiler.prettyError err))
@@ -93,12 +93,12 @@ mixedProgram predicates = ordinaryClass ++
   "caller n = signed n (42 :: Int)\n" ++
   "main = textFromChars (prettyCallStack (caller 2))\n"
 
-managedChecks = do
+managedChecks selected = do
   forM_ [("managed-first", "HasCallStack, Tag a"),
          ("managed-last", "Tag a, HasCallStack")] $ \(order, predicates) -> do
-    stackCase ("signed self recursion " ++ order) (signedProgram predicates)
+    stackCase selected ("signed self recursion " ++ order) (signedProgram predicates)
       ["signed,", "caller,"] ["callStack,"]
-    stackCase ("mixed signed/unsigned recursion " ++ order) (mixedProgram predicates)
+    stackCase selected ("mixed signed/unsigned recursion " ++ order) (mixedProgram predicates)
       ["signed,"] ["caller,", "unsigned,", "callStack,"]
 
 int = T.SCon "Int" []
@@ -144,20 +144,21 @@ explicitMembers = concat
    ]
   | (name, wrapper, classes) <- explicitCases]
 
-explicitStandaloneChecks = forM_ explicitCases $ \(name, wrapper, classes) -> do
+explicitStandaloneChecks selected = forM_ explicitCases $ \(name, wrapper, classes) -> do
   let label = "standalone explicit qualified interface " ++ Host.unpack name
       expression = T.SLet name (wrapper explicitBody (explicitAnnotation classes))
         (apply name [number 42])
-  compiled <- case Compiler.compileProgramWithPrelude T.NoImplicitPrelude
-      (T.SClassProgram [] [classTag] [instanceTag] expression) of
-    T.Left err -> error (label ++ ": " ++ Host.unpack (Compiler.prettyError err))
-    T.Right value -> pure value
-  putStrLn ("COMPILED " ++ label)
-  checkedTarget label (T.XCon "Int" []) (Compiler.compiledTerm compiled)
-  putStrLn ("CHECKED " ++ label)
-  actual <- evaluate (Compiler.compiledTerm compiled)
-  assert label (case actual of Runtime.RInteger 42 -> True; _ -> False)
-  pass label
+  when (maybe True (== label) selected) $ do
+    compiled <- case Compiler.compileProgramWithPrelude T.NoImplicitPrelude
+        (T.SClassProgram [] [classTag] [instanceTag] expression) of
+      T.Left err -> error (label ++ ": " ++ Host.unpack (Compiler.prettyError err))
+      T.Right value -> pure value
+    putStrLn ("COMPILED " ++ label)
+    checkedTarget label (T.XCon "Int" []) (Compiler.compiledTerm compiled)
+    putStrLn ("CHECKED " ++ label)
+    actual <- evaluate (Compiler.compiledTerm compiled)
+    assert label (case actual of Runtime.RInteger 42 -> True; _ -> False)
+    pass label
 
 located name = T.SCallSite name
   (T.SourceSpan "main" "RecursiveManagedEvidence" "RecursiveManagedEvidence.hs" 5 1 5 12)
@@ -166,7 +167,7 @@ locatedApply name arguments = foldl T.SApp (located name) arguments
 stackType = T.SCon "MLFCallStack" []
 managedQualifier = T.SPredicate "MLFHasCallStack" []
 
-rawManagedChecks = forM_ [("first", [managedQualifier, T.SPredicate "Tag" [T.STVar "a"]]),
+rawManagedChecks selected = forM_ [("first", [managedQualifier, T.SPredicate "Tag" [T.STVar "a"]]),
                           ("last", [T.SPredicate "Tag" [T.STVar "a"], managedQualifier])] $
   \(order, predicates) -> forM_ [False, True] $ \mixed -> do
     let label = "raw managed recursion " ++ order ++ if mixed then " mixed" else " signed"
@@ -190,29 +191,30 @@ rawManagedChecks = forM_ [("first", [managedQualifier, T.SPredicate "Tag" [T.STV
           (T.SApp (T.SPrimitive T.PPrettyCallStack) (locatedApply "caller" [number 2]))
         program = T.SClassProgram [] [classTag] [instanceTag]
           (T.SLetRec definitions (T.SLet "caller" caller result))
-    putStrLn ("BEGIN " ++ label)
-    compiled <- case Compiler.compileProgramWithPrelude T.NoImplicitPrelude program of
-      T.Left err -> error (label ++ ": " ++ Host.unpack (Compiler.prettyError err))
-      T.Right value -> pure value
-    putStrLn ("COMPILED " ++ label)
-    checkedTarget label (T.XCon "String" []) (Compiler.compiledTerm compiled)
-    putStrLn ("CHECKED " ++ label)
-    actual <- evaluate (Compiler.compiledTerm compiled)
-    case actual of
-      Runtime.RString value -> do
-        let text = Host.unpack value
-        assert (label ++ " signed frame: " ++ text) ("signed," `isInfixOf` text)
-        assert (label ++ " managed scope: " ++ text)
-          (("caller," `isInfixOf` text) == not mixed)
-        assert (label ++ " unsigned does not become managed: " ++ text)
-          (not ("unsigned," `isInfixOf` text))
-      _ -> error (label ++ ": expected stack text")
-    pass label
+    when (maybe True (== label) selected) $ do
+      putStrLn ("BEGIN " ++ label)
+      compiled <- case Compiler.compileProgramWithPrelude T.NoImplicitPrelude program of
+        T.Left err -> error (label ++ ": " ++ Host.unpack (Compiler.prettyError err))
+        T.Right value -> pure value
+      putStrLn ("COMPILED " ++ label)
+      checkedTarget label (T.XCon "String" []) (Compiler.compiledTerm compiled)
+      putStrLn ("CHECKED " ++ label)
+      actual <- evaluate (Compiler.compiledTerm compiled)
+      case actual of
+        Runtime.RString value -> do
+          let text = Host.unpack value
+          assert (label ++ " signed frame: " ++ text) ("signed," `isInfixOf` text)
+          assert (label ++ " managed scope: " ++ text)
+            (("caller," `isInfixOf` text) == not mixed)
+          assert (label ++ " unsigned does not become managed: " ++ text)
+            (not ("unsigned," `isInfixOf` text))
+        _ -> error (label ++ ": expected stack text")
+      pass label
 
 -- User-written nested method qualifications are outside shared-haskell-v1.
 -- Exercise the supported managed-method representation directly, as the
 -- existing CallStackEvidence managedTargetCompilation fixture does.
-copiedScopeChecks = forM_ [("direct", Nothing), ("unsigned", Just T.InferRecursive),
+copiedScopeChecks selected = forM_ [("direct", Nothing), ("unsigned", Just T.InferRecursive),
                            ("signed", Just (T.CheckRecursive
                              (T.SAnnotation [] (T.SArrow int stackType))))] $ \(kind, mode) -> do
   let label = "managed method with " ++ kind ++ " helper scope"
@@ -230,23 +232,24 @@ copiedScopeChecks = forM_ [("direct", Nothing), ("unsigned", Just T.InferRecursi
       result = T.SApp (T.SPrimitive T.PTextFromChars)
         (T.SApp (T.SPrimitive T.PPrettyCallStack) (locatedApply "caller" [number 2]))
       program = T.SClassProgram [] [declaration] [instanceDecl] (T.SLet "caller" caller result)
-  putStrLn ("BEGIN " ++ label)
-  compiled <- case Compiler.compileProgramWithPrelude T.NoImplicitPrelude program of
-    T.Left err -> error (label ++ ": " ++ Host.unpack (Compiler.prettyError err))
-    T.Right value -> pure value
-  putStrLn ("COMPILED " ++ label)
-  checkedTarget label (T.XCon "String" []) (Compiler.compiledTerm compiled)
-  putStrLn ("CHECKED " ++ label)
-  actual <- evaluate (Compiler.compiledTerm compiled)
-  case actual of
-    Runtime.RString value -> do
-      let text = Host.unpack value
-      case mode of
-        Nothing -> assert (label ++ ": " ++ text)
-          ("observe," `isInfixOf` text && "caller," `isInfixOf` text)
-        Just _ -> assert (label ++ " copied scope is empty: " ++ text) (null text)
-    _ -> error (label ++ ": expected stack text")
-  pass label
+  when (maybe True (== label) selected) $ do
+    putStrLn ("BEGIN " ++ label)
+    compiled <- case Compiler.compileProgramWithPrelude T.NoImplicitPrelude program of
+      T.Left err -> error (label ++ ": " ++ Host.unpack (Compiler.prettyError err))
+      T.Right value -> pure value
+    putStrLn ("COMPILED " ++ label)
+    checkedTarget label (T.XCon "String" []) (Compiler.compiledTerm compiled)
+    putStrLn ("CHECKED " ++ label)
+    actual <- evaluate (Compiler.compiledTerm compiled)
+    case actual of
+      Runtime.RString value -> do
+        let text = Host.unpack value
+        case mode of
+          Nothing -> assert (label ++ ": " ++ text)
+            ("observe," `isInfixOf` text && "caller," `isInfixOf` text)
+          Just _ -> assert (label ++ " copied scope is empty: " ++ text) (null text)
+      _ -> error (label ++ ": expected stack text")
+    pass label
 
 consumedCases =
   [ ("consumedFirst", ["MLFHasCallStack", "Tag"])
@@ -264,33 +267,37 @@ consumedMembers = concat
    ]
   | (name, classes) <- consumedCases]
 
-consumedStandaloneChecks = forM_ consumedCases $ \(name, classes) -> do
+consumedStandaloneChecks selected = forM_ consumedCases $ \(name, classes) -> do
   let located = consumedBody classes
       copied = T.SSourceDefinition located
-  assert "located managed expression consumes its explicit interface"
-    (null (Classes.sourceDeclaredClasses T.Nothing located))
-  assert "copied located expression also consumes its explicit interface"
-    (null (Classes.sourceDeclaredClasses T.Nothing copied))
-  forM_ [("located", located), ("copied", copied)] $ \(kind, rhs) -> do
-    let label = "standalone " ++ kind ++ " managed expression " ++ Host.unpack name
-    compiled <- case Compiler.compileProgramWithPrelude T.NoImplicitPrelude
-        (T.SClassProgram [] [classTag] [instanceTag]
-          (T.SLet name rhs (apply name [number 42]))) of
-      T.Left err -> error (label ++ ": " ++ Host.unpack (Compiler.prettyError err))
-      T.Right value -> pure value
-    putStrLn ("COMPILED " ++ label)
-    checkedTarget label (T.XCon "Int" []) (Compiler.compiledTerm compiled)
-    putStrLn ("CHECKED " ++ label)
-    actual <- evaluate (Compiler.compiledTerm compiled)
-    assert label (case actual of Runtime.RInteger 42 -> True; _ -> False)
-    pass label
-  copiedPlan <- expect "copied managed-expression source routing"
-    (Source.prepareSourcePlan Map.empty [] [classTag] [("tagInt", instanceTag)]
-      (Map.fromList Primitive.compareString [(name, IntSet.fromList [0])])
-      [IntSet.fromList [0]] [member name copied])
-  assert "copied managed expression retains whole-path fallback"
-    (case copiedPlan of T.Nothing -> True; _ -> False)
-parsedConsumedChecks = forM_ consumedCases $ \(name, classes) -> do
+      caseLabel kind = "standalone " ++ kind ++ " managed expression " ++ Host.unpack name
+  when (maybe True (`elem` map caseLabel ["located", "copied"]) selected) $ do
+    assert "located managed expression consumes its explicit interface"
+      (null (Classes.sourceDeclaredClasses T.Nothing located))
+    assert "copied located expression also consumes its explicit interface"
+      (null (Classes.sourceDeclaredClasses T.Nothing copied))
+    forM_ [("located", located), ("copied", copied)] $ \(kind, rhs) -> do
+      let label = caseLabel kind
+      when (maybe True (== label) selected) $ do
+        compiled <- case Compiler.compileProgramWithPrelude T.NoImplicitPrelude
+            (T.SClassProgram [] [classTag] [instanceTag]
+              (T.SLet name rhs (apply name [number 42]))) of
+          T.Left err -> error (label ++ ": " ++ Host.unpack (Compiler.prettyError err))
+          T.Right value -> pure value
+        putStrLn ("COMPILED " ++ label)
+        checkedTarget label (T.XCon "Int" []) (Compiler.compiledTerm compiled)
+        putStrLn ("CHECKED " ++ label)
+        actual <- evaluate (Compiler.compiledTerm compiled)
+        assert label (case actual of Runtime.RInteger 42 -> True; _ -> False)
+        pass label
+    copiedPlan <- expect "copied managed-expression source routing"
+      (Source.prepareSourcePlan Map.empty [] [classTag] [("tagInt", instanceTag)]
+        (Map.fromList Primitive.compareString [(name, IntSet.fromList [0])])
+        [IntSet.fromList [0]] [member name copied])
+    assert "copied managed expression retains whole-path fallback"
+      (case copiedPlan of T.Nothing -> True; _ -> False)
+
+parsedConsumedChecks selected = forM_ consumedCases $ \(name, classes) -> do
   predicates <- case classes of
     ["MLFHasCallStack", "Tag"] -> pure "HasCallStack, Tag a"
     ["Tag", "MLFHasCallStack"] -> pure "Tag a, HasCallStack"
@@ -299,15 +306,16 @@ parsedConsumedChecks = forM_ consumedCases $ \(name, classes) -> do
       source = ordinaryClass ++
         "bound = ((\\x -> tag x) :: forall a. (" ++ predicates ++ ") => a -> Int)\n" ++
         "main = bound (42 :: Int)\n"
-  compiled <- case Compiler.compile "RecursiveManagedEvidence.hs" (Host.literal (header ++ source)) of
-    T.Left err -> error (label ++ ": " ++ Host.unpack (Compiler.prettyError err))
-    T.Right value -> pure value
-  putStrLn ("COMPILED " ++ label)
-  checkedTarget label (T.XCon "Int" []) (Compiler.compiledTerm compiled)
-  putStrLn ("CHECKED " ++ label)
-  actual <- evaluate (Compiler.compiledTerm compiled)
-  assert label (case actual of Runtime.RInteger 42 -> True; _ -> False)
-  pass label
+  when (maybe True (== label) selected) $ do
+    compiled <- case Compiler.compile "RecursiveManagedEvidence.hs" (Host.literal (header ++ source)) of
+      T.Left err -> error (label ++ ": " ++ Host.unpack (Compiler.prettyError err))
+      T.Right value -> pure value
+    putStrLn ("COMPILED " ++ label)
+    checkedTarget label (T.XCon "Int" []) (Compiler.compiledTerm compiled)
+    putStrLn ("CHECKED " ++ label)
+    actual <- evaluate (Compiler.compiledTerm compiled)
+    assert label (case actual of Runtime.RInteger 42 -> True; _ -> False)
+    pass label
 
 sourceMembers =
   [ member "plain" (lambda ["n"] (whenZero (number 42) (apply "plain" [subtractOne])))
@@ -473,10 +481,16 @@ sourceChecks cache = do
 main = do
   hSetBuffering stdout LineBuffering
   arguments <- getArgs
+  let runRaw selected = rawManagedChecks selected >> copiedScopeChecks selected >>
+        explicitStandaloneChecks selected >> consumedStandaloneChecks selected
+      runParsed selected = managedChecks selected >> parsedConsumedChecks selected
+      unrecognized = error "usage: RecursiveManagedEvidence [--raw | --parsed | --managed | --source CACHE | CACHE] [--exact LABEL]"
   case arguments of
-    ["--raw"] -> rawManagedChecks >> copiedScopeChecks >> explicitStandaloneChecks >> consumedStandaloneChecks
-    ["--parsed"] -> managedChecks >> parsedConsumedChecks
-    ["--managed"] -> rawManagedChecks >> copiedScopeChecks >> explicitStandaloneChecks >> consumedStandaloneChecks >> managedChecks >> parsedConsumedChecks
+    ["--raw"] -> runRaw Nothing
+    ["--raw", "--exact", label] -> runRaw (Just label)
+    ["--parsed"] -> runParsed Nothing
+    ["--parsed", "--exact", label] -> runParsed (Just label)
+    ["--managed"] -> runRaw Nothing >> runParsed Nothing
     ["--source", cache] -> sourceChecks cache
-    [cache] -> rawManagedChecks >> copiedScopeChecks >> explicitStandaloneChecks >> consumedStandaloneChecks >> managedChecks >> parsedConsumedChecks >> sourceChecks cache
-    _ -> error "usage: RecursiveManagedEvidence [--raw | --parsed | --managed | --source CACHE | CACHE]"
+    [cache] -> runRaw Nothing >> runParsed Nothing >> sourceChecks cache
+    _ -> unrecognized

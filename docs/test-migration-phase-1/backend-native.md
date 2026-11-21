@@ -181,3 +181,41 @@ and process tree. Also compare timeout and panic results with and without a
 wrong oracle using disposable copies. GHC -O0 exact output, target rejections,
 Windows event-file encoding, and the isolated 126/PID 0 negative control
 still need execution.
+
+## Exact selection for retained native receipts
+
+A follow-up keeps the same producer and literal oracles while allowing the
+common runner to enumerate and select retained native receipt cases before
+producing any build output. The gate-specific receipts still contain their
+original native-case and raw command data.
+
+| Adapter | Coverage and focused dispatch |
+| --- | --- |
+| `native-library` | The original 34 runtime outcomes retain the same labels and native O0/O2 variants. Six named host checks are also selectable. A focused runtime case builds only its selected emitter, library or root, and native optimization lane. A focused host case compiles its fixture and any required header adapters. |
+| `installed-native-library` | The same 40 cases plus the installed frontend contract. A full run still uses the copied source snapshot and requires its installed frontend source root. |
+| `io-action-sharing` | The original 18 source labels and 19 optimizer-shape assertions. Exact source selection still checks original, serialized and optimized-erased forms, plus native execution when a GC prefix is supplied. Exact shape selection has no native link. |
+| `artifact-binary-native` | All 142 original command labels. Exact selection runs only the producing backend and authenticates required setup. Genuine cold-state, Session seed, pack, unpack or legacy-pair dependencies are retained and reported separately. The full path still checks the other backend byte-for-byte and runs the independent reference corpus. |
+
+For Phase 2, use fresh output directories and the existing configured GHC
+producer, private native library install, and BDWGC prefix. The artifact
+binary command is Linux-only and keeps the existing outer resource guard and
+literal failure sink.
+
+```sh
+for suite in native-library installed-native-library io-action-sharing artifact-binary-native; do
+  python3 -B tools/testing/run.py "$suite" --list
+done
+python3 -B tools/testing/run.py native-library --exact native-library/poison7-O2-demand-fails -- --build-receipt .mlf-build/shared-ghc/receipt.json --gc-prefix .mlf-build/io-action-gc --output .mlf-build/phase2/native-poison-demand
+python3 -B tools/testing/run.py installed-native-library --exact installed-native-library/installed-frontend-controls -- --build-receipt .mlf-build/stdlib-default/receipt.json --gc-prefix .mlf-build/io-action-gc --frontend-source-root .mlf-build/stdlib-default/sources/libraries/mlf-foundation --output .mlf-build/phase2/installed-frontend
+python3 -B tools/testing/run.py io-action-sharing --exact io-action-sharing/bare-do-loop -- --build-receipt .mlf-build/shared-ghc/receipt.json --gc-prefix .mlf-build/io-action-gc --output .mlf-build/phase2/io-bare-do
+python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 640 --disk-free-mib 4096 .mlf-build/phase2/artifact-exact-guard python3 -B tools/testing/run.py --inherit-process-group artifact-binary-native --exact artifact-binary-native/shared-native-public-pair -- --source-root "$PWD" --build-receipt .mlf-build/shared-ghc/receipt.json --clang clang --gc-prefix "$PWD/.mlf-build/io-action-gc" --partial-write-sink /dev/full --output .mlf-build/phase2/artifact-exact-guard/results
+```
+
+Compare full commands and specialized receipts with the pinned revision.
+For focused runs, count emitter calls, fixture links and child processes.
+Direct hosted artifact cases should avoid the fresh native crate closure;
+a native case still compiles that closure cold. Repeat one warm cache or
+publication selection and verify its cold seed occurs with the original
+oracle and carries no separate test credit. Verify that the copied
+installation contains the common selection helper and that the borrowing
+batch-replacement fixture still compiles under its existing module adapter.

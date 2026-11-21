@@ -66,7 +66,8 @@
         "process-fixture",
         "task-fixture"
       ]
-    }
+    },
+    "exact": true
   },
   "recursive-managed": {
     "command": [
@@ -105,7 +106,8 @@
         "parsed managed expression consumedLast",
         "source recursive singleton/mutual and qualified successor contracts"
       ]
-    }
+    },
+    "exact": true
   },
   "parameter-field-graph": {
     "command": [
@@ -138,7 +140,8 @@
         "no-op case does not conceal malformed indexes",
         "higher-kinded local variables preserve kind and identity sharing"
       ]
-    }
+    },
+    "exact": true
   },
   "source-field-layouts": {
     "command": [
@@ -208,7 +211,8 @@
         "fresh source class consumer cold/warm artifacts are byte-identical",
         "fresh source class saved method applications check and evaluate to 42"
       ]
-    }
+    },
+    "exact": true
   },
   "common-calls": {
     "command": [
@@ -246,7 +250,8 @@
         "raw-earlier-failure-order",
         "raw-fresh-arrays-each-execution"
       ]
-    }
+    },
+    "exact": true
   },
   "callback-sharing": {
     "command": [
@@ -296,7 +301,8 @@
         "self or different ABI keeps inline choice",
         "specialized or straight line calls keep inline choice"
       ]
-    }
+    },
+    "exact": true
   },
   "guest-framework": {
     "command": [
@@ -318,7 +324,8 @@
       ],
       "id": "label",
       "verdict": "complete"
-    }
+    },
+    "exact": true
   },
   "guest-state-laws": {
     "command": [
@@ -339,6 +346,7 @@
       ],
       "id": "label",
       "verdict": "complete"
-    }
+    },
+    "exact": true
   }
 }

@@ -8,11 +8,15 @@ or a performance threshold. Producer and fixture inputs are rechecked at exit.
 from __future__ import annotations
 import argparse
 import json
+import sys
 from pathlib import Path
 from build import DEMAND_FLAGS, EXHAUSTIVENESS_FLAGS, PACKAGES
 from test_direct import CommandRunner, authenticate_build, sha
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tools/testing'))
+from receipt_selection import identity, select
+
 FIXTURE = ROOT / 'tools/shared/fixtures/native/CallbackSharingAudit.hs'
 # Independent exact inventory, not extracted from the Haskell fixture/output.
 CHECKS = [
@@ -62,6 +66,9 @@ def main():
     parser.add_argument('--build-receipt', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
+    selected = select('callback-sharing/', CHECKS)
+    wanted = [selected] if selected else CHECKS
+    expected_stdout = ('PASS ' + selected + '\n').encode() if selected else EXPECTED
     receipt = args.build_receipt.resolve(strict=True)
     producer_dir, output = receipt.parent, args.output.resolve()
     if output.is_relative_to(producer_dir) or producer_dir.is_relative_to(output):
@@ -74,6 +81,9 @@ def main():
               'commands': []}
     objects, inputs, artifacts = {}, {}, {}
     authenticated = False
+
+    if selected:
+        record.update(scope='focused', selected_ids=[identity('callback-sharing/', selected)])
 
     def save():
         temporary = output / 'receipt.json.new'
@@ -132,9 +142,11 @@ def main():
         runner.run('link-fixture', [ghc, *flags, '-rtsopts=ignoreAll', obj,
                    *link_objects, *transports, '-o', executable], timeout=120)
         artifacts = {str(p): sha(p) for p in [obj, hi, executable, *transports]}
-        result = runner.run('audit', [executable], expected=EXPECTED, timeout=120)
-        verify_inventory(result.stdout)
-        record.update(checks=CHECKS, artifacts=artifacts, complete=True, status='passed')
+        arguments = [executable, '--exact', selected] if selected else [executable]
+        result = runner.run('audit', arguments, expected=expected_stdout, timeout=120)
+        if not selected:
+            verify_inventory(result.stdout)
+        record.update(checks=wanted, artifacts=artifacts, complete=True, status='passed')
     except BaseException as error:
         record.update(complete=False, status='failed', error=type(error).__name__ + ': ' + str(error))
         raise

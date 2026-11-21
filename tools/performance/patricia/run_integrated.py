@@ -1,21 +1,49 @@
 #!/usr/bin/env python3
 """Retained finite regressions across the explicitly reviewed Int64/Patricia ABI."""
 from pathlib import Path
-import argparse, hashlib, json, shutil, types, struct, zlib
+import argparse, hashlib, json, shutil, sys, types, struct, zlib
 from legacy_controls import prepare
 ROOT=Path(__file__).resolve().parents[3]
 HERE=Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT/'tools/testing'))
+from receipt_selection import inventory_json, select
+
+PREFIX = 'patricia-integrated/'
+GRAPH_MODULES = ('PatriciaOracleControls', 'PublicControls', 'C4TransactionControls',
+                 'SessionTests', 'AdmissionTests', 'HeteroinputControls')
+VALIDATION_NEGATIVES = ('solveGenerated', 'prepareValidatedGraph', 'solvePreparedGraph')
+SUITES = {
+    'p123': ('P1Controls', 'P2Controls', 'NativeCompatibilityControls', 'P3Controls'),
+    'map-balance': ('BalanceControls',),
+    'graph': GRAPH_MODULES,
+    'validation': ('BoundaryControls', *['private-'+name for name in VALIDATION_NEGATIVES]),
+    'builtin': ('BinaryBuiltinControls',),
+}
 LIMITS={'address_space_per_process_bytes':6*1024**3,'disk_free_floor_bytes':5*1024**3,
         'host_available_floor_bytes':3*1024**3,'max_work_bytes':3*1024**3,
         'process_tree_rss_bytes':5*1024**3,'wall_seconds':1200}
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--suite',choices=['p123','map-balance','graph','validation','builtin'],required=True)
-    p.add_argument('--producer',type=Path,required=True)
+    listing = '--framework-list' in sys.argv[1:]
+    p.add_argument('--framework-list', action='store_true')
+    p.add_argument('--suite',choices=SUITES,required=not listing)
+    p.add_argument('--producer',type=Path,required=not listing)
     p.add_argument('--source',type=Path,default=ROOT)
-    p.add_argument('--output',type=Path,required=True)
-    a=p.parse_args();out=a.output.resolve();producer=a.producer.resolve();source=a.source.resolve()
+    p.add_argument('--output',type=Path,required=not listing)
+    a=p.parse_args()
+    labels = []
+    for suite in ([a.suite] if a.suite else SUITES):
+        labels.extend(SUITES[suite])
+        if suite == 'graph':
+            inventory = json.loads((ROOT/'tools/performance/a1-private-index/controls/manifest.json').read_text())
+            labels.extend('private-'+row['name'] for row in inventory['negative_cases'])
+    exact = select(PREFIX, labels)
+    planned = [exact] if exact is not None else labels
+    if a.framework_list:
+        print(inventory_json(PREFIX, planned))
+        return
+    out=a.output.resolve();producer=a.producer.resolve();source=a.source.resolve()
     if out.exists() or out.is_relative_to(producer) or producer.is_relative_to(out) or ROOT.is_relative_to(out):
         p.error('fresh output separate from the producer and source ancestors required')
     out.mkdir(parents=True)
@@ -23,8 +51,8 @@ def main():
     H=types.ModuleType('guard');H.__file__=str(hp);exec(compile(hp.read_bytes(),str(hp),'exec'),H.__dict__)
     record={'complete':False,'suite':a.suite,'performance_measured':False,
             'ABI_migration':'Haskell Int64 arithmetic; Patricia public collection representation',
-            'historical_unbounded_or_BST_contract_claimed':False,'checks':[],
-            'driver_inputs':{str(p):H.sha(p) for p in [Path(__file__),HERE/'adapt_oracles.py',HERE/'legacy_controls.py',HERE/'legacy-controls-pins.json',hp,ROOT/'tools/performance/c4-local-transaction/contracts.py']}}
+            'historical_unbounded_or_BST_contract_claimed':False,'checks':[],'planned_checks':planned,
+            'driver_inputs':{str(p):H.sha(p) for p in [Path(__file__),HERE/'adapt_oracles.py',HERE/'legacy_controls.py',HERE/'legacy-controls-pins.json',hp,ROOT/'tools/performance/c4-local-transaction/contracts.py',ROOT/'tools/testing/receipt_selection.py']}}
     save=lambda:H.save(out/'receipt.json',record)
     save()
     try:
@@ -52,7 +80,7 @@ def main():
                 for name,digest in a1['files'].items():H.require(H.sha(old/name)==digest,'frozen A1 control '+name)
                 A.prepare(source,out/'source')
                 for name in ['OracleTypes.hs','PatriciaOracleControls.hs']:shutil.copy2(HERE/name,out/'source'/name)
-                modules=['PatriciaOracleControls','PublicControls','C4TransactionControls','SessionTests','AdmissionTests','HeteroinputControls']
+                modules=GRAPH_MODULES
                 if a.suite=='validation':
                     V=H.module(ROOT/'tools/performance/validation-reuse/source_contract.py','validation_contract')
                     raw=(source/V.OWNER).read_bytes()
@@ -146,6 +174,8 @@ def main():
                 flags.append(str(objects) if token==str(producer/'objects') else token)
                 if token=='-i':flags.append('-i'+str(out/'source'))
             for module in modules:
+                if module not in planned:
+                    continue
                 entry=out/(module+'Main.hs')
                 entry.write_text('module Main where\nimport qualified '+module+' as C\nmain :: IO ()\nmain=C.'+('boundary' if module=='PatriciaOracleControls' else 'main')+'\n')
                 binary=out/(module+'-binary');extra=['-package','filepath'] if module=='P2Controls' else []
@@ -197,10 +227,14 @@ def main():
                 if a.suite=='graph':
                     negatives=[(row['name'],old/row['source'],row['required_error_fragments'],row['expected_error_count']) for row in a1['negative_cases']]
                 else:
-                    for name in ['solveGenerated','prepareValidatedGraph','solvePreparedGraph']:
+                    for name in VALIDATION_NEGATIVES:
+                        if 'private-'+name not in planned:
+                            continue
                         path=out/(name+'.hs');path.write_text('module PrivateAccess where\nimport Bootstrap.CrateSession ('+name+')\n')
                         negatives.append((name,path,['does not export',name],1))
                 for name,path,fragments,count in negatives:
+                    if 'private-'+name not in planned:
+                        continue
                     log=out/('private-'+name)
                     H.Runner(out,LIMITS).run([auth['ghc']['path'],*flags,'-c',path],source,log,expected_exit=1)
                     error=(log/'stderr').read_text()

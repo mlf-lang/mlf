@@ -11,12 +11,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 from build import DEMAND_FLAGS, EXHAUSTIVENESS_FLAGS, PACKAGES
 from test_direct import CommandRunner, authenticate_build, sha
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tools/testing'))
+from receipt_selection import identity, select
+
 FIXTURE = ROOT / 'tools/shared/fixtures/item4/ParameterFieldGraph.hs'
 # Authored independently of fixture parsing and execution. Exact order, count,
 # wording and terminal banner are mandatory; a partial run is never a pass.
@@ -151,6 +155,7 @@ def main():
         return
     if args.build_receipt is None or args.output is None:
         parser.error('--build-receipt and --output are required unless --self-test is selected')
+    selected = select('parameter-field-graph/', EXPECTED_CHECKS)
     for name, maximum in [('build_timeout', 300), ('run_timeout', 300)]:
         if not 1 <= getattr(args, name) <= maximum:
             parser.error(name.replace('_', '-') + ' must be between 1 and ' + str(maximum))
@@ -167,6 +172,9 @@ def main():
         'native_or_llvm_campaign': False, 'compiler_modules_rebuilt': False,
         'strict_stderr': True, 'commands': [],
     }
+
+    if selected:
+        record.update(scope='focused', selected_ids=[identity('parameter-field-graph/', selected)])
 
     def save():
         temporary = output / 'receipt.json.new'
@@ -244,10 +252,15 @@ def main():
         record['artifacts'] = artifacts
         save()
         check_producer()
-        result = runner.run('field-projection-graph', [executable], timeout=args.run_timeout)
-        verify_result(result.returncode, result.stdout, result.stderr)
-        record.update(passing_checks=18, passing_inventory=EXPECTED_CHECKS,
-                      authored_expected_copy_graph=True, independent_index_reconstruction=True)
+        arguments = [executable, '--exact', selected] if selected else [executable]
+        expected = ('PASS ' + selected + '\n').encode() if selected else None
+        result = runner.run('field-projection-graph', arguments, expected=expected, timeout=args.run_timeout)
+        if selected:
+            record.update(passing_checks=1, passing_inventory=[selected])
+        else:
+            verify_result(result.returncode, result.stdout, result.stderr)
+            record.update(passing_checks=18, passing_inventory=EXPECTED_CHECKS,
+                          authored_expected_copy_graph=True, independent_index_reconstruction=True)
         check_producer()
         record.update(complete=True, status='passed')
     except BaseException as error:

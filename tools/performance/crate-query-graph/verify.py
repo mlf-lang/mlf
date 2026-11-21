@@ -13,6 +13,10 @@ from concurrent.futures import ThreadPoolExecutor
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'tools/shared'))
+sys.path.insert(0, str(ROOT / 'tools/testing'))
+from receipt_selection import identity, select
+
+PREFIX = 'query-graph-acceptance/'
 from artifact_binary_reference import read_document, tree_document, Invalid, require
 from test_query_index import read_index
 from artifact_binary_typed import value_node as node, text, list_values as items, unpack
@@ -27,7 +31,7 @@ def frame(values): return ''.join(f'{len(v)}:{v}' for v in values)
 
 def verifier_inputs():
     paths = [Path(__file__), Path(__file__).with_name('finish_receipts.py'),
-             Path(__file__).with_name('template_receipts.py')]
+             Path(__file__).with_name('template_receipts.py'), ROOT / 'tools/testing/receipt_selection.py']
     paths += [ROOT / 'tools/shared' / name for name in (
         'query_generation.py', 'test_query_index.py', 'artifact_binary_reference.py',
         'artifact_binary_typed.py', 'artifact_binary_open.py', 'artifact_structure_contract.json')]
@@ -190,12 +194,24 @@ CASES = {
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('binary', type=Path)
-    parser.add_argument('output', type=Path)
+    parser.add_argument('binary', type=Path, nargs='?')
+    parser.add_argument('output', type=Path, nargs='?')
+    parser.add_argument('--framework-list', action='store_true')
     parser.add_argument('--smoke', action='store_true')
     parser.add_argument('--case', choices=list(CASES), help='run a single named control')
     parser.add_argument('--resume', action='store_true', help='retain completed cases for the same binary and rerun incomplete cases in fresh directories')
     args = parser.parse_args()
+    available = [name for name in CASES if (not args.smoke or name == 'body')
+                 and (args.case is None or name == args.case)]
+    if not available:
+        parser.error('--smoke and --case must select at least one control')
+    focused = select(PREFIX, available)
+    selected = [focused] if focused is not None else available
+    if args.framework_list:
+        print(json.dumps([identity(PREFIX, name) for name in selected]))
+        return
+    if args.binary is None or args.output is None:
+        parser.error('binary and output are required')
     binary, output = args.binary.resolve(strict=True), args.output.resolve()
     output.mkdir(parents=True, exist_ok=args.resume)
     builtin = output / 'builtin'
@@ -207,11 +223,15 @@ def main():
     if args.resume:
         record.setdefault('resumptions', []).append(dict(script_sha256=sha(Path(__file__).read_bytes()),
             completed_cases=list(record.get('recovery', []))))
-    def save(): (output / 'results.json').write_text(json.dumps(record, indent=2) + '\n')
+    record['selected_cases'] = selected
+    def save():
+        record['framework_cases'] = [name for name in record.get('recovery', []) if name in selected]
+        temporary = output / 'results.json.new'
+        temporary.write_text(json.dumps(record, indent=2) + '\n')
+        temporary.replace(output / 'results.json')
     save()
     for name, versions in CASES.items():
-        if args.smoke and name != 'body': continue
-        if args.case and name != args.case: continue
+        if name not in selected: continue
         if args.resume and name in record.get('recovery', []): continue
         folder = output / name
         if folder.exists():
@@ -502,9 +522,7 @@ def main():
             assert all(outputs(p) == outputs(inc) for p in writes)
             graph(cache); record['serialized_writers'] = True
         record.setdefault('recovery', []).append(name); save()
-    selected = [name for name in CASES if (not args.smoke or name=='body') and (not args.case or name==args.case)]
-    assert set(selected).issubset(record['recovery'])
-    record['selected_cases'] = selected
+    require(set(selected).issubset(record['recovery']), 'selected control did not finish')
     record['complete'] = True; save()
     print('PASS query graph acceptance', flush=True)
 

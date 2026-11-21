@@ -5,6 +5,8 @@ import argparse, hashlib, sys, types
 
 ROOT=Path(__file__).resolve().parents[3]
 HERE=Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT / 'tools/testing'))
+from receipt_selection import select
 ORACLE_MANIFEST_SHA='978b839cf05455bce0dc0c3db8756cd96489fad60c8033bfb95585dbde222a1b'
 CLASSES_MANIFEST_SHA='73e7836abfbafdf311269d25b321b4e6ffa3b44ab43ab272ad13c2e77e679961'
 
@@ -15,7 +17,11 @@ def main():
     p.add_argument('--oracle-source',type=Path,
         help='optionally verify the frozen encoder against its complete historical checkout')
     p.add_argument('--output',type=Path,required=True)
-    a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=False)
+    a=p.parse_args()
+    options = ('0', '2')
+    chosen = select('owned-source-context/', options)
+    optimizations = options if chosen is None else (chosen,)
+    out=a.output.resolve();out.mkdir(parents=True,exist_ok=False)
     hp=ROOT/'tools/performance/a1-private-index/helper.py'
     H=types.ModuleType('guard');H.__file__=str(hp);exec(compile(hp.read_bytes(),str(hp),'exec'),H.__dict__)
     H.require(H.sha(HERE/'oracle.json')==ORACLE_MANIFEST_SHA,'fixed baseline oracle identity')
@@ -92,7 +98,7 @@ def main():
             record['ordinary_object_producer']=auth;save()
             for rel in ['host/ghc/cbits/host.c','runtime/mlf_process_supervisor.c']:
                 H.require(H.sha(ROOT/rel)==H.sha(a.source/rel),'unchanged borrowed C object input')
-            for opt in ['0','2']:
+            for opt in optimizations:
                 label='O'+opt;objects=out/(label+'-objects');binary=out/(label+'-binary')
                 argv=[auth['ghc']['path'],'--make','-j1','-O'+opt,'-fpedantic-bottoms','-fno-state-hack',
                     '-Werror=incomplete-patterns','-Werror=incomplete-uni-patterns','-package-env','-',
