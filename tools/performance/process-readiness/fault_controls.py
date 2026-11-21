@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Original twenty fault/order cases, four real cleanup cases, and ABI fallback."""
-import json,os,subprocess,sys
+import json,subprocess
 from pathlib import Path
 import support as common
 args=common.arguments();common.check_pair(args)

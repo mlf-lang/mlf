@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Complete independent wire fixtures, not compiler-generated proof evidence."""
 from pathlib import Path
-import copy
 import hashlib
 import json
 import tempfile

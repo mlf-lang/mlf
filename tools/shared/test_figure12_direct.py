@@ -10,7 +10,6 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
-import sys
 
 from figure12_data import decode
 from test_direct import authenticate_build

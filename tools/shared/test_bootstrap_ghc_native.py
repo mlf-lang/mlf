@@ -7,7 +7,6 @@ import tempfile
 import unittest
 from unittest import mock
 import subprocess
-import os
 import sys
 import signal
 import time

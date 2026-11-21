@@ -1,8 +1,6 @@
 """Pure route controls plus three REAL bounded synthetic Linux supervisor cases.
 No GHC/emlf/native fixture. Synthetic receipts are not project qualification.
 """
-import copy
-import hashlib
 import json
 import os
 from pathlib import Path

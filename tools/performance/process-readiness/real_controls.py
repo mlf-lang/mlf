@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Twenty original transport cases, unchanged, against original and candidate C."""
-import json,os,subprocess,sys
+import json,subprocess
 from pathlib import Path
 import support as common
 args=common.arguments();common.check_pair(args)

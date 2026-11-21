@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'shared'))
 from query_generation import cache_directory
 from artifact_binary_reference import read_document, tree_document
 from artifact_binary_typed import (value_node as node, text, list_values as items,
-                                   unpack, logical_context, validate_type, query_payload_root)
+                                   unpack, logical_context, query_payload_root)
 
 
 def read(path, schema):
@@ -57,7 +57,7 @@ def body_semantics(value):
 
 def old_raw(cache, key):
     document = read(cache / (key + '.mlfq'), 2)
-    root = query_payload_root(document)
+    query_payload_root(document)
     value = document.values()[-1]
     if value[1] in (301, 303):
         fields = node(value)

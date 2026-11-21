@@ -6,8 +6,6 @@ Both sides here must be authenticated ordinary GHC 9.14.1 O2 producers.
 """
 import argparse
 import ast
-import json
-import os
 from pathlib import Path
 import shutil
 import subprocess

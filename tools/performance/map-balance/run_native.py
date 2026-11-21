@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
-import json,sys,types,shlex,hashlib,argparse,shutil
+import types,shlex,hashlib,argparse,shutil
 out=Path(__file__).resolve().parent;root=out.parents[2]
 parser=argparse.ArgumentParser(description='Focused native Map controls at ordinary Clang O2, including preserved MapFolds and literal malformed/large-size shapes.')
 parser.add_argument('--compiler',type=Path,required=True);parser.add_argument('--baseline-compiler',type=Path)
