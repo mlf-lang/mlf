@@ -1550,6 +1550,25 @@ module Bootstrap.LLVM.Optimize where {
       result <- rewriteUsed (useLet name value body);
       freshPure (beginPending result)
     };
+  -- The checked pass owns every binder after its initial fresh copy. An
+  -- already-saturated action used only as another bind's continuation body
+  -- can move there with its original binders and exact execution order.
+  sequenceSingleAction :: XName -> UseTree -> UseTree -> Maybe UseTree;
+  sequenceSingleAction name value body = case useTerm value of {
+    XEApp (XEApp (XEPrimitive PIOBind) _) _ -> case useChildren body of {
+      UseApp function continuation -> case (,) (useTerm function) (useChildren continuation) of {
+        (,) (XEApp (XEPrimitive PIOBind) _) (UseAbs arg result) -> case useTerm result of {
+          XEVar wanted -> if eqName name wanted && L.not (eqName name arg) &&
+            L.not (M.member compareName arg (useCounts value))
+            then Just (useApp function (useAbs arg value)) else Nothing;
+          _ -> Nothing
+        };
+        _ -> Nothing
+      };
+      _ -> Nothing
+    };
+    _ -> Nothing
+  };
   -- Preserve a shared binding without forcing the substitutions queued for
   -- the rest of the declaration spine. Its RHS is outside the binder scope.
   delayCheckedLet name value pending = case pending of {
@@ -1568,6 +1587,10 @@ module Bootstrap.LLVM.Optimize where {
       -- fresh names and leaves the effective body and its queued copies intact.
       if uses == 0 then freshPure pending
       else if uses == 1 && constructorValue then freshPure (queueSubstitution name [value] 1 pending)
+      else if uses == 1 && M.null replacements then case sequenceSingleAction name value body of {
+        Just result -> freshPure (beginPending result);
+        Nothing -> delayOwnedLet name value pending
+      }
       else if uses < 2 || L.not (branchesToFreeValues value) then delayOwnedLet name value pending
       else let {
         retained = PendingBody (useLet name value body) replacements

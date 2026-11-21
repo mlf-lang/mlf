@@ -1494,6 +1494,43 @@ constructorSubstitutionChecks = do
   check "unused normalized RHS leaves a variable continuation"
     (0,True) (test (T.XELet (name 210) deadRhs (var 211)))
 
+-- A bound IO action used by a single continuation keeps its unique binders.
+-- Other bind shapes, aliases which could be captured, and multiple uses take
+-- the ordinary path.
+singleActionChecks = do
+  let name i = T.XName i "same hint"
+      var = T.XEVar . name
+      prim p = foldl T.XEApp (T.XEPrimitive p)
+      bind p action i body = prim p [action,T.XEAbs (name i) body]
+      readCell i = prim T.PReadIntArray [var i,T.XEInt 0]
+      writeCell i x = prim T.PWriteIntArray [var i,T.XEInt 0,x]
+      value = bind T.PIOBind (readCell 90) 10 (writeCell 91 (var 10))
+      first = writeCell 90 (T.XEInt 3)
+      body = bind T.PIOBind first 20 (var 1)
+      term = T.XELet (name 1) value body
+      normalize input = let (tree,seed) = Optimize.runFresh (Optimize.passPendingFor True input) 300
+                        in (Optimize.useTerm (Optimize.materializePending tree),seed)
+      (moved,seed) = normalize term
+      recognized rhs rest = case Optimize.sequenceSingleAction (name 1)
+                                  (Optimize.indexUses rhs) (Optimize.indexUses rest) of
+        T.Just _ -> True
+        T.Nothing -> False
+  check "single-use IO action retains both ordered binds and its original names" True
+    (X.equalErased moved (bind T.PIOBind first 20 value))
+  check "moving the action consumes no fresh identity" 300 seed
+  let shared = bind T.PIOBind (var 1) 20 (var 1)
+      (same,actualSeed) = normalize (T.XELet (name 1) value shared)
+      (ordinary,wantSeed) = Optimize.runFresh (Optimize.passRaw (T.XELet (name 1) value shared)) 300
+  check "repeated execution keeps the ordinary action sharing decision" True
+    (X.equalErased same (Optimize.useTerm ordinary) && actualSeed == wantSeed)
+  forM_ [(value,bind T.PSTBind first 20 (var 1)),
+         (value,bind T.PIOBind first 1 (var 1)),
+         (value,bind T.PIOBind first 90 (var 1)),
+         (value,bind T.PIOBind first 20 (prim T.PIOReturn [var 1])),
+         (prim T.PIOBind [first],body)] $ \(rhs,rest) ->
+    check "other bind scopes, partial actions and nested uses keep the fallback" False
+      (recognized rhs rest)
+
 -- Compare each emitted callback's capture set to a fresh traversal. Include
 -- repeated open-term identities and transitive captures through static workers.
 lambdaCaptureChecks = do
@@ -3071,6 +3108,7 @@ main = do
   knownConstructorFoldChecks
   sharedFunctionDiamondChecks
   continuationPipelineChecks
+  singleActionChecks
   lambdaCaptureChecks
   constructorSubstitutionChecks
   openGeometryChecks
