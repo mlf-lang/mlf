@@ -148,10 +148,16 @@ module Bootstrap.Surface where {
   valueBody ((,,) _ _ e) = e;
   bindValues :: [] ((,,) String (Maybe SAnnotation) SExpr) -> SExpr -> Either String SExpr;
   bindValues values body =
-    case Dependency.declarationGroups values of {
-      Left error -> Left error;
-      Right groups -> wrapGroups values (Dependency.declarationEdges values) groups body
-    };
+    let {
+      table = M.fromList compareString (map (\v -> (,) (valueName v) v) values);
+      ordered = M.elems table;
+      edges = Dependency.declarationEdges ordered;
+      hasLocal entry = any (\name -> M.member compareString name table) (snd entry)
+    } in if length values /= M.size table then Left "duplicate value declaration"
+    else if any hasLocal edges then
+      wrapIndexed table (M.fromDistinctAscList edges) (Dependency.components edges) body
+    -- In the absence of local edges, lexical DFS closes each root immediately.
+    else Right (foldr bindSingle body ordered);
   -- Independently lowered source and generated rows may introduce or remove
   -- dependencies. Only references to IDs in this group can close its SCC.
   indexedMemberGroups entries = mapEither (map (map fst)) (indexedMemberComponents entries);
@@ -261,10 +267,11 @@ module Bootstrap.Surface where {
   wrapValueGroup local cyclic continuation =
     if cyclic then mapEither (\ds -> SLetRec ds continuation) (recursiveValues local)
     else case local of {
-      [(,,) n annotation rhs] -> Right (SLet n (case annotation of {
-        Nothing -> rhs; Just t -> SSignature rhs t }) continuation);
+      [value@((,,) _ _ _)] -> Right (bindSingle value continuation);
       _ -> Left "invalid declaration group"
     };
+  bindSingle ((,,) name annotation rhs) continuation =
+    SLet name (case annotation of { Nothing -> rhs; Just t -> SSignature rhs t }) continuation;
   lowerSurface :: SProgram -> Either String SProgram;
   lowerSurface program = do {
     env <- D.validateDeclarations (case program of { SProgram ds _ -> ds; SClassProgram ds _ _ _ -> ds });

@@ -2346,6 +2346,21 @@ main = do
       case result of
         T.Left msg -> check "complete frame checksum precedes symbol decoding" "binary checksum mismatch" (H.unpack msg)
         T.Right _ -> fail "accepted corrupted symbol bytes"
+  do
+    let localRows = [("late",T.Nothing,T.SVar "M.imported"),
+                     ("early",T.Nothing,T.SLam "late" T.Nothing (T.SVar "late"))]
+        localUse = T.SGlobal (V.fromInt 7) "continuation"
+        localShape = T.SLet "early" (T.SLam "late" T.Nothing (T.SVar "late"))
+                   (T.SLet "late" (T.SVar "M.imported") localUse)
+    case Surface.bindValues localRows localUse of
+      T.Right actual -> check "independent local declarations preserve lexical nesting and external and shadowed references"
+                          True (Equality.eqSExprBits localShape actual)
+      T.Left why -> fail (H.unpack why)
+    let opaque = error "duplicate group forced an opaque RHS"
+    case Surface.bindValues [("a",T.Nothing,opaque),("a",T.Nothing,opaque)] (error "opaque continuation") of
+      T.Left why -> check "duplicate local declarations take precedence over opaque expressions"
+                      "duplicate value declaration" (H.unpack why)
+      T.Right _ -> fail "duplicate local declaration accepted"
   let chain = [("v" ++ show i,["v" ++ show (i+1)]) | i <- [0..24 :: Int]]
       wide = [("top",map fst chain)] ++ chain
       duplicate = [("z",["a"]),("a",["missing","a","a"]),("z",["other"])]
