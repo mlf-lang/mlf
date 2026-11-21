@@ -935,7 +935,7 @@ module Bootstrap.CrateGraph where {
   compileWithData = compileUsing (Dependency.valueOccurrences True);
   compileUsing occurrences selectData verify crateId compilerHash cacheDir imports protected originalPlan =
     case do {
-      (,) plan open <- Source.protectedQueryPlan originalPlan protected;
+      (,) plan open <- Source.protectedQueryPlanReading (occurrences False) originalPlan protected;
       inventory <- Q.prepareData (Source.planData plan);
       types <- foldM Inference.mergeExternal M.empty (concatMap Separate.unitBindings imports);
       contracts <- Source.initialContracts plan types protected;

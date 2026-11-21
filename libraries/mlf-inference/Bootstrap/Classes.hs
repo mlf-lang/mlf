@@ -858,7 +858,8 @@ module Bootstrap.Classes where {
     Fresh SourceRootLowering;
   lowerUnsignedSourceRootProtectedOwned = lowerUnsignedSourceRootUsingNames sourceOwnedEnvironmentNames;
   lowerUnsignedSourceRootUsingNames environmentNames = lowerUnsignedRootAt environmentNames Nothing;
-  lowerUnsignedRootAt environmentNames owner
+  lowerUnsignedRootAt = lowerUnsignedRootReading (Dependency.valueOccurrences True False);
+  lowerUnsignedRootReading references environmentNames owner
     (ClassInventory _ ds infos valueScopes _ baseMethodEnv _ _ _) overloads protected name original =
     do {
       body <- freshLift (Surface.lowerExpressionWithData ds original);
@@ -870,7 +871,7 @@ module Bootstrap.Classes where {
       let { environment = M.union compareString overloads baseMethodEnv };
       reserveSourceNames ((:) name (append (Desugar.allNames body)
         (environmentNames overloads baseMethodEnv environment (map snd candidates))));
-      let { usesManaged = protectedInScopes valueScopes environment protected body };
+      let { usesManaged = protectedReading references valueScopes environment protected body };
       lowered <- lowerExpr (Dependency.nestedScopes valueScopes) ds infos environment candidates body;
       case lowered of {
         (,) rhs wanted -> do {
@@ -1013,7 +1014,8 @@ module Bootstrap.Classes where {
           Nothing -> False;
           Just ((,) _ predicates) -> any (\predicate -> eqString predicate callStackPredicate) predicates
         }) (Surface.freeNames body);
-  protectedInScopes scopes environment protected body = case Dependency.scopeGeneration scopes of {
+  protectedInScopes = protectedReading (Dependency.valueOccurrences True False);
+  protectedReading references scopes environment protected body = case Dependency.scopeGeneration scopes of {
     Nothing -> protectedSourceBody environment protected body;
     Just table -> let {
       flag i = case Dependency.scopeContract scopes i of {
@@ -1025,7 +1027,7 @@ module Bootstrap.Classes where {
           Nothing -> False; Just ((,) target classes) -> flag target || elem eqString callStackPredicate classes
         })
       }
-    } in managedExpression body || any reads (Dependency.valueOccurrences True False body)
+    } in managedExpression body || any reads (references body)
   };
   -- Metadata is derived before class expansion, including original instance
   -- methods. It cannot be recovered from a plain result target type.

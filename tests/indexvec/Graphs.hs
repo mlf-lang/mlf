@@ -877,6 +877,18 @@ typedClassChecks = do
         T.Left reason -> error (H.unpack reason)
   check "qualified predecessor read by slot despite identical display" (["C"],True) (rootContract qualified)
   check "ordinary predecessor does not inherit its same-spelled peer's scheme" ([],False) (rootContract plain)
+  do
+    let protectionTable = D.GeneratedTable factsBase [] M.empty M.empty (V.fromList
+          [T.Nothing,T.Nothing,T.Just (qualified,[]),T.Nothing])
+        protectionScope = D.withScopeContext
+          (T.Just (D.ClassContext protectionTable True scheme)) factsScope
+        protectionBodies =
+          [T.SGlobal qualified "same",T.SGlobal plain "same",T.SGlobal (V.fromInt 2) "selector",
+           T.SDeclScope [qualified] (T.SLet "same" (T.SIntLit 1) (T.SGlobal qualified "hidden")),
+           T.SLet "same" (T.SIntLit 2) (T.SGlobal qualified "same"),T.SVar "$MLF.Stack.callStack"]
+    forM_ (zip protectionBodies [True,False,True,False,True,True]) $ \(expression,expected) -> do
+      check "file-owned protection honors the exact slot, selector target, lexical and declaration scopes"
+        expected (Classes.protectedReading (D.fileValueOccurrences False) protectionScope M.empty M.empty expression)
   let infer slot = Inference.compileOpenGroupIndexed "answer" [(foreignId,"external",T.XCon "Int" [])] []
         [(use,("answer",T.Nothing,T.SLet "external" (T.SBoolLit True) (T.SGlobal slot "external")))]
   case infer foreignId of

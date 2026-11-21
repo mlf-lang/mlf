@@ -1582,7 +1582,8 @@ module Bootstrap.SourceInference where {
     (planStepsUsing selectedContractBindings Dependency.symbolName plan);
   planStepsUsing selectBindings projection = planStepsWithRows selectBindings projection
     (\symbols -> indexedBindingWith (projection symbols));
-  planStepsWithRows selectBindings projection selectRows plan = case planGraph plan of {
+  planStepsWithRows = planStepsReading (Dependency.valueOccurrences True False);
+  planStepsReading references selectBindings projection selectRows plan = case planGraph plan of {
     NamedPlan _ _ groups -> map (\names -> (,) names (\_ contracts -> prepareGroupUsing selectBindings plan contracts names)) groups;
     IndexedPlan symbols rows _ _ groups -> let {
       row = selectRows symbols rows;
@@ -1598,7 +1599,7 @@ module Bootstrap.SourceInference where {
           };
           [] -> False
         };
-        prepare checked contracts = prepareWithChecked checked (Just memberOrder) selectBindings Nothing (case ids of { [i] -> Just i; _ -> Nothing })
+        prepare checked contracts = prepareCheckedReading references checked (Just memberOrder) selectBindings Nothing (case ids of { [i] -> Just i; _ -> Nothing })
           (eligibleIndexedSourceWith (any snd group)) plan contracts names
           (if support then [] else members) (if support then members else [])
           (contractOverloads contracts) (M.map contractProtected contracts)
@@ -1619,12 +1620,13 @@ module Bootstrap.SourceInference where {
   -- Protection uses the resolver's display names. The query scope created
   -- below extends the same symbol table. With no ambiguous display names,
   -- every source and pattern projects identically in both consumers.
-  protectedQueryPlan original imported = let {
+  protectedQueryPlan = protectedQueryPlanReading (Dependency.valueOccurrences True False);
+  protectedQueryPlanReading references original imported = let {
     open contracts plan cached = let { scope = planScope plan (M.keys contracts) } in do {
       checked <- installContracts scope contracts;
       steps <- case (,) cached scope of {
         (,) (Just rows) (DeclScope _ _ _ ambiguous _) -> if Set.size ambiguous == 0
-          then queryStepsFrom plan scope (planStepsWithRows (\_ _ -> []) (\_ -> declName scope)
+          then queryStepsFrom plan scope (planStepsReading references (\_ _ -> []) (\_ -> declName scope)
             (\_ _ -> V.at rows) plan) else querySteps plan scope;
         _ -> querySteps plan scope
       };
@@ -1737,7 +1739,8 @@ module Bootstrap.SourceInference where {
     read = case current of { CheckedContracts _ contracts _ -> M.lookupProjectedId V.toInt
       (\_ c -> (,) (contractClasses c) (contractProtected c)) contracts }
   } in \i -> read i;
-  prepareWithChecked checked memberOrder selectBindings reserved knownOwner eligible (SourcePlan base graph count used _ _ _ supportProtection)
+  prepareWithChecked = prepareCheckedReading (Dependency.valueOccurrences True False);
+  prepareCheckedReading references checked memberOrder selectBindings reserved knownOwner eligible (SourcePlan base graph count used _ _ _ supportProtection)
     contracts names original support overloads protected = do {
     let { inventory = case checked of {
       Just current -> Classes.withCheckedClassContracts (checkedFacts current) base;
@@ -1785,9 +1788,9 @@ module Bootstrap.SourceInference where {
         (if eligibleMember original then case original of {
           (:) ((,,) name Nothing rhs) [] -> do {
             lowered <- (case reserved of {
-              Nothing -> Classes.lowerUnsignedRootAt
+              Nothing -> Classes.lowerUnsignedRootReading references
                 (\_ _ env suffix -> Classes.sourceEnvironmentNames env suffix) owner;
-              Just _ -> Classes.lowerUnsignedRootAt Classes.sourceOwnedEnvironmentNames owner
+              Just _ -> Classes.lowerUnsignedRootReading references Classes.sourceOwnedEnvironmentNames owner
             }) inventory overloads protected name rhs;
             case lowered of { Classes.SourceRootLowering body labels candidates protected -> do {
               -- Lowering still sees the complete definition scope. Once it
@@ -1822,9 +1825,9 @@ module Bootstrap.SourceInference where {
           };
           [(,,) name (Just annotation@(SAnnotation [] _)) rhs] -> do {
             lowered <- (case reserved of {
-              Nothing -> Classes.lowerUnsignedRootAt
+              Nothing -> Classes.lowerUnsignedRootReading references
                 (\_ _ env suffix -> Classes.sourceEnvironmentNames env suffix) owner;
-              Just _ -> Classes.lowerUnsignedRootAt Classes.sourceOwnedEnvironmentNames owner
+              Just _ -> Classes.lowerUnsignedRootReading references Classes.sourceOwnedEnvironmentNames owner
             }) inventory overloads protected name (SSignature rhs annotation);
             case lowered of { Classes.SourceRootLowering body labels _ protectedNow -> do {
               freshLift (ensure (null labels) "signed source root leaked ordinary obligations");
