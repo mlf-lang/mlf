@@ -243,9 +243,10 @@ module Bootstrap.Dependency where {
   -- Typed reads survive a same-spelled local binder. Collect every RHS and
   -- pattern operation, without treating a scope's owner IDs as references.
   expressionGlobalIds :: SExpr -> [] (V.Index Declaration);
-  expressionGlobalIds expression = mapMaybe (\ref -> case ref of {
+  expressionGlobalIds = occurrenceGlobalIds (valueOccurrences True False);
+  occurrenceGlobalIds occurrences expression = mapMaybe (\ref -> case ref of {
     LexicalRef _ -> Nothing; DeclRef i _ -> Just i
-  }) (valueOccurrences True False expression);
+  }) (occurrences expression);
   observeDeclaration ((,,) _ annotation body) =
     normalize (merge (observeOptional annotation) (observeExpression body));
   declarationObservations values =

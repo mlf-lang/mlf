@@ -127,7 +127,8 @@ module Bootstrap.CrateGraph where {
   compileIndexedMemo context templates group parameters declarations members =
     compileIndexedMemoWithKey (inferenceTemplateKey context parameters members)
       templates group parameters declarations members;
-  compileIndexedMemoWithKey key templates group parameters declarations members = do {
+  compileIndexedMemoWithKey = compileIndexedMemoUsing Inference.compileOpenGroupIndexed;
+  compileIndexedMemoUsing compile key templates group parameters declarations members = do {
     let { reused = do {
         identity <- key;
         template <- case M.lookup compareString identity templates of {
@@ -138,7 +139,7 @@ module Bootstrap.CrateGraph where {
     case reused of {
       Right fragment -> Right ((,) fragment templates);
       Left _ -> do {
-        fragment <- Inference.compileOpenGroupIndexed group parameters declarations members;
+        fragment <- compile group parameters declarations members;
         let { ordered = eqList eqString (map (compose X.nameHint fst) (Open.parameters fragment))
               (map (\((,,) _ name _) -> name) parameters);
           next = case key of {
@@ -1092,6 +1093,8 @@ module Bootstrap.CrateGraph where {
                         seq cached (G.elapsed statistics 1 loadStarted);
                         inferStarted <- G.clock statistics;
                         let { hit = case cached of { Right _ -> True; Left _ -> False };
+                          compile = compileIndexedMemoUsing (Inference.compileOpenGroupIndexedWith
+                            (Surface.bindIndexedMembersWith (Dependency.occurrenceGlobalIds (occurrences False))));
                           raw = case cached of {
                             Right fragment -> Right ((,) fragment templates);
                             Left _ -> do {
@@ -1099,10 +1102,10 @@ module Bootstrap.CrateGraph where {
                                 -- templateInfo already resolved these immutable members,
                                 -- parameters and their complete structural key above.
                                 Right (TemplateInfo identity parameters members _ _) ->
-                                  compileIndexedMemoWithKey (Right identity) templates group parameters declarations members;
+                                  compile (Right identity) templates group parameters declarations members;
                                 Left reason -> do {
                                   members <- indexed;
-                                  compileIndexedMemoWithKey (Left reason) templates group currentParameters declarations members
+                                  compile (Left reason) templates group currentParameters declarations members
                                 }
                               } else mapEither (\fragment -> (,) fragment templates) (Inference.compileOpenGroup group
                                 [Q.dependencyInterface (Source.groupBindings prepared)] declarations (Source.groupMembers prepared));

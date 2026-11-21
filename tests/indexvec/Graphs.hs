@@ -827,6 +827,24 @@ typedClassChecks = do
   check "scope with typed binder leaves a lexical reference free" ["same"] (map H.unpack (D.expressionNamedReads copied))
   check "prepared syntax also inventories the owned slot and enclosed occurrence"
     [1,1,1,0] [V.toInt i | T.DeclRef i _ <- D.querySyntaxRefs copied]
+  do
+    let a = V.fromInt 9
+        b = V.fromInt 3
+        candidate = D.occurrenceGlobalIds (D.fileValueOccurrences False)
+        mk i n rhs = (i,(n,T.Nothing,rhs))
+        body = T.SDeclScope [a] (T.SLet "same" (T.SGlobal b "same")
+          (T.SApp (T.SGlobal a "hidden") (T.SWantedRefs "D"
+            [(T.GivenEvidence,T.LexicalRef "same"),(T.GivenEvidence,T.DeclRef b "again")])))
+        rows = [mk a "b" body,mk b "a" (T.SLet "b" (T.SConstructor "K") (T.SGlobal a "b"))]
+        components result = case result of
+          T.Left why -> error (H.unpack why)
+          T.Right parts -> [[(V.toInt i,cyclic) | (i,cyclic) <- part] | part <- parts]
+    check "file SCC occurrence projection drops lexical and bound slots and retains repeated candidates"
+      [3,3] (map V.toInt (candidate body))
+    check "file SCC groups use declaration identities through same-spelled lexical bindings"
+      [[(3,False),(9,False)]] (components (Surface.indexedMemberComponentsWith candidate rows))
+    check "independent ordered SCC reconstruction on file and ordinary inputs"
+      (components (Surface.indexedMemberComponents rows)) (components (Surface.indexedMemberComponentsWith candidate rows))
   let annotation = T.SAnnotation [] (T.SQualified [T.SPredicate "C" [T.SCon "Inner" []]] (T.SCon "Body" []))
       bodyWithType = T.SChecked (T.SCon "Head" []) (T.SSignature (T.SApp (T.SGlobal own "outer") (T.SConstructor "K")) annotation)
       observed = D.observeSyntax True True bodyWithType

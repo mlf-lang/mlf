@@ -326,13 +326,15 @@ module Bootstrap.InferenceUnit where {
       lowered <- Classes.lowerSeparateClasses externals [] (SProgram datatypes body);
       Right ((,) externalTypes lowered)
   };
-  compileOpenGroupIndexed name parameters datatypes members =
+  compileOpenGroupIndexed = compileOpenGroupIndexedWith Surface.bindIndexedMembers;
+  compileOpenGroupIndexedWith bindMembers name parameters datatypes members =
     case signedApplicationGroup parameters datatypes members of {
       Right fragment -> Right fragment;
-      Left _ -> compileElaboratedGroup parameters datatypes members
+      Left _ -> compileElaboratedGroupWith bindMembers parameters datatypes members
     };
-  compileElaboratedGroup parameters datatypes members = do {
-    (,) externalTypes lowered <- prepareIndexedGroup parameters datatypes members;
+  compileElaboratedGroup = compileElaboratedGroupWith Surface.bindIndexedMembers;
+  compileElaboratedGroupWith bindMembers parameters datatypes members = do {
+    (,) externalTypes lowered <- prepareIndexedGroupWith bindMembers parameters datatypes members;
     case monomorphicIndexed parameters members lowered of {
       Right fragment -> Right fragment;
       Left _ -> case groundIndexed parameters members lowered of {
@@ -1482,7 +1484,8 @@ module Bootstrap.InferenceUnit where {
     result <- monomorphicCheck globals names serial ty body;
     Right ((,,) (fst result) ty (snd result))
   };
-  prepareIndexedGroup parameters datatypes members = do {
+  prepareIndexedGroup = prepareIndexedGroupWith Surface.bindIndexedMembers;
+  prepareIndexedGroupWith bindMembers parameters datatypes members = do {
     ensure (not (null members)) "cannot infer an empty declaration group";
     let { parameterIds = M.fromList compareString (map (\((,,) i n _) -> (,) n i) parameters) };
     externalTypes <- foldM mergeExternal M.empty (map (\((,,) _ n ty) -> (,) n ty) parameters);
@@ -1491,7 +1494,7 @@ module Bootstrap.InferenceUnit where {
     ensure (length externalIds == IS.size (IS.fromList externalIds)) "duplicate inference parameter slot";
     ensure (not (any (\((,) i _) -> elem eqInt (V.toInt i) externalIds) members))
       "inference group also imports its own binding";
-    body <- Surface.bindIndexedMembers members (SConstructor "()");
+    body <- bindMembers members (SConstructor "()");
     let { externals = M.map (Separate.sourceSchemeIn M.empty False) externalTypes };
     lowered <- Classes.lowerSeparateClasses externals [] (SProgram datatypes body);
     let { attached = case lowered of {

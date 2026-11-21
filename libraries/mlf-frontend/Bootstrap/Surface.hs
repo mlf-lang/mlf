@@ -155,13 +155,14 @@ module Bootstrap.Surface where {
   -- Independently lowered source and generated rows may introduce or remove
   -- dependencies. Only references to IDs in this group can close its SCC.
   indexedMemberGroups entries = mapEither (map (map fst)) (indexedMemberComponents entries);
-  indexedMemberComponents entries = let {
+  indexedMemberComponents = indexedMemberComponentsWith Dependency.expressionGlobalIds;
+  indexedMemberComponentsWith globalIds entries = let {
     ordered = V.fromList (sortBy (\a b -> compareString (valueName (snd a)) (valueName (snd b))) entries);
     ids = map fst entries;
     ranks = M.fromList compareInt (map (\rank -> (,) (V.toInt (fst (V.at ordered rank))) rank) (V.indices ordered));
     row member = V.fromList (map V.fromInt (IS.toAscList (IS.fromList (mapMaybe
       (\ref -> mapOptional V.toInt (M.lookup compareInt (V.toInt ref) ranks))
-      (Dependency.expressionGlobalIds (valueBody (snd member)))))));
+      (globalIds (valueBody (snd member)))))));
     rows = Dependency.Rows (V.fromList (map row (V.toList ordered)));
     describe rank = (,) (fst (V.at ordered rank))
       (any (\child -> V.toInt child == V.toInt rank) (Dependency.neighbors rows rank));
@@ -171,8 +172,9 @@ module Bootstrap.Surface where {
       == length ids) "duplicate value declaration";
     Right (map (\ranks -> map describe (sortBy (\a b -> compareInt (V.toInt a) (V.toInt b)) ranks)) groups)
   };
-  bindIndexedMembers entries body = do {
-    groups <- indexedMemberComponents entries;
+  bindIndexedMembers = bindIndexedMembersWith Dependency.expressionGlobalIds;
+  bindIndexedMembersWith globalIds entries body = do {
+    groups <- indexedMemberComponentsWith globalIds entries;
     let { values = M.fromList compareInt (map (\((,) i row) -> (,) (V.toInt i) row) entries);
           wrap continuation group = let { ids = map fst group } in
             mapEither (SDeclScope ids) (wrapValueGroup (map (\i -> M.get compareInt (V.toInt i) values) ids)
