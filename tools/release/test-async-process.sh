@@ -113,6 +113,12 @@ done
 # GMP is conventional pkg-config discovery. Honor the repository's documented
 # explicit collector prefix when one is selected by a native bootstrap.
 case "$wanted" in ''|async-process/parity/*|async-process/panic-cleanup/*)
+  success fixture "$clang" -O2 -std=c11 -Wall -Wextra -Werror "$fixtures/fixture.c" -o "$work/fixture"
+  ;;
+esac
+emit_llvm=false
+case "$wanted" in ''|async-process/parity/llvm/*|async-process/panic-cleanup/llvm)
+emit_llvm=true
 read -r -a cflags <<< "$(pkg-config --cflags gmp)"
 read -r -a libs <<< "$(pkg-config --libs gmp)"
 if [ -n "${MLF_GC_PREFIX:-}" ]; then
@@ -126,11 +132,11 @@ else
 fi
 libs+=(-lm -lpthread)
 if [ "$(uname -s)" = Linux ]; then libs+=(-ldl); fi
-success fixture "$clang" -O2 -std=c11 -Wall -Wextra -Werror "$fixtures/fixture.c" -o "$work/fixture"
 success runtime "$clang" -O2 -std=c11 -Wall -Wextra -Werror "${cflags[@]}" -c "$root/runtime/mlf_runtime.c" -o "$work/runtime.o"
   ;;
 esac
 parity_cases=0 panic_cleanup_cases=0
+ran_interpreter=false ran_llvm=false
 case "$wanted" in ''|async-process/parity/*)
 oracle_file="$fixtures/suite.stdout"
 if [ -n "$wanted" ]; then
@@ -141,9 +147,11 @@ fi
 success compile "$compiler" "${include_args[@]}" "$fixtures/Main.emlf"
 success check "$compiler" --check "$work/compile.stdout"
 cmp "$fixtures/io-unit.type" "$work/check.stdout" || fail 'checked target does not have type IO Unit'
-success emit "$compiler" --xmlf-to-llvm-io-gc "$work/compile.stdout"
-python3 -B "$root/tools/release/check_async_abi.py" "$work/emit.stdout" >/dev/null || fail 'native target lacks the current async primitive capability guard'
-success link "$clang" -O2 -Wno-override-module -x ir "$work/emit.stdout" -x none "$work/runtime.o" "${libs[@]}" -o "$work/suite.native"
+if "$emit_llvm"; then
+  success emit "$compiler" --xmlf-to-llvm-io-gc "$work/compile.stdout"
+  python3 -B "$root/tools/release/check_async_abi.py" "$work/emit.stdout" >/dev/null || fail 'native target lacks the current async primitive capability guard'
+  success link "$clang" -O2 -Wno-override-module -x ir "$work/emit.stdout" -x none "$work/runtime.o" "${libs[@]}" -o "$work/suite.native"
+fi
 export MLF_ASYNC_FIXTURE="$work/fixture"
 for backend in interpreter llvm; do
   prefix="async-process/parity/$backend"
@@ -158,6 +166,7 @@ for backend in interpreter llvm; do
   fi
   mlf_report_labeled_output "$prefix" "$oracle_file" "$work/$backend.stdout" "$status" || fail "$backend differs from the literal oracle"
   test "$status" -eq 0 && test ! -s "$work/$backend.stderr" || fail "$backend failed"
+  if [ "$backend" = interpreter ]; then ran_interpreter=true; else ran_llvm=true; fi
   if [ -z "$wanted" ]; then
     printf 'PASS %s: 13 Async.Process contracts\n' "$backend"
   fi
@@ -178,8 +187,10 @@ export MLF_ASYNC_FIXTURE="$work/fixture"
 success panic.compile "$compiler" "${include_args[@]}" "$fixtures/Panic.emlf"
 success panic.check "$compiler" --check "$work/panic.compile.stdout"
 cmp "$fixtures/io-unit.type" "$work/panic.check.stdout" || fail 'panic target does not have type IO Unit'
-success panic.emit "$compiler" --xmlf-to-llvm-io-gc "$work/panic.compile.stdout"
-success panic.link "$clang" -O2 -Wno-override-module -x ir "$work/panic.emit.stdout" -x none "$work/runtime.o" "${libs[@]}" -o "$work/panic.native"
+if "$emit_llvm"; then
+  success panic.emit "$compiler" --xmlf-to-llvm-io-gc "$work/panic.compile.stdout"
+  success panic.link "$clang" -O2 -Wno-override-module -x ir "$work/panic.emit.stdout" -x none "$work/runtime.o" "${libs[@]}" -o "$work/panic.native"
+fi
 for backend in interpreter llvm; do
   mlf_case_selected "async-process/panic-cleanup/$backend" || continue
   mlf_case_start "async-process/panic-cleanup/$backend"
@@ -196,6 +207,7 @@ for backend in interpreter llvm; do
   grep -F 'async-scope-panic' "$work/panic.$backend.stderr" >/dev/null || fail "panic.$backend failed for an unrelated reason"
   success "panic.$backend.reaped" "$work/fixture" assert-gone "$MLF_ASYNC_WORK/panic.pid"
   mlf_case_result pass "$status"
+  if [ "$backend" = interpreter ]; then ran_interpreter=true; else ran_llvm=true; fi
   panic_cleanup_cases=1
   printf 'PASS %s panic cancel-and-join\n' "$backend"
 done
@@ -223,10 +235,11 @@ jq -n --arg exact "${MLF_TEST_EXACT:-}" --arg compiler_sha256 "$compiler_hash" -
   --arg target_sha256 "$(hash_if_present "$work/compile.stdout")" --arg runtime_object_sha256 "$(hash_if_present "$work/runtime.o")" \
   --arg native_sha256 "$(hash_if_present "$work/suite.native")" --arg work "$work" \
   --argjson parity "$parity_cases" --argjson panic_cleanup "$panic_cleanup_cases" --argjson rejections "$rejections" \
+  --argjson interpreter "$ran_interpreter" --argjson llvm "$ran_llvm" \
   --argjson seconds "$((SECONDS - started))" --argjson timeout_seconds "$timeout_seconds" \
   --slurpfile inputs "$work/inputs.json" --slurpfile observations "$work/observations.json" \
   '{complete:($exact == ""),cases:$parity,panic_cleanup_cases:$panic_cleanup,source_rejections:$rejections,
-    backends:(if $parity > 0 or $panic_cleanup > 0 then ["interpreter","llvm"] else [] end),
+    backends:[if $interpreter then "interpreter" else empty end, if $llvm then "llvm" else empty end],
     compiler_sha256:$compiler_sha256,clang_sha256:$clang_sha256,target_sha256:$target_sha256,
     runtime_object_sha256:$runtime_object_sha256,native_sha256:$native_sha256,
     work:$work,seconds:$seconds,timeout_seconds:$timeout_seconds,
