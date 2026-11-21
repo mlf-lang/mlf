@@ -5,8 +5,8 @@ import types
 import os
 import stat
 
-FINAL_MANIFEST_SHA256 = '14cf3eb9ebdd6b9968e41a1474b1bdac4642addf4798e891d8726b16e484b517'
-CONTRACT_SOURCE_SHA256 = '303ea21082a601c4f048c6bfaa977e14873cf58c04f072f2ecbbe3fd74cf0960'
+FINAL_MANIFEST_SHA256 = '1cfb5fc7ed7db299f1d4d9475ce6dbfd174a88c98d26886f90171dce5640cfb8'
+CONTRACT_SOURCE_SHA256 = '5bf2625ef45b94fdd7b88f2513f9c0a8a5ce0a7e0fd0eb87cf398c176bdfd6db'
 
 
 def read_implementation(path):

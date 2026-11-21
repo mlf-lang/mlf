@@ -1885,6 +1885,21 @@ applicationPatternChecks = do
     \(limits,value,why) -> do
       failed <- encoded (W.encode limits 8 [value])
       check "binary planning returns its leftmost limit before later field demand" (Left why) failed
+  let wireVar i hint = W.VNode 70 [W.VNode 31 [W.VInt i,W.VText hint]]
+      wireLeaf ty = W.VNode 58 [W.VNode 53 [W.VNode 51 [W.VNode 44 [W.VText ty,W.VNode 1 []]]],W.VNode 55 []]
+      wireJoin x y = W.VNode 58 [x,y]
+      wireHead i hint pr = W.VNode 72 [W.VNode 74 [wireVar i hint,pr],wireVar 0 "step"]
+      wireProof = wireJoin (wireJoin (wireLeaf "λ") (wireLeaf "")) (wireLeaf "Int")
+      wireApp h z = W.VNode 72 [h,z]
+      wireChain hs = foldr wireApp (wireVar 2 "tail") hs
+      wireSame = wireHead 1 "compose" wireProof
+      wireOther = wireHead 3 "compose" wireProof
+      wireRoots = [wireChain [wireSame,wireSame,wireSame,wireOther,wireSame],
+                   wireChain [wireOther,wireOther,wireOther]]
+  forM_ [300,600,2000] $ \budget -> do
+    expected <- encoded (W.encodeRootBounded W.defaultLimits budget 8 wireRoots)
+    actual <- encoded (W.encodeRootsWithAtoms Structure.termAtomShapes W.defaultLimits budget 8 wireRoots)
+    check "admitted left subtrees preserve binder IDs, bytes and aggregate work" expected actual
   let groundBinder n = T.XTyVar n
       bottom n body = T.XForall (groundBinder n) T.XBot body
       groundInt = Inference.GroundCon "Int" []

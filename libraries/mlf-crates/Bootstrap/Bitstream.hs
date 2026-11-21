@@ -755,10 +755,96 @@ module Bootstrap.Bitstream (
   };
   -- For a binary node, the admitted left ID travels with its pending close.
   -- Each child still enters the depth, work and atom checks in source order.
+  -- A repeat can start only after two adjacent binary nodes have already
+  -- returned the same complete left ID. Derive a matcher from that ID in the
+  -- current document, while its admitted variable/proof slots still agree.
+  data WireHead = WireHead Int Int Int (Value -> Bool);
+  planRepeatedLeft limits depth outerTag value tasks stack identity state@(PlanState symbols nodes work) = let {
+    ordinary = planOne limits depth value tasks stack state;
+    inspect count edges saved entries pages = case saved of {
+      AtomIds nameTag namePair primitive _ empty _ names named (ProofAtoms t i b c e previous cache) ->
+        case cache of {
+          LastProof key height size cost proofId ((,,) _ _ lastId) -> case previous of {
+            Just ((,,) _ _ activeId) -> let {
+              free tag = tag /= nameTag && tag /= primitive && tag /= t &&
+                (case named of { NamedAtoms other _ -> tag /= other; NoNamedAtoms -> True });
+              root tag matches node = case node of {
+                VNode actual fields -> actual == tag && matches fields;
+                _ -> False
+              };
+              lookupName ordinal = IM.foldrWithKey (\binding item rest -> case item of {
+                (,,) hint bytes stored -> if stored /= ordinal then rest else let {
+                  check fields = case fields of {
+                    [child] -> case atomNameFields namePair child of {
+                      Just ((,) actual text) -> actual == binding && (case text of {
+                        VText label -> eqString hint label; _ -> False
+                      });
+                      Nothing -> False
+                    };
+                    _ -> False
+                  }
+                } in if bytes > 8192 then Nothing else Just (WireHead 3 4 (4 + bytes) (root nameTag check))
+              }) Nothing names;
+              build level ordinal = if level == 0 then Nothing else if ordinal == proofId then
+                (if cost > 8192 then Nothing else Just (WireHead height size cost
+                  (root t (matchesProof t i b c empty e key))))
+                else case plannedEntry ordinal count entries pages of {
+                  ENode tag fields -> if tag == nameTag then lookupName ordinal else
+                    if not (free tag) then Nothing else case fields of {
+                      [left,right] -> case build (level - 1) left of {
+                        Nothing -> Nothing;
+                        Just (WireHead lh ln lw lm) -> case build (level - 1) right of {
+                          Nothing -> Nothing;
+                          Just (WireHead rh rn rw rm) -> let {
+                            n = 1 + ln + rn;
+                            w = 1 + lw + rw;
+                            pair args = case args of {
+                              [a,z] -> lm a && rm z;
+                              _ -> False
+                            }
+                          } in if n > 96 || w > 8192 then Nothing else
+                            Just (WireHead (1 + max lh rh) n w (root tag pair))
+                        }
+                      };
+                      _ -> Nothing
+                    };
+                  _ -> Nothing
+                };
+              start (WireHead h n w matches) = let {
+                scan d rest pending used = let {
+                  resume = planOne limits d rest pending stack (PlanState symbols nodes used);
+                  admit fields = case fields of {
+                    [a,z] -> if matches a then let { next = used + w + 1; childDepth = d + 1 } in
+                      seq next (seq childDepth (scan childDepth z ((:) (EncodePair outerTag identity) pending) next))
+                      else resume;
+                    _ -> resume
+                  }
+                } in if d > maxDepth limits - h || w + 1 > maxExpandedWork limits - used then resume
+                  else case rest of { VNode tag fields -> if tag == outerTag then admit fields else resume; _ -> resume }
+              } in if n < 8 || maxNodes limits - count < max 7 n || maxEdges limits - edges < max 6 (n - 1) ||
+                  min (maxEdges limits) (maxExpandedWork limits - 1) < 2 then ordinary
+                else scan depth value tasks work
+            } in if activeId /= lastId || not (free outerTag) then ordinary else case build 5 identity of {
+              Just head -> start head;
+              Nothing -> ordinary
+            };
+            Nothing -> ordinary
+          };
+          _ -> ordinary
+        };
+      _ -> ordinary
+    }
+  } in case nodes of { Nodes _ entries count edges saved pages -> inspect count edges saved entries pages };
   planId :: Limits -> [] EncodeTask -> [] Int -> Int -> PlanState -> Either String ((,) ([] Int) PlanState);
   planId limits tasks stack index state = case tasks of {
-    (:) (EncodeRight depth tag right) rest ->
-      planOne limits depth right ((:) (EncodePair tag index) rest) stack state;
+    (:) (EncodeRight depth tag right) rest -> let {
+      pending = (:) (EncodePair tag index) rest;
+      ordinary = planOne limits depth right pending stack state
+    } in case rest of {
+      (:) (EncodePair outer previous) _ -> if tag == outer && index == previous
+        then planRepeatedLeft limits depth tag right pending stack index state else ordinary;
+      _ -> ordinary
+    };
     (:) (EncodePair tag left) rest -> planEntry limits rest stack (ENode tag [left,index]) state;
     (:) (EncodeClose tag 1) rest -> planEntry limits rest stack (ENode tag [index]) state;
     _ -> planTasks limits tasks ((:) index stack) state
