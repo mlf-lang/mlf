@@ -46,7 +46,7 @@ class PinContracts(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
-        root = Path(self.temporary.name)
+        root = Path(self.temporary.name).resolve()
         self.source = root / 'snapshot'
         self.here = root / 'runner/tools/performance/a1-private-index'
         self.here.mkdir(parents=True)
@@ -129,7 +129,7 @@ class ToolchainDispatch(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
-        root = Path(self.temporary.name)
+        root = Path(self.temporary.name).resolve()
         self.libdir = root / 'install/lib'
         self.libdir.mkdir(parents=True)
         self.actual = root / 'install/bin/ghc-9.14.1'
@@ -192,7 +192,7 @@ class PreparationTransport(unittest.TestCase):
     def preparation(self, platform):
         """Run prepare's orchestration, with all compiler/host work replaced."""
         with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
-            root = Path(directory)
+            root = Path(directory).resolve()
             repo, work = root / 'repo', root / 'work'
             repo.mkdir()
             here = root / 'runner/tools/performance/a1-private-index'
