@@ -554,7 +554,13 @@ module Bootstrap.SourceInference where {
   smallFinalValue = smallFinalTree False;
   smallFinalTree = finalTreeGeometry 256;
   finalTreeGeometry = finalTreeGeometryUsing False;
-  finalTreeGeometryUsing spines depthLimit stored raw = let {
+  finalTreeGeometryUsing spines depthLimit stored raw =
+    finalTreeBounds depthLimit (\chargeText maxDepth -> finalGeometryUsing spines stored
+      chargeText maxDepth [(,,) 1 False [raw]]);
+  finalCheckedTreeGeometry depthLimit term =
+    finalTreeBounds depthLimit (\chargeText maxDepth -> finalGeometryWalk True False
+      chargeText maxDepth (GeometryTerm 1 term (GeometryRoots [])));
+  finalTreeBounds depthLimit scan = let {
     limits = Wire.defaultLimits;
     -- Bound expanded nodes independently of text bytes. A symbol can occupy
     -- many bytes while contributing only one node and one symbol.
@@ -568,7 +574,7 @@ module Bootstrap.SourceInference where {
     scalars = min ((nodes - 1) / 4) (Wire.maxSymbolBytes limits / 4);
     chargeText = \text available -> let { bytes = stringUtf8Length text } in
         if stringLength text > scalars || bytes > available then Nothing else Just (available - bytes)
-  } in finalGeometryUsing spines stored chargeText (min depthLimit (Wire.maxDepth limits)) [(,,) 1 False [raw]] nodes work False;
+  } in scan chargeText (min depthLimit (Wire.maxDepth limits)) nodes work False;
   -- Preserve the scalar-weighted budget of the existing task-list entry point.
   smallFinalTasks pending remaining maxDepth nested = let {
     chargeText = \text available -> let { count = stringLength text } in
@@ -629,16 +635,63 @@ module Bootstrap.SourceInference where {
   -- A cursor points directly into the current constructor's child list.
   -- Only descending into a nonempty constructor saves its remaining siblings.
   data GeometryFrame = GeometrySiblings Int Bool ([] Wire.Value) GeometryFrame |
-    GeometryRoots ([] ((,,) Int Bool ([] Wire.Value)));
-  finalGeometryUsing spines stored chargeText maxDepth = let {
+    GeometryRoots ([] ((,,) Int Bool ([] Wire.Value))) |
+    GeometryTerm Int XTerm GeometryFrame | GeometryProof Int Bool XComputation GeometryFrame;
+  finalGeometryUsing spines stored chargeText maxDepth roots =
+    finalGeometryWalk spines stored chargeText maxDepth (GeometryRoots roots);
+  finalGeometryWalk spines stored chargeText maxDepth = let {
     resume pending nodes work nested = case pending of {
       GeometrySiblings depth parentThen fields rest -> visit depth parentThen fields rest nodes work nested;
-      GeometryRoots roots -> start roots nodes work nested
+      GeometryRoots roots -> start roots nodes work nested;
+      GeometryTerm depth term rest -> visitTerm depth term rest nodes work nested;
+      GeometryProof depth parentThen proof rest -> visitProof depth parentThen proof rest nodes work nested
     };
     start roots nodes work nested = case roots of {
       [] -> Just nested;
       (:) ((,,) depth parentThen fields) rest -> visit depth parentThen fields (GeometryRoots rest) nodes work nested
     };
+    -- This cursor receives the immutable checked term. Off the supported
+    -- path, resume on its exact wire projection with the same remaining
+    -- budgets. Scalar payloads and binder IDs retain ordinary wire demand.
+    visitTerm depth term rest nodes work nested =
+      if nodes <= 0 || work <= 0 || depth > maxDepth then Nothing else let {
+        d = depth + 1; n = nodes - 1; w = work - 1
+      } in case term of {
+        XLet name a b -> seq nested (visit d False [Structure.toXName name]
+          (GeometryTerm d a (GeometryTerm d b rest)) n w nested);
+        XAbs name ty body -> seq nested (visit d False [Structure.toXName name,Structure.toXType ty]
+          (GeometryTerm d body rest) n w nested);
+        XApp a b -> seq nested (visitTerm d a (GeometryTerm d b rest) n w nested);
+        XTypeApp a proof -> seq nested (visitTerm d a (GeometryProof d False proof rest) n w nested);
+        _ -> visit depth False [Structure.toXTerm term] rest nodes work nested
+      };
+    -- Then schedules its right proof after its left. Unary proof nodes have
+    -- no siblings. Neither path changes proof grouping or constructs a term.
+    visitProof depth parentThen proof rest nodes work nested =
+      if nodes <= 0 || work <= 0 || depth > maxDepth then Nothing else let {
+        d = depth + 1; n = nodes - 1; w = work - 1;
+        changed = nested || (parentThen && isComposition proof)
+      } in case proof of {
+        XThen a b -> seq changed
+          (visitProof d True a (GeometryProof d True b rest) n w changed);
+        XInner a -> seq changed (visitProof d False a rest n w changed);
+        XBottom ty -> seq changed (visitBottom d ty rest n w changed);
+        XElim -> seq changed (resume rest n w changed);
+        _ -> visit depth parentThen [Structure.toXComputation proof] rest nodes work nested
+      };
+    -- Con contains a text node and an argument-list node at the same
+    -- depth. Charge the text before examining even the spine of that list.
+    visitBottom depth ty rest nodes work nested =
+      if nodes <= 0 || work <= 0 || depth > maxDepth then Nothing else case ty of {
+        XCon name arguments -> if nodes < 2 || work < 2 || depth >= maxDepth then Nothing
+          else case chargeText name (work - 2) of {
+            Nothing -> Nothing;
+            Just available -> if nodes < 3 || available <= 0 then Nothing
+              else visit (depth + 2) False (map Structure.toXType arguments) rest
+                (nodes - 3) (available - 1) nested
+          };
+        _ -> visit depth False [Structure.toXType ty] rest nodes work nested
+      };
     visit depth parentThen fields rest nodes work nested = case fields of {
       [] -> resume rest nodes work nested;
       (:) value more -> if nodes <= 0 || work <= 0 || depth > maxDepth then Nothing else let {
@@ -660,7 +713,7 @@ module Bootstrap.SourceInference where {
         _ -> visit depth parentThen more rest left next nested
       }
     }
-  } in start;
+  } in resume;
   -- On the certified small domain the only rewriting operation is still the
   -- same depth-aware XThen forest. Atom heights and child identities are local
   -- to each computation; header, datatype and unrelated term nodes cannot
@@ -1920,7 +1973,9 @@ module Bootstrap.SourceInference where {
   canonicalOpenUsing spines storage object = let {
     geometry = finalTreeGeometryUsing spines (Wire.maxDepth Wire.defaultLimits);
     planned = canonicalOpenPlanned object;
-    ordinary = case geometry False (Open.bodyValue object) of {
+    rawGeometry = if spines then finalCheckedTreeGeometry (Wire.maxDepth Wire.defaultLimits) (Open.body object)
+      else geometry False (Open.bodyValue object);
+    ordinary = case rawGeometry of {
       Just False -> Right object;
       Just True -> if not spines then planned else case editGroundTerm 1 (Open.body object) of {
         Just (Just result) -> Open.normalize object result;

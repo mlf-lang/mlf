@@ -1205,6 +1205,25 @@ openGeometryChecks = do
     [[],[True],[]] [cursor frames 5 10,cursor frames 6 7,cursor frames 6 6]
   check "a rejected child precedes its unevaluated sibling list" []
     (cursor [(1,False,W.VNode 4 [W.VText "reject"] : error "premature sibling demand")] 32 32)
+  let proofArgument text = T.XThen (T.XInner (T.XBottom (T.XCon text []))) T.XElim
+      headTerm = T.XVarTerm (T.XName (error "geometry forced a binder ID") "f")
+      application proof = T.XTypeApp headTerm proof
+      payment text rest = let size = Prim.stringUtf8Length text in
+        if size > rest then T.Nothing else T.Just (rest - size)
+      admission term depth nodes work = case Source.finalGeometryWalk True False payment depth
+        (Source.GeometryTerm 1 term (Source.GeometryRoots [])) nodes work False of
+          T.Nothing -> Nothing
+          T.Just changed -> Just changed
+      leafProof = proofArgument "λ😀"
+  check "ground geometry counts its UTF-8 name and complete argument-list node"
+    [Just False,Nothing,Nothing,Nothing]
+    [admission (application leafProof) d n w | (d,n,w) <- [(6,12,19),(5,12,19),(6,11,19),(6,12,18)]]
+  check "nested ground proof compositions preserve their original grouping flag" (Just True)
+    (admission (application (T.XThen leafProof leafProof)) 7 20 33)
+  let incomplete = T.XThen (T.XInner (T.XBottom (T.XCon "λ😀" (error "geometry forced type arguments"))))
+        (error "geometry forced the right proof")
+  check "a UTF-8 budget failure precedes both type arguments and the right proof" Nothing
+    (admission (application incomplete) 6 100 14)
 
 protectionChecks = do
   let chain = [(show i,[show (i+1)]) | i <- [0..126::Int]] ++ [("127",[])]
