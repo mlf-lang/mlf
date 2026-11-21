@@ -14,6 +14,9 @@ module Bootstrap.InferenceUnit where {
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.Classes as Classes;
+  import qualified Bootstrap.Constraint as Constraint;
+  import qualified Bootstrap.Elaborate as Elaborate;
+  import qualified Bootstrap.Graph as Graph;
   import qualified Bootstrap.CompilerCore as Compiler;
   import qualified Bootstrap.Primitive as Primitive;
   import qualified Bootstrap.Separate as Separate;
@@ -338,11 +341,87 @@ module Bootstrap.InferenceUnit where {
           Right fragment -> Right fragment;
           Left _ -> case signedDataGroup parameters members lowered of {
             Right fragment -> Right fragment;
-            Left _ -> finishOpenGroup externalTypes (map snd members) lowered
+            Left _ -> case signedLocalGroup parameters members lowered of {
+              Right fragment -> Right fragment;
+              Left _ -> finishOpenGroup externalTypes (map snd members) lowered
+            }
           }
         }
       }
     }
+  };
+  -- A closed simply typed lambda spine checks against its declared arrows.
+  -- Obtain the export's forall order from the signature graph itself: flexible
+  -- bottom leaves occur in graph traversal order, regardless of their spelling.
+  signedLocalGroup parameters members lowered = case (,,) parameters members lowered of {
+    (,,) [] [(,) owner ((,,) exported (Just declared) _)]
+      ((,) (SProgram datatypes (SDeclScope [slot] (SLet name (SSignature source written)
+        (SConstructor "()")))) _) -> do {
+      ensure (V.toInt owner == V.toInt slot && eqString exported name &&
+        SourceEquality.eqSAnnotation declared written) "signed local declaration mismatch";
+      signature <- case written of {
+        SAnnotation [] ty@(SForall Flexible _ SBottom _) -> Right ty;
+        _ -> Left "signed local declaration needs an explicit universal type"
+      };
+      implementation <- case source of {
+        SChecked ty value -> do {
+          ensure (SourceEquality.eqSType ty signature) "signed local body annotation mismatch";
+          Right value
+        };
+        _ -> Right source
+      };
+      let { vars names ty = case ty of {
+          STVar n -> Right (S.insert compareString n names);
+          SArrow a b -> do { found <- vars names a; vars found b };
+          _ -> Left "signed local declaration needs a type made of arrows and variables"
+        };
+        prefix names ty = case ty of {
+          SForall Flexible n SBottom b -> do {
+            ensure (not (S.member compareString n names)) "signed local quantifiers overlap";
+            prefix (S.insert compareString n names) b
+          };
+          SArrow _ _ -> do {
+            used <- vars S.empty ty;
+            ensure (eqList eqString (S.toList used) (S.toList names)) "signed local quantifier inventory mismatch"
+          };
+          _ -> Left "signed local declaration needs a quantified arrow type"
+        }
+      };
+      prefix S.empty signature;
+      env <- Open.environment datatypes;
+      Kinding.annotationType (Open.dataEnvironment env) M.empty signature;
+      (,) root (Constraint.Generation graph _ _) <- Constraint.runGenerate
+        (Constraint.embed (Open.dataEnvironment env) M.empty signature)
+        (Constraint.Generation Graph.emptyGraph [] []);
+      let { expected = Elaborate.typeAt graph root;
+        compile ty = case ty of {
+          XForall variable XBot body -> mapEither (XTypeAbs variable XBot) (compile body);
+          _ -> signedApplicationSpineUsing (\n _ -> XVarTerm n) signedLocalBody
+            (V.toInt owner) M.empty M.empty 1 ty implementation
+        }
+      };
+      term <- compile expected;
+      result <- Open.check env [] (XLet (XName 0 name) term (XConstructor "()" []));
+      ensure (case Open.bindings result of {
+        [(,) actual ty] -> eqString (X.nameHint actual) name && T.alphaEq expected ty;
+        _ -> False
+      }) "signed local export type mismatch";
+      Right result
+    };
+    _ -> Left "ordinary local elaboration required"
+  };
+  signedLocalBody :: Map Int XTerm -> Map String XTerm -> SExpr -> Either String XTerm;
+  signedLocalBody globals names expression = let {
+    child = signedLocalBody globals names;
+    use binding = case binding of { Just term -> Right term; Nothing -> Left "unknown signed local variable" }
+  } in case expression of {
+    SApp f a -> do { x <- child f; y <- child a; Right (XApp x y) };
+    SGlobal i _ -> use (M.lookup compareInt (V.toInt i) globals);
+    SVar name -> if eqString name "$MLF.Stack.callStack" then Left "managed call stack requires evidence"
+      else use (M.lookup compareString name names);
+    SCallSite _ _ body -> child body;
+    SSourceDefinition body -> child body;
+    _ -> Left "signed local declaration needs a local variable or application"
   };
   -- A closed, explicitly quantified constructor or case projection has its
   -- type arguments in the declaration. The ordinary xMLF checker verifies

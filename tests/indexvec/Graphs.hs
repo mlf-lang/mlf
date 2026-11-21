@@ -856,6 +856,47 @@ typedClassChecks = do
 
 -- The reference propagates named flags to convergence, independently of
 -- reverse edges and the candidate's work queue.
+
+signedLocalChecks = do
+  let a = T.STVar "a"; b = T.STVar "b"; c = T.STVar "c"
+      ar = T.SArrow; lam ns rhs = foldr (\n -> T.SLam n T.Nothing) rhs ns
+      body = lam ["f","g","x"] (T.SApp (T.SVar "f") (T.SApp (T.SVar "g") (T.SVar "x")))
+      arrow = ar (ar b c) (ar (ar a b) (ar a c))
+      signature ns = foldr (\n -> T.SForall T.Flexible n T.SBottom) arrow ns
+      members ty term = [(V.fromInt 23, ("entry", T.Just (T.SAnnotation [] ty), T.SChecked ty term))]
+      checked (T.Right v) = pure v
+      checked (T.Left e) = fail (H.unpack e)
+      int = T.XCon "Int" []
+      plus offset = let n = T.XName 200 "n" in T.XAbs n int
+                      (T.XApp (T.XApp (T.XPrimitive T.PAddInt []) (T.XVarTerm n)) (T.XIntTerm offset))
+  forM_ [["a","b","c"],["c","b","a"]] $ \ns -> do
+    let m = members (signature ns) body
+    (extern, lowered) <- checked (Inference.prepareIndexedGroup [] [] m)
+    prior <- checked (Inference.finishOpenGroup extern (map snd m) lowered)
+    direct <- checked (Inference.signedLocalGroup [] m lowered)
+    routed <- checked (Inference.compileOpenGroupIndexed "case" [] [] m)
+    check "quantified local scheme uses direct path" (H.unpack (Open.fingerprint direct)) (H.unpack (Open.fingerprint routed))
+    let [(_, original)] = Open.bindings prior
+    forM_ [routed,prior] $ \fragment -> case Open.body fragment of
+      T.XLet name impl _ -> do
+        let [(_,actual)] = Open.bindings fragment
+            use = foldl (\term t -> T.XTypeApp term (X.typeApplication t)) (T.XVarTerm name) [int,int,int]
+            program = T.XLet name impl (foldl T.XApp use [plus 2, plus 3, T.XIntTerm 7])
+        check "quantified local scheme preserves canonical binder order" True (XT.alphaEq original actual)
+        _ <- checked (Independent.checkClosed program)
+        value <- checked (Runtime.integer (Runtime.evaluate (Open.dataEnvironment (Open.context fragment)) (Runtime.REnv M.empty) (X.erase program)))
+        check "quantified local composition" 12 value
+      _ -> fail "expected nonrecursive local function"
+  let unused = members (T.SForall T.Flexible "unused" T.SBottom (signature ["a","b","c"])) body
+  (ctx, lowered) <- checked (Inference.prepareIndexedGroup [] [] unused)
+  case Inference.signedLocalGroup [] unused lowered of
+    T.Left _ -> pure ()
+    _ -> fail "unused explicit quantifier took the direct path"
+  prior <- checked (Inference.finishOpenGroup ctx (map snd unused) lowered)
+  current <- checked (Inference.compileOpenGroupIndexed "case" [] [] unused)
+  let [(_,t)] = Open.bindings prior; [(_,u)] = Open.bindings current
+  check "unused local quantifier falls back to the graph scheme" True (XT.alphaEq t u)
+
 -- Compare the routed program with ordinary graph inference. The outer
 -- argument and the selected field share a spelling, and the other field fails
 -- if evaluation demands it.
@@ -2118,6 +2159,7 @@ main = do
   importConventionChecks
   typedClassChecks
   signedDataChecks
+  signedLocalChecks
   knownConstructorFoldChecks
   openGeometryChecks
   signedConstructorChecks
