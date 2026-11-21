@@ -77,6 +77,42 @@ Each cell shows MLF / GHC median wall time in seconds for the six full builds pe
 | `rank2_callbacks` | 0.298 / 0.558 | 0.414 / 0.581 | 0.935 / 0.777 | 6.360 / 5.419 | GHC leg stopped |
 | `decoder_pipeline` | 0.340 / 0.624 | 0.364 / 0.640 | 0.477 / 0.708 | 2.880 / 1.901 | 11.575 / 15.623 |
 
+## Five-size fitted growth exponents
+
+The fit uses the median of 6 paired full builds at each of 8, 32, 128, 1,024, and 8,192 units. MLF met the point-exponent target on 15 of 25 shapes. MLF had a higher interior exponent on 5. The remaining rows comprise 1 indeterminate and 4 incomplete comparisons.
+
+Each row uses a single MLF compiler build across its five sizes. Each lane minimizes squared error in elapsed seconds for `a + b × (n / nmax)^p`, estimating both the nonnegative startup offset `a` and nonnegative scale `b` from the five measured sizes. The existing fitter searches 0.1 through 3 and treats [0.101, 2.999] as interior. Each Yes or No compares the unrounded interior estimates. A boundary estimate or a zero growth scale makes the comparison indeterminate. An incomplete row identifies the failing lane and size and leaves both point estimates empty. Run `python3 tools/dev.py bench shapes growth docs/compiler-shapes-2026-11-21.csv` to reproduce the point estimates. [Fitting implementation](../tools/performance/compiler-shapes/fit_growth.py) · [Full-precision input](compiler-shapes-2026-11-21.csv).
+
+| Shape | MLF compiler | MLF p | GHC p | MLF − GHC | MLF p ≤ GHC p? |
+| --- | --- | ---: | ---: | ---: | --- |
+| `flat_functions` | `c8eaf641` | 1.1872 | 1.4282 | -0.2410 | Yes |
+| `inferred_functions` | `c8eaf641` | 1.1970 | 1.2611 | -0.0641 | Yes |
+| `inferred_poly_functions` | `e3dd70fc` | — | — | — | Incomplete · GHC at 8,192 (process-tree RSS limit) |
+| `dependency_chain` | `d893e3dd` | 1.0229 | 1.2046 | -0.1817 | Yes |
+| `inferred_chain` | `d893e3dd` | 1.0902 | 1.2702 | -0.1800 | Yes |
+| `inferred_poly_chain` | `d893e3dd` | 1.1024 | 1.1254 | -0.0230 | Yes |
+| `recursive_ring` | `c8eaf641` | 1.2034 | 1.2707 | -0.0672 | Yes |
+| `mono_calls` | `c8eaf641` | 1.1233 | 1.0794 | +0.0439 | No |
+| `poly_calls` | `c8eaf641` | 0.5426 | 1.0209 | -0.4784 | Yes |
+| `tree_chain` | `c8eaf641` | 3.0000 | 1.1039 | +1.8961 | Indeterminate · MLF reaches a fit boundary |
+| `balanced_tree` | `c8eaf641` | 0.8903 | 1.1029 | -0.2126 | Yes |
+| `literal_table` | `c8eaf641` | 1.1096 | 1.1082 | +0.0014 | No |
+| `higher_order_chain` | `c8eaf641` | 0.6267 | 0.3265 | +0.3002 | No |
+| `local_functions` | `c8eaf641` | 1.1139 | 1.5210 | -0.4071 | Yes |
+| `wide_case` | `c8eaf641` | 1.2985 | 1.1522 | +0.1463 | No |
+| `class_instances` | `052906a8` | 1.0678 | 1.1023 | -0.0345 | Yes |
+| `dependency_diamonds` | `d893e3dd` | 1.0669 | 1.9046 | -0.8377 | Yes |
+| `state_updates` | `c0883708` | — | — | — | Incomplete · GHC at 8,192 (wall limit) |
+| `captured_closures` | `c8eaf641` | 1.0902 | 1.0612 | +0.0290 | No |
+| `wide_product` | `c8eaf641` | 1.2120 | 1.5849 | -0.3729 | Yes |
+| `rank2_arguments` | `c8eaf641` | 1.0722 | 1.0913 | -0.0190 | Yes |
+| `irregular_literal_table` | `c8eaf641` | 0.9623 | 1.0886 | -0.1262 | Yes |
+| `nested_poly_types` | `e41d3abd` | — | — | — | Incomplete · GHC at 8,192 (process-tree RSS limit) |
+| `rank2_callbacks` | `c0883708` | — | — | — | Incomplete · GHC at 8,192 (process-tree RSS limit) |
+| `decoder_pipeline` | `ac54c40d` | 0.6999 | 1.1818 | -0.4819 | Yes |
+
+<!-- five-size exponent CSV SHA-256 35b90f5087da9516d000d7b86e31607c7ed87d9eef72c36c720dad268861a20f -->
+
 ## Peak resident memory
 
 Each cell shows MLF / GHC in MiB. The recorder sampled the resident set size (RSS) of the build process group every 100 ms, summed the resident sizes across its processes, then took the largest sample for each build. The table gives the median of those six peaks. Short-lived peaks between samples can be higher. Shared pages may count toward multiple processes.
@@ -120,14 +156,14 @@ These additional sizes use the same six-pair schedule. Depth counts the nested `
 
 ## Incomplete paired measurements
 
-A failure stops the remaining builds in that cell. The CSV retains the successful and skipped counts for both compilers.
+A failure stops the remaining builds in that cell. The CSV retains the successful and skipped counts for both compilers. The last two columns give one separate cold MLF build per shape under the same 90-second and 5 GiB limits. Each build compiled and linked the program and passed its three output checks.
 
-| Shape | Size | Completed pairs | Stopped leg | Skipped MLF / GHC | Recorded reason |
-| --- | ---: | ---: | --- | ---: | --- |
-| `inferred_poly_functions` | 8,192 | 0/6 | GHC | 6 / 5 | process-tree RSS limit |
-| `state_updates` | 8,192 | 0/6 | GHC | 6 / 5 | wall limit |
-| `nested_poly_types` | 8,192 | 0/6 | GHC | 6 / 5 | process-tree RSS limit |
-| `rank2_callbacks` | 8,192 | 0/6 | GHC | 6 / 5 | process-tree RSS limit |
+| Shape | Size | Completed pairs | Stopped leg | Skipped MLF / GHC | Recorded reason | Separate MLF seconds | Separate MLF peak MiB |
+| --- | ---: | ---: | --- | ---: | --- | ---: | ---: |
+| `inferred_poly_functions` | 8,192 | 0/6 | GHC | 6 / 5 | process-tree RSS limit | 25.388 | 1,634.7 |
+| `state_updates` | 8,192 | 0/6 | GHC | 6 / 5 | wall limit | 55.234 | 3,928.0 |
+| `nested_poly_types` | 8,192 | 0/6 | GHC | 6 / 5 | process-tree RSS limit | 3.401 | 248.2 |
+| `rank2_callbacks` | 8,192 | 0/6 | GHC | 6 / 5 | process-tree RSS limit | 55.869 | 2,436.2 |
 
 ## Initial sweep and follow-ups
 
