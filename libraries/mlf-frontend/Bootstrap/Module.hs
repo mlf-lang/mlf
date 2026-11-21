@@ -498,10 +498,14 @@ module Bootstrap.Module where {
         ((:) (Entity "MLF.Primitive" "callStack" Value) [])))
       (filter (\entity -> not (eqString (spelling entity) "pure" || eqString (spelling entity) "ioError")) primitiveEntities);
   builtinEntities source = if eqString (moduleIdentity source) "MLF.Primitive" then sharedPrimitiveEntities else [];
-  primitiveSource =
+  primitiveSource = let {
+    apply = SLam "$function" Nothing (SLam "$argument" Nothing
+      (SApp (SVar "$function") (SVar "$argument")))
+  } in
     SourceModule "<MLF.Primitive>" (Just "MLF.Primitive") Nothing [] []
       Prelude.sharedClasses Prelude.sharedInstances
-      (append Prelude.stackFacadeValues (filter (\((,,) name _ _) -> not (eqString name "==" || eqString name "/="))
+      (append ((:) ((,,) "$" Nothing apply) Prelude.stackFacadeValues)
+        (filter (\((,,) name _ _) -> not (eqString name "==" || eqString name "/="))
 ((:) ((,,) "otherwise" Nothing (SBoolLit True)) ((:) ((,,) "implementationHost" Nothing (SStringLit "native-MLF")) ((:) ((,,) "bind" Nothing (SVar "$MLF.Primitive.>>=")) ((:) ((,,) "negate" Nothing (SLam "$x" Nothing (SApp (SApp (SPrimitive PSubInt) (SIntLit 0)) (SVar "$x")))) ((:) ((,,) "+" Nothing (SPrimitive PAddInt)) ((:) ((,,) "-" Nothing (SPrimitive PSubInt)) ((:) ((,,) "*" Nothing (SPrimitive PMulInt)) ((:) ((,,) "/" Nothing (SPrimitive PQuotInt)) ((:) ((,,) "%" Nothing (SPrimitive PRemInt)) ((:) ((,,) "==" Nothing (SPrimitive PEqInt)) ((:) ((,,) "<" Nothing (SPrimitive PLtInt)) ((:) ((,,) "++" Nothing (SPrimitive PConcatString)) ((:) ((,,) "/=" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.notValue (SApp (SApp (SPrimitive PEqInt) (SVar "$a")) (SVar "$b")))))) ((:) ((,,) "<=" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.notValue (SApp (SApp (SPrimitive PLtInt) (SVar "$b")) (SVar "$a")))))) ((:) ((,,) ">" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (SApp (SApp (SPrimitive PLtInt) (SVar "$b")) (SVar "$a"))))) ((:) ((,,) ">=" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.notValue (SApp (SApp (SPrimitive PLtInt) (SVar "$a")) (SVar "$b")))))) ((:) ((,,) "&&" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.conditional (SVar "$a") (SVar "$b") (SBoolLit False))))) ((:) ((,,) "||" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.conditional (SVar "$a") (SBoolLit True) (SVar "$b"))))) ([]))))))))))))))))))))) Nothing LegacyEmlfV1;
   locals :: SourceModule -> Either String Interface;
   locals source =

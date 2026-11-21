@@ -1560,6 +1560,11 @@ module MLF.Tests.SharedFrontend where {
       check "tuple expressions accepted" (accept "main = (1,2)");
       check "unit sugar accepted" (accept "main = ()");
       check "list sugar accepted" (accept "main = [1]");
+      check "list comprehension with a missing source rejected"
+        (reject "main = [x | x <- ]");
+      check "list comprehension with a trailing comma rejected"
+        (reject "main = [x | x <- [1], ]");
+      check "open-ended range without a start rejected" (reject "main = [..]");
       check "canonical list-tail accepted" (accept "main = 1 : []");
       check "tuple types accepted" (accept "main :: (Int, Int)\nmain = (1,2)");
       check "tuple patterns accepted" (accept "f (x,y) = x");
@@ -1636,6 +1641,15 @@ module MLF.Tests.SharedFrontend where {
     check "hidden Bool constructor" (not (linkRaw "module Example where\nimport MLF.Primitive hiding (True)\nmain = True\n"));
     check "qualified canonical operator" (linked "main = 1 MLF.Primitive.+ 2");
     check "operator prefix" (linked "main = (+) 1 2");
+    check "qualified application operator" (linked "main = addInt 40 MLF.Primitive.$ 2");
+    check "application operator selective import"
+      (linkRaw "module Example where\nimport MLF.Primitive (($), addInt)\nmain = ($) (addInt 40) 2\n");
+    check "application operator honors hiding"
+      (not (linkRaw "module Example where\nimport MLF.Primitive hiding (($))\nmain = addInt 40 $ 2\n"));
+    check "shadowed application operator is accepted in prefix form"
+      (linked "main = let { ($) x y = subInt x y } in ($) 10 3");
+    check "shadowed application operator is rejected in infix form"
+      (recursiveInfixRejected "main = let { ($) x y = subInt x y } in 10 $ 3");
     check "ordinary symbolic local prefix" (linked "main = let { (++) x y = subInt x y } in (++) 10 3");
     check "noncanonical infix explicit rejection" (not (linked "main = let { (++) x y = subInt x y } in 10 ++ 3 ++ 1"));
     check "method selective import" (linkRaw "module Example where\nimport MLF.Primitive (IO, Monad((>>=)), ioReturn)\nmain = ioReturn 1 >>= ioReturn\n");
@@ -1678,8 +1692,53 @@ module MLF.Tests.SharedFrontend where {
       recursiveInferenceChecks;
       putStrLn "shared frontend: parser and namespace checks passed"
     };
+  listExpressionChecks :: IO ();
+  listExpressionChecks =
+    let {
+      cases =
+        [("comprehension skips a refutable generator and preserves nested generator order",
+          "case [10 * x + y | Symbol x <- [Symbol 1, Missing, Symbol 2], (_,y) <- [(0,x),(0,x + 1)]] of { [11,12,22,23] -> 42; _ -> 0 }"),
+         ("comprehension lets and guards use the preceding qualifier scope",
+          "case [y | x <- [19,20,21], let { y = x * 2 }, y > 40] of { [42] -> 42; _ -> 0 }"),
+         ("implicit comprehension let ends before the next qualifier",
+          "case [y | x <- [40], let y = x + 2, y > 0] of { [y] -> y; _ -> 0 }"),
+         ("final implicit comprehension let ends at the closing bracket",
+          "case [y | x <- [40], let y = x + 2] of { [y] -> y; _ -> 0 }"),
+         ("comprehension does not force an ignored element or unused tail",
+          "case [42 | _ <- (panic \"unused element\" :: Int) : panic \"unused tail\"] of { x : _ -> x; [] -> 0 }"),
+         ("typed open-ended range supplies a finite prefix lazily",
+          "case [40 :: Int ..] of { x : y : z : _ -> z; _ -> 0 }"),
+         ("compact open-ended range stops at Int's upper bound",
+          "case ([9223372036854775807..] :: [Int]) of { [_] -> 42; _ -> 0 }"),
+         ("stepped open-ended range descends",
+          "case [46,44..] of { x : y : z : _ -> z; _ -> 0 }"),
+         ("zero-step open-ended range repeats",
+          "case [42,42..] of { x : y : z : _ -> z; _ -> 0 }"),
+         ("stepped open-ended range handles a step wider than Int",
+          "let { low = 0 - 9223372036854775807 - 1; high = 9223372036854775807 } in case ([low,high..] :: [Int]) of { [a,b] -> if a == low && b == high then 42 else 0; _ -> 0 }"),
+         ("application operator is right-associative", "addInt 2 $ mulInt 2 $ 20"),
+         ("application operator binds below arithmetic", "mulInt 2 $ 20 + 1"),
+         ("application operator binds below monadic bind", "unBox $ Box 20 >>= (\\x -> Box (x + 22))"),
+         ("application operator accepts a lambda and preserves laziness",
+          "(\\f -> f (panic \"unused argument\" :: Int)) $ \\_ -> 42")];
+      -- Compile the controls together to share the compiler's builtin setup.
+      numbered = zip (range 1 (length cases)) cases;
+      requireExpression (ordinal, (_, expression)) rest =
+        "require " ++ showInt ordinal ++ " (" ++ expression ++ ") (" ++ rest ++ ")";
+      fixture = boxMonad ++
+        "data Symbol = Missing | Symbol Int\nrequire :: Int -> Int -> Int -> Int\n" ++
+        "require ordinal actual rest = if actual == 42 then rest else ordinal\nmain = " ++
+        foldr requireExpression "0" numbered
+    } in
+    case evaluated fixture of {
+      Right (Runtime.RInteger 0) -> ioReturn ();
+      Right (Runtime.RInteger ordinal) -> check (fst (index cases (ordinal - 1))) False;
+      Right _ -> check "list-expression controls returned an unexpected value" False;
+      Left error -> check ("list-expression controls: " ++ error) False
+    };
   nativeFirst :: IO ();
   nativeFirst = do {
+    listExpressionChecks;
     check "default and generated-name capture execution" (evaluatesInt captureDefaults 40);
     check "native standard hierarchy inference" (evaluatesInt (boxMonad ++ "main = unBox (do { x <- pure 40; return (x + 2) })") 42);
     check "native Applicative defaults" (evaluatesInt (boxApplicative ++ "main = unBox (liftA2 addInt (Box 30) (Box 12))") 42);

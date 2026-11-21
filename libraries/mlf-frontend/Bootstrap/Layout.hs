@@ -134,7 +134,8 @@ module Bootstrap.Layout where {
     };
   continuation :: String -> String -> Bool;
   continuation token previous =
-    (elem eqString token continuationTokens || elem eqString previous continuationPrevious);
+    (elem eqString token continuationTokens ||
+     (eqString previous "$" || elem eqString previous continuationPrevious));
   continuationTokens :: [] String;
   continuationTokens =
     (:) "]"

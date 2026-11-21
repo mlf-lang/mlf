@@ -488,7 +488,7 @@ def main():
         producer = td.authenticate_build(receipt_path, producer_dir / 'bin', root=source)
         manifest = json.loads(source_manifest.read_text())
         require(manifest['primitive_abi'] == 'mlf-primitive-134-v9' and
-                manifest['builtin_interface'] == 'mlf-primitive/shared-haskell-v1/13',
+                manifest['builtin_interface'] == 'mlf-primitive/shared-haskell-v1/14',
                 'this finite suite requires the new byte-file/digest ABI')
         objects = producer.get('object_inputs', {})
         require(objects, 'producer object/interface inventory missing')
