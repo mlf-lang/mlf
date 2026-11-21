@@ -283,7 +283,7 @@ class ProcessFailureHelperNames(unittest.TestCase):
         root = HERE.parents[1]
         # Keep the full fixture guard, including Main's exact-case dispatch.
         normalized_digests = {
-            'Main': '8fc8d754af4d335b43eca693cae90dc0e3117a61b2dccfc55390c2d7bea09b7e',
+            'Main': 'a7b01d2a65c822be95c1f77351f60e5b8c674629500cc22e489e3943d0d36bb6',
             'Panic': '8818d7ba77bbb85fb712bb44f16b8dba2232d55613bd9e7b14883d078e3c3106',
         }
         for name, digest in normalized_digests.items():

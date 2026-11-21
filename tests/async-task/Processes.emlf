@@ -1,6 +1,5 @@
 module Main where
 import Bootstrap.Types
-import qualified Bootstrap.Std as S
 import qualified Bootstrap.Std as L
 import qualified Async.Task as T
 import qualified Async.Process as P
@@ -155,24 +154,32 @@ compareDiamond helper work = do
  many <- diamond helper work 4
  assert (one == many) "jobs changed successful artifact values"
  putStrLn "PASS synthetic-dynamic-diamond-jobs-one-and-four"
+
+runSelected : String -> String -> IO () -> IO Bool
+runSelected selection label action =
+ if eqString selection "" || eqString selection label then do
+  action
+  ioReturn True
+ else ioReturn False
+
 main = do
  helper <- getEnv "MLF_ASYNC_FIXTURE"
  work <- getEnv "MLF_ASYNC_WORK"
  assert (stringLength helper > 0 && stringLength work > 0) "missing harness paths"
  selection <- getEnv "MLF_ASYNC_CASE"
- let cases =
-  (:) ((,) "cold-construction-spawn-once" (cold helper work)) (
-  (:) ((,) "scope-exit-joins-child" (join helper work)) (
-  (:) ((,) "dynamic-submission-while-independent-process-runs" (dynamic helper work)) (
-  (:) ((,) "running-process-cancellation-joins" (cancelRunning helper work)) (
-  (:) ((,) "failure-cancels-and-joins-process-sibling" (failFast helper work)) (
-  (:) ((,) "process-outcomes-and-checked-failure" (processOutcomes helper work)) (
-  (:) ((,) "cancelled-pending-process-never-admitted" (queuedCancellation helper work)) (
-  (:) ((,) "ancestor-cancellation-before-nested-admission" (ancestorCancellation helper work)) (
-  (:) ((,) "pending-process-total-deadline-includes-task-queue" (queuedDeadline helper work)) (
-  (:) ((,) "task-owned-process-pending-limit" (pendingBound helper work)) (
-  (:) ((,) "synthetic-dynamic-diamond-jobs-one-and-four" (compareDiamond helper work)) (
-  [])))))))))))
- if eqString selection "" || S.any (\entry -> eqString (S.fst entry) selection) cases then
-  S.mapM_ (\((,) label action) -> if eqString selection "" || eqString selection label then action else ioReturn ()) cases
+ ranColdConstruction <- runSelected selection "cold-construction-spawn-once" (cold helper work)
+ ranJoin <- runSelected selection "scope-exit-joins-child" (join helper work)
+ ranDynamic <- runSelected selection "dynamic-submission-while-independent-process-runs" (dynamic helper work)
+ ranRunningCancellation <- runSelected selection "running-process-cancellation-joins" (cancelRunning helper work)
+ ranFailFast <- runSelected selection "failure-cancels-and-joins-process-sibling" (failFast helper work)
+ ranOutcomes <- runSelected selection "process-outcomes-and-checked-failure" (processOutcomes helper work)
+ ranQueuedCancellation <- runSelected selection "cancelled-pending-process-never-admitted" (queuedCancellation helper work)
+ ranAncestorCancellation <- runSelected selection "ancestor-cancellation-before-nested-admission" (ancestorCancellation helper work)
+ ranQueuedDeadline <- runSelected selection "pending-process-total-deadline-includes-task-queue" (queuedDeadline helper work)
+ ranPendingBound <- runSelected selection "task-owned-process-pending-limit" (pendingBound helper work)
+ ranDiamond <- runSelected selection "synthetic-dynamic-diamond-jobs-one-and-four" (compareDiamond helper work)
+ if ranColdConstruction || ranJoin || ranDynamic || ranRunningCancellation ||
+  ranFailFast || ranOutcomes || ranQueuedCancellation || ranAncestorCancellation ||
+  ranQueuedDeadline || ranPendingBound || ranDiamond
+ then ioReturn ()
  else exitWith 2
