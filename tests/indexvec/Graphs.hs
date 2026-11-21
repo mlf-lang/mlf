@@ -2011,6 +2011,29 @@ applicationPatternChecks = do
   ordinaryOperand <- close Inference.prepareGroundImport 2
   forwardedOperand <- close Inference.prepareGroundApplication 1
   check "forward closed operands with the ordinary quantified proof bytes" ordinaryOperand forwardedOperand
+  do
+    let v n=T.XVar(T.XTyVar n)
+        arrow=T.XArrow
+        forallIds ids body=foldr (\n -> T.XForall (T.XTyVar n) T.XBot) body ids
+        i=T.XCon "Int" []
+        scheme=forallIds [19,3,8] (arrow (arrow (v 19) (v 3))
+          (arrow (arrow (v 8) (v 19)) (arrow (v 8) (v 3))))
+        bindings make=M.fromList H.v_compareString
+          [("outer",make (T.XName 1 "outer") scheme),("offset",make (T.XName 2 "offset") (arrow i i)),
+           ("zero",make (T.XName 3 "zero") (forallIds [54] (arrow (v 54) (v 54))))]
+        expr n=T.SApp (foldr (\_ -> T.SApp (T.SApp (T.SVar "outer") (T.SVar "offset")))
+          (T.SVar "zero") [1..n]) (T.SIntLit 8)
+        infer n make=Inference.groundInfer M.empty (bindings make) (Inference.GroundState 0 IntMap.empty IntMap.empty 3) (expr n)
+    forM_ [2,17::Int] $ \n -> do
+      (before,_,oldState)<-right (infer n Inference.prepareGroundImport)
+      (term,_,st@(Inference.GroundState next known ranks serial))<-right (infer n Inference.prepareGroundApplication)
+      check "nested second-operand forwarding retains just the sentinel and the identity instance"
+        (fromIntegral(5*n+2),3,1,3) (next,IntMap.size known,IntMap.size ranks,serial)
+      oldTerm<-right (Inference.groundSeal oldState before)
+      newTerm<-right (Inference.groundSeal st term)
+      oldBytes<-encoded (W.encode W.defaultLimits 8 [Structure.toXTerm oldTerm])
+      newBytes<-encoded (W.encode W.defaultLimits 8 [Structure.toXTerm newTerm])
+      check "nested callback inference preserves exact ground evidence bytes" oldBytes newBytes
   env <- right (Open.environment [])
   forM_ bodies $ \xs -> do
     let source = T.XLet result (tree [add (T.XVarTerm arg) (T.XIntTerm n) | n <- xs]) (T.XConstructor "()" [])

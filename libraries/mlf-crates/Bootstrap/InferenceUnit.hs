@@ -695,9 +695,10 @@ module Bootstrap.InferenceUnit where {
   -- to the result. The wrapper, if present, must contain exactly that variable.
   data GroundParameter = GroundBare | GroundWrapped String;
   data GroundEvidence = GroundEvidence (GroundState -> [] ((,) XTyVar GroundType) -> Either String XComputation);
+  data GroundArrowHead = GroundArrowHead Bool Int GroundType GroundType (GroundType -> GroundTerm);
   data GroundBinding = GroundLocal XName GroundType | GroundImport XName XType |
     GroundQuantifiedImport XName XType GroundEvidence |
-    GroundArrowOperand GroundBinding (GroundState -> GroundState -> GroundType -> Maybe ((,,) GroundTerm GroundType GroundState)) |
+    GroundArrowOperand GroundBinding (GroundState -> GroundState -> GroundType -> Maybe ((,) GroundArrowHead GroundState)) |
     GroundPreparedImport (GroundState -> Either String ((,,) GroundTerm GroundType GroundState)) |
     GroundUnaryImport XName XType XTyVar GroundParameter GroundParameter;
   groundImport name scheme = let {
@@ -845,7 +846,7 @@ module Bootstrap.InferenceUnit where {
     GroundQuantifiedImport _ _ evidence -> GroundArrowOperand ordinary (groundArrowOperand name scheme evidence);
     _ -> ordinary
   };
-  groundArrowOperand :: XName -> XType -> GroundEvidence -> GroundState -> GroundState -> GroundType -> Maybe ((,,) GroundTerm GroundType GroundState);
+  groundArrowOperand :: XName -> XType -> GroundEvidence -> GroundState -> GroundState -> GroundType -> Maybe ((,) GroundArrowHead GroundState);
   groundArrowOperand name scheme evidence = let {
     fallback _ _ _ = Nothing;
     same x y = T.tyVarId x == T.tyVarId y
@@ -858,11 +859,14 @@ module Bootstrap.InferenceUnit where {
       bSlot = slot b; cSlot = slot c; aSlot = slot a;
       forward state following actual = case following of { GroundState next known ranks serial -> case actual of {
         GroundArrow domain codomain -> case state of { GroundState start _ _ _ -> let {
-            hole = GroundVar (advanceIdentity start aSlot);
+            holeId = advanceIdentity start aSlot;
             domainId = advanceIdentity start bSlot; codomainId = advanceIdentity start cSlot;
-            value v = if same v b then domain else if same v c then codomain else hole;
-            term = GroundQuantifiedUse name evidence [(,) x (value x),(,) y (value y),(,) z (value z)];
-            result = GroundArrow (GroundArrow hole domain) (GroundArrow hole codomain);
+            term parameter = let { value v = if same v b then domain else if same v c then codomain else parameter }
+              in GroundQuantifiedUse name evidence [(,) x (value x),(,) y (value y),(,) z (value z)];
+            -- Do not inspect the last private slot early at the exhaustion
+            -- boundary. The first operand has already demanded start.
+            safe = start <= 9223372036854775807 - aSlot;
+            head = GroundArrowHead safe holeId domain codomain term;
             -- An empty map avoids demanding a missing lookup key. Retain one
             -- solved slot on that transition so later unbound lookups still
             -- demand their identity, including the checked overflow boundary.
@@ -870,7 +874,7 @@ module Bootstrap.InferenceUnit where {
             fresh = GroundState (advanceIdentity next 1) saved ranks serial;
             forwarded = case domain of {
               GroundCon _ [] -> seq domainId (seq codomainId (case codomain of {
-                GroundCon _ [] -> Just ((,,) term result fresh); _ -> Nothing
+                GroundCon _ [] -> Just ((,) head fresh); _ -> Nothing
               }));
               _ -> Nothing
             }
@@ -1037,24 +1041,65 @@ module Bootstrap.InferenceUnit where {
             Right ((,,) applied result solved)
           }
         };
-      ordinary operator = do {
+      ordinary = ordinaryOn a;
+      ordinaryOn operand operator = do {
         (,,) function functionType next <- operator;
-        (,,) argument argumentType following <- groundInfer globals names next a;
+        (,,) argument argumentType following <- groundInfer globals names next operand;
         apply function functionType argument argumentType following
       };
-      bound binding = case binding of {
-        Just (GroundArrowOperand original forward) -> do {
-          (,,) function functionType next <- groundUse state (Just original);
-          (,,) argument argumentType following <- groundInfer globals names next a;
-          case forward state following argumentType of {
-            Just ((,,) head result fresh) -> Right ((,,) (GroundApplication head argument) result fresh);
-            Nothing -> apply function functionType argument argumentType following
+      firstOperand original forward operand accept fallback = do {
+        (,,) function functionType next <- groundUse state (Just original);
+        (,,) first actual following <- groundInfer globals names next operand;
+        case forward state following actual of {
+          Just ((,) head fresh) -> accept head first fresh;
+          Nothing -> fallback (apply function functionType first actual following)
+        }
+      };
+      partial (GroundArrowHead _ identity domain codomain term) first after = let {
+        hole = GroundVar identity
+      } in Right ((,,) (GroundApplication (term hole) first)
+        (GroundArrow (GroundArrow hole domain) (GroundArrow hole codomain)) after);
+      second head@(GroundArrowHead safe identity domain codomain term) first after = do {
+        (,,) argument actual following <- groundInfer globals names after a;
+        let {
+          fresh = snd (groundFresh following);
+          fallback = do {
+            (,,) operator ty _ <- partial head first after;
+            apply operator ty argument actual following
           }
         };
+        if not safe then fallback else case groundDeref following actual of {
+          GroundArrow input output -> case following of { GroundState _ known _ _ ->
+            case IM.lookup identity known of {
+              Just _ -> fallback;
+              Nothing -> case groundDeref following input of {
+                closed@(GroundCon _ []) -> case groundDeref following output of {
+                  -- The prior first operand made domain a nullary constructor.
+                  -- Keep the ordinary name/arity comparison and its errors.
+                  GroundCon _ _ -> do {
+                    solved <- groundUnify fresh domain output;
+                    Right ((,,) (GroundApplication (GroundApplication (term closed) first) argument)
+                      (GroundArrow closed codomain) solved)
+                  };
+                  _ -> fallback
+                };
+                _ -> fallback
+              }
+            }
+          };
+          _ -> fallback
+        }
+      };
+      pair binding operand = case binding of {
+        Just (GroundArrowOperand original forward) -> firstOperand original forward operand second ordinary;
+        _ -> ordinary (bound operand binding)
+      };
+      bound operand binding = case binding of {
+        Just (GroundArrowOperand original forward) -> firstOperand original forward operand partial (\answer -> answer);
         Just (GroundUnaryImport name scheme variable input output) -> let {
           allocated = groundFresh state; hole = fst allocated; next = snd allocated
         } in do {
-          (,,) argument actual following <- groundInfer globals names next a;
+          (,,) argument actual following <- groundInfer globals names next operand;
           let {
             fresh = snd (groundFresh following);
             applied value = GroundApplication (GroundVariable name scheme [(,) variable value]) argument
@@ -1069,11 +1114,16 @@ module Bootstrap.InferenceUnit where {
             }
           }
         };
-        _ -> ordinary (groundUse state binding)
+        _ -> ordinaryOn operand (groundUse state binding)
       }
     } in case f of {
-      SGlobal i _ -> bound (M.lookup compareInt (V.toInt i) globals);
-      SVar name -> bound (M.lookup compareString name names);
+      SGlobal i _ -> bound a (M.lookup compareInt (V.toInt i) globals);
+      SVar name -> bound a (M.lookup compareString name names);
+      SApp operator operand -> case operator of {
+        SGlobal i _ -> pair (M.lookup compareInt (V.toInt i) globals) operand;
+        SVar name -> pair (M.lookup compareString name names) operand;
+        _ -> ordinary (groundInfer globals names state f)
+      };
       _ -> ordinary (groundInfer globals names state f)
     };
     SPrimitive primitive -> groundPrimitive state primitive;
