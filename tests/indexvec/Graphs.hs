@@ -20,6 +20,8 @@ import qualified Bootstrap.CrateQuery as CQ
 import qualified Bootstrap.Data as Data
 import qualified Bootstrap.Dependency as D
 import qualified Bootstrap.Desugar as Desugar
+import qualified Bootstrap.Elaborate as Elaborate
+import qualified Bootstrap.Evidence as Evidence
 import qualified Bootstrap.Fresh as Fresh
 import qualified Bootstrap.IntMap as IntMap
 import qualified Bootstrap.Layout as Layout
@@ -2521,6 +2523,53 @@ applicationPatternChecks = do
   _ <- right (Structure.admitPatterns graph 46)
   pure ()
 
+evidenceScopeChecks = do
+  let T.Right ds = Data.validateDeclarations
+        [T.DataDecl "Score" ["a"] [T.ConstructorDecl "MkScore" []],
+         T.DataDecl "Base" ["a"] [T.ConstructorDecl "MkBase" []]]
+      variable = T.XTyVar 733
+      a = T.XVar variable
+      int = T.XCon "Int" []
+      bool = T.XCon "Bool" []
+      score ty = T.XCon "Score" [ty]
+      base ty = T.XCon "Base" [ty]
+      visible i = T.XName i (H.literal ("dictionary" ++ show i))
+      instanceOf i ty = (T.InstanceEvidence, visible i, ty)
+      given i ty = (T.GivenEvidence, visible i, ty)
+      selector i ty = (T.SuperclassEvidence, visible i, ty)
+      polymorphic = T.XForall variable T.XBot
+      exact = instanceOf 0 (score int)
+      rules = [exact, instanceOf 1 (score bool),
+               instanceOf 2 (polymorphic (score a)),
+               instanceOf 3 (T.XArrow (base int) (score int)),
+               instanceOf 4 (T.XApply (T.XCon "Score" []) int),
+               instanceOf 5 (base int), given 6 (score int), given 7 (base int),
+               selector 8 (polymorphic (T.XArrow (base a) (score a))),
+               instanceOf 0 (score bool), instanceOf 9 a]
+      observe outcome = case outcome of
+        T.Left (Evidence.NoEntailment why) -> Left ("entailment " ++ H.unpack why)
+        T.Left (Evidence.InvalidEvidence why) -> Left ("validation " ++ H.unpack why)
+        T.Right proof -> Right (H.unpack (Pretty.prettyTerm proof))
+      compareScope rows goal = check "indexed evidence agrees on exact term or first diagnostic"
+        (observe (Evidence.resolveDictionaryDetailed ds M.empty rows goal))
+        (observe (Evidence.indexedResolver ds M.empty rows goal))
+  forM_ ([[]] ++ [[x] | x <- rules] ++ [[x,y] | x <- rules, y <- rules] ++
+         [[x,y,z] | x <- rules, y <- rules, z <- rules]) $ \rows ->
+    forM_ [score int, score bool, base int, T.XApply (T.XCon "Score" []) int] (compareScope rows)
+  check "unselected ill-scoped candidate still fails independent proof verification" True
+    (case Evidence.indexedResolver ds M.empty [exact, instanceOf 9 a] (score int) of
+       T.Left (Evidence.InvalidEvidence _) -> True
+       _ -> False)
+  let source = T.EvidenceBinding T.InstanceEvidence (T.XName 4 "first") 1 True
+  check "identical graph authority" True (Elaborate.sameGraphCandidate source source)
+  forM_ [T.EvidenceBinding T.GivenEvidence (T.XName 4 "first") 1 True,
+         T.EvidenceBinding T.InstanceEvidence (T.XName 5 "first") 1 True,
+         T.EvidenceBinding T.InstanceEvidence (T.XName 4 "second") 1 True,
+         T.EvidenceBinding T.InstanceEvidence (T.XName 4 "first") 2 True,
+         T.EvidenceBinding T.InstanceEvidence (T.XName 4 "first") 1 False,
+         T.DeclaredEvidenceBinding T.InstanceEvidence (T.XName 4 "first") (score int)] $ \other ->
+    check "different graph authorities keep separate resolvers" False (Elaborate.sameGraphCandidate source other)
+
 main = do
   preparedScopeFingerprintChecks
   childBytes <- Prim.newByteArray 4 0
@@ -2609,6 +2658,7 @@ main = do
   applicationPatternChecks
   importConventionChecks
   typedClassChecks
+  evidenceScopeChecks
   signedDataChecks
   signedLocalChecks
   knownConstructorFoldChecks

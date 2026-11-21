@@ -14,7 +14,7 @@
   "changes": {
     "bootstrap/MLF/BuiltinPreludeData.hs": [
       "91b2dee48f06af0432c7d2e81372d3a51d223c0e91ff22eab6e132559b4e3211",
-      "e3bd50d415f406d6d991bbceb8495f8aac51c6f7346bf430ef5cffecd1c7664c"
+      "b943ffc44b8dd07644bdda89d7f3d8fe097d17a57480d2f3f5e1311352938c18"
     ],
     "bootstrap/MLF/Entry/BuiltinPrelude.hs": [
       "66a9f4ccbdac21123fb721f0e2aa13b506e4b55d6c25642e829d2c6ec1b4fd2a",
@@ -176,6 +176,14 @@
       "d39189aa3fbac77083d9eed274f8595c5b6cb59967499c99ea8b579ea88a869b",
       "2094852f7992f38717b937a67a80f6d56f7b3b4c1d92a5f629ccc57a5b3d3016"
     ],
+    "libraries/mlf-inference/Bootstrap/Elaborate.hs": [
+      "c061b8a6ff668acd5f362c180d8c6ad24c9bb54c219108ea793d968ee4f43c58",
+      "9d61167ff55710a415cefdfb288f3c8f5e462d54ddd1b2a7440b56712aa747f8"
+    ],
+    "libraries/mlf-inference/Bootstrap/Evidence.hs": [
+      "c533ce20b23c9580f2bddf7e340cb3e8fb813a197e46cc4ea173f705177a9bcd",
+      "1f6ff6a48885b245afb64828e08e41eb0f5ccddb062676cc3530a5d9442e1e7d"
+    ],
     "libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs": [
       "df2a050309ad10b4770cae1defcc87f1d56bedca87e1d4c5d4feb21b975f93b2",
       "03126236e4c74c7b4197291cd8ad260b3eaa5d7e8b8119447f5074f32e0891eb"
@@ -234,7 +242,7 @@
     ],
     "libraries/mlf-xmlf/Bootstrap/X/Check.hs": [
       "5c299a3617d07a9d7fe89f88039134491630eee256dbdd57ebe8270e41f78f1c",
-      "3f17965a5b63b89d135462e11b0a96e585a22f207f86ef8debb275ff88d16279"
+      "9b9582b8441edf845832e2c910d02134cada8edec4578f761d2cd5abe9ac4e44"
     ],
     "libraries/mlf-xmlf/Bootstrap/X/Type.hs": [
       "5ae7191adc5df556b83901682ee17e3de889a99e9fe35e97d7370ec2443d0d3d",
@@ -246,7 +254,7 @@
     ],
     "mlf.lock": [
       "5f7f58dece7a251711a3da2b78ba42502bd25554672bbbeaf8bf95abbc469077",
-      "07d97ea11d1af4fc9bbc2f222c5e963debaa6cf50b4a7c2b9bc27e9c9e93cc27"
+      "fe4d46fba8420c816f91374939e2407346c5f8fb0666d17802079d07011b412a"
     ],
     "runtime/mlf_build_runner_hash.h": [
       "cbbdfd06eb43324dceef594e42b21621559df3e3d4e91d62f2b73e2b04d9e778",
@@ -4009,6 +4017,33 @@
       "predecessor": "fc1d5a9aca74fba758d970feea71a2e940942199",
       "predecessor_manifest_sha256": "f7a214234321243c4ef35cc07ceeb93134d63b846118c7b5fb0630b591ffa4e3",
       "predecessor_tree": "7f04ac5d9c9ef17883b2a936a01bbed5b1d0c9ed"
+    },
+    {
+      "changes": {
+        "bootstrap/MLF/BuiltinPreludeData.hs": [
+          "e3bd50d415f406d6d991bbceb8495f8aac51c6f7346bf430ef5cffecd1c7664c",
+          "b943ffc44b8dd07644bdda89d7f3d8fe097d17a57480d2f3f5e1311352938c18"
+        ],
+        "libraries/mlf-inference/Bootstrap/Elaborate.hs": [
+          "c061b8a6ff668acd5f362c180d8c6ad24c9bb54c219108ea793d968ee4f43c58",
+          "9d61167ff55710a415cefdfb288f3c8f5e462d54ddd1b2a7440b56712aa747f8"
+        ],
+        "libraries/mlf-inference/Bootstrap/Evidence.hs": [
+          "c533ce20b23c9580f2bddf7e340cb3e8fb813a197e46cc4ea173f705177a9bcd",
+          "1f6ff6a48885b245afb64828e08e41eb0f5ccddb062676cc3530a5d9442e1e7d"
+        ],
+        "libraries/mlf-xmlf/Bootstrap/X/Check.hs": [
+          "3f17965a5b63b89d135462e11b0a96e585a22f207f86ef8debb275ff88d16279",
+          "9b9582b8441edf845832e2c910d02134cada8edec4578f761d2cd5abe9ac4e44"
+        ],
+        "mlf.lock": [
+          "07d97ea11d1af4fc9bbc2f222c5e963debaa6cf50b4a7c2b9bc27e9c9e93cc27",
+          "fe4d46fba8420c816f91374939e2407346c5f8fb0666d17802079d07011b412a"
+        ]
+      },
+      "predecessor": "84c8426a9d51f6f3e273c6e93d4aacd0e540006b",
+      "predecessor_manifest_sha256": "97a14fdda765226bc0dbdbdd6048139e89497d76496e34531417abfbba19a881",
+      "predecessor_tree": "136fe09d1b17fa47cdaaafb82c8ce335184e63d9"
     }
   ],
   "format": "pr43-reconciliation-source-migration-v1",

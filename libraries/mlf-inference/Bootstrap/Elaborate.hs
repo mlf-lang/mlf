@@ -384,82 +384,64 @@ module Bootstrap.Elaborate where {
       DeclaredEvidenceBinding role name declaration ->
         (,,) role name (declaredTypeIn context IS.empty declaration)
     };
-  mergeEvidence results = foldl IM.union IM.empty results;
   resolveEvidence graph typed = resolveEvidenceIn (prepareTypes graph) typed;
   resolveEvidenceIn context typed =
     resolveWithinIn context (graphDatatypes (contextGraph context)) M.empty typed;
   resolveWithinIn :: TypeContext ->
                      DataEnv -> Map XTyVar XType -> Typed -> Either String (IntMap XTerm);
   resolveWithinIn context datatypes outer typed =
-    let {
-      graph = contextGraph context
-    } in
-    let {
-      gen = C.generalization typed
-    } in
-    let {
-      env = extendEnvironment outer (boundsAtIn context gen)
-    } in
-    let {
-      child = resolveWithinIn context datatypes env
-    } in
-    case C.form typed of {
-      FEvidence candidates ->
-        do {
-          term <-
-            Evidence.resolveDictionary datatypes env (map (candidateTypeIn context) candidates)
-              (referenceIn context (G.genRoot graph gen));
-          Right (IM.singleton gen term)
-        };
-      FLambda _ _ body _ -> child body;
-      FApply a b _ _ ->
-        do {
-          left <- child a;
-          right <- child b;
-          Right (IM.union left right)
-        };
-      FBinding _ a b _ ->
-        do {
-          left <- child a;
-          right <- child b;
-          Right (IM.union left right)
-        };
-      FMatch scrutinee _ branches ->
-        do {
-          results <-
-            mapM child
-              ((:) scrutinee
-                 (map
-                    (\branch ->
-                       case branch of {
-                         Branch _ body _ -> body
-                       })
-                    branches));
-          Right (mergeEvidence results)
-        };
-      FRecursive definitions body _ ->
-        do {
-          continuation <- child body;
-          results <- mapM
-            (\definition ->
-               case definition of {
-                 RecursiveDefinition _ _ rhs _ closure ->
-                   case closure of {
-                     Nothing -> child rhs;
-                     Just (RecursiveClosure group _) ->
-                       resolveWithinIn context datatypes
-                         (extendEnvironment env (boundsAtIn context group)) rhs
-                   }
-               }) definitions;
-          Right (mergeEvidence ((:) continuation results))
-        };
-      FChecked variables body _ ->
-        resolveWithinIn context datatypes
-          (extendEnvironment env
-             (map (\variable -> (,) (fst variable) (T.bottomKind (snd variable))) variables))
-          body;
-      _ -> Right IM.empty
-    };
+    resolveRequests context datatypes Nothing IM.empty (evidenceRequests context outer typed []);
+  -- The graph is immutable during resolution. Rows with the same identity
+  -- and binding mode denote the same translated type. Check the whole
+  -- ordered authorization, including target name hints used in artifacts.
+  sameGraphCandidate (EvidenceBinding role name identity poly)
+                     (EvidenceBinding other target source polymorphic) =
+    Evidence.sameRole role other && identity == source && (if poly then polymorphic else not polymorphic) &&
+      X.equalName name target && eqString (X.nameHint name) (X.nameHint target);
+  sameGraphCandidate _ _ = False;
+  resolveRequests context datatypes previous results requests = case requests of {
+    [] -> Right results;
+    (:) ((,,) gen env candidates) rest -> let {
+      wanted = referenceIn context (G.genRoot (contextGraph context) gen);
+      types = map (candidateTypeIn context) candidates;
+      fresh = Evidence.indexedResolver datatypes M.empty types;
+      choice = if M.null env then case previous of {
+        Just ((,) scope resolve) -> if eqList sameGraphCandidate candidates scope
+          then (,) (resolve wanted) previous
+          else (,) (fresh wanted) (Just ((,) candidates fresh));
+        Nothing -> (,) (fresh wanted) (Just ((,) candidates fresh))
+      } else (,) (Evidence.resolveDictionaryDetailed datatypes env types wanted) previous
+    } in case fst choice of {
+      Left failure -> Left (Evidence.evidenceFailureMessage failure);
+      Right term -> let { next = IM.insertWith (\_ old -> old) gen term results }
+        in seq next (resolveRequests context datatypes (snd choice) next rest)
+    }
+  };
+  -- Produce wants in the same order as source proof resolution. Each
+  -- carries the type binders in force at that precise point in the tree.
+  evidenceRequests context outer typed rest = let {
+    gen = C.generalization typed;
+    env = extendEnvironment outer (boundsAtIn context gen);
+    child = evidenceRequests context env
+  } in case C.form typed of {
+    FEvidence candidates -> (:) ((,,) gen env candidates) rest;
+    FLambda _ _ body _ -> child body rest;
+    FApply a b _ _ -> child a (child b rest);
+    FBinding _ a b _ -> child a (child b rest);
+    FMatch scrutinee _ branches -> child scrutinee
+      (foldr (\(Branch _ body _) more -> child body more) rest branches);
+    FRecursive definitions body _ -> child body
+      (foldr (\(RecursiveDefinition _ _ rhs _ closure) more -> case closure of {
+        Nothing -> child rhs more;
+        Just (RecursiveClosure group _) -> evidenceRequests context
+          (extendEnvironment env (boundsAtIn context group)) rhs more
+      }) rest definitions);
+    FChecked variables body _ -> evidenceRequests context
+      (extendEnvironment env
+        (map (\variable -> (,) (fst variable) (T.bottomKind (snd variable))) variables))
+      body rest;
+    _ -> rest
+  };
   elaborate graph typed =
     do {
       evidence <- resolveEvidence graph typed;

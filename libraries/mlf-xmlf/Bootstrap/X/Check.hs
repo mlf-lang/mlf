@@ -158,12 +158,17 @@ module Bootstrap.X.Check where {
       _ -> inferWithData D.emptyDataEnv env term
     };
   inferWithData :: DataEnv -> XEnv -> XTerm -> Either String XType;
-  inferWithData ds env body =
-    do {
-      validateTypeEnv ds (typeEnv env);
-      L.mapM (termType ds (typeEnv env)) (M.elems (termEnv env));
-      inferIn ds env body
-    };
+  inferWithData ds env body = do {
+    check <- checkerIn ds env;
+    check body
+  };
+  -- Several independent proofs may have exactly the same complete scope.
+  checkerIn :: DataEnv -> XEnv -> Either String (XTerm -> Either String XType);
+  checkerIn ds env = do {
+    validateTypeEnv ds (typeEnv env);
+    L.mapM (termType ds (typeEnv env)) (M.elems (termEnv env));
+    Right (inferIn ds env)
+  };
   -- With no type arguments a primitive's result depends only on its ABI
   -- identity. Share that instantiation across checks in every term scope.
   instantiateClosedPrimitive :: Primitive -> Either String XType;
