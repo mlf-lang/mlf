@@ -57,7 +57,7 @@ def write_cohort(root, label='screen', family='flat_functions', size=8, repeats=
                           'families': [family], 'sizes': [size], 'cells': 1,
                           'timed_compilations': len(schedule), 'claim_limits': ['synthetic']},
             'source': {'commit': '0' * 40, 'branch': 'test', 'dirty': False,
-                       'patch_sha256': hashlib.sha256(b'').hexdigest()},
+                       'patch_bytes': 0, 'patch_sha256': hashlib.sha256(b'').hexdigest()},
             'toolchain': {'ghc': {'path': '/ghc', 'version': '9.14.1'},
                           'clang': {'path': '/clang', 'version': 'clang test'},
                           'producer': {'path': '/producer', 'receipt_sha256': 'a' * 64, 'emlf_sha256': 'b' * 64},

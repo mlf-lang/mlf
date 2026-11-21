@@ -6,11 +6,11 @@ import hashlib
 import json
 import random
 import shutil
-import subprocess
 import sys
 import command_runner
 import generate as G
 import query_cache as Q
+import provenance
 import worker
 
 ROOT=Path(__file__).resolve().parents[3]
@@ -19,29 +19,6 @@ HERE=Path(__file__).resolve().parent
 
 def registry():
     return json.loads((HERE/'matrix.json').read_text())
-
-
-def git(*argv):
-    return subprocess.run(['git',*argv],cwd=ROOT,capture_output=True,text=True)
-
-
-def source_identity(out):
-    """Record the exact measured source state, including uncommitted patches."""
-    commit=git('rev-parse','HEAD').stdout.strip()
-    branch=git('rev-parse','--abbrev-ref','HEAD').stdout.strip()
-    status=git('status','--porcelain').stdout
-    patch=git('diff','HEAD').stdout.encode()
-    untracked={}
-    for name in git('ls-files','--others','--exclude-standard').stdout.splitlines():
-        path=ROOT/name
-        if path.is_file():untracked[name]=hashlib.sha256(path.read_bytes()).hexdigest()
-    record={'commit':commit,'branch':branch,'dirty':bool(status.strip()),
-        'status_porcelain':status.splitlines(),'patch_sha256':hashlib.sha256(patch).hexdigest(),
-        'patch_bytes':len(patch),'untracked':untracked}
-    if patch:
-        (out/'source-patch.diff').write_bytes(patch)
-        record['patch_file']=str(out/'source-patch.diff')
-    return record
 
 
 def lanes_for(index,repeats):
@@ -107,7 +84,7 @@ def main():
         schedule=interleave_pairs(schedule,repeats,rng)
     inputs={str(p.resolve()):H.sha(p) for p in [args.setup,Path(H.__file__),HERE/'command_runner.py',HERE/'bench.py',HERE/'run.py',HERE/'worker.py',HERE/'generate.py',
         HERE/'data_shapes.py',HERE/'rank_shapes.py',
-        HERE/'matrix.json',HERE/'query_cache.py',Q.SHARED/'artifact_binary_reference.py',
+        HERE/'matrix.json',HERE/'query_cache.py',HERE/'provenance.py',Q.SHARED/'artifact_binary_reference.py',
         Q.SHARED/'test_query_index.py',Q.SHARED/'artifact_binary_open.py',
         Path(setup['producer'])/'receipt.json',Path(setup['producer'])/'bin/emlf',
         Path(setup['ghc']),Path(setup['clang']),Path(setup['runtime']),Path(setup['builtin']+'.mlfci'),
@@ -120,7 +97,7 @@ def main():
     # about 2.6 GiB, and the earlier 2 GiB carry-over stopped a run at leg 149.
     limits={**setup['limits'],'wall_seconds':90,'max_work_bytes':512*1024**2,
             'aggregate_cohort_bytes':args.cohort_output_gib*1024**3}
-    identity=source_identity(out)
+    identity=provenance.source_identity(ROOT, out)
     cohort=args.cohort or out.name
     plan={'purpose':'generator/transport qualification' if args.pilot else 'fixed measured shape matrix; descriptive medians only',
         'benchmark':{'schema':2,'suite':data['suite'],'suite_version':data['version'],'cohort':cohort,
@@ -149,7 +126,7 @@ def main():
         'timing_boundary':'exact-child worker launch through wait4; common Python dispatcher included; preparation and validation excluded'}
     plan_path=out/'plan.json';H.save(plan_path,plan);plan_sha=H.sha(plan_path)
     scripts=out/'scripts';scripts.mkdir()
-    for name in ['run.py','worker.py','generate.py','data_shapes.py','rank_shapes.py','matrix.json','query_cache.py']:
+    for name in ['run.py','worker.py','generate.py','data_shapes.py','rank_shapes.py','matrix.json','query_cache.py','provenance.py']:
         shutil.copy2(HERE/name,scripts/name)
     record={'complete':False,'plan_sha256':plan_sha,'runs':[],'failures':[]}; refs={};blocked=set()
     def save():H.save(out/'receipt.json',record)

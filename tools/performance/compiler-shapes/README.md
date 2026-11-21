@@ -75,6 +75,15 @@ to the next cell. The command exits unsuccessfully if any selected cell failed.
 The comparison table and its CSV are written to `WORKDIR/summary.md` and
 `WORKDIR/summary.csv`.
 
+Each cohort retains the whole tracked Git patch. The sweep verifies the
+archive against its recorded byte count and SHA-256. When patches differ,
+it replays them at the recorded revision in a temporary index. The revision,
+shared measurement pins and all tracked file contents and modes must agree,
+apart from edits, additions or deletions of regular UTF-8 prose files named
+`README.md`, `CONTRIBUTING.md`, `CHANGELOG.md` at the project root or
+`docs/*.md` directly under `docs`. A change to a measured file's pin still
+fails the comparison even if its path matches a documentation name.
+
 ```sh
 # Show the standard matrix or a filtered selection.
 python3 tools/dev.py bench shapes list

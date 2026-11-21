@@ -9,6 +9,7 @@ from pathlib import Path
 import analyze
 import bench
 import command_runner
+import provenance
 
 
 def failure_detail(folder, receipt):
@@ -93,18 +94,33 @@ def measure(folder, setup, row, args, repeats, reference):
             or plan['benchmark']['endpoint']['id'] != args.endpoint):
         raise ValueError('analyzed cohort differs from the requested cell')
     memory = peak_rss_medians(receipt, repeats)
-    # Per-cell sources vary. All other inputs, including the compiler, benchmark
-    # scripts and setup, must match before putting their numbers in one table.
-    sources = {case['source'] for case in plan['cases']}
-    identity = {path: digest for path, digest in plan['inputs'].items() if path not in sources}
-    identity.update(revision=plan['source']['commit'], patch=plan['source']['patch_sha256'])
-    if not reference:
-        reference.update(identity)
-    if reference != identity:
-        raise ValueError('source revision, tracked patch or shared measurement inputs changed during sweep')
+    check_shared_inputs(bench.ROOT, folder, plan, reference)
     metrics = rows[0]
     row.update(status='passed', mlf_seconds=metrics['mlf_wall_median'],
                ghc_seconds=metrics['ghc_wall_median'], mlf_over_ghc=metrics['mlf_over_ghc'], **memory)
+
+
+def check_shared_inputs(root, folder, plan, reference):
+    sources = {case['source'] for case in plan['cases']}
+    inputs = {path: digest for path, digest in plan['inputs'].items() if path not in sources}
+    if not inputs:
+        raise ValueError('missing shared measurement inputs')
+    source = plan['source']
+    if reference and source['commit'] != reference['commit']:
+        raise ValueError('source revision changed during sweep')
+    if reference and inputs != reference['inputs']:
+        raise ValueError('shared measurement inputs changed during sweep')
+    try:
+        patch = provenance.archived_patch(folder, source)
+        patch_key = (source['patch_sha256'], source.get('patch_format'))
+        if reference and patch_key == reference['patch_key']:
+            return
+        changes = provenance.protected_changes(root, source, patch)
+    except (KeyError, OSError, ValueError) as exc:
+        raise ValueError(f'invalid tracked patch evidence: {exc}') from exc
+    if reference and changes != reference['changes']:
+        raise ValueError('tracked files outside the documentation exception changed during sweep')
+    reference.update(inputs=inputs, commit=source['commit'], patch_key=patch_key, changes=changes)
 
 
 def prune_products(folder):

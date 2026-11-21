@@ -27,6 +27,7 @@ class SweepTests(unittest.TestCase):
         self.seen = []
         self.fail = {}
         self.changed_inputs = set()
+        self.commit = sweep.provenance.git(sweep.bench.ROOT, 'rev-parse', 'HEAD').decode().strip()
 
     def recorder(self, argv, cwd):
         def option(name):
@@ -41,6 +42,7 @@ class SweepTests(unittest.TestCase):
         write_cohort(folder.parent, folder.name, family, size, repeats=self.args.repeats, endpoint=self.args.endpoint)
         plan = sweep.analyze.load(folder / 'plan.json')
         receipt = sweep.analyze.load(folder / 'receipt.json')
+        plan['source']['commit'] = self.commit
         plan['inputs'] = {plan['cases'][0]['source']: 'source',
                           '/compiler': 'changed' if folder.name in self.changed_inputs else 'fixed'}
         (folder / 'plan.json').write_text(json.dumps(plan))
@@ -203,6 +205,146 @@ class SweepTests(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, 'fresh'):
                 sweep.run(self.args)
             self.assertEqual(recorder.call_count, 1)
+
+
+class TrackedProvenanceTests(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.temp = Path(tmp.name)
+        self.root = self.temp / 'repo'
+        self.root.mkdir()
+        self.git('init', '--quiet')
+        self.git('config', 'user.name', 'Sweep fixture')
+        self.git('config', 'user.email', 'fixture@example.invalid')
+        self.files = {
+            'README.md': b'readme\n', 'CONTRIBUTING.md': b'guide\n', 'docs/guide.md': b'text\n',
+            'src/Base.hs': b'x = 1\n', 'config.json': b'{}\n', 'docs/data.tsv': b'x\n',
+            'oracles/expected.md': b'1\n', 'tools/run.py': b'print(1)\n', 'value.bin': b'\0one',
+        }
+        for name, data in self.files.items():
+            path = self.root / name
+            path.parent.mkdir(exist_ok=True)
+            path.write_bytes(data)
+        self.git('add', '.')
+        self.git('-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'fixture')
+        self.serial = 0
+        self.reference = {}
+
+    def git(self, *args):
+        return sweep.provenance.git(self.root, *args)
+
+    def capture(self):
+        self.serial += 1
+        folder = self.temp / str(self.serial)
+        folder.mkdir()
+        source = sweep.provenance.source_identity(self.root, folder)
+        return folder, dict(cases=[{'source': '/generated'}], inputs={'/compiler': 'fixed', '/generated': 'case'},
+                            source=source)
+
+    def check(self, folder, plan):
+        sweep.check_shared_inputs(self.root, folder, plan, self.reference)
+
+    def test_shared_dirty_code_and_document_add_edit_delete(self):
+        code = self.root / 'src/Base.hs'
+        code.write_text('x = 2\n')
+        self.check(*self.capture())
+        self.check(*self.capture())
+        tracked = self.root / 'CONTRIBUTING.md'
+        tracked.write_text('edited twice\n')
+        self.check(*self.capture())
+        (self.root / 'docs/added.md').write_text('a new guide\n')
+        self.git('add', 'docs/added.md')
+        tracked.unlink()
+        self.check(*self.capture())
+        self.git('restore', '--source=HEAD', '--worktree', 'CONTRIBUTING.md')
+        self.check(*self.capture())
+        self.assertEqual(code.read_text(), 'x = 2\n')
+        self.assertEqual(self.git('diff', '--cached', '--name-only').splitlines(), [b'docs/added.md'])
+
+    def test_protected_content_modes_and_renames_reject(self):
+        self.check(*self.capture())
+        (self.root / 'README.md').write_text('new readme\n')
+        for name in ('src/Base.hs', 'config.json', 'docs/data.tsv', 'oracles/expected.md', 'tools/run.py', 'value.bin'):
+            with self.subTest(path=name):
+                (self.root / name).write_bytes(self.files[name] + b'!')
+                with self.assertRaisesRegex(ValueError, 'outside the documentation exception'):
+                    self.check(*self.capture())
+                (self.root / name).write_bytes(self.files[name])
+        doc = self.root / 'docs/guide.md'
+        for data in (b'\0opaque', b'\xff'):
+            doc.write_bytes(data)
+            with self.assertRaisesRegex(ValueError, 'outside the documentation exception'):
+                self.check(*self.capture())
+        doc.write_bytes(self.files['docs/guide.md'])
+        doc.chmod(0o755)
+        with self.assertRaisesRegex(ValueError, 'outside the documentation exception'):
+            self.check(*self.capture())
+        doc.unlink()
+        doc.symlink_to('../config.json')
+        with self.assertRaisesRegex(ValueError, 'outside the documentation exception'):
+            self.check(*self.capture())
+        doc.unlink()
+        self.git('mv', 'tools/run.py', 'docs/tool.md')
+        with self.assertRaisesRegex(ValueError, 'outside the documentation exception'):
+            self.check(*self.capture())
+
+    def test_pin_and_revision_drift_reject_even_for_prose(self):
+        def pinned():
+            folder, plan = self.capture()
+            plan['inputs'][str(self.root / 'CONTRIBUTING.md')] = sweep.analyze.sha(self.root / 'CONTRIBUTING.md')
+            return folder, plan
+        self.check(*pinned())
+        (self.root / 'CONTRIBUTING.md').write_text('new measured input\n')
+        with self.assertRaisesRegex(ValueError, 'shared measurement inputs changed'):
+            self.check(*pinned())
+        self.git('add', 'CONTRIBUTING.md')
+        self.git('-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'changed revision')
+        with self.assertRaisesRegex(ValueError, 'source revision changed'):
+            self.check(*pinned())
+
+    def test_legacy_archive_can_move_and_survives_later_checkout_edits(self):
+        self.check(*self.capture())
+        (self.root / 'CONTRIBUTING.md').write_text('older documentation edit\n')
+        folder, plan = self.capture()
+        patch = self.git('diff', 'HEAD')
+        (folder / 'source-patch.diff').write_bytes(patch)
+        source = plan['source']
+        del source['patch_format']
+        source.update(patch_file='/original/machine/source-patch.diff', patch_bytes=len(patch),
+                      patch_sha256=hashlib.sha256(patch).hexdigest())
+        (self.root / 'src/Base.hs').write_text('unrelated later edit in the live checkout\n')
+        self.check(folder, plan)
+        self.assertEqual((self.root / 'src/Base.hs').read_text(), 'unrelated later edit in the live checkout\n')
+
+    def test_clean_patch_requires_valid_commit_and_typed_metadata(self):
+        folder, plan = self.capture()
+        for fields in ({'commit': '0' * 40}, {'commit': self.git('rev-parse', 'HEAD^{tree}').decode().strip()},
+                       {'patch_bytes': False}, {'patch_bytes': 0.0}, {'patch_file': 0}):
+            with self.subTest(fields=fields), self.assertRaisesRegex(ValueError, 'invalid tracked patch evidence'):
+                self.check(folder, {**plan, 'source': {**plan['source'], **fields}})
+
+    def test_missing_corrupt_and_unparsable_archives_reject(self):
+        (self.root / 'CONTRIBUTING.md').write_text('changed docs\n')
+        folder, plan = self.capture()
+        self.check(folder, plan)
+        path = folder / 'source-patch.diff'
+        valid = path.read_bytes()
+        path.unlink()
+        with self.assertRaisesRegex(ValueError, 'invalid tracked patch evidence'):
+            self.check(folder, plan)
+        path.write_bytes(b'?' * len(valid))
+        with self.assertRaisesRegex(ValueError, 'invalid tracked patch evidence'):
+            self.check(folder, plan)
+        for data in (b'not a patch\n', valid + b'unparsed trailing text\n'):
+            with self.subTest(data=data[-25:]):
+                path.write_bytes(data)
+                plan['source'].update(patch_bytes=len(data), patch_sha256=hashlib.sha256(data).hexdigest())
+                with self.assertRaisesRegex(ValueError, 'invalid tracked patch evidence'):
+                    self.check(folder, plan)
+        del plan['source']['patch_bytes']
+        with self.assertRaisesRegex(ValueError, 'invalid tracked patch evidence'):
+            self.check(folder, plan)
 
 
 if __name__ == '__main__':
