@@ -221,6 +221,20 @@ queryChecks = do
     let large = H.literal (replicate 4097 '葉')
     check "a constructor above the dictionary limit keeps its ordinary framing"
       (Just ("P3header" ++ field large)) (prepared scope (charge large) (T.SConstructor large))
+  do
+    let repeatedSite = T.SCallSite "s" (T.SourceSpan "pkg" "Mod" "file" 0 0 0 0) (T.SVar "s")
+        appliedSites n = foldr (\_ rest -> T.SApp (T.SApp repeatedSite repeatedSite) rest) (T.SIntLit 0) [1..n]
+        firstField = "d" ++ [toEnum 127] ++ "1:s" ++ "\0\0v\0"
+        nextField = "d\0\0\0v\0"
+    forM_ [1,3,22,43,129 :: Int] $ \n -> do
+      let tree = appliedSites n
+          bytes = "P5headeraa" ++ firstField ++ nextField ++
+            concat (replicate (n-1) ("aa" ++ nextField ++ nextField)) ++ "="
+          ordinaryCost = fromIntegral (164*n+12)
+      check "cached source leaves followed by two applications keep exact preorder bytes across pages"
+        (Just bytes) (prepared CrateGraph.WrittenOrigin ordinaryCost tree)
+      check "the following application nodes retain their ordinary admission costs"
+        Nothing (prepared CrateGraph.WrittenOrigin (ordinaryCost-1) tree)
   let spine depth = foldr (T.SApp . T.SConstructor) (T.SStringLit "尾:😀")
           (take depth (cycle ["節", "λ:𐐀"]))
       members body = [("表:λ", T.Nothing, body)]

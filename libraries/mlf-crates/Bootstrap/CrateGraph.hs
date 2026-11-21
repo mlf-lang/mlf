@@ -477,9 +477,9 @@ module Bootstrap.CrateGraph where {
   data OriginScope = WrittenOrigin | SourceOrigin
     (V.Index Declaration -> V.Index Declaration) (Map String String) Int (Map String String) Int;
   data PreparedConstructor = PreparedConstructor Int String String String;
-  data CachedLocation = CachedLocation String | CachedLocationLeaf String String String Int String;
+  data CachedLocation = CachedLocation String | CachedLocationLeaf String String String Int String String;
   locationFragment cached = case cached of {
-    CachedLocation site -> site; CachedLocationLeaf site _ _ _ _ -> site
+    CachedLocation site -> site; CachedLocationLeaf site _ _ _ _ _ -> site
   };
   packedOrigin = packedOriginIn WrittenOrigin;
   packedOriginIn initialScope origin originBytes initialBudget tree header = let {
@@ -603,7 +603,7 @@ module Bootstrap.CrateGraph where {
             -- per existing location. Binders still supply their current name.
             reuse cached = let {
               single = next ((:) (locationFragment cached)) locations;
-              both leafCost fragment saved = let {
+              both leafCost fragment withApps saved = let {
                 remaining = budget - cost - leafCost;
                 resume = collect remaining rest (\tail -> chunks ((:) fragment tail))
                   pages (slots - 2) sl sc table saved constructors previousInteger
@@ -613,18 +613,33 @@ module Bootstrap.CrateGraph where {
                 (:) (SIntLit n) more -> collect (remaining - integerCost n) more
                   (\tail -> chunks ((:) fragment (integerField previousInteger n tail)))
                   pages (slots - 3) sl sc table saved constructors (Just n);
+                -- A cached located reference can precede a curried application.
+                -- Preserve the page and the two ordinary application charges,
+                -- including the point where the ordinary writer inspects its head.
+                (:) (SApp function argument) more -> if slots < 4 || remaining < 25 then resume
+                  else case function of {
+                    SApp head first -> let {
+                      pair = collect (remaining - 50) ((:) head ((:) first ((:) argument more)))
+                        (\tail -> chunks ((:) withApps tail)) pages (slots - 4)
+                        sl sc table saved constructors previousInteger
+                    } in if slots < 5 || remaining < 50 then pair else case head of {
+                      SConstructor _ -> resume; _ -> pair
+                    };
+                    _ -> resume
+                  };
                 _ -> resume
               };
               leaf tag spelling overhead = case cached of {
-                CachedLocationLeaf _ previous name leafCost field ->
-                  if eqString tag previous && eqString spelling name then both leafCost field locations else single;
+                CachedLocationLeaf _ previous name leafCost field withApps ->
+                  if eqString tag previous && eqString spelling name then both leafCost field withApps locations else single;
                 CachedLocation site -> case M.lookup compareString spelling table of {
                   Nothing -> single;
                   Just ((,) leafCode bytes) -> let {
                     leafCost = overhead + bytes;
                     field = concatStringList [site,tag,leafCode];
-                    saved = IM.insert key (CachedLocationLeaf site tag spelling leafCost field) locations
-                  } in both leafCost field saved
+                    withApps = field ++ "aa";
+                    saved = IM.insert key (CachedLocationLeaf site tag spelling leafCost field withApps) locations
+                  } in both leafCost field withApps saved
                 }
               }
             } in if slots < 2 || budget < cost then single else case body of {
