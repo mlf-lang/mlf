@@ -11,6 +11,7 @@ import subprocess
 from functools import lru_cache
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import contracts as C
 import run_controls as R
@@ -370,8 +371,30 @@ class StaticControls(unittest.TestCase):
         self.assertEqual(MANIFEST['matrix']['cases'], 216)
 
     def test_shared_support_and_historical_oracle_pins(self):
-        for path, digest in {**MANIFEST['shared_support_pins'], **MANIFEST['historical_a1_pins']}.items():
+        helper_path = 'tools/performance/a1-private-index/helper.py'
+
+        def version(revision):
+            return subprocess.check_output(['git', '--no-replace-objects', '-C', str(HERE),
+                'show', revision + ':' + helper_path], timeout=30)
+
+        old = version(MANIFEST['base_commit'])
+        successor = version('84596b6188585c6aafc8f518d92ecd649152543d')
+        self.assertEqual(C.sha_bytes(old), MANIFEST['shared_support_pins']['helper.py'])
+        helper, current = R.load_helper(CURRENT_MANIFEST)
+        self.assertEqual(current, {**MANIFEST['shared_support_pins'], 'helper.py': C.sha_bytes(successor)})
+        self.assertEqual(helper.__file__, str(R.A1/'helper.py'))
+        for path, digest in {**MANIFEST['historical_a1_pins'], **current}.items():
             self.assertEqual(C.sha_bytes((R.A1/path).read_bytes()), digest, path)
+
+    def test_resource_helper_refuses_wrong_predecessor_or_live_bytes(self):
+        wrong = copy.deepcopy(CURRENT_MANIFEST)
+        wrong['shared_support_pins']['helper.py'] = R.CURRENT_HELPER_SHA
+        with self.assertRaisesRegex(ValueError, 'fixed historical A1 helper'):
+            R.load_helper(wrong)
+        with tempfile.TemporaryDirectory() as folder, patch.object(R, 'A1', Path(folder)):
+            (R.A1/'helper.py').write_text("raise AssertionError('unverified code was executed')")
+            with self.assertRaisesRegex(ValueError, 'fixed shared support helper.py'):
+                R.load_helper(CURRENT_MANIFEST)
 
     def test_python_parses(self):
         for path in HERE.glob('*.py'):
