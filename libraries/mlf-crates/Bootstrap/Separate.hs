@@ -1367,27 +1367,33 @@ module Bootstrap.Separate where {
       XDefaultPattern n -> XDefaultPattern (mapMaybeValue name n)
     };
   mapTerm :: (XName -> XName) -> (XTyVar -> XTyVar) -> XTerm -> XTerm;
-  mapTerm name variable term =
+  mapTerm name variable = mapTermProof name variable (mapComputation variable);
+  -- Each proof operation remains lazy in its original XTypeApp field.
+  mapTermProof :: (XName -> XName) -> (XTyVar -> XTyVar) ->
+    (XComputation -> XComputation) -> XTerm -> XTerm;
+  mapTermProof name variable proof term = let {
+    walk = mapTermProof name variable proof
+  } in
     case term of {
       XVarTerm n -> XVarTerm (name n);
-      XAbs n ty b -> XAbs (name n) (mapType variable ty) (mapTerm name variable b);
-      XApp a b -> XApp (mapTerm name variable a) (mapTerm name variable b);
+      XAbs n ty b -> XAbs (name n) (mapType variable ty) (walk b);
+      XApp a b -> XApp (walk a) (walk b);
       XTypeAbs a bound b ->
-        XTypeAbs (variable a) (mapType variable bound) (mapTerm name variable b);
-      XTypeApp a p -> XTypeApp (mapTerm name variable a) (mapComputation variable p);
-      XLet n a b -> XLet (name n) (mapTerm name variable a) (mapTerm name variable b);
+        XTypeAbs (variable a) (mapType variable bound) (walk b);
+      XTypeApp a p -> XTypeApp (walk a) (proof p);
+      XLet n a b -> XLet (name n) (walk a) (walk b);
       XLetRec bs b ->
         XLetRec
-          (map (\((,,) n t a) -> (,,) (name n) (mapType variable t) (mapTerm name variable a))
+          (map (\((,,) n t a) -> (,,) (name n) (mapType variable t) (walk a))
              bs)
-          (mapTerm name variable b);
+          (walk b);
       XPrimitive p ts -> XPrimitive p (map (mapType variable) ts);
       XConstructor c ts -> XConstructor c (map (mapType variable) ts);
       XCase a t bs ->
-        XCase (mapTerm name variable a) (mapType variable t)
-          (map (\(XAlternative p b) -> XAlternative (mapPattern name p) (mapTerm name variable b))
+        XCase (walk a) (mapType variable t)
+          (map (\(XAlternative p b) -> XAlternative (mapPattern name p) (walk b))
              bs);
-      XWithData ds b -> XWithData ds (mapTerm name variable b);
+      XWithData ds b -> XWithData ds (walk b);
       _ -> term
     };
   -- Dense renumbering also handles valid object IDs near the parser's Int64

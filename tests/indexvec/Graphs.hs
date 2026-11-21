@@ -2157,6 +2157,28 @@ applicationPatternChecks = do
   newBytes <- encoded (W.encode W.defaultLimits 6 [Structure.toXTerm newTerm])
   check "raw query storage restores exact checked syntax" oldBytes newBytes
   unless (rejected (Structure.storedTermFor True compactQuery newBody)) (fail "old query reader admitted a spine")
+  do
+    let pubVar = T.XTyVar 713
+        pubOp = T.XName (-18) "polymorphic"
+        pubOwner = T.XName 108 "result"
+        pubLeaf ty = T.XThen (T.XInner (T.XBottom ty)) T.XElim
+        pubTy = T.XForall (T.XTyVar 41) T.XBot (T.XCon "Int" [])
+        pubRhs ev = T.XTypeAbs pubVar T.XBot (T.XTypeApp (T.XVarTerm pubOp) ev)
+        pubDecl ev = T.XLet pubOwner (pubRhs ev) (T.XConstructor "()" [])
+    pubEnv <- right (Open.environment [])
+    forM_ [pubLeaf (T.XCon "Int" []),pubLeaf (T.XVar pubVar)] $ \ev -> do
+      before <- right (Open.check pubEnv [(pubOp,pubTy)] (pubDecl ev))
+      packed <- Open.makeCheckedPackage "retained-proof" "owner" [("group",before)] >>= right
+      [(_,after)] <- pure (Open.packageFragments packed)
+      forM_ [0,461,maxBound-8] $ \serial -> do
+        let imports = M.singleton pubOp (T.XName 328 "foreign")
+            (a,ab,at) = Open.linkBody serial imports before
+            (b,bb,bt) = Open.linkBody serial imports after
+            asWire names body = Structure.toXTerm body :
+              [W.VNode 301 [Structure.toXName n,Structure.toXType ty] | (n,ty) <- names]
+        expected <- encoded (W.encode W.defaultLimits 8 (asWire ab at))
+        actual <- encoded (W.encode W.defaultLimits 8 (asWire bb bt))
+        check "retained ground and bound-variable proofs preserve fresh serial, export IDs and the linked term" (a,expected) (b,actual)
   -- A type argument is part of the literal template's identity. Count both
   -- UTF-8 strings and all nodes of its original, fully explicit evidence.
   let unary v t = T.XTypeApp (T.XVarTerm v) (T.XThen (T.XInner (T.XBottom t)) T.XElim)

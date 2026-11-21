@@ -66,7 +66,7 @@ module Bootstrap.OpenFragment
   -- expanded-work and first-use checks. Unpublished fragments retain their
   -- ordinary linking behavior, including demand for individual fields.
   data LinkView = LinkPattern Structure.TermPattern | LinkLambda LinkView |
-    LinkLet (Maybe LinkView) (Maybe LinkView);
+    LinkLet (Maybe LinkView) (Maybe LinkView) | LinkPublishedRaw;
   data Fragment = Fragment Environment ([] ((,) XName XType)) XTerm
     ([] ((,) XName XType)) ([] XName) String W.Value (Maybe StoredTerm) (Maybe StoredTerm) (Maybe LinkView);
   fragmentWith env ps term bs used saved =
@@ -663,10 +663,26 @@ module Bootstrap.OpenFragment
     }
   } in fill (IM.get root rows) 1 0 0 runs (\term previous _ _ following ->
     if previous == 1 && null following then Just term else Nothing);
+  -- A successful raw package encoded this same checked term. Its writer
+  -- already traversed all constructor tags and list spines examined here,
+  -- including on cached ground-proof hits. These bounded trees contain no
+  -- type identities, so injective renumbering leaves them unchanged.
+  publishedProof variable source = let {
+    closed room proof = case proof of {
+      XThen a b -> case a of {
+        XInner (XBottom (XCon _ [])) -> case b of { XElim -> True; _ -> False };
+        XThen _ _ -> room > 0 && closed (room - 1) a && closed (room - 1) b;
+        _ -> False
+      };
+      _ -> False
+    }
+  } in if closed 3 source then source else Separate.mapComputation variable source;
   mapLinkedTerm name variable source view = let {
     ordinary = Separate.mapTerm name variable source;
     child = mapLinkedTerm name variable
   } in case (,) source view of {
+    (,) _ (Just LinkPublishedRaw) ->
+      Separate.mapTermProof name variable (publishedProof variable) source;
     (,) _ (Just (LinkPattern plan)) -> fromMaybe ordinary (mapLinkPattern name variable plan);
     (,) (XLet binder a b) (Just (LinkLet left right)) ->
       XLet (name binder) (child a left) (child b right);
@@ -1221,6 +1237,14 @@ module Bootstrap.OpenFragment
     (:) _ entries -> attach fragments entries;
     [] -> fragments
   };
+  -- Keep the marker on a copy of the exact fragment whose raw final record
+  -- was written. Existing authenticated compact views remain usable.
+  publishedRawRow ((,) label fragment) = (,) label (case fragment of {
+    Fragment env ps source bs used stamp raw stored spines view ->
+      Fragment env ps source bs used stamp raw stored spines (case view of {
+        Nothing -> Just LinkPublishedRaw; Just _ -> view
+      })
+  });
   -- Only the checked crate-session path speculates on new storage shapes.
   -- General callers retain the original field and fragment evaluation order.
   makePackage = makePackageWith False;
@@ -1264,7 +1288,8 @@ module Bootstrap.OpenFragment
                     remaining schema ((:) (header format) (if stored then map final plans else map (encodeFinal False) fragments));
                   legacy = do {
                     encoded <- write 8 wireFormat8 False;
-                    ioReturn (mapEither (\bytes -> (,) bytes fragments) encoded)
+                    ioReturn (mapEither (\bytes -> (,) bytes
+                      (if spines then map publishedRawRow fragments else fragments)) encoded)
                   };
                   requiredSchema current entries = case entries of {
                     [] -> current;
