@@ -558,7 +558,7 @@ module Bootstrap.SourceInference where {
     finalTreeBounds depthLimit (\chargeText maxDepth -> finalGeometryUsing spines stored
       chargeText maxDepth [(,,) 1 False [raw]]);
   finalCheckedTreeGeometry depthLimit term =
-    finalTreeBounds depthLimit (\chargeText maxDepth -> finalGeometryWalk True False
+    finalTreeBounds depthLimit (\chargeText maxDepth -> finalGeometryWalkUsing True True False
       chargeText maxDepth (GeometryTerm 1 term (GeometryRoots [])));
   finalTreeBounds depthLimit scan = let {
     limits = Wire.defaultLimits;
@@ -636,15 +636,76 @@ module Bootstrap.SourceInference where {
   -- Only descending into a nonempty constructor saves its remaining siblings.
   data GeometryFrame = GeometrySiblings Int Bool ([] Wire.Value) GeometryFrame |
     GeometryRoots ([] ((,,) Int Bool ([] Wire.Value))) |
-    GeometryTerm Int XTerm GeometryFrame | GeometryProof Int Bool XComputation GeometryFrame;
+    GeometryTerm Int XTerm GeometryFrame | GeometryProof Int Bool XComputation GeometryFrame |
+    GeometryAfterHead Int XTerm XTerm Int Int GeometryFrame;
   finalGeometryUsing spines stored chargeText maxDepth roots =
     finalGeometryWalk spines stored chargeText maxDepth (GeometryRoots roots);
-  finalGeometryWalk spines stored chargeText maxDepth = let {
+  -- A positive height also proves that this entire bounded, already-visited
+  -- head is in the comparison grammar. Variable IDs are scalar nodes with
+  -- no geometry cost or demand. Exact hints and constructor names determine
+  -- the UTF-8 and scalar charges. Preserve every Then boundary.
+  geometryHeadHeight term = let {
+    pair a b = if a <= 0 || b <= 0 then 0 else 1 + max a b;
+    proof value = case value of {
+      XThen a b -> pair (proof a) (proof b);
+      XInner (XBottom (XCon _ [])) -> 4;
+      XElim -> 1;
+      _ -> 0
+    };
+    visit value = case value of {
+      XApp a b -> pair (visit a) (visit b);
+      XTypeApp a p -> pair (visit a) (proof p);
+      XVarTerm _ -> 3;
+      _ -> 0
+    }
+  } in visit term;
+  sameGeometryHead first other = let {
+    proof a b = case a of {
+      XThen p q -> case b of { XThen x y -> proof p x && proof q y; _ -> False };
+      XInner (XBottom (XCon name _)) -> case b of {
+        XInner (XBottom (XCon label args)) -> eqString name label && null args;
+        _ -> False
+      };
+      XElim -> case b of { XElim -> True; _ -> False };
+      _ -> False
+    };
+    visit a b = case a of {
+      XApp f x -> case b of { XApp g y -> visit f g && visit x y; _ -> False };
+      XTypeApp f p -> case b of { XTypeApp g q -> visit f g && proof p q; _ -> False };
+      XVarTerm (XName _ hint) -> case b of {
+        XVarTerm (XName _ label) -> eqString hint label; _ -> False
+      };
+      _ -> False
+    }
+  } in visit first other;
+  -- Only the checked tree entry point supplies the additive UTF-8 charge
+  -- that can be replayed. Ordinary wire and diagnostic callbacks run on
+  -- each occurrence exactly as before.
+  finalGeometryWalk = finalGeometryWalkUsing False;
+  finalGeometryWalkUsing repeatHeads spines stored chargeText maxDepth = let {
     resume pending nodes work nested = case pending of {
       GeometrySiblings depth parentThen fields rest -> visit depth parentThen fields rest nodes work nested;
       GeometryRoots roots -> start roots nodes work nested;
       GeometryTerm depth term rest -> visitTerm depth term rest nodes work nested;
-      GeometryProof depth parentThen proof rest -> visitProof depth parentThen proof rest nodes work nested
+      GeometryProof depth parentThen proof rest -> visitProof depth parentThen proof rest nodes work nested;
+      GeometryAfterHead depth head tail beforeNodes beforeWork rest -> let {
+        size = beforeNodes - nodes; cost = beforeWork - work;
+        ordinary = visitTerm depth tail rest nodes work nested;
+        matches height level value n w =
+          if size >= n || cost >= w || level < 1 || level > maxDepth || height > maxDepth - level
+          then visitTerm level value rest n w nested else case value of {
+            XApp next more -> if sameGeometryHead head next then let {
+              nextLevel = level + 1; left = n - 1 - size; available = w - 1 - cost
+            } in seq nextLevel (seq left (seq available (matches height nextLevel more left available)))
+              else visitTerm level value rest n w nested;
+            _ -> visitTerm level value rest n w nested
+          }
+      } in if size < 8 || size > 96 || cost > 8192 || nodes <= 0 || work <= 0 || depth > maxDepth
+        then ordinary else case tail of {
+          XApp _ _ -> let { height = geometryHeadHeight head } in
+            if height <= 0 then ordinary else matches height depth tail nodes work;
+          _ -> ordinary
+        }
     };
     start roots nodes work nested = case roots of {
       [] -> Just nested;
@@ -661,7 +722,8 @@ module Bootstrap.SourceInference where {
           (GeometryTerm d a (GeometryTerm d b rest)) n w nested);
         XAbs name ty body -> seq nested (visit d False [Structure.toXName name,Structure.toXType ty]
           (GeometryTerm d body rest) n w nested);
-        XApp a b -> seq nested (visitTerm d a (GeometryTerm d b rest) n w nested);
+        XApp a b -> seq nested (visitTerm d a
+          (if repeatHeads then GeometryAfterHead d a b n w rest else GeometryTerm d b rest) n w nested);
         XTypeApp a proof -> seq nested (visitTerm d a (GeometryProof d False proof rest) n w nested);
         XVarTerm name -> if nodes >= 4 && work >= 4 && depth >= 0 && maxDepth - depth >= 2
           then seq stored (seq nested (case name of {

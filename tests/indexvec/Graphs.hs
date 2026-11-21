@@ -1284,6 +1284,29 @@ openGeometryChecks = do
       (\_ w -> if w==15 then T.Just 1 else error "wrong proof text charge"))
 
 protectionChecks = do
+  let runBinder hint = T.XVarTerm (T.XName (error "geometry demanded a binder ID") hint)
+      runGround text = T.XThen (T.XInner (T.XBottom (T.XCon text []))) T.XElim
+      runOperator proof = T.XTypeApp (runBinder "f") proof
+      runHead = runOperator (runGround "I")
+      runTree heads = foldr T.XApp (runBinder "z") heads
+      runCost text budget = let bytes = Prim.stringUtf8Length text
+        in if bytes > budget then T.Nothing else T.Just (budget-bytes)
+      runAdmits term depth nodes work = case Source.finalGeometryWalkUsing True True False
+          runCost depth (Source.GeometryTerm 1 term (Source.GeometryRoots [])) nodes work False of
+            T.Just b -> Just b
+            T.Nothing -> Nothing
+      fourHeads = runTree (replicate 4 runHead)
+      changedProof = runOperator (T.XThen (runGround "I") (runGround "J"))
+      partialHead = T.XTypeApp (runBinder "f") (T.XThen
+        (T.XInner (T.XBottom (T.XCon "longer" (error "geometry demanded the type list after exhausting UTF-8 work"))))
+        (error "geometry demanded the right proof after exhausting UTF-8 work"))
+  check "each repeated typed head contributes its full depth, nodes and UTF-8 work"
+    [Just False,Nothing,Nothing,Nothing]
+    [runAdmits fourHeads d n w | (d,n,w) <- [(10,56,65),(9,56,65),(10,55,65),(10,56,64)]]
+  check "a changed proof after a repeated run still sets the composition flag" (Just True)
+    (runAdmits (runTree [runHead,runHead,changedProof,runHead]) 40 500 800)
+  check "a changed head exhausts its text budget before its remaining proof" Nothing
+    (runAdmits (runTree [runHead,runHead,partialHead]) 40 500 46)
   let chain = [(show i,[show (i+1)]) | i <- [0..126::Int]] ++ [("127",[])]
       diamond = [("join",["left","right"]),("left",["import"]),("right",["import"]),
                  ("import",[]),("cycleA",["cycleB","join"]),("cycleB",["cycleA"]),("unrelated",[])]
