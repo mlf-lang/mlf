@@ -1,5 +1,8 @@
 # Explicit async parity on pull requests
 
+This policy applies when the async job runs. For pull requests labeled
+`ci:skip`, see [Skipping pull request CI](ci.md#skipping-pull-request-ci).
+
 Pull requests do not run the expensive async interpreter/native parity campaign
 by default. A maintainer can add the **`ci:async-parity`** label to request it;
 adding or removing that label triggers CI again. An explicit opt-in runs parity
