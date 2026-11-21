@@ -1259,8 +1259,9 @@ This larger example takes longer to compile than the small examples. To play
 again without recompiling, save the xMLF once and run that file:
 
 ```sh
-"$EMLF_BIN" examples/snake.emlf > snake.xmlf
-"$EMLF_BIN" --run-xmlf snake.xmlf
+mkdir -p .mlf-build
+"$EMLF_BIN" examples/snake.emlf > .mlf-build/snake.xmlf
+"$EMLF_BIN" --run-xmlf .mlf-build/snake.xmlf
 ```
 
 Type `w`, `a`, `s`, or `d`, then press Enter to move up, left, down, or right.
