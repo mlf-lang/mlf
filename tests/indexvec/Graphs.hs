@@ -4,7 +4,7 @@ module Main where
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (forM_, unless)
 import Data.Bits (testBit)
-import Data.List (isInfixOf, nub, sort)
+import Data.List (intercalate, isInfixOf, nub, sort)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Bootstrap.ArtifactStorage as Storage
@@ -399,6 +399,34 @@ datatypeChecks = do
         ["A","B","Unused"] (select (T.SWantedRefs "Unused" []) [("p",T.XCon "B" [])])
       check "ordinary term names cannot introduce file datatype roots"
         [] (select (T.SApp (T.SVar "MkZ") (T.SVar "Unused")) [])
+
+-- A visible alias can admit only the method of its own class. Reusing a
+-- module's method index must keep distinct owners with the same spellings.
+instanceVisibilityChecks = do
+  let header = ["-- mlf:syntax shared-haskell-v1",
+                "{-# LANGUAGE " ++ intercalate ", " (map H.unpack Lexer.sharedExtensions) ++ " #-}"]
+      parsed name rows = case Parser.parseModule (H.literal (name ++ ".hs")) (H.literal (unlines (header ++ rows))) of
+        T.Right m -> pure m
+        T.Left why -> fail (H.unpack why)
+      mangled e = H.literal (H.unpack (Modules.owner e) ++ "." ++ H.unpack (Modules.spelling e))
+      klass name = parsed name ["module " ++ name ++ " where {", "class C a where { score :: a -> a };", "}"]
+      client imported = parsed "Main" ["module Main where {","import qualified A as First;",
+        "import qualified B as Second" ++ imported ++ ";","data Box = Box;",
+        "instance First.C Box where { score x = x };","instance Second.C Box where { score x = x };","}"]
+      resolve modules = Modules.resolveCrate T.NoImplicitPrelude M.empty mangled modules
+  a <- klass "A"
+  b <- klass "B"
+  both <- client ""
+  case resolve [a,b,both] of
+    T.Right crate -> check "both qualified class owners keep their methods" 2
+      (sum [length (Modules.renamedInstances (Modules.resolvedContents m)) | m <- Modules.resolvedCrateModules crate,
+              Modules.moduleIdentity (Modules.resolvedSource m) == "Main"])
+    T.Left why -> fail (H.unpack why)
+  hidden <- client " (C)"
+  case resolve [a,b,hidden] of
+    T.Left why -> check "another class cannot make a hidden method visible" True
+      ("instance method is not visible: score" `isInfixOf` H.unpack why)
+    T.Right _ -> fail "accepted hidden method through a different class"
 
 -- Inspect the resolver's actual numeric edges before any graph is built.
 -- Two aliases reach one declaration, an identically spelled import reaches
@@ -2508,6 +2536,7 @@ main = do
   layoutTokenChecks
   loweringChecks
   resolverChecks
+  instanceVisibilityChecks
   protectionChecks
   projectedBindingChecks
   fragmentFingerprintChecks

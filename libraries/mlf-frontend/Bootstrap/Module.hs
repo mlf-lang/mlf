@@ -1434,11 +1434,18 @@ module Bootstrap.Module where {
           (classMethods klass);
       Right (R.Class name (classParameters klass) supers methods)
     };
-  renameInstance shared names env inst =
+  renameInstance shared names env = renameInstanceWithMethods
+    (if shared then Just (sourceMethodVisible env) else Nothing) names env;
+  renameInstanceWithMethods visibleMethods names env inst =
     do {
       klass <- lookupEntity Types (instanceClass inst) env;
       unless (isRole Class klass) (Left ("not a class: " ++ instanceClass inst));
-      when shared (mapM_ (\method -> unless (Set.member compareEntity (Entity (owner klass) (fst method) (Method (spelling klass))) (sourceMethodVisible env)) (Left ("instance method is not visible: " ++ fst method))) (instanceMethods inst));
+      case visibleMethods of {
+        Nothing -> Right ();
+        Just methods -> mapM_ (\method ->
+          unless (Set.member compareEntity (Entity (owner klass) (fst method) (Method (spelling klass))) methods)
+            (Left ("instance method is not visible: " ++ fst method))) (instanceMethods inst)
+      };
       originals <- if eqString (owner klass) "MLF.Primitive" then Prelude.standardDefaults (spelling klass) (instanceMethods inst) else Right (instanceMethods inst);
       methods <-
         mapM
@@ -1459,7 +1466,9 @@ module Bootstrap.Module where {
   renameModuleWith readExpr names local env source = do {
     ds <- mapM (renameDatatype names local env) (sourceDatatypes source);
     cs <- mapM (renameClass names local env) (sourceClasses source);
-    instances <- mapM (renameInstance (Lexer.isSharedSyntax (sourceSyntax source)) names env) (sourceInstances source);
+    -- Every instance in this module sees the same imports and local declarations.
+    let { methods = if Lexer.isSharedSyntax (sourceSyntax source) then Just (sourceMethodVisible env) else Nothing };
+    instances <- mapM (renameInstanceWithMethods methods names env) (sourceInstances source);
     values <- mapM (\((,,) original annotation expression) -> do {
       entity <- lookupEntity Terms original local;
       i <- termId names entity;
