@@ -2,8 +2,8 @@
 
 This benchmark compiles **the same generated shared-Haskell source bytes** with GHC
 and with GHC-hosted MLF, starting from fresh target outputs and ending at a native
-executable. The standard matrix covers 21 program shapes at sizes 8, 32, 128,
-1,024 and 8,192, with six paired builds per size. Its 105 cells schedule 1,260
+executable. The standard matrix covers 25 program shapes at sizes 8, 32, 128,
+1,024 and 8,192, with six paired builds per size. Its 125 cells schedule 1,500
 native compilations. Each reported time is the median for one compiler, shape
 and size.
 
@@ -80,7 +80,7 @@ The comparison table and its CSV are written to `WORKDIR/summary.md` and
 python3 -B tools/performance/compiler-shapes/bench.py list
 python3 -B tools/performance/compiler-shapes/bench.py list --family wide_case --size 128
 
-# Prepare dependencies once, then run the full 105-cell sweep.
+# Prepare dependencies once, then run the full 125-cell sweep.
 python3 -B tools/performance/compiler-shapes/bench.py prepare \
   --workdir .mlf-build/compiler-shapes --producer .mlf-build/shared-ghc --build-builtin
 python3 -B tools/performance/compiler-shapes/bench.py sweep \
@@ -153,9 +153,14 @@ docker run --rm -v "$PWD:/work" -w /work mlf-compiler-shapes:9.14.1 \
       --workdir .mlf-build/compiler-shapes --setup .mlf-build/compiler-shapes/setup/setup.json'
 ```
 
+The sweep also reports each compiler’s median sampled peak process-group RSS in
+MiB. The resource monitor samples every 100 ms, so short-lived peaks may fall
+between samples. For a type-depth experiment, pass `--family nested_poly_types`
+and repeat `--size` with 4, 8, 16 and 32. That selection uses the standard runner.
+
 ## Matrix
 
-The 21 families below make up the standard matrix. Each family has its own
+The 25 families below make up the standard matrix. Each family has its own
 size unit. For example, `n` counts case arms in `wide_case` and fields in
 `wide_product`. Request `--family baseline` separately to include the minimal
 size-zero program that reads and prints its argument.
@@ -176,13 +181,17 @@ size-zero program that reads and prints its argument.
 | `literal_table` | a generated constructor table of `n` items |
 | `higher_order_chain` | `n` nested higher-order compositions |
 | `local_functions` | flat functions inside one local `let` |
-| `wide_case` | a datatype with `n` constructors and a matching case arm for each constructor, selected by a runtime input clamped to the constructor range |
+| `wide_case` | a datatype with `n` constructors and a matching case arm for each constructor, selected by a runtime input clamped to the constructor range. An additional untimed invocation checks every arm in order |
 | `class_instances` | `n` concrete wrapper types, each with an instance of the same class, all called through one constrained function |
 | `dependency_diamonds` | `n` layers of branching and reconverging function dependencies, with one runtime path through each layer |
 | `state_updates` | `n` ordered integer-array updates in `IO`, with the result read back at runtime |
 | `captured_closures` | `n` closures capture runtime values, escape in a returned tree, and are applied in a separate consumer |
 | `wide_product` | one constructor holds `n` integer fields, all destructured once and read with distinct positional weights |
 | `rank2_arguments` | `n` call sites pass polymorphic functions to a rank-2 consumer that instantiates them at both `Int` and `Bool` |
+| `irregular_literal_table` | two-field literal rows with deterministic irregular payloads and an order-sensitive checksum |
+| `nested_poly_types` | `n` polymorphic boxes nest around the input before `n` projections return it |
+| `rank2_callbacks` | `n` separately type-checked consumers each use a rank-2 callback at both `Int` and `Bool` |
+| `decoder_pipeline` | `n` field reads validate against prior decoded state, with successful and malformed runtime inputs |
 
 The generator records each case's runtime inputs and independently computed
 expected output in the plan. Both executables must produce the expected value
@@ -282,8 +291,9 @@ the index mapping or closure and must be re-measured, not retroactively filled i
   graph evidence, schedule balance and matrix shape without invoking a compiler.
   The GHC O2 job filters the standard matrix to size 8 for `flat_functions`,
   `recursive_ring`, `wide_case`, `class_instances`, `dependency_diamonds`,
-  `state_updates`, `captured_closures`, `wide_product` and `rank2_arguments`.
-  Six paired builds per cell give 108 timed compilations in one cohort. CI
+  `state_updates`, `captured_closures`, `wide_product`, `rank2_arguments`,
+  `irregular_literal_table`, `nested_poly_types`, `rank2_callbacks` and `decoder_pipeline`.
+  Six paired builds per cell give 156 timed compilations in one cohort. CI
   uploads the available receipts and measurements even if a build fails.
 - The manual `.github/workflows/compiler-shapes.yml` workflow runs the standard
   sweep. Dispatch inputs can filter families and sizes or set the repeat count.

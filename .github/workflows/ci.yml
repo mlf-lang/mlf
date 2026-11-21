@@ -144,7 +144,9 @@ jobs:
         run: |
           python3 -B tools/performance/compiler-shapes/test_contract.py
           python3 -B tools/performance/compiler-shapes/test_sweep.py
-      - name: Compile nine shapes at size 8 (GHC vs MLF, 108 timed builds)
+          python3 -B tools/performance/compiler-shapes/test_data_shapes.py
+          python3 -B tools/performance/compiler-shapes/test_rank_shapes.py
+      - name: Compile thirteen shapes at size 8 (GHC vs MLF, 156 timed builds)
         if: matrix.suite == 'all' && matrix.optimization == '2'
         run: |
           python3 -B tools/performance/compiler-shapes/bench.py all \
@@ -152,7 +154,8 @@ jobs:
             --producer .mlf-build/shared-ghc --build-builtin --size 8 --repeats 6 --interleave-pairs \
             --family flat_functions --family recursive_ring --family wide_case \
             --family class_instances --family dependency_diamonds --family state_updates \
-            --family captured_closures --family wide_product --family rank2_arguments
+            --family captured_closures --family wide_product --family rank2_arguments \
+            --family irregular_literal_table --family nested_poly_types --family rank2_callbacks --family decoder_pipeline
       - name: Check Int64 arithmetic and Patricia boundaries
         if: matrix.optimization == '2'
         run: |

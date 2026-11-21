@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       families:
-        description: Comma-separated families (blank = all 21 scalable families)
+        description: Comma-separated families (blank = all 25 scalable families)
         type: string
         default: ''
       sizes:
@@ -56,6 +56,8 @@ jobs:
         run: |
           python3 -B tools/performance/compiler-shapes/test_contract.py
           python3 -B tools/performance/compiler-shapes/test_sweep.py
+          python3 -B tools/performance/compiler-shapes/test_data_shapes.py
+          python3 -B tools/performance/compiler-shapes/test_rank_shapes.py
       - name: Prepare fixed dependencies
         run: |
           python3 -B tools/performance/compiler-shapes/bench.py prepare \

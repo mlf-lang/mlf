@@ -1407,7 +1407,7 @@ reports the separate frozen-source comparison and diagnostic timing boundaries.
 
 The [compiler shape benchmark](tools/performance/compiler-shapes/README.md)
 measures cold compilation of identical shared-Haskell sources to native executables.
-The standard matrix covers 21 program shapes at 8, 32, 128, 1,024 and 8,192
+The standard matrix covers 25 program shapes at 8, 32, 128, 1,024 and 8,192
 units. Each size has six paired MLF and GHC builds. The default MLF endpoint
 emits LLVM and checked artifacts with `--compile-crate-to-llvm-gc`, then links
 with Clang at `-O2`.

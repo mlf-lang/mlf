@@ -276,12 +276,13 @@ class ScheduleTests(unittest.TestCase):
             'local_functions', 'dependency_chain', 'inferred_chain', 'recursive_ring', 'mono_calls',
             'poly_calls', 'tree_chain', 'balanced_tree', 'literal_table', 'higher_order_chain',
             'wide_case', 'class_instances', 'dependency_diamonds', 'state_updates',
-            'captured_closures', 'wide_product', 'rank2_arguments'])
+            'captured_closures', 'wide_product', 'rank2_arguments', 'irregular_literal_table',
+            'nested_poly_types', 'rank2_callbacks', 'decoder_pipeline'])
         self.assertEqual(sizes, [8, 32, 128, 1024, 8192])
         self.assertEqual(matrix['repeats'], 6)
         self.assertFalse(baseline)
         listing = subprocess.check_output([sys.executable, '-B', HERE / 'bench.py', 'list'], text=True)
-        self.assertIn('cells:    105, timed compilations: 1260', listing)
+        self.assertIn('cells:    125, timed compilations: 1500', listing)
         with tempfile.TemporaryDirectory() as directory:
             # Enumerate the whole public generator schedule without building 8,192-node sources.
             with mock.patch.object(generate, 'program', return_value='module Main where\n'):
@@ -329,8 +330,11 @@ class LanguageFeatureShapeTests(unittest.TestCase):
             for case in cases:
                 path = Path(case['source'])
                 self.assertEqual(digest(path), case['source_sha256'])
-                self.assertEqual(case['expected_stdout'], [
-                    f"{self.reference(case['family'], case['size'], x)}\n" for x in case['inputs']])
+                for argument, stdout in zip(case['inputs'], case['expected_stdout'], strict=True):
+                    if case['family'] == 'wide_case' and argument == '--all':
+                        self.assertEqual(stdout, ''.join(f'{v}\n' for v in range(1, 2*case['size'], 2)))
+                    else:
+                        self.assertEqual(stdout, f"{self.reference(case['family'], case['size'], argument)}\n")
 
     @staticmethod
     def reference(family, size, x):
@@ -389,7 +393,33 @@ class LanguageFeatureShapeTests(unittest.TestCase):
             # Each alternative must also be produced somewhere on the selector path.
             self.assertCountEqual(re.findall(r'\bTag(\d+)\b', source), tags * 3)
             self.assertCountEqual(re.findall(r'ltInt x (\d+)', source), tags[1:])
-            self.assertIn('entry x = addInt x (score (pick x))', source)
+            self.assertIn('selectedScore i = score (pick i)', source)
+            self.assertIn('entry x = addInt x (selectedScore x)', source)
+            self.assertIn('if eqString text "--all" then printAll 0 else printInt (entry (readInt text))', source)
+            self.assertIn(f'printAll i = if eqInt i {size} then ioReturn ()', source)
+            self.assertIn(r'ioBind (printInt (selectedScore i)) (\_ -> printAll (addInt i 1))', source)
+
+    def test_wide_case_batch_detects_missing_or_swapped_interior_arms(self):
+        n = 7
+        source = generate.program('wide_case', n)
+        original = 'Tag1 -> 3; Tag2 -> 5;'
+        self.assertIn(original, source)
+        with tempfile.TemporaryDirectory() as directory:
+            for label, replacement in [('omitted', 'Tag2 -> 5;'), ('swapped', 'Tag1 -> 5; Tag2 -> 3;')]:
+                with self.subTest(label=label), mock.patch.object(generate, 'program',
+                        return_value=source.replace(original, replacement)):
+                    case, = generate.generate(Path(directory)/label, sizes=[n], families=['wide_case'])
+                    arms = {int(i): int(v) for i, v in re.findall(r'\bTag(\d+) -> (\d+)',
+                                                                    Path(case['source']).read_text())}
+                    self.assertEqual(case['inputs'], [-1, 3, 7, '--all'])
+                    spots = [x + arms[min(n-1, max(x, 0))] for x in case['inputs'][:-1]]
+                    self.assertEqual(case['expected_stdout'][:-1], [f'{v}\n' for v in spots])
+                    batch = case['expected_stdout'][-1]
+                    self.assertEqual(batch, '1\n3\n5\n7\n9\n11\n13\n')
+                    self.assertNotEqual(batch, ''.join(f'{arms[i]}\n' for i in sorted(arms)))
+        largest = generate.expected_output('wide_case', 8192, '--all').splitlines()
+        self.assertEqual(len(largest), 8192)
+        self.assertEqual((largest[0], largest[4096], largest[-1]), ('1', '8193', '16383'))
 
     def test_entry_calls_the_constrained_method_for_every_instance(self):
         size = 5

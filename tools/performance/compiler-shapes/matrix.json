@@ -1,6 +1,6 @@
 {
   "suite": "compiler-shapes",
-  "version": 3,
+  "version": 4,
   "default_endpoint": "crate-fused-v1",
   "title": "GHC / MLF compiler shape classification benchmark",
   "purpose": "Compile identical generated shared-Haskell programs with GHC and with GHC-hosted MLF, from fresh targets to native executables. This classifies compiler behaviour by program shape; it is not the C/MLF Benchmarks Game comparison in tools/bench.",
@@ -26,6 +26,10 @@
     "captured_closures": {"label": "Escaping closures", "default": true, "work": "n escaping functions with captured runtime values"},
     "wide_product": {"label": "Wide product", "default": true, "work": "one constructor with n integer fields and a pattern that consumes every field"},
     "rank2_arguments": {"label": "Rank-2 function arguments", "default": true, "work": "n rank-2 call sites passing a polymorphic argument that the consumer uses at Bool and Int"},
+    "irregular_literal_table": {"label": "Irregular literal table", "default": true, "work": "n two-field rows with irregular payloads consumed by an order-sensitive checksum"},
+    "nested_poly_types": {"label": "Nested polymorphic types", "default": true, "work": "n nested polymorphic Box constructors followed by n projections"},
+    "rank2_callbacks": {"label": "Many rank-2 callback consumers", "default": true, "work": "n distinct consumers use their polymorphic callback at both Int and Bool"},
+    "decoder_pipeline": {"label": "Dependent decoder stages", "default": true, "work": "n field reads with state-dependent checks and an early malformed-input exit"},
     "baseline": {"label": "Minimal IO baseline", "default": false, "work": "a program that only reads argv and prints it"}
   },
   "sizes": [8, 32, 128, 1024, 8192],
@@ -33,12 +37,12 @@
   "seed": 20261031,
   "matrices": {
     "default": {
-      "description": "21 families at five sizes, six paired builds per size; 105 cells, 1,260 timed compilations",
+      "description": "25 families at five sizes, six paired builds per size; 125 cells, 1,500 timed compilations",
       "families": ["flat_functions", "inferred_functions", "inferred_poly_functions", "dependency_chain",
                    "inferred_chain", "inferred_poly_chain", "recursive_ring", "mono_calls", "poly_calls",
                    "tree_chain", "balanced_tree", "literal_table", "higher_order_chain", "local_functions",
                    "wide_case", "class_instances", "dependency_diamonds", "state_updates", "captured_closures",
-                   "wide_product", "rank2_arguments"],
+                   "wide_product", "rank2_arguments", "irregular_literal_table", "nested_poly_types", "rank2_callbacks", "decoder_pipeline"],
       "sizes": [8, 32, 128, 1024, 8192],
       "baseline": false,
       "repeats": 6

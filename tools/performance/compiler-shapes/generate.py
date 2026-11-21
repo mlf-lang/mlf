@@ -3,6 +3,9 @@ from pathlib import Path
 import hashlib
 import json
 
+import data_shapes
+import rank_shapes
+
 REGISTRY = json.loads(Path(__file__).with_name('matrix.json').read_text())
 HEADER = '''-- mlf:syntax shared-haskell-v1
 {-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
@@ -92,7 +95,14 @@ def program(family, n):
         arms = '; '.join(f'Tag{i} -> {2*i+1}' for i in range(n))
         declarations = (f'data Tag = {tags};\npick :: Int -> Tag;\npick x = {tag_selector(0, n-1)};\n'
                         f'score :: Tag -> Int;\nscore tag = case tag of {{ {arms} }};\n')
-        expression = 'addInt x (score (pick x))'
+        return (HEADER + declarations
+                + 'selectedScore :: Int -> Int;\nselectedScore i = score (pick i);\n'
+                + 'entry :: Int -> Int;\nentry x = addInt x (selectedScore x);\n'
+                + 'printAll :: Int -> IO ();\n'
+                + f'printAll i = if eqInt i {n} then ioReturn () '
+                + 'else ioBind (printInt (selectedScore i)) (\\_ -> printAll (addInt i 1));\n'
+                + 'main :: IO ();\nmain = ioBind (getArg 0) (\\text -> if eqString text "--all" '
+                + 'then printAll 0 else printInt (entry (readInt text)))\n}\n')
     elif family == 'class_instances':
         declarations = ('class Score a where { score :: a -> Int };\n'
                         'measure :: forall a. Score a => a -> Int;\nmeasure value = score value;\n')
@@ -153,6 +163,10 @@ def program(family, n):
             selected = 'left' if i % 2 == 0 else 'right'
             terms.append(f'probe (\\left right -> {selected}) x {i}')
         expression = balanced(terms, lambda a, b: f'addInt ({a}) ({b})')
+    elif family in ('irregular_literal_table', 'decoder_pipeline'):
+        declarations, expression = data_shapes.program_body(family, n)
+    elif family in ('nested_poly_types', 'rank2_callbacks'):
+        declarations, expression = rank_shapes.program_body(family, n, balanced)
     elif family == 'state_updates':
         updates = ''.join(f'v{i} <- readIntArray cell 0; writeIntArray cell 0 (subInt {i} v{i});\n'
                           for i in range(n))
@@ -210,11 +224,21 @@ def expected(family, n, x):
         left_sites = n - right_sites
         increments = (left_sites if x < 0 else 0) + (right_sites if x > 0 else 0)
         return (left_sites + 2 * right_sites) * x + n * (n - 1) // 2 + increments
+    if family in ('irregular_literal_table', 'decoder_pipeline'):
+        return data_shapes.expected(family, n, x)
+    if family in ('nested_poly_types', 'rank2_callbacks'):
+        return rank_shapes.expected(family, n, x)
     if family == 'state_updates':
         return n//2 - x if n % 2 else x + n//2
     if family == 'literal_table':
         return x*n*(n-1)//2 + n*(n+1)//2
     raise ValueError(family)
+
+
+def expected_output(family, size, argument):
+    if family == 'wide_case' and argument == '--all':
+        return ''.join(f'{2*i+1}\n' for i in range(size))
+    return f'{expected(family, size, argument)}\n'
 
 
 def generate(out, sizes=None, families=None):
@@ -233,12 +257,16 @@ def generate(out, sizes=None, families=None):
         source = directory/'Main.hs'; source.write_text(program(family,n))
         inputs = [-1,0,n+3] if family == 'recursive_ring' else [-1,0,7]
         if family == 'wide_case':
+            inputs = [-1, n//2, n, '--all']
+        elif family == 'decoder_pipeline':
+            inputs = data_shapes.inputs(family, n)
+        elif family == 'rank2_callbacks':
             inputs = [-1, n//2, n]
         elif family in ('captured_closures', 'wide_product'):
             inputs = [-n-1, 0, n+1]
         cases.append({'id':identity,'family':family,'size':n,'source':str(source.resolve()),
             'source_sha256':hashlib.sha256(source.read_bytes()).hexdigest(),'source_bytes':source.stat().st_size,
-            'inputs':inputs, 'expected_stdout':[f'{expected(family,n,x)}\n' for x in inputs],
+            'inputs':inputs, 'expected_stdout':[expected_output(family,n,x) for x in inputs],
             'syntax':'shared-haskell-v1; identical source bytes for GHC and MLF',
             'route':'one Main module, imports fixed MLF.Primitive; main reads runtime argv'})
     (out/'cases.json').write_text(json.dumps(cases,indent=2)+'\n')
