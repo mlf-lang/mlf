@@ -44,36 +44,24 @@ module Bootstrap.LLVM.Optimize where {
   eqName :: XName -> XName -> Bool;
   eqName a b = (nameId a == nameId b);
   free :: XErased -> Set XName;
-  free expression =
-    case expression of {
-      XEVar n -> S.singleton n;
-      XEAbs n b -> S.delete compareName n (free b);
-      XEApp f a -> S.union compareName (free f) (free a);
-      XELet n a b -> S.union compareName (free a) (S.delete compareName n (free b));
-      XELetRec ds b ->
-        S.difference compareName
-          (S.unions compareName
-             ((:) (free b)
-                (L.map
-                   (\entry ->
-                      case entry of {
-                        (,) n a -> free a
-                      })
-                   ds)))
-          (S.fromList compareName
-             (L.map
-                (\entry ->
-                   case entry of {
-                     (,) n a -> n
-                   })
-                ds));
-      XECase a branches ->
-        S.union compareName (free a) (S.unions compareName (L.map freeAlternative branches));
-      _ -> S.empty
-    };
+  free expression = freeWith free expression;
+  freeWith :: (XErased -> Set XName) -> XErased -> Set XName;
+  freeWith descend expression = case expression of {
+    XEVar n -> S.singleton n;
+    XEAbs n b -> S.delete compareName n (descend b);
+    XEApp f a -> S.union compareName (descend f) (descend a);
+    XELet n a b -> S.union compareName (descend a) (S.delete compareName n (descend b));
+    XELetRec ds b -> S.difference compareName
+      (S.unions compareName ((:) (descend b) (L.map (L.compose descend L.snd) ds)))
+      (S.fromList compareName (L.map L.fst ds));
+    XECase a branches -> S.union compareName (descend a)
+      (S.unions compareName (L.map (freeAlternativeWith descend) branches));
+    _ -> S.empty
+  };
   freeAlternative :: XErasedAlternative -> Set XName;
-  freeAlternative (XErasedAlternative p b) =
-    S.difference compareName (free b) (S.fromList compareName (X.patternNames p));
+  freeAlternative = freeAlternativeWith free;
+  freeAlternativeWith descend (XErasedAlternative pattern body) =
+    S.difference compareName (descend body) (S.fromList compareName (X.patternNames pattern));
   applications :: XErased -> (,) XErased ([] XErased);
   applications expression = collectApplications [] expression;
   collectApplications :: [] XErased -> XErased -> (,) XErased ([] XErased);

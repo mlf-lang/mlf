@@ -33,6 +33,7 @@ import qualified Bootstrap.QueryGraph as Q
 import qualified Bootstrap.InferenceUnit as Inference
 import qualified Bootstrap.OpenFragment as Open
 import qualified Bootstrap.Separate as Separate
+import qualified Bootstrap.LLVM.Analysis as Analysis
 import qualified Bootstrap.LLVM.Codegen as Codegen
 import qualified Bootstrap.LLVM.Optimize as Optimize
 import qualified Bootstrap.X.Check as XCheck
@@ -1151,6 +1152,39 @@ continuationPipelineChecks = do
       case Runtime.integer (Runtime.evaluate env (Runtime.REnv M.empty) term) of
         T.Right result -> check "callback pipeline exits at first invalid field" expected result
         T.Left why -> fail (H.unpack why)
+
+-- Compare each emitted callback's capture set to a fresh traversal. Include
+-- repeated open-term identities and transitive captures through static workers.
+lambdaCaptureChecks = do
+  let name i = T.XName i "same hint"
+      var = T.XEVar . name
+      app = T.XEApp
+      lam i = T.XEAbs (name i)
+      ids = map Optimize.nameId . S.toList
+      fields = T.XConstructorPattern "Pair" [T.Just (name 12),T.Nothing]
+      arm = T.XErasedAlternative fields
+      recursion = T.XELetRec [(name 7,lam 8 (app (var 7) (var 90)))] (var 7)
+      shadowed = T.XELet (name 9) (var 93)
+        (T.XECase (var 9) [arm (app (var 12) (lam 2 (app (var 9) (var 91))))])
+      tree = lam 1 (app (app recursion shadowed) (lam 2 (app (var 2) (var 94))))
+      worker = Analysis.WorkerFunction [name 200] (var 90) [name 1,name 95] S.empty (Analysis.EntryDemand [] False)
+      workers = M.singleton (name 90) worker
+      summaries = Analysis.lambdaFreeTable tree
+      bodies term = case term of
+        T.XEAbs n b -> (n,b) : bodies b
+        _ -> concatMap bodies (Analysis.children term)
+  forM_ (bodies tree) $ \(binder,body) ->
+    check "indexed lexical captures agree with worker expansion and lexical scope"
+      (ids (S.delete Optimize.compareName binder (Analysis.needed workers body)))
+      (ids (Analysis.lambdaNeeded workers summaries binder body))
+  check "two open lambdas sharing an identity fall back to their own bodies" True
+    (case M.lookup Optimize.compareName (name 2) summaries of T.Just T.Nothing -> True; _ -> False)
+  let depth = 8192
+      chain = foldr (\i body -> lam i (app (var i) body)) (var 99999) [1..depth]
+      table = Analysis.lambdaFreeTable chain
+  check "all deep callback bodies retain a lexical summary" depth (M.size table)
+  check "deep lambda captures only the external name" [99999]
+    (case chain of T.XEAbs n b -> ids (Analysis.lambdaNeeded M.empty table n b); _ -> [])
 
 -- Both arms call the previous layer with their own lambda parameters.
 -- Duplicating that captured function at each use unfolds a linear graph into
@@ -2485,6 +2519,7 @@ main = do
   knownConstructorFoldChecks
   sharedFunctionDiamondChecks
   continuationPipelineChecks
+  lambdaCaptureChecks
   openGeometryChecks
   signedConstructorChecks
   putStrLn "1032 ordered SCC and reach comparisons, query DAG and package controls passed"

@@ -16,10 +16,9 @@ module Bootstrap.LLVM.Build where {
   data CGBinding = CGBinding String Bool | CGSlot String Bool;
   data Scalar = Boxed String | Floating String;
   data NativeMode = General | UnboxedDouble | NonnegativeInt | SmallIndex;
+  data FunctionScope = FunctionScope (Map XName A.WorkerFunction) (Map XName (Maybe (Set XName)));
   data Output =
-    Output Int ([] String) String ([] String) ([] String) (Map String ((,) Int Int)) (Map
-                                                                                             XName
-                                                                                             A.WorkerFunction) (Set
+    Output Int ([] String) String ([] String) ([] String) (Map String ((,) Int Int)) FunctionScope (Set
                                                                                                                 String) (Map
                                                                                                                         XName
                                                                                                                         String) (Set
@@ -87,10 +86,15 @@ module Bootstrap.LLVM.Build where {
   withConstructors value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) =
     Output f0 f1 f2 f3 f4 value f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22;
   functions :: Output -> Map XName A.WorkerFunction;
-  functions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) = f6;
+  functions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) = case f6 of { FunctionScope fs _ -> fs };
   withFunctions :: Map XName A.WorkerFunction -> Output -> Output;
   withFunctions value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) =
-    Output f0 f1 f2 f3 f4 f5 value f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22;
+    case f6 of { FunctionScope _ names ->
+      Output f0 f1 f2 f3 f4 f5 (FunctionScope value names) f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 };
+  callbackNames :: Output -> XName -> XErased -> [] XName;
+  callbackNames (Output _ _ _ _ _ _ (FunctionScope fs names) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) binder body =
+    S.toList (A.lambdaNeeded fs names binder body);
+
   workers :: Output -> Set String;
   workers (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) = f7;
   withWorkers :: Set String -> Output -> Output;

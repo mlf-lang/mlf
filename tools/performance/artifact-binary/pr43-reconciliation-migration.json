@@ -196,13 +196,17 @@
       "4ca4c87e0a32932b4d2227b9ff55bd73d34e4f1c5570f027b7e7677fc86d2750",
       "94926fadbac6423e4379865554fb9572fcd3597d93922d4174481cb54af142f3"
     ],
+    "libraries/mlf-llvm/Bootstrap/LLVM/Analysis.hs": [
+      "b10dbe9ea529646a375f50144ffb4dbac5b2c3ac5453e02170334f78fd57e65e",
+      "db63641e330fa0c29ee7be1bef811d9591406ac0e314130afc9c019fbe230e11"
+    ],
     "libraries/mlf-llvm/Bootstrap/LLVM/Build.hs": [
       "e78bf81269ae16b493f3170d91cd2c451891479aca184a2fa302194b95679e86",
-      "08bc45a9c4f3e0a2906d48829cb27567228410f15707e7b82196afef2f2f7881"
+      "13346e78ad7284cbeac2dc20781855789f8f74dcff9961bb0677c4b6b1b9900c"
     ],
     "libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs": [
       "d4c94567ae188538e107306e6730206547261aa8c461e87fdb564bcdad7e11db",
-      "2f62b0fba4793e8aa27518ebcf45fe20a1b33cc531691054311fe6631c74fff1"
+      "7070a639f4db740d49794f6a5256fd4b1cebfdff957b42dd649939ca5661706b"
     ],
     "libraries/mlf-llvm/Bootstrap/LLVM/Kernel.hs": [
       "46ae5be45d9c6f58a61a1c52856bd11befeb3b6fa4ed7c7b09118a9226948642",
@@ -214,7 +218,7 @@
     ],
     "libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs": [
       "4cc34c817a9e12dd77e2f27ebae98aa4d977c5247d741668bad1a86b898bba1f",
-      "c7a626c5cf3630a99cd528ec762d515c09658b9bf4dd58120ad7bdc9feaa1aa9"
+      "1d6523f59722e30dfd42ace9c788ab189c4055cea53b72dc947c5c419fe3562b"
     ],
     "libraries/mlf-package-core/Package/Build.hs": [
       "9df00f9622c9a1acafc2d6068980dadf56cafd33886c644b5bffb995a84152d8",
@@ -242,7 +246,7 @@
     ],
     "mlf.lock": [
       "5f7f58dece7a251711a3da2b78ba42502bd25554672bbbeaf8bf95abbc469077",
-      "43a88598cc9c55a212ad2a0be03eef9c630a7f7ebb7896a7bb24d48889a0652e"
+      "b19009c46b532198153aa21e5e702921e4730928f96b6c50d8a614e12524795a"
     ],
     "runtime/mlf_build_runner_hash.h": [
       "cbbdfd06eb43324dceef594e42b21621559df3e3d4e91d62f2b73e2b04d9e778",
@@ -3906,6 +3910,33 @@
       "predecessor": "0226d3a2cdde176e5c1a317436b5eae74c92e643",
       "predecessor_manifest_sha256": "8ab619d7fd1766ef3dd32417b61ec4458c09893449bdb240310ddd86d5df8e3e",
       "predecessor_tree": "dda815d353452c22f93a2b7fefc3940c371700ee"
+    },
+    {
+      "changes": {
+        "libraries/mlf-llvm/Bootstrap/LLVM/Analysis.hs": [
+          "b10dbe9ea529646a375f50144ffb4dbac5b2c3ac5453e02170334f78fd57e65e",
+          "db63641e330fa0c29ee7be1bef811d9591406ac0e314130afc9c019fbe230e11"
+        ],
+        "libraries/mlf-llvm/Bootstrap/LLVM/Build.hs": [
+          "08bc45a9c4f3e0a2906d48829cb27567228410f15707e7b82196afef2f2f7881",
+          "13346e78ad7284cbeac2dc20781855789f8f74dcff9961bb0677c4b6b1b9900c"
+        ],
+        "libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs": [
+          "2f62b0fba4793e8aa27518ebcf45fe20a1b33cc531691054311fe6631c74fff1",
+          "7070a639f4db740d49794f6a5256fd4b1cebfdff957b42dd649939ca5661706b"
+        ],
+        "libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs": [
+          "c7a626c5cf3630a99cd528ec762d515c09658b9bf4dd58120ad7bdc9feaa1aa9",
+          "1d6523f59722e30dfd42ace9c788ab189c4055cea53b72dc947c5c419fe3562b"
+        ],
+        "mlf.lock": [
+          "43a88598cc9c55a212ad2a0be03eef9c630a7f7ebb7896a7bb24d48889a0652e",
+          "b19009c46b532198153aa21e5e702921e4730928f96b6c50d8a614e12524795a"
+        ]
+      },
+      "predecessor": "719c6f16737b28bb9155cb2dd66c0baf6ab9be6b",
+      "predecessor_manifest_sha256": "42a816f8c68986f2b66363d1a85d504cd3019d3a2a9f2b6d2de3b2316069988f",
+      "predecessor_tree": "2a4f6dcb888cdbc430d04efdcaca4a5bbbcdba33"
     }
   ],
   "format": "pr43-reconciliation-source-migration-v1",

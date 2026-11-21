@@ -43,7 +43,7 @@ module Bootstrap.LLVM.Codegen where {
     } in
     let {
       output =
-        Output 0 [] "entry" [] [] cs fs S.empty M.empty ks S.empty (K.collecting fs ks) M.empty
+        Output 0 [] "entry" [] [] cs (FunctionScope fs (A.lambdaFreeTable term)) S.empty M.empty ks S.empty (K.collecting fs ks) M.empty
           True
           M.empty
           M.empty
@@ -1014,10 +1014,7 @@ module Bootstrap.LLVM.Codegen where {
         };
       XEAbs n body ->
         do {
-          fs <- gets functions;
-          let {
-            captures = S.toList (S.delete O.compareName n (A.needed fs body))
-          };
+          captures <- gets (\state -> callbackNames state n body);
           code <- callback captures (Just n) body;
           env <- environment scope captures;
           call "@mlf_closure" (args2 (pointer code) (pointer env))
