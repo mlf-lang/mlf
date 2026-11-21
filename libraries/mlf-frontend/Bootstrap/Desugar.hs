@@ -41,6 +41,8 @@ module Bootstrap.Desugar where {
     SVar n -> (:) n rest;
     SGlobal _ n -> (:) n rest;
     SDeclScope _ body -> namesBefore body rest;
+    SGivenScope names body -> namesBefore (expandWantedScopes names body) rest;
+    SWantedScope n env -> namesBefore (SWantedRefs n (wantedScopeRefs [] env)) rest;
     SWantedRefs n candidates -> (:) n (foldr (\candidate more -> (:) (termRefName (snd candidate)) more) rest candidates);
     SConstructor n -> (:) n rest;
     SLam n _ body -> (:) n (namesBefore body rest);
@@ -139,6 +141,7 @@ module Bootstrap.Desugar where {
       freshPure (SApp (SApp f a) (SLam name Nothing continuation))
     };
     SDeclScope ids body -> do { b <- sharedGo env body; freshPure (SDeclScope ids b) };
+    SGivenScope names body -> do { b <- sharedGo env body; freshPure (SGivenScope names b) };
     SSourceDefinition body -> do { b <- sharedGo env body; freshPure (SSourceDefinition b) };
     SCallSite n location body -> do { b <- sharedGo env body; freshPure (SCallSite n location b) };
     SLam n annotation body -> do { b <- sharedGo env body; freshPure (SLam n annotation b) };
@@ -173,6 +176,7 @@ module Bootstrap.Desugar where {
   go expression =
     case expression of {
       SDeclScope ids body -> do { b <- go body; freshPure (SDeclScope ids b) };
+      SGivenScope names body -> do { b <- go body; freshPure (SGivenScope names b) };
       SSourceDefinition body -> do { b <- go body; freshPure (SSourceDefinition b) };
       SCallSite name location body -> do {
         result <- go body; freshPure (SCallSite name location result)

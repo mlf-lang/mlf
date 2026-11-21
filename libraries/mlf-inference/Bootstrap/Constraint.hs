@@ -26,18 +26,41 @@ module Bootstrap.Constraint where {
   -- The writer keeps solver work in reverse dependency order. A case barrier
   -- carries a sealed descriptor list before any alternative body is generated.
   data Generation = Generation Graph ([] ((,) Int Int)) ([] SolveStep);
-  data Generate a = Generate (Generation -> Either String ((,) a Generation));
-  runGenerate (Generate f) state = f state;
+  -- The file compiler owns one resolver snapshot. Its module handles remain
+  -- meaningful only inside the current declaration binding environment.
+  -- Public/manual inputs may combine snapshots and resolve their exact rows.
+  data CandidateMemo = SeparateEnvironments | SharedEnvironments (IntMap ResolvedCandidateEnvironment);
+  data Generate a = Generate (Generation -> Either String ((,) a Generation)) |
+    WithCandidates (CandidateMemo -> Generation -> Either String ((,,) a Generation CandidateMemo));
+  runWithCandidates memo action state = case action of {
+    Generate f -> case f state of {
+      Left message -> Left message;
+      Right ((,) value after) -> Right ((,,) value after memo)
+    };
+    WithCandidates f -> f memo state
+  };
+  runGeneration memo action state = case runWithCandidates memo action state of {
+    Left message -> Left message;
+    Right ((,,) value after _) -> Right ((,) value after)
+  };
+  runGenerate action state = runGeneration SeparateEnvironments action state;
   generatePure :: forall a. a -> Generate a;
   generatePure value = Generate (\state -> Right ((,) value state));
   generateBind :: forall a b. Generate a -> (a -> Generate b) -> Generate b;
-  generateBind action next =
-    Generate
-      (\state ->
-         case runGenerate action state of {
-           Left message -> Left message;
-           Right ((,) value after) -> seq after (runGenerate (next value) after)
-         });
+  generateBind action next = WithCandidates (\memo state ->
+    case runWithCandidates memo action state of {
+      Left message -> Left message;
+      Right ((,,) value after memo2) -> seq after (runWithCandidates memo2 (next value) after)
+    });
+  -- Lexical binders cannot change a declaration slot. A declaration binder
+  -- installs a different slot table, whose memo lives only inside its body.
+  withDeclarationScope action = WithCandidates (\memo state -> case memo of {
+    SeparateEnvironments -> runWithCandidates SeparateEnvironments action state;
+    SharedEnvironments _ -> case runWithCandidates (SharedEnvironments IM.empty) action state of {
+      Left message -> Left message;
+      Right ((,,) value after _) -> Right ((,,) value after memo)
+    }
+  });
   instance Functor Generate where {
     fmap function action = generateBind action (\value -> generatePure (function value))
   };
@@ -184,7 +207,9 @@ module Bootstrap.Constraint where {
   evaluatePreparedSteps :: Solver -> [] SolveStep -> Either String Solver;
   evaluatePreparedSteps initial steps = foldM evaluatePreparedStep initial steps;
   generalization (Typed gen _) = gen;
-  form (Typed _ f) = f;
+  rawForm (Typed _ f) = f;
+  form typed = stripGivenScope (rawForm typed);
+  stripGivenScope f = case f of { FWithGivens _ body -> stripGivenScope body; _ -> f };
   fromGen (Edge gen _) = gen;
   toNode (Edge _ target) = target;
   initialGraph (Constraints graph _ _ _) = graph;
@@ -240,6 +265,8 @@ module Bootstrap.Constraint where {
         CDeclScope [i] (CLam n (CDeclScope [i] (CLet n (CApp (CCoerce annotation) (CGlobal i n)) (desugar body))));
       SDeclScope ids body -> CDeclScope ids (desugar body);
       SWantedRefs dictionary candidates -> CWantedRefs dictionary candidates;
+      SWantedScope dictionary environment -> CWantedScope dictionary environment;
+      SGivenScope names body -> CGivenScope names (desugar body);
       SConstructor n -> CConstructor n;
       SLam x Nothing body -> CLam x (desugar body);
       SLam x (Just annotation) body ->
@@ -284,7 +311,9 @@ module Bootstrap.Constraint where {
     };
   generate expression = generateProgram (SProgram [] expression);
   generateProgram :: SProgram -> Either String Constraints;
-  generateProgram program =
+  generateProgram = generateProgramWith SeparateEnvironments;
+  generateFileProgram = generateProgramWith (SharedEnvironments IM.empty);
+  generateProgramWith memo program =
     case program of {
       SClassProgram _ _ _ _ ->
         Left "class declarations must be translated before constraint generation";
@@ -294,7 +323,7 @@ module Bootstrap.Constraint where {
           lowered <- Surface.lowerExpression expression;
           validateAnnotations datatypes lowered;
           result <-
-            runGenerate (build datatypes M.empty Nothing M.empty (desugar lowered))
+            runGeneration memo (build datatypes M.empty Nothing M.empty (desugar lowered))
               (Generation G.emptyGraph [] []);
           case result of {
             (,) typed (Generation graph eqs es) ->
@@ -322,6 +351,32 @@ module Bootstrap.Constraint where {
     DeclRef i _ -> BindingEnv locals (M.insert compareRefSlot i value globals)
   };
   bindTerms env entries = foldlStrict (\scope ((,) ref value) -> bindTerm scope ref value) env entries;
+  isDeclarationRef ref = case ref of { DeclRef _ _ -> True; _ -> False };
+  withBoundRef ref action = if isDeclarationRef ref then withDeclarationScope action else action;
+  evidenceBinding env ((,) role ref) = case lookupTerm env ref of {
+    Just (Mono name identity) -> Right (EvidenceBinding role name identity False);
+    Just (Poly name source) -> Right (EvidenceBinding role name source True);
+    Just (DeclaredPoly name _ declared) -> Right (DeclaredEvidenceBinding role name declared);
+    Just (RecursiveMono _ _ _) -> Left "recursive dictionary interfaces require an explicit signature";
+    Nothing -> Left ("dictionary candidate is out of scope: " ++ termRefName ref)
+  };
+  resolveCandidateEnvironment env gen (CandidateEnvironment owner refs) =
+    WithCandidates (\memo state -> let {
+      resolve = traverseEither (evidenceBinding env) refs;
+      fresh rows = ResolvedCandidateEnvironment gen rows
+    } in case memo of {
+      SeparateEnvironments -> mapEither (\rows -> (,,) (fresh rows) state memo) resolve;
+      SharedEnvironments table -> case IM.lookup owner table of {
+        Just shared -> Right ((,,) shared state memo);
+        Nothing -> do {
+          -- Only declaration references belong to a module's immutable base.
+          ensure (all (compose isDeclarationRef snd) refs) "lexical binding in module evidence environment";
+          rows <- resolve;
+          let { shared = fresh rows; next = IM.insert owner shared table };
+          seq next (Right ((,,) shared state (SharedEnvironments next)))
+        }
+      }
+    });
   build :: DataEnv -> Map String Int -> Maybe Int -> Map String Binding -> Core -> Generate Typed;
   build datatypes typeScope parent locals = buildIn datatypes typeScope parent (BindingEnv locals M.empty);
   buildIn :: DataEnv -> Map String Int -> Maybe Int -> BindingEnv -> Core -> Generate Typed;
@@ -330,20 +385,7 @@ module Bootstrap.Constraint where {
       gen <- newNode (GGen (-1)) parent Flexible;
       root <- newNode GBot (Just gen) Flexible;
       setNode gen (Node (GGen root) parent Flexible);
-      let {
-        resolved =
-          case core of {
-            CVar x ->
-              if isJust (lookupTerm env (LexicalRef x))
-              then core
-              else case P.lookupPrimitive x of {
-                     Nothing -> core;
-                     Just p -> CPrimitive p
-                   };
-            _ -> core
-          }
-      };
-      f <- buildCore datatypes typeScope env gen root resolved;
+      f <- buildCore datatypes typeScope env gen root core;
       return (Typed gen f)
     };
   buildCore :: DataEnv ->
@@ -360,7 +402,13 @@ module Bootstrap.Constraint where {
     } in
     let {
       variable ref = case lookupTerm env ref of {
-          Nothing -> failGenerate ("unbound variable: " ++ termRefName ref);
+          Nothing -> case ref of {
+            LexicalRef x -> case P.lookupPrimitive x of {
+              Just primitive -> buildCore datatypes typeScope env gen root (CPrimitive primitive);
+              Nothing -> failGenerate ("unbound variable: " ++ x)
+            };
+            DeclRef _ hint -> failGenerate ("unbound variable: " ++ hint)
+          };
           Just (Mono name identity) ->
             do {
               equality root identity;
@@ -389,7 +437,7 @@ module Bootstrap.Constraint where {
           domain <- bottom;
           result <- bottom;
           setTag (GArr domain result);
-          body' <- child (bindTerm env ref (Mono name domain)) body;
+          body' <- withBoundRef ref (child (bindTerm env ref (Mono name domain)) body);
           e <- edge (generalization body') result;
           return (FLambda name domain body' e)
         };
@@ -397,11 +445,12 @@ module Bootstrap.Constraint where {
         do {
           name <- freshName (termRefName ref);
           a' <- child env a;
-          b' <- child (bindTerm env ref (Poly name (generalization a'))) b;
+          b' <- withBoundRef ref (child (bindTerm env ref (Poly name (generalization a'))) b);
           e <- edge (generalization b') root;
           return (FBinding name a' b' e)
         };
-      wanted dictionary candidates =
+      explicit refs = liftResult (mapEither FEvidence (traverseEither (evidenceBinding env) refs));
+      wanted dictionary evidence =
         do {
           declaration <- liftResult (D.lookupDatatype datatypes dictionary);
           graph <- getGraph;
@@ -418,36 +467,24 @@ module Bootstrap.Constraint where {
             embed datatypes ps (SCon dictionary (map STVar (D.datatypeParameters declaration)));
           attach gen Flexible embedded;
           equality root embedded;
-          candidates' <-
-            mapM
-              (\candidate ->
-                 case candidate of {
-                   (,) role x ->
-                     case lookupTerm env x of {
-                       Just (Mono name identity) ->
-                         return (EvidenceBinding role name identity False);
-                       Just (Poly name source) -> return (EvidenceBinding role name source True);
-                       Just (DeclaredPoly name _ declared) ->
-                         return (DeclaredEvidenceBinding role name declared);
-                       Just (RecursiveMono _ _ _) ->
-                         failGenerate "recursive dictionary interfaces require an explicit signature";
-                       Nothing -> failGenerate ("dictionary candidate is out of scope: " ++ termRefName x)
-                     }
-                 })
-              candidates;
-          return (FEvidence candidates')
+          evidence
         }
     } in
     case core of {
       CVar x -> variable (LexicalRef x);
+      CGivenScope names body -> do {
+        givens <- liftResult (traverseEither (\name -> evidenceBinding env ((,) GivenEvidence (LexicalRef name))) names);
+        enclosed <- buildCore datatypes typeScope env gen root body;
+        return (FWithGivens givens enclosed)
+      };
       CGlobal i hint -> variable (DeclRef i hint);
       CLam x body -> lambda (LexicalRef x) body;
       CDeclScope ids enclosed -> case (,) ids enclosed of {
         (,) [i] (CLam x body) -> lambda (DeclRef i x) body;
         (,) [i] (CLet x a b) -> binding (DeclRef i x) a b;
         (,) slots (CRec defs body) -> if length slots == length defs
-          then buildRecursive datatypes typeScope env gen root
-            (zipWith (\i ((,,) n mode rhs) -> (,,) (DeclRef i n) mode rhs) slots defs) body
+          then withDeclarationScope (buildRecursive datatypes typeScope env gen root
+            (zipWith (\i ((,,) n mode rhs) -> (,,) (DeclRef i n) mode rhs) slots defs) body)
           else failGenerate "recursive declaration slot inventory mismatch";
         _ -> failGenerate "declaration scope requires a matching top-level binder"
       };
@@ -464,8 +501,11 @@ module Bootstrap.Constraint where {
       CLet x a b -> binding (LexicalRef x) a b;
       CRec defs body -> buildRecursive datatypes typeScope env gen root
         (map (\((,,) n mode rhs) -> (,,) (LexicalRef n) mode rhs) defs) body;
-      CWanted dictionary candidates -> wanted dictionary (map (\((,) role n) -> (,) role (LexicalRef n)) candidates);
-      CWantedRefs dictionary candidates -> wanted dictionary candidates;
+      CWanted dictionary candidates -> wanted dictionary
+        (explicit (map (\((,) role n) -> (,) role (LexicalRef n)) candidates));
+      CWantedRefs dictionary candidates -> wanted dictionary (explicit candidates);
+      CWantedScope dictionary environment -> wanted dictionary
+        (fmap FScopedEvidence (resolveCandidateEnvironment env gen environment));
       CChecked signature expression ->
         do {
           embedded <- embed datatypes typeScope signature;
@@ -662,6 +702,8 @@ module Bootstrap.Constraint where {
     };
     CWanted _ candidates -> map (compose LexicalRef snd) candidates;
     CWantedRefs _ candidates -> map snd candidates;
+    CWantedScope _ (CandidateEnvironment _ refs) -> map snd refs;
+    CGivenScope names body -> append (map LexicalRef names) (recursiveRefs body);
     CChecked _ expression -> recursiveRefs (desugar expression);
     _ -> []
   };
@@ -715,7 +757,9 @@ module Bootstrap.Constraint where {
              case state of {
                (,) scope done ->
                  do {
-                   result <- buildRecursiveGroup datatypes typeScope scope gen names;
+                   result <- if any (\((,,) ref _ _) -> isDeclarationRef ref) names
+                     then withDeclarationScope (buildRecursiveGroup datatypes typeScope scope gen names)
+                     else buildRecursiveGroup datatypes typeScope scope gen names;
                    case result of {
                      (,) scope2 values -> return ((,) scope2 (append done values))
                    }
@@ -831,6 +875,7 @@ module Bootstrap.Constraint where {
   -- Ordinary let infers/generalizes its RHS as before. Only its continuation
   -- is checked under the same expected type, including scoped skolems.
   directed expected (SLet name rhs body) = SLet name rhs (directed expected body);
+  directed expected (SGivenScope names expression) = SGivenScope names (directed expected expression);
   directed expected (SDeclScope ids expression) = SDeclScope ids (directed expected expression);
   directed _ expression = expression;
   freshOptional :: Maybe String -> Generate (Maybe XName);
@@ -1047,6 +1092,8 @@ module Bootstrap.Constraint where {
           "invalid declaration binder slots";
         validateIn datatypes scope b
       };
+      SWantedScope _ _ -> Right ();
+      SGivenScope _ body -> validateIn datatypes scope body;
       SWantedRefs dictionary candidates ->
         validateIn datatypes scope (SWanted dictionary (map (\((,) role ref) -> (,) role (termRefName ref)) candidates));
       SConstructor _ -> Right ();
@@ -1260,6 +1307,9 @@ module Bootstrap.Constraint where {
       solved <- evaluatePreparedSteps initial (solveSteps constraints);
       Solver.finishNormalized solved
     };
+  eraseEvidence evidence typed = case IM.lookup (generalization typed) evidence of {
+    Nothing -> XEEvidenceHole (generalization typed); Just proof -> X.erase proof
+  };
   eraseSource typed = eraseSourceWith IM.empty typed;
   eraseSourceWith :: IntMap XTerm -> Typed -> XErased;
   eraseSourceWith evidence typed =
@@ -1294,11 +1344,8 @@ module Bootstrap.Constraint where {
                 })
              definitions)
           (eraseSourceWith evidence body);
-      FEvidence _ ->
-        case IM.lookup (generalization typed) evidence of {
-          Nothing -> XEEvidenceHole (generalization typed);
-          Just proof -> X.erase proof
-        };
+      FEvidence _ -> eraseEvidence evidence typed;
+      FScopedEvidence _ -> eraseEvidence evidence typed;
       FChecked _ body _ -> eraseSourceWith evidence body
     }
 }

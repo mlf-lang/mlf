@@ -263,6 +263,8 @@ module Bootstrap.BuiltinPreludeLiteral where {
   sourceExpression value = case value of {
     SGlobal _ n -> sourceExpression (SVar n);
     SDeclScope _ b -> sourceExpression b;
+    SGivenScope names body -> sourceExpression (L.expandWantedScopes names body);
+    SWantedScope n env -> sourceExpression (SWantedRefs n (wantedScopeRefs [] env));
     SWantedRefs n xs -> sourceExpression (SWanted n (L.namedCandidates xs));
     SVar n -> application "SVar" [string n];
     SConstructor n -> application "SConstructor" [string n];

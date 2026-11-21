@@ -327,13 +327,17 @@ module Bootstrap.InferenceUnit where {
       Right ((,) externalTypes lowered)
   };
   compileOpenGroupIndexed = compileOpenGroupIndexedWith Surface.bindIndexedMembers;
-  compileOpenGroupIndexedWith bindMembers name parameters datatypes members =
+  compileOpenGroupIndexedWith = compileIndexedUsing Compiler.finishCompilation;
+  -- The file pass supplies members lowered against one resolver snapshot.
+  compileFileGroupIndexedWith = compileIndexedUsing (Compiler.finishCompilationWith Constraint.generateFileProgram);
+  compileIndexedUsing finish bindMembers name parameters datatypes members =
     case signedApplicationGroup parameters datatypes members of {
       Right fragment -> Right fragment;
-      Left _ -> compileElaboratedGroupWith bindMembers parameters datatypes members
+      Left _ -> compileElaboratedUsing finish bindMembers parameters datatypes members
     };
   compileElaboratedGroup = compileElaboratedGroupWith Surface.bindIndexedMembers;
-  compileElaboratedGroupWith bindMembers parameters datatypes members = do {
+  compileElaboratedGroupWith = compileElaboratedUsing Compiler.finishCompilation;
+  compileElaboratedUsing finish bindMembers parameters datatypes members = do {
     (,) externalTypes lowered <- prepareIndexedGroupWith bindMembers parameters datatypes members;
     case monomorphicIndexed parameters members lowered of {
       Right fragment -> Right fragment;
@@ -345,7 +349,7 @@ module Bootstrap.InferenceUnit where {
             Right fragment -> Right fragment;
             Left _ -> case signedLocalGroup parameters members lowered of {
               Right fragment -> Right fragment;
-              Left _ -> finishOpenGroup externalTypes (map snd members) lowered
+              Left _ -> finishOpenGroupWith finish externalTypes (map snd members) lowered
             }
           }
         }
@@ -1504,8 +1508,9 @@ module Bootstrap.InferenceUnit where {
     } };
     Right ((,) externalTypes attached)
   };
-  compileGroupBody externalTypes lowered = do {
-      compiled <- mapLeft Compiler.prettyError (Compiler.finishCompilation lowered);
+  compileGroupBody = compileGroupBodyWith Compiler.finishCompilation;
+  compileGroupBodyWith finish externalTypes lowered = do {
+      compiled <- mapLeft Compiler.prettyError (finish lowered);
       let {
         coreAndData =
           case Compiler.compiledTerm compiled of {
@@ -1544,8 +1549,9 @@ module Bootstrap.InferenceUnit where {
              };
       Right ((,,) declarations (fst boundValueShared9) (snd boundValueShared9))
   };
-  finishOpenGroup externalTypes members lowered = do {
-    (,,) declarations parameters implementation <- compileGroupBody externalTypes lowered;
+  finishOpenGroup = finishOpenGroupWith Compiler.finishCompilation;
+  finishOpenGroupWith finish externalTypes members lowered = do {
+    (,,) declarations parameters implementation <- compileGroupBodyWith finish externalTypes lowered;
     env <- Open.environment declarations;
     checked <- Open.check env parameters implementation;
     ensure

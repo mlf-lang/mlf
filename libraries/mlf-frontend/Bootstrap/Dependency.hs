@@ -111,7 +111,7 @@ module Bootstrap.Dependency where {
   data ValueOccurrences = NoValueOccurrences | ValueOccurrences ([] TermRef);
   valueOccurrences includeCandidates inventory expression = let {
     refsOf values = case values of { NoValueOccurrences -> []; ValueOccurrences refs -> refs };
-    child body = case collect body NoValueOccurrences of {
+    child givens body = case collect givens body NoValueOccurrences of {
       NoValueOccurrences -> emptyObservation; ValueOccurrences refs -> Observation refs [] [] []
     };
     prepend ref rest = case rest of {
@@ -122,66 +122,106 @@ module Bootstrap.Dependency where {
     before values rest = case rest of {
       NoValueOccurrences -> ValueOccurrences values; ValueOccurrences tail -> ValueOccurrences (append values tail)
     };
-    collect body rest = case body of {
-      SSourceDefinition inner -> collect inner rest; SCallSite _ _ inner -> collect inner rest;
-      SApp f a -> collect f (collect a rest);
+    collect givens body rest = let { visit = collect givens } in case body of {
+      SSourceDefinition inner -> visit inner rest; SCallSite _ _ inner -> visit inner rest;
+      SGivenScope locals inner -> collect locals inner rest;
+      SApp f a -> visit f (visit a rest);
       SGlobal i n -> prepend (DeclRef i n) rest;
       SVar n -> prepend (LexicalRef (lexicalValueName n)) rest;
       SConstructor _ -> rest; SPrimitive _ -> rest; SIntLit _ -> rest; SBoolLit _ -> rest;
       SStringLit _ -> rest; SDoubleLit _ -> rest;
-      _ -> case observeScopedWith child includeCandidates inventory body of {
+      _ -> case observeScopedIn givens (child givens) includeCandidates inventory body of {
         Observation values _ _ _ -> before values rest
       }
     }
-  } in refsOf (collect expression NoValueOccurrences);
-  -- Parsed-file inputs and their lowered forms contain complete syntax and
-  -- spellings. Carry lexical masks into the body of each ordinary let so its
-  -- surviving occurrences need only one lookup. A declaration-marked binder
-  -- hides slots, not equal-looking lexicals. Less common scoped nodes retain
-  -- their ordinary walker and filter their resulting list once on exit.
+  } in refsOf (collect [] expression NoValueOccurrences);
+  -- A declaration binder hides IDs, while a lexical binder hides spellings.
+  -- Both file projections use the same masks and visit every form in source
+  -- observation order, including recursively bound definitions and patterns.
   fileValueOccurrences = fileOccurrencesWith True;
-  -- SCC edges and indexed managed protection consult declaration slots only.
-  -- Ignore lexical leaves and their binders in the ordinary file traversal.
   fileDeclarationOccurrences = fileOccurrencesWith False False;
-  fileOccurrencesWith lexical inventory expression = let {
-    emit names ids ref rest = case ref of {
-      LexicalRef n -> if lexical && not (S.member compareString n names) then (:) ref rest else rest;
-      DeclRef i _ -> if IS.member (V.toInt i) ids then rest else (:) ref rest
-    };
-    walk names ids term rest = let { visit = walk names ids;
-      bodyAfter name = if lexical then walk (S.insert compareString name names) ids else visit;
+  fileOccurrencesWith lexical inventory = fileOccurrencesUsing lexical inventory (:)
+    (\visible _ _ (CandidateEnvironment _ entries) rest -> foldr (\((,) _ ref) tail ->
+      if visible ref then (:) ref tail else tail) rest entries) [];
+  -- Contract selection and Prepared ranks care only about the last read of
+  -- each identity. A scope seen to the right covers every visible candidate
+  -- except those hidden at *every* later occurrence. Keep the intersection
+  -- of those masks so differently shadowed sites still contribute their reads.
+  fileLastValueOccurrences = fileLastOccurrencesWith True;
+  fileLastDeclarationOccurrences = fileLastOccurrencesWith False False;
+  fileLastOccurrencesWith lexical inventory expression = let {
+    one ref ((,) scopes refs) = (,) scopes ((:) ref refs);
+    group visible names ids (CandidateEnvironment key entries) ((,) scopes refs) = let {
+      include next = (,) next (foldr (\((,) _ ref) tail ->
+        if visible ref then (:) ref tail else tail) refs entries)
+    } in case IM.lookup key scopes of {
+      Nothing -> include (IM.insert key ((,) names ids) scopes);
+      Just ((,) hidden masked) ->
+        if IS.isSubsetOf masked ids && S.isSubsetOf compareString hidden names
+        then (,) scopes refs
+        else include (IM.insert key ((,) (S.intersection compareString names hidden)
+          (IS.intersection ids masked)) scopes)
+    }
+  } in snd (fileOccurrencesUsing lexical inventory one group ((,) IM.empty []) expression);
+  fileOccurrencesUsing lexical inventory one groupReads empty expression = let {
+    walk givens names ids term rest = let {
+      visible ref = case ref of {
+        LexicalRef n -> lexical && not (S.member compareString n names);
+        DeclRef i _ -> not (IS.member (V.toInt i) ids)
+      };
+      emit ref tail = if visible ref then one ref tail else tail;
+      visit = walk givens names ids;
+      bind bound = if lexical then walk givens (foldlStrict (\prior n -> S.insert compareString n prior) names bound) ids
+        else visit;
+      patternReads pattern tail = foldr emit tail (valueRefs (observePattern pattern));
+      row patterns body tail = foldr patternReads
+        (bind (concatMap Desugar.patternVariables patterns) body tail) patterns;
+      recursive traverse defs body = traverse body (foldr (\((,,) _ _ rhs) -> traverse rhs) rest defs);
+      defNames defs = map (\((,,) name _ _) -> name) defs;
       scoped owners group = let {
         hidden = if inventory then ids else foldlStrict (\prior i -> IS.insert (V.toInt i) prior) ids owners;
-        addOwners hints result = if inventory then
-          foldr (emit names ids) result (zipWith DeclRef owners hints) else result
+        within = walk givens names hidden;
+        addOwners hints result = if inventory then foldr emit result (zipWith DeclRef owners hints) else result
       } in case group of {
-        SLam n _ body -> addOwners [n] (walk names hidden body rest);
-        SLet n rhs body -> addOwners [n] (visit rhs (walk names hidden body rest));
-        _ -> foldr (emit names ids) rest (valueOccurrences True inventory term)
+        SLam n _ body -> addOwners [n] (within body rest);
+        SLet n rhs body -> addOwners [n] (visit rhs (within body rest));
+        SLetRec defs body -> addOwners (defNames defs) (recursive within defs body);
+        _ -> visit group rest
       }
     } in case term of {
       SApp f a -> visit f (visit a rest);
-      SVar n -> if lexical then emit names ids (LexicalRef (lexicalValueName n)) rest else rest;
-      SGlobal i n -> emit names ids (DeclRef i n) rest;
+      SVar n -> if lexical then emit (LexicalRef (lexicalValueName n)) rest else rest;
+      SGlobal i n -> emit (DeclRef i n) rest;
       SSourceDefinition body -> visit body rest;
       SCallSite _ _ body -> visit body rest;
       SSignature body _ -> visit body rest;
       SAnn body _ -> visit body rest;
       SChecked _ body -> visit body rest;
-      SLam n _ body -> bodyAfter n body rest;
-      SLet n rhs body -> visit rhs (bodyAfter n body rest);
+      SLam n _ body -> bind [n] body rest;
+      SLet n rhs body -> visit rhs (bind [n] body rest);
       SDeclScope owners group -> scoped owners group;
-      SPrimitive _ -> rest; SConstructor _ -> rest; SIntLit _ -> rest;
-      SBoolLit _ -> rest; SDoubleLit _ -> rest; SStringLit _ -> rest;
-      _ -> foldr (emit names ids) rest (valueOccurrences True inventory term)
+      SLetRec defs body -> recursive (bind (defNames defs)) defs body;
+      SCase test branches -> visit test (foldr (\(SAlternative p body) -> row [p] body) rest branches);
+      SEquations rows -> foldr (\((,) ps body) -> row ps body) rest rows;
+      SDo _ _ -> visit (Desugar.desugarDo term) rest;
+      SSharedBind p action body binding failure ->
+        row [p] body (visit action (visit binding (visit failure rest)));
+      SGivenScope locals body -> walk locals names ids body rest;
+      SWantedScope _ environment -> foldr (\name -> emit (LexicalRef name))
+        (groupReads visible names ids environment rest) givens;
+      SWantedRefs _ entries -> foldr (\((,) _ ref) -> emit ref) rest entries;
+      SWanted _ entries -> if lexical then foldr (\((,) _ n) -> emit (LexicalRef n)) rest entries else rest;
+      _ -> rest
     }
-  } in walk S.empty IS.empty expression [];
+  } in walk [] S.empty IS.empty expression empty;
   observeSyntax includeCandidates inventory expression =
     observeBefore includeCandidates inventory expression emptyObservation;
   -- Application subtrees contribute ordered occurrences to four independent lists.
-  observeBefore includeCandidates inventory expression rest = let {
-    visit = observeBefore includeCandidates inventory
+  observeBefore = observeBeforeIn [];
+  observeBeforeIn givens includeCandidates inventory expression rest = let {
+    visit = observeBeforeIn givens includeCandidates inventory
   } in case expression of {
+    SGivenScope locals body -> observeBeforeIn locals includeCandidates inventory body rest;
     SSourceDefinition body -> visit body rest;
     SCallSite _ _ body -> visit body rest;
     SApp f a -> visit f (visit a rest);
@@ -189,11 +229,13 @@ module Bootstrap.Dependency where {
     SVar n -> case rest of { Observation vs ts cs ks -> Observation ((:) (LexicalRef (lexicalValueName n)) vs) ts cs ks };
     SConstructor n -> case rest of { Observation vs ts cs ks -> Observation vs ts ((:) n cs) ks };
     SPrimitive _ -> rest; SIntLit _ -> rest; SBoolLit _ -> rest; SStringLit _ -> rest; SDoubleLit _ -> rest;
-    _ -> merge (observeScoped includeCandidates inventory expression) rest
+    _ -> merge (observeScopedIn givens (\body -> visit body emptyObservation) includeCandidates inventory expression) rest
   };
   observeScoped includeCandidates inventory =
     observeScopedWith (observeSyntax includeCandidates inventory) includeCandidates inventory;
-  observeScopedWith child includeCandidates inventory expression = case expression of {
+  observeScopedWith = observeScopedIn [];
+  observeScopedIn givens child includeCandidates inventory expression = case expression of {
+      SGivenScope locals body -> observeBeforeIn locals includeCandidates inventory body emptyObservation;
       SSharedBind pattern action body binding failure ->
         merge (observePattern pattern)
           (merge (bindObservation (S.fromList compareString (Desugar.patternVariables pattern)) (child body))
@@ -241,6 +283,8 @@ module Bootstrap.Dependency where {
                    declarations)));
       SWanted dictionary candidates ->
         Observation (if includeCandidates then map (compose LexicalRef snd) candidates else []) ((:) dictionary []) [] [];
+      SWantedScope dictionary env ->
+        Observation (if includeCandidates then map snd (wantedScopeRefs givens env) else []) [dictionary] [] [];
       SWantedRefs dictionary candidates -> Observation (if includeCandidates then map snd candidates else []) [dictionary] [] [];
       SChecked ty b -> observeTypeBefore (observeType ty) (child b);
       _ -> emptyObservation
@@ -471,36 +515,54 @@ module Bootstrap.Dependency where {
   -- enter the adapter used by the named surface/class lowering boundary.
   data ClassContext = ClassContext GeneratedTable Bool (V.Index Declaration -> Maybe ((,) ([] String) Bool));
   data DefiningScope = DefiningScope;
+  data InstancePosition = InstancePosition;
   data ScopeRows a = ScopeRows (V.IndexVec Declaration (Maybe (V.Index DefiningScope)))
-    (V.IndexVec DefiningScope ((,) (V.Index Declaration) a));
+    (V.IndexVec InstancePosition (V.Index DefiningScope))
+    (V.IndexVec DefiningScope ((,) (Maybe (V.Index Declaration)) a));
   data ValueScopes a = NamedScopes (Map String a) |
     IndexedScopes Bool (Maybe ClassContext) Symbols (Map String (V.Index Declaration)) (ScopeRows a);
   indexedScopes symbols entries =
     indexedScopeGroups symbols (map (\((,) i value) -> (,) [i] value) entries);
-  -- Each nonempty group comes from one defining module. Its first declaration
-  -- identifies that environment within this resolved graph, across all SCCs.
   indexedScopeGroups :: forall a. Symbols -> [] ((,) ([] (V.Index Declaration)) a) -> ValueScopes a;
-  indexedScopeGroups symbols groups = let {
-    active = V.fromList (mapMaybe (\((,) ids value) -> case ids of {
-      [] -> Nothing; (:) owner _ -> Just ((,,) owner ids value)
-    }) groups);
-    members = concatMap (\group -> case V.at active group of {
-      (,,) _ ids _ -> map (\i -> (,) i group) ids
-    }) (V.indices active);
+  indexedScopeGroups symbols groups =
+    indexedScopeRows symbols (V.fromList (filter (\group -> not (null (fst group))) groups)) (V.fromList []);
+  -- The instance-owner sequence follows the unmodified instance inventory,
+  -- including imported declarations. An instance-only module has a real row.
+  indexedModuleScopes symbols declarations instanceOwners scopeOf = let {
+    defined = S.fromList compareString (map fst declarations);
+    extra = S.toList (S.difference compareString (S.fromList compareString instanceOwners) defined);
+    modules = V.fromList (append declarations (map (\name -> (,) name []) extra));
+    ids = M.fromList compareString (map (\i -> (,) (fst (V.at modules i)) i) (V.indices modules));
+    rows = V.fromList (map (\((,) name bindings) -> (,) bindings (scopeOf name)) (V.toList modules));
+    instances = V.fromList (map (\name -> M.get compareString name ids) instanceOwners)
+  } in indexedScopeRows symbols rows instances;
+  indexedScopeRows symbols groups instances = let {
+    members = concatMap (\group -> map (\i -> (,) i group) (fst (V.at groups group))) (V.indices groups);
     names = M.fromList compareString (map (\((,) i _) -> (,) (symbolName symbols i) i) members);
     owners = runST (stBind (V.filled (V.count (symbolNodes symbols)) Nothing) (\rows ->
       stBind (ST.map_ (\((,) i group) -> V.set rows i (Just group)) members) (\_ -> V.freeze rows)));
-    values = V.fromList (map (\((,,) owner _ value) -> (,) owner value) (V.toList active))
-  } in IndexedScopes True Nothing symbols names (ScopeRows owners values);
-  rowScope (ScopeRows owners values) i =
+    values = V.fromList (map (\((,) ids value) -> (,) (listToMaybe ids) value) (V.toList groups))
+  } in IndexedScopes True Nothing symbols names (ScopeRows owners instances values);
+  rowScope (ScopeRows owners _ values) i =
     mapOptional (\group -> snd (V.at values group)) (V.at owners i);
+  lookupInstanceScope scopes position = case scopes of {
+    NamedScopes _ -> Nothing;
+    IndexedScopes _ _ _ _ (ScopeRows _ instances values) ->
+      if position < 0 || position >= V.count instances then Nothing
+      else Just (snd (V.at values (V.at instances (V.fromInt position))))
+  };
   mapScopes f = mapScopesWithId (\_ value -> f value);
   mapScopesWithId :: forall a b. (Maybe (V.Index Declaration) -> a -> b) -> ValueScopes a -> ValueScopes b;
-  mapScopesWithId f scopes = case scopes of {
-    NamedScopes named -> NamedScopes (M.map (f Nothing) named);
-    IndexedScopes top tableId symbols names (ScopeRows owners values) -> let {
-      project ((,) owner value) = (,) owner (f (Just owner) value)
-    } in IndexedScopes top tableId symbols names (ScopeRows owners (V.fromList (map project (V.toList values))))
+  mapScopesWithId f = mapScopeRows (\_ owner -> f owner);
+  mapDefiningScopes :: forall a b. (Maybe Int -> a -> b) -> ValueScopes a -> ValueScopes b;
+  mapDefiningScopes f = mapScopeRows (\group _ -> f (mapOptional V.toInt group));
+  mapScopeRows f scopes = case scopes of {
+    NamedScopes named -> NamedScopes (M.map (f Nothing Nothing) named);
+    IndexedScopes top tableId symbols names (ScopeRows owners instances values) -> let {
+      project group = case V.at values group of {
+        (,) owner value -> (,) owner (f (Just group) owner value)
+      }
+    } in IndexedScopes top tableId symbols names (ScopeRows owners instances (V.fromList (map project (V.indices values))))
   };
   namedScopes scopes = case scopes of {
     NamedScopes named -> named;
@@ -539,7 +601,7 @@ module Bootstrap.Dependency where {
   };
   lookupSourceScope scopes i = case scopes of {
     NamedScopes _ -> Nothing;
-    IndexedScopes _ _ _ _ rows@(ScopeRows owners _) ->
+    IndexedScopes _ _ _ _ rows@(ScopeRows owners _ _) ->
       if V.toInt i < 0 || V.toInt i >= V.count owners then Nothing else rowScope rows i
   };
   scopeForBinder scopes ref copied fallback = case ref of {

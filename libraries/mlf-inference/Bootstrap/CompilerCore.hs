@@ -40,13 +40,14 @@ module Bootstrap.CompilerCore where {
       Right a -> Right a
     };
   finishCompilation :: (,) SProgram (Map String String) -> Either CompileError Compilation;
-  finishCompilation ((,) program names) =
+  finishCompilation = finishCompilationWith C.generateProgram;
+  finishCompilationWith generate ((,) program names) =
     case program of {
       SClassProgram _ _ _ _ ->
         Left (CompileError Inference "class translation did not produce a core program");
       SProgram declarations expression ->
         do {
-          constraints <- atPhase Inference (C.generateProgram program);
+          constraints <- atPhase Inference (generate program);
           solved <- atPhase Inference (C.solvePrepared constraints);
           let {
             graph = Solver.solverGraph solved

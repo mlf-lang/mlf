@@ -169,6 +169,24 @@ module Bootstrap.X.Check where {
     L.mapM (termType ds (typeEnv env)) (M.elems (termEnv env));
     Right (inferIn ds env)
   };
+  -- Lexical evidence precedes module evidence in the original binding list,
+  -- so a duplicate name retains the later module type. When the base is
+  -- valid, only surviving new types require validation. When it is invalid,
+  -- the combined map preserves the original first-error order.
+  checkerWithEarlierBindings ds base = let {
+    checked = checkerIn ds base;
+    types = typeEnv base;
+    globals = termEnv base
+  } in \earlier -> if M.null earlier then checked else let {
+    env = XEnv types (M.union X.compareName globals earlier)
+  } in case checked of {
+    Left _ -> checkerIn ds env;
+    Right _ -> do {
+      L.mapM (\((,) n ty) -> if M.member X.compareName n globals then Right () else termType ds types ty)
+        (M.toList earlier);
+      Right (inferIn ds env)
+    }
+  };
   -- With no type arguments a primitive's result depends only on its ABI
   -- identity. Share that instantiation across checks in every term scope.
   instantiateClosedPrimitive :: Primitive -> Either String XType;

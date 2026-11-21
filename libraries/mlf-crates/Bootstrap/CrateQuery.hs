@@ -9,6 +9,7 @@ module Bootstrap.CrateQuery where {
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.IntSet as IS;
+  import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.Desugar as Desugar;
@@ -118,6 +119,8 @@ module Bootstrap.CrateQuery where {
   encodeExpression expression =
     case expression of {
       SGlobal i _ -> node "decl" [showInt (V.toInt i)];
+      SGivenScope names body -> encodeExpression (expandWantedScopes names body);
+      SWantedScope d base -> encodeExpression (SWantedRefs d (wantedScopeRefs [] base));
       SDeclScope ids body -> node "declaration-scope" [encodeScopes ids,encodeExpression body];
       SWantedRefs dictionary refs -> node "wanted-declarations"
         [dictionary,list (\((,) role ref) -> node (encodeRole role) [encodeTermRef ref]) refs];
@@ -189,7 +192,8 @@ module Bootstrap.CrateQuery where {
   -- and flatten once, instead of copying every enclosing expression at each
   -- node. The ordinary encoders above remain independent format oracles.
   data SourceKey = KeyText String | KeyFields ([] SourceKey)
-    | KeyScope ([] ((,) EvidenceRole String));
+    | KeyScope ([] ((,) EvidenceRole String))
+    | KeyOwnedScope Int ([] String) ([] ((,) EvidenceRole String));
   data FramedKey = FramedText String | FramedFields Int ([] FramedKey);
   keyNode :: String -> [] SourceKey -> SourceKey;
   keyNode tag fields = KeyFields ((:) (KeyText tag) fields);
@@ -198,7 +202,15 @@ module Bootstrap.CrateQuery where {
   inlineScopeKey :: [] ((,) EvidenceRole String) -> SourceKey;
   inlineScopeKey candidates = keyList (\candidate -> KeyText (encodeCandidate candidate)) candidates;
   expressionKey :: ([] ((,) EvidenceRole String) -> SourceKey) -> SExpr -> SourceKey;
-  expressionKey scope expression = let { child = expressionKey scope } in case expression of {
+  expressionKey = expressionKeyWith False;
+  expressionKeyWith projected scope expression = let { child = expressionKeyWith projected scope } in case expression of {
+    SGivenScope names inner -> case inner of {
+      SWantedScope d (CandidateEnvironment owner refs) -> if projected
+        then keyNode "wanted" [KeyText d,KeyOwnedScope owner names (map (\((,) role ref) -> (,) role (termRefName ref)) refs)]
+        else child (expandWantedScopes names inner);
+      _ -> child (expandWantedScopes names inner)
+    };
+    SWantedScope d base -> child (SWantedRefs d (wantedScopeRefs [] base));
     SGlobal i _ -> keyNode "decl" [KeyText (showInt (V.toInt i))];
     SDeclScope ids body -> keyNode "declaration-scope" [KeyText (encodeScopes ids),child body];
     SWantedRefs dictionary refs -> keyNode "wanted-declarations" [KeyText dictionary,
@@ -216,42 +228,38 @@ module Bootstrap.CrateQuery where {
     SBoolLit b -> keyNode "boolean" [KeyText (boolean b)];
     SStringLit s -> keyNode "string" [KeyText s];
     SPrimitive p -> keyNode "primitive" [KeyText (Primitive.primitiveName p)];
-    SCase a branches -> keyNode "case" [child a, keyList (alternativeKey scope) branches];
+    SCase a branches -> keyNode "case" [child a, keyList (alternativeKey child) branches];
     SSourceDefinition body -> keyNode "source-definition" [child body];
     SCallSite label span body -> keyNode "call-site" [KeyText label, KeyText (encodeSourceSpan span), child body];
     SSharedBind pattern action continuation bindMethod failure -> keyNode "shared-bind"
       [KeyText (encodePattern pattern), child action, child continuation, child bindMethod, child failure];
-    SDo statements body -> keyNode "do" [keyList (statementKey scope) statements, child body];
-    SEquations rows -> keyNode "equations" [keyList (equationKey scope) rows];
-    SLetRec definitions body -> keyNode "letrec" [keyList (recursiveKey scope) definitions, child body];
+    SDo statements body -> keyNode "do" [keyList (statementKey child) statements, child body];
+    SEquations rows -> keyNode "equations" [keyList (equationKey child) rows];
+    SLetRec definitions body -> keyNode "letrec" [keyList (recursiveKey child) definitions, child body];
     SWanted dictionary candidates -> keyNode "wanted" [KeyText dictionary, scope candidates];
     SChecked ty body -> keyNode "checked" [KeyText (encodeType ty), child body]
   };
-  alternativeKey :: ([] ((,) EvidenceRole String) -> SourceKey) -> SAlternative -> SourceKey;
-  alternativeKey scope (SAlternative pattern body) =
-    keyNode "alternative" [KeyText (encodePattern pattern), expressionKey scope body];
-  equationKey :: ([] ((,) EvidenceRole String) -> SourceKey) -> (,) ([] SPattern) SExpr -> SourceKey;
-  equationKey scope ((,) patterns body) =
-    keyNode "equation" [KeyText (list encodePattern patterns), expressionKey scope body];
-  recursiveKey :: ([] ((,) EvidenceRole String) -> SourceKey) ->
-    (,,) String RecursiveMode SExpr -> SourceKey;
-  recursiveKey scope ((,,) name mode body) = case mode of {
-    InferRecursive -> keyNode "recursive-infer" [KeyText name, expressionKey scope body];
+  alternativeKey child (SAlternative pattern body) =
+    keyNode "alternative" [KeyText (encodePattern pattern), child body];
+  equationKey child ((,) patterns body) =
+    keyNode "equation" [KeyText (list encodePattern patterns), child body];
+  recursiveKey child ((,,) name mode body) = case mode of {
+    InferRecursive -> keyNode "recursive-infer" [KeyText name, child body];
     CheckRecursive annotation -> keyNode "recursive"
-      [KeyText name, KeyText (encodeAnnotation annotation), expressionKey scope body]
+      [KeyText name, KeyText (encodeAnnotation annotation), child body]
   };
-  statementKey :: ([] ((,) EvidenceRole String) -> SourceKey) -> SStatement -> SourceKey;
-  statementKey scope statement = case statement of {
-    SDoBind pattern body -> keyNode "do-bind" [KeyText (encodePattern pattern), expressionKey scope body];
-    SDoThen body -> keyNode "do-then" [expressionKey scope body];
+  statementKey child statement = case statement of {
+    SDoBind pattern body -> keyNode "do-bind" [KeyText (encodePattern pattern), child body];
+    SDoThen body -> keyNode "do-then" [child body];
     SDoLet name annotation body -> keyNode "do-let"
-      [KeyText name, KeyText (optional encodeAnnotation annotation), expressionKey scope body];
-    SDoLetRec definitions -> keyNode "do-letrec" [keyList (recursiveKey scope) definitions]
+      [KeyText name, KeyText (optional encodeAnnotation annotation), child body];
+    SDoLetRec definitions -> keyNode "do-letrec" [keyList (recursiveKey child) definitions]
   };
   memberKey :: ([] ((,) EvidenceRole String) -> SourceKey) ->
     (,,) String (Maybe SAnnotation) SExpr -> SourceKey;
-  memberKey scope ((,,) name annotation body) = keyNode "member"
-    [KeyText name, KeyText (optional encodeAnnotation annotation), expressionKey scope body];
+  memberKey = memberKeyWith False;
+  memberKeyWith projected scope ((,,) name annotation body) = keyNode "member"
+    [KeyText name, KeyText (optional encodeAnnotation annotation), expressionKeyWith projected scope body];
   compareCandidateScopes :: [] ((,) EvidenceRole String) -> [] ((,) EvidenceRole String) -> Int;
   compareCandidateScopes left right = case left of {
     [] -> if null right then 0 else 0 - 1;
@@ -268,6 +276,7 @@ module Bootstrap.CrateQuery where {
   keyScopes key known = case key of {
     KeyText _ -> known;
     KeyScope candidates -> S.insert compareCandidateScopes candidates known;
+    KeyOwnedScope _ givens base -> keyScopes (KeyScope (givenCandidates givens base)) known;
     KeyFields fields -> foldlStrict (\found field -> keyScopes field found) known fields
   };
   framedLength :: FramedKey -> Int;
@@ -278,6 +287,7 @@ module Bootstrap.CrateQuery where {
   frameKey :: Map ([] ((,) EvidenceRole String)) Int -> SourceKey -> FramedKey;
   frameKey scopes key = case key of {
     KeyText text -> FramedText text;
+    KeyOwnedScope _ givens base -> frameKey scopes (KeyScope (givenCandidates givens base));
     KeyScope candidates -> case M.lookup compareCandidateScopes candidates scopes of {
       Nothing -> panic "query key scope missing from its own inventory";
       Just index -> FramedText (showInt index)
@@ -310,11 +320,13 @@ module Bootstrap.CrateQuery where {
   -- before flattening, and expand each distinct ordered evidence scope once.
   -- In an oversized field, references index a first-use scope table instead.
   -- Both declaration ranks and lexical names are already canonical here.
-  data PreparedPool = PreparedPool (Map ([] ((,) EvidenceRole String)) ((,,) String String Int)) ([] String);
+  givenCandidates givens base = append (map (\n -> (,) GivenEvidence n) givens) base;
+  data PreparedPool = PreparedPool (Map ([] ((,) EvidenceRole String)) ((,,) String String Int)) ([] String)
+    (IntMap (Map ([] String) PreparedField));
   data PreparedField = PreparedField Int Int FramedKey FramedKey;
   preparedKeyField limit key =
-    case prepareKey limit key (PreparedPool M.empty []) of {
-      (,) (PreparedField _ bytes original pooled) (PreparedPool _ rows) ->
+    case prepareKey limit key (PreparedPool M.empty [] IM.empty) of {
+      (,) (PreparedField _ bytes original pooled) (PreparedPool _ rows _) ->
         if bytes <= limit then concatStringList (framedChunks original [])
         else "F6" ++ Separate.pack [concatStringList (framedChunks pooled []),Separate.pack (reverse rows)]
     };
@@ -322,7 +334,20 @@ module Bootstrap.CrateQuery where {
     KeyText text -> let { field = FramedText text;
       size = stringLength text; bytes = stringUtf8Length text
     } in (,) (PreparedField size bytes field field) pool;
-    KeyScope candidates -> case pool of { PreparedPool table rows ->
+    -- Each handle belongs to this projection's one resolved snapshot and
+    -- rank table. The persistent row is still selected by complete ordered
+    -- contents, including the canonical spelling of the lexical prefix.
+    KeyOwnedScope owner givens base -> case pool of { PreparedPool _ _ handles -> let {
+      byGivens = case IM.lookup owner handles of { Nothing -> M.empty; Just seen -> seen };
+      compareNames = compareList compareString
+    } in case M.lookup compareNames givens byGivens of {
+      Just field -> (,) field pool;
+      Nothing -> case prepareKey limit (KeyScope (givenCandidates givens base)) pool of {
+        (,) field (PreparedPool table rows _) -> (,) field (PreparedPool table rows
+          (IM.insert owner (M.insert compareNames givens field byGivens) handles))
+      }
+    } };
+    KeyScope candidates -> case pool of { PreparedPool table rows handles ->
       let { use index text bytes next = (,) (PreparedField (stringLength text) bytes
           (FramedText text) (FramedText index)) next
       } in case M.lookup compareCandidateScopes candidates table of {
@@ -331,7 +356,7 @@ module Bootstrap.CrateQuery where {
           index = showInt (M.size table);
           text = renderKey M.empty (inlineScopeKey candidates);
           bytes = stringUtf8Length text;
-          next = PreparedPool (M.insert compareCandidateScopes candidates ((,,) index text bytes) table) ((:) text rows)
+          next = PreparedPool (M.insert compareCandidateScopes candidates ((,,) index text bytes) table) ((:) text rows) handles
         } in use index text bytes next
       }
     };
@@ -586,11 +611,21 @@ module Bootstrap.CrateQuery where {
     };
   canonicalExpression = canonicalExpressionWith (\i -> i);
   canonicalExpressionWith :: (V.Index Declaration -> V.Index Declaration) -> Map String String -> Int -> Map String String -> Int -> SExpr -> SExpr;
-  canonicalExpressionWith rank env depth types typeDepth expression =
+  canonicalExpressionWith = canonicalExpressionReading False [];
+  canonicalExpressionReading projected givens rank env depth types typeDepth expression =
     let {
-      child = canonicalExpressionWith rank env depth types typeDepth
+      child = canonicalExpressionReading projected givens rank env depth types typeDepth
     } in
     case expression of {
+      SGivenScope names body -> canonicalExpressionReading projected names rank env depth types typeDepth body;
+      SWantedScope dictionary base@(CandidateEnvironment owner refs) -> if projected then let {
+        names = map (canonicalReference env) givens;
+        canonical ((,) role ref) = (,) role (case ref of {
+          DeclRef i _ -> let { ordinal = rank i } in DeclRef ordinal (ordinalToken ordinal);
+          LexicalRef name -> LexicalRef (canonicalReference env name)
+        })
+      } in SGivenScope names (SWantedScope dictionary (CandidateEnvironment owner (map canonical refs)))
+      else child (SWantedRefs dictionary (wantedScopeRefs givens base));
       SGlobal i _ -> SVar (ordinalToken (rank i));
       SDeclScope ids body -> SDeclScope (map rank ids) (child body);
       SWantedRefs dictionary refs -> SWanted dictionary (map (\((,) role ref) ->
@@ -599,7 +634,7 @@ module Bootstrap.CrateQuery where {
       SLam n annotation body ->
         SLam ("local:" ++ showInt depth)
           (Separate.mapMaybeValue (canonicalAnnotation types typeDepth) annotation)
-          (canonicalExpressionWith rank (M.insert compareString n ("local:" ++ showInt depth) env)
+          (canonicalExpressionReading projected givens rank (M.insert compareString n ("local:" ++ showInt depth) env)
              (depth + 1)
              types
              typeDepth
@@ -607,7 +642,7 @@ module Bootstrap.CrateQuery where {
       SApp a b -> SApp (child a) (child b);
       SLet n a b ->
         SLet ("local:" ++ showInt depth) (child a)
-          (canonicalExpressionWith rank (M.insert compareString n ("local:" ++ showInt depth) env)
+          (canonicalExpressionReading projected givens rank (M.insert compareString n ("local:" ++ showInt depth) env)
              (depth + 1)
              types
              typeDepth
@@ -621,7 +656,7 @@ module Bootstrap.CrateQuery where {
           }
         } in
         SSignature
-          (canonicalExpressionWith rank env depth (canonicalScope "type:" types typeDepth names)
+          (canonicalExpressionReading projected givens rank env depth (canonicalScope "type:" types typeDepth names)
              (typeDepth + length names) a)
           (canonicalAnnotation types typeDepth annotation);
       SCase a branches ->
@@ -635,7 +670,7 @@ module Bootstrap.CrateQuery where {
                   scope = canonicalScope "local:" env depth names
                 } in
                 SAlternative (canonicalPatternWith rank scope types typeDepth pattern)
-                  (canonicalExpressionWith rank scope (depth + length names) types typeDepth body))
+                  (canonicalExpressionReading projected givens rank scope (depth + length names) types typeDepth body))
              branches);
       SEquations rows ->
         SEquations
@@ -648,7 +683,7 @@ module Bootstrap.CrateQuery where {
                   scope = canonicalScope "local:" env depth names
                 } in
                 (,) (map (canonicalPatternWith rank scope types typeDepth) patterns)
-                  (canonicalExpressionWith rank scope (depth + length names) types typeDepth body))
+                  (canonicalExpressionReading projected givens rank scope (depth + length names) types typeDepth body))
              rows);
       SSourceDefinition body -> SSourceDefinition (child body);
       SCallSite label span body -> SCallSite label span (child body);
@@ -656,7 +691,7 @@ module Bootstrap.CrateQuery where {
         let { names = Desugar.patternVariables pattern } in
         let { scope = canonicalScope "local:" env depth names } in
         SSharedBind (canonicalPatternWith rank scope types typeDepth pattern) (child action)
-          (canonicalExpressionWith rank scope (depth + length names) types typeDepth continuation)
+          (canonicalExpressionReading projected givens rank scope (depth + length names) types typeDepth continuation)
           (child bindMethod) (child failure);
       SDo _ _ -> child (Desugar.desugarDo expression);
       SLetRec definitions body ->
@@ -669,8 +704,8 @@ module Bootstrap.CrateQuery where {
         let {
           nextDepth = (depth + length names)
         } in
-        SLetRec (map (canonicalRecursiveWith rank scope nextDepth types typeDepth) definitions)
-          (canonicalExpressionWith rank scope nextDepth types typeDepth body);
+        SLetRec (map (canonicalRecursiveReading projected givens rank scope nextDepth types typeDepth) definitions)
+          (canonicalExpressionReading projected givens rank scope nextDepth types typeDepth body);
       SWanted dictionary candidates ->
         SWanted dictionary
           (map (\((,) role n) -> (,) role (canonicalReference env n)) candidates);
@@ -679,7 +714,7 @@ module Bootstrap.CrateQuery where {
           names = leadingTypes ty
         } in
         SChecked (canonicalTypeIn types typeDepth ty)
-          (canonicalExpressionWith rank env depth (canonicalScope "type:" types typeDepth names)
+          (canonicalExpressionReading projected givens rank env depth (canonicalScope "type:" types typeDepth names)
              (typeDepth + length names)
              body);
       _ -> expression
@@ -689,11 +724,12 @@ module Bootstrap.CrateQuery where {
                         Int ->
                         Map String String ->
                         Int -> (,,) String RecursiveMode SExpr -> (,,) String RecursiveMode SExpr;
-  canonicalRecursiveWith rank env depth types typeDepth ((,,) n mode body) =
+  canonicalRecursiveWith = canonicalRecursiveReading False [];
+  canonicalRecursiveReading projected givens rank env depth types typeDepth ((,,) n mode body) =
     case mode of {
       InferRecursive ->
         (,,) (canonicalReference env n) InferRecursive
-          (canonicalExpressionWith rank env depth types typeDepth body);
+          (canonicalExpressionReading projected givens rank env depth types typeDepth body);
       CheckRecursive annotation ->
         let {
           names =
@@ -704,7 +740,7 @@ module Bootstrap.CrateQuery where {
         } in
         (,,) (canonicalReference env n)
           (CheckRecursive (canonicalAnnotation types typeDepth annotation))
-          (canonicalExpressionWith rank env depth (canonicalScope "type:" types typeDepth names)
+          (canonicalExpressionReading projected givens rank env depth (canonicalScope "type:" types typeDepth names)
              (typeDepth + length names)
              body)
     };
@@ -715,38 +751,41 @@ module Bootstrap.CrateQuery where {
       _ -> []
     }
   } in visit (canonicalScope "type:" M.empty 0 names) (length names);
-  canonicalMemberIn rank globals owner ((,,) n annotation body) =
+  canonicalMemberIn = canonicalMemberReading False;
+  canonicalMemberReading projected rank globals owner ((,,) n annotation body) =
     (,,) (owner n) (Separate.mapMaybeValue (canonicalAnnotation M.empty 0) annotation)
       (memberTypeScope annotation (\types typeDepth ->
-        canonicalExpressionWith rank globals 0 types typeDepth body));
+        canonicalExpressionReading projected [] rank globals 0 types typeDepth body));
   -- The table is ordered by defining identity. Its ordinals belong only
   -- to this Prepared value, independently of resolver slot order or crate.
   data ReferenceTable = ReferenceTable ([] String) (Map String String)
     (Map (V.Index Declaration) (V.Index Declaration));
   referenceDefinitions (ReferenceTable keys _ _) = keys;
   referenceToken (ReferenceTable _ names _) name = M.findWithDefault compareString name name names;
-  referenceMember table@(ReferenceTable _ names ranks) =
-    canonicalMemberIn (\i -> M.get Source.compareDecl i ranks) names (referenceToken table);
+  referenceMember = referenceMemberReading False;
+  referenceMemberReading projected table@(ReferenceTable _ names ranks) =
+    canonicalMemberReading projected (\i -> M.get Source.compareDecl i ranks) names (referenceToken table);
   referenceTable slots prepared = referenceTableUsing slots prepared
     (append (Source.groupOriginal prepared) (Source.groupMembers prepared));
   referenceTableUsing = referenceTableReading Dependency.querySyntaxRefs;
   referenceTableReading references slots prepared members = let {
     scope = Source.slotScope slots;
-    prepend rest i = (:) i rest;
-    observe acc member = Source.foldDeclarationRefs scope prepend acc
+    -- Keep the last declaration observed for each defining identity. Repeated
+    -- wanted environments can contain millions of references to a few slots.
+    remember current@((,) winners definitions) i = let { slot = V.toInt i } in
+      if IS.member slot winners then current else let {
+        stable = Source.declStable scope i;
+        next = case M.lookup compareString stable definitions of {
+          Nothing -> winners; Just previous -> IS.delete (V.toInt previous) winners
+        };
+        updated = IS.insert slot next; entries = M.insert compareString stable i definitions
+      } in seq updated (seq entries ((,) updated entries));
+    observe acc member = Source.foldDeclarationRefs scope remember acc
       (references (Source.sourceRhs member));
-    -- Finish each input spine from left to right before deduplicating its
-    -- slots in reverse order. Slot values and display hints stay lazy.
-    owners = reverse (Source.memberIds slots);
-    parameters = foldlStrict prepend owners (Source.parameterIds slots);
-    candidates = foldlStrict prepend parameters (Source.candidateIds slots);
-    reversed = seq owners (seq parameters (seq candidates (foldlStrict observe candidates members)));
-    -- Retain the last occurrence of each ID, including the old last-wins
-    -- ordering for two distinct IDs whose caller-supplied stable key agrees.
-    keep ((,) seen kept) i = let { index = V.toInt i } in
-      if IS.member index seen then (,) seen kept else (,) (IS.insert index seen) ((:) i kept);
-    unique = snd (foldlStrict keep ((,) IS.empty []) reversed);
-    definitions = M.toList (M.fromList compareString (map (\i -> (,) (Source.declStable scope i) i) unique));
+    owners = foldlStrict remember ((,) IS.empty M.empty) (Source.memberIds slots);
+    parameters = foldlStrict remember owners (Source.parameterIds slots);
+    candidates = foldlStrict remember parameters (Source.candidateIds slots);
+    definitions = M.toList (snd (foldlStrict observe candidates members));
     ranks = zipWith (\ordinal ((,) _ i) -> (,) i (V.fromInt ordinal))
       (range 0 (length definitions - 1)) definitions;
     names = map (\((,) i rank) -> (,) (Source.declName scope i) (ordinalToken rank)) ranks

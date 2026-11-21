@@ -90,6 +90,8 @@ module Bootstrap.Surface where {
       SVar n -> (:) (Dependency.lexicalValueName n) [];
       SGlobal _ n -> [n];
       SDeclScope _ b -> freeNamesRaw b;
+      SGivenScope names body -> freeNamesRaw (expandWantedScopes names body);
+      SWantedScope n env -> freeNamesRaw (SWantedRefs n (wantedScopeRefs [] env));
       SWantedRefs _ candidates -> map (compose termRefName snd) candidates;
       SLam n _ b -> without (freeNamesRaw b) ((:) n []);
       SApp a b -> append (freeNamesRaw a) (freeNamesRaw b);
@@ -325,6 +327,8 @@ module Bootstrap.Surface where {
     SDo _ _ -> False;
     SSharedBind _ _ _ _ _ -> False;
     SGlobal _ _ -> True;
+    SWantedScope _ _ -> True;
+    SGivenScope _ body -> surfaceCore body;
     SWantedRefs _ _ -> True;
     SVar _ -> True;
     SConstructor _ -> True;
@@ -346,6 +350,7 @@ module Bootstrap.Surface where {
   lower env expression =
     case expression of {
       SDeclScope ids body -> do { b <- lower env body; freshPure (SDeclScope ids b) };
+      SGivenScope names body -> do { b <- lower env body; freshPure (SGivenScope names b) };
       SSourceDefinition body -> do { b <- lower env body; freshPure (SSourceDefinition b) };
       SCallSite name location body -> do { b <- lower env body; freshPure (SCallSite name location b) };
       SSharedBind _ _ _ _ _ -> freshFail "internal error: shared do escaped metadata lowering";

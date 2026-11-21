@@ -645,5 +645,33 @@ module Bootstrap.Std where {
       bits = doubleToBits value
     } in
     doubleFromBits
-      (xorInt bits (-9223372036854775808))
+      (xorInt bits (-9223372036854775808));
+  -- Project compiler-owned evidence regions into the legacy source vocabulary.
+  -- A nested region replaces the outer list, including at copied definitions.
+  expandWantedScopes :: [] String -> SExpr -> SExpr;
+  expandWantedScopes givens expression = let {
+    visit = expandWantedScopes givens;
+    definition ((,,) name mode body) = (,,) name mode (visit body);
+    statement item = case item of {
+      SDoBind pat e -> SDoBind pat (visit e); SDoThen e -> SDoThen (visit e);
+      SDoLet n ann e -> SDoLet n ann (visit e);
+      SDoLetRec defs -> SDoLetRec (map definition defs)
+    }
+  } in case expression of {
+    SGivenScope names body -> expandWantedScopes names body;
+    SWantedScope dictionary env -> SWantedRefs dictionary (wantedScopeRefs givens env);
+    SDeclScope ids body -> SDeclScope ids (visit body);
+    SLam n ann body -> SLam n ann (visit body);
+    SApp f a -> SApp (visit f) (visit a); SLet n a b -> SLet n (visit a) (visit b);
+    SAnn e ann -> SAnn (visit e) ann; SSignature e ann -> SSignature (visit e) ann;
+    SCase e alternatives -> SCase (visit e)
+      (map (\(SAlternative p rhs) -> SAlternative p (visit rhs)) alternatives);
+    SDo statements e -> SDo (map statement statements) (visit e);
+    SEquations rows -> SEquations (map (\((,) ps e) -> (,) ps (visit e)) rows);
+    SLetRec definitions e -> SLetRec (map definition definitions) (visit e);
+    SChecked ty e -> SChecked ty (visit e); SSourceDefinition e -> SSourceDefinition (visit e);
+    SCallSite n span e -> SCallSite n span (visit e);
+    SSharedBind p e k bind fail -> SSharedBind p (visit e) (visit k) (visit bind) (visit fail);
+    _ -> expression
+  }
 }

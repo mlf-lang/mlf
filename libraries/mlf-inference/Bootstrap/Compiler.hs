@@ -80,7 +80,7 @@ module Bootstrap.Compiler (Compilation, inferredType, compiledTerm, checkedTerm,
   compileLinked :: PreludeMode -> [] SourceModule -> Either CompileError Compilation;
   compileLinked mode modules =
     do {
-      boundValueShared1 <- atPhase ModuleResolution (Modules.linkModulesInScopes mode modules);
+      boundValueShared1 <- atPhase ModuleResolution (Modules.linkModulesForCompilation mode modules);
       case boundValueShared1 of {
         (,) (LinkedModule program names _ instanceScopes) valueScopes ->
           do {

@@ -305,6 +305,8 @@ module Bootstrap.ArtifactStructure where {
   toSExpr value = case value of {
     SGlobal _ n -> toSExpr (SVar n);
     SDeclScope _ b -> toSExpr b;
+    SGivenScope names body -> toSExpr (S.expandWantedScopes names body);
+    SWantedScope n env -> toSExpr (SWantedRefs n (wantedScopeRefs [] env));
     SWantedRefs n xs -> toSExpr (SWanted n (S.namedCandidates xs));
     SVar x0 -> W.VNode 120 [toText x0];
     SConstructor x0 -> W.VNode 121 [toText x0];

@@ -359,6 +359,11 @@ module Bootstrap.Module where {
   resolvedValueScopesIn (ResolvedCrate bindings _ masks _) modules =
     Dependency.indexedScopeGroups (bindingSymbols bindings)
       (resolvedScopeGroups modules (\name -> M.get compareString name masks));
+  resolvedModuleScopesIn crate@(ResolvedCrate bindings _ masks _) modules =
+    Dependency.indexedModuleScopes (bindingSymbols bindings) (map (\entry -> (,)
+      (moduleIdentity (resolvedSource entry))
+      (map Dependency.boundId (renamedBindings (resolvedContents entry)))) modules)
+      (map fst (resolvedInstanceRows crate)) (\name -> M.get compareString name masks);
   resolvedCrateValueScopes crate = resolvedValueScopesIn crate (resolvedCrateModules crate);
   resolvedCrateInstanceScopes (ResolvedCrate _ modules masks _) = concatMap (\entry ->
     map (\_ -> M.get compareString (moduleIdentity (resolvedSource entry)) masks)
@@ -1365,6 +1370,8 @@ module Bootstrap.Module where {
     SChecked _ _ -> Left "checked source forms are reserved for dictionary translation";
     SGlobal _ _ -> Left "resolved global cannot enter source name resolution";
     SDeclScope _ _ -> Left "resolved binder cannot enter source name resolution";
+    SGivenScope _ _ -> Left "dictionary scopes are reserved for dictionary translation";
+    SWantedScope _ _ -> Left "dictionary holes are reserved for dictionary translation";
     SWantedRefs _ _ -> Left "dictionary holes are reserved for dictionary translation";
     SWanted _ _ -> Left "dictionary holes are reserved for dictionary translation"
   };
@@ -1732,7 +1739,10 @@ module Bootstrap.Module where {
   linkModules :: PreludeMode -> [] SourceModule -> Either String LinkedModule;
   linkModules mode supplied = mapEither fst (linkModulesUsing Surface.bindResolvedExpr Surface.closeResolvedInstance mode supplied);
   linkModulesInScopes = linkModulesUsing Surface.bindIndexedExpr Surface.closeIndexedInstance;
-  linkModulesUsing bind close mode supplied =
+  linkModulesUsing = linkModulesWithScopeTable resolvedCrateValueScopes;
+  linkModulesForCompilation = linkModulesWithScopeTable
+    (\crate -> resolvedModuleScopesIn crate (resolvedCrateModules crate)) Surface.bindIndexedExpr Surface.closeIndexedInstance;
+  linkModulesWithScopeTable scopeTable bind close mode supplied =
     do {
       crate <- resolveCrateWithAllocator mode M.empty freshNames supplied;
       let {
@@ -1745,7 +1755,7 @@ module Bootstrap.Module where {
         instances = resolvedInstanceRows crate
       };
       let {
-        scopes = resolvedCrateValueScopes crate
+        scopes = scopeTable crate
       };
       let {
         ds = concatMap (\entry -> renamedDatatypes (resolvedContents entry)) resolved

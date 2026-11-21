@@ -111,6 +111,8 @@ normalizeExpr :: T.SExpr -> T.SExpr
 normalizeExpr expression = case expression of
   T.SGlobal slot name -> T.SGlobal slot name
   T.SDeclScope slots body -> T.SDeclScope slots (normalizeExpr body)
+  T.SGivenScope names body -> T.SGivenScope names (normalizeExpr body)
+  T.SWantedScope name env -> T.SWantedScope name env
   T.SWantedRefs name refs -> T.SWantedRefs name refs
   T.SVar name -> T.SVar name
   T.SConstructor name -> T.SConstructor name

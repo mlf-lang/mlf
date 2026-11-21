@@ -11,8 +11,11 @@ import qualified Bootstrap.ArtifactStorage as Storage
 import qualified Bootstrap.ArtifactStructure as Structure
 import qualified Bootstrap.Bitstream as W
 import qualified Bootstrap.BuiltinPreludeLiteral as BuiltinLiteral
+import qualified Bootstrap.Constraint as C
+import qualified Bootstrap.Graph as Graph
 import qualified Bootstrap.Classes as Classes
 import qualified Bootstrap.Compiler as Compiler
+import qualified Bootstrap.CompilerCore as CompilerCore
 import qualified Bootstrap.Crate as Crate
 import qualified Bootstrap.CrateArtifact as Artifact
 import qualified Bootstrap.CrateGraph as CrateGraph
@@ -102,6 +105,55 @@ package name deps mods = P.Package (H.literal ("/packages/" ++ name ++ "/mlf-pac
              ("dependencies",J.Object [(H.literal n,J.empty) | n <- deps])]) mods
 modl owner name deps = P.Module name owner (H.v_concatString name ".hs") deps
 
+-- Generate against the same two module environments at many independent
+-- holes. A declaration shadow changes their graph bindings, a lexical lambda
+-- only changes the explicitly marked given frame.
+candidateSkeletonChecks = do
+  env <- case Data.validateDeclarations [T.DataDecl "Dict" [] [T.ConstructorDecl "DictValue" []]] of
+    T.Right ok -> pure ok
+    T.Left why -> fail (H.unpack why)
+  let slot n = V.fromInt n
+      global i = (T.InstanceEvidence,T.DeclRef (slot i) "candidate")
+      base owner is = T.CandidateEnvironment owner (map global is)
+      hole owner is = T.CWantedScope "Dict" (base owner is)
+      request = hole 0 [0]
+      start = C.BindingEnv M.empty (M.fromList C.compareRefSlot
+        [(slot i,T.Poly (T.XName (1000+i) "import") i) | i <- [0,1]])
+      run memo term = case C.runGeneration memo (C.buildIn env M.empty T.Nothing start term)
+                             (C.Generation Graph.emptyGraph [] []) of
+        T.Right (typed,_) -> pure typed
+        T.Left why -> fail (H.unpack why)
+      bindingName (T.EvidenceBinding _ (T.XName i _) _ _) = i
+      bindingName (T.DeclaredEvidenceBinding _ (T.XName i _) _) = i
+      wanted active (T.Typed _ form) = walk active form
+      walk active form = case form of
+        T.FWithGivens bindings body -> walk (map bindingName bindings) body
+        T.FScopedEvidence (T.ResolvedCandidateEnvironment token rows) -> [(token,map bindingName rows,active)]
+        T.FBinding _ a b _ -> wanted active a ++ wanted active b
+        T.FLambda _ _ b _ -> wanted active b
+        T.FApply a b _ _ -> wanted active a ++ wanted active b
+        _ -> []
+      file = C.SharedEnvironments IntMap.empty
+      rep = replicate 64 request
+      local = T.CLam "d" (T.CGivenScope ["d"] (T.CApp request (T.CGivenScope [] request)))
+      shadow = T.CDeclScope [slot 0] (T.CLet "candidate" (T.CInt 8) request)
+      spans = foldr1 T.CApp (rep ++ [local,shadow,request,hole 1 [1,0]])
+  rows <- wanted [] <$> run file spans
+  let tokens = [token | (token,_,_) <- rows]
+      ids = [names | (_,names,_) <- rows]
+      givens = [active | (_,_,active) <- rows]
+      outer = head tokens
+  check "one resolved module environment across lexical scopes" (replicate 66 outer) (take 66 tokens)
+  check "rebound declaration receives separate graph identity" True (tokens !! 66 /= outer)
+  check "leaving declaration restores outer environment" outer (tokens !! 67)
+  check "distinct defining module has its own inventory" [1001,1000] (last ids)
+  check "shadowed binding cannot reuse outer rows" True (ids !! 66 /= [1000])
+  check "eligible given enters and resets lexically" (1,[]) (length (givens !! 64),givens !! 65)
+  -- Generic callers may compose input from two independently numbered snapshots.
+  manual <- wanted [] <$> run C.SeparateEnvironments (T.CApp request (hole 0 [1]))
+  check "manual source never conflates equal snapshot-local ordinals"
+    [[1000],[1001]] [names | (_,names,_) <- manual]
+
 packageChecks = do
   let leaf = package "leaf" [] [modl "leaf" "Leaf" []]
       left = package "left" ["leaf"] [modl "left" "Left" ["Leaf","Leaf"]]
@@ -172,8 +224,68 @@ packageChecks = do
     [("A",["A","B","External"]),("Alone",["Alone"]),("B",["A","B","External"])]
     [(H.unpack k, map H.unpack (S.toList ns)) | (k,ns) <- M.toList (Modules.moduleReach direct)]
 
+methodOwnerChecks = do
+  let primitive = T.SourceModule "<MLF.Primitive>" (T.Just "MLF.Primitive") T.Nothing [] [] [] [] [] T.Nothing T.LegacyEmlfV1
+      right (T.Right value) = pure value
+      right (T.Left message) = fail (H.unpack message)
+  source <- right (Parser.parseModule "Owner.emlf" (H.literal (unlines ["module Owner where","class Inspect a where { inspect : a -> Bool }",
+    "class Mark a where { mark : a -> Bool }","instance Inspect Bool where { inspect x = x }",
+    "instance Mark Bool where { mark x = inspect x }","use : Bool -> Bool","use x = inspect x"])))
+  crate <- right (Crate.prepareCrate (Crate.CrateSpec "owner" "" T.NoImplicitPrelude [] [] "" "") [] [primitive,source])
+  let scopes (T.SWantedScope _ (T.CandidateEnvironment owner _)) = [owner]
+      scopes (T.SGivenScope _ b) = scopes b
+      scopes (T.SDeclScope _ b) = scopes b
+      scopes (T.SLam _ _ b) = scopes b
+      scopes (T.SApp a b) = scopes a ++ scopes b
+      scopes (T.SChecked _ b) = scopes b
+      scopes (T.SCallSite _ _ b) = scopes b
+      scopes _ = []
+      uses = [(H.unpack name,i) | (name,_,rhs) <- Inference.loweredValues (Crate.preparedLowered crate), i <- scopes rhs]
+  case ([i | (name,i) <- uses,"instance_" `isInfixOf` name],[i | (name,i) <- uses,"use" `isInfixOf` name]) of
+    ([method],[value]) -> check "lowered instance method and value carry the same module environment" value method
+    _ -> error ("missing dictionary requests in lowered module: " ++ show uses)
+
 -- Construct the typed input independently of the writer, including the
 -- noncanonical row order that an older reader accepts and must republish.
+sharedWantedProjectionChecks = do
+  let ref i = T.DeclRef (V.fromInt i) (H.literal ("hint:" ++ show i))
+      entries = [(T.InstanceEvidence,ref 2),(T.SuperclassEvidence,ref 0),(T.InstanceEvidence,ref 2)]
+      base owner rows = T.CandidateEnvironment owner rows
+      hole owner rows = T.SWantedScope "D" (base owner rows)
+      want names rows = T.SWantedRefs "D" ([(T.GivenEvidence,T.LexicalRef n) | n <- names] ++ rows)
+      terms a b c = T.SLam "g" T.Nothing (T.SApp a (T.SLam "h" T.Nothing (T.SApp b c)))
+      source = terms (T.SGivenScope ["g"] (hole 7 entries))
+        (T.SGivenScope ["h","g"] (T.SApp (hole 7 entries) (T.SGivenScope [] (hole 7 entries))))
+        (T.SGivenScope ["g"] (hole 13 entries))
+      legacy = terms (want ["g"] entries)
+        (T.SApp (want ["h","g"] entries) (want [] entries)) (want ["g"] entries)
+      ranks = M.fromList Source.compareDecl [(V.fromInt i, V.fromInt j) | (i,j) <- [(0,1),(1,2),(2,0)]]
+      table = CQ.ReferenceTable [] M.empty ranks
+      member e = ("entry",T.Nothing,e)
+      canonical = CQ.encodeMember . CQ.referenceMember table . member
+      field limit fast e = CQ.preparedKeyField limit (CQ.keyList (CQ.memberKeyWith fast CQ.KeyScope)
+        [CQ.referenceMemberReading fast table (member e)])
+  check "scoped wanteds preserve exact declaration ranks, lexical givens and resets"
+    (H.unpack (canonical legacy)) (H.unpack (canonical source))
+  forM_ [0,16777216] $ \limit -> do
+    check "prepared source uses the same first-use pool and admitted inline bytes"
+      (H.unpack (field limit False legacy)) (H.unpack (field limit True source))
+    let other = drop 1 entries
+    check "generic projections resolve mixed snapshots by actual contents"
+      (H.unpack (field limit False (T.SApp (want [] entries) (want [] other))))
+      (H.unpack (field limit False (T.SApp (hole 7 entries) (hole 7 other))))
+    let different = terms (T.SGivenScope ["g"] (hole 7 (reverse other)))
+          (T.SGivenScope [] (hole 13 entries)) (hole 7 (reverse other))
+    unless (H.unpack (field limit True different) /= H.unpack (field limit True source))
+      (fail "projected wanted lost allocation-independent content")
+  let outer = Classes.SharedEvidence ["g"] (base 7 entries)
+      inner = T.SGivenScope [] (T.SApp (hole 7 entries) (T.SVar "outerWanted"))
+      actual = Classes.withGivenScope outer
+        (Classes.closeWantedIn (M.singleton "outerWanted" "D") outer inner)
+      expected = T.SApp (want [] entries) (want ["g"] entries)
+  check "substitution under a closed inner region restores the outer wanted's eligibility"
+    (H.unpack (canonical expected)) (H.unpack (canonical actual))
+
 preparedScopeFingerprintChecks = do
   let candidates = [(T.InstanceEvidence,H.literal ("ref:" ++ show i)) | i <- [1..1024::Int]]
       terms 1 hole = hole
@@ -436,6 +548,68 @@ datatypeChecks = do
       check "ordinary term names cannot introduce file datatype roots"
         [] (select (T.SApp (T.SVar "MkZ") (T.SVar "Unused")) [])
 
+-- Both query consumers give the last occurrence priority. Exercise adjacent
+-- and separated scopes, including two different masks on the same environment.
+evidenceReadChecks = do
+  let table = D.symbolsWithKeys [("left","same-key",False),("right","same-key",False),
+                                 ("x","X",False),("root","Root",False)]
+      ids@[a,b,x,owner] = V.indices (D.symbolNodes table)
+      scope = Source.declarationScope table ids [] []
+      slots = Source.GroupSlots scope [owner] [] []
+      entries = [(T.InstanceEvidence,T.DeclRef a "first"),(T.InstanceEvidence,T.DeclRef b "second")]
+      globals = T.CandidateEnvironment 17 entries
+      other = T.CandidateEnvironment 29 [(T.SuperclassEvidence,T.DeclRef x "x")]
+      term shared =
+        let marker ns body = if shared then T.SGivenScope ns body else body
+            want ns env@(T.CandidateEnvironment _ values) = if shared then T.SWantedScope "D" env
+              else T.SWantedRefs "D" ([(T.GivenEvidence,T.LexicalRef n) | n <- ns] ++ values)
+            local n id env = T.SDeclScope [id] (T.SLam n T.Nothing (want ["x"] env))
+            inner = marker [] (T.SApp (want [] other) (want [] globals))
+        in marker ["x"] (T.SLet "v" (local "left" a globals)
+             (T.SCase (want ["x"] globals) [T.SAlternative (T.SDefaultPattern (T.Just "x"))
+               (T.SApp (local "right" b globals) (T.SApp inner (want ["x"] globals)))]))
+      shape = term True
+      old = term False
+      label ref = case ref of
+        T.LexicalRef n -> (False,0,H.unpack n)
+        T.DeclRef i n -> (True,V.toInt i,H.unpack n)
+      lastReads = reverse . nub . reverse . map label
+      rows expression = [("root",T.Nothing,expression)]
+      selected reads expression = map V.toInt (Source.selectedContractIdsWith reads scope [owner] (rows expression))
+      ranks reads expression = case CQ.referenceTableReading reads slots (error "unused prepared") (rows expression) of
+        CQ.ReferenceTable defs names ranked -> (map H.unpack defs,[(H.unpack k,H.unpack v) | (k,v) <- M.toList names],
+          [(V.toInt i,V.toInt rank) | (i,rank) <- M.toList ranked])
+  forM_ [False,True] $ \inventory -> do
+    let expected = D.valueOccurrences True inventory old
+    check "shared wants preserve lexical given reset, declaration masks and encounter order"
+      (map label expected) (map label (D.valueOccurrences True inventory shape))
+    check "file reads match the raw candidate sequence through scoped branches"
+      (map label expected) (map label (D.fileValueOccurrences inventory shape))
+    check "deduplicated environment retains the last occurrence under binder and pattern masks"
+      (lastReads expected) (lastReads (D.fileLastValueOccurrences inventory shape))
+  check "ID-only group reads preserve masked candidates after SCC deduplication"
+      (lastReads [ref | ref@(T.DeclRef _ _) <- D.valueOccurrences True False old])
+      (lastReads (D.fileLastDeclarationOccurrences shape))
+  check "contract dependency winners and output order agree with expanded scopes"
+    (selected (D.fileValueOccurrences False) old) (selected (D.fileLastValueOccurrences False) shape)
+  check "canonical stable-key winners and declaration ranks agree with expanded scopes"
+    (ranks (D.fileValueOccurrences True) old) (ranks (D.fileLastValueOccurrences True) shape)
+  let pat = T.SIndexedStringPattern (T.CharString [65]) (T.LexicalRef "x") (T.DeclRef b "pattern")
+      childForms body = [T.SLetRec [("x",T.InferRecursive,body)] body,
+        T.SDeclScope [b] (T.SLetRec [("x",T.InferRecursive,body)] body),
+        T.SSharedBind pat body body body body, T.SEquations [([pat],body)],
+        T.SDo [T.SDoThen body] body]
+  forM_ (zip (childForms old) (childForms shape)) $ \(expanded,scoped) -> forM_ [False,True] $ \inventory -> do
+    let expected = D.valueOccurrences True inventory expanded
+    check "recursive, pattern and do observers retain the order of expanded evidence"
+      (map label expected) (map label (D.fileValueOccurrences inventory scoped))
+    check "recursive, pattern and do queries preserve last-read precedence"
+      (lastReads expected) (lastReads (D.fileLastValueOccurrences inventory scoped))
+  let hole = T.SWantedScope "D" globals
+  check "repeated scope contributes each global once, with every site retaining its own lexical reads"
+    [(False,0,"x"),(False,0,"x"),(True,V.toInt a,"first"),(True,V.toInt b,"second")]
+    (map label (D.fileLastValueOccurrences False (T.SGivenScope ["x"] (T.SApp hole hole))))
+
 -- A visible alias can admit only the method of its own class. Reusing a
 -- module's method index must keep distinct owners with the same spellings.
 instanceVisibilityChecks = do
@@ -654,7 +828,39 @@ resolverChecks = do
       scopeOwner i = case D.scopeAt shared i of { T.Just n -> n; T.Nothing -> -2 }
   check "one owner across declarations in a defining scope" (V.toInt own) (scopeOwner method)
   check "equal masks in separate defining scopes keep their own owners" (V.toInt external) (scopeOwner external)
+  let moduleScopes = D.mapDefiningScopes (\owner _ -> case owner of
+        T.Just i -> i; T.Nothing -> error "missing snapshot module owner")
+        (D.indexedModuleScopes slots [("Local",[own,method]),("OnlyInstances",[])]
+          ["Imported","OnlyInstances","Local","Imported","OnlyInstances"] (const True))
+      moduleOf n = case D.lookupInstanceScope moduleScopes n of
+        T.Just i -> Just i; T.Nothing -> Nothing
+      declModule i = case D.scopeAt moduleScopes i of { T.Just n -> Just n; T.Nothing -> Nothing }
+  check "value and instance methods share their defining module" (declModule method) (moduleOf 2)
+  check "staged instances from the same external module share their row" (moduleOf 0) (moduleOf 3)
+  check "instance-only modules own a row independently of equal masks"
+    (True,True,True) (moduleOf 1 /= Nothing,moduleOf 1 == moduleOf 4,moduleOf 1 /= moduleOf 0)
+  check "unnamed positional masks retain the caller's fallback" (Nothing :: Maybe String)
+    (case D.lookupInstanceScope visibility 0 of { T.Nothing -> Nothing; T.Just _ -> Just "unexpected owner" })
   let primitive = T.SourceModule "<MLF.Primitive>" (T.Just "MLF.Primitive") T.Nothing [] [] [] [] [] T.Nothing T.LegacyEmlfV1
+  ownerModules <- mapM parsed
+    [("Api","module Api where\nclass Inspect a where { inspect : a -> Bool }\n"),
+     ("Only","module Only () where\nimport Api\ninstance Inspect Int where { inspect x = true }\ninstance Inspect Bool where { inspect x = x }\n"),
+     ("Mixed","module Mixed where\nimport Api\ndata Box = Box\ninstance Inspect Box where { inspect x = true }\nuse = inspect Box\n")]
+  ownerCrate <- right (Modules.resolveCrate T.NoImplicitPrelude M.empty mangle (primitive:ownerModules))
+  let localModules = filter ((=="Mixed") . H.unpack . Modules.moduleIdentity . Modules.resolvedSource)
+        (Modules.resolvedCrateModules ownerCrate)
+      owned = D.mapDefiningScopes (\owner _ -> case owner of { T.Just i -> i; T.Nothing -> error "unowned" })
+        (Modules.resolvedModuleScopesIn ownerCrate localModules)
+      D.BoundValues _ localBindings = Modules.boundIn ownerCrate localModules
+      visibleScopes = [(H.unpack owner,i) | (position,(owner,_)) <- zip [0..] (Modules.resolvedInstanceRows ownerCrate),
+                                             T.Just i <- [D.lookupInstanceScope owned position]]
+  case ([i | ("Only",i) <- visibleScopes],[i | ("Mixed",i) <- visibleScopes],localBindings) of
+    ([i,j],[k],[D.Bound v _ _]) -> do
+      check "two instances from one imported instance-only module share one owner" i j
+      check "importing a module preserves its distinct instance owner" False (i == k)
+      check "resolved local instance and value use the same row" (Just k)
+        (case D.scopeAt owned v of { T.Just n -> Just n; T.Nothing -> Nothing })
+    _ -> error "instance-owner inventory no longer follows resolved declarations"
   let runScoped imports = do
         modules <- mapM parsed [("Inspect","module Inspect where\nclass Inspect a where { inspect : a -> Bool }\n"),
           ("Inst","module Inst () where\nimport Inspect\ninstance Inspect Int where { inspect = \\x -> true }\n"),
@@ -2538,7 +2744,33 @@ applicationPatternChecks = do
   _ <- right (Structure.admitPatterns graph 46)
   pure ()
 
+lexicalProofChecks = do
+  let declarations = [T.DataDecl "Dict" [] [T.ConstructorDecl "DictValue" []]]
+      T.Right datatypes = Data.validateDeclarations declarations
+      generator term _ = case C.runGeneration (C.SharedEnvironments IntMap.empty)
+        (C.build datatypes M.empty T.Nothing M.empty term) (C.Generation Graph.emptyGraph [] []) of
+          T.Left why -> T.Left why
+          T.Right (tree,C.Generation graph equalities steps) ->
+            T.Right (T.Constraints graph tree (reverse equalities) (reverse steps))
+      compile term = case CompilerCore.finishCompilationWith (generator term) (T.SProgram declarations (T.SIntLit 0),M.empty) of
+        T.Left err -> Left (H.unpack (CompilerCore.prettyError err))
+        T.Right result -> Right (H.unpack (Pretty.prettyTerm (CompilerCore.compiledTerm result)))
+      request = T.CWantedScope "Dict" (T.CandidateEnvironment 41 [])
+      legacy = T.CWantedRefs "Dict" [(T.GivenEvidence,T.LexicalRef "dictionary")]
+      app x = T.CApp (T.CLam "dictionary" (T.CCase (T.CVar "dictionary") [(T.SConstructorPattern "DictValue" [],x)])) (T.CConstructor "DictValue")
+      traditional = compile (app legacy)
+      scoped = compile (app (T.CGivenScope ["dictionary"] request))
+      reset = compile (app (T.CGivenScope ["dictionary"] (T.CGivenScope [] request)))
+  case traditional of
+    Left msg -> error msg
+    Right _ -> check "lexical frame passes production solve, elaboration and independent checking" traditional scoped
+  case reset of
+    Left msg | "Resolution: no instance or given" `isInfixOf` msg -> pure ()
+    other -> error ("scope reset unexpectedly produced " ++ show other)
+
+
 evidenceScopeChecks = do
+  lexicalProofChecks
   let T.Right ds = Data.validateDeclarations
         [T.DataDecl "Score" ["a"] [T.ConstructorDecl "MkScore" []],
          T.DataDecl "Base" ["a"] [T.ConstructorDecl "MkBase" []]]
@@ -2571,6 +2803,47 @@ evidenceScopeChecks = do
   forM_ ([[]] ++ [[x] | x <- rules] ++ [[x,y] | x <- rules, y <- rules] ++
          [[x,y,z] | x <- rules, y <- rules, z <- rules]) $ \rows ->
     forM_ [score int, score bool, base int, T.XApply (T.XCon "Score" []) int] (compareScope rows)
+  -- Splitting the canonical list at any boundary must keep the entire
+  -- dictionary proof and the category and order of competing diagnostics.
+  forM_ [M.empty, M.singleton variable T.XBot, M.singleton variable a] $ \gamma ->
+    forM_ ([[]] ++ [[x] | x <- rules] ++ [[x,y] | x <- rules, y <- rules]) $ \globals -> do
+      let resolve = Evidence.scopedResolver ds globals gamma
+      forM_ ([] : [[x] | x <- rules]) $ \locals ->
+        forM_ [score int, score bool, base int] $ \goal ->
+          check "lexical overlay agrees with complete ordered proof environment"
+            (observe (Evidence.resolveDictionaryDetailed ds gamma (locals ++ globals) goal))
+            (observe (resolve locals goal))
+  let param i = T.EvidenceBinding T.GivenEvidence (visible i) i False
+      moduleEnv = T.ResolvedCandidateEnvironment 47 []
+      request g = T.Typed g (T.FScopedEvidence moduleEnv)
+      frame bindings (T.Typed g body) = T.Typed g (T.FWithGivens bindings body)
+      pair g left right = T.Typed g (T.FApply left right (error "unused edge") (error "unused edge"))
+      tree = frame [param 1] $ pair 0
+        (frame [param 2,param 3] $ pair 4 (request 5) (frame [] $ request 6))
+        (pair 7 (request 8) (frame [param 9] $ frame [param 10] $ request 11))
+      inspect (g,Elaborate.EvidenceContext _ locals,Elaborate.ScopedEvidence (T.ResolvedCandidateEnvironment token _)) =
+        (g,token,[n | (_,T.XName n _,_) <- locals])
+      inspect _ = error "unexpected explicit evidence node"
+  check "nested, reset and sibling givens resolve under their own frame"
+    [(5,47,[2,3]),(6,47,[]),(8,47,[1]),(11,47,[10])]
+    (map inspect (Elaborate.evidenceRequests (error "unused graph") M.empty [] tree []))
+  let node tag = T.Node tag T.Nothing T.Rigid
+      graph = T.Graph (IntMap.fromList ((0,node (T.GCon "Score" [])) :
+                [(g,node (T.GGen 0)) | g <- [1..5]])) IntMap.empty 6
+      types = Elaborate.TypeContext graph (IntMap.singleton 0 (score int))
+                (IntMap.fromList [(g,[]) | g <- [1..5]]) I.empty
+      binding role i = T.DeclaredEvidenceBinding role (visible i) (score int)
+      site g token i = T.Typed g (T.FScopedEvidence
+        (T.ResolvedCandidateEnvironment token [binding T.InstanceEvidence i]))
+      solved expression = case Elaborate.resolveWithinIn types ds M.empty expression of
+        T.Left why -> error (H.unpack why)
+        T.Right terms -> [(g,i) | (g,T.XVarTerm (T.XName i _)) <- IntMap.toList terms]
+      scopedTree = frame [binding T.GivenEvidence 80] $ pair 1 (site 2 100 60)
+        (pair 3 (frame [] $ site 4 101 70) (site 5 100 60))
+  check "each solved wanted selects from its lexical terms and its own module"
+    [(2,80),(4,70),(5,80)] (solved scopedTree)
+  check "a token from another resolution cannot reuse an earlier authority"
+    [(2,90)] (solved (site 2 100 90))
   check "unselected ill-scoped candidate still fails independent proof verification" True
     (case Evidence.indexedResolver ds M.empty [exact, instanceOf 9 a] (score int) of
        T.Left (Evidence.InvalidEvidence _) -> True
@@ -2587,6 +2860,8 @@ evidenceScopeChecks = do
 
 main = do
   preparedScopeFingerprintChecks
+  methodOwnerChecks
+  sharedWantedProjectionChecks
   childBytes <- Prim.newByteArray 4 0
   forM_ (zip [0..] [224,134,1,102]) $ \(i,b) -> Prim.writeByteArray childBytes i b
   let readChildren end = case W.getEntry W.defaultLimits 3 1 5 1 3 of
@@ -2651,6 +2926,7 @@ main = do
   check "deep ring membership" [map H.unpack names]
     (unpackGroups (D.components (zip names (map (:[]) (tail names ++ [head names])))))
   packageChecks
+  candidateSkeletonChecks
   queryChecks
   datatypeChecks
   let sourceTuples = ["(" ++ replicate (arity-1) ',' ++ ")" | arity <- [2..64]]
@@ -2667,6 +2943,7 @@ main = do
   loweringChecks
   resolverChecks
   instanceVisibilityChecks
+  evidenceReadChecks
   protectionChecks
   projectedBindingChecks
   fragmentFingerprintChecks

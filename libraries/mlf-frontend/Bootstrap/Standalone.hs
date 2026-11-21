@@ -334,6 +334,7 @@ module Bootstrap.Standalone where {
   rewriteExpr scope bound expression = case expression of {
     SVar name -> variable scope bound name;
     SDeclScope ids b -> do { next <- rewriteExpr scope bound b; unchanged (SDeclScope ids next) };
+    SGivenScope names b -> do { next <- rewriteExpr scope bound b; unchanged (SGivenScope names next) };
     SConstructor name -> constructor scope name;
     SLam name annotation body -> do {
       annotation' <- rewriteOptionalAnnotation scope annotation;
@@ -500,6 +501,8 @@ module Bootstrap.Standalone where {
     SVar name -> (:) name [];
     SGlobal _ name -> [name];
     SDeclScope _ b -> expressionNames b;
+    SGivenScope names body -> expressionNames (expandWantedScopes names body);
+    SWantedScope n env -> expressionNames (SWantedRefs n (wantedScopeRefs [] env));
     SWantedRefs n candidates -> (:) n (map (compose termRefName snd) candidates);
     SConstructor name -> (:) name [];
     SLam name annotation body -> (:) name (append (maybe [] annotationNames annotation) (expressionNames body));

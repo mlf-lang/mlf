@@ -146,13 +146,22 @@ module Bootstrap.SourceEquality where {
   eqSExprBits :: SExpr -> SExpr -> Bool;
   eqSExprBits = eqSExprWith (\a b -> eqInt (doubleToBits a) (doubleToBits b));
   eqSExprWith :: (Double -> Double -> Bool) -> SExpr -> SExpr -> Bool;
-  eqSExprWith doubles a b = let { same = eqSExprWith doubles } in
+  eqSExprWith doubles a right = let {
+    same = eqSExprWith doubles;
+    b = case right of {
+      SGivenScope names body -> L.expandWantedScopes names body;
+      SWantedScope dictionary env -> SWantedRefs dictionary (wantedScopeRefs [] env);
+      _ -> right
+    }
+  } in
     case a of {
       SGlobal i _ -> case b of { SGlobal j _ -> V.toInt i == V.toInt j; _ -> False };
       SDeclScope slots term -> case b of {
         SDeclScope slots2 term2 -> L.eqList (\i j -> V.toInt i == V.toInt j) slots slots2 && same term term2;
         _ -> False
       };
+      SGivenScope names body -> same (L.expandWantedScopes names body) b;
+      SWantedScope n env -> same (SWantedRefs n (wantedScopeRefs [] env)) b;
       SWantedRefs n candidates -> case b of {
         SWantedRefs m others -> eqString n m && L.eqList (L.eqPair eqEvidenceRole L.eqTermRef) candidates others;
         _ -> False

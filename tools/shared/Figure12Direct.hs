@@ -58,6 +58,8 @@ freeNames expression = case expression of
   T.SVar x -> referenceFreeNames x
   T.SGlobal _ _ -> error "Figure12 signature oracle received a resolved global"
   T.SDeclScope _ _ -> error "Figure12 signature oracle received a declaration scope"
+  T.SGivenScope _ _ -> error "Figure12 signature oracle received a given scope"
+  T.SWantedScope _ _ -> error "Figure12 signature oracle received resolved evidence"
   T.SWantedRefs _ _ -> error "Figure12 signature oracle received resolved evidence"
   T.SConstructor _ -> Set.empty
   T.SLam x _ b -> Set.delete (H.unpack x) (freeNames b)
@@ -139,6 +141,9 @@ oracleControls = do
     "Figure12 signature oracle received a resolved global"
   reject (T.SDeclScope [slot] (variable "free"))
     "Figure12 signature oracle received a declaration scope"
+  reject (T.SGivenScope [] (variable "free")) "Figure12 signature oracle received a given scope"
+  reject (T.SWantedScope (t "wanted") (T.CandidateEnvironment 5 []))
+    "Figure12 signature oracle received resolved evidence"
   reject (T.SWantedRefs (t "wanted") [(,) T.GivenEvidence (T.LexicalRef (t "local")),
     (,) T.InstanceEvidence (T.DeclRef slot (t "hint"))])
     "Figure12 signature oracle received resolved evidence"

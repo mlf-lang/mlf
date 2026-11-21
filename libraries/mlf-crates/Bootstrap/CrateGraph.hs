@@ -342,6 +342,7 @@ module Bootstrap.CrateGraph where {
       Q.KeyText text -> let { size = stringLength text } in
         if size > scalars then Nothing else Just ((,) (nodes - 1) (scalars - size));
       Q.KeyFields fields -> boundedPreparedFields (depth + 1) (nodes - 1) scalars fields;
+      Q.KeyOwnedScope _ _ _ -> Nothing;
       Q.KeyScope _ -> Nothing
     };
   boundedPreparedFields depth nodes scalars fields = case fields of {
@@ -410,9 +411,10 @@ module Bootstrap.CrateGraph where {
   };
   -- Frame each member subtree once. The inline evidence scope preserves the
   -- ordinary field spelling used by the prepared-declaration fingerprint.
-  preparedSyntax previous original lowered = let {
-    members = Q.keyList (Q.memberKey Q.inlineScopeKey);
-    field values = Q.preparedKeyField preparedFieldLimit (Q.keyList (Q.memberKey Q.KeyScope) values);
+  preparedSyntax = preparedSyntaxReading False;
+  preparedSyntaxReading projected previous original lowered = let {
+    members = Q.keyList (Q.memberKeyWith projected Q.inlineScopeKey);
+    field values = Q.preparedKeyField preparedFieldLimit (Q.keyList (Q.memberKeyWith projected Q.KeyScope) values);
     firstKey = members original;
     first = if smallPreparedKey firstKey then Q.renderKey M.empty firstKey else field original;
     fresh = let {
@@ -726,7 +728,8 @@ module Bootstrap.CrateGraph where {
     _ -> Nothing
   };
   preparedWith = preparedUsing Q.referenceTableUsing;
-  preparedUsing readTable create previous slots prepared = let {
+  preparedUsing = preparedReading False;
+  preparedReading owned readTable create previous slots prepared = let {
     source = Source.groupOriginal prepared;
     checked = Source.groupMembers prepared;
     sameSource = matchingSourceMembers source checked;
@@ -734,7 +737,7 @@ module Bootstrap.CrateGraph where {
     -- lowered body just erases location wrappers. The final occurrence
     -- already comes from the lowered member.
     table = readTable slots prepared (if sameSource then checked else append source checked);
-    member = Q.referenceMember table;
+    member = Q.referenceMemberReading owned table;
     token = Q.referenceToken table;
     candidate protected ((,,) role n _) = Q.node "candidate"
       [Q.encodeRole role,token n,Q.boolean (elem eqString n protected)];
@@ -755,7 +758,7 @@ module Bootstrap.CrateGraph where {
     -- application/lambda spine. Dropping a location wrapper preserves its
     -- subtree; the lowered key therefore exceeds the 256-node retention limit.
     Just ((,) source relative) -> (,) (create names source relative metadata) Nothing;
-    Nothing -> case preparedSyntax previous original lowered of { (,,) first second cached ->
+    Nothing -> case preparedSyntaxReading owned previous original lowered of { (,,) first second cached ->
       (,) (create names (compactOrigin original first second names metadata) second metadata) cached
     }
   };
@@ -927,8 +930,9 @@ module Bootstrap.CrateGraph where {
     ioReturn (mapEither fst answer)
   };
   preparedInputCached = preparedInputReading Q.referenceTableUsing;
-  preparedInputReading readTable previous slots prepared session =
-    case preparedUsing readTable hashPrepared previous slots prepared of { (,) action cached -> do {
+  preparedInputReading = preparedInputFor False;
+  preparedInputFor owned readTable previous slots prepared session =
+    case preparedReading owned readTable hashPrepared previous slots prepared of { (,) action cached -> do {
       answer <- action;
       ioReturn (mapEither (\digest -> (,) (G.recordDigest (G.inputKey (groupKey PreparedQuery slots))
         [] Nothing digest Nothing session) cached) answer)
@@ -946,9 +950,10 @@ module Bootstrap.CrateGraph where {
   rawValueWith encode references group fragment = encode
     (A.toList (A.toPair A.toText A.toText) references) "raw" group fragment;
   compile = compileWithData Q.requiredDataIn;
-  compileFile = compileUsing Dependency.fileValueOccurrences Dependency.fileDeclarationOccurrences Q.requiredFileDataIn;
+  compileFile = compileReading True Dependency.fileLastValueOccurrences Dependency.fileDeclarationOccurrences Q.requiredFileDataIn;
   compileWithData = compileUsing (Dependency.valueOccurrences True) (Dependency.valueOccurrences True False);
-  compileUsing occurrences declarationReads selectData verify crateId compilerHash cacheDir imports protected originalPlan =
+  compileUsing = compileReading False;
+  compileReading owned occurrences declarationReads selectData verify crateId compilerHash cacheDir imports protected originalPlan =
     case do {
       (,) plan open <- Source.protectedQueryPlanReading declarationReads originalPlan protected;
       inventory <- Q.prepareData (Source.planData plan);
@@ -958,7 +963,7 @@ module Bootstrap.CrateGraph where {
       Right ((,,,) plan inventory checked steps)
     } of {
       Left e -> ioReturn (Left e);
-      Right ((,,,) plan inventory checked steps) -> startUsing occurrences declarationReads selectData verify crateId compilerHash cacheDir
+      Right ((,,,) plan inventory checked steps) -> startGroupUsing owned occurrences declarationReads selectData verify crateId compilerHash cacheDir
         "source" inventory (Source.planData plan) checked steps
     };
   -- The already-lowered fallback has no unsigned-root evidence finalization.
@@ -1010,7 +1015,8 @@ module Bootstrap.CrateGraph where {
   };
   start = startWithData Q.requiredDataIn;
   startWithData = startUsing (Dependency.valueOccurrences True) (Dependency.valueOccurrences True False);
-  startUsing occurrences declarationReads selectData verify crateId compilerHash cacheDir flavor inventory datatypes contracts groups = do {
+  startUsing = startGroupUsing False;
+  startGroupUsing owned occurrences declarationReads selectData verify crateId compilerHash cacheDir flavor inventory datatypes contracts groups = do {
         statistics <- G.profile;
         graphStarted <- G.clock statistics;
         auditSetting <- getEnv "MLF_QUERY_SEMANTIC_AUDIT";
@@ -1019,14 +1025,15 @@ module Bootstrap.CrateGraph where {
         case started of { Left e -> ioReturn (Left e); Right session -> do {
           let { initial = case contracts of { Source.CheckedContracts _ indexed _ -> indexed } };
           G.elapsed statistics 0 graphStarted;
-          runGroupsReading occurrences declarationReads selectData verify (eqString auditSetting "1") (Separate.compactOpenGroupName crateId) inventory initial ((,) Nothing Nothing) groups
+          runCheckedGroups owned occurrences declarationReads selectData verify (eqString auditSetting "1") (Separate.compactOpenGroupName crateId) inventory initial ((,) Nothing Nothing) groups
             (State session contracts (InferenceCaches M.empty M.empty M.empty Nothing Nothing) [] 0 0 [] statistics)
         } }
     };
   runGroups verify audit crateId = runGroupsWithOwner verify audit (Separate.compactOpenGroupName crateId);
   runGroupsWithOwner = runGroupsUsing Q.requiredDataIn;
   runGroupsUsing = runGroupsReading (Dependency.valueOccurrences True) (Dependency.valueOccurrences True False);
-  runGroupsReading occurrences declarationReads selectData verify audit groupName inventory initial scopeHashes groups state = case groups of {
+  runGroupsReading = runCheckedGroups False;
+  runCheckedGroups owned occurrences declarationReads selectData verify audit groupName inventory initial scopeHashes groups state = case groups of {
     [] -> ioReturn (Right state);
     (:) ((,) owners prepare) rest -> case state of {
       State session contracts (InferenceCaches contexts templates payloads contractHash preparedCache) objects inferred reused reports statistics ->
@@ -1042,7 +1049,7 @@ module Bootstrap.CrateGraph where {
             source <- do {
               demanded <- demandInputs scope initial (append (Source.candidateIds slots) (Source.parameterIds slots)) declarations session;
               case demanded of { Left e -> ioReturn (Left e); Right current ->
-                preparedInputReading (Q.referenceTableReading (occurrences True)) preparedCache slots prepared current }
+                preparedInputFor owned (Q.referenceTableReading (occurrences True)) preparedCache slots prepared current }
             };
             case source of { Left e -> ioReturn (Left e); Right ((,) ((,) sourceNode first) nextPreparedCache) -> do {
               let { inventoryValue = scopeInventory prepared;
@@ -1108,8 +1115,10 @@ module Bootstrap.CrateGraph where {
                         seq cached (G.elapsed statistics 1 loadStarted);
                         inferStarted <- G.clock statistics;
                         let { hit = case cached of { Right _ -> True; Left _ -> False };
-                          compile = compileIndexedMemoUsing (Inference.compileOpenGroupIndexedWith
-                            (Surface.bindIndexedMembersWith (Dependency.occurrenceGlobalIds declarationReads)));
+                          bind reads = Surface.bindIndexedMembersWith (Dependency.occurrenceGlobalIds reads);
+                          compiler = if owned then Inference.compileFileGroupIndexedWith (bind Dependency.fileLastDeclarationOccurrences)
+                            else Inference.compileOpenGroupIndexedWith (bind declarationReads);
+                          compile = compileIndexedMemoUsing compiler;
                           raw = case cached of {
                             Right fragment -> Right ((,) fragment templates);
                             Left _ -> do {
@@ -1168,7 +1177,7 @@ module Bootstrap.CrateGraph where {
                                     evidenceReads delta reads afterInputs };
                                 case supplied of { Left e -> ioReturn (Left e); Right ((,) next nextContractHash) -> do {
                                     G.elapsed statistics 3 finishStarted;
-                                    runGroupsReading occurrences declarationReads selectData verify audit groupName inventory initial ((,) inventoryHash scopeHash) rest
+                                    runCheckedGroups owned occurrences declarationReads selectData verify audit groupName inventory initial ((,) inventoryHash scopeHash) rest
                                       (State next (Source.publishContracts contracts delta) (InferenceCaches currentContexts nextTemplates nextPayloads nextContractHash nextPreparedCache)
                                         ((:) ((,,) group final (map fst delta)) objects)
                                         (inferred + if hit then 0 else 1) (reused + if hit then 1 else 0)

@@ -246,6 +246,11 @@ module Bootstrap.Separate where {
   hygieneWith rename env expression = let { walk = hygieneWith rename } in case expression of {
       SVar n -> freshPure (SVar (hygieneName env n));
       SGlobal _ _ -> freshPure expression;
+      SGivenScope names body -> do {
+        inner <- walk env body;
+        freshPure (SGivenScope (map (hygieneName env) names) inner)
+      };
+      SWantedScope _ _ -> freshPure expression;
       SWantedRefs n cs -> freshPure (SWantedRefs n (map (\((,) role r) -> (,) role (hygieneRef env r)) cs));
       SDeclScope ids enclosed -> do {
         b <- case enclosed of {
@@ -339,6 +344,9 @@ module Bootstrap.Separate where {
           failure2 <- walk env failure;
           freshPure (SSharedBind (hygienePattern scope pattern) action2 continuation2 bindMethod2 failure2)
         };
+      SChecked ty body -> do { inner <- walk env body; freshPure (SChecked ty inner) };
+      SWanted dict candidates -> freshPure (SWanted dict
+        (map (\((,) role name) -> (,) role (hygieneName env name)) candidates));
       SDo _ _ -> walk env (Desugar.desugarDo expression);
       _ -> freshPure expression
     };

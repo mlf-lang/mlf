@@ -414,8 +414,8 @@ module Bootstrap.Crate where {
                   extra = case entry of {
                     CrateEntry _ i -> if eqString name (specEntry spec) then [i] else []; NoEntry -> []
                   }
-                } in (,) (append (map Dependency.boundId (compilationBindings unit)) extra) (candidates name)
-                } in Dependency.indexedScopeGroups symbols (map group resolved)
+                } in (,) name (append (map Dependency.boundId (compilationBindings unit)) extra)
+                } in Dependency.indexedModuleScopes symbols (map group resolved) (map fst instances) candidates
               }
             };
             let {
