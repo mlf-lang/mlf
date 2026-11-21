@@ -1446,7 +1446,8 @@ module Bootstrap.SourceInference where {
     }
   } in visit;
   expressionDeclarations scope body = declarationRefs scope (Dependency.valueOccurrences True False body);
-  selectedContractIds scope owners members = let {
+  selectedContractIds = selectedContractIdsWith (Dependency.valueOccurrences True False);
+  selectedContractIdsWith references scope owners members = let {
     -- Only the current winner for each spelling can be ignored on a repeat.
     -- A distinct slot may shadow it, then the original slot may appear again.
     select state@((,) current names) i = let { slot = V.toInt i } in
@@ -1459,12 +1460,13 @@ module Bootstrap.SourceInference where {
         entries = M.insert compareString name i names
       } in seq name (seq next (seq entries ((,) next entries)));
     selectMember state member =
-      foldDeclarationRefs scope select state (Dependency.valueOccurrences True False (sourceRhs member));
+      foldDeclarationRefs scope select state (references (sourceRhs member));
     ordered = snd (foldlStrict selectMember ((,) IS.empty M.empty) members)
   } in filter (\i -> not (elem (\a b -> compareDecl a b == 0) i owners)) (M.elems ordered);
-  slotPrepared checked owners (SlotPrepared _ named) = slotPrepared checked owners named;
-  slotPrepared checked owners (PreparedGroup original members _ registry specs authority _) = do {
-    let { scope = checkedScope checked; parameters = selectedContractIds scope owners members;
+  slotPrepared = slotPreparedWith (Dependency.valueOccurrences True False);
+  slotPreparedWith references checked owners (SlotPrepared _ named) = slotPreparedWith references checked owners named;
+  slotPreparedWith references checked owners (PreparedGroup original members _ registry specs authority _) = do {
+    let { scope = checkedScope checked; parameters = selectedContractIdsWith references scope owners members;
       materialize i = mapEither ((,) (declName scope i)) (checkedBinding checked i) };
     values <- traverseEither materialize parameters;
     let { resolveCandidate ((,,) role name _) = do {

@@ -810,6 +810,17 @@ typedClassChecks = do
       check "class candidate identity" (Just 3) (case D.generatedNameId table "dictionary" of
         T.Just i -> Just (V.toInt i); _ -> Nothing)
     _ -> error "class generation did not label support owners"
+  do
+    let fileRefs expression = [(case r of
+          T.LexicalRef n -> (False,0,H.unpack n)
+          T.DeclRef i n -> (True,V.toInt i,H.unpack n)) | r <- expression]
+        lexicalGroup = T.SLet "+" (T.SVar "$MLF.Infix.+") (T.SApp (T.SVar "$MLF.Infix.+")
+          (T.SDeclScope [own] (T.SLet "same" (T.SGlobal own "rhs")
+            (T.SApp (T.SGlobal own "hidden") (T.SApp (T.SVar "same") (T.SGlobal foreignId "+"))))))
+    forM_ [False,True] $ \inventory -> do
+      check "parsed lexical observation preserves every raw slot, hint and occurrence in order"
+        (fileRefs (D.valueOccurrences True inventory lexicalGroup))
+        (fileRefs (D.fileValueOccurrences inventory lexicalGroup))
   let copied = T.SDeclScope [own] (T.SLet "same" (T.SGlobal own "outer") (T.SApp
         (T.SGlobal own "inner") (T.SApp (T.SVar "same") (T.SGlobal foreignId "same"))))
   check "copied helper hides its own slot only in its body" [1,0] (map V.toInt (D.expressionGlobalIds copied))

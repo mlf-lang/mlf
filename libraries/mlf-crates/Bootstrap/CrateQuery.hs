@@ -680,11 +680,12 @@ module Bootstrap.CrateQuery where {
     canonicalMemberIn (\i -> M.get Source.compareDecl i ranks) names (referenceToken table);
   referenceTable slots prepared = referenceTableUsing slots prepared
     (append (Source.groupOriginal prepared) (Source.groupMembers prepared));
-  referenceTableUsing slots prepared members = let {
+  referenceTableUsing = referenceTableReading Dependency.querySyntaxRefs;
+  referenceTableReading references slots prepared members = let {
     scope = Source.slotScope slots;
     prepend rest i = (:) i rest;
     observe acc member = Source.foldDeclarationRefs scope prepend acc
-      (Dependency.querySyntaxRefs (Source.sourceRhs member));
+      (references (Source.sourceRhs member));
     -- Finish each input spine from left to right before deduplicating its
     -- slots in reverse order. Slot values and display hints stay lazy.
     owners = reverse (Source.memberIds slots);

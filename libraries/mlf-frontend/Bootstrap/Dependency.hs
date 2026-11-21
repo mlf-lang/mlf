@@ -134,6 +134,43 @@ module Bootstrap.Dependency where {
       }
     }
   } in refsOf (collect expression NoValueOccurrences);
+  -- Parsed-file inputs and their lowered forms contain complete syntax and
+  -- spellings. Carry lexical masks into the body of each ordinary let so its
+  -- surviving occurrences need only one lookup. A declaration-marked binder
+  -- hides slots, not equal-looking lexicals. Less common scoped nodes retain
+  -- their ordinary walker and filter their resulting list once on exit.
+  fileValueOccurrences inventory expression = let {
+    emit names ids ref rest = case ref of {
+      LexicalRef n -> if S.member compareString n names then rest else (:) ref rest;
+      DeclRef i _ -> if IS.member (V.toInt i) ids then rest else (:) ref rest
+    };
+    walk names ids term rest = let { visit = walk names ids;
+      scoped owners group = let {
+        hidden = if inventory then ids else foldlStrict (\prior i -> IS.insert (V.toInt i) prior) ids owners;
+        addOwners hints result = if inventory then
+          foldr (emit names ids) result (zipWith DeclRef owners hints) else result
+      } in case group of {
+        SLam n _ body -> addOwners [n] (walk names hidden body rest);
+        SLet n rhs body -> addOwners [n] (visit rhs (walk names hidden body rest));
+        _ -> foldr (emit names ids) rest (valueOccurrences True inventory term)
+      }
+    } in case term of {
+      SApp f a -> visit f (visit a rest);
+      SVar n -> emit names ids (LexicalRef (lexicalValueName n)) rest;
+      SGlobal i n -> emit names ids (DeclRef i n) rest;
+      SSourceDefinition body -> visit body rest;
+      SCallSite _ _ body -> visit body rest;
+      SSignature body _ -> visit body rest;
+      SAnn body _ -> visit body rest;
+      SChecked _ body -> visit body rest;
+      SLam n _ body -> walk (S.insert compareString n names) ids body rest;
+      SLet n rhs body -> visit rhs (walk (S.insert compareString n names) ids body rest);
+      SDeclScope owners group -> scoped owners group;
+      SPrimitive _ -> rest; SConstructor _ -> rest; SIntLit _ -> rest;
+      SBoolLit _ -> rest; SDoubleLit _ -> rest; SStringLit _ -> rest;
+      _ -> foldr (emit names ids) rest (valueOccurrences True inventory term)
+    }
+  } in walk S.empty IS.empty expression [];
   observeSyntax includeCandidates inventory expression =
     observeBefore includeCandidates inventory expression emptyObservation;
   -- Application subtrees contribute ordered occurrences to four independent lists.
