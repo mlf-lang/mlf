@@ -13,7 +13,7 @@ PREDECESSOR = '4fd6730d35b6ecaf8e169ad228ac3c7a3ed56160'
 PREDECESSOR_TREE = '1c60d3daca5162bd24658d295169f601593345ef'
 PREDECESSOR_MANIFEST = '69bc6cc39ec70a0209a6011f4ce7fef0aaf5039d903fa1b8477ee4a2bc46dcd8'
 MANIFEST = 'pr43-reconciliation-migration.json'
-MANIFEST_SHA256 = 'c06d380d4a18955858363b6fc90610c85101cafbba06d34f28183815291d05e7'
+MANIFEST_SHA256 = 'eeb1f8ef7d4d74002e5122618faf118abbf5c2e173dbf89cfa4bb29c7fc237dc'
 PREDECESSOR_IMPLEMENTATION = '7cacadad979f3db29da9067b5fe0ca8e1634d960dbf978ad6d5cae39ba338794'
 LIVE_PREDECESSOR = 'f9bdb40a659bfdff4cbb782d438afbb0417dd2e1'
 LIVE_PREDECESSOR_TREE = '3148203097e7622ced1b272e606bfa892fad746b'
@@ -32,6 +32,8 @@ LIST_PATHS = (
     'libraries/mlf-frontend/Bootstrap/Parser.hs',
     'mlf.lock',
     'shared-sources.json',
+    'tests/Tests/TupleList.hs',
+    'tests/Tests/TupleListLegacy.hs',
     'tests/shared/MLF/Tests/SharedFrontend.hs',
 )
 LIST_MAINTENANCE = 'patricia/test_adapters.py'

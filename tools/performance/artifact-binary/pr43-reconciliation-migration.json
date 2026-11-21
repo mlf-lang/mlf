@@ -83,11 +83,19 @@
       ],
       "mlf.lock": [
         "351b07e06e28bae17717c9e860c22e3302bc73a63313e5e12c5cce33125abd99",
-        "d244cc18860fce02b5632c6f7bebc0512fc6d4c294b8eb7c73cdc0ac93b1b2c7"
+        "a757092184e55358aeeca76b59b2990788f40d37672dd70a6eb901d9b8221b59"
       ],
       "shared-sources.json": [
         "7264b9d556d1112d6c6883e6a1269ff812c76e4eb6557f6445bc67dd28e031a4",
         "8d8a6483bbf088fb1e0f5a824658eab9e7dd40ef07aa4ecd2e617d2c6488d00c"
+      ],
+      "tests/Tests/TupleList.hs": [
+        "2ff183466ff22c3627aa58f0b73d9503ef1dc979f7b0e9c1f7744cd9933996f8",
+        "4d8ceb5ddee0ae9981659402c1c490ff00e0dc50264ba344af0d30ca96c760ae"
+      ],
+      "tests/Tests/TupleListLegacy.hs": [
+        "60176aca5512cf858f1c5fcde5819741a28073b4b504049a301a54f0492ab6b0",
+        "295f480509cb670133578781ce7daafa265bc28fe37c4a47a4b6e5170bd2b3a7"
       ],
       "tests/shared/MLF/Tests/SharedFrontend.hs": [
         "f5f2956a34248a6e107ec275250c72399416d39a69317df9c0b136979e24ad03",
