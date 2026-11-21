@@ -412,11 +412,14 @@ module Bootstrap.CrateGraph where {
   -- ordinary field spelling used by the prepared-declaration fingerprint.
   preparedSyntax previous original lowered = let {
     members = Q.keyList (Q.memberKey Q.inlineScopeKey);
-    first = Q.renderKey M.empty (members original);
+    field values = Q.preparedKeyField preparedFieldLimit (Q.keyList (Q.memberKey Q.KeyScope) values);
+    firstKey = members original;
+    first = if smallPreparedKey firstKey then Q.renderKey M.empty firstKey else field original;
     fresh = let {
       key = members lowered;
-      second = Q.renderKey M.empty key;
-      cached = if smallPreparedKey key && stringLength second <= 65536
+      small = smallPreparedKey key;
+      second = if small then Q.renderKey M.empty key else field lowered;
+      cached = if small && stringLength second <= 65536
         then Just (LoweredSyntax lowered second) else Nothing
     } in (,,) first second cached
   } in case previous of {
@@ -862,6 +865,18 @@ module Bootstrap.CrateGraph where {
         }
       }
   } in if small then hashTextFields (preparedFrames preparedVersion names original lowered metadata)
+    else let {
+      oversized text = stringLength text > preparedFieldLimit / 4 && stringUtf8Length text > preparedFieldLimit;
+      -- A source with many genuinely distinct terms can remain large after
+      -- scope pooling. Each chunk has at most 64 Ki Unicode scalars. Framing
+      -- preserves their order and boundaries, and the wire still enforces
+      -- its normal total byte, node and expanded-work limits.
+      chunks text = let { count = stringLength text;
+        next offset = let { available = count - offset; width = if available < 65536 then available else 65536 }
+          in if width <= 0 then [] else (:) (W.VText (stringSlice text offset width)) (next (offset + width))
+      } in W.VNode 1 (next 0)
+    } in if oversized original || oversized lowered then G.hashValue (W.VNode 421
+      [W.VText "prepared-declarations-chunks-1",A.toList A.toText names,chunks original,chunks lowered,A.toList A.toText metadata])
     else hashRebuiltValue (preparedTree names original lowered metadata);
   recordRebuilt identity reads value session = do {
     hashed <- hashRebuiltValue value;

@@ -305,6 +305,55 @@ module Bootstrap.CrateQuery where {
     scopes = M.fromList compareCandidateScopes (zip candidates (range 0 (length candidates - 1)));
     table = keyList inlineScopeKey candidates
   } in renderKey scopes (KeyFields (snoc fields table));
+  -- The old Prepared input stored an entire member list in one wire symbol.
+  -- Retain its exact spelling when admitted. Count its framed UTF-8 bytes
+  -- before flattening, and expand each distinct ordered evidence scope once.
+  -- In an oversized field, references index a first-use scope table instead.
+  -- Both declaration ranks and lexical names are already canonical here.
+  data PreparedPool = PreparedPool (Map ([] ((,) EvidenceRole String)) ((,,) String String Int)) ([] String);
+  data PreparedField = PreparedField Int Int FramedKey FramedKey;
+  preparedKeyField limit key =
+    case prepareKey limit key (PreparedPool M.empty []) of {
+      (,) (PreparedField _ bytes original pooled) (PreparedPool _ rows) ->
+        if bytes <= limit then concatStringList (framedChunks original [])
+        else "F6" ++ Separate.pack [concatStringList (framedChunks pooled []),Separate.pack (reverse rows)]
+    };
+  prepareKey limit key pool = case key of {
+    KeyText text -> let { field = FramedText text;
+      size = stringLength text; bytes = stringUtf8Length text
+    } in (,) (PreparedField size bytes field field) pool;
+    KeyScope candidates -> case pool of { PreparedPool table rows ->
+      let { use index text bytes next = (,) (PreparedField (stringLength text) bytes
+          (FramedText text) (FramedText index)) next
+      } in case M.lookup compareCandidateScopes candidates table of {
+        Just ((,,) index text bytes) -> use index text bytes pool;
+        Nothing -> let {
+          index = showInt (M.size table);
+          text = renderKey M.empty (inlineScopeKey candidates);
+          bytes = stringUtf8Length text;
+          next = PreparedPool (M.insert compareCandidateScopes candidates ((,,) index text bytes) table) ((:) text rows)
+        } in use index text bytes next
+      }
+    };
+    KeyFields fields -> prepareFields limit fields pool 0 0 0 [] []
+  };
+  prepareFields limit fields pool scalars bytes compact originals pooled = case fields of {
+    [] -> (,) (PreparedField scalars bytes (FramedFields scalars (reverse originals))
+      (FramedFields compact (reverse pooled))) pool;
+    (:) field rest -> case prepareKey limit field pool of {
+      (,) (PreparedField width size old short) next -> let {
+        prefix = 1 + stringLength (showInt width);
+        shortWidth = framedLength short;
+        compactSize = compact + shortWidth + 1 + stringLength (showInt shortWidth);
+        -- A clipped scalar count can only describe a field already too large
+        -- for the old symbol. Its prefix is immaterial to that decision.
+        capped n = if n > limit then limit + 1 else n;
+        newWidth = capped (scalars + prefix + width);
+        newBytes = capped (bytes + prefix + size)
+      } in seq newWidth (seq newBytes (seq compactSize
+        (prepareFields limit rest next newWidth newBytes compactSize ((:) old originals) ((:) short pooled))))
+    }
+  };
   encodeField :: Field -> String;
   encodeField field =
     case field of {

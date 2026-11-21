@@ -172,6 +172,40 @@ packageChecks = do
 
 -- Construct the typed input independently of the writer, including the
 -- noncanonical row order that an older reader accepts and must republish.
+preparedScopeFingerprintChecks = do
+  let candidates = [(T.InstanceEvidence,H.literal ("ref:" ++ show i)) | i <- [1..1024::Int]]
+      terms 1 hole = hole
+      terms n hole = let child = terms (n `div` 2) hole in T.SApp child child
+      member xs = [("entry",T.Nothing,terms (1024::Int) (T.SWanted "Score" xs))]
+      lowered xs = let (_,field,_) = CrateGraph.preparedSyntax T.Nothing [] (member xs) in field
+      digest xs = do
+        result <- CrateGraph.hashPrepared ["entry"] "" (lowered xs) []
+        case result of { T.Right value -> pure value; T.Left message -> fail (H.unpack message) }
+  first <- digest candidates
+  let swaps = [(T.InstanceEvidence,"ref:2"),(T.InstanceEvidence,"ref:1")] ++ drop 2 candidates
+  reordered <- digest swaps
+  unless (H.unpack first /= H.unpack reordered) (fail "Prepared fingerprint lost ordered evidence candidates")
+  unless (H.v_stringLength (lowered candidates) < 65536) (fail "Prepared fingerprint expanded the repeated candidate scopes")
+  let unicode = [(T.GivenEvidence,"界"),(T.InstanceEvidence,"λ"),(T.InstanceEvidence,"λ")]
+      scoped xs = CQ.KeyFields [CQ.KeyText "e:0", CQ.KeyScope xs]
+      inline = CQ.renderKey M.empty (CQ.KeyFields [CQ.KeyText "e:0", CQ.inlineScopeKey unicode])
+      bytes = H.v_stringUtf8Length inline
+  check "admitted UTF-8 field keeps exact prior scalar framing" (H.unpack inline)
+    (H.unpack (CQ.preparedKeyField bytes (scoped unicode)))
+  let spill xs = H.unpack (CQ.preparedKeyField (bytes-1) (scoped xs))
+  check "overflow uses distinct typed encoding" "F6" (take 2 (spill unicode))
+  forM_ [reverse unicode, drop 1 unicode, init unicode,
+         [(T.InstanceEvidence,"界"),(T.InstanceEvidence,"λ"),(T.InstanceEvidence,"λ")]] $ \xs ->
+    unless (spill unicode /= spill xs) (fail "spilled Prepared scope lost role, order, name or multiplicity")
+  let block = H.literal (replicate 4096 'x')
+      large = H.v_concatStringList (replicate 4096 block)
+      chunked suffix = CrateGraph.hashPrepared ["entry"] "" (H.v_concatString large suffix) [] >>= \result ->
+        case result of { T.Right value -> pure value; T.Left message -> fail (H.unpack message) }
+  a <- chunked "a"
+  b <- chunked "b"
+  unless (a /= b) (fail "chunked Prepared field lost its final scalar")
+
+
 queryChecks = do
   let origin = T.SourceSpan "pkg" "Mod" "file" 1 1 1 1
       prepared scope budget expression = case CrateGraph.packedOriginIn scope origin 0 budget expression "header" of
@@ -2488,6 +2522,7 @@ applicationPatternChecks = do
   pure ()
 
 main = do
+  preparedScopeFingerprintChecks
   childBytes <- Prim.newByteArray 4 0
   forM_ (zip [0..] [224,134,1,102]) $ \(i,b) -> Prim.writeByteArray childBytes i b
   let readChildren end = case W.getEntry W.defaultLimits 3 1 5 1 3 of
