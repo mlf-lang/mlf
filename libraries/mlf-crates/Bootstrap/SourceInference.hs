@@ -663,6 +663,12 @@ module Bootstrap.SourceInference where {
           (GeometryTerm d body rest) n w nested);
         XApp a b -> seq nested (visitTerm d a (GeometryTerm d b rest) n w nested);
         XTypeApp a proof -> seq nested (visitTerm d a (GeometryProof d False proof rest) n w nested);
+        XVarTerm name -> if nodes >= 4 && work >= 4 && depth >= 0 && maxDepth - depth >= 2
+          then seq stored (seq nested (case name of {
+            XName _ hint -> case chargeText hint (work - 4) of {
+              Nothing -> Nothing; Just available -> resume rest (nodes - 4) available nested
+            }
+          })) else visit depth False [Structure.toXTerm term] rest nodes work nested;
         _ -> visit depth False [Structure.toXTerm term] rest nodes work nested
       };
     -- Then schedules its right proof after its left. Unary proof nodes have
@@ -672,8 +678,22 @@ module Bootstrap.SourceInference where {
         d = depth + 1; n = nodes - 1; w = work - 1;
         changed = nested || (parentThen && isComposition proof)
       } in case proof of {
-        XThen a b -> seq changed
-          (visitProof d True a (GeometryProof d True b rest) n w changed);
+        XThen a b -> seq changed (let {
+          ordinary = visitProof d True a (GeometryProof d True b rest) n w changed
+        } in if nodes < 6 || work < 6 || depth < 0 || maxDepth - depth < 4 then ordinary
+          else case a of {
+            -- The guards cover Then, Inner, Bottom, Con, text and list.
+            -- Text must be charged before looking at the list or right proof.
+            XInner (XBottom (XCon name arguments)) -> case chargeText name (work - 5) of {
+              Nothing -> Nothing;
+              Just available -> if available <= 0 then Nothing else case arguments of {
+                [] -> visitProof d True b rest (nodes - 6) (available - 1) changed;
+                _ -> visit (depth + 5) False (map Structure.toXType arguments)
+                  (GeometryProof d True b rest) (nodes - 6) (available - 1) changed
+              }
+            };
+            _ -> ordinary
+          });
         XInner a -> seq changed (visitProof d False a rest n w changed);
         XBottom ty -> seq changed (visitBottom d ty rest n w changed);
         XElim -> seq changed (resume rest n w changed);

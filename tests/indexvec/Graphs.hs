@@ -1265,6 +1265,23 @@ openGeometryChecks = do
         (error "geometry forced the right proof")
   check "a UTF-8 budget failure precedes both type arguments and the right proof" Nothing
     (admission (application incomplete) 6 100 14)
+  let cursorHint = T.XVarTerm (T.XName (error "cursor forced binding ID") "λ😀")
+      cursorPay expected _ available = if available==expected then T.Just available else T.Nothing
+      cursorTerm frame budget work depth pay = case Source.finalGeometryWalk True False pay depth
+          frame budget work False of { T.Just b -> Just b; T.Nothing -> Nothing }
+      done = Source.GeometryRoots []
+      varFrame = Source.GeometryTerm 1 cursorHint done
+      guardedProof = T.XThen (T.XInner (T.XBottom (T.XCon "other" [])))
+          (error "cursor forced a proof after exhausting its work")
+  check "checked variable charges its name at the original remaining work"
+    [Just False,Nothing,Nothing,Nothing]
+    [cursorTerm varFrame 4 13 3 (cursorPay 9),
+     cursorTerm varFrame 4 13 3 (cursorPay 8),
+     cursorTerm varFrame 3 13 3 (cursorPay 9),
+     cursorTerm varFrame 4 13 2 (cursorPay 9)]
+  check "ground proof consumes its empty type-list node before the right proof" Nothing
+    (cursorTerm (Source.GeometryProof 1 False guardedProof done) 20 20 5
+      (\_ w -> if w==15 then T.Just 1 else error "wrong proof text charge"))
 
 protectionChecks = do
   let chain = [(show i,[show (i+1)]) | i <- [0..126::Int]] ++ [("127",[])]
