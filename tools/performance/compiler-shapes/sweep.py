@@ -1,7 +1,9 @@
 """Serial family-by-family measurements with a table of complete and failed cells."""
 import csv
 import io
+import statistics
 import sys
+from decimal import Decimal
 from pathlib import Path
 
 import analyze
@@ -43,6 +45,23 @@ def completed_pairs(runs):
     return sum(lanes == {'mlf', 'ghc'} for lanes in pairs.values())
 
 
+def peak_rss_medians(receipt, repeats):
+    """Median sampled peak process-group RSS in bytes for a validated single-cell receipt."""
+    runs = receipt['runs']
+    if (not receipt['complete'] or not receipt['all_cases_passed'] or receipt['failures']
+            or completed_pairs(runs) != repeats):
+        raise ValueError('peak RSS requires a complete paired cohort')
+    peaks = {'mlf': [], 'ghc': []}
+    for run in runs:
+        peak = run['command'].get('sampled_process_tree_peak_rss_bytes')
+        if type(peak) is not int or peak < 0:
+            raise ValueError(f"invalid sampled peak RSS for {run['lane']} at position {run['position']}")
+        peaks[run['lane']].append(Decimal(peak))
+    if any(len(values) != repeats for values in peaks.values()):
+        raise ValueError('peak RSS requires one sample per compiler in each pair')
+    return {lane + '_peak_rss_bytes': statistics.median(values) for lane, values in peaks.items()}
+
+
 def measure(folder, setup, row, args, repeats, reference):
     family, size = row['family'], row['size']
     argv = [sys.executable, '-B', bench.HERE / 'run.py', '--output', folder, '--setup', setup,
@@ -68,11 +87,12 @@ def measure(folder, setup, row, args, repeats, reference):
             reason = f'recorder exit {status}; {reason}'
         row.update(status='failed', lane=lane, reason=reason)
         return
-    rows, plan, _, _ = analyze.analyze(folder)
+    rows, plan, receipt, _ = analyze.analyze(folder)
     if (len(rows) != 1 or (rows[0]['family'], rows[0]['size']) != (family, size)
             or row['completed_pairs'] != repeats or plan['benchmark']['repeats'] != repeats
             or plan['benchmark']['endpoint']['id'] != args.endpoint):
         raise ValueError('analyzed cohort differs from the requested cell')
+    memory = peak_rss_medians(receipt, repeats)
     # Per-cell sources vary. All other inputs, including the compiler, benchmark
     # scripts and setup, must match before putting their numbers in one table.
     sources = {case['source'] for case in plan['cases']}
@@ -84,7 +104,7 @@ def measure(folder, setup, row, args, repeats, reference):
         raise ValueError('source revision, tracked patch or shared measurement inputs changed during sweep')
     metrics = rows[0]
     row.update(status='passed', mlf_seconds=metrics['mlf_wall_median'],
-               ghc_seconds=metrics['ghc_wall_median'], mlf_over_ghc=metrics['mlf_over_ghc'])
+               ghc_seconds=metrics['ghc_wall_median'], mlf_over_ghc=metrics['mlf_over_ghc'], **memory)
 
 
 def prune_products(folder):
@@ -105,6 +125,24 @@ def prune_products(folder):
     return len(products), sum(sizes)
 
 
+def comparison_table(by_cell, families, sizes, metric, divisor, precision):
+    lines = ['| Family | ' + ' | '.join(map(str, sizes)) + ' |', '| --- |' + ' ---: |' * len(sizes)]
+    for family in families:
+        cells = []
+        for size in sizes:
+            row = by_cell.get((family, size))
+            if row is None:
+                cells.append('—')
+            elif row['status'] == 'passed':
+                mlf = row['mlf_' + metric] / divisor
+                ghc = row['ghc_' + metric] / divisor
+                cells.append(f"[{mlf:.{precision}f} / {ghc:.{precision}f}]({row['evidence']})")
+            else:
+                cells.append(row['status'])
+        lines.append(f'| `{family}` | ' + ' | '.join(cells) + ' |')
+    return lines
+
+
 def save_tables(root, rows, repeats, endpoint):
     out = io.StringIO(newline='')
     writer = csv.DictWriter(out, fieldnames=list(rows[0]))
@@ -113,21 +151,16 @@ def save_tables(root, rows, repeats, endpoint):
     families = list(dict.fromkeys(row['family'] for row in rows))
     sizes = sorted({row['size'] for row in rows})
     by_cell = {(row['family'], row['size']): row for row in rows}
-    lines = ['# MLF and GHC compilation time', '',
-             f'Median elapsed seconds for MLF / GHC, {repeats} paired builds per size, endpoint `{endpoint}`. '
+    lines = ['# MLF and GHC compilation time and memory', '',
+             f'Each cell shows MLF / GHC for {repeats} paired builds at endpoint `{endpoint}`. '
              'Each compiler builds the same source to a fresh native executable.', '',
-             '| Family | ' + ' | '.join(map(str, sizes)) + ' |', '| --- |' + ' ---: |' * len(sizes)]
-    for family in families:
-        cells = []
-        for size in sizes:
-            row = by_cell.get((family, size))
-            if row is None:
-                cells.append('—')
-            elif row['status'] == 'passed':
-                cells.append(f"[{row['mlf_seconds']:.3f} / {row['ghc_seconds']:.3f}]({row['evidence']})")
-            else:
-                cells.append(row['status'])
-        lines.append(f'| `{family}` | ' + ' | '.join(cells) + ' |')
+             '## Median elapsed time (seconds)', '']
+    lines.extend(comparison_table(by_cell, families, sizes, 'seconds', 1, 3))
+    lines.extend(['', '## Median sampled peak process-group RSS (MiB)', '',
+                  'Each build contributes its largest observed sum of resident bytes across the compiler process group. '
+                  'Sampling approximately every 100 ms can miss short peaks. A build that finishes before the first '
+                  'sample can record zero.', ''])
+    lines.extend(comparison_table(by_cell, families, sizes, 'peak_rss_bytes', 2**20, 2))
     failures = [row for row in rows if row['status'] == 'failed']
     if failures:
         lines.extend(['', '## Failed cells', ''])
@@ -135,7 +168,7 @@ def save_tables(root, rows, repeats, endpoint):
             reason = ' '.join(row['reason'].split())
             lines.append(f"- [{row['family']} at {row['size']}]({row['evidence']}) "
                          f"({row['completed_pairs']}/{repeats} complete pairs). {row['lane']} {reason}".rstrip())
-    lines += ['', '[Full-precision timings and outcomes](summary.csv)', '']
+    lines += ['', '[Full-precision timings, median peak RSS in bytes, and outcomes](summary.csv)', '']
     for filename, content in [('summary.csv', out.getvalue()), ('summary.md', '\n'.join(lines))]:
         path = root / filename
         temporary = root / (filename + '.tmp')
@@ -163,7 +196,8 @@ def run(args):
         raise SystemExit(f'choose a fresh sweep output directory: {root}')
     (root / 'cohorts').mkdir(parents=True)
     rows = [dict(family=family, size=size, status='pending', completed_pairs=0,
-                 mlf_seconds='', ghc_seconds='', mlf_over_ghc='', lane='', reason='',
+                 mlf_seconds='', ghc_seconds='', mlf_over_ghc='', mlf_peak_rss_bytes='', ghc_peak_rss_bytes='',
+                 lane='', reason='',
                  evidence=f'cohorts/{family}-{size}', pruned_files=0, pruned_bytes=0)
             for family, size in cells]
     reference = {}

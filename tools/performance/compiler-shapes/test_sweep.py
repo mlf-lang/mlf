@@ -33,9 +33,9 @@ class SweepTests(unittest.TestCase):
         folder = Path(option('--output'))
         self.seen.append((family, size))
         self.assertEqual(cwd, sweep.bench.ROOT)
-        self.assertEqual(option('--repeats'), '3')
+        self.assertEqual(int(option('--repeats')), self.args.repeats)
         self.assertNotIn('--pilot', argv)
-        write_cohort(folder.parent, folder.name, family, size, endpoint=self.args.endpoint)
+        write_cohort(folder.parent, folder.name, family, size, repeats=self.args.repeats, endpoint=self.args.endpoint)
         plan = sweep.analyze.load(folder / 'plan.json')
         receipt = sweep.analyze.load(folder / 'receipt.json')
         plan['inputs'] = {plan['cases'][0]['source']: 'source',
@@ -43,6 +43,11 @@ class SweepTests(unittest.TestCase):
         (folder / 'plan.json').write_text(json.dumps(plan))
         receipt['plan_sha256'] = sweep.analyze.sha(folder / 'plan.json')
         for run in receipt['runs']:
+            pair = run['position'] // 2
+            scale = 2 if run['lane'] == 'mlf' else 1
+            peak = (9, 1, 7, 3, 5, 0)[pair] * scale * 2**20
+            run['command']['sampled_process_tree_peak_rss_bytes'] = peak + (1 if pair == 4 else 0)
+            run['command']['max_individual_child_rss_bytes'] = 33 * 2**20
             leg = folder / 'legs' / f"{run['position']:03d}-{folder.name}-{run['lane']}"
             build = leg / 'build'
             build.mkdir(parents=True)
@@ -78,9 +83,12 @@ class SweepTests(unittest.TestCase):
         self.assertEqual(failure['lane'], 'mlf')
         self.assertIn(self.fail['flat_functions-32'], failure['reason'])
         self.assertTrue((self.root / failure['evidence']).is_file())
-        self.assertEqual([failure[k] for k in ('mlf_seconds','ghc_seconds','mlf_over_ghc')], ['', '', ''])
+        for key in ('mlf_seconds', 'ghc_seconds', 'mlf_over_ghc', 'mlf_peak_rss_bytes', 'ghc_peak_rss_bytes'):
+            self.assertEqual(failure[key], '')
         self.assertEqual((rows[-1]['mlf_seconds'], rows[-1]['ghc_seconds'], rows[-1]['mlf_over_ghc']), ('2.2','1.0','2.2'))
-        self.assertIn('2.200 / 1.000', (self.root / 'summary.md').read_text())
+        summary = (self.root / 'summary.md').read_text()
+        self.assertIn('2.200 / 1.000', summary)
+        self.assertEqual(summary.count(' | failed |'), 2)
         self.assertEqual(rows[0]['pruned_files'], '12')
         self.assertEqual(failure['pruned_files'], '0')
         passed = self.root / 'cohorts/flat_functions-8/legs'
@@ -89,6 +97,47 @@ class SweepTests(unittest.TestCase):
         self.assertEqual(len(list(passed.glob('*-mlf/build/unit.mlfci'))), 3)
         self.assertEqual(len(list(passed.glob('*-mlf/query-cache-inventory.json'))), 3)
         self.assertTrue(list(failed.glob('*/build/program')))
+
+    def test_reports_median_group_peak_for_six_builds_in_bytes_and_mib(self):
+        self.args.repeats = 6
+        with mock.patch.object(sweep.bench, 'resolve', return_value=({'repeats': 6}, ['flat_functions'], [8], False)), \
+             mock.patch.object(sweep.command_runner, 'run_recorder', side_effect=self.recorder):
+            sweep.run(self.args)
+        row, = self.rows()
+        self.assertEqual(row['status'], 'passed')
+        self.assertEqual(row['completed_pairs'], '6')
+        self.assertEqual(row['mlf_peak_rss_bytes'], '8388608.5')
+        self.assertEqual(row['ghc_peak_rss_bytes'], '4194304.5')
+        report = (self.root / 'summary.md').read_text()
+        self.assertIn('Median elapsed time (seconds)', report)
+        self.assertIn('Median sampled peak process-group RSS (MiB)', report)
+        self.assertIn(f"[8.00 / 4.00]({row['evidence']})", report)
+
+    def test_rejects_missing_negative_and_noninteger_rss(self):
+        folder = write_cohort(self.root)
+        receipt = sweep.analyze.load(folder / 'receipt.json')
+        for run in receipt['runs']:
+            run['command']['sampled_process_tree_peak_rss_bytes'] = 0
+        command = receipt['runs'][4]['command']
+        for value in [None, False, -1, 1.5, float('inf'), float('nan'), '10']:
+            with self.subTest(value=value):
+                command['sampled_process_tree_peak_rss_bytes'] = value
+                with self.assertRaisesRegex(ValueError, 'invalid sampled peak RSS for ghc at position 4'):
+                    sweep.peak_rss_medians(receipt, 3)
+        del command['sampled_process_tree_peak_rss_bytes']
+        with self.assertRaisesRegex(ValueError, 'invalid sampled peak RSS for ghc at position 4'):
+            sweep.peak_rss_medians(receipt, 3)
+
+    def test_raw_reader_rejects_failed_or_incomplete_receipts(self):
+        folder = write_cohort(self.root)
+        receipt = sweep.analyze.load(folder / 'receipt.json')
+        for run in receipt['runs']:
+            run['command']['sampled_process_tree_peak_rss_bytes'] = 0
+        for change in ({'complete': False}, {'all_cases_passed': False}, {'failures': ['failed']},
+                       {'runs': receipt['runs'][:-1]}, {'runs': receipt['runs'] + receipt['runs'][:1]}):
+            with self.subTest(field=next(iter(change))):
+                with self.assertRaisesRegex(ValueError, 'peak RSS requires'):
+                    sweep.peak_rss_medians({**receipt, **change}, 3)
 
     def test_baseline_runs_once_and_changed_inputs_are_reported(self):
         self.changed_inputs.add('flat_functions-32')
