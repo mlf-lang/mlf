@@ -98,10 +98,12 @@ class ManifestParity(unittest.TestCase):
         path.write_text(json.dumps(data))
 
     def test_closed_corpus_has_matching_137_modules_13_executables(self):
+        # Keep the registered test ID after retiring Tests.TupleListLegacy.
         manifest = self.check()
-        self.assertEqual(len(manifest['modules']), 137)
+        self.assertEqual(len(manifest['modules']), 136)
         modules = {entry['module']: entry for entry in manifest['modules']}
-        self.assertEqual(len(modules), 137)
+        self.assertEqual(len(modules), 136)
+        self.assertNotIn('Tests.TupleListLegacy', modules)
         for name, path, role in (
             ('Bootstrap.Bitstream', 'libraries/mlf-crates/Bootstrap/Bitstream.hs', 'implementation'),
             ('Bootstrap.ArtifactStorage', 'libraries/mlf-crates/Bootstrap/ArtifactStorage.hs', 'implementation'),

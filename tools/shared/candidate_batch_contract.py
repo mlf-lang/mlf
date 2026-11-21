@@ -16,6 +16,8 @@ CLASSES_BLOBS = (
     'bdbc1000fce1a8b1b388f953adc13d7c7d862655',
     'fa396c405908b897db00decda395c1d1fa660420',
     'f22cec64548c408602c85c8c81732fb57694927e',
+    # Defining-module dictionary resolution (814571b2) kept the selector body byte-identical.
+    '5f813fb61a3982644a528e7fb481210e6da56b95',
 )
 ORIGINAL_FIXTURE_SHA256 = '0d61d38552efcbfca9c8709257454233c3699775a106e368900da7dbe3f3fc66'
 SOURCE_BASIS = '8d80e0fb1dbf4e6d40c53de35b727674b5c74817'

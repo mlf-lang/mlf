@@ -49,6 +49,13 @@ class RunnerControls(unittest.TestCase):
         self.assertEqual(runner.FORMAT_FLAGS,
                          ['--no-cabal', '--no-dot-ormolu', '--check-idempotence', '--color', 'never'])
 
+    def test_pinned_tool_versions_accept_both_banner_forms(self):
+        runner.require_tool_versions('9.14.1', 'ormolu 0.9.0.0\nusing ghc-lib-parser 9.14.1.20251220')
+        runner.require_tool_versions('9.14.1', 'ormolu 0.9.0.0 development')
+        for ghc, banner in [('9.14.2', 'ormolu 0.9.0.0'), ('9.14.1', 'ormolu 0.9.0.01')]:
+            with self.subTest(ghc=ghc, banner=banner), self.assertRaises(RuntimeError):
+                runner.require_tool_versions(ghc, banner)
+
     def test_missing_tool_leaves_incomplete_receipt(self):
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp) / 'run'

@@ -72,9 +72,11 @@ FORMS = ['original', 'serialized', 'optimized-erased']
 BANNER = 'IO action sharing: passed (19 shape checks, 18 source cases, 3 execution forms)'
 
 
-def expected_inventory(shapes=SHAPES, cases=CASES, full=True):
+def expected_inventory(shapes=None, cases=None, full=True):
     if len(SHAPES) != 19 or len(set(SHAPES)) != 19 or len(CASES) != 18:
         raise ValueError('authored regression inventory is inconsistent')
+    shapes = SHAPES if shapes is None else shapes
+    cases = CASES if cases is None else cases
     chunks = ['PASS shape: ' + label + '\n' for label in shapes]
     for label, output, error, kernel in cases:
         if kernel:

@@ -8,6 +8,10 @@ import unittest
 import history_refs as history
 
 ROOT = Path(__file__).resolve().parents[2]
+RELEASE_ENTRY = '      - run: tools/release/check.sh'
+RELEASE_PREPARE = 'python3 -B tools/testing/prepare_history_refs.py'
+FIRST_HISTORY_SUITE = 'run benchmark-provenance'
+WRAPPED_BY_RELEASE_CHECK = {('ci', 'metadata')}
 CALLERS = {
     'ci': ('metadata', 'native'),
     'native-qualification': ('metadata', 'mac-package', 'linux-package'),
@@ -29,7 +33,7 @@ RECOVERY_PREPARE = (
 )
 
 
-def require_callers(workflows):
+def require_callers(workflows, release_check):
     for workflow, jobs in CALLERS.items():
         for job in jobs:
             match = re.search(r'^  ' + re.escape(job) + r':\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)',
@@ -41,6 +45,17 @@ def require_callers(workflows):
             checkouts = [step for step in steps if step.startswith('      - uses: actions/checkout@')]
             if not checkouts or len(re.findall(r'^          fetch-depth: 0(?:[ \t]+#[^\n]*)?$', checkouts[0], re.M)) != 1:
                 raise ValueError('consumer requires full source history: ' + job)
+            if (workflow, job) in WRAPPED_BY_RELEASE_CHECK:
+                matching = [step for step in steps if step.rstrip() == RELEASE_ENTRY]
+                if len(matching) != 1 or body.index(checkouts[0]) >= body.index(RELEASE_ENTRY):
+                    raise ValueError('history validation requires the unsuppressed release wrapper: ' + job)
+                lines = release_check.splitlines()
+                if (lines.count(RELEASE_PREPARE) != 1 or FIRST_HISTORY_SUITE not in lines
+                        or 'set -euo pipefail' not in lines
+                        or not (lines.index('set -euo pipefail') < lines.index(RELEASE_PREPARE)
+                                < lines.index(FIRST_HISTORY_SUITE))):
+                    raise ValueError('release wrapper must prepare history before its consumers')
+                continue
             expected = RECOVERY_PREPARE if workflow == 'recover-release' else PREPARE
             matching = [step for step in steps if step.rstrip() == expected.rstrip()]
             if len(matching) != 1:
@@ -55,25 +70,36 @@ class HistoryWorkflowControls(unittest.TestCase):
     def setUp(self):
         self.workflows = {name: (ROOT / '.github/workflows' / (name + '.yml')).read_text()
                           for name in CALLERS}
+        self.release_check = (ROOT / 'tools/release/check.sh').read_text()
 
     def test_all_validation_and_packaging_consumers_prepare_history(self):
-        require_callers(self.workflows)
+        require_callers(self.workflows, self.release_check)
 
     def test_each_missing_or_suppressed_preparation_is_rejected(self):
         for name, jobs in CALLERS.items():
+            explicit_jobs = [job for job in jobs if (name, job) not in WRAPPED_BY_RELEASE_CHECK]
             expected = RECOVERY_PREPARE if name == 'recover-release' else PREPARE
-            for index, _job in enumerate(jobs):
+            for index, job in enumerate(explicit_jobs):
                 offsets = [match.start() for match in re.finditer(re.escape(expected), self.workflows[name])]
-                self.assertEqual(len(offsets), len(jobs))
+                self.assertEqual(len(offsets), len(explicit_jobs))
                 offset = offsets[index]
                 for replacement in ('', expected.replace('python3 -B', 'echo python3 -B'),
                                     expected.replace('        run:', '        if: false\n        run:'),
                                     expected + '        continue-on-error: true\n'):
-                    with self.subTest(workflow=name, job=_job, replacement=replacement):
+                    with self.subTest(workflow=name, job=job, replacement=replacement):
                         changed = dict(self.workflows)
                         changed[name] = changed[name][:offset] + replacement + changed[name][offset + len(expected):]
                         with self.assertRaises(ValueError):
-                            require_callers(changed)
+                            require_callers(changed, self.release_check)
+
+    def test_release_wrapper_preparation_cannot_be_missing_or_suppressed(self):
+        for replacement in ('', 'echo ' + RELEASE_PREPARE, RELEASE_PREPARE + ' || true'):
+            with self.subTest(replacement=replacement), self.assertRaises(ValueError):
+                require_callers(self.workflows, self.release_check.replace(RELEASE_PREPARE, replacement))
+        removed = dict(self.workflows)
+        removed['ci'] = removed['ci'].replace(RELEASE_ENTRY, RELEASE_ENTRY + '\n        if: false', 1)
+        with self.assertRaises(ValueError):
+            require_callers(removed, self.release_check)
 
     def test_each_shallow_source_checkout_is_rejected(self):
         for name, jobs in CALLERS.items():
@@ -84,14 +110,19 @@ class HistoryWorkflowControls(unittest.TestCase):
                     offset = changed[name].index('          fetch-depth: 0', start)
                     changed[name] = changed[name][:offset] + changed[name][offset:].replace('fetch-depth: 0', 'fetch-depth: 1', 1)
                     with self.assertRaises(ValueError):
-                        require_callers(changed)
+                        require_callers(changed, self.release_check)
 
     def test_preparation_after_validation_is_rejected(self):
+        moved = self.release_check.replace(RELEASE_PREPARE + '\n', '', 1).replace(
+            FIRST_HISTORY_SUITE, FIRST_HISTORY_SUITE + '\n' + RELEASE_PREPARE, 1)
+        with self.assertRaises(ValueError):
+            require_callers(self.workflows, moved)
         changed = dict(self.workflows)
         changed['ci'] = changed['ci'].replace(PREPARE, '', 1).replace(
-            '      - run: tools/release/check.sh\n', '      - run: tools/release/check.sh\n' + PREPARE, 1)
+            '      - name: Preserve actual builtin generation after freshness failure\n',
+            PREPARE + '      - name: Preserve actual builtin generation after freshness failure\n', 1)
         with self.assertRaises(ValueError):
-            require_callers(changed)
+            require_callers(changed, self.release_check)
 
     def test_pr19_historical_reconciliation_inputs_remain_independently_pinned(self):
         for path in history.RECONCILED_MAIN_PATHS:

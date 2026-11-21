@@ -81,12 +81,20 @@ def copy_invalid(probe, destination):
     return os.fsdecode(destination)
 
 error='Left (HostError "IO error: invalid UTF-8 input")'
-invalid=os.fsencode(out)+b'/invalid-\xff'; os.mkdir(invalid)
-link=out/'invalid-target-link'; os.symlink(b'invalid-\xff',os.fsencode(link))
-regular=out/'regular'; regular.write_text('file\n')
-fifo=out/'fifo'; os.mkfifo(fifo)
+invalid=os.fsencode(out)+b'/invalid-\xff'
+link=out/'invalid-target-link'
+regular=out/'regular'
+fifo=out/'fifo'
 receipt={'selected_cases':selected,'started_utc':stamp,'ghc':str(pathlib.Path(a.ghc).resolve()),'platform':os.uname().sysname+' '+os.uname().machine,'steps':steps}
 try:
+    invalid_paths = ('canonical-discard-', 'canonical-force-', 'executable-invalid-', 'native-canonical-invalid')
+    if any(label.startswith(invalid_paths) for label in selected):
+        os.mkdir(invalid)
+        os.symlink(b'invalid-\xff', os.fsencode(link))
+    if any(label.startswith(('file-exists-regular-', 'canonical-valid-')) for label in selected):
+        regular.write_text('file\n')
+    if any(label.startswith('file-exists-fifo-') for label in selected):
+        os.mkfifo(fifo)
     if any(not name.startswith('native-') and name not in ('digest-controls', 'ownership') for name in selected):
         run('ghc-version',[a.ghc,'--version'],setup=True)
     for opt in MODES:
@@ -145,6 +153,9 @@ try:
     if set(completed) != set(selected) or len(completed) != len(selected):
         raise RuntimeError('shared host observation set differs from its selected inventory')
     receipt['passed']=True
+except BaseException as error:
+    receipt['error'] = type(error).__name__ + ': ' + str(error)
+    raise
 finally:
     sources=list((root/'host/ghc/MLF').rglob('*.hs'))+[root/'host/ghc/cbits/host.c',root/'tools/shared/fixtures/IntDemandControls.hs']+list(tests.glob('*.hs'))+list(tests.glob('*.c'))+[tests/'run.py',tests/'test-digest.py',root/'tools/testing/receipt_selection.py']+[root/'runtime'/x for x in ['mlf_runtime.c','mlf_system.h','mlf_build_runner_hash.h','mlf_process_binding.h','mlf_process_supervisor.c','mlf_completion.h']]
     receipt['sources']={str(x.relative_to(root)):hashlib.sha256(x.read_bytes()).hexdigest() for x in sorted(sources)}

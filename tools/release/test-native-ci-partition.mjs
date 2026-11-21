@@ -508,7 +508,7 @@ const controls = [
   ['LLP64 controls omitted', 'tools/performance/int64/run_llp64.py', 'tools/performance/int64/omitted.py'],
   ['collection native route omitted', '--mode standalone\n', '--mode installed\n'],
   ['resource guard relaxed', '--rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-focused-guard', '--rss-mib 6144 --disk-free-mib 4096 .mlf-build/patricia-focused-guard'],
-  ['artifact collision', '-${{ matrix.suite }}\n', '\n'],
+  ['artifact collision', 'O${{ matrix.optimization }}-${{ matrix.suite }}\n', 'combined\n'],
   ['aggregate missing matrix', 'needs: [metadata, native, windows-runtime', 'needs: [metadata, windows-runtime'],
   ['aggregate accepts skipped', '.result == "success"', '.result != "failure"'],
   ['PR matrix skipped', "(github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only)", "(github.event_name == 'workflow_dispatch')"],

@@ -18,7 +18,7 @@ def main():
              "predecessor/declid-optimized", "predecessor/main", "predecessor/main-optimized",
              "adaptation-inventory"]
     names.extend("adaptation/" + source["build_source"]
-                 for work in manifest["workloads"] for source in work["provenance"]
+                 for work in manifest["workloads"] for source in work["provenance"].values()
                  if source["original_source"] != source["build_source"])
     ids = ["benchmark-provenance/" + name for name in names]
     exact = (os.environ.get("MLF_TEST_EXACT")

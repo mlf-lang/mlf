@@ -892,7 +892,8 @@ def main():
                       "recursive_graph_helpers_sha256": RECURSION_HELPERS_SHA256,
                       "historical_shared_partition_sha256": PARTITIONS_SHA256,
                       "shared_partition_sha256": hashlib.sha256((ROOT / PARTITIONS).read_bytes()).hexdigest(),
-                      "default_campaign": "legacy", "qualification_eligible": False,
+                      "default_campaign": "framework", "historical_default_campaign": "legacy",
+                      "qualification_eligible": False,
                       "compilation_verified": False, "semantic_execution_verified": False}, indent=2))
 
 

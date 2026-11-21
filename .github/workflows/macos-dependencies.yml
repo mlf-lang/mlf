@@ -29,11 +29,17 @@ jobs:
           name: pinned-macos-dependency-hashes
           include-hidden-files: true
           path: |
-            .mlf-build/test-framework/
             .mlf-build/macos-dependencies/closure.txt
             .mlf-build/macos-dependencies/homebrew-core-commit
             .mlf-build/macos-dependencies/installed.json
             .mlf-build/macos-dependencies/files.sha256
+          retention-days: 7
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: pinned-macos-dependency-record-receipts
+          include-hidden-files: true
+          path: .mlf-build/test-framework/
           retention-days: 7
   consumer:
     needs: producer
@@ -53,6 +59,7 @@ jobs:
         if: always()
         with:
           name: pinned-macos-dependency-verification
+          include-hidden-files: true
           path: |
             .mlf-build/test-framework/
             .mlf-build/macos-dependencies/verification.log

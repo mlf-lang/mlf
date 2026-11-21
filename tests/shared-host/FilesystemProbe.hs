@@ -13,7 +13,7 @@ main = do
       print (result :: Either SomeException ())
     ["canonical-force",path] -> do
       result <- try (F.canonicalPath (B.literal path) >>= evaluate . F.stringLength)
-      print (result :: Either SomeException Integer)
+      print (result :: Either SomeException B.Int)
     ["executable-discard"] -> do
       result <- try (F.getExecutablePath >> pure ())
       print (result :: Either SomeException ())
@@ -26,5 +26,5 @@ main = do
     ["contents-byte-line"] -> do
       _ <- F.getContents
       result <- try (F.getByteLine >>= F.lengthByteArray)
-      print (result :: Either SomeException Integer)
+      print (result :: Either SomeException B.Int)
     _ -> error "unknown test mode"

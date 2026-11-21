@@ -93,6 +93,12 @@ def require_success(result, label):
     return result[1].strip()
 
 
+def require_tool_versions(ghc_version, formatter_version):
+    banner = formatter_version.split('\n', 1)[0].split()
+    if ghc_version != '9.14.1' or banner[:2] != ['ormolu', '0.9.0.0']:
+        raise RuntimeError('requires GHC 9.14.1 and Ormolu 0.9.0.0')
+
+
 def controls(binary, output, timeout, receipt, planned):
     folder = output / 'controls'
     folder.mkdir()
@@ -168,8 +174,7 @@ def main():
         ghc, ormolu = executable(args.ghc), executable(args.ormolu)
         ghc_version = require_success(run([ghc, '--numeric-version'], output, 'ghc-version', args.timeout, receipt), 'GHC version')
         formatter_version = require_success(run([ormolu, '--version'], output, 'ormolu-version', args.timeout, receipt), 'Ormolu version')
-        if ghc_version != '9.14.1' or not formatter_version.startswith('ormolu 0.9.0.0 '):
-            raise RuntimeError('requires GHC 9.14.1 and Ormolu 0.9.0.0')
+        require_tool_versions(ghc_version, formatter_version)
         libdir = Path(require_success(run([ghc, '--print-libdir'], output, 'ghc-libdir', args.timeout, receipt), 'GHC libdir'))
         actual_ghc = libdir.parent / 'bin' / 'ghc-9.14.1'
         receipt['tools'] = {'ghc': {'path': str(ghc), 'sha256': sha(ghc), 'version': ghc_version,

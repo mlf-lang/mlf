@@ -102,15 +102,15 @@ withBackends action = do
   let generated = S.filter (\name -> S.any (\prefix -> O.starts prefix name) (O.words "program- emitted- case-")) names
   removeGenerated dir generated
   emitter <- getEnv "MLF_BOOTSTRAP_LLVM"
-  exists <- if eqString emitter "" then ioReturn false else fileExists emitter
-  emitterHash <- if exists then fileDigest emitter else ioReturn ""
+  emitterPresent <- if eqString emitter "" then ioReturn false else fileExists emitter
+  emitterHash <- if emitterPresent then fileDigest emitter else ioReturn ""
   writeFile (dir ++ "/emitter.sha256") emitterHash
   writeFile (dir ++ "/rows.jsonl") ""
   writeFile (dir ++ "/current-label") "<unlabelled>"
   writeFile (dir ++ "/current-id") "<unregistered>"
   count <- newIntArray 2 0
   value <- action (Backends dir count 60 candidate candidate)
-  if exists then do
+  if emitterPresent then do
     after <- fileDigest emitter
     H.assert (eqString after emitterHash) "backend emitter changed during the matrix"
   else ioReturn ()

@@ -281,8 +281,12 @@ class ProcessFailureHelperNames(unittest.TestCase):
     def test_local_failure_helpers_do_not_shadow_primitive_fail(self):
         import hashlib
         root = HERE.parents[1]
-        originals = {'Main': '19ba4322c1b1fcc5cf56da077f021aca995714310d0a18c55ed0fe0a5f9f898b', 'Panic': '8818d7ba77bbb85fb712bb44f16b8dba2232d55613bd9e7b14883d078e3c3106'}
-        for name, digest in originals.items():
+        # Keep the full fixture guard, including Main's exact-case dispatch.
+        normalized_digests = {
+            'Main': '8fc8d754af4d335b43eca693cae90dc0e3117a61b2dccfc55390c2d7bea09b7e',
+            'Panic': '8818d7ba77bbb85fb712bb44f16b8dba2232d55613bd9e7b14883d078e3c3106',
+        }
+        for name, digest in normalized_digests.items():
             source = (root / ('tests/async-process/' + name + '.emlf')).read_text()
             self.assertIn('processTestFailure : forall a. String -> IO a', source)
             self.assertIn('processTestFailure message =', source)
@@ -314,7 +318,7 @@ class TaskTripleContract(unittest.TestCase):
         self.assertIn('T.pure ((,,) (f n) s again)', source)
         self.assertIn('case result of (,,) n s again ->', source)
         self.assertEqual(hashlib.sha256(source.replace('(,,)', 'Triple').encode()).hexdigest(),
-                         '08aa5c242c62fc169c9a0348412f1a19cf98adf6fee7ca2fdb70d4a988c88794')
+                         'a95ff262d1af52e8bdd7afdb5de6a9334b7c2b3cdfe3228c17a92c557c1fa739')
 
 
 if __name__ == '__main__':

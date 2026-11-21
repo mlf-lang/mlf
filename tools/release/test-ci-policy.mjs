@@ -83,7 +83,35 @@ for (const [name, jobName] of [
   assert.match(workflow, /^concurrency:\n  group: [^\n]+\n  cancel-in-progress: true$/m);
   assert.ok(workflowJob(workflow, jobName).includes(`    if: ${runPrTests}\n`), jobName);
 }
-assert.match(workflowJob(read('macos-dependencies'), 'consumer'), /^    needs: producer$/m);
+const dependencyWorkflow = fs.readFileSync('.github/workflows/macos-dependencies.yml', 'utf8');
+const requireDependencyArtifact = workflow => {
+  const name = 'pinned-macos-dependency-hashes';
+  const step = (job, action) => {
+    const matches = job.split(/^      - /m).filter(candidate =>
+      candidate.startsWith(`uses: actions/${action}-artifact@`) && candidate.includes(`          name: ${name}\n`));
+    assert.equal(matches.length, 1, `One ${action} of the pinned macOS dependency hashes is required`);
+    return matches[0];
+  };
+  const upload = step(workflowJob(workflow, 'producer'), 'upload');
+  const paths = upload.match(/^          path: \|\n((?:            [^\n]+\n)+)/m)?.[1].trim().split(/\s+/);
+  // A sibling upload path changes the archive root to their common parent.
+  assert.deepEqual(paths?.sort(), ['closure.txt', 'files.sha256', 'homebrew-core-commit', 'installed.json']
+    .map(file => `.mlf-build/macos-dependencies/${file}`), 'The hash artifact must contain four root-level input files');
+  const consumer = workflowJob(workflow, 'consumer');
+  assert.match(consumer, /^    needs: producer$/m);
+  const download = step(consumer, 'download');
+  const downloadPath = download.match(/^          path: ([^\n]+)$/m)?.[1];
+  assert.ok(downloadPath && consumer.includes(`tools/testing/run.py macos-dependencies-verify -- ${downloadPath}\n`),
+    'The verifier requires the artifact download directory');
+};
+requireDependencyArtifact(dependencyWorkflow);
+assert.throws(() => requireDependencyArtifact(dependencyWorkflow.replace(
+  '            .mlf-build/macos-dependencies/closure.txt\n',
+  '            .mlf-build/test-framework/\n            .mlf-build/macos-dependencies/closure.txt\n')),
+/The hash artifact must contain four root-level input files/);
+assert.throws(() => requireDependencyArtifact(dependencyWorkflow.replace(
+  '          path: .mlf-build/producer-dependencies\n', '          path: .mlf-build/wrong-download-root\n')),
+/The verifier requires the artifact download directory/);
 const gate = ciJob('pr-gate');
 assert.ok(gate.includes("        if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci:skip')\n"));
 assert.ok(gate.includes(`      - name: Require every merge check to succeed\n        if: ${runPrTests}\n`));

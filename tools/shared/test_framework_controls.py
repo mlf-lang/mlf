@@ -11,6 +11,7 @@ import copy
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import re
 import sys
@@ -73,7 +74,7 @@ class MainFixture:
     def __init__(self, test, optimization='2'):
         temporary = tempfile.TemporaryDirectory(prefix='mlf-framework-control-')
         test.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
+        self.root = Path(temporary.name).resolve()
         self.producer_dir = self.root / 'producer'
         self.output = self.root / 'result'
         (self.producer_dir / 'objects').mkdir(parents=True)
@@ -138,10 +139,12 @@ class MainFixture:
     def execute(self, *arguments):
         argv = ['test_framework_direct.py', '--build-receipt', str(self.build_receipt),
                 '--output', str(self.output), *arguments]
-        with patch.object(sys, 'argv', argv), \
+        with patch.dict(os.environ), patch.object(sys, 'argv', argv), \
                 patch.object(gate, 'CommandRunner', side_effect=self.runner), \
                 patch.object(gate, 'authenticate_build', side_effect=self.authenticate), \
                 contextlib.redirect_stderr(io.StringIO()):
+            os.environ.pop('MLF_TEST_EVENTS', None)
+            os.environ.pop('MLF_TEST_EXACT', None)
             gate.main()
         return self.receipt()
 

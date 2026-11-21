@@ -18,10 +18,10 @@ check a b = do
  assert (L.eqList eqInt (IS.toList result) expected && IS.size result == L.length expected && IS.valid result)
 
 unions : A.Test ()
-unions = do
- let (,,) ordered unique expected = unionInputs
- A.assert (ordered == 360 && unique == 276) "ordered union stimulus coverage changed"
- L.mapM_ (\((,) a b) -> check a b) expected
+unions = case unionInputs of
+ (,,) ordered unique expected -> do
+  A.assert (ordered == 360 && unique == 276) "ordered union stimulus coverage changed"
+  L.mapM_ (\((,) a b) -> check a b) expected
 
 -- Reuse the immutable stimulus inventory when the same registry is planned repeatedly.
 unionInputs : (,,) Int Int ([] ((,) ([] Int) ([] Int)))
