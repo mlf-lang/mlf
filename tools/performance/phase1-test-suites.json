@@ -1,4 +1,10 @@
 {
+  "full-compiler-native-comparison": {
+    "kind": "events",
+    "ids": ["full-compiler/native-comparison"],
+    "command": ["python3", "-B", "tools/performance/llvm-memory/compare_native.py"],
+    "exact": true
+  },
   "compiler-shapes": {
     "kind": "events",
     "prefix": "compiler-shapes/",

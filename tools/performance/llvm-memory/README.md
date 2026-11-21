@@ -122,9 +122,7 @@ python3 -B tools/performance/llvm-memory/run_controls.py \
   --output .mlf-build/llvm-memory-fresh-controls
 ```
 
-For a new full comparison, prepare the current 81-module workload and fixed
-dependency setup with the existing full-compiler/compiler-shapes tools, then
-invoke `compare_native.py` with `--producer`, `--workload`, `--setup`,
-`--reference-prefix` and a fresh `--output`. The reference must be independent
-pre-change checked output for those exact shared sources. Existing completed
-cohorts are immutable and must not be extended.
+For a new full comparison, use the [paired native compiler build entry
+point](../full-compiler/README.md#paired-native-compiler-builds). This historical
+cohort used independent pre-change checked output for its exact shared sources.
+Run each new cohort in a fresh output directory.

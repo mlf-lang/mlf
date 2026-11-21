@@ -12,6 +12,7 @@ from developer.process import run_build
 
 ROOT = Path(__file__).resolve().parents[1]
 SHAPES = ROOT / 'tools/performance/compiler-shapes'
+NATIVE_COMPARISON = ROOT / 'tools/performance/llvm-memory/compare_native.py'
 TEST_RUNNER = ROOT / 'tools/testing/run.py'
 
 
@@ -97,6 +98,10 @@ def main(argv):
     os.chdir(ROOT)
     if argv[:1] == ['build-host']:
         return launch(python(ROOT / 'tools/shared/build.py', *argv[1:]))
+    if argv[:2] == ['bench', 'compiler']:
+        if any(flag in argv[2:] for flag in ('-h', '--help')):
+            return launch(python(NATIVE_COMPARISON, *argv[2:]))
+        return launch(python(TEST_RUNNER, 'full-compiler-native-comparison', '--', *argv[2:]))
     if argv[:2] == ['bench', 'shapes']:
         if len(argv) > 2 and argv[2] in ('list', 'growth'):
             return launch(python(SHAPES / 'bench.py', *argv[2:]))
@@ -120,8 +125,9 @@ def main(argv):
     tools.add_argument('--suite', help='select a registered developer or shape suite')
     tools.add_argument('--list', action='store_true', help='list selected case IDs')
     tools.add_argument('--exact', help='select one case in the chosen suite')
-    bench = commands.add_parser('bench', help='compile shapes against GHC or benchmark native applications')
+    bench = commands.add_parser('bench', help='compare compiler builds or benchmark native applications')
     suites = bench.add_subparsers(dest='suite', required=True)
+    suites.add_parser('compiler', help='compare fresh full compiler builds by GHC and GHC-hosted MLF')
     suites.add_parser('shapes', help='run the paired compiler sweep, or use shapes list or growth')
     apps = suites.add_parser('apps', help='run the native candidate / baseline / C comparison')
     apps.add_argument('--candidate', type=Path, default=ROOT / '.mlf-build/bin/emlf',

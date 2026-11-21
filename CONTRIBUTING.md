@@ -20,6 +20,7 @@ points. Paths in these commands are relative to the checkout root.
 | `python3 tools/dev.py test --target unit` | One native test target. Repeat `--target` to select more |
 | `python3 tools/dev.py build-host` | Build the GHC-hosted compiler and fixed native standard library |
 | `python3 tools/dev.py check-tools` | Developer command, paired benchmark, and worker cleanup tests |
+| `python3 tools/dev.py bench compiler` | Compare fresh builds of the full runnable compiler by GHC and GHC-hosted MLF |
 | `python3 tools/dev.py bench shapes` | Prepare the GHC-hosted bootstrap compiler, then run the standard MLF/GHC compilation matrix |
 | `python3 tools/dev.py bench apps --baseline PATH --output DIR` | Build the native application benchmark driver, then compare the candidate, baseline and C implementations |
 
@@ -33,6 +34,10 @@ On macOS and Linux, interrupting `check-tools` stops the active test script
 and its workers. On Windows the developer commands share the console. Use
 Ctrl+C to interrupt the checks there. Forcibly terminating just the Windows
 launcher process can leave its active Python script running.
+
+The [full compiler benchmark](tools/performance/full-compiler/README.md#paired-native-compiler-builds)
+measures both routes through native linking, with the same frozen shared source
+closure in each route and dedicated fresh target directories.
 
 The [compiler-shape benchmark](tools/performance/compiler-shapes/README.md)
 runs on macOS and Linux with GHC 9.14.1. Preview the matrix with

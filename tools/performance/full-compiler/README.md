@@ -142,6 +142,56 @@ sources. No test body, compiler or resource guard was changed for this issue.
 
 ## Reproduction and evidence
 
+### Paired native compiler builds
+
+Run one cohort in a fresh work directory on a machine with GHC 9.14.1, Clang,
+GMP, BDWGC and `pkg-config`. Set `SOURCE` to the checkout to measure and `WORK`
+to an absolute path outside its tracked files. From the checkout containing
+this benchmark, prepare the ordinary GHC-hosted O2 producer and fixed inputs:
+
+```sh
+mkdir -p "$WORK"
+(cd "$SOURCE" && python3 -B tools/shared/build.py --bootstrap-only \
+  --optimization 2 --build-dir "$WORK/producer")
+python3 -B tools/performance/full-compiler/prepare_workload.py \
+  --source "$SOURCE" --label "$(git -C "$SOURCE" rev-parse HEAD)" \
+  --output "$WORK/workload.json"
+python3 -B tools/performance/compiler-shapes/prepare.py \
+  --source "$SOURCE" --producer "$WORK/producer" --endpoint crate-bootstrap-v1 \
+  --build-builtin --expose-host-io --output "$WORK/setup"
+python3 -B tools/dev.py bench compiler \
+  --producer "$WORK/producer" --producer-source "$SOURCE" \
+  --workload "$WORK/workload.json" --setup "$WORK/setup/setup.json" \
+  --output "$WORK/native-comparison"
+```
+
+The framework case is `full-compiler/native-comparison` in
+`full-compiler-native-comparison`. `tools/testing/run.py` accepts `--list`,
+`--exact`, and `--report` for that case. Pass the benchmark arguments after `--`.
+
+Both lanes build the complete `MLF.Entry.Emlf` import closure to a runnable
+compiler. GHC builds the host wrapper and all shared target modules at `-O2 -j1`.
+The ordinary GHC-hosted MLF checks the same shared sources, emits LLVM and links
+with serial Clang `-O2`. Fixed dependencies and the producer are prepared outside
+the timing window. The four measurements use MLF/GHC/GHC/MLF order and fresh
+target directories. The receipt records individual wall times and the geometric
+mean ratio of the two pairs. It also records agreement of the two fresh checked
+MLF results and an authored behavior check of both executable pairs.
+
+The default time limit is 600 seconds per endpoint. `--wall-seconds` sets the
+same recorded limit for all four legs when a larger closure requires more time.
+
+When available, use `--reference-prefix` for an additional raw-byte and group
+comparison against an independently built pre-change producer. Qualify
+`mlf-checked` on the exact same `workload.json` and fixed setup using the
+pre-change `--producer` and `--producer-source`, then pass the resulting `unit`
+prefix. To compare producers, use the same frozen workload for both cohorts,
+with separate output directories on the same host and toolchain. Identical
+builtin inputs can be shared by preparing the second fixed setup with
+`--builtin-prefix` pointing to the first setup's builtin pair.
+
+### Individual endpoints and semantic controls
+
 With an authenticated ordinary producer and its source checkout, freeze a fresh
 workload (this reads imports and hashes sources; it does not compile):
 
@@ -151,9 +201,8 @@ python3 -B tools/performance/full-compiler/prepare_workload.py \
 ```
 
 Use fixed dependencies prepared by `compiler-shapes/prepare.py`. For GHC's
-original Main wrapper its **private** primitive package must expose `MLF.Host.IO`
-in addition to `MLF.Primitive`; this task retained the updated private package
-configuration and receipt. Do not modify the global package database.
+original Main wrapper, `--expose-host-io` exposes `MLF.Host.IO` in the private
+primitive package. The global package database is untouched.
 
 ```sh
 python3 -B tools/performance/full-compiler/qualify.py \

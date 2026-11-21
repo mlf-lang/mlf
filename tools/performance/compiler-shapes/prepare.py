@@ -24,7 +24,7 @@ def pack(values):
     return ''.join(str(len(x))+':'+x for x in values)
 
 
-def prepare_host_package(ghc, source, producer, deps, run):
+def prepare_host_package(ghc, source, producer, deps, run, *, expose_host_io=False):
     pkg=ghc.with_name('ghc-pkg');deps.mkdir()
     objects=deps/'objects';objects.mkdir();db=deps/'package-db'
     packages=['base','array','bytestring','text','containers','directory']
@@ -37,8 +37,10 @@ def prepare_host_package(ghc, source, producer, deps, run):
     run('init-package-db',[pkg,'init',db])
     ids=[subprocess.check_output([pkg,'--global','field',name,'id','--simple-output'],text=True).strip() for name in packages]
     conf=deps/'package.conf'
+    exposed = 'MLF.Primitive MLF.Host.IO' if expose_host_io else 'MLF.Primitive'
+    hidden = 'MLF.Host.Base MLF.Host.Async' if expose_host_io else 'MLF.Host.Base MLF.Host.IO MLF.Host.Async'
     conf.write_text('name: mlf-shape-primitives\nversion: 0.1\nid: mlf-shape-primitives-0.1\nkey: mlf-shape-primitives-0.1\n'
-        'exposed: True\nexposed-modules: MLF.Primitive\nhidden-modules: MLF.Host.Base MLF.Host.IO MLF.Host.Async\n'
+        f'exposed: True\nexposed-modules: {exposed}\nhidden-modules: {hidden}\n'
         +'import-dirs: '+str(objects)+'\nlibrary-dirs: '+str(deps)+'\nhs-libraries: HSmlf-shape-primitives-0.1\ndepends: '+' '.join(ids)+'\n')
     run('register-package',[pkg,'--package-db',db,'register',conf])
     return db
@@ -53,6 +55,8 @@ def main():
     p.add_argument('--output',type=Path,required=True)
     p.add_argument('--clang',default='/usr/bin/clang')
     p.add_argument('--ghc')
+    p.add_argument('--expose-host-io', action='store_true',
+                   help='Expose MLF.Host.IO in the private dependency package for the full compiler Main wrapper.')
     p.add_argument('--endpoint',default=json.loads(Path(__file__).with_name('matrix.json').read_text())['default_endpoint'],choices=sorted(PROFILES))
     a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=False)
     H=command_runner.load_helper()
@@ -71,7 +75,7 @@ def main():
     builtin_record={}
     with H.SerialLock(ROOT/'.mlf-build'):
         deps=out/'dependencies'
-        db=prepare_host_package(ghc,source,producer,deps,run)
+        db=prepare_host_package(ghc,source,producer,deps,run,expose_host_io=a.expose_host_io)
         cflags=shlex.split(subprocess.check_output(['pkg-config','--cflags','bdw-gc','gmp'],text=True))
         libs=shlex.split(subprocess.check_output(['pkg-config','--libs','bdw-gc','gmp'],text=True))
         clang=Path(a.clang).resolve();runtime=deps/'runtime.o'
