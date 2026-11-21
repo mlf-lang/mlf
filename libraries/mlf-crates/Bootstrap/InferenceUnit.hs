@@ -697,6 +697,7 @@ module Bootstrap.InferenceUnit where {
   data GroundEvidence = GroundEvidence (GroundState -> [] ((,) XTyVar GroundType) -> Either String XComputation);
   data GroundBinding = GroundLocal XName GroundType | GroundImport XName XType |
     GroundQuantifiedImport XName XType GroundEvidence |
+    GroundArrowOperand GroundBinding (GroundState -> GroundState -> GroundType -> Maybe ((,,) GroundTerm GroundType GroundState)) |
     GroundPreparedImport (GroundState -> Either String ((,,) GroundTerm GroundType GroundState)) |
     GroundUnaryImport XName XType XTyVar GroundParameter GroundParameter;
   groundImport name scheme = let {
@@ -835,6 +836,52 @@ module Bootstrap.InferenceUnit where {
     GroundImport _ _ -> prepare (GroundVariable name ty);
     other -> other
   };
+  -- Within a signed group, this import owns three fresh slots. A closed
+  -- first operand determines two of them outright. Keep the third slot
+  -- available to the ordinary unifier and retain the source telescope order.
+  prepareGroundApplication name scheme = let {
+    ordinary = prepareGroundImport name scheme
+  } in case groundImport name scheme of {
+    GroundQuantifiedImport _ _ evidence -> GroundArrowOperand ordinary (groundArrowOperand name scheme evidence);
+    _ -> ordinary
+  };
+  groundArrowOperand :: XName -> XType -> GroundEvidence -> GroundState -> GroundState -> GroundType -> Maybe ((,,) GroundTerm GroundType GroundState);
+  groundArrowOperand name scheme evidence = let {
+    fallback _ _ _ = Nothing;
+    same x y = T.tyVarId x == T.tyVarId y
+  } in case scheme of {
+    XForall x XBot (XForall y XBot (XForall z XBot
+      (XArrow (XArrow (XVar b) (XVar c))
+        (XArrow (XArrow (XVar a) (XVar b2)) (XArrow (XVar a2) (XVar c2)))))) -> let {
+      member v = same v x || same v y || same v z;
+      slot v = if same v x then 0 else if same v y then 1 else 2;
+      bSlot = slot b; cSlot = slot c; aSlot = slot a;
+      forward state following actual = case following of { GroundState next known ranks serial -> case actual of {
+        GroundArrow domain codomain -> case state of { GroundState start _ _ _ -> let {
+            hole = GroundVar (advanceIdentity start aSlot);
+            domainId = advanceIdentity start bSlot; codomainId = advanceIdentity start cSlot;
+            value v = if same v b then domain else if same v c then codomain else hole;
+            term = GroundQuantifiedUse name evidence [(,) x (value x),(,) y (value y),(,) z (value z)];
+            result = GroundArrow (GroundArrow hole domain) (GroundArrow hole codomain);
+            -- An empty map avoids demanding a missing lookup key. Retain one
+            -- solved slot on that transition so later unbound lookups still
+            -- demand their identity, including the checked overflow boundary.
+            saved = if IM.null known then IM.singleton domainId domain else known;
+            fresh = GroundState (advanceIdentity next 1) saved ranks serial;
+            forwarded = case domain of {
+              GroundCon _ [] -> seq domainId (seq codomainId (case codomain of {
+                GroundCon _ [] -> Just ((,,) term result fresh); _ -> Nothing
+              }));
+              _ -> Nothing
+            }
+          } in if IM.null known then forwarded else seq domainId forwarded
+        };
+        _ -> Nothing
+      } }
+    } in if same a a2 && same b b2 && same c c2 && not (same a b || same b c || same a c) &&
+      member a && member b && member c then forward else fallback;
+    _ -> fallback
+  };
   -- A non-bottom bound can connect earlier quantifiers to a later argument.
   -- Project one possible closed instance with fresh variables now; sealing
   -- reconstructs the bound's actual instance proof after all uses agree.
@@ -930,6 +977,7 @@ module Bootstrap.InferenceUnit where {
   groundUse state binding = case binding of {
     Nothing -> Left "unknown ground variable";
     Just (GroundLocal name ty) -> Right ((,,) (GroundLiteral (XVarTerm name)) ty state);
+    Just (GroundArrowOperand ordinary _) -> groundUse state (Just ordinary);
     Just (GroundPreparedImport instantiate) -> instantiate state;
     Just (GroundUnaryImport name ty _ _ _) -> groundUse state (Just (GroundImport name ty));
     Just (GroundQuantifiedImport name ty evidence) -> do {
@@ -972,15 +1020,11 @@ module Bootstrap.InferenceUnit where {
     SDeclScope [identity] (SLam name annotation body) -> groundLambda globals names state (Just identity) name annotation body;
     SLam name annotation body -> groundLambda globals names state Nothing name annotation body;
     SApp f a -> let {
-      ordinary operator = do {
-        (,,) function functionType next <- operator;
-        (,,) argument argumentType following <- groundInfer globals names next a;
-        let {
+      apply function functionType argument argumentType following = let {
           allocated = groundFresh following;
           fresh = snd allocated;
           applied = GroundApplication function argument
-        };
-        case groundDeref following functionType of {
+        } in case groundDeref following functionType of {
           GroundArrow domain result -> do {
             -- The result already belongs to this type. Preserve the identity
             -- supply but avoid storing an alias for a new result variable.
@@ -992,9 +1036,21 @@ module Bootstrap.InferenceUnit where {
             solved <- groundUnify fresh unknown (GroundArrow argumentType result);
             Right ((,,) applied result solved)
           }
-        }
+        };
+      ordinary operator = do {
+        (,,) function functionType next <- operator;
+        (,,) argument argumentType following <- groundInfer globals names next a;
+        apply function functionType argument argumentType following
       };
       bound binding = case binding of {
+        Just (GroundArrowOperand original forward) -> do {
+          (,,) function functionType next <- groundUse state (Just original);
+          (,,) argument argumentType following <- groundInfer globals names next a;
+          case forward state following argumentType of {
+            Just ((,,) head result fresh) -> Right ((,,) (GroundApplication head argument) result fresh);
+            Nothing -> apply function functionType argument argumentType following
+          }
+        };
         Just (GroundUnaryImport name scheme variable input output) -> let {
           allocated = groundFresh state; hole = fst allocated; next = snd allocated
         } in do {
@@ -1059,7 +1115,7 @@ module Bootstrap.InferenceUnit where {
     (,) [(,) identity ((,,) name (Just annotation) _)] ((,) (SProgram declarations expression) _) -> do {
       expected <- monomorphicAnnotation annotation;
       let { entries = zip parameters (range 0 (length parameters - 1));
-        binding = \((,,) _ hint ty) serial -> prepareGroundImport (XName serial hint) ty;
+        binding = \((,,) _ hint ty) serial -> prepareGroundApplication (XName serial hint) ty;
         globals = M.fromList compareInt (map (\((,) row@((,,) i _ _) serial) -> (,) (V.toInt i) (binding row serial)) entries);
         names = M.fromList compareString (map (\((,) row@((,,) _ n _) serial) -> (,) n (binding row serial)) entries);
         ps = map (\((,) ((,,) _ hint ty) serial) -> (,) (XName serial hint) ty) entries;

@@ -1957,6 +1957,32 @@ applicationPatternChecks = do
       bodies = [take 32 (iterate (+7) (maxBound-4)),replicate 32 minBound,
                 take 63 (cycle [maxBound,0,7,7,-1,minBound]),
                 take 64 (cycle [-10001,-1000,-101,-100,-99,-10,-9,0,9,10,99,100,101,9999,10000])]
+  let var n = T.XVar (T.XTyVar n)
+      xarrow = T.XArrow
+      scheme = foldr (\i -> T.XForall (T.XTyVar i) T.XBot)
+        (xarrow (xarrow (var 4) (var 17)) (xarrow (xarrow (var 20) (var 4)) (xarrow (var 20) (var 17)))) [4,17,20]
+      headName = T.XName 55 "λ→"
+      argName = T.XName 62 "変換"
+      argType = Inference.GroundArrow (Inference.GroundCon "Int" []) (Inference.GroundCon "Bool" [])
+      start = Inference.GroundState 19 IntMap.empty IntMap.empty 77
+      order a b = if a < b then -1 else if a == b then 0 else 1
+      apply bind = Inference.groundInfer
+        (M.fromList order [(1,bind headName scheme),(2,Inference.GroundLocal argName argType)])
+        M.empty start (T.SApp (T.SGlobal (V.fromInt 1) "ignored") (T.SGlobal (V.fromInt 2) "ignored"))
+      close bind expectedSlots = case apply bind of
+        T.Left message -> fail (H.unpack message)
+        T.Right (term,actual,st@(Inference.GroundState next known _ serial)) -> do
+          check "closed-arrow operand preserves reservations" (23,77,expectedSlots) (next,serial,IntMap.size known)
+          let from = Inference.GroundCon "String" []
+              to = Inference.GroundCon "Bool" []
+              wanted = Inference.GroundArrow (Inference.GroundArrow from (Inference.GroundCon "Int" []))
+                         (Inference.GroundArrow from to)
+          solved <- right (Inference.groundUnify st actual wanted)
+          sealed <- right (Inference.groundSeal solved term)
+          encoded (W.encode W.defaultLimits 8 [Structure.toXTerm sealed])
+  ordinaryOperand <- close Inference.prepareGroundImport 2
+  forwardedOperand <- close Inference.prepareGroundApplication 1
+  check "forward closed operands with the ordinary quantified proof bytes" ordinaryOperand forwardedOperand
   env <- right (Open.environment [])
   forM_ bodies $ \xs -> do
     let source = T.XLet result (tree [add (T.XVarTerm arg) (T.XIntTerm n) | n <- xs]) (T.XConstructor "()" [])
