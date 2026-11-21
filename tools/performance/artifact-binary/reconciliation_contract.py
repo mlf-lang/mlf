@@ -13,13 +13,29 @@ PREDECESSOR = '4fd6730d35b6ecaf8e169ad228ac3c7a3ed56160'
 PREDECESSOR_TREE = '1c60d3daca5162bd24658d295169f601593345ef'
 PREDECESSOR_MANIFEST = '69bc6cc39ec70a0209a6011f4ce7fef0aaf5039d903fa1b8477ee4a2bc46dcd8'
 MANIFEST = 'pr43-reconciliation-migration.json'
-MANIFEST_SHA256 = 'ebe5671476447cd4b256784e7d898ed6095c7c54cc9286c6869ca4909b2b708b'
+MANIFEST_SHA256 = 'c06d380d4a18955858363b6fc90610c85101cafbba06d34f28183815291d05e7'
 PREDECESSOR_IMPLEMENTATION = '7cacadad979f3db29da9067b5fe0ca8e1634d960dbf978ad6d5cae39ba338794'
 LIVE_PREDECESSOR = 'f9bdb40a659bfdff4cbb782d438afbb0417dd2e1'
 LIVE_PREDECESSOR_TREE = '3148203097e7622ced1b272e606bfa892fad746b'
 LIVE_PREDECESSOR_MANIFEST = '63598306f049a050def3fd21ddf21878a7f4f882b59a48a86c53a3398624e9c5'
 LIVE_TRANSITION_PATH = 'tools/shared/build.py'
 LIVE_PREDECESSOR_SOURCE = 'eff291112f318206ce0f7ab85cb8a2e474be41489441204696630a395f4ca3df'
+LIST_BASE = 'fc300bc9fdc389b585cbef0630fc8915d53e89c5'
+LIST_BASE_TREE = '386f0b41ab5f9b39fca273f3040f51d73df924a1'
+LIST_BASE_MANIFEST = 'ebe5671476447cd4b256784e7d898ed6095c7c54cc9286c6869ca4909b2b708b'
+LIST_PATHS = (
+    'bootstrap/MLF/BuiltinPreludeData.hs',
+    'host/ghc/MLF/Primitive.hs',
+    'libraries/mlf-frontend/Bootstrap/Layout.hs',
+    'libraries/mlf-frontend/Bootstrap/Lexer.hs',
+    'libraries/mlf-frontend/Bootstrap/Module.hs',
+    'libraries/mlf-frontend/Bootstrap/Parser.hs',
+    'mlf.lock',
+    'shared-sources.json',
+    'tests/shared/MLF/Tests/SharedFrontend.hs',
+)
+LIST_MAINTENANCE = 'patricia/test_adapters.py'
+
 
 
 def require(condition, message):
@@ -111,6 +127,36 @@ def validate_live_transition(spec, repository, core):
     require(spec == expected, 'only the declared live build endpoint may change')
 
 
+def list_transition(spec, repository, core):
+    """Authenticate a distinct forward source delta; leave the earlier migration frozen."""
+    git = ['git', '--no-replace-objects', '-C', str(repository)]
+    def base_bytes(path):
+        return subprocess.check_output([*git, 'show', LIST_BASE + ':' + path])
+    tree = subprocess.check_output([*git, 'rev-parse', LIST_BASE + '^{tree}'], text=True).strip()
+    require(tree == LIST_BASE_TREE, 'pinned list-expressions base tree')
+    raw = base_bytes('tools/performance/artifact-binary/' + MANIFEST)
+    require(len(raw) <= core.MAX_METADATA_BYTES and sha(raw) == LIST_BASE_MANIFEST,
+            'pinned list-expressions base manifest')
+    prior = core.strict_json(raw)
+    transition = spec.get('list_expressions_transition', {})
+    require({k: v for k, v in spec.items() if k != 'list_expressions_transition'} == prior,
+            'list-expressions must preserve the prior migration verbatim')
+    require(type(transition) is dict and set(transition) == {
+        'predecessor', 'predecessor_tree', 'predecessor_manifest_sha256', 'changes', 'maintenance'
+    } and (transition['predecessor'], transition['predecessor_tree'],
+           transition['predecessor_manifest_sha256']) == (LIST_BASE, LIST_BASE_TREE, LIST_BASE_MANIFEST),
+            'pinned list-expressions transition identity')
+    changes, maintenance = transition['changes'], transition['maintenance']
+    require(type(changes) is dict and set(changes) == set(LIST_PATHS) and
+            type(maintenance) is dict and set(maintenance) == {LIST_MAINTENANCE},
+            'exact list-expressions transition paths')
+    for path, row in {**changes, **{'tools/performance/' + k: v for k, v in maintenance.items()}}.items():
+        old = base_bytes(path)
+        require(len(old) <= core.MAX_SOURCE_BYTES and type(row) is list and len(row) == 2 and
+                row[0] == sha(old) and row[0] != row[1], 'list-expressions transition ' + path)
+    return prior, changes, maintenance
+
+
 class Contract:
     def __init__(self, directory, manifest_sha256, history_root, source_root=None):
         self.directory = Path(directory).resolve(strict=True)
@@ -142,12 +188,10 @@ class Contract:
         raw = self.core.read_file(self.directory, MANIFEST, self.core.MAX_METADATA_BYTES)
         require(sha(raw) == manifest_sha256, 'successor manifest SHA')
         spec = self.core.strict_json(raw)
-        require(set(spec) == {'format', 'predecessor', 'changes', 'additions', 'maintenance', 'live_transition'} and
-                spec['format'] == 'pr43-reconciliation-source-migration-v1' and spec['predecessor'] == PREDECESSOR,
-                'successor manifest schema')
+        spec, list_changes, list_maintenance = list_transition(spec, location, self.core)
         validate_live_transition(spec, location, self.core)
-        self.changes = spec['changes']
-        self.maintenance = spec['maintenance']
+        self.changes = dict(spec['changes'])
+        self.maintenance = dict(spec['maintenance'])
         files = dict(self.previous.value['current_files'])
         for name, row in self.changes.items():
             require(len(row) == 2 and files[name] == row[0] and row[0] != row[1], 'source transition ' + name)
@@ -155,6 +199,15 @@ class Contract:
         for name, digest in spec['additions'].items():
             require(name not in files, 'added path already owned: ' + name)
             files[name] = digest
+        for name, row in list_changes.items():
+            require(files.get(name) == row[0] and name in self.previous.value['current_files'],
+                    'list-expressions changed an unowned path: ' + name)
+            first = self.previous.value['current_files'][name]
+            self.changes[name] = [first, row[1]]
+            files[name] = row[1]
+        for name, row in list_maintenance.items():
+            require(self.maintenance[name][1] == row[0], 'list-expressions maintenance predecessor')
+            self.maintenance[name] = [self.maintenance[name][0], row[1]]
         self.core.hash_map(files, 'PR43 reconciled files')
         self.value = {'current_files': files}
         self.live_source_inventory(self.source_root)

@@ -55,6 +55,55 @@
     ]
   },
   "format": "pr43-reconciliation-source-migration-v1",
+  "list_expressions_transition": {
+    "changes": {
+      "bootstrap/MLF/BuiltinPreludeData.hs": [
+        "4b9d52fa6fa2108cc3dc1a6d04e06f18486abff4f2e682f633bddeb674c03692",
+        "c9f9b95e4190e1a978edb947c5d15f446a53d1019e9e2687efd8b93b6d9800a6"
+      ],
+      "host/ghc/MLF/Primitive.hs": [
+        "d5a66475293578650a975172ae14d5a6e5506668859fd559d1a18eb08d2160cb",
+        "34a6232e2c60605c14f1db1b5fbc2ad5aa24f99ab7faa0499a76d8e419574dc2"
+      ],
+      "libraries/mlf-frontend/Bootstrap/Layout.hs": [
+        "b64c7f09bdf23a9652baa1fbd74729287dac243fd5a3801fbbc83e6abe5f58c8",
+        "c73e29528cf92ba525b3f9a40e4bbf54f73f7c211917721c48f9ccc63636ba60"
+      ],
+      "libraries/mlf-frontend/Bootstrap/Lexer.hs": [
+        "d053db12391324d4305a78ac5dad24b3fe81c449007e318e14183c4e464adb43",
+        "80ee32b04c9c3ee6ade37f6ff79bbff25bf7a87c2cde312efcfc9ad2cbf805e3"
+      ],
+      "libraries/mlf-frontend/Bootstrap/Module.hs": [
+        "1f7ea629418456d898ad30227abd9aab444494199425b489d4330319ca9b42ca",
+        "c78cfd3e6a2d2d8838a432cc14b6345fe8c484a3d3c82b518e1941bcb602d3af"
+      ],
+      "libraries/mlf-frontend/Bootstrap/Parser.hs": [
+        "02e9eecfdf3460bdb3b0fdd83a7f96963202c1c58052c220f238ccb73779e16c",
+        "fe8dc287b9bf78639ea41689ee937b877cb178f8ad92901ca5d6dd85279bbf7b"
+      ],
+      "mlf.lock": [
+        "351b07e06e28bae17717c9e860c22e3302bc73a63313e5e12c5cce33125abd99",
+        "d244cc18860fce02b5632c6f7bebc0512fc6d4c294b8eb7c73cdc0ac93b1b2c7"
+      ],
+      "shared-sources.json": [
+        "7264b9d556d1112d6c6883e6a1269ff812c76e4eb6557f6445bc67dd28e031a4",
+        "8d8a6483bbf088fb1e0f5a824658eab9e7dd40ef07aa4ecd2e617d2c6488d00c"
+      ],
+      "tests/shared/MLF/Tests/SharedFrontend.hs": [
+        "f5f2956a34248a6e107ec275250c72399416d39a69317df9c0b136979e24ad03",
+        "5a2ff8cf1bc6462b5480e4e8671fb0f607283b799d52cf4aa48a14acd0db9f17"
+      ]
+    },
+    "maintenance": {
+      "patricia/test_adapters.py": [
+        "4bd92f590a69b2b0af6da401035c04d871cb14a044f8a76ae9c3be0be1d0e556",
+        "98c9bb164e478cc823eac44dea1575c0cf5444ff157fcb5d8a0d2b8c1559a08b"
+      ]
+    },
+    "predecessor": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+    "predecessor_manifest_sha256": "ebe5671476447cd4b256784e7d898ed6095c7c54cc9286c6869ca4909b2b708b",
+    "predecessor_tree": "386f0b41ab5f9b39fca273f3040f51d73df924a1"
+  },
   "live_transition": {
     "changes": {
       "tools/shared/build.py": [
