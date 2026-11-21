@@ -114,7 +114,7 @@ class EntryControls(unittest.TestCase):
                 return types.SimpleNamespace(pid=456,returncode=0,
                     communicate=lambda timeout:(b'actual mock output\n',b''))
             with mock.patch.object(E,'HERE',root),mock.patch.object(E.subprocess,'Popen',side_effect=spawn),\
-                 mock.patch.object(E.os,'pidfd_open',return_value=789),mock.patch.object(E.os,'close') as close:
+                 mock.patch.object(E.os,'pidfd_open',return_value=789,create=True),mock.patch.object(E.os,'close') as close:
                 result=E.managed(runner,original,crc,worker,pins,argv)
                 close.assert_called_once_with(789)
             self.assertEqual(commands[0],[sys.executable,'-B',str(root/'crc_process_supervisor.py'),
@@ -125,6 +125,7 @@ class EntryControls(unittest.TestCase):
             self.assertEqual(entry['state'],'passed');self.assertEqual(entry['timeout_seconds'],625)
             for sig,handler in before.items():self.assertEqual(signal.getsignal(sig),handler)
 
+@unittest.skipUnless(sys.platform == 'linux', 'real supervisor requires Linux pidfds and procfs')
 class RealSyntheticControls(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

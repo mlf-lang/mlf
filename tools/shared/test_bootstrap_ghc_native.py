@@ -20,16 +20,18 @@ class GateControls(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         evidence = self.root / 'evidence'
         evidence.write_text('original execution evidence')
         self.gate = {'status': 'passed', 'producer_receipt_sha256': 'producer',
                      'inputs': {str(evidence): b.sha(evidence)},
                      'artifacts': {str(evidence): b.sha(evidence)}, 'results': {}, 'commands': []}
-        for name, count in [('foundation', 15), ('async', 5), ('language-core', 4), ('frontend', 10)]:
-            self.add_crate(name, count)
+        for name in ('foundation', 'async', 'language-core', 'frontend'):
+            self.add_crate(name)
 
-    def add_crate(self, name, count):
+    def add_crate(self, name):
+        manifest = b.ROOT / 'libraries' / ('mlf-' + name) / 'mlf-package.json'
+        count = len(json.loads(manifest.read_text())['library']['modules'])
         crate = 'mlf-' + name + '/0.3.0/library'
         self.gate['results'][crate] = {'module_count': count, 'reused_groups': 0}
         self.gate['commands'].append({'crate': crate, 'status': 'passed', 'resource': {'complete': True}})
@@ -43,7 +45,7 @@ class GateControls(unittest.TestCase):
         self.check()
 
     def test_combined(self):
-        self.add_crate('inference', 6)
+        self.add_crate('inference')
         self.check()
 
     def test_misassigned_module_counts(self):
@@ -61,7 +63,7 @@ class GateControls(unittest.TestCase):
         with self.assertRaises(Exception): self.check()
 
     def test_failed_extra_command(self):
-        self.add_crate('inference', 6)
+        self.add_crate('inference')
         self.gate['commands'][-1]['status'] = 'failed'
         with self.assertRaises(Exception): self.check()
 
@@ -71,7 +73,7 @@ class GateControls(unittest.TestCase):
             with self.assertRaises(Exception): self.check()
 
     def test_extra_command_not_complete(self):
-        self.add_crate('inference', 6)
+        self.add_crate('inference')
         self.gate['commands'][-1]['resource']['complete'] = False
         with self.assertRaises(Exception): self.check()
 
@@ -80,12 +82,12 @@ class GateControls(unittest.TestCase):
         with self.assertRaises(Exception): self.check()
 
     def test_reused_extra_row(self):
-        self.add_crate('inference', 6)
+        self.add_crate('inference')
         self.gate['results']['mlf-inference/0.3.0/library']['reused_groups'] = 1
         with self.assertRaises(Exception): self.check()
 
     def test_extra_evidence_drift(self):
-        self.add_crate('inference', 6)
+        self.add_crate('inference')
         extra = self.root / 'extra'
         extra.write_text('original')
         self.gate['artifacts'][str(extra)] = b.sha(extra)
@@ -96,7 +98,7 @@ class GateControls(unittest.TestCase):
 class StageControls(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         self.stage = self.root / 'stage'
         self.cache = self.root / 'cache'
         self.pair = self.root / 'pair'
@@ -379,7 +381,7 @@ class StageControls(unittest.TestCase):
 class MainControls(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         self.git = Path('/usr/bin/git').resolve()
         self.env = {'PATH': '/usr/bin:/bin', 'HOME': '/nonexistent', 'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null'}
         subprocess.run([self.git, 'init', '-q', self.root], check=True, env=self.env)
@@ -431,6 +433,7 @@ class MainControls(unittest.TestCase):
         for name in ('compiler.path','manager.path','compiler.path.pending','manager.path.pending'):
             self.assertFalse((self.root/name).exists())
 
+    @unittest.skipUnless(sys.platform == 'linux', 'the resource watchdog reads Linux procfs')
     def test_sigterm_reaps_watchdog_sleeping_descendant(self):
         pidfile = self.root/'child.pid'
         bounded = self.root/'bounded'
