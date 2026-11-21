@@ -863,6 +863,16 @@ typedClassChecks = do
   collectedFault <- firstFault (D.valueOccurrences False False incomplete)
   check "observing an incomplete application preserves the first source diagnostic"
     expectedFault collectedFault
+  do
+    let typedSccReads = D.occurrenceGlobalIds D.fileDeclarationOccurrences
+        typedBody = T.SDeclScope [own] (T.SLet "owner" (T.SGlobal own "rhs")
+          (T.SApp (T.SGlobal own "hidden") (T.SApp (T.SVar "lexical-only")
+            (T.SWantedRefs "D" [(T.GivenEvidence,T.DeclRef foreignId "first"),
+              (T.InstanceEvidence,T.DeclRef foreignId "second")]))))
+    check "ID-only SCC and protection reads retain the unmasked RHS and both candidate slots"
+      [V.toInt own,V.toInt foreignId,V.toInt foreignId] (map V.toInt (typedSccReads typedBody))
+    check "reference-table and contract reads retain the lexical-only import"
+      ["lexical-only"] [H.unpack n | T.LexicalRef n <- D.fileValueOccurrences False typedBody]
   let factsBase = D.symbolsWithKeys [("same","A.same",False),("same","B.same",False),
                                      ("method","C.method",True),("root","Root.root",False)]
       [qualified,plain,_,owner] = V.indices (D.symbolNodes factsBase)

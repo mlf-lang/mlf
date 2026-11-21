@@ -139,12 +139,17 @@ module Bootstrap.Dependency where {
   -- surviving occurrences need only one lookup. A declaration-marked binder
   -- hides slots, not equal-looking lexicals. Less common scoped nodes retain
   -- their ordinary walker and filter their resulting list once on exit.
-  fileValueOccurrences inventory expression = let {
+  fileValueOccurrences = fileOccurrencesWith True;
+  -- SCC edges and indexed managed protection consult declaration slots only.
+  -- Ignore lexical leaves and their binders in the ordinary file traversal.
+  fileDeclarationOccurrences = fileOccurrencesWith False False;
+  fileOccurrencesWith lexical inventory expression = let {
     emit names ids ref rest = case ref of {
-      LexicalRef n -> if S.member compareString n names then rest else (:) ref rest;
+      LexicalRef n -> if lexical && not (S.member compareString n names) then (:) ref rest else rest;
       DeclRef i _ -> if IS.member (V.toInt i) ids then rest else (:) ref rest
     };
     walk names ids term rest = let { visit = walk names ids;
+      bodyAfter name = if lexical then walk (S.insert compareString name names) ids else visit;
       scoped owners group = let {
         hidden = if inventory then ids else foldlStrict (\prior i -> IS.insert (V.toInt i) prior) ids owners;
         addOwners hints result = if inventory then
@@ -156,15 +161,15 @@ module Bootstrap.Dependency where {
       }
     } in case term of {
       SApp f a -> visit f (visit a rest);
-      SVar n -> emit names ids (LexicalRef (lexicalValueName n)) rest;
+      SVar n -> if lexical then emit names ids (LexicalRef (lexicalValueName n)) rest else rest;
       SGlobal i n -> emit names ids (DeclRef i n) rest;
       SSourceDefinition body -> visit body rest;
       SCallSite _ _ body -> visit body rest;
       SSignature body _ -> visit body rest;
       SAnn body _ -> visit body rest;
       SChecked _ body -> visit body rest;
-      SLam n _ body -> walk (S.insert compareString n names) ids body rest;
-      SLet n rhs body -> visit rhs (walk (S.insert compareString n names) ids body rest);
+      SLam n _ body -> bodyAfter n body rest;
+      SLet n rhs body -> visit rhs (bodyAfter n body rest);
       SDeclScope owners group -> scoped owners group;
       SPrimitive _ -> rest; SConstructor _ -> rest; SIntLit _ -> rest;
       SBoolLit _ -> rest; SDoubleLit _ -> rest; SStringLit _ -> rest;
