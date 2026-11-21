@@ -301,8 +301,6 @@ module Bootstrap.PreparedLibraries
     Artifact.uniqueNames "native export" (map fst entries);
     Right (map snd (M.toList (M.fromList compareString numbered)))
   };
-  nativeLibraryDeclarationsV1 raw = foldEither Separate.mergeDeclaration []
-    (concatMap Artifact.crateLoweredData (interfaces raw));
   nativeExportSignatures raw = M.toList (M.fromList compareString
     (concatMap Artifact.crateBindings (interfaces raw)));
   nativeLibraryV1 raw = do {

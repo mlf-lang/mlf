@@ -912,14 +912,6 @@ module Bootstrap.OpenFragment
   compatibilityIdentity = hashSyntax (W.VNode 431
     [Structure.toText "MLF/shared-haskell-v1",Structure.toText packageFormat,
      Structure.toList Structure.toDataDecl D.builtinDeclarations]);
-  referenceHashes encode values = do {
-    hashes <- mapM (\((,) key value) -> do {
-      digest <- hashSyntax (encode value);
-      ioReturn (mapEither ((,) key) digest)
-    }) values;
-    ioReturn (sequenceEither hashes)
-  };
-
   -- The returned remainder is derived from the SAME plan that is encoded.
   -- Single-reference limits remain defaultLimits; aggregate is remaining.
   hashSyntaxBudget remaining value =
