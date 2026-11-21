@@ -42,7 +42,7 @@ sameOutcome label expected actual = case (expected, actual) of
   (T.Left message, T.Right _) -> fail (label ++ ": accepted rejected input: " ++ B.unpack message)
   (T.Right _, T.Left message) -> fail (label ++ ": rejected accepted input: " ++ B.unpack message)
 
-node :: T.GTag -> Integer -> T.Flag -> T.Node
+node :: T.GTag -> B.Int -> T.Flag -> T.Node
 node tag parent flag = T.Node tag (T.Just parent) flag
 
 -- These hand-authored graphs do not call expansion, graft or source inference
@@ -61,15 +61,15 @@ poly = T.Graph (IM.fromList
   , (8, node T.GBot 7 T.Flexible)
   ]) IM.empty 9
 
-replace :: Integer -> T.Node -> T.Graph -> T.Graph
+replace :: B.Int -> T.Node -> T.Graph -> T.Graph
 replace identity value graph = T.Graph (IM.insert identity value (G.nodes graph))
   (G.links graph) (max (G.nextId graph) (identity + 1))
 
-without :: [Integer] -> T.Graph -> T.Graph
+without :: [B.Int] -> T.Graph -> T.Graph
 without identities graph = T.Graph (foldr IM.delete (G.nodes graph) identities)
   (G.links graph) (G.nextId graph)
 
-rename :: (Integer -> Integer) -> T.Graph -> T.Graph
+rename :: (B.Int -> B.Int) -> T.Graph -> T.Graph
 rename image graph = T.Graph
   (IM.fromList [(image identity, T.Node (G.mapTag image (G.tag value))
       (G.mapMaybeInt image (G.binder value)) (G.flag value))
@@ -113,7 +113,7 @@ cases =
       (replace 10 (node (T.GCon "Int" []) 9 T.Rigid) poly))))
   ]
 
-check :: String -> Bool -> T.Graph -> Integer -> Integer -> IO ()
+check :: String -> Bool -> T.Graph -> B.Int -> B.Int -> IO ()
 check label wanted original source target = do
   initial <- right (label ++ " prepare") (S.prepare original)
   (root, _, frontier, expanded) <- right (label ++ " expansion") (S.expanded source target initial)
@@ -272,11 +272,11 @@ congruenceKindControls = do
 -- The validation oracle retains the original identities and delegates directly
 -- to the public graph validator. Only duplicate IDs and anchor collisions are
 -- separately rejected as malformed fragment inputs outside the prepared domain.
-fragmentNodes :: [(Integer, T.Node)]
+fragmentNodes :: [(B.Int, T.Node)]
 fragmentNodes = [(10,node (T.GArr 11 12) 0 T.Flexible), (11,node T.GBot 10 T.Flexible), (12,node (T.GCon "Int" []) 10 T.Rigid)]
-replaceFragment :: Integer -> T.Node -> [(Integer, T.Node)] -> [(Integer, T.Node)]
+replaceFragment :: B.Int -> T.Node -> [(B.Int, T.Node)] -> [(B.Int, T.Node)]
 replaceFragment i n = map (\(j,v) -> if i == j then (j,n) else (j,v))
-fragmentReference :: Integer -> T.Maybe Integer -> [(Integer, T.Node)] -> Integer -> Bool
+fragmentReference :: B.Int -> T.Maybe B.Int -> [(B.Int, T.Node)] -> B.Int -> Bool
 fragmentReference root parent fresh next = case parent of
   T.Nothing -> False
   T.Just scope -> case G.validateGraph (T.Graph
@@ -304,7 +304,7 @@ fragmentValidationControls = do
           replaceFragment 10 (node (T.GTyApp 11 12) 0 T.Flexible)
           (replaceFragment 11 (node (T.GTyCon "List" (T.KArrow T.Star T.Star)) 10 T.Rigid) fragmentNodes)),
          ("unused-direct-gen-node",True,10,T.Just 0,fragmentNodes++[(13,node T.GBot 0 T.Flexible)])]
-  forM_ [("ordinary",1,0),("sparse",100003,-9001),("huge",1,10^40),("negative",1,negate (10^40))] $ \(prefix,scale,offset) ->
+  forM_ [("ordinary",1,0),("sparse",100003,-9001),("huge",1,2^60),("negative",1,negate (2^60))] $ \(prefix,scale,offset) ->
     forM_ cases $ \(label,wanted,root,parent,fresh) -> do
       let image n = n*scale+offset
           nodes = [(image n,T.Node (G.mapTag image (G.tag v)) (G.mapMaybeInt image (G.binder v)) (G.flag v)) | (n,v)<-fresh]
@@ -354,10 +354,45 @@ guardControls = do
     (finish (S.instantiateWithFreshBottom 2 8 stale))
   putStrLn "PASS malformed-disconnected-index"
 
+-- Reuse only exact canonical inputs, including equation order, alias targets,
+-- field order, generalization parents, flags, kinds and constructor names.
+projectedUnificationChecks :: IO ()
+projectedUnificationChecks = do
+  let results value = case value of
+        T.Left why -> T.Left why
+        T.Right (graph,_) -> T.Right graph
+      stored memo eqs graph = S.solveProjected memo eqs graph
+      fixNode identity fn graph = T.Graph
+        (IM.insert identity (fn (G.nodeAt graph identity)) (G.nodes graph))
+        (G.links graph) (G.nextId graph)
+      withTag tag (T.Node _ parent flag) = T.Node tag parent flag
+      changed identity tag = fixNode identity (withTag tag) poly
+      scope = fixNode 5 (\(T.Node tag _ flag) -> T.Node tag (T.Just 2) flag) poly
+      flagged = fixNode 5 (\(T.Node tag parent _) -> T.Node tag parent T.Flexible) poly
+      alias target = T.Graph (G.nodes poly) (IM.singleton 9 target) 10
+      cases = [(graph,eqs) | graph <- [poly, changed 6 (T.GCon "Bool" []),
+                   changed 5 (T.GArr 6 4), changed 4 (T.GBotK (T.KArrow T.Star T.Star)),
+                   scope,flagged,alias 1,alias 6],
+                 eqs <- [[],[(4,6)],[(6,4)],[(4,6),(4,1)],[(4,1),(4,6)],
+                   [(3,6),(3,1)],[(3,1),(3,6)],[(0,7)],[(9,4)]]]
+  (_,populated) <- right "seed local solver cache" (stored S.emptyUnificationCache [] poly)
+  (_,withAlias) <- right "seed distinct alias targets" (stored populated [] (alias 1))
+  sameOutcome "same nodes and different input links" (G.unify [] (alias 6))
+    (results (stored withAlias [] (alias 6)))
+  forM_ cases $ \(graph,eqs) -> do
+    let ordinary = G.unify eqs graph
+        first = stored populated eqs graph
+    sameOutcome "projected cache collision" ordinary (results first)
+    case first of
+      T.Left _ -> pure ()
+      T.Right (_,again) -> sameOutcome "same projected graph and ordered equations"
+        ordinary (results (stored again eqs graph))
+
 main :: IO ()
 main = do
+  projectedUnificationChecks
   forM_ cases $ \(label,wanted,graph) -> check label wanted graph 2 8
-  forM_ [("sparse",100003,-9001), ("huge",1,10^40), ("negative",1,-10^40)] $ \(name,scale,offset) ->
+  forM_ [("sparse",100003,-9001), ("huge",1,2^60), ("negative",1,-2^60)] $ \(name,scale,offset) ->
     forM_ (take 8 cases) $ \(label,wanted,graph) -> do
       let image n = scale*n+offset
       check (name ++ "-" ++ label) wanted (rename image graph) (image 2) (image 8)

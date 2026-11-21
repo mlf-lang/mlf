@@ -205,7 +205,12 @@ module Bootstrap.Constraint where {
       ProjectCase fields -> Solver.projectCaseFields fields solver
     };
   evaluatePreparedSteps :: Solver -> [] SolveStep -> Either String Solver;
-  evaluatePreparedSteps initial steps = foldM evaluatePreparedStep initial steps;
+  evaluatePreparedSteps initial steps = let {
+    advance ((,) solver cache) step = case step of {
+      Instantiate e -> Solver.instantiateClosedWith cache (fromGen e) (toNode e) solver;
+      ProjectCase fields -> mapEither (\result -> (,) result cache) (Solver.projectCaseFields fields solver)
+    }
+  } in mapEither fst (foldM advance ((,) initial Solver.emptyUnificationCache) steps);
   generalization (Typed gen _) = gen;
   rawForm (Typed _ f) = f;
   form typed = stripGivenScope (rawForm typed);

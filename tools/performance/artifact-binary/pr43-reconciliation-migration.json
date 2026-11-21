@@ -14,7 +14,7 @@
   "changes": {
     "bootstrap/MLF/BuiltinPreludeData.hs": [
       "91b2dee48f06af0432c7d2e81372d3a51d223c0e91ff22eab6e132559b4e3211",
-      "476e72269a47a0f3737c917022edc4c33977ce0f8da3dc0f5e13c3dd860ae099"
+      "fe7779d3489344df283754528d81cfb883eeb3cc90cca9fdbc43da19d45c38bc"
     ],
     "bootstrap/MLF/Entry/BuiltinPrelude.hs": [
       "66a9f4ccbdac21123fb721f0e2aa13b506e4b55d6c25642e829d2c6ec1b4fd2a",
@@ -194,7 +194,7 @@
     ],
     "libraries/mlf-inference/Bootstrap/Constraint.hs": [
       "eb54d03e146e30a8f2aea53de92357155bb448dacee4161df19aab9648477c0c",
-      "823af09b32b35499d58d8ad14693114cbb7a35fb09cd2434c8755722aa4df263"
+      "5c981bf04a97773ac12f0e818efc0e52a040e6e24ea681fce9fddbe3401fcbbd"
     ],
     "libraries/mlf-inference/Bootstrap/Elaborate.hs": [
       "c061b8a6ff668acd5f362c180d8c6ad24c9bb54c219108ea793d968ee4f43c58",
@@ -207,6 +207,10 @@
     "libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs": [
       "df2a050309ad10b4770cae1defcc87f1d56bedca87e1d4c5d4feb21b975f93b2",
       "03126236e4c74c7b4197291cd8ad260b3eaa5d7e8b8119447f5074f32e0891eb"
+    ],
+    "libraries/mlf-inference/Bootstrap/Graph/Solver.hs": [
+      "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612",
+      "f701989dff1266ab1092ac6a6a357d88e6823a444195b8f1b5ca955be8622ff5"
     ],
     "libraries/mlf-interpreter/Bootstrap/Runtime.hs": [
       "a764518838cc7ca32b58a5b13901e542d30b269b50cdcd67bf4a23f5ac4d11f6",
@@ -274,7 +278,7 @@
     ],
     "mlf.lock": [
       "5f7f58dece7a251711a3da2b78ba42502bd25554672bbbeaf8bf95abbc469077",
-      "0914b5540c9e0acb863563815d13e128d64b232578cde48ed56aa02119d62be5"
+      "15a90f12ad6f0d9a2388ef5cac4b16d62c4d511e654e59ac2f344126045a546f"
     ],
     "runtime/mlf_build_runner_hash.h": [
       "cbbdfd06eb43324dceef594e42b21621559df3e3d4e91d62f2b73e2b04d9e778",
@@ -4388,6 +4392,29 @@
       "predecessor": "d6ff36295cc64573961d0e7696212fb89be6d5e0",
       "predecessor_manifest_sha256": "ef235dc2e54e9bed7e6c5e6a15c38dd9910a9d75d1ed15675ab6f4bdf17ce1a8",
       "predecessor_tree": "afa68e3909f8cbee2b0b18293bb37f78f13ebd37"
+    },
+    {
+      "changes": {
+        "bootstrap/MLF/BuiltinPreludeData.hs": [
+          "476e72269a47a0f3737c917022edc4c33977ce0f8da3dc0f5e13c3dd860ae099",
+          "fe7779d3489344df283754528d81cfb883eeb3cc90cca9fdbc43da19d45c38bc"
+        ],
+        "libraries/mlf-inference/Bootstrap/Constraint.hs": [
+          "823af09b32b35499d58d8ad14693114cbb7a35fb09cd2434c8755722aa4df263",
+          "5c981bf04a97773ac12f0e818efc0e52a040e6e24ea681fce9fddbe3401fcbbd"
+        ],
+        "libraries/mlf-inference/Bootstrap/Graph/Solver.hs": [
+          "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612",
+          "f701989dff1266ab1092ac6a6a357d88e6823a444195b8f1b5ca955be8622ff5"
+        ],
+        "mlf.lock": [
+          "0914b5540c9e0acb863563815d13e128d64b232578cde48ed56aa02119d62be5",
+          "15a90f12ad6f0d9a2388ef5cac4b16d62c4d511e654e59ac2f344126045a546f"
+        ]
+      },
+      "predecessor": "6e2de8cfe7eef80f49d14a8e3478a8d5f64006b8",
+      "predecessor_manifest_sha256": "279058b4b99c898573b5f45e998ebb58f9064a307add8e7a555275cfc5ef4e92",
+      "predecessor_tree": "5b8e825de156155c771eccfd9c01d0e69e21e1dd"
     }
   ],
   "format": "pr43-reconciliation-source-migration-v1",
