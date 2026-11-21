@@ -8,6 +8,8 @@ module Bootstrap.X.Check where {
   import Bootstrap.Kind;
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.Data as D;
   import qualified Bootstrap.Primitive as P;
@@ -58,10 +60,24 @@ module Bootstrap.X.Check where {
   checkComputationScoped ds env p source =
     do {
       wellFormedIn ds env source;
+      checkedComputationResult ds env p source
+    };
+  -- The source has passed kind checking in this exact environment. Each
+  -- composition passes its checked result to the next computation.
+  checkedComputationResult ds env p source = case p of {
+    XRefl -> Right source;
+    -- Inst-Bot already checks the target kind against its bottom source.
+    XBottom _ -> computeResult ds env p source;
+    XThen first second -> do {
+      middle <- checkedComputationResult ds env first source;
+      checkedComputationResult ds env second middle
+    };
+    _ -> do {
       result <- computeResult ds env p source;
       wellFormedIn ds env result;
-      return result
-    };
+      Right result
+    }
+  };
   computeResult :: DataEnv -> Map XTyVar XType -> XComputation -> XType -> Either String XType;
   computeResult ds env p source =
     case p of {
@@ -148,8 +164,105 @@ module Bootstrap.X.Check where {
       L.mapM (termType ds (typeEnv env)) (M.elems (termEnv env));
       inferIn ds env body
     };
+  -- With no type arguments a primitive's result depends only on its ABI
+  -- identity. Share that instantiation across checks in every term scope.
+  instantiateClosedPrimitive :: Primitive -> Either String XType;
+  instantiateClosedPrimitive p = case P.primitiveSignature p of {
+    (,) [] field -> T.instantiateField M.empty field;
+    _ -> Left "primitive type argument arity mismatch"
+  };
+  closedPrimitiveTypes :: IntMap (Either String XType);
+  closedPrimitiveTypes = IM.fromList (L.map (\p ->
+    (,) (P.primitiveCode p) (closedPrimitiveType p)) P.allPrimitives);
+  -- The primitive registry is in wire-code order. Compute each closed
+  -- signature on first demand and index it directly on subsequent checks.
+  closedPrimitiveType :: Primitive -> Either String XType;
+  closedPrimitiveType = let {
+    results :: V.IndexVec Primitive (Either String XType);
+    results = V.fromList (L.map instantiateClosedPrimitive P.allPrimitives)
+  } in \p -> V.at results (V.fromInt (P.primitiveCode p));
   inferIn :: DataEnv -> XEnv -> XTerm -> Either String XType;
-  inferIn ds env term =
+  inferIn ds env term = inferApplications ds env (scopeApplications ds env) term;
+  checkedLookup :: forall k a b. (k -> k -> Int) -> (k -> a -> b) -> Map k a -> k -> Maybe b;
+  checkedLookup = M.lookupProjected;
+  data VariableInstantiation = InstantiatedType XType |
+    TypeApplications XType (String -> Maybe ((,) (Either String XType) (Either String VariableInstantiation)));
+  instantiationType state = case state of {
+    InstantiatedType ty -> ty;
+    TypeApplications ty _ -> ty
+  };
+  scopeApplications ds env = let {
+    types = typeEnv env;
+    cached ty = let {
+      check name _ = let {
+        first = checkedComputationResult ds types (XInner (XBottom (XCon name []))) ty;
+        eliminated = do {
+          middle <- first;
+          result <- checkedComputationResult ds types XElim middle;
+          Right (cached result)
+        }
+      } in (,) first eliminated;
+      primitive = checkedLookup compareString check D.primitiveKinds;
+      named = case ds of { DataEnv _ _ declared -> checkedLookup compareString check declared };
+      arguments name = case primitive name of { Nothing -> named name; found -> found }
+    } in case ty of {
+      XForall _ XBot _ -> TypeApplications ty arguments;
+      _ -> InstantiatedType ty
+    };
+    scheme _ ty = (,) (wellFormedIn ds types ty) (cached ty)
+  } in checkedLookup X.compareName scheme (termEnv env);
+  -- Each completed type application has its own lazy table for the next
+  -- argument. A composed proof checks its left side before examining its
+  -- right side, including when the first side fails. Each table belongs to
+  -- one variable, datatype environment and sequence of checked arguments.
+  checkedVariableApplication ds env admitted origin proof = do {
+    admitted;
+    result <- variableInstantiation ds env origin proof;
+    Right (instantiationType result)
+  };
+  variableInstantiation ds env state proof = let {
+    ordinary source computation = fmap InstantiatedType (checkedComputationResult ds env computation source)
+  } in case state of {
+    InstantiatedType ty -> ordinary ty proof;
+    TypeApplications ty arguments -> case proof of {
+      XThen first following -> case first of {
+        XThen _ _ -> do {
+          next <- variableInstantiation ds env state first;
+          variableInstantiation ds env next following
+        };
+        XInner (XBottom (XCon name [])) -> case arguments name of {
+          Nothing -> ordinary ty proof;
+          Just ((,) firstChecked eliminated) -> do {
+            middle <- firstChecked;
+            case following of { XElim -> eliminated; _ -> ordinary middle following }
+          }
+        };
+        _ -> ordinary ty proof
+      };
+      _ -> ordinary ty proof
+    }
+  };
+  -- For a constructor with no supplied type arguments, the declaration and
+  -- result are fixed throughout this checking scope. Keep its ordinary checks
+  -- and share the result selected by the exact constructor key.
+  constructorApplication ds env name ((,) d ctor) = let {
+    instantiate arguments = do {
+      ensure (L.length arguments == L.length (D.datatypeParameters d))
+        ("constructor type argument arity mismatch: " ++ name);
+      actualKinds <- L.mapM (T.kindOf ds env) arguments;
+      ensure (X.equalList eqKind actualKinds (L.map L.snd (D.datatypeBinders d)))
+        "constructor type argument kind mismatch";
+      let { parameters = M.fromList compareString (L.zip (D.datatypeParameters d) arguments) };
+      fields <- L.mapM (T.instantiateField parameters) (D.constructorFields ctor);
+      return (L.foldr XArrow (XCon (D.datatypeName d) arguments) fields)
+    };
+    bare = instantiate []
+  } in \arguments -> case arguments of { [] -> bare; _ -> instantiate arguments };
+  inferApplications ds env applications = let {
+    constructors = case ds of { DataEnv _ cs _ ->
+      checkedLookup compareString (constructorApplication ds (typeEnv env)) cs }
+  } in inferWithConstructors ds env applications constructors;
+  inferWithConstructors ds env applications constructors term =
     case term of {
       XVarTerm x ->
         case M.lookup X.compareName x (termEnv env) of {
@@ -165,8 +278,8 @@ module Bootstrap.X.Check where {
         };
       XApp f a ->
         do {
-          ft <- inferIn ds env f;
-          at <- inferIn ds env a;
+          ft <- inferWithConstructors ds env applications constructors f;
+          at <- inferWithConstructors ds env applications constructors a;
           case ft of {
             XArrow domain result ->
               if T.alphaEq domain at then Right result else Left "application type mismatch";
@@ -181,11 +294,16 @@ module Bootstrap.X.Check where {
             inferIn ds (XEnv (M.insert T.compareTyVar a bound (typeEnv env)) (termEnv env)) body;
           return (XForall a bound result)
         };
-      XTypeApp t p ->
-        do {
-          source <- inferIn ds env t;
-          checkComputationScoped ds (typeEnv env) p source
+      XTypeApp t p -> case t of {
+        XVarTerm name -> case applications name of {
+          Nothing -> Left ("unbound term variable " ++ X.nameHint name);
+          Just ((,) valid choices) -> checkedVariableApplication ds (typeEnv env) valid choices p
         };
+        _ -> do {
+          source <- inferWithConstructors ds env applications constructors t;
+          checkComputationScoped ds (typeEnv env) p source
+        }
+      };
       XLet x a b ->
         do {
           t <- inferLetBinding ds env x a;
@@ -211,8 +329,9 @@ module Bootstrap.X.Check where {
         };
       XPrimitive p arguments ->
         case P.primitiveSignature p of {
-          (,) parameters signature ->
-            do {
+          (,) parameters signature -> case arguments of {
+            [] -> closedPrimitiveType p;
+            _ -> do {
               ensure (L.length arguments == L.length parameters)
                 "primitive type argument arity mismatch";
               actualKinds <- L.mapM (T.kindOf ds (typeEnv env)) arguments;
@@ -222,29 +341,15 @@ module Bootstrap.X.Check where {
                 (M.fromList compareString (L.zip (L.map L.fst parameters) arguments))
                 signature
             }
-        };
-      XConstructor c arguments ->
-        do {
-          boundValueShared1 <- D.lookupConstructor ds c;
-          case boundValueShared1 of {
-            (,) d ctor ->
-              do {
-                ensure (L.length arguments == L.length (D.datatypeParameters d))
-                  ("constructor type argument arity mismatch: " ++ c);
-                actualKinds <- L.mapM (T.kindOf ds (typeEnv env)) arguments;
-                ensure (X.equalList eqKind actualKinds (L.map L.snd (D.datatypeBinders d)))
-                  "constructor type argument kind mismatch";
-                let {
-                  parameters = M.fromList compareString (L.zip (D.datatypeParameters d) arguments)
-                };
-                fields <- L.mapM (T.instantiateField parameters) (D.constructorFields ctor);
-                return (L.foldr XArrow (XCon (D.datatypeName d) arguments) fields)
-              }
           }
         };
+      XConstructor c arguments -> do {
+        instantiate <- D.requireConstructor c (constructors c);
+        instantiate arguments
+      };
       XCase scrutinee result alternatives ->
         do {
-          st <- inferIn ds env scrutinee;
+          st <- inferWithConstructors ds env applications constructors scrutinee;
           termType ds (typeEnv env) result;
           owner <- D.checkAlternatives ds (L.map shape alternatives);
           parameters <- caseParameters ds st owner;

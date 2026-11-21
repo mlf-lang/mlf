@@ -343,7 +343,9 @@ module Bootstrap.LLVM.Build where {
   definitionBody :: String -> [] String -> Build () -> Build ();
   definitionBody name args body = definitionBodyTyped "ptr" name args body;
   definitionBodyTyped :: String -> String -> [] String -> Build () -> Build ();
-  definitionBodyTyped ty name args body =
+  definitionBodyTyped = definitionBodyWithPolicy False;
+  definitionBodyWithPolicy :: Bool -> String -> String -> [] String -> Build () -> Build ();
+  definitionBodyWithPolicy keepWorker ty name args body =
     do {
       saved <- get;
       modify
@@ -365,7 +367,7 @@ module Bootstrap.LLVM.Build where {
           if (startsWith "@mlf.numeric." name &&
               (L.not (startsWith "@mlf.numeric.entry." name) && L.not collectingWorker))
           then " alwaysinline"
-          else if startsWith "@mlf.worker." name && workerBodyLimit 64 code
+          else if startsWith "@mlf.worker." name && (keepWorker || workerBodyLimit 64 code)
                then " noinline"
                else ""
       };
@@ -677,15 +679,23 @@ module Bootstrap.LLVM.Build where {
          };
   -- Compact constructor initialization uses shared allocation helpers. Refill,
   -- allocator debugging and constructor audits remain runtime responsibilities.
+  -- Constructor allocation functions are private to each LLVM module.
+  -- Record their symbols with the other module-wide worker definitions.
+  callConstructor :: String -> [] String -> Build String;
+  callConstructor symbol arguments = do {
+    modify (\state -> let { known = workers state } in if S.member compareString symbol known
+      then state else withWorkers (S.insert compareString symbol known) state);
+    call symbol arguments
+  };
   compactConstructor :: Int -> [] String -> Build String;
   compactConstructor tag fields =
     case fields of {
       [] -> cgPure (immediate ((tag * 8) + 4));
-      (:) a [] -> call "@mlf.construct.1" (args2 (number tag) (pointer a));
-      (:) a ((:) b []) -> call "@mlf.construct.2" (args3 (number tag) (pointer a) (pointer b));
+      (:) a [] -> callConstructor "@mlf.construct.1" (args2 (number tag) (pointer a));
+      (:) a ((:) b []) -> callConstructor "@mlf.construct.2" (args3 (number tag) (pointer a) (pointer b));
       _ ->
         do {
-          value <- call "@mlf.construct.wide" (args2 (number tag) (number (L.length fields)));
+          value <- callConstructor "@mlf.construct.wide" (args2 (number tag) (number (L.length fields)));
           L.mapM_
             (\entry ->
                case entry of {

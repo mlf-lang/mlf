@@ -79,26 +79,33 @@ module Bootstrap.EvidenceBoundary where {
     XConstructor _ _ -> []
   };
   freeNames :: XTerm -> [] XName;
-  freeNames term = case term of {
-    XVarTerm n -> (:) n [];
-    XAbs n _ b -> filter (\x -> not (X.equalName n x)) (freeNames b);
-    XApp a b -> append (freeNames a) (freeNames b);
-    XTypeAbs _ _ b -> freeNames b;
-    XTypeApp b _ -> freeNames b;
-    XLet n a b -> append (freeNames a) (filter (\x -> not (X.equalName n x)) (freeNames b));
-    XLetRec ds b -> let {
-      bound = map (\((,,) n _ _) -> n) ds;
-      uses = append (concatMap (\((,,) _ _ v) -> freeNames v) ds) (freeNames b)
-    } in filter (\n -> not (any (X.equalName n) bound)) uses;
-    XCase a _ bs -> append (freeNames a)
-      (concatMap (\(XAlternative p b) -> filter (\n -> not (any (X.equalName n) (X.patternNames p))) (freeNames b)) bs);
-    XWithData _ b -> freeNames b;
-    XIntTerm _ -> [];
-    XDoubleTerm _ -> [];
-    XBoolTerm _ -> [];
-    XStringTerm _ -> [];
-    XPrimitive _ _ -> [];
-    XConstructor _ _ -> []
+  freeNames term = freeNamesOnto (\_ -> True) term [];
+  -- Produce each free occurrence directly into the consumer's tail. Test
+  -- inner scopes before outer ones so rejected variables keep their laziness.
+  freeNamesOnto allowed term rest = let {
+    after = freeNamesOnto allowed;
+    bind name n = not (X.equalName name n) && allowed n;
+    bindMany names n = not (any (X.equalName n) names) && allowed n
+  } in case term of {
+    XVarTerm n -> if allowed n then (:) n rest else rest;
+    XAbs n _ body -> freeNamesOnto (bind n) body rest;
+    XApp f a -> after f (after a rest);
+    XTypeAbs _ _ body -> after body rest;
+    XTypeApp body _ -> after body rest;
+    XLet n expr body -> after expr (freeNamesOnto (bind n) body rest);
+    XLetRec defs body -> let {
+      bound = bindMany (map (\((,,) n _ _) -> n) defs);
+      visit = freeNamesOnto bound
+    } in foldr (\((,,) _ _ rhs) tail -> visit rhs tail) (visit body rest) defs;
+    XCase a _ branches -> after a (foldr (\(XAlternative pat body) tail ->
+      freeNamesOnto (bindMany (X.patternNames pat)) body tail) rest branches);
+    XWithData _ body -> after body rest;
+    XIntTerm _ -> rest;
+    XDoubleTerm _ -> rest;
+    XBoolTerm _ -> rest;
+    XStringTerm _ -> rest;
+    XPrimitive _ _ -> rest;
+    XConstructor _ _ -> rest
   };
   ground :: XType -> Bool;
   ground ty = case ty of {

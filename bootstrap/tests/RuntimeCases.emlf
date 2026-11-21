@@ -18,6 +18,8 @@ expectError expected term = case evaluate term of
   Right value -> panic "direct primitive lost its error"
 primitiveApplications = do
   expectInteger 2 (erasedCall PStringLength ((:) (XEString "λ😀") []))
+  expectInteger 6 (erasedCall PStringUtf8Length ((:) (XEString "λ😀") []))
+  expectError "byte length argument" (erasedCall PStringUtf8Length [poison "byte length argument"])
   expectInteger 7 (erasedCall PAddInt ((:) (XEInt 3) ((:) (XEInt 4) [])))
   expectInteger 11 (erasedCall PIfThenElse ((:) (XEBool true) ((:) (XEInt 11) ((:) (poison "unused branch") []))))
   expectInteger 13 (erasedCall PIfThenElse ((:) (XEBool false) ((:) (poison "unused branch") ((:) (XEInt 13) []))))

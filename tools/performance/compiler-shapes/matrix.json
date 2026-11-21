@@ -1,12 +1,16 @@
 {
   "suite": "compiler-shapes",
-  "version": 2,
+  "version": 4,
+  "default_endpoint": "crate-fused-v1",
   "title": "GHC / MLF compiler shape classification benchmark",
   "purpose": "Compile identical generated shared-Haskell programs with GHC and with GHC-hosted MLF, from fresh targets to native executables. This classifies compiler behaviour by program shape; it is not the C/MLF Benchmarks Game comparison in tools/bench.",
   "families": {
     "flat_functions": {"label": "Independent annotated functions", "default": true, "work": "n annotated top-level functions summed in a balanced tree"},
+    "inferred_functions": {"label": "Independent inferred functions", "default": true, "work": "the flat_functions family with no signatures on the n generated functions"},
+    "inferred_poly_functions": {"label": "Independent inferred polymorphic functions", "default": true, "work": "n unsigned independent identity/constant/application/composition functions, each used at Int and Bool with runtime-dependent branches"},
     "dependency_chain": {"label": "Annotated dependency chain", "default": true, "work": "n annotated functions in a strict chain"},
     "inferred_chain": {"label": "Inferred dependency chain", "default": true, "work": "the same chain with no signature on the generated functions"},
+    "inferred_poly_chain": {"label": "Inferred polymorphic dependency chain", "default": true, "work": "n unsigned functions; each layer calls its predecessor and applies a supplied step once; the whole chain is used at Int and Bool"},
     "recursive_ring": {"label": "Mutually recursive ring", "default": true, "work": "n functions in a mutually recursive cycle"},
     "mono_calls": {"label": "Monomorphic Box calls", "default": true, "work": "n monomorphic constructor pack/unpack calls"},
     "poly_calls": {"label": "Polymorphic Box calls", "default": true, "work": "the same calls through a rank-1 forall"},
@@ -14,27 +18,34 @@
     "balanced_tree": {"label": "Balanced constructor tree", "default": true, "work": "the same leaves in a balanced constructor tree"},
     "literal_table": {"label": "Generated literal table", "default": true, "work": "a generated constructor table of n items"},
     "higher_order_chain": {"label": "Higher-order composition chain", "default": true, "work": "n nested higher-order compositions"},
-    "local_functions": {"label": "Local let-bound functions (optional)", "default": false, "work": "flat functions placed inside one local let; never part of the default matrix"},
+    "local_functions": {"label": "Local let-bound functions", "default": true, "work": "flat functions placed inside one local let"},
+    "wide_case": {"label": "Wide constructor dispatch", "default": true, "work": "a runtime decision selects one of n constructors, followed by a single exhaustive n-arm case"},
+    "class_instances": {"label": "Typeclass instance selection", "default": true, "work": "one constrained method wrapper used at n distinct concrete types with separate instances"},
+    "dependency_diamonds": {"label": "Reconvergent dependency graph", "default": true, "work": "n top-level diamonds with two branches that depend on the same previous layer"},
+    "state_updates": {"label": "Ordered IO updates", "default": true, "work": "n unrolled pairs of reads and writes to a runtime-initialized integer array"},
+    "captured_closures": {"label": "Escaping closures", "default": true, "work": "n escaping functions with captured runtime values"},
+    "wide_product": {"label": "Wide product", "default": true, "work": "one constructor with n integer fields and a pattern that consumes every field"},
+    "rank2_arguments": {"label": "Rank-2 function arguments", "default": true, "work": "n rank-2 call sites passing a polymorphic argument that the consumer uses at Bool and Int"},
+    "irregular_literal_table": {"label": "Irregular literal table", "default": true, "work": "n two-field rows with irregular payloads consumed by an order-sensitive checksum"},
+    "nested_poly_types": {"label": "Nested polymorphic types", "default": true, "work": "n nested polymorphic Box constructors followed by n projections"},
+    "rank2_callbacks": {"label": "Many rank-2 callback consumers", "default": true, "work": "n distinct consumers use their polymorphic callback at both Int and Bool"},
+    "decoder_pipeline": {"label": "Dependent decoder stages", "default": true, "work": "n field reads with state-dependent checks and an early malformed-input exit"},
     "baseline": {"label": "Minimal IO baseline", "default": false, "work": "a program that only reads argv and prints it"}
   },
-  "sizes": [8, 32, 128],
-  "repeats": 3,
+  "sizes": [8, 32, 128, 1024, 8192],
+  "repeats": 6,
   "seed": 20261031,
   "matrices": {
     "default": {
-      "description": "10 families x sizes 8, 32, 128 plus one minimal baseline; 31 cells, 186 timed compilations",
-      "families": ["flat_functions", "dependency_chain", "inferred_chain", "recursive_ring", "mono_calls",
-                   "poly_calls", "tree_chain", "balanced_tree", "literal_table", "higher_order_chain"],
-      "sizes": [8, 32, 128],
-      "baseline": true,
-      "repeats": 3
-    },
-    "smoke": {
-      "description": "Low-cost integrity and coverage check for ordinary PRs: 2 families at size 8 plus baseline; 3 cells, 18 timed compilations",
-      "families": ["flat_functions", "recursive_ring"],
-      "sizes": [8],
-      "baseline": true,
-      "repeats": 3
+      "description": "25 families at five sizes, six paired builds per size; 125 cells, 1,500 timed compilations",
+      "families": ["flat_functions", "inferred_functions", "inferred_poly_functions", "dependency_chain",
+                   "inferred_chain", "inferred_poly_chain", "recursive_ring", "mono_calls", "poly_calls",
+                   "tree_chain", "balanced_tree", "literal_table", "higher_order_chain", "local_functions",
+                   "wide_case", "class_instances", "dependency_diamonds", "state_updates", "captured_closures",
+                   "wide_product", "rank2_arguments", "irregular_literal_table", "nested_poly_types", "rank2_callbacks", "decoder_pipeline"],
+      "sizes": [8, 32, 128, 1024, 8192],
+      "baseline": false,
+      "repeats": 6
     }
   },
   "endpoints": {
@@ -45,6 +56,20 @@
       "driver": "PRODUCER/bin/emlf --compile-crate SPEC -o UNIT; PRODUCER/bin/emlf --crate-to-llvm-gc UNIT.mlfci; clang -O2 UNIT.ll",
       "compiles_user_program_fresh": true,
       "reused_inputs": ["fixed builtin checked pair (.mlfci/.mlfco)", "prebuilt host MLF.Primitive package", "runtime.o", "GHC and Clang toolchains"],
+      "cache_boundary": "each leg gets a private, empty query cache directory that is inventoried and deleted after correctness checks; no target objects, .hi/.o files, LLVM or executables are reused between legs"
+    },
+    "crate-fused-v1": {
+      "status": "measured",
+      "summary": "GHC-hosted single-invocation checked crate to LLVM; publishes the same checked object and query cache, then links the retained checked root. Separate from the two-process crate-bootstrap-v1 endpoint.",
+      "producer": "tools/shared/build.py --bootstrap-only --optimization 2",
+      "driver": "PRODUCER/bin/emlf --compile-crate-to-llvm-gc SPEC -o UNIT; clang -O2 UNIT.ll",
+      "compiles_user_program_fresh": true,
+      "reused_inputs": [
+        "fixed builtin checked pair (.mlfci/.mlfco)",
+        "prebuilt host MLF.Primitive package",
+        "runtime.o",
+        "GHC and Clang toolchains"
+      ],
       "cache_boundary": "each leg gets a private, empty query cache directory that is inventoried and deleted after correctness checks; no target objects, .hi/.o files, LLVM or executables are reused between legs"
     }
   },
@@ -57,7 +82,7 @@
     }
   },
   "claim_limits": [
-    "Three repetitions per cell describe spread on one machine; they are not a confidence interval.",
+    "Six repetitions per cell describe spread on one machine; they are not a confidence interval.",
     "A single cohort cannot show that one compiler is faster in general, only the measured wall ratios for these fixtures.",
     "Different cohorts are separate windows and are never pooled into one median."
   ]

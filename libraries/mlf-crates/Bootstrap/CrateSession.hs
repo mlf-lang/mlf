@@ -3,7 +3,8 @@
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
 -- File-owned candidate route. No raw AST, Solver, region, or callback escapes.
-module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, compileSpecFileWithVerification, compileSpecFileUsingInstaller) where {
+module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, compileSpecFileWithVerification, compileSpecFileUsingInstaller,
+    CompiledCrate, compiledObject, compiledInterfaces, compileSpecFileRetainedUsingInstaller) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
@@ -18,11 +19,12 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.IntRank as Rank;
   import qualified Bootstrap.BuiltinPreludeContext as Builtin;
-  import Bootstrap.Crate (CrateSpec, PreparedCrate, withPreludeUsing, ensureBuiltinWith, prepareCrate,
+  import Bootstrap.Crate (CrateSpec, PreparedCrate, withPreludeLoading, ensureBuiltinWith, prepareCrate,
     withDependencies, loadSourcesInPackage, decodeSpec, specIdentity, specSources,
     specDependencies, specCache, specMode, preparedLowered, preparedSourcePlan,
     preparedResolution, preparedNames, preparedLayouts, preparedReach, CrateEntry(..), preparedEntryId,
     preparedData, preparedClasses, preparedInstances, preparedEntry);
+  import qualified Bootstrap.Crate as Crate;
   import qualified Bootstrap.CrateQuery as Query;
   import qualified Bootstrap.CrateGraph as CrateGraph;
   import qualified Bootstrap.QueryGraph as QueryGraph;
@@ -46,6 +48,14 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   import qualified Bootstrap.X.Syntax as X;
   import qualified Bootstrap.X.Type as T;
   import qualified Bootstrap.X.Pretty as Pretty;
+
+  -- Only the file-owned compiler can construct this receipt. It survives
+  -- successful object/query publication and owns the exact checked root plus
+  -- the dependency metadata snapshot used to infer it.
+  data CompiledCrate = CompiledCrate Artifact.CrateObject
+    ([] ((,) String Artifact.CrateInterface));
+  compiledObject (CompiledCrate object _) = object;
+  compiledInterfaces (CompiledCrate _ interfaces) = interfaces;
 
   compilePreparedWithEncoding :: forall a. Bool -> Bool ->
     (Artifact.CrateObject -> String -> Query.QueryReport -> a) ->
@@ -173,15 +183,32 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   compileSourcesWithEncoding :: Bool -> Maybe ((,) Builtin.PreparedPrelude String) -> Bool -> CrateSpec -> [] SourceModule ->
     [] ((,) String Artifact.CrateInterface) -> String -> IO (Either String ());
   compileSourcesWithEncoding verifyAll witness = compileSourcesUsingInstaller verifyAll (ensureBuiltinWith witness);
-  compileSourcesUsingInstaller verifyAll install shareEncoding spec sources interfaces prefix =
+  compileSourcesUsingInstaller = compileSourcesLoading Artifact.loadInterfaces;
+  compileSourcesLoading load verifyAll install shareEncoding spec sources interfaces prefix = do {
+    result <- compileSourcesRetainedLoading load verifyAll install shareEncoding spec sources interfaces prefix;
+    ioReturn (mapEither (\_ -> ()) result)
+  };
+  data FileCrate = FileCrate Crate.CompilationModules ([] DataDecl) ([] SClassDecl) ([] ((,) String SInstanceDecl))
+    Inference.LoweredDeclarations CrateEntry (Map String (Set String)) (Maybe Source.SourcePlan);
+  fileModules (FileCrate modules _ _ _ _ _ _ _) = modules;
+  filePlan (FileCrate _ _ _ _ _ _ _ plan) = plan;
+  fileLowered (FileCrate _ _ _ _ lowered _ _ _) = lowered;
+  fileNames prepared = case filePlan prepared of {
+    Just plan -> Source.planNames plan; Nothing -> Inference.loweredNames (fileLowered prepared)
+  };
+  fileLayouts prepared = case filePlan prepared of {
+    Just plan -> Source.planData plan; Nothing -> Inference.loweredData (fileLowered prepared)
+  };
+  compileSourcesRetainedLoading load = compileSourcesRetainedWith (withPreludeLoading load);
+  compileSourcesRetainedWith addPrelude verifyAll install shareEncoding spec sources interfaces prefix =
     do {
-      dependencies <- withPreludeUsing install spec sources interfaces;
+      dependencies <- addPrelude install spec sources interfaces;
       case do {
              boundValueShared20 <- dependencies;
              case boundValueShared20 of {
                (,) updated loaded ->
                  do {
-                   prepared <- prepareCrate updated loaded sources;
+                   prepared <- Crate.prepareFileCrate FileCrate updated loaded sources;
                    Right ((,,) updated loaded prepared)
                  }
              }
@@ -189,21 +216,21 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
         Left message -> ioReturn (Left message);
         Right ((,,) updated loaded prepared) ->
           do {
-            result <- compileGraphSources verifyAll updated loaded prepared (preparedSourcePlan prepared) prefix;
+            result <- compileGraphSources verifyAll updated loaded prepared (filePlan prepared) prefix;
             case result of {
               Left message ->
                 let {
-                  names = Modules.resolvedCrateDisplayNames (preparedResolution prepared)
+                  names = Crate.compilationNames (fileModules prepared)
                 } in
                 let {
                   diagnostics =
                     M.union compareString
                       (M.map (Modules.displayNames names)
-                         (preparedNames prepared))
+                         (fileNames prepared))
                       names
                 } in
                 ioReturn (Left (Modules.displayNames diagnostics message));
-              Right _ -> ioReturn (Right ())
+              Right object -> ioReturn (Right (CompiledCrate object loaded))
             }
           }
       }
@@ -228,8 +255,8 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
       protected = M.fromList compareString (concatMap (compose Artifact.crateProtection snd) interfaces) };
     compiled <- if Query.validSourceContextDigest compiler
       then case plan of {
-        Just source -> CrateGraph.compile verify (specIdentity spec) compiler directory imported protected source;
-        Nothing -> CrateGraph.compileLoweredIn (preparedLowered prepared) verify (specIdentity spec) compiler directory imported
+        Just source -> CrateGraph.compileFile verify (specIdentity spec) compiler directory imported protected source;
+        Nothing -> CrateGraph.compileLoweredIn (fileLowered prepared) verify (specIdentity spec) compiler directory imported
       }
       else ioReturn (Left "cannot fingerprint query graph compiler");
     case compiled of { Left e -> ioReturn (Left e); Right state -> case CrateGraph.checkedResult state of {
@@ -248,30 +275,28 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
               published <- QueryGraph.publish session;
               QueryGraph.elapsed (CrateGraph.statistics state) 5 publishStarted;
               QueryGraph.writeProfile (prefix ++ ".query-profile") (CrateGraph.statistics state);
-              ioReturn (mapEither (\_ -> ()) published)
+              ioReturn (mapEither (\_ -> object) published)
             } }
           } }
         }
       }
     } }
   };
-  graphInterface spec interfaces prepared fragments contracts = do {
-    let { resolved = Modules.resolvedCrateModules (preparedResolution prepared);
-      modules = map (compose Modules.moduleIdentity Modules.resolvedSource) resolved;
+  graphInterface spec interfaces prepared@(FileCrate (Crate.CompilationModules termTable resolved _) ownData ownClasses ownInstances _ ownEntry reachByModule _) fragments contracts = do {
+    let { modules = map Crate.compilationName resolved;
       dependencies = map (\path -> case find (\p -> eqString (fst p) path) interfaces of {
         Nothing -> panic "missing direct crate metadata";
         Just ((,) _ iface) -> (,,) (Artifact.crateId iface) path (Artifact.semanticFingerprint iface)
       }) (specDependencies spec);
       external = Set.fromList compareString (concatMap (\((,) _ iface) ->
         map D.datatypeName (Artifact.crateLoweredData iface)) interfaces);
-      layouts = filter (\d -> not (Set.member compareString (D.datatypeName d) external)) (preparedLayouts prepared);
+      layouts = filter (\d -> not (Set.member compareString (D.datatypeName d) external)) (fileLayouts prepared);
       reach = map (\name -> (,) name (Set.toList
-        (M.findWithDefault compareString Set.empty name (preparedReach prepared)))) modules;
+        (M.findWithDefault compareString Set.empty name reachByModule))) modules;
       symbols = Source.contractSymbols contracts; scope = Source.checkedScope contracts;
       owners = IS.fromList (concatMap (\((,,) _ _ ids) -> map V.toInt ids) fragments);
       methods = IS.fromList (concatMap (\r -> concatMap (\(R.Class _ _ _ items) ->
-        map (compose V.toInt fst) items) (Modules.resolvedClasses (Modules.resolvedContents r))) resolved);
-      termTable = Modules.resolvedCrateBindings (preparedResolution prepared);
+        map (compose V.toInt fst) items) (Modules.resolvedClasses (Crate.compilationContents r))) resolved);
       validateOwned entity ids = do {
         i <- Modules.termId termTable entity;
         ensure (IS.member (V.toInt i) ids) ("crate exports an undeclared entity: " ++ Modules.label entity)
@@ -294,10 +319,10 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
     }) fragments;
     let { output = concat rows };
     exports <- traverseEither (\r -> mapEither (\visible ->
-      (,) (Modules.moduleIdentity (Modules.resolvedSource r)) (Set.toList (Modules.visible visible)))
-      (Modules.resolvedExports (specMode spec) r)) resolved;
+      (,) (Crate.compilationName r) (Set.toList (Modules.visible visible)))
+      (Crate.compilationExports r)) resolved;
     mapM_ validateExport (concatMap snd exports);
-    entry <- case preparedEntryId prepared of {
+    entry <- case ownEntry of {
       NoEntry -> Right "";
       CrateEntry allocated i -> do {
         ensure (IS.member (V.toInt i) owners && eqString (Dependency.symbolKey allocated i) (Dependency.symbolKey symbols i))
@@ -306,7 +331,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
       }
     };
     let { iface = Artifact.CrateInterface (specIdentity spec) dependencies modules exports reach
-      (preparedData prepared) (preparedClasses prepared) (preparedInstances prepared)
+      ownData ownClasses ownInstances
       layouts (map fst output) entry "pending" (map snd output) };
     Artifact.validateInterface iface;
     Right iface
@@ -318,7 +343,11 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   compileSpecFileWithPrelude = compileSpecFileWithVerification False;
   compileSpecFileWithVerification :: Bool -> Maybe ((,) Builtin.PreparedPrelude String) -> String -> String -> IO (Either String ());
   compileSpecFileWithVerification verifyAll witness = compileSpecFileUsingInstaller verifyAll (ensureBuiltinWith witness);
-  compileSpecFileUsingInstaller verifyAll install file prefix =
+  compileSpecFileUsingInstaller verifyAll install file prefix = do {
+    result <- compileSpecFileRetainedUsingInstaller verifyAll install file prefix;
+    ioReturn (mapEither (\_ -> ()) result)
+  };
+  compileSpecFileRetainedUsingInstaller verifyAll install file prefix =
     do {
       present <- fileExists file;
       if not present
@@ -342,9 +371,12 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
                         } of {
                      Left message -> ioReturn (Left message);
                      Right ((,) sources interfaces) ->
-                       -- Both source and dependency values originate in the
-                       -- parsers/decoders above, not caller-supplied lazy ASTs.
-                       compileSourcesUsingInstaller verifyAll install True normalized sources interfaces prefix
+                       -- loadInterfaces admitted every existing metadata value. Keep
+                       -- that snapshot for inference and check any newly installed
+                       -- dependency through the same graph loader.
+                       compileSourcesRetainedWith (Crate.withPreludeMetadata (compose Right fst)
+                         (Artifact.loadGraph [] interfaces))
+                         verifyAll install True normalized sources interfaces prefix
                    }
                  }
              }

@@ -376,7 +376,9 @@ module Bootstrap.ArtifactStorage where {
     }
   };
   v2DecimalLength :: Int -> Int;
-  v2DecimalLength value = if value < 10 then 1 else 1 + v2DecimalLength (quotInt value 10);
+  v2DecimalLength value = if value < 10 then 1 else if value < 100 then 2
+    else if value < 1000 then 3 else if value < 10000 then 4
+    else 4 + v2DecimalLength (quotInt value 10000);
   v2IntLength :: Int -> Int;
   v2IntLength value = if value >= 0 then v2DecimalLength value
     else if value == (-9223372036854775808) then 20
@@ -908,19 +910,31 @@ module Bootstrap.ArtifactStorage where {
             d = if pad1 then 0 else base64Digit dc;
             last = offset + 4 == total;
             valid = a >= 0 && b >= 0 && c >= 0 && d >= 0
-              && (not pad2 || (pad1 && last && remInt b 16 == 0))
-              && (not pad1 || (last && (pad2 || remInt c 4 == 0))) };
+              && (not pad2 || (pad1 && last && andInt b 15 == 0))
+              && (not pad1 || (last && (pad2 || andInt c 3 == 0))) };
       if not valid then ioReturn (Left "noncanonical release base64") else do {
-        writeByteArray bytes output (a * 4 + quotInt b 16);
-        if pad2 then ioReturn () else writeByteArray bytes (output + 1) (remInt b 16 * 16 + quotInt c 4);
-        if pad1 then ioReturn () else writeByteArray bytes (output + 2) (remInt c 4 * 64 + d);
+        writeByteArray bytes output (orInt (shiftLInt a 2) (shiftRInt b 4));
+        if pad2 then ioReturn () else writeByteArray bytes (output + 1) (orInt (shiftLInt (andInt b 15) 4) (shiftRInt c 2));
+        if pad1 then ioReturn () else writeByteArray bytes (output + 2) (orInt (shiftLInt (andInt c 3) 6) d);
         decodeBase64Groups text total (offset + 4) bytes
           (output + (if pad2 then 1 else if pad1 then 2 else 3))
       }
     };
   decodeBase64 :: String -> IO (Either String ByteArray);
   decodeBase64 text = let { total = stringLength text;
-      maximum = (quotInt maxBytes 3 + 1) * 4 } in
+      maximum = (quotInt maxBytes 3 + 1) * 4;
+      -- The length check places all four scalars in bounds. Before the
+      -- final quartet padding is invalid and exactly three bytes are due.
+      preceding bytes offset output = if offset + 4 >= total then decodeBase64Groups text total offset bytes output
+        else let {
+          a = base64Digit (stringCodeAt text offset); b = base64Digit (stringCodeAt text (offset + 1));
+          c = base64Digit (stringCodeAt text (offset + 2)); d = base64Digit (stringCodeAt text (offset + 3))
+        } in if a < 0 || b < 0 || c < 0 || d < 0 then ioReturn (Left "noncanonical release base64") else do {
+          writeByteArray bytes output (orInt (shiftLInt a 2) (shiftRInt b 4));
+          writeByteArray bytes (output + 1) (orInt (shiftLInt (andInt b 15) 4) (shiftRInt c 2));
+          writeByteArray bytes (output + 2) (orInt (shiftLInt (andInt c 3) 6) d);
+          preceding bytes (offset + 4) (output + 3)
+        } } in
     if total > maximum || remInt total 4 /= 0
     then ioReturn (Left "invalid release base64 length")
     else let { padding = if total == 0 then 0
@@ -930,7 +944,7 @@ module Bootstrap.ArtifactStorage where {
       if count < 0 || count > maxBytes then ioReturn (Left "release byte payload exceeds limit")
       else do {
         bytes <- newByteArray count 0;
-        decodeBase64Groups text total 0 bytes 0
+        preceding bytes 0 0
       };
   readBase64 :: String -> IO (Either String String);
   readBase64 path = do {

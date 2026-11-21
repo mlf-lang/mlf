@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
-import json,sys,shutil,types,hashlib,argparse
+import shutil,types,hashlib,argparse
 out=Path(__file__).resolve().parent;root=out.parents[2]
 parser=argparse.ArgumentParser(description='Independent full-tree and demand controls for Map.balance against an authenticated ordinary producer.')
 parser.add_argument('--producer',type=Path,required=True);parser.add_argument('--output',type=Path,required=True);args=parser.parse_args()

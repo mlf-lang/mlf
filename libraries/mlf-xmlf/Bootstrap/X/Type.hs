@@ -15,29 +15,28 @@ module Bootstrap.X.Type where {
     if (tyVarId a < tyVarId b) then (0 - 1) else if (tyVarId a == tyVarId b) then 0 else 1;
   equalTyVar a b = (tyVarId a == tyVarId b);
   freeVars :: XType -> Set XTyVar;
-  freeVars ty =
-    case ty of {
-      XVar a -> S.singleton a;
-      XBot -> S.empty;
-      XBotKind _ -> S.empty;
-      XArrow a b -> S.union compareTyVar (freeVars a) (freeVars b);
-      XCon _ ts -> L.foldr (S.union compareTyVar) S.empty (L.map freeVars ts);
-      XApply f a -> S.union compareTyVar (freeVars f) (freeVars a);
-      XForall a bound body ->
-        S.union compareTyVar (freeVars bound) (S.delete compareTyVar a (freeVars body))
-    };
+  freeVars = typeVariableSet (\variable bound body ->
+    unionVariables bound (seq body (M.delete compareTyVar variable body)));
   allVars :: XType -> Set XTyVar;
-  allVars ty =
-    case ty of {
-      XVar a -> S.singleton a;
-      XBot -> S.empty;
-      XBotKind _ -> S.empty;
-      XArrow a b -> S.union compareTyVar (allVars a) (allVars b);
-      XCon _ ts -> L.foldr (S.union compareTyVar) S.empty (L.map allVars ts);
-      XApply f a -> S.union compareTyVar (allVars f) (allVars a);
-      XForall a bound body ->
-        S.insert compareTyVar a (S.union compareTyVar (allVars bound) (allVars body))
-    };
+  allVars = typeVariableSet (\variable bound body ->
+    let { both = unionVariables bound body } in seq both (M.insert compareTyVar variable () both));
+  -- Set union evaluates the left inventory before the right one. Preserve
+  -- that order on partially defined types and delayed constructor arguments.
+  unionVariables left right = seq left (seq right (M.union compareTyVar left right));
+  -- Both inventories use the same ordered tree. Keep the binder operation
+  -- explicit and wrap the finished tree once, at the public set boundary.
+  typeVariableSet :: (XTyVar -> Map XTyVar () -> Map XTyVar () -> Map XTyVar ()) -> XType -> Set XTyVar;
+  typeVariableSet quantify ty = let {
+    variables term = case term of {
+      XVar a -> M.singleton a ();
+      XBot -> M.empty;
+      XBotKind _ -> M.empty;
+      XArrow a b -> unionVariables (variables a) (variables b);
+      XCon _ arguments -> L.foldr (\argument rest -> unionVariables (variables argument) rest) M.empty arguments;
+      XApply f a -> unionVariables (variables f) (variables a);
+      XForall a bound body -> quantify a (variables bound) (variables body)
+    }
+  } in S.wrap (variables ty);
   freshNegative :: Set XTyVar -> Int -> XTyVar;
   freshNegative used i =
     if S.member compareTyVar (XTyVar i) used then freshNegative used (L.advanceIdentity i (-1)) else XTyVar i;
@@ -160,10 +159,29 @@ module Bootstrap.X.Type where {
   bottomKind k = XBotKind k;
   kindOf :: DataEnv -> Map XTyVar XType -> XType -> Either String Kind;
   kindOf ds bounds ty =
-    do {
-      kinds <- L.mapM (kindBinding ds bounds S.empty) (S.toList (freeVars ty));
-      kindIn ds (M.fromList compareTyVar kinds) ty
+    case ty of {
+      XVar a -> seq a (visitKind ds bounds S.empty a);
+      XBot -> Right Star;
+      XBotKind k -> Right k;
+      XCon name [] -> Right (D.constructorKind ds name 0);
+      _ -> kindFromVariables ds bounds S.empty ty
     };
+  -- The free-variable set already has distinct ordered keys. Resolve them
+  -- in ascending order so competing environment errors keep their priority.
+  kindFromVariables ds bounds seen ty = let {
+    resolve tree = case tree of {
+      MapEmpty -> Right M.empty;
+      MapNode size variable _ left right -> do {
+        before <- resolve left;
+        kind <- visitKind ds bounds seen variable;
+        after <- resolve right;
+        Right (M.node size variable kind before after)
+      }
+    }
+  } in case freeVars ty of { Set variables -> do {
+    kinds <- resolve variables;
+    kindIn ds kinds ty
+  } };
   kindBinding :: DataEnv ->
                  Map XTyVar XType -> Set XTyVar -> XTyVar -> Either String ((,) XTyVar Kind);
   kindBinding ds bounds seen a =
@@ -177,13 +195,12 @@ module Bootstrap.X.Type where {
     then Left "cyclic type environment"
     else case M.lookup compareTyVar a bounds of {
            Nothing -> Left ("unbound type variable " ++ showInt (tyVarId a));
-           Just b ->
-             do {
-               kinds <-
-                 L.mapM (kindBinding ds bounds (S.insert compareTyVar a seen))
-                   (S.toList (freeVars b));
-               kindIn ds (M.fromList compareTyVar kinds) b
-             }
+           Just b -> case b of {
+             XBot -> Right Star;
+             XBotKind k -> Right k;
+             XCon name [] -> Right (D.constructorKind ds name 0);
+             _ -> kindFromVariables ds bounds (S.insert compareTyVar a seen) b
+           }
          };
   kindIn :: DataEnv -> Map XTyVar Kind -> XType -> Either String Kind;
   kindIn ds env ty =

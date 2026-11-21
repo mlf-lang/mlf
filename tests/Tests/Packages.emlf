@@ -41,6 +41,7 @@ crateRow identity saved = S.fromMaybe (panic ("missing crate action " ++ identit
 codegenRow identity saved =
  let metadata = J.getText "metadata" "" (crateRow identity saved) in
  S.fromMaybe (panic ("missing codegen action " ++ identity)) (S.find (\row -> eqString (J.getText "metadata" "" row) metadata) (J.values (J.get "codegen" saved)))
+compilerCommands flag saved = S.filter (\row -> S.elem eqString flag (J.getStrings "argv" row)) (J.values (J.get "commands" saved))
 runBinary c expected = do
  code <- O.exec (work c) ((:) (program c) []) "" (work c ++ "/program.out") (work c ++ "/program.err") 60
  out <- readFile (work c ++ "/program.out")
@@ -181,6 +182,9 @@ integration = Sys.withScratch (\dir -> do
  expect c ((:) "build" []) true ""
  initial <- report c
  H.assert (S.all (\row -> S.not (J.getBool "cached" true row)) (J.values (J.get "builds" initial))) "first package build reused an artifact"
+ let fused = J.getBool "compiler-fused-codegen" false (J.get "toolchain" initial)
+ H.assert (S.not fused || (S.length (compilerCommands "--compile-crate-to-llvm-gc" initial) == 1 && S.length (compilerCommands "--compile-crate" initial) == 2 && S.null (compilerCommands "--crate-to-llvm-gc" initial))) "cold executable did not use one fused invocation while preserving library compilation"
+ H.assert (S.not fused || S.all (\row -> eqString (J.getText "cache_source" "" (J.get "queries" row)) "retained-root") (J.values (J.get "codegen" initial))) "cold emission did not consume its retained checked-root result"
  S.mapM_ (\row -> do
   detailed <- J.read (J.getText "query_report" "" row)
   let summary = J.get "queries" row
@@ -190,6 +194,7 @@ integration = Sys.withScratch (\dir -> do
  expect c ((:) "build" []) true ""
  cached <- report c
  H.assert (S.all (J.getBool "cached" false) (J.values (J.get "builds" cached))) "unchanged package build missed cache"
+ H.assert (S.all (\flag -> S.null (compilerCommands flag cached)) ["--compile-crate", "--compile-crate-to-llvm-gc", "--crate-to-llvm-gc"]) "cached package build unnecessarily invoked the compiler"
  H.assert (S.all (\row -> let queries = J.get "queries" row in J.getBool "outer_cached" false queries && J.equal (J.get "inferred_groups" queries) (J.num 0) && J.equal (J.get "reused_groups" queries) (J.get "group_count" queries)) (J.values (J.get "crates" cached))) "outer artifact hits did not normalize query summary counters"
  H.assert (S.all (\row -> let validation = J.get "validation" row in J.getBool "outer_cached" false validation && S.not (J.getBool "root_checked" true validation) && J.equal (J.get "checked_objects" validation) (J.num 0) && J.equal (J.get "reused_objects" validation) (J.get "object_count" validation)) (J.values (J.get "crates" cached))) "outer artifact hits misreported independent object checks"
  passed "content-addressed no-op build"

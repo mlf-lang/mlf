@@ -72,7 +72,7 @@ def main():
     groups = cold["inferred_groups"]
     if not groups or cold["reused_groups"] or len(cold["groups"]) != groups:
         raise ValueError("cold compiler group accounting")
-    pointer, = (cache / ".queries/mlf-crates").rglob("query-graph-v2/CURRENT")
+    pointer, = (cache / ".queries/mlf-crates").rglob("query-graph-v3/CURRENT")
     published = pointer.read_bytes()
     address = text(read_document(published, 6).values()[0])
     wire = (pointer.parent / "generations" / f"{address}.mlfqg").read_bytes()

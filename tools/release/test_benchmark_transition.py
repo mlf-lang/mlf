@@ -14,7 +14,7 @@ class BenchmarkTransition(unittest.TestCase):
         cls.root = bridge.ROOT
         cls.contract = bridge.load_contract(cls.root)
         cls.inputs = [(cls.root / name).read_bytes() for name in
-                      ['benchmarks/manifest.json', bridge.HISTORY, bridge.TYPES, bridge.OLD_TYPES, bridge.STD]]
+                      ['benchmarks/manifest.json', bridge.HISTORY, bridge.TYPES, bridge.OLD_TYPES, bridge.STD, bridge.MAP]]
 
     def check(self, inputs):
         bridge.validate_bridge(*inputs, self.contract)
@@ -46,6 +46,29 @@ class BenchmarkTransition(unittest.TestCase):
 
     def test_current_std_source_drift(self):
         self.reject(4, lambda raw: raw + b'\n')
+
+    def test_current_map_source_drift(self):
+        self.reject(5, lambda raw: raw + b'\n')
+
+    def test_old_map_source_is_not_live_source(self):
+        old = self.contract.restore_path(self.inputs[5], bridge.MAP)
+        self.reject(5, lambda raw: old)
+
+    def test_old_map_pin_cannot_attest_live_source(self):
+        historical = json.loads(self.inputs[1])['pinned_sha256'][bridge.MAP]
+        self.mutate_manifest(lambda value: value['pinned_sha256'].__setitem__(bridge.MAP, historical))
+
+    def test_wrong_historical_map_reconstruction(self):
+        # Keep every real current-source check; isolate the historical projection
+        # so merely updating a live pin cannot satisfy the bridge.
+        real = self.contract
+        class WrongMapProjection:
+            value = real.value
+            def restore_path(self, raw, path):
+                restored = real.restore_path(raw, path)
+                return restored + b'\n' if path == bridge.MAP else restored
+        with self.assertRaisesRegex(ValueError, 'exact historical Map reconstruction'):
+            bridge.validate_bridge(*self.inputs, WrongMapProjection())
 
     def test_old_source_is_not_live_source(self):
         self.reject(2, lambda raw: self.inputs[3])

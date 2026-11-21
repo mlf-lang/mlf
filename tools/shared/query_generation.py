@@ -8,6 +8,8 @@ from artifact_binary_typed import list_values, n, pack, text, value_node
 
 V1 = "MLF-CRATE-QUERY-GRAPH-1"
 V2 = "MLF-CRATE-QUERY-GRAPH-2"
+V3 = "MLF-CRATE-QUERY-GRAPH-3"
+CONSTANTS = {435: ("Input", "EmptyScopeInventory"), 436: ("EmptyScope",)}
 DIGEST = re.compile(r"[0-9a-f]{64}")
 KINDS = {415: ("Input", "Binding"), 416: ("Input", "Prepared"),
          417: ("Input", "ScopeInventory"), 418: ("Scope",), 419: ("InferScc",),
@@ -16,7 +18,7 @@ KINDS = {415: ("Input", "Binding"), 416: ("Input", "Prepared"),
 
 
 def cache_directory(cache):
-    for name in ("query-graph-v2", "query-graph-v1"):
+    for name in ("query-graph-v3", "query-graph-v2", "query-graph-v1"):
         path = cache / name
         if (path / "CURRENT").is_file():
             return path
@@ -98,15 +100,15 @@ class Generation:
                          for k, (h, reads, payload) in records.items()]
             self.refs = {}
             return
-        self.version = 1 if root[1] == 411 else 2
-        fields = value_node(root, root[1], 3 if self.version == 1 else 7)
-        require(text(fields[0]) == (V1 if self.version == 1 else V2), "generation format")
+        self.version = 1 if root[1] == 411 else (3 if len(root[2]) == 11 else 2)
+        fields = value_node(root, root[1], {1: 3, 2: 7, 3: 11}[self.version])
+        require(text(fields[0]) == {1: V1, 2: V2, 3: V3}[self.version], "generation format")
         self.config = fields[1]
         require(text(self.config) and (configuration is None or text(self.config) == configuration),
                 "generation configuration")
-        self.tables = fields[2:-1]
+        self.tables = fields[2:6] if self.version == 3 else fields[2:-1]
         self.refs = {}
-        if self.version == 2:
+        if self.version >= 2:
             declarations, members, requests, datatypes = self.tables
             self.declarations = names(declarations)
             self.datatypes = names(datatypes)
@@ -123,14 +125,31 @@ class Generation:
                 return packed([lookup(self.groups, group), str(index(site)), text(goal)])
             self.evidence = table(map(evidence_key, list_values(requests)), "duplicate evidence")
 
-        entries = list_values(fields[-1])
+        if self.version == 3:
+            keys, results, lengths, targets, locations = map(list_values, fields[6:])
+            require(len(keys) == len(results) == len(lengths), "query column lengths")
+            payloads = [index(value) for value in locations]
+            require(payloads == sorted(set(payloads)), "query payload row order")
+            require(all(row < len(keys) for row in payloads), "query payload row range")
+            payloads = set(payloads)
+            entries, cursor = [], 0
+            for row, (key, result, length) in enumerate(zip(keys, results, lengths)):
+                count = index(length)
+                require(count <= len(targets) - cursor, "query read column length")
+                reads = targets[cursor:cursor + count]
+                cursor += count
+                entries.append(n(413, key, result, n(1, *reads),
+                                 n(5, result) if row in payloads else n(4)))
+            require(cursor == len(targets), "query read column trailing targets")
+        else:
+            entries = list_values(fields[-1])
         rows = []
         hashes, descriptors, budget = {}, {}, Limits().work
         for entry in entries:
             key, result, reads, location = value_node(entry, 410 if self.version == 1 else 413, 4)
             logical = self.key(key)
             require(logical not in hashes, "unique query graph keys")
-            if self.version == 2:
+            if self.version >= 2:
                 budget -= len(logical)
                 require(budget >= 0, "identity work limit")
                 descriptors[key] = logical
@@ -146,7 +165,7 @@ class Generation:
             else:
                 edges = []
                 for ref in reads:
-                    require(ref[0] == "int" or (ref[0] == "node" and len(ref[2]) == 1 and ref[2][0][0] == "int"),
+                    require((self.version == 3 and ref[0] == "node" and ref[1] in CONSTANTS and not ref[2]) or ref[0] == "int" or (ref[0] == "node" and len(ref[2]) == 1 and ref[2][0][0] == "int"),
                             "invalid read descriptor")
                     name = descriptors.get(ref)
                     require(name is not None, "dangling query read")
@@ -167,6 +186,12 @@ class Generation:
             return text(ref)
         if ref[0] == "int":
             return packed(["Binding", lookup(self.declarations, ref)])
+        if self.version == 3 and ref[0] == "node" and ref[1] in CONSTANTS:
+            value_node(ref, ref[1], 0)
+            key = ""
+            for part in reversed(CONSTANTS[ref[1]]):
+                key = packed([part, key])
+            return key
         require(ref[0] == "node" and ref[1] in KINDS, "unknown query descriptor")
         kind = KINDS[ref[1]]
         slot, = value_node(ref, ref[1], 1)
@@ -179,21 +204,25 @@ class Generation:
         return key
 
     def check_cycles(self):
-        heights = {}
-        for key in self.nodes:
-            pending, visiting = [(key, False)], set()
-            while pending:
-                name, leaving = pending.pop()
-                if leaving:
-                    visiting.remove(name)
-                    height = 1 + max((heights[k] for k, _ in self.nodes[name]["reads"]), default=0)
-                    require(height <= 4096, "cyclic/deep query graph")
-                    heights[name] = height
-                elif name not in heights:
-                    require(name not in visiting and len(visiting) < 4096, "cyclic/deep query graph")
-                    visiting.add(name)
-                    pending.append((name, True))
-                    pending.extend((k, False) for k, _ in reversed(self.nodes[name]["reads"]))
+        done, visiting = set(), set()
+        for root in self.nodes:
+            if root in done:
+                continue
+            visiting.add(root)
+            stack = [(root, iter(self.nodes[root]["reads"]))]
+            while stack:
+                key, reads = stack[-1]
+                dependency = next(reads, None)
+                if dependency is None:
+                    stack.pop()
+                    visiting.remove(key)
+                    done.add(key)
+                    continue
+                child, _ = dependency
+                require(child not in visiting, "cyclic query graph")
+                if child not in done:
+                    visiting.add(child)
+                    stack.append((child, iter(self.nodes[child]["reads"])))
 
     def legacy_bytes(self):
         return tree_document([n(411, ("text", V1), self.config, n(1, *self.rows))], schema=6)
@@ -231,4 +260,18 @@ class Generation:
                 # Negative fixtures deliberately encode an unknown target.
                 refs.append(self.refs.get(text(target), ("int", len(self.declarations))))
             encoded.append(n(413, self.refs[text(key)], result, n(1, *refs), payload))
+        if self.version == 3:
+            columns = [[], [], [], [], []]
+            for row, entry in enumerate(encoded):
+                key, result, reads, payload = value_node(entry, 413, 4)
+                targets = list_values(reads)
+                columns[0].append(key)
+                columns[1].append(result)
+                columns[2].append(("int", len(targets)))
+                columns[3].extend(targets)
+                if payload != n(4):
+                    require(value_node(payload, 5, 1)[0] == result, "query graph payload matches result hash")
+                    columns[4].append(("int", row))
+            return tree_document([n(412, ("text", V3), config, *self.tables,
+                                       *(n(1, *column) for column in columns))], schema=6)
         return tree_document([n(412, ("text", V2), config, *self.tables, n(1, *encoded))], schema=6)

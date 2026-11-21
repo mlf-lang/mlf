@@ -39,6 +39,10 @@ try:
     for opt in ['O0','O2']:
         b=build('contracts','ContractProbe.hs',opt)
         run('contracts-'+opt,[b],text='TOTAL 89 FAILED 0')
+        b=build('integer-demand',root/'tools/shared/fixtures/IntDemandControls.hs',opt)
+        run('integer-demand-'+opt,[b],text='PASS integer results, nested demand order')
+        b=build('string-compare','StringCompareProbe.hs',opt)
+        run('string-compare-'+opt,[b],text='PASS string comparison: 11664 codepoint pairs and 8 demand/error controls per host/primitive lane')
         b=build('numeric','NumericProbe.hs',opt,[tests/'NumericOracle.c'])
         run('numeric-'+opt,[b],text='TOTAL 722 FAILED 0')
         b=build('identity','IdentityProbe.hs',opt)
@@ -86,7 +90,7 @@ try:
                 run('native-environment-nul-'+compiler,[binary,'nul-name'],expected=1,exact='Runtime: file path contains NUL\n')
     receipt['passed']=True
 finally:
-    sources=list((root/'host/ghc/MLF').rglob('*.hs'))+[root/'host/ghc/cbits/host.c']+list(tests.glob('*.hs'))+list(tests.glob('*.c'))+[tests/'run.py',tests/'test-digest.py']+[root/'runtime'/x for x in ['mlf_runtime.c','mlf_system.h','mlf_process_binding.h','mlf_process_supervisor.c','mlf_completion.h']]
+    sources=list((root/'host/ghc/MLF').rglob('*.hs'))+[root/'host/ghc/cbits/host.c',root/'tools/shared/fixtures/IntDemandControls.hs']+list(tests.glob('*.hs'))+list(tests.glob('*.c'))+[tests/'run.py',tests/'test-digest.py']+[root/'runtime'/x for x in ['mlf_runtime.c','mlf_system.h','mlf_build_runner_hash.h','mlf_process_binding.h','mlf_process_supervisor.c','mlf_completion.h']]
     receipt['sources']={str(x.relative_to(root)):hashlib.sha256(x.read_bytes()).hexdigest() for x in sorted(sources)}
     receipt.setdefault('passed',False)
     (out/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')

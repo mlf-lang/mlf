@@ -124,6 +124,76 @@ dependencyChain size = foldr make (app (v size) [T.XEInt 0]) [1..size] where
              (if i == 1 then pair (v (10000+i)) (T.XEInt 0)
               else app (v (i-1)) [pair (v (10000+i)) (T.XEInt i)]))
 
+polymorphicChain :: B.Int -> B.Int -> T.XErased
+polymorphicChain size copies = foldr definition calls [1..size] where
+ definition i body =
+  let step = 10000 + i*2; arg = step+1
+      previous = if i == 1 then v arg else app (v (i-1)) [v step,v arg]
+  in T.XELet (n i) (T.XEAbs (n step) (T.XEAbs (n arg) (app (v step) [previous]))) body
+ calls = foldr1 pair [app (v size) [ident (40000+i),T.XEInt i] | i <- [1..copies]]
+
+iterator size callback input = foldr definition (app (v size) [callback,input]) [1..size] where
+ definition i body = let step = 10000+i*2; arg = step+1
+                         previous = if i == 1 then v arg else app (v (i-1)) [v step,v arg]
+                     in T.XELet (n i) (T.XEAbs (n step) (T.XEAbs (n arg) (app (v step) [previous]))) body
+lastBody (T.XELet _ _ body) = lastBody body
+lastBody body = body
+
+iterationChecks = do
+ env <- case D.validateDeclarations [] of
+  T.Right result -> pure result
+  T.Left message -> fail (B.unpack message)
+ let eval = R.evaluate env (R.REnv M.empty)
+     integer value = case R.integer (eval value) of
+      T.Right result -> pure result
+      T.Left message -> fail (B.unpack message)
+     boolean value = case R.boolean (eval value) of
+      T.Right result -> pure result
+      T.Left message -> fail (B.unpack message)
+     translate op amount = T.XEAbs (n 40000) (p op [v 40000,T.XEInt amount])
+ forM_ [1,2,3,17] $ \count -> forM_ [minBound,maxBound,-3,0,1] $ \amount ->
+  forM_ [minBound,maxBound,-1,0,7] $ \input -> forM_ [T.PAddInt,T.PSubInt] $ \op -> do
+   let callback = translate op amount
+       original = iterator count callback (T.XEInt input)
+       folded = C.simplifyIterations M.empty original
+       operation = case op of T.PAddInt -> (+); _ -> (-)
+       expected = foldl operation input (replicate (fromIntegral count) amount)
+   a <- integer original; b <- integer folded; c <- integer (C.optimizeChecked original)
+   ensure "iteration arithmetic agrees with repeated wrapped operations" (a == expected && b == expected && c == expected)
+   ensure "iteration reduction is actually exercised" (not (exact (lastBody original) (lastBody folded)))
+ forM_ [1,2,3,16,129] $ \count -> forM_ [False,True] $ \input -> do
+  let callback = T.XEAbs (n 40000) (p T.PIfThenElse [v 40000,T.XEBool False,T.XEBool True])
+      original = iterator count callback (T.XEBool input)
+      expected = iterate not input !! fromIntegral count
+  a <- boolean original; b <- boolean (C.optimizeChecked original)
+  ensure "iteration Boolean parity" (a == expected && b == expected)
+ let unsupported = [ident 40000,
+       T.XEAbs (n 40000) (p T.PQuotInt [v 40000,T.XEInt 2]),
+       T.XEAbs (n 40000) (p T.PAddInt [v 40001,T.XEInt 1]),
+       T.XEAbs (n 40000) (p T.PNewIntArray [T.XEInt 1,v 40000])]
+ forM_ unsupported $ \callback -> do
+  let term = iterator 3 callback (T.XEInt 7)
+  ensure "unknown, captured and effectful callbacks retain ordinary code" (exact term (C.simplifyIterations M.empty term))
+ let summary = M.singleton (n 1) 3
+     call = app (v 1) [translate T.PAddInt 1,T.XEInt 7]
+     shadowed = [T.XEAbs (n 1) call,T.XELet (n 1) (v 9000) call,
+                 T.XELetRec [(n 1,v 9000)] call,
+                 T.XECase (v 9000) [T.XErasedAlternative (T.XDefaultPattern (T.Just (n 1))) call]]
+ forM_ shadowed $ \term -> ensure "every binding form masks iterator identities"
+   (exact term (C.simplifyIterations summary term))
+ let over = app (v 2) [app (v 1) [v 2,v 3]]
+ case C.iterationBody (M.singleton (n 1) 2147483647) (n 2) (n 3) over of
+  T.Nothing -> pure ()
+  _ -> fail "iteration count overflow was admitted"
+ let poison = iterator 3 (translate T.PAddInt 1) (p T.PPanic [T.XEString "iteration input"])
+ forM_ [poison,C.optimizeChecked poison] $ \term -> case R.integer (eval term) of
+  T.Left message -> ensure "iteration retains input failure" (message == "iteration input")
+  _ -> fail "iteration erased a demanded input failure"
+ let lazy = p T.PIfThenElse [T.XEBool False,poison,T.XEInt 42]
+ result <- integer (C.optimizeChecked lazy)
+ ensure "iteration retains undemanded branch laziness" (result == 42)
+ putStrLn "PASS checked-iteration-algebra-and-scopes"
+
 checkPending :: B.Int -> T.XErased -> IO ()
 checkPending expected term = do
  let seed = 50000
@@ -226,6 +296,7 @@ ioSemantics = do
 
 main :: IO ()
 main = do
+ iterationChecks
  forM_ (zip [0::Int ..] generated) $ \(i,t) -> checkTerm ("generated " ++ show i) t
  -- Reuse the authored source cases as inputs, but the oracle is the frozen
  -- baseline module and exact identity/hint/seed checks above.
@@ -244,6 +315,10 @@ main = do
   checkTerm "independent chain" (independentChain size)
   checkTerm "dependent chain" (dependencyChain size)
  putStrLn "PASS long-chain-admission"
+ forM_ [2,3] $ \copies -> forM_ [2,16,128] $ \size -> do
+  checkPending size (polymorphicChain size copies)
+  checkTerm "polymorphic dependent chain with several instantiations" (polymorphicChain size copies)
+ forM_ [4,7] $ \copies -> checkTerm "bounded multiple-copy fallback" (polymorphicChain 16 copies)
  putStrLn "PASS pending-materialization"
  let ordered = T.XELet (n 1) (ident 11) (T.XELet (n 2) (ident 12)
                   (pair (app (v 1) [T.XEInt 1]) (app (v 2) [T.XEInt 2])))

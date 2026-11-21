@@ -505,7 +505,10 @@ module Bootstrap.CrateQuery where {
       SForall Flexible n (SBottomKind _) body -> (:) n (leadingTypes body);
       _ -> []
     };
-  ordinalToken i = "ref:" ++ showInt (V.toInt i);
+  smallOrdinalTokens :: V.IndexVec Declaration String;
+  smallOrdinalTokens = V.fromList (map (\i -> "ref:" ++ showInt i) (range 0 255));
+  ordinalToken i = let { slot = V.toInt i } in if slot >= 0 && slot < 256
+    then V.at smallOrdinalTokens i else "ref:" ++ showInt slot;
   canonicalTermRef rank env ref = case ref of {
     LexicalRef n -> canonicalReference env n;
     DeclRef i _ -> ordinalToken (rank i)
@@ -657,15 +660,16 @@ module Bootstrap.CrateQuery where {
              body)
     };
   canonicalMember = canonicalMemberIn (\i -> i) M.empty (\n -> n);
+  memberTypeScope annotation visit = let {
+    names = case annotation of {
+      Just (SAnnotation [] ty) -> leadingTypes ty;
+      _ -> []
+    }
+  } in visit (canonicalScope "type:" M.empty 0 names) (length names);
   canonicalMemberIn rank globals owner ((,,) n annotation body) =
-    let {
-      names = case annotation of {
-        Just (SAnnotation [] ty) -> leadingTypes ty;
-        _ -> []
-      }
-    } in
     (,,) (owner n) (Separate.mapMaybeValue (canonicalAnnotation M.empty 0) annotation)
-      (canonicalExpressionWith rank globals 0 (canonicalScope "type:" M.empty 0 names) (length names) body);
+      (memberTypeScope annotation (\types typeDepth ->
+        canonicalExpressionWith rank globals 0 types typeDepth body));
   -- The table is ordered by defining identity. Its ordinals belong only
   -- to this Prepared value, independently of resolver slot order or crate.
   data ReferenceTable = ReferenceTable ([] String) (Map String String)
@@ -674,13 +678,26 @@ module Bootstrap.CrateQuery where {
   referenceToken (ReferenceTable _ names _) name = M.findWithDefault compareString name name names;
   referenceMember table@(ReferenceTable _ names ranks) =
     canonicalMemberIn (\i -> M.get Source.compareDecl i ranks) names (referenceToken table);
-  referenceTable slots prepared = let {
+  referenceTable slots prepared = referenceTableUsing slots prepared
+    (append (Source.groupOriginal prepared) (Source.groupMembers prepared));
+  referenceTableUsing = referenceTableReading Dependency.querySyntaxRefs;
+  referenceTableReading references slots prepared members = let {
     scope = Source.slotScope slots;
-    observed = concatMap (compose (Source.declarationRefs scope) (compose Dependency.querySyntaxRefs Source.sourceRhs))
-      (append (Source.groupOriginal prepared) (Source.groupMembers prepared));
-    ids = append (Source.memberIds slots) (append (Source.parameterIds slots)
-      (append (Source.candidateIds slots) observed));
-    definitions = M.toList (M.fromList compareString (map (\i -> (,) (Source.declStable scope i) i) ids));
+    prepend rest i = (:) i rest;
+    observe acc member = Source.foldDeclarationRefs scope prepend acc
+      (references (Source.sourceRhs member));
+    -- Finish each input spine from left to right before deduplicating its
+    -- slots in reverse order. Slot values and display hints stay lazy.
+    owners = reverse (Source.memberIds slots);
+    parameters = foldlStrict prepend owners (Source.parameterIds slots);
+    candidates = foldlStrict prepend parameters (Source.candidateIds slots);
+    reversed = seq owners (seq parameters (seq candidates (foldlStrict observe candidates members)));
+    -- Retain the last occurrence of each ID, including the old last-wins
+    -- ordering for two distinct IDs whose caller-supplied stable key agrees.
+    keep ((,) seen kept) i = let { index = V.toInt i } in
+      if IS.member index seen then (,) seen kept else (,) (IS.insert index seen) ((:) i kept);
+    unique = snd (foldlStrict keep ((,) IS.empty []) reversed);
+    definitions = M.toList (M.fromList compareString (map (\i -> (,) (Source.declStable scope i) i) unique));
     ranks = zipWith (\ordinal ((,) _ i) -> (,) i (V.fromInt ordinal))
       (range 0 (length definitions - 1)) definitions;
     names = map (\((,) i rank) -> (,) (Source.declName scope i) (ordinalToken rank)) ranks
@@ -706,27 +723,58 @@ module Bootstrap.CrateQuery where {
       XForall _ a b -> append (xTypeNames a) (xTypeNames b);
       _ -> []
     };
-  requiredDataIn (TypeInventory graph constructors closures) members schemes =
-    let {
-      observations = map Dependency.observeDeclaration members
-    } in
-    let {
-      direct = concatMap Dependency.typeNames observations
-    } in
-    let {
-      owners =
-        catMaybes
-          (map (\n -> M.lookup compareString n constructors)
-             (concatMap Dependency.constructorNames observations))
-    } in
-    let {
-      roots = append direct (append owners (concatMap (\((,) _ ty) -> xTypeNames ty) schemes))
-    } in
-    let {
-      ids = mapMaybe (Dependency.graphId graph) roots;
-      needed = IS.unions (map (V.at closures) ids);
-      nodes = Dependency.graphNodes graph
-    } in map (\i -> V.at nodes (V.fromInt i)) (IS.toAscList needed);
+  -- File members have already been resolved. Only types and constructor owners
+  -- can reach datatype layouts. Keep one copy of each spelling as we traverse
+  -- application spines, and use the ordinary observation for other scoped forms.
+  fileMemberDataRoots members = let {
+    remember seen name = if S.member compareString name seen then seen else S.insert compareString name seen;
+    include seen observed = foldlStrict remember seen (Dependency.typeNames observed);
+    collect ((,) knownTypes knownConstructors) ((,,) _ annotation body) = let {
+      visit expression pending types constructors = let {
+        next ts cs = case pending of {
+          [] -> (,) ts cs;
+          (:) item more -> visit item more ts cs
+        };
+        annotated observation inner = let { ts = include types observation } in
+          seq ts (visit inner pending ts constructors)
+      } in case expression of {
+        SApp f a -> visit f ((:) a pending) types constructors;
+        SCallSite _ _ inner -> visit inner pending types constructors;
+        SSourceDefinition inner -> visit inner pending types constructors;
+        SDeclScope _ inner -> visit inner pending types constructors;
+        SLam _ a inner -> annotated (Dependency.observeOptional a) inner;
+        SAnn inner a -> annotated (Dependency.observeAnnotation a) inner;
+        SSignature inner a -> annotated (Dependency.observeAnnotation a) inner;
+        SChecked ty inner -> annotated (Dependency.observeType ty) inner;
+        SLet _ rhs inner -> visit rhs ((:) inner pending) types constructors;
+        SConstructor name -> let { cs = remember constructors name } in seq cs (next types cs);
+        SVar _ -> next types constructors; SGlobal _ _ -> next types constructors;
+        SPrimitive _ -> next types constructors; SIntLit _ -> next types constructors;
+        SBoolLit _ -> next types constructors; SStringLit _ -> next types constructors;
+        SDoubleLit _ -> next types constructors;
+        _ -> let { observed = Dependency.observeExpression expression; ts = include types observed;
+          cs = foldlStrict remember constructors (Dependency.constructorNames observed)
+        } in seq ts (seq cs (next ts cs))
+      };
+      initial = include knownTypes (Dependency.observeOptional annotation)
+    } in seq initial (visit body [] initial knownConstructors)
+  } in case foldlStrict collect ((,) S.empty S.empty) members of {
+    (,) types constructors -> (,) (S.toList types) (S.toList constructors)
+  };
+  requiredDataIn inventory members schemes = let {
+    observations = map Dependency.observeDeclaration members
+  } in selectDataRoots inventory (concatMap Dependency.typeNames observations)
+    (concatMap Dependency.constructorNames observations) schemes;
+  requiredFileDataIn inventory members schemes = case fileMemberDataRoots members of {
+    (,) types constructors -> selectDataRoots inventory types constructors schemes
+  };
+  selectDataRoots (TypeInventory graph owners closures) types constructors schemes = let {
+    fromConstructors = mapMaybe (\name -> M.lookup compareString name owners) constructors;
+    roots = append types (append fromConstructors (concatMap (\((,) _ ty) -> xTypeNames ty) schemes));
+    ids = mapMaybe (Dependency.graphId graph) roots;
+    needed = IS.unions (map (V.at closures) ids);
+    nodes = Dependency.graphNodes graph
+  } in map (\i -> V.at nodes (V.fromInt i)) (IS.toAscList needed);
   requiredData :: [] DataDecl ->
                   [] ((,,) String (Maybe SAnnotation) SExpr) ->
                   [] ((,) String XType) -> Either String ([] DataDecl);
@@ -753,15 +801,20 @@ module Bootstrap.CrateQuery where {
               else stringFromCode code;
   jsonFrom :: String -> Int -> String;
   jsonFrom value position = concatStringList (jsonSpans value position position);
-  jsonSpans value start position =
-    let { size = stringLength value; spanText = \end -> if start == 0 && end == size then value
-          else stringSlice value start (end - start) } in
-    if position >= size then (if position == start then [] else [spanText position])
+  -- A local slice helper allocates a captured closure at each scanned character.
+  jsonSpanText value size start end = if start == 0 && end == size then value
+    else stringSlice value start (end - start);
+  -- Bound uninterrupted native evaluation even when Clang does not optimize calls.
+  jsonSpans value start position = jsonSpanUntil value start position (start + 256);
+  jsonSpanUntil value start position limit =
+    let { size = stringLength value } in
+    if position >= size then (if position == start then [] else [jsonSpanText value size start position])
+    else if position >= limit then (:) (jsonSpanText value size start position) (jsonSpans value position position)
     else let { code = stringCodeAt value position; next = position + 1 } in
       if code < 32 || code == 34 || code == 92
       then let { tail = (:) (jsonCharacter code) (jsonSpans value next next) } in
-        if start == position then tail else (:) (spanText position) tail
-      else jsonSpans value start next;
+        if start == position then tail else (:) (jsonSpanText value size start position) tail
+      else jsonSpanUntil value start next limit;
   jsonString value = ("\"" ++ (jsonFrom value 0 ++ "\""));
   jsonArray values = ("[" ++ (intercalate "," values ++ "]"));
   groupJSON (GroupResult identity names cached semantic key) =
@@ -1547,7 +1600,7 @@ module Bootstrap.CrateQuery where {
       }
   };
   sourceInputHash :: String -> IO String;
-  sourceInputHash key = do { bytes <- byteArrayFromString key; byteArrayDigest bytes };
+  sourceInputHash key = ioBind (byteArrayFromString key) byteArrayDigest;
   -- Hash the same canonical UTF-8 bytes in memory for modest inputs. Large
   -- keys and an existing scratch path retain the original file/cleanup lane.
   sourceLookupHash directory key = let {

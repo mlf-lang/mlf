@@ -86,10 +86,11 @@ Its temporary ordinals belong to one admitted graph. The inference constraint
 graph keeps its own solver identities.
 
 Primitive codes 132 and 133 append array snapshots and `stToIO` to the wire
-inventory. Earlier code assignments retain their meaning. The builtin interface
-is `/13`, the builtin crate identity ends in `:13`, and the primitive ABI is
-`mlf-primitive-134-v9`. The runtime retains
-the old link markers and adds a marker for the IO-world bridge. Standalone name
+inventory. Code 134 appends [`byteArrayCRC32`](byte-array-crc32.md), a read-only IO checksum with a
+bounded range treated as zero. Earlier code assignments retain their meaning.
+The builtin interface is `/14`, the builtin crate identity ends in `:14`, and
+the primitive ABI is `mlf-primitive-135-v10`. The runtime retains the old link
+markers and adds a marker for the bulk CRC operation. Standalone name
 allocation visits the original entities before the appended primitives and
 `IOWorld`, preserving existing generated names. Locks, interfaces, cache keys,
 worker JSON and diagnostics continue to use source or crate identities.

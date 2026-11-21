@@ -72,7 +72,7 @@ class StateLawControls(unittest.TestCase):
             with self.assertRaises(ValueError):gate.unchanged(before,gate.capture_inputs(root,[tool]))
     def test_directory_alias_retarget_addition_and_cycle(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root=Path(temporary)
+            root=Path(temporary).resolve()
             for relative in ['libraries','tests','tools/shared/fixtures','actual/One','actual/Two']:
                 (root/relative).mkdir(parents=True)
             (root/'actual/One/M.emlf').write_text('first')
@@ -112,6 +112,7 @@ class StateLawControls(unittest.TestCase):
             with self.assertRaises(FileNotFoundError):gate.capture_inputs(root,[])
             alias.unlink();alias.symlink_to(alias,target_is_directory=True)
             with self.assertRaises((RuntimeError,OSError)):gate.capture_inputs(root,[])
+    @unittest.skipUnless(sys.platform == 'linux', 'the live resource watchdog uses Linux procfs and ionice')
     def test_watchdog_default_and_stricter_disk_floor(self):
         for options, expected in [([],768),(['--disk-free-mib','3072'],3072)]:
             with self.subTest(options=options), tempfile.TemporaryDirectory() as temporary:

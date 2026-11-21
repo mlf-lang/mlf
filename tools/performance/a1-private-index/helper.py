@@ -158,6 +158,29 @@ def process_group(group):
     return rows
 
 
+def kill_group(group, *, members=None):
+    """Stop this group. Darwin reports EPERM for groups containing only zombies."""
+    members = process_group if members is None else members
+    try:
+        os.killpg(group, signal.SIGKILL)
+    except ProcessLookupError:
+        return
+    except PermissionError:
+        live = [row for row in members(group) if not row['state'].startswith('Z')]
+        if sys.platform == 'darwin' and not live:
+            return
+        # A real denial is a supervision failure, even if individual signals are
+        # permitted. Stop the remaining members where possible before reporting it.
+        for row in live:
+            pid = row['pid']
+            try:
+                if os.getpgid(pid) == group or os.getsid(pid) == group:
+                    os.kill(pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                continue
+        raise
+
+
 def tree_bytes(root):
     total = 0
     for path in Path(root).rglob('*'):
@@ -251,41 +274,70 @@ class Runner:
                         elif tree_bytes(self.work) > limit['max_work_bytes']:
                             reason = 'work-directory size limit'
                     if reason:
-                        os.killpg(process.pid, signal.SIGKILL)
-                        done.wait()
                         break
-            except BaseException:
-                try:
-                    os.killpg(process.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                done.wait()
-                raise
+            except BaseException as error:
+                errors.append(error)
             finally:
-                thread.join()
+                # Keep the guard and the known session even if signaling or the
+                # final process inventory fails. wait4 remains the sole reaper.
+                record.update(pid=process.pid, process_group=process.pid, reason=reason,
+                              sampled_process_tree_peak_rss_bytes=peak)
+                def stop_worker_group():
+                    try:
+                        kill_group(process.pid)
+                    except Exception as error:
+                        errors.append(error)
+                if reason or errors:
+                    # Preserve the observed guard before attempting termination.
+                    try:
+                        save(receipt, record)
+                    except OSError as error:
+                        errors.append(error)
+                    finally:
+                        stop_worker_group()
+                # A genuine permission failure must not wedge the recorder on
+                # join(). The daemon waiter can still reap a child that exits later.
+                reaped = done.wait(5)
+                if not reaped:
+                    errors.append(RuntimeError('worker did not exit within five seconds of cleanup'))
+                try:
+                    def live_members():
+                        return [row for row in process_group(process.pid) if not row['state'].startswith('Z')]
+                    survivors = live_members()
+                    record['terminal_live_descendants'] = survivors
+                    if survivors:
+                        record['reason'] = reason or 'live descendants after leader completion'
+                        stop_worker_group()
+                        deadline = time.monotonic() + 5
+                        while survivors and time.monotonic() < deadline:
+                            survivors = live_members()
+                            if survivors:
+                                time.sleep(0.05)
+                        record['remaining_live_after_cleanup'] = survivors
+                        if survivors:
+                            errors.append(RuntimeError('live group members remain after cleanup'))
+                except Exception as error:
+                    errors.append(error)
+                    # A failed inventory cannot establish that every child exited.
+                    stop_worker_group()
+                if reaped or done.wait(0):
+                    thread.join()
                 if waited:
                     status, usage, end = waited[0]
                     process.returncode = os.waitstatus_to_exitcode(status)
-                    survivors = [row for row in process_group(process.pid) if not row['state'].startswith('Z')]
-                    if survivors:
-                        try:
-                            os.killpg(process.pid, signal.SIGKILL)
-                        except ProcessLookupError:
-                            pass
-                        reason = reason or 'live descendants after leader completion'
-                    record.update(exit_code=process.returncode, reason=reason,
-                                  wall_seconds=(end-begin)/1e9, child_user_seconds=usage.ru_utime,
-                                  child_system_seconds=usage.ru_stime,
+                    record.update(exit_code=process.returncode, wall_seconds=(end-begin)/1e9,
+                                  child_user_seconds=usage.ru_utime, child_system_seconds=usage.ru_stime,
                                   max_individual_child_rss_bytes=usage.ru_maxrss if sys.platform == 'darwin' else usage.ru_maxrss*1024,
-                                  sampled_process_tree_peak_rss_bytes=peak,
                                   voluntary_context_switches=usage.ru_nvcsw,
-                                  involuntary_context_switches=usage.ru_nivcsw,
-                                  terminal_live_descendants=survivors)
-                record['complete'] = bool(waited and not errors and not reason and process.returncode == expected_exit)
+                                  involuntary_context_switches=usage.ru_nivcsw)
+                record['child_reaped'] = bool(waited)
+                if errors:
+                    record['supervision_errors'] = [repr(error) for error in errors]
+                record['complete'] = bool(waited and not errors and not record['reason'] and process.returncode == expected_exit)
                 save(receipt, record)
-        if errors:
-            raise errors[0]
         record['logs'] = {str(output/name): sha(output/name) for name in ['stdout','stderr']}
         save(receipt, record)
+        if errors:
+            raise errors[0]
         require(record['complete'], 'command failed/guarded: ' + str(receipt))
         return record

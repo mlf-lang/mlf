@@ -1,5 +1,5 @@
 """Pure loader tests; synthetic metadata here does not claim compiler acceptance."""
-import copy, json, pathlib, sys, tempfile, unittest
+import copy, pathlib, sys, tempfile, unittest
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]))
 from common import CONTRACTS, digest, pack, write
 from snapshot import verified_bundle

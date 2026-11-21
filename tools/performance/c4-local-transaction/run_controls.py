@@ -27,9 +27,13 @@ VALIDATION_PINS = {
     'source_contract.py': '039bb8833ef6a232e80458b584005ad88bb46cd9797459d6ef813b7b378cddc6',
     'source-contract.json': 'ec83da63b4021b65a882c0edd9bd5b7f39d4fcb14f47af61655389d1caeea6c5'}
 SPAWN_CONTRACT = HERE.parent / 'process-spawn/source_contract.py'
-SPAWN_CONTRACT_SHA = '5ce3dfbc559445ba91096453939b198faa717f7c86be40c515a0b0abe2bcbc15'
+SPAWN_CONTRACT_SHA = '9f1cbe37799f4db70cdd6fcf441e3fd72d6b654861cf4ec57493f9a7dbab386e'
 COMPARISON_CONTRACT = HERE.parent / 'integer-compare/source_contract.py'
 COMPARISON_CONTRACT_SHA = '912676a53b8059b334018f186290490f7675e8f79eab8315c03c2fc401adef8a'
+# The frozen C4 manifest records the original A1 supervisor. The current
+# supervisor was introduced in 84596b6188585c6aafc8f518d92ecd649152543d.
+HISTORICAL_HELPER_SHA = '0d11b29419a32fc9832096951aa085cc317c8a304b9db110ee96ba411a4ce7cc'
+CURRENT_HELPER_SHA = '692ac002d72a333ad6e9af0fd252917c6a462a8c8d99d1269bea207ea3266f1d'
 BUILTIN_STDOUT = b'PASS current builtin: canonical literal, full check, exact wire, 7 malformed/mismatch rejections\n'
 
 
@@ -38,12 +42,18 @@ def pack(values):
 
 
 def load_helper(manifest):
-    for relative, expected in manifest['shared_support_pins'].items():
-        C.require(C.sha_bytes((A1 / relative).read_bytes()) == expected, 'unchanged shared support '+relative)
-    module = types.ModuleType('c4_unchanged_resource_helper')
+    pins = dict(manifest['shared_support_pins'])
+    C.require(pins.get('helper.py') == HISTORICAL_HELPER_SHA, 'fixed historical A1 helper')
+    pins['helper.py'] = CURRENT_HELPER_SHA
+    sources = {}
+    for relative, expected in pins.items():
+        data = (A1 / relative).read_bytes()
+        C.require(C.sha_bytes(data) == expected, 'fixed shared support ' + relative)
+        sources[relative] = data
+    module = types.ModuleType('c4_resource_helper')
     module.__file__ = str(A1 / 'helper.py')
-    exec(compile((A1 / 'helper.py').read_bytes(), module.__file__, 'exec'), module.__dict__)
-    return module
+    exec(compile(sources['helper.py'], module.__file__, 'exec'), module.__dict__)
+    return module, pins
 
 
 def source_contract(record, source):
@@ -85,7 +95,7 @@ def main():
     elif not all([args.source_base, args.producer_base, args.builtin_prefix]):
         parser.error('full mode requires both base arguments and --builtin-prefix')
     manifest = json.loads((HERE/'manifest.json').read_text())
-    H = load_helper(manifest)
+    H, shared_support_pins = load_helper(manifest)
     validation_pins = {str(VALIDATION_DIR/name): digest for name,digest in VALIDATION_PINS.items()}
     H.check_pins(validation_pins)
     validation_contract = H.module(VALIDATION_DIR/'source_contract.py', 'validation_reuse_source_contract')
@@ -127,8 +137,8 @@ def main():
             input_pins.update(validation_pins)
             for relative, expected in manifest['pins'].items():
                 H.require(H.sha(HERE/relative) == expected, 'fixed independent input '+relative)
-            for relative, expected in {**manifest['historical_a1_pins'], **manifest['shared_support_pins']}.items():
-                H.require(H.sha(A1/relative) == expected, 'unchanged referenced A1 input '+relative)
+            for relative, expected in {**manifest['historical_a1_pins'], **shared_support_pins}.items():
+                H.require(H.sha(A1/relative) == expected, 'fixed referenced A1 input '+relative)
                 input_pins[str(A1/relative)] = expected
             # In focused mode the byte-exact inverse is still checked against its
             # fixed source hash, but the candidate must not stand in for before.

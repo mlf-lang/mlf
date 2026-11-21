@@ -4,7 +4,7 @@
              MultiParamTypeClasses, OverloadedStrings #-}
 module MLF.PreparedCompiler
   (Compilation, compileFileWithPrelude, compileSourceWithImports, compileProgramWithPrelude,
-   checkedTerm, compiledTerm, sourceType, reused, dictionaryIdentities, verifyBuiltin, verifyBuiltinImages, installCompilerPrelude, cratePrelude,
+   checkedTerm, compiledTerm, sourceType, reused, dictionaryIdentities, verifyBuiltin, verifyBuiltinImages, installCompilerPrelude, cratePrelude, linkCrateFile, linkCrateFileProfiled, linkCompiledCrate,
    emitNativeFileChunks, emitNativeSourceChunks, nativeInstallInfo,
    NativeCompilation, compileNativeFile, compileNativeSource,
    nativeChunks, nativeManifest, nativeExportCount, nativeInlineCount, nativeFallback, nativeInputs,
@@ -12,6 +12,7 @@ module MLF.PreparedCompiler
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
+  import qualified Bootstrap.Host as Host;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.Module as Modules;
@@ -24,6 +25,7 @@ module MLF.PreparedCompiler
   import qualified Bootstrap.CompilerCore as Core;
   import qualified Bootstrap.CrateArtifact as Artifact;
   import qualified Bootstrap.Crate as Crate;
+  import qualified Bootstrap.CrateSession as Session;
   import qualified Bootstrap.CrateQuery as Query;
   import qualified Bootstrap.ArtifactStorage as Storage;
   import qualified Bootstrap.Separate as Separate;
@@ -274,11 +276,25 @@ module MLF.PreparedCompiler
     Left message -> ioReturn (Left message);
     Right object -> do {
       images <- Literal.imageTexts object;
-      ioReturn (do {
-        pair <- images;
-        ensure (eqString (fst pair) Builtin.interfaceImage && eqString (snd pair) Builtin.objectImage)
-          "prepared Prelude binary images differ from fresh complete preparation"
-      })
+      case images of {
+        Left message -> ioReturn (Left message);
+        Right ((,) meta unit) -> let {
+          check encoded fields = do {
+            expected <- decodeCompilerImage encoded;
+            actual <- Literal.openCompilerImage fields;
+            case (,) expected actual of {
+              (,) (Right a) (Right b) -> Storage.sameBytes a b;
+              _ -> ioReturn False
+            }
+          };
+          error = "prepared Prelude binary images differ from fresh complete preparation"
+        } in if not (eqString meta Builtin.interfaceImage && eqString unit Builtin.objectImage)
+          then ioReturn (Left error) else do {
+            iface <- check meta Builtin.interfaceOctets;
+            body <- if iface then check unit Builtin.objectOctets else ioReturn False;
+            ioReturn (ensure (iface && body) error)
+          }
+      }
     }
   };
   -- Only the fixed generator's physically verified images enter this route.
@@ -305,7 +321,8 @@ module MLF.PreparedCompiler
       }
     };
   compilerPreludeImages = do {
-    first <- decodeCompilerImage Builtin.interfaceImage; second <- decodeCompilerImage Builtin.objectImage;
+    first <- Literal.openCompilerImage Builtin.interfaceOctets;
+    second <- Literal.openCompilerImage Builtin.objectOctets;
     ioReturn (do { meta <- first; body <- second; Right ((,) meta body) })
   };
   decodeCompilerImage text = if stringLength text > 2796204
@@ -328,11 +345,101 @@ module MLF.PreparedCompiler
       ioReturn (if sameInterface && sameObject then Just (Right metadata) else Nothing)
     }
   };
-  exactImage path expected = do {
+  exactImage = exactImageProfiled Nothing;
+  exactImageProfiled profile path expected = Host.phaseIO profile "validate_ms" (do {
     limit <- lengthByteArray expected;
-    acquired <- readByteFileOrError path limit;
+    acquired <- Host.phaseIO profile "read_ms" (readByteFileOrError path limit);
     case acquired of { (,) message bytes -> if eqString message ""
       then Storage.sameBytes bytes expected else ioReturn False }
+  });
+  -- The fixed literal is independently checked at runtime and both physical
+  -- images are verified against fresh preparation by the producer build. A
+  -- disk hit must match every byte, as installation does. All other artifacts
+  -- retain ordinary admission, including the envelope's cumulative bounds.
+  linkCrateFile = linkCrateFileProfiled Nothing;
+  linkCrateFileProfiled profile path = do {
+    loaded <- Artifact.loadInterfacesProfiled profile [path];
+    case loaded of {
+      Left message -> ioReturn (Left message);
+      Right interfaces -> case interfaces of {
+        (:) ((,) metadata iface) rest ->
+          if not (eqString (Artifact.crateId iface) Artifact.builtinCrateIdentity)
+          then Artifact.linkCheckedFileProfiled profile path
+          else do {
+            witnessResult <- Host.phaseValue profile "prelude_check_ms" (Host.phaseEither (\w -> seq w ())) prepared;
+            case witnessResult of {
+            Left _ -> Artifact.linkCheckedFileProfiled profile path;
+            Right witness -> do {
+              images <- Host.phaseIO profile "image_decode_ms" compilerPreludeImages;
+              exact <- Host.phaseIO profile "validate_ms" (case images of {
+                Left _ -> ioReturn False;
+                Right ((,) header body) -> do {
+                  first <- exactImageProfiled profile metadata header;
+                  second <- if first then exactImageProfiled profile (Artifact.objectPath metadata) body else ioReturn False;
+                  ioReturn (first && second && Artifact.sameAdmittedInterface iface (Context.interface witness))
+                }
+              });
+              if not exact then Artifact.linkCheckedFileProfiled profile path else do {
+                admitted <- mapM (\((,) file expected) ->
+                  Artifact.readObjectWithInterfacesProfiled profile (map snd interfaces) (Artifact.objectPath file) expected) rest;
+                case sequenceEither admitted of {
+                  Left message -> ioReturn (Left message);
+                  Right objects -> if any Artifact.envelopeMarked objects then Artifact.linkCheckedFileProfiled profile path
+                    else case reverse interfaces of {
+                      [] -> ioReturn (Left "no root crate metadata");
+                      (:) ((,) _ root) _ ->
+                        Artifact.linkCheckedObjectsV1Profiled profile (Context.finishLinked witness) (Context.linked witness)
+                          [Context.interface witness] objects (Artifact.crateId root)
+                    }
+                }
+              }
+            }
+            }
+          };
+        [] -> Artifact.linkCheckedFileProfiled profile path
+      }
+    }
+  };
+  -- A retained root is already checked and published by this invocation.
+  -- Dependencies still acquire ordinary object snapshots and check them against
+  -- the metadata used for inference. No disk cache supplies the retained root.
+  linkCompiledCrate compiled = do {
+    let { root = Session.compiledObject compiled;
+          iface = Artifact.objectInterface root;
+          dependencies = Session.compiledInterfaces compiled;
+          available = (:) iface (map snd dependencies);
+          ordinary = \ignored -> do {
+            admitted <- mapM (\((,) file expected) ->
+              Artifact.readObjectWithInterfaces available (Artifact.objectPath file) expected) dependencies;
+            ioReturn (do { objects <- sequenceEither admitted;
+              Artifact.linkCheckedObjects (snoc objects root) (Artifact.crateId iface) })
+          } };
+    case (,) dependencies prepared of {
+      (,) ((:) ((,) metadata builtin) rest) (Right witness) ->
+        if not (eqString (Artifact.crateId builtin) Artifact.builtinCrateIdentity)
+        then ordinary () else do {
+          images <- compilerPreludeImages;
+          exact <- case images of {
+            Left _ -> ioReturn False;
+            Right ((,) header body) -> do {
+              first <- exactImage metadata header;
+              second <- if first then exactImage (Artifact.objectPath metadata) body else ioReturn False;
+              ioReturn (first && second && Artifact.sameAdmittedInterface builtin (Context.interface witness))
+            }
+          };
+          if not exact then ordinary () else do {
+            admitted <- mapM (\((,) file expected) ->
+              Artifact.readObjectWithInterfaces available (Artifact.objectPath file) expected) rest;
+            case sequenceEither admitted of {
+              Left message -> ioReturn (Left message);
+              Right objects -> if any Artifact.envelopeMarked ((:) root objects) then ordinary ()
+                else ioReturn (Artifact.linkCheckedObjectsV1Using (Context.finishLinked witness) (Context.linked witness)
+                  [Context.interface witness] (snoc objects root) (Artifact.crateId iface))
+            }
+          }
+        };
+      _ -> ordinary ()
+    }
   };
   rawNames = case Builtin.builtin of { Context.RawPrelude _ _ _ _ _ _ value _ _ _ _ _ -> value };
   rawEnvironment = case Builtin.builtin of { Context.RawPrelude _ _ _ _ _ _ _ value _ _ _ _ -> value };

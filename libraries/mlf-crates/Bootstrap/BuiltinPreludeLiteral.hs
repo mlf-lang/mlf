@@ -10,6 +10,7 @@ module Bootstrap.BuiltinPreludeLiteral where {
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.CrateArtifact as Artifact;
   import qualified Bootstrap.ArtifactStorage as Storage;
+  import qualified Bootstrap.Bitstream as W;
   import qualified Bootstrap.ArtifactStructure as Structure;
   import qualified Bootstrap.BuiltinPreludeContext as Context;
   import qualified Bootstrap.SourceInference as Source;
@@ -227,7 +228,10 @@ module Bootstrap.BuiltinPreludeLiteral where {
     PWriteByteFileOrError -> "PWriteByteFileOrError";
     PByteArrayDigest -> "PByteArrayDigest";
     PFreezeSTArray -> "PFreezeSTArray";
-    PSTToIO -> "PSTToIO"
+    PSTToIO -> "PSTToIO";
+    PByteArrayCRC32 -> "PByteArrayCRC32";
+    PPackStringFields -> "PPackStringFields";
+    PStringUtf8Length -> "PStringUtf8Length"
   };
   sourceType :: SType -> String;
   sourceType value = case value of {
@@ -544,25 +548,80 @@ module Bootstrap.BuiltinPreludeLiteral where {
     } in (:) (string (stringSlice text offset size)) (objectLiteralPieces text (offset + size));
   -- Produce the same v1 pair as the ordinary artifact writer. Limit this
   -- compiler-owned witness to the small, checked builtin crate.
-  imageTexts object = let {
+  imageTexts = imageFields imageText;
+  imageFields :: forall a. (Int -> W.Value -> IO (Either String a)) -> Artifact.CrateObject -> IO (Either String ((,) a a));
+  imageFields emit object = let {
     iface = Structure.toCrateInterfaceFields (Artifact.binaryInterfaceFields (Artifact.objectInterface object));
     unit = Structure.toCrateObjectFields (Artifact.binaryObjectFields object)
   } in if Artifact.envelopeMarked object || Artifact.envelopeAboveOldWork [unit]
     then ioReturn (Left "prepared Prelude binary image exceeds the v1 domain") else do {
-      metadata <- imageText 3 iface; body <- imageText 4 unit;
+      metadata <- emit 3 iface; body <- emit 4 unit;
       ioReturn (do { a <- metadata; b <- body; Right ((,) a b) })
     };
-  imageText schema value = do {
+  imageText = imageWith (\bytes _ -> Storage.encodeBase64 bytes);
+  imageWith emit schema value = do {
     encoded <- Storage.encode schema [value];
     case encoded of {
       Left message -> ioReturn (Left message);
       Right bytes -> do {
         size <- lengthByteArray bytes;
         if size > 2097152 then ioReturn (Left "prepared Prelude binary image exceeds its limit")
-        else Storage.encodeBase64 bytes
+        else emit bytes size
       }
     }
   };
+  -- A non-NUL ASCII template can be copied to a mutable byte array in one
+  -- operation. Corrections advance over unchanged bytes. Codes 1..32 set
+  -- the high bit, 33..64 restore zero and 65..96 restore 128. Code 97 skips
+  -- 32 unchanged bytes before a correction at a more distant position.
+  compilerImageFields bytes size = let {
+    offset gap kind tail = if gap < 32 then (:) (stringFromCode (kind + gap)) tail
+      else offset (gap - 32) kind ((:) "a" tail);
+    page i end gap low patches = if i == end then ioReturn ((,,) gap
+      (concatStringList (L.reverse low)) (concatStringList (L.reverse patches))) else do {
+      byte <- readByteArray bytes i;
+      let { part = (:) (stringFromCode (L.max 1 (andInt byte 127))) low;
+        kind = if byte == 0 then 33 else if byte == 128 then 65 else 1
+      };
+      if byte > 0 && byte < 128 then page (i + 1) end (gap + 1) part patches
+      else page (i + 1) end 0 part (offset gap kind patches)
+    };
+    pages start gap lows patches = if start == size then ioReturn
+      ((,) (concatStringList (L.reverse lows)) (concatStringList (L.reverse patches))) else do {
+        let { end = L.min size (start + 1024) };
+        fields <- page start end gap [] [];
+        case fields of { (,,) pending low ops -> seq low (seq ops
+          (pages end pending ((:) low lows) ((:) ops patches))) }
+      }
+  } in pages 0 0 [] [];
+  literalImage = imageWith (\bytes size -> do {
+    text <- Storage.encodeBase64 bytes;
+    case text of { Left message -> ioReturn (Left message); Right base64 -> do {
+      fields <- compilerImageFields bytes size;
+      ioReturn (Right ((,) base64 fields))
+    } }
+  });
+  openCompilerImage :: (,) String String -> IO (Either String ByteArray);
+  openCompilerImage ((,) low patches) = let {
+    count = stringLength low; length = stringLength patches;
+    invalid = Left "invalid compiler image";
+    fill bytes i base = if i == length then ioReturn (Right bytes) else let {
+      code = stringCodeAt patches i; next = i + 1;
+      write position byte = if position >= count then ioReturn invalid else do {
+        writeByteArray bytes position byte;
+        fill bytes next (position + 1)
+      }
+    } in if code < 1 then ioReturn invalid
+      else if code <= 32 then let { at = base + code - 1 } in write at (stringCodeAt low at + 128)
+      else if code <= 64 then write (base + code - 33) 0
+      else if code <= 96 then write (base + code - 65) 128
+      else if code == 97 && next < length && base + 32 < count then fill bytes next (base + 32)
+      else ioReturn invalid
+  } in if count > 2097152 || stringUtf8Length low /= count ||
+      length > count || stringUtf8Length patches /= length then ioReturn invalid else do {
+      bytes <- byteArrayFromString low;
+      fill bytes 0 0
+    };
   objectLiteral text = "concatStringList [" ++ L.intercalate "," (objectLiteralPieces text 0) ++ "]";
   rawPreludePieces :: Context.RawPrelude -> (,) String String;
   rawPreludePieces value = case value of {

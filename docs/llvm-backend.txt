@@ -146,6 +146,16 @@ byte/numeric loop therefore does not depend on optimization to bound its
 stack. No argument points into the caller's stack. The reverse-complement
 61,440/61,441-byte regressions exercise this path with LLVM -O0 and sanitizers.
 
+Ordinary boxed workers likewise preserve tail position through lets, cases,
+conditionals and seq. Calls use musttail only for matching all-pointer arities;
+numeric, producer and admitted result-worker entry selection remains intact.
+The existing operand-demand schedule and outlining limits still apply.
+This bounds native frames for eligible tail recursion, not the heap retained
+by a lazy accumulator or the stack used when that accumulator is later forced.
+tools/shared/test_ordinary_tail.py checks deep self/mutual calls, captured and
+escaping closures, lazy defaults and different-arity fallback at O0/O2. Its GC
+controls disable interior-pointer recognition and require observed collections.
+
 The array length and buffer pointer are immutable for the array's lifetime.
 Codegen reuses their SSA loads only on dominating paths within one native
 function. It does not mark managed storage globally invariant or reuse cell

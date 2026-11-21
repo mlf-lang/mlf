@@ -12,6 +12,19 @@ def pack(values):
     return ''.join(str(len(x))+':'+x for x in values)
 
 
+def mlf_commands(endpoint, emlf, spec, out):
+    if endpoint == 'crate-bootstrap-v1':
+        return [('source-to-checked', [emlf, '--compile-crate', spec, '-o', out/'unit'], None),
+                ('checked-to-llvm', [emlf, '--crate-to-llvm-gc', out/'unit.mlfci'], out/'unit.ll')]
+    if endpoint == 'crate-fused-v1':
+        return [('source-to-llvm', [emlf, '--compile-crate-to-llvm-gc', spec, '-o', out/'unit'], out/'unit.ll')]
+    raise ValueError('unsupported compile endpoint: ' + endpoint)
+
+
+def mlf_stage_names(endpoint):
+    return [stage for stage, _, _ in mlf_commands(endpoint, Path('/emlf'), Path('/spec'), Path('/out'))] + ['llvm-to-executable']
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--plan',type=Path,required=True)
@@ -50,8 +63,9 @@ def main():
             spec=out/'crate.spec'
             spec.write_text(pack(['MLF-CRATE-1','compiler-shapes/'+case['id'],'Main','false',
                 pack([pack(['Main',case['source']])]),pack([setup['builtin']+'.mlfci']),str(query),setup['builtin']]))
-            run('source-to-checked',[emlf,'--compile-crate',spec,'-o',out/'unit'])
-            run('checked-to-llvm',[emlf,'--crate-to-llvm-gc',out/'unit.mlfci'],out/'unit.ll')
+            endpoint = plan.get('benchmark', {}).get('endpoint', {}).get('id', 'crate-bootstrap-v1')
+            for name, argv, target in mlf_commands(endpoint, emlf, spec, out):
+                run(name, argv, target)
         else:
             run('module-source-to-llvm',[emlf,'--emit-llvm-gc',case['source']],out/'unit.ll')
         run('llvm-to-executable',[setup['clang'],'-O2','-Wno-override-module',out/'unit.ll',

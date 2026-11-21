@@ -1,12 +1,20 @@
-{-# LANGUAGE ForeignFunctionInterface, ScopedTypeVariables, ImplicitParams, CPP #-}
+{-# LANGUAGE ForeignFunctionInterface, ScopedTypeVariables, ImplicitParams, CPP, MagicHash, UnboxedTuples #-}
 module MLF.Host.IO where
 
 import Prelude hiding (Int, String)
 import qualified Prelude as P
 import MLF.Host.Base
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Unsafe as BU
+import qualified Data.Text.Array as TA
+import qualified Data.Text.Internal as TI
+import qualified Data.Text.Foreign as TF
 import qualified Data.Array.IO as A
 import qualified Data.Array.Base as AB
+import qualified Data.Array.IO.Internals as AI
+import qualified GHC.Exts as G
+import GHC.IO (IO(..))
+import GHC.Ptr (Ptr(..))
 #include "MachDeps.h"
 #if WORD_SIZE_IN_BITS >= 64 && !defined(MLF_TEST_NARROW_INT_TABLE)
 import qualified Data.IntMap.Lazy as M
@@ -15,11 +23,10 @@ import qualified Data.Map.Lazy as M
 #endif
 import Data.IORef
 import Data.Int (Int64)
-import Data.Word (Word8)
+import Data.Word (Word8, Word32, Word64)
 import Foreign.Marshal.Alloc (mallocBytes)
-import Foreign.ForeignPtr (ForeignPtr, mallocForeignPtrBytes, withForeignPtr)
 import Foreign.Marshal.Utils (copyBytes, fillBytes)
-import Foreign (Ptr, alloca, peek, peekElemOff, pokeElemOff, nullPtr, free, castPtr, plusPtr)
+import Foreign (alloca, peek, peekElemOff, pokeElemOff, nullPtr, free, castPtr, plusPtr)
 import Foreign.C
 import Control.Concurrent.MVar
 import Control.Exception
@@ -162,11 +169,25 @@ v_exitWith n = do
 
 -- Keep native primitive type identities distinct even when two host storage
 -- representations coincide. The facade exports these types abstractly.
-newtype IntArray = IntArray (A.IOArray P.Int Int)
+-- Int cells are strict machine values. Keep the immutable length with unboxed
+-- storage, so hot checksum/index loops do not fetch boxed-array bounds or
+-- allocate a box for each stored word. Primitive demand order stays explicit.
+data IntArray = IntArray !P.Int !(A.IOUArray P.Int Int)
 newtype DoubleArray = DoubleArray (A.IOArray P.Int Double)
 -- The fixed length and private storage share one owner. File and digest
 -- adapters take snapshots in bulk before calling out to the host.
-data ByteArray = ByteArray !P.Int !(ForeignPtr Word8)
+data ByteArray = ByteArray !P.Int !(A.IOUArray P.Int Word8)
+-- Scalar operations use GC-managed array primops. The backing bytes stay
+-- pinned for bulk snapshots/FFI, with their owner live across each pointer
+-- use. An individual cell needs no foreign-pointer lifetime wrapper.
+newByteStorage :: P.Int -> IO (A.IOUArray P.Int Word8)
+newByteStorage size = case max 1 size of
+  G.I# allocated -> IO $ \world -> case G.newPinnedByteArray# allocated world of
+    (# next, bytes #) -> (# next, AI.IOUArray (AB.STUArray 0 (size-1) size bytes) #)
+withByteStorage :: A.IOUArray P.Int Word8 -> (Ptr Word8 -> IO a) -> IO a
+withByteStorage storage@(AI.IOUArray (AB.STUArray _ _ _ bytes)) action =
+  IO $ \world -> G.keepAlive# storage world $ \next ->
+    case action (Ptr (G.mutableByteArrayContents# bytes)) of IO run -> run next
 newArray :: Int -> a -> IO (A.IOArray P.Int a)
 newArray n initial = do
   size <- evaluate (bounded "invalid array length" (9223372036854775807 `quot` 8) n)
@@ -187,37 +208,55 @@ writeArray array n value = do
 lengthArray :: A.IOArray P.Int a -> IO Int
 lengthArray array = do { (_,hi) <- A.getBounds array; pure (fromIntegral hi+1) }
 v_newIntArray :: Int -> Int -> IO IntArray
-v_newIntArray n x = IntArray <$> newArray n x
+v_newIntArray n x = do
+  size <- evaluate (bounded "invalid array length" (9223372036854775807 `quot` 8) n)
+  value <- evaluate x
+  cells <- A.newArray (0,size-1) value
+  pure (IntArray size cells)
 v_newDoubleArray :: Int -> Double -> IO DoubleArray
 v_newDoubleArray n x = DoubleArray <$> newArray n x
 v_newByteArray :: Int -> Int -> IO ByteArray
 v_newByteArray n x = do
   size <- evaluate (bounded "invalid array length" (9223372036854775807 `quot` 8) n)
   value <- evaluate (fromIntegral (bounded "byte value must be between 0 and 255" 255 x) :: Word8)
-  storage <- mallocForeignPtrBytes (max 1 size)
-  withForeignPtr storage $ \pointer -> fillBytes pointer value size
+  storage <- newByteStorage size
+  withByteStorage storage $ \pointer -> fillBytes pointer value size
   pure (ByteArray size storage)
 v_readIntArray :: IntArray -> Int -> IO Int
-v_readIntArray (IntArray a) = readArray a
+v_readIntArray array n = do
+  IntArray size cells <- evaluate array
+  i <- evaluate (stIndex (fromIntegral size) n)
+  AB.unsafeRead cells i
 v_readDoubleArray :: DoubleArray -> Int -> IO Double
 v_readDoubleArray (DoubleArray a) = readArray a
 v_readByteArray :: ByteArray -> Int -> IO Int
 v_readByteArray array n = do
   ByteArray size storage <- evaluate array
-  i <- evaluate (stIndex (fromIntegral size) n)
-  withForeignPtr storage $ \pointer -> fromIntegral <$> peekElemOff pointer i
+  if (fromIntegral n :: Word64) >= fromIntegral size
+    then throwIO (HostError "array index out of bounds")
+    else fromIntegral <$> AB.unsafeRead storage (fromIntegral n)
 v_writeIntArray :: IntArray -> Int -> Int -> IO ()
-v_writeIntArray (IntArray a) = writeArray a
+v_writeIntArray array n value = do
+  IntArray size cells <- evaluate array
+  i <- evaluate (stIndex (fromIntegral size) n)
+  x <- evaluate value
+  AB.unsafeWrite cells i x
 v_writeDoubleArray :: DoubleArray -> Int -> Double -> IO ()
 v_writeDoubleArray (DoubleArray a) = writeArray a
 v_writeByteArray :: ByteArray -> Int -> Int -> IO ()
 v_writeByteArray array n x = do
   ByteArray size storage <- evaluate array
-  i <- evaluate (stIndex (fromIntegral size) n)
-  value <- evaluate (fromIntegral (bounded "byte value must be between 0 and 255" 255 x) :: Word8)
-  withForeignPtr storage $ \pointer -> pokeElemOff pointer i value
+  -- Size fits the host index. Test it before demanding the byte, keeping
+  -- both checks in the action while passing unboxed values to the store.
+  if (fromIntegral n :: Word64) >= fromIntegral size
+    then throwIO (HostError "array index out of bounds")
+    else if (fromIntegral x :: Word64) > 255
+      then throwIO (HostError "byte value must be between 0 and 255")
+      else AB.unsafeWrite storage (fromIntegral n) (fromIntegral x)
 v_lengthIntArray :: IntArray -> IO Int
-v_lengthIntArray (IntArray a) = lengthArray a
+v_lengthIntArray array = do
+  IntArray size _ <- evaluate array
+  pure (fromIntegral size)
 v_lengthDoubleArray :: DoubleArray -> IO Int
 v_lengthDoubleArray (DoubleArray a) = lengthArray a
 v_lengthByteArray :: ByteArray -> IO Int
@@ -225,14 +264,25 @@ v_lengthByteArray array = do
   ByteArray size _ <- evaluate array
   pure (fromIntegral size)
 bytesArray :: B.ByteString -> IO ByteArray
-bytesArray bytes = B.useAsCStringLen bytes $ \(pointer,size) -> copyByteArray (castPtr pointer) size
+-- The callback reads exactly size bytes and retains no source pointer. Borrow
+-- the immutable input while making the independent mutable copy; a temporary
+-- NUL-terminated copy would duplicate this work and is not needed here.
+bytesArray bytes = BU.unsafeUseAsCStringLen bytes $ \(pointer,size) -> copyByteArray (castPtr pointer) size
 copyByteArray :: Ptr Word8 -> P.Int -> IO ByteArray
 copyByteArray input size = do
-  storage <- mallocForeignPtrBytes (max 1 size)
-  if size == 0 then pure () else withForeignPtr storage $ \pointer -> copyBytes pointer input size
+  storage <- newByteStorage size
+  if size == 0 then pure () else withByteStorage storage $ \pointer -> copyBytes pointer input size
   pure (ByteArray size storage)
 v_byteArrayFromString :: String -> IO ByteArray
-v_byteArrayFromString = bytesArray . utf8
+v_byteArrayFromString value = do
+  -- The host text already contains valid UTF-8. Copy its exact slice once
+  -- into independent mutable storage, including embedded zero bytes.
+  text <- evaluate (stringText value)
+  case text of
+    TI.Text (TA.ByteArray source) (G.I# offset#) size@(G.I# length#) -> do
+      storage@(AI.IOUArray (AB.STUArray _ _ _ target)) <- newByteStorage size
+      IO $ \world -> case G.copyByteArray# source offset# target 0# length# world of
+        next -> (# next, ByteArray size storage #)
 v_getByteLine :: IO ByteArray
 v_getByteLine = ioErrorAs "IO error: byte input failed" $ do
   bytes <- readByteLine []
@@ -246,7 +296,7 @@ v_putBytes array start count = do
   ByteArray size storage <- evaluate array
   i <- evaluate (bounded "byte slice out of bounds" (fromIntegral size) start)
   n <- evaluate (bounded "byte slice out of bounds" (fromIntegral size-start) count)
-  bytes <- withForeignPtr storage $ \pointer -> B.packCStringLen (castBytePointer pointer `plusPtr` i,n)
+  bytes <- withByteStorage storage $ \pointer -> B.packCStringLen (castBytePointer pointer `plusPtr` i,n)
   ioErrorAs "IO error: output failed" (B.hPut H.stdout bytes >> H.hFlush H.stdout)
 -- The primitive owns evaluated Int64 keys/values. Machine IntMap is lossless
 -- on 64-bit hosts; retain full keys on narrower hosts instead of truncating.
@@ -288,7 +338,7 @@ castBytePointer :: Ptr Word8 -> CString
 castBytePointer = castPtr
 withByteSnapshot :: ByteArray -> (Ptr Word8 -> IO a) -> IO a
 withByteSnapshot (ByteArray size storage) action = bracket (mallocBytes (max 1 size)) free $ \pointer -> do
-  withForeignPtr storage $ \source -> copyBytes pointer source size
+  withByteStorage storage $ \source -> copyBytes pointer source size
   action pointer
 -- These two primitives return ordinary diagnostics, not HostError. Mask the
 -- ownership handoff from the safe FFI just like host(), retaining cancellation
@@ -326,7 +376,43 @@ foreign import ccall safe "mlf_ghc_byte_array_digest" c_byteArrayDigest :: Ptr W
 v_byteArrayDigest :: ByteArray -> IO String
 v_byteArrayDigest array = do
   ByteArray size _ <- evaluate array
-  withByteSnapshot array $ \bytes ->
-    bracket (mallocBytes 65) free $ \digest -> do
-      c_byteArrayDigest bytes (fromIntegral size) digest
-      B.packCStringLen (digest,64) >>= evaluate . fromUtf8
+  withByteSnapshot array $ \bytes -> digestBytes bytes size
+
+digestBytes :: Ptr Word8 -> P.Int -> IO String
+digestBytes bytes size = bracket (mallocBytes 65) free $ \digest -> do
+  c_byteArrayDigest bytes (fromIntegral size) digest
+  B.packCStringLen (digest,64) >>= evaluate . fromUtf8
+
+-- The portable expression creates a private byte array solely to hash it.
+-- Borrow immutable pinned text for the safe call. For a movable slice,
+-- text's scoped pointer adapter supplies a pinned copy of the exact bytes.
+digestString :: String -> IO String
+digestString value = do
+  text <- evaluate (stringText value)
+  case text of
+    TI.Text (TA.ByteArray source) offset size
+      | G.isTrue# (G.isByteArrayPinned# source) ->
+          IO $ \world -> G.keepAlive# text world $ \next ->
+            case digestBytes (Ptr (G.byteArrayContents# source) `plusPtr` offset) size of
+              IO run -> run next
+      | otherwise -> TF.useAsPtr text $ \bytes _ -> digestBytes bytes size
+
+-- Expose the ordered primitive actions to hot codec loops. Bounds and value
+-- checks remain in the inlined body, including the IO demand boundaries.
+{-# INLINE v_readIntArray #-}
+{-# INLINE v_writeIntArray #-}
+{-# INLINE v_lengthIntArray #-}
+{-# INLINE v_readByteArray #-}
+{-# INLINE v_writeByteArray #-}
+{-# INLINE v_lengthByteArray #-}
+
+-- Array and range arguments are forced in that order when the action runs.
+-- The pinned owner stays alive across the read-only call, including a safe-FFI GC.
+foreign import ccall safe "mlf_ghc_byte_array_crc32" c_byteArrayCRC32 :: Ptr Word8 -> CSize -> CSize -> CSize -> IO Word32
+v_byteArrayCRC32 :: ByteArray -> Int -> Int -> IO Int
+v_byteArrayCRC32 array zeroStart zeroCount = do
+  ByteArray size cells <- evaluate array
+  start <- evaluate (bounded "invalid CRC zero range" (fromIntegral size) zeroStart)
+  count <- evaluate (bounded "invalid CRC zero range" (fromIntegral (size-start)) zeroCount)
+  withByteStorage cells $ \bytes ->
+    fromIntegral <$> c_byteArrayCRC32 bytes (fromIntegral size) (fromIntegral start) (fromIntegral count)

@@ -6,6 +6,7 @@ import System.Environment (getArgs)
 import System.Directory (createDirectoryIfMissing)
 import Data.String (fromString)
 import qualified MLF.Host.IO as Host
+import qualified MLF.Primitive as P
 import qualified Bootstrap.Crate as Crate
 import qualified Bootstrap.CrateArtifact as Artifact
 import qualified Bootstrap.BuiltinPreludeContext as Builtin
@@ -76,7 +77,7 @@ main = do
   putStrLn "PASS typed SCC query kinds, ordered members and split identities"
   args <- getArgs
   case args of
-    [directory] -> queryDefinitions directory >> mixedLowered (directory ++ "/mixed") >> legacyCrate (directory ++ "/crate") >> mutualOrder (directory ++ "/mutual") >> typedInputs
+    [directory] -> queryDefinitions directory >> mixedLowered (directory ++ "/mixed") >> legacyCrate (directory ++ "/crate") >> mutualOrder (directory ++ "/mutual") >> typedInputs >> scopeTransitions (directory ++ "/scope") >> expectedReads >> directFinishReads
     _ -> fail "expected a fresh cache directory"
   putStrLn "PASS declaration readers, sparse publication, local shadowing, ABI order and contract fields"
 
@@ -250,3 +251,95 @@ mutualOrder directory = do
   (_,legacy,_) <- Q.compileParsedSourceGroups "mutualOrder" (fromString (directory ++ "/parsed")) [] M.empty plan >>= expect
   check "standalone source-ordered group" (Q.inferredCount legacy == 1)
   putStrLn "PASS source-order member slots with distinct recursive calling conventions"
+
+
+-- Keep another empty group live while f acquires and loses a candidate.
+-- Both transitions must recompute f; identical following runs must reuse it.
+scopeTransitions directory = do
+  let names = ["candidate", "stillEmpty", "f"]
+      symbols = D.symbols [(n,False) | n <- names]
+      available = V.fromInt 0; emptyOwner = V.fromInt 1; owner = V.fromInt 2
+      scope = Source.declarationScope symbols [emptyOwner,owner] [] ["candidate"]
+      int = T.XCon "Int" []; sint = T.SCon "Int" []
+      contract = Source.SourceContract int [] False
+      group name candidates =
+        let member = (name,T.Just (T.SAnnotation [] (T.SArrow sint sint)),
+                           T.SLam "x" T.Nothing (T.SVar "x"))
+        in Source.PreparedGroup [member] [member] [] M.empty [(name,[],False)]
+             (T.Just (Source.RootAuthority name [] False candidates [])) []
+  initial <- expect (Source.installContracts scope (M.fromDistinctAscList [("candidate",contract)]))
+  inventory <- expect (Q.prepareData [])
+  let run present = do
+        let candidates = if present then [(T.InstanceEvidence,"candidate",int)] else []
+            steps = [([emptyOwner],\_ -> T.Right (group "stillEmpty" [])),
+                     ([owner],\_ -> T.Right (group "f" candidates))]
+        state <- CG.start True "scope-transition" "fixed" (fromString directory) "source"
+                   inventory [] initial steps >>= expect
+        let (_,report,_,session) = CG.result state
+        _ <- G.publish session >>= expect
+        let active = G.currentNodes session
+        check "shared empty input and scope remain distinct authorities"
+          (case (M.lookup P.compareString CG.emptyInventoryKey active,M.lookup P.compareString CG.emptyScopeKey active) of
+            (T.Just _,T.Just _) -> True; _ -> False)
+        check "only nonempty group owns a per-group scope"
+          (case M.lookup P.compareString (CG.groupKey CG.ScopeQuery (Source.GroupSlots scope [owner] [] [])) active of T.Just _ -> present; _ -> not present)
+        pure (Q.inferredCount report,Q.reusedCount report)
+  results <- mapM run [False,False,True,True,False,False]
+  check "candidate addition/deletion invalidation and stable warm reuse"
+    (results == [(2,0),(0,2),(1,1),(0,2),(1,1),(0,2)])
+  putStrLn "PASS shared empty scope, candidate addition/deletion and repeated warm reuse"
+
+-- Old shared dependencies can remain green while the provider changes its
+-- current authority or dependencies. Check exact current read order and hash.
+expectedReads = do
+  let h = fromString (replicate 64 'a'); h2 = fromString (replicate 64 'b')
+      shared = G.QueryNode CG.emptyScopeKey h [] T.Nothing
+      private = G.QueryNode (G.key "Scope" "private") h [] T.Nothing
+      input = G.QueryNode (G.inputKey (G.key "Prepared" "f")) h [] T.Nothing
+      wanted = G.key "InferScc" "f"
+      oldReads = [G.edge input,G.edge shared]
+      old = G.QueryNode wanted h oldReads (T.Just h)
+      current = M.fromList P.compareString [(G.nodeKey n,n) | n <- [input,shared,private]]
+      session = G.Session "" "cfg" "" (M.fromList P.compareString [(wanted,old)]) current M.empty
+      hit result = case fst result of T.Just _ -> True; _ -> False
+  check "old dependencies are green in transition counterexample" (hit (G.validate wanted session))
+  check "same current dependency list reuses" (hit (G.validateExpected wanted oldReads session))
+  check "route change invalidates even when old shared authority remains live"
+    (not (hit (G.validateExpected wanted [G.edge input,G.edge private] session)))
+  check "read reordering, repetition, omission and changed hash invalidate"
+    (all (not . hit . (\reads -> G.validateExpected wanted reads session))
+      [reverse oldReads,oldReads ++ [G.edge shared],[],[(G.nodeKey input,h2),G.edge shared]])
+  putStrLn "PASS current authority/read-list guard independent of prepared input changes"
+
+
+directFinishReads = do
+  let h = fromString (replicate 64 'a'); h2 = fromString (replicate 64 'b')
+      symbols = D.symbols [("f",False),("other",False)]
+      owner = V.fromInt 0; other = V.fromInt 1
+      scope = Source.declarationScope symbols [owner,other] [] []
+      slots = Source.GroupSlots scope [owner] [] []
+      key = CG.bindingKey scope owner
+      fin = CG.groupKey CG.FinishQuery slots
+      raw = G.QueryNode (CG.groupKey CG.InferQuery slots) h [] (T.Just h)
+      source = G.QueryNode (G.inputKey (CG.groupKey CG.PreparedQuery slots)) h [] T.Nothing
+      empty = G.QueryNode CG.emptyScopeKey h [] T.Nothing
+      reads = [G.edge raw,G.edge source,G.edge empty]
+      contract flag = Source.SourceContract (T.XArrow (T.XCon "Int" []) (T.XCon "Int" [])) [] flag
+      session = G.Session "" "cfg" "" M.empty (M.fromList P.compareString [(G.nodeKey n,n) | n <- [raw,source,empty]]) M.empty
+      run digest evidence delta = CG.recordCheckedFinish T.Nothing slots "g" digest Source.KeepRawBody raw [] [] evidence delta reads session >>= expect
+      binding state = case M.lookup P.compareString key (G.currentNodes (fst state)) of
+        T.Just row -> pure row; _ -> fail "missing direct Binding"
+      hasFinish state = case M.lookup P.compareString fin (G.currentNodes (fst state)) of T.Just _ -> True; _ -> False
+  plain <- run h [] [(owner,contract False)]
+  protected <- run h [] [(owner,contract True)]
+  a <- binding plain; b <- binding protected
+  check "direct binding retains complete ordered finalization dependencies"
+    (not (hasFinish plain) && G.nodeReads a == reads)
+  check "metadata-only contract changes stay visible under the same raw hash"
+    (G.nodeHash a /= G.nodeHash b && G.nodeReads b == reads)
+  changedBody <- run h2 [] [(owner,contract False)]
+  evidence <- run h [G.edge empty] [(owner,contract False)]
+  multiple <- run h [] [(owner,contract False),(other,contract False)]
+  check "different content, evidence and multi-output groups keep FinishScc"
+    (all hasFinish [changedBody,evidence,multiple])
+  putStrLn "PASS direct singleton finalization reads, contract metadata and fallback boundaries"

@@ -11,6 +11,7 @@ import System.Directory (createDirectory, doesPathExist)
 import qualified Bootstrap.Types as T
 import qualified Bootstrap.Map as M
 import qualified Bootstrap.QueryGraph as Q
+import qualified Bootstrap.Separate as Separate
 import qualified Bootstrap.Bitstream as W
 import qualified Bootstrap.ArtifactStorage as Storage
 import qualified MLF.Primitive as P
@@ -70,6 +71,14 @@ chain count dependencyFirst =
   in M.fromDistinctAscList [(Q.nodeKey (node i),node i) | i <- [0..count-1]]
 
 pureTests = do
+  right "scalar-length identity fields" (Q.canonicalFields "1:😊0:1::") >>=
+    need "Unicode, empty and colon fields" . (== ["😊","",":"])
+  right "compatible raw padded length" (Separate.unpack "01:a") >>=
+    need "raw unpack preserves padding acceptance" . (== ["a"])
+  reject "canonical padding" "noncanonical query identity" (Q.canonicalFields "01:a0:")
+  reject "framing failure after padding" "malformed module artifact framing" (Q.canonicalFields "00:x")
+  reject "truncation after padding" "truncated module artifact" (Q.canonicalFields "00:2:a")
+  reject "length wider than nine digits" "malformed module artifact framing" (Q.canonicalFields "0000000000:")
   decoded <- right "v2 baseline" (decode base)
   need "exact fields/order/repetition/location" (snapshots decoded ==
     [("leaf",B.unpack hashA,[],Nothing),

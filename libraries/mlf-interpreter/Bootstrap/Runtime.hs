@@ -580,7 +580,7 @@ module Bootstrap.Runtime where {
     let {
       n = P.primitiveCode primitive
     } in
-    ((n == 133) || (((n == 129) || (n == 131)) || ((n == 130) || ((n == 106) || ((n == 100) || ((n == 101) || ((n <= 5) ||
+    ((n == 134) || (n == 133) || (((n == 129) || (n == 131)) || ((n == 130) || ((n == 106) || ((n == 100) || ((n == 101) || ((n <= 5) ||
      (((n >= 27) && (n <= 44)) || (((n >= 56) && (n <= 65)) || ((n >= 73) && (n <= 94)))))))))));
   isSTAction primitive =
     case primitive of {
@@ -645,6 +645,8 @@ module Bootstrap.Runtime where {
         };
       PConcatStringList ->
         bindEither (runtimeStringChunks a []) (\chunks -> Right (RString (concatStringList chunks)));
+      PPackStringFields ->
+        bindEither (runtimeStringChunks a []) (\fields -> Right (RString (packStringFields fields)));
       PShowInt -> mapEither (\n -> RString (showInt n)) (integer a);
       PAddInt -> integer2 addInt a b;
       PSubInt -> integer2 subInt a b;
@@ -703,6 +705,7 @@ module Bootstrap.Runtime where {
         };
       PIfThenElse -> bindEither (boolean a) (\choice -> if choice then b else c);
       PStringLength -> mapEither (\s -> RInteger (stringLength s)) (string a);
+      PStringUtf8Length -> mapEither (\s -> RInteger (stringUtf8Length s)) (string a);
       PStringCodeAt ->
         do {
           s <- string a;
@@ -1187,6 +1190,16 @@ module Bootstrap.Runtime where {
           else checkedIO (byteArray b)
             (\bytes -> wrapIO (writeByteFileOrError file bytes) RString));
       PByteArrayDigest -> checkedIO (byteArray a) (\bytes -> wrapIO (byteArrayDigest bytes) RString);
+      PByteArrayCRC32 -> checkedIO (byteArray a) (\bytes -> do {
+        size <- lengthByteArray bytes;
+        checkedIO (do {
+          start <- integer b;
+          ensure (start >= 0 && start <= size) "invalid CRC zero range";
+          count <- integer c;
+          ensure (count >= 0 && count <= size - start) "invalid CRC zero range";
+          Right ((,) start count)
+        }) (\((,) start count) -> wrapIO (byteArrayCRC32 bytes start count) RInteger)
+      });
       PReadFile -> checkedIO (path a) (\file -> wrapIO (readFile file) RString);
       PWriteFile ->
         checkedIO

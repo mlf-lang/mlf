@@ -169,7 +169,10 @@ module Bootstrap.Types where {
     PWriteByteFileOrError |
     PByteArrayDigest |
     PFreezeSTArray |
-    PSTToIO;
+    PSTToIO |
+    PByteArrayCRC32 |
+    PPackStringFields |
+    PStringUtf8Length;
   data SType =
     STVar String |
     SBottom |

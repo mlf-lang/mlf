@@ -11,6 +11,7 @@ module Bootstrap.Surface where {
   import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.Resolved as R;
   import qualified Bootstrap.IndexVec as V;
+  import qualified Bootstrap.ST as ST;
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as Set;
@@ -147,20 +148,27 @@ module Bootstrap.Surface where {
   valueBody ((,,) _ _ e) = e;
   bindValues :: [] ((,,) String (Maybe SAnnotation) SExpr) -> SExpr -> Either String SExpr;
   bindValues values body =
-    case Dependency.declarationGroups values of {
-      Left error -> Left error;
-      Right groups -> wrapGroups values (Dependency.declarationEdges values) groups body
-    };
+    let {
+      table = M.fromList compareString (map (\v -> (,) (valueName v) v) values);
+      ordered = M.elems table;
+      edges = Dependency.declarationEdges ordered;
+      hasLocal entry = any (\name -> M.member compareString name table) (snd entry)
+    } in if length values /= M.size table then Left "duplicate value declaration"
+    else if any hasLocal edges then
+      wrapIndexed table (M.fromDistinctAscList edges) (Dependency.components edges) body
+    -- In the absence of local edges, lexical DFS closes each root immediately.
+    else Right (foldr bindSingle body ordered);
   -- Independently lowered source and generated rows may introduce or remove
   -- dependencies. Only references to IDs in this group can close its SCC.
   indexedMemberGroups entries = mapEither (map (map fst)) (indexedMemberComponents entries);
-  indexedMemberComponents entries = let {
+  indexedMemberComponents = indexedMemberComponentsWith Dependency.expressionGlobalIds;
+  indexedMemberComponentsWith globalIds entries = let {
     ordered = V.fromList (sortBy (\a b -> compareString (valueName (snd a)) (valueName (snd b))) entries);
     ids = map fst entries;
     ranks = M.fromList compareInt (map (\rank -> (,) (V.toInt (fst (V.at ordered rank))) rank) (V.indices ordered));
     row member = V.fromList (map V.fromInt (IS.toAscList (IS.fromList (mapMaybe
       (\ref -> mapOptional V.toInt (M.lookup compareInt (V.toInt ref) ranks))
-      (Dependency.expressionGlobalIds (valueBody (snd member)))))));
+      (globalIds (valueBody (snd member)))))));
     rows = Dependency.Rows (V.fromList (map row (V.toList ordered)));
     describe rank = (,) (fst (V.at ordered rank))
       (any (\child -> V.toInt child == V.toInt rank) (Dependency.neighbors rows rank));
@@ -170,8 +178,9 @@ module Bootstrap.Surface where {
       == length ids) "duplicate value declaration";
     Right (map (\ranks -> map describe (sortBy (\a b -> compareInt (V.toInt a) (V.toInt b)) ranks)) groups)
   };
-  bindIndexedMembers entries body = do {
-    groups <- indexedMemberComponents entries;
+  bindIndexedMembers = bindIndexedMembersWith Dependency.expressionGlobalIds;
+  bindIndexedMembersWith globalIds entries body = do {
+    groups <- indexedMemberComponentsWith globalIds entries;
     let { values = M.fromList compareInt (map (\((,) i row) -> (,) (V.toInt i) row) entries);
           wrap continuation group = let { ids = map fst group } in
             mapEither (SDeclScope ids) (wrapValueGroup (map (\i -> M.get compareInt (V.toInt i) values) ids)
@@ -187,16 +196,21 @@ module Bootstrap.Surface where {
   indexedValue symbols (Dependency.Bound i annotation rhs) =
     (,,) (Dependency.symbolName symbols i) annotation (R.indexedExpr (Dependency.symbolName symbols) rhs);
   bindIndexed = bindResolvedWith indexedValue SDeclScope;
-  bindResolvedWith project scoped values@(Dependency.BoundValues symbols bindings) body = case bindings of {
+  -- Build each active declaration's projection once. The SCC validation runs
+  -- before the table is demanded, including for sparse or malformed inputs.
+  projectedBindings project (Dependency.BoundValues symbols bindings) = runST
+    (stBind (V.filled (V.count (Dependency.symbolNodes symbols)) (panic "unbound declaration ID")) (\table ->
+      stBind (ST.map_ (\binding -> V.set table (Dependency.boundId binding) (project symbols binding)) bindings)
+        (\_ -> V.freeze table)));
+  bindResolvedWith project scoped values = bindResolvedRows scoped values
+    (V.at (projectedBindings project values));
+  bindResolvedRows scoped values = bindResolvedEdgeRows scoped (Dependency.checkedSourceEdges values);
+  bindResolvedEdgeRows scoped edges@(Dependency.SourceEdges (Dependency.BoundValues _ bindings) _) member body = case bindings of {
     [] -> Right body;
     (:) _ _ -> do {
-      (,) _ groups <- Dependency.resolvedGroups values [] M.empty M.empty;
-      let { table = Dependency.boundTable values;
-            member ((,) i _) = case V.at table i of {
-              Just binding -> project symbols binding; Nothing -> panic "unbound declaration ID"
-            };
-            wrap continuation group = mapEither (scoped (map fst group))
-              (wrapValueGroup (map member group) (length group > 1 || any snd group) continuation)
+      (,) _ groups <- Dependency.resolvedGroupsFromScopes edges [] M.empty (Dependency.NamedScopes M.empty);
+      let { wrap continuation group = let { ids = map fst group } in mapEither (scoped ids)
+              (wrapValueGroup (map member ids) (length group > 1 || any snd group) continuation)
       } in foldM wrap body (reverse groups)
     }
   };
@@ -253,10 +267,11 @@ module Bootstrap.Surface where {
   wrapValueGroup local cyclic continuation =
     if cyclic then mapEither (\ds -> SLetRec ds continuation) (recursiveValues local)
     else case local of {
-      [(,,) n annotation rhs] -> Right (SLet n (case annotation of {
-        Nothing -> rhs; Just t -> SSignature rhs t }) continuation);
+      [value@((,,) _ _ _)] -> Right (bindSingle value continuation);
       _ -> Left "invalid declaration group"
     };
+  bindSingle ((,,) name annotation rhs) continuation =
+    SLet name (case annotation of { Nothing -> rhs; Just t -> SSignature rhs t }) continuation;
   lowerSurface :: SProgram -> Either String SProgram;
   lowerSurface program = do {
     env <- D.validateDeclarations (case program of { SProgram ds _ -> ds; SClassProgram ds _ _ _ -> ds });
@@ -282,9 +297,43 @@ module Bootstrap.Surface where {
   lowerExpression :: SExpr -> Either String SExpr;
   lowerExpression = lowerExpressionWithData D.emptyDataEnv;
   lowerExpressionWithData :: DataEnv -> SExpr -> Either String SExpr;
-  lowerExpressionWithData env original = do {
-    shared <- Desugar.lowerSharedDo env original;
-    runFresh (Desugar.allNames shared) (lower env (Desugar.desugarDo shared))
+  lowerExpressionWithData env original =
+    if surfaceCore original then Right original else do {
+      shared <- Desugar.lowerSharedDo env original;
+      -- lowerSharedDo also expands every legacy do block it visits.
+      runFresh (Desugar.allNames shared) (lower env shared)
+    };
+  -- These forms need no pattern compilation or fresh names. Preserve the
+  -- existing tree, including its declaration IDs, name hints and source spans.
+  -- Flat cases already have their lowered shape. Other patterns, equations
+  -- and do blocks enter the ordinary lowering path.
+  surfaceCore :: SExpr -> Bool;
+  surfaceCore expression = case expression of {
+    SDeclScope _ body -> surfaceCore body;
+    SSourceDefinition body -> surfaceCore body;
+    SCallSite _ _ body -> surfaceCore body;
+    SLam _ _ body -> surfaceCore body;
+    SApp f x -> surfaceCore f && surfaceCore x;
+    SLet _ rhs body -> surfaceCore rhs && surfaceCore body;
+    SAnn body _ -> surfaceCore body;
+    SSignature body _ -> surfaceCore body;
+    SChecked _ body -> surfaceCore body;
+    SLetRec ds body -> all (\((,,) _ _ rhs) -> surfaceCore rhs) ds && surfaceCore body;
+    SCase scrutinee alternatives -> surfaceCore scrutinee &&
+      all (\(SAlternative pattern body) -> flatPattern pattern && surfaceCore body) alternatives;
+    SEquations _ -> False;
+    SDo _ _ -> False;
+    SSharedBind _ _ _ _ _ -> False;
+    SGlobal _ _ -> True;
+    SWantedRefs _ _ -> True;
+    SVar _ -> True;
+    SConstructor _ -> True;
+    SIntLit _ -> True;
+    SDoubleLit _ -> True;
+    SBoolLit _ -> True;
+    SStringLit _ -> True;
+    SPrimitive _ -> True;
+    SWanted _ _ -> True
   };
   flatPattern :: SPattern -> Bool;
   flatPattern pattern =

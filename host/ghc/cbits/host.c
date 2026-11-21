@@ -226,3 +226,8 @@ const char *mlf_ghc_write_byte_file(const char *path, size_t path_length,
 void mlf_ghc_byte_array_digest(const unsigned char *bytes, size_t length, char hex[65]) {
     build_hash(bytes, length, hex);
 }
+
+uint32_t mlf_ghc_byte_array_crc32(const unsigned char *bytes, size_t length,
+                               size_t zero_start, size_t zero_count) {
+    return mlf_crc32_zeros(bytes, length, zero_start, zero_count);
+}

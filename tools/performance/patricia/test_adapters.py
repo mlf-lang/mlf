@@ -5,6 +5,7 @@ import hashlib
 import json
 import importlib.util
 import tempfile
+import subprocess
 import unittest
 from unittest.mock import patch
 
@@ -1744,18 +1745,46 @@ class BinarySourceBoundaryTests(unittest.TestCase):
 
     def test_reviewed_source_repairs_project_all_declared_owners(self):
         binary = migration.binary_contract()
-        # The DeclId repairs remain independently authenticated. Formatter
-        # compatibility subsequently changes Layout only among these owners;
-        # prove that exact overlap instead of treating the live bytes as DeclId.
+        # DeclId, formatter compatibility and the performance successor remain
+        # separate authenticated endpoints. Layout alone overlaps these owners;
+        # prove both transitions instead of relabeling live bytes as historical.
         repairs = binary.previous
         names = ('Bootstrap.Layout', 'Package.Benchmark', 'Package.Verification', 'Tests.CompilerTests')
         layout = binary.value['module_paths']['Bootstrap.Layout']
         self.assertEqual({binary.value['module_paths'][name] for name in names}
                          & set(binary.changes), {layout})
-        self.assertEqual(binary.changes[layout], [
+        raw = (binary.directory / 'pr43-reconciliation-migration.json').read_bytes()
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), binary.manifest_sha256)
+        manifest = json.loads(raw)
+        transition = manifest['performance_transition']
+        git = ['git', '--no-replace-objects', '-C', str(ROOT)]
+        previous_manifest = subprocess.check_output([*git, 'show', transition['predecessor'] +
+            ':tools/performance/artifact-binary/pr43-reconciliation-migration.json'])
+        self.assertEqual(hashlib.sha256(previous_manifest).hexdigest(),
+                         transition['predecessor_manifest_sha256'])
+        formatter = json.loads(previous_manifest)['changes'][layout]
+        self.assertEqual(formatter, [
             '2d728d0dedebb05abe620095abe0f03999e3a8e00fca845faf47036fc81178de',
             'b64c7f09bdf23a9652baa1fbd74729287dac243fd5a3801fbbc83e6abe5f58c8',
         ])
+        performance = transition['changes'][layout]
+        self.assertEqual(performance, [
+            'b64c7f09bdf23a9652baa1fbd74729287dac243fd5a3801fbbc83e6abe5f58c8',
+            'd95d391e89bb1ad86312a6de0df5868146fbcc1d34bc5c204712724ad01852fc',
+        ])
+        previous_source = subprocess.check_output([*git, 'show', transition['predecessor'] + ':' + layout])
+        self.assertEqual(hashlib.sha256(previous_source).hexdigest(), performance[0])
+        self.assertEqual(formatter[1], performance[0])
+        current_layout = performance[1]
+        for edge in manifest['compiler_source_transitions']:
+            if layout in edge['changes']:
+                old, new = edge['changes'][layout]
+                previous_layout = subprocess.check_output([*git, 'show', edge['predecessor'] + ':' + layout])
+                self.assertEqual(hashlib.sha256(previous_layout).hexdigest(), old)
+                self.assertEqual(current_layout, old)
+                current_layout = new
+        self.assertEqual(hashlib.sha256((ROOT / layout).read_bytes()).hexdigest(), current_layout)
+        self.assertEqual(binary.changes[layout], [formatter[0], current_layout])
         for module in names:
             path = binary.value['module_paths'][module]
             live = (ROOT / path).read_bytes()

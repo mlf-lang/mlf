@@ -17,11 +17,30 @@ from artifact_binary_reference import read_document, tree_document, Invalid, req
 from test_query_index import read_index
 from artifact_binary_typed import value_node as node, text, list_values as items, unpack
 from query_generation import Generation, cache_directory
-from finish_receipts import check_receipts, forge_generation
+from finish_receipts import (check_receipts, forge_generation, wrong_template_stamp,
+                             forge_template_generation, forge_direct_binding_generation)
 
 
 def sha(data): return hashlib.sha256(data).hexdigest()
 def frame(values): return ''.join(f'{len(v)}:{v}' for v in values)
+
+
+def verifier_inputs():
+    paths = [Path(__file__), Path(__file__).with_name('finish_receipts.py'),
+             Path(__file__).with_name('template_receipts.py')]
+    paths += [ROOT / 'tools/shared' / name for name in (
+        'query_generation.py', 'test_query_index.py', 'artifact_binary_reference.py',
+        'artifact_binary_typed.py', 'artifact_binary_open.py', 'artifact_structure_contract.json')]
+    return {str(path.relative_to(ROOT)): sha(path.read_bytes()) for path in paths}
+
+
+def require_current_run(record, binary_hash, inputs):
+    require(not record['complete'] and record['binary_sha256'] == binary_hash,
+            'resume requires the same unfinished compiler run')
+    require(record.get('verifier_inputs') == inputs,
+            'resume verifier inputs changed; use a fresh output directory')
+
+
 def spec(source, cache, builtin, identity='query-acceptance'):
     return frame(['MLF-CRATE-1', identity, '', 'false',
                   frame([frame(['App', str(source)])]), '', str(cache), str(builtin / 'unit')])
@@ -156,6 +175,16 @@ CASES = {
                     'class Tag a where { tag :: a -> Int }\ninstance Tag Bool where { tag x = 7 }\ninstance Tag Int where { tag x = x }\nf = tag True\n'],
     'recursive-dictionary': ['class Tag a where { tag :: a -> Int }\ninstance Tag Int where { tag x = getName x }\ngetName :: Int -> Int\ngetName x = tag x\nuntouched x = x\n',
                          'class Tag a where { tag :: a -> Int }\ninstance Tag Int where { tag x = addInt (getName x) 1 }\ngetName :: Int -> Int\ngetName x = tag x\nuntouched x = x\n'],
+    'finish-receipts': [
+        'f x = g x\ng x = f x\nh x = j x\nj x = h x\nuntouched x = x\n'],
+    'signed-template-rebind': [
+        'getName :: Int -> Int\ngetName x = x\nleft :: Int -> Int\nleft x = getName x\nright :: Int -> Int\nright x = getName x\n',
+        'getName :: Int -> Int\ngetName x = x\nleft :: Int -> Int\nleft x = getName x\nrenamed :: Int -> Int\nrenamed x = getName x\n',
+        'getName :: Bool -> Bool\ngetName x = x\nleft :: Bool -> Bool\nleft x = getName x\nrenamed :: Bool -> Bool\nrenamed x = getName x\n'],
+    'template-rebind': [
+        'getName :: forall a. a -> a\ngetName x = x\nleft x = getName x\nright x = getName x\n',
+        'getName :: forall a. a -> a\ngetName x = x\nleft x = getName x\nrenamed x = getName x\n',
+        'getName :: forall a. a -> a -> a\ngetName x y = x\nleft x = getName x\nrenamed x = getName x\n'],
 }
 
 
@@ -170,9 +199,11 @@ def main():
     binary, output = args.binary.resolve(strict=True), args.output.resolve()
     output.mkdir(parents=True, exist_ok=args.resume)
     builtin = output / 'builtin'
+    inputs = verifier_inputs()
+    binary_hash = sha(binary.read_bytes())
     record = json.loads((output / 'results.json').read_text()) if args.resume else {
-        'binary_sha256': sha(binary.read_bytes()), 'cases': [], 'complete': False}
-    assert not record['complete'] and record['binary_sha256'] == sha(binary.read_bytes())
+        'binary_sha256': binary_hash, 'verifier_inputs': inputs, 'cases': [], 'complete': False}
+    require_current_run(record, binary_hash, inputs)
     if args.resume:
         record.setdefault('resumptions', []).append(dict(script_sha256=sha(Path(__file__).read_bytes()),
             completed_cases=list(record.get('recovery', []))))
@@ -189,6 +220,11 @@ def main():
             folder.rename(previous)
             (previous / 'attempt-results.json').write_text(json.dumps(record,indent=2)+'\n')
             record['cases'] = [row for row in record['cases'] if row['case'] != name]
+            record['template_stamp_rejected'] = [row for row in record.get('template_stamp_rejected', [])
+                                                 if row['case'] != name]
+            if name in ('template-rebind', 'signed-template-rebind'):
+                record.get('template_rebinding', {}).pop(name, None)
+                record.get('template_recovery', {}).pop(name, None)
         folder.mkdir()
         source = folder / 'App.hs'; cache = folder / 'cache'; specfile = folder / 'crate.spec'
         specfile.write_text(spec(source, cache, builtin))
@@ -205,6 +241,16 @@ def main():
             report = json.loads(inc.with_suffix('.queries').read_text())
             current, nodes = graph(cache)
             receipts = check_receipts(inc, cache, nodes)
+            if name in ('template-rebind', 'signed-template-rebind'):
+                template_hashes = [g['query_key'] for g in report['groups'] if g['id'] in receipts['template_groups']]
+                require(len(template_hashes) == 2 and len(set(template_hashes)) == 1,
+                        'distinct owners must share one canonical template payload')
+                previous_templates = record.setdefault('template_rebinding', {}).setdefault(name, [])
+                if previous_templates:
+                    require((template_hashes[0] == previous_templates[-1]['raw_sha256']) == (version == 1),
+                            'owner rename must retain template; dependency scheme edit must invalidate it')
+                previous_templates.append(dict(version=version, raw_sha256=template_hashes[0],
+                                               groups=receipts['template_groups']))
             if name == 'scope-order' and version == 1:
                 assert receipts['rewritten'] > 0, 'expected a final evidence adapter'
             if name == 'recursive-dictionary':
@@ -238,8 +284,34 @@ def main():
             assert linked.stdout, 'empty linked program'
             audited_link = execute(binary, ['--link-crate', inc.with_suffix('.mlfci')], env={'MLF_QUERY_SEMANTIC_AUDIT': '1'})
             assert linked.stdout == audited_link.stdout
+            if receipts['template_groups']:
+                forged_pair = wrong_template_stamp(outputs(inc), receipts['template_groups'][0])
+                invalid = folder / f'{version}-wrong-template-stamp'
+                for extension, payload in zip(('.mlfci', '.mlfco'), forged_pair):
+                    invalid.with_suffix(extension).write_bytes(payload)
+                for label, env in [('normal', {}), ('audit', {'MLF_QUERY_SEMANTIC_AUDIT': '1'})]:
+                    rejected = execute(binary, ['--link-crate', invalid.with_suffix('.mlfci')], env=env, success=False)
+                    invalid.with_name(invalid.name + '-' + label).with_suffix('.stderr').write_bytes(rejected.stderr)
+                    require(b'open crate fragment fingerprint mismatch' in rejected.stderr,
+                            'wrong template stamp did not reach actual content validation')
+                record.setdefault('template_stamp_rejected', []).append(dict(case=name, version=version))
             shutil.rmtree(folder / f'{version}-clean-cache')
             (folder / f'{version}-retained-cache').rename(cache)
+            if name in ('template-rebind', 'signed-template-rebind') and version == 0:
+                target = next(g for g in report['groups'] if g['id'] in receipts['template_groups'])
+                target_key = frame(['InferScc', frame(sorted(target['members']))])
+                modes = ['owner', 'member', 'source-key', 'scheme-key']
+                if name == 'signed-template-rebind': modes.append('signature-key')
+                for mode in modes:
+                    forged = forge_template_generation(cache, current, target_key, mode)
+                    require(graph(cache)[0] == forged, 'template attack must retain valid checksums and graph closure')
+                    repaired = compile('repair-template-' + mode)
+                    require(graph(cache)[0] == current and outputs(repaired) == outputs(inc),
+                            'template source admission did not restore original commitment')
+                    require(json.loads(repaired.with_suffix('.queries').read_text())['inferred_groups'] == 1,
+                            'template corruption should re-infer exactly its declaration')
+                    check_receipts(repaired, cache, graph(cache)[1])
+                record.setdefault('template_recovery', {})[name] = modes
             row = dict(case=name, version=version, inferred=report['inferred_groups'], reused=report['reused_groups'],
                        nodes=len(nodes), kinds=sorted({unpack(k)[0] for k in nodes}), generation=current,
                        artifact_sha256=[sha(x) for x in outputs(inc)])
@@ -248,18 +320,24 @@ def main():
                 assert report['inferred_groups'] == 1, 'body edit should reuse same-contract callers'
         # A corrupt/missing result is repaired; final output remains exact.
         current, nodes = graph(cache)
-        payload = next(n['payload'] for k, n in nodes.items() if unpack(k)[0] == 'InferScc')
+        raw_payloads = [n['payload'] for k, n in nodes.items() if unpack(k)[0] == 'InferScc']
+        payload = max(raw_payloads, key=raw_payloads.count) if name in ('template-rebind', 'signed-template-rebind') else raw_payloads[0]
+        affected = raw_payloads.count(payload)
+        if name in ('template-rebind', 'signed-template-rebind'):
+            require(affected == 2, 'shared-template corruption must target both actual owners')
         damaged = cache_directory(cache) / 'results' / (payload + '.mlfqr')
         damaged.write_bytes(b'corrupt checked record')
         repaired = compile('repaired')
-        assert json.loads(repaired.with_suffix('.queries').read_text())['inferred_groups'] == 1
+        assert json.loads(repaired.with_suffix('.queries').read_text())['inferred_groups'] == affected
         assert outputs(repaired) == outputs(inc)
         graph(cache)
         damaged.unlink()
         missing = compile('missing')
-        assert json.loads(missing.with_suffix('.queries').read_text())['inferred_groups'] == 1
+        assert json.loads(missing.with_suffix('.queries').read_text())['inferred_groups'] == affected
         assert outputs(missing) == outputs(inc)
         graph(cache)
+        if name in ('template-rebind', 'signed-template-rebind'):
+            record.setdefault('shared_template_payload_recovery', {})[name] = dict(owners=affected, corrupt=True, missing=True)
         # Failed source/output/publication cannot advance the generation pointer.
         pointer = cache_directory(cache) / 'CURRENT'; old = pointer.read_bytes()
         source.write_text(source_text(versions[-1] + '\ninvalid = missingDefinition\n'))
@@ -385,25 +463,37 @@ def main():
             assert json.loads(repaired.with_suffix('.queries').read_text())['inferred_groups'] == 0
             graph(cache); damaged_kinds.append(kind)
         record.setdefault('shared_repair', {})[name] = damaged_kinds
-        if name == 'body':
+        if name == 'finish-receipts':
             generation, nodes = graph(cache)
+            require(sum(unpack(k)[0] == 'FinishScc' for k in nodes) >= 2,
+                    'multi-member fixture must retain two finish receipts')
             target = next(n for k,n in nodes.items() if unpack(k)[0] == 'FinishScc')
-            path = cache_directory(cache) / 'results' / (target['payload'] + '.mlfqr')
-            path.write_bytes(b'damaged finish receipt')
-            repaired = compile('damaged-finish')
-            assert sha(path.read_bytes()) == target['sha'] and outputs(repaired) == outputs(inc)
-            assert json.loads(repaired.with_suffix('.queries').read_text())['inferred_groups'] == 0
-            modes = ('swapped', 'stale', 'reordered', 'wrong-address', 'finish-as-raw', 'previous-format')
+            assert target['payload'] is None, 'rebuilt finish receipt must not require a result file'
+            directory = cache_directory(cache)
+            layout = Generation((directory / 'generations' / (generation + '.mlfqg')).read_bytes()).version
+            address_attack = 'payload-row-range' if layout == 3 else 'wrong-address'
+            modes = ('swapped', 'stale', 'reordered', address_attack, 'finish-as-raw', 'previous-format')
             for mode in modes:
                 forged = forge_generation(cache, generation, mode)
-                if mode != 'wrong-address':
+                if mode not in ('wrong-address', 'payload-row-range'):
                     assert graph(cache)[0] == forged  # Valid checksums and dependency closure.
                 repaired = compile('repair-finish-' + mode)
                 assert graph(cache)[0] == generation and outputs(repaired) == outputs(inc)
                 report = json.loads(repaired.with_suffix('.queries').read_text())
-                expected = len(report['groups']) if mode in ('wrong-address', 'previous-format') else int(mode == 'finish-as-raw')
+                expected = len(report['groups']) if mode in ('wrong-address', 'payload-row-range', 'previous-format') else int(mode == 'finish-as-raw')
                 assert report['inferred_groups'] == expected
-            record['finish_receipt_recovery'] = ['damaged', 'missing', *modes]
+            record['finish_receipt_recovery'] = ['reconstructed', *modes]
+        if name == 'body':
+            generation, nodes = graph(cache)
+            for mode in ('swapped-result', 'reordered', 'missing-prepared'):
+                forged = forge_direct_binding_generation(cache, generation, mode)
+                require(graph(cache)[0] == forged, 'direct-binding attack closure')
+                repaired = compile('repair-direct-binding-' + mode)
+                require(graph(cache)[0] == generation and outputs(repaired) == outputs(inc),
+                        'direct-binding reconstruction did not restore current graph/output')
+                require(json.loads(repaired.with_suffix('.queries').read_text())['inferred_groups'] == 0,
+                        'unused direct-binding attack must preserve raw reuse')
+            record['direct_binding_recovery'] = ['swapped-result', 'reordered', 'missing-prepared']
             cache.rename(folder / 'before-concurrent-writers')
             with ThreadPoolExecutor(max_workers=2) as pool:
                 writes = list(pool.map(compile, ['writer-a', 'writer-b']))

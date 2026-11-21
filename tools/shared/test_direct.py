@@ -331,6 +331,8 @@ def main():
     parser.add_argument('--build-receipt', type=Path)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--cc', default=os.environ.get('CC', 'cc'))
+    parser.add_argument('--clang', default=os.environ.get('CLANG', 'clang'),
+                        help='Clang for generated native ordered-map controls')
     parser.add_argument('--frontend-timeout', type=int,
                         help='bounded frontend override: O0 1..3600, O2 1..1800; defaults come from authenticated optimization')
     args = parser.parse_args()
@@ -367,6 +369,22 @@ def main():
         inputs += [ROOT / 'shared-sources.json', ROOT / 'tests/async-process/fixture.c',
                    ROOT / 'tests/async-task/fixture.c', Path(__file__).resolve(),
                    ROOT / 'tools/release/test-suite-build-receipts.py', build_receipt,
+                   ROOT / 'tools/shared/test_ordered_map.py',
+                   ROOT / 'tools/shared/test_query_json.py', ROOT / 'tests/shared-host/QueryJsonProbe.hs',
+                   ROOT / 'tools/shared/fixtures/QueryJson.hs.txt',
+                   ROOT / 'tools/shared/test_crc32.py', ROOT / 'tools/shared/fixtures/ByteArrayCRC32.hs',
+                   ROOT / 'tools/shared/test_byte_array_copy.py', ROOT / 'tools/shared/fixtures/ByteArrayCopy.hs',
+                   ROOT / 'tools/shared/test_utf8_length.py',
+                   ROOT / 'tools/shared/fixtures/utf8-length/Main.hs', ROOT / 'tools/shared/fixtures/utf8-length/Length.hs',
+                   ROOT / 'tests/native/runtime_utf8_length.c',
+                   ROOT / 'tools/shared/test_parser_satisfy.py',
+                   ROOT / 'tools/shared/fixtures/ParserSatisfyControls.hs',
+                   ROOT / 'tools/shared/test_metadata_receipt.py',
+                   ROOT / 'tools/shared/fixtures/MetadataReceiptControls.hs',
+                   ROOT / 'tools/shared/test_candidate_selection.py',
+                   ROOT / 'tools/shared/fixtures/CandidateSelectionControls.hs',
+                   ROOT / 'tests/indexvec/OrderedMapControls.hs',
+                   ROOT / 'tools/shared/fixtures/OrderedMap.hs',
                    Path(compiler), Path(sys.executable).resolve()]
         receipt['inputs'] = {str(path): sha(path) for path in inputs}
         runner = CommandRunner(ROOT, output, receipt, save)
@@ -394,6 +412,27 @@ def main():
                        timeout=budgets[name])
         runner.run('build-receipts', [sys.executable, ROOT / 'tools/release/test-suite-build-receipts.py',
                    '--executable', binaries / 'build-receipts', '--output', output / 'build-receipts'], timeout=1800)
+        runner.run('ordered-map', [sys.executable, '-B', ROOT / 'tools/shared/test_ordered_map.py',
+                   '--build-receipt', build_receipt, '--clang', args.clang,
+                   '--output', output / 'ordered-map'], timeout=600)
+        runner.run('bulk-crc', [sys.executable, '-B', ROOT / 'tools/shared/test_crc32.py',
+                   '--build-receipt', build_receipt, '--clang', args.clang,
+                   '--output', output / 'bulk-crc'], timeout=600)
+        runner.run('query-json', [sys.executable, '-B', ROOT / 'tools/shared/test_query_json.py',
+                   '--build-receipt', build_receipt, '--clang', args.clang,
+                   '--output', output / 'query-json'], timeout=1200)
+        runner.run('byte-array-copy', [sys.executable, '-B', ROOT / 'tools/shared/test_byte_array_copy.py',
+                   '--build-receipt', build_receipt, '--output', output / 'byte-array-copy'], timeout=300)
+        runner.run('utf8-length', [sys.executable, '-B', ROOT / 'tools/shared/test_utf8_length.py',
+                   '--build-receipt', build_receipt, '--clang', args.clang,
+                   '--output', output / 'utf8-length'], timeout=600)
+        runner.run('parser-satisfy', [sys.executable, '-B', ROOT / 'tools/shared/test_parser_satisfy.py',
+                   '--build-receipt', build_receipt, '--output', output / 'parser-satisfy'], timeout=300)
+        runner.run('candidate-selection', [sys.executable, '-B', ROOT / 'tools/shared/test_candidate_selection.py',
+                   '--build-receipt', build_receipt, '--clang', args.clang,
+                   '--output', output / 'candidate-selection'], timeout=600)
+        runner.run('metadata-receipt', [sys.executable, '-B', ROOT / 'tools/shared/test_metadata_receipt.py',
+                   '--build-receipt', build_receipt, '--output', output / 'metadata-receipt'], timeout=300)
         for collection in [receipt['inputs'], receipt['helpers']]:
             if any(sha(path) != digest for path, digest in collection.items()):
                 raise RuntimeError('test input changed during qualification')

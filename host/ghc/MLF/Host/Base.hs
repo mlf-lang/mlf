@@ -1,9 +1,9 @@
-{-# LANGUAGE RankNTypes, KindSignatures, FlexibleInstances, ForeignFunctionInterface, ConstraintKinds, MagicHash #-}
+{-# LANGUAGE RankNTypes, KindSignatures, FlexibleInstances, ForeignFunctionInterface, ConstraintKinds, MagicHash, UnboxedTuples, ExtendedLiterals #-}
 module MLF.Host.Base
   ( Int, Integer, Bool(..), Double, Char, IO, String, ST, STArray
   , MLFCallStack, MLFHasCallStack, MLFStackFrame(..), MLFStackEvidence(..)
   , v_emptyCallStack, v_pushCallStack, v_prettyCallStack
-  , literal, unpack, utf8, fromUtf8, matchString, neInt, leInt, gtInt, geInt
+  , literal, unpack, stringText, utf8, fromUtf8, matchString, neInt, leInt, gtInt, geInt
   , v_textToChars, v_textFromChars, v_charCode, v_charFromCode
   , v_ioReturn, v_ioBind, v_stReturn, v_stBind, v_runST
   , v_newSTArray, v_readSTArray, v_writeSTArray, v_lengthSTArray, v_freezeSTArray
@@ -14,8 +14,8 @@ module MLF.Host.Base
   , v_quotInteger, v_remInteger, v_eqInteger, v_ltInteger, v_showInteger, v_readInteger, v_integerToDouble
   , v_addDouble, v_subDouble, v_mulDouble, v_divDouble, v_sqrtDouble
   , v_eqDouble, v_ltDouble, v_intToDouble, v_doubleToBits, v_doubleFromBits
-  , v_concatString, v_concatStringList, v_eqString, v_compareString, v_stringLength, v_stringCodeAt
-  , v_stringSlice, v_stringFromCode, v_showInt, v_readInt, v_readDouble, v_formatDouble
+  , v_concatString, v_concatStringList, v_packStringFields, v_eqString, v_compareString, v_stringLength, v_stringCodeAt
+  , v_stringUtf8Length, v_stringSlice, v_stringFromCode, v_showInt, v_readInt, v_readDouble, v_formatDouble
   , v_ifThenElse, v_seq, v_panic, HostError(..), failure, bounded, stIndex, strict2
   ) where
 
@@ -37,12 +37,12 @@ import qualified Data.Word as Word
 import Data.Typeable (Typeable)
 import Control.Exception (Exception, throw)
 import qualified Control.Monad.ST as S
-import qualified Data.Array as Boxed
-import qualified Data.Array.ST as A
-import qualified Data.Array.Base as AB
+import qualified GHC.ST as GS
 import GHC.Float (castDoubleToWord64, castWord64ToDouble)
 import GHC.Conc (pseq)
 import GHC.Exts (isTrue#, (<#))
+import qualified GHC.Exts as G
+import qualified GHC.Int as GI
 import GHC.Num.Integer (Integer(IS))
 import Foreign.C (CInt(..), CDouble(..), CString, peekCStringLen)
 import Foreign.Marshal.Alloc (allocaBytes)
@@ -54,14 +54,19 @@ type Int = Fixed.Int64
 type ST = S.ST
 -- The private constructor fixes zero-based bounds once. Language lengths are
 -- Int64; only a proven in-range index is converted to the host machine index.
-data STArray s a = STArray !Int !(A.STArray s P.Int a)
+data STArray s a = STArray !Int (G.MutableArray# s a)
 -- Text is strict UTF-8 in the supported text-2 toolchain. String indices and
 -- lengths below count Unicode scalars, never bytes or UTF-16 code units.
-data String = String !T.Text !P.Int (Array.UArray P.Int P.Int)
+data String = String {-# UNPACK #-} !T.Text !P.Int (Array.UArray P.Int P.Int)
 mkText :: T.Text -> String
 mkText text = mkSizedText (T.length text) text
 mkSizedText :: P.Int -> T.Text -> String
-mkSizedText count text = String text count (scalarOffsets count text)
+mkSizedText count text@(TI.Text _ _ bytes)
+  | count < 256 || count == bytes = String text count firstScalarBlock
+  | otherwise = String text count (scalarOffsets count text)
+-- Every text shorter than one index block starts its only block at zero.
+firstScalarBlock :: Array.UArray P.Int P.Int
+firstScalarBlock = Array.listArray (0,0) [0]
 -- One byte offset per 256 Unicode scalars, rather than a boxed Char per
 -- scalar. Most blocks in compiler objects are ASCII even when the object
 -- contains Unicode literals; those blocks retain constant-time indexing.
@@ -118,10 +123,24 @@ v_panic s = s `pseq` failure (unpack s)
 literal :: P.String -> String
 literal chars = if any (\c -> let n=ord c in n>=0xd800 && n<=0xdfff) chars
   then failure "invalid Unicode scalar" else mkText (T.pack chars)
+-- unpackCString# reads one Latin-1 scalar per byte up to NUL. Copy the
+-- complete address while it is in scope, including when a Haskell caller
+-- supplies a nonliteral address. Its length is also the scalar count.
+byteAddressLiteral :: G.Addr# -> String
+byteAddressLiteral address =
+  let bytes = unsafeDupablePerformIO (BS.packCString (G.Ptr address))
+  in mkSizedText (BS.length bytes) (TE.decodeLatin1 bytes)
+{-# OPAQUE literal #-}
+{-# RULES
+"mlf/literal/byte-address" forall address. literal (G.unpackCString# address) =
+  byteAddressLiteral address
+#-}
 unpack :: String -> P.String
 unpack (String t _ _) = T.unpack t
+stringText :: String -> T.Text
+stringText (String text _ _) = text
 utf8 :: String -> BS.ByteString
-utf8 (String t _ _) = TE.encodeUtf8 t
+utf8 = TE.encodeUtf8 . stringText
 fromUtf8 :: BS.ByteString -> String
 fromUtf8 bytes = case TE.decodeUtf8' bytes of
   Left _ -> failure "IO error: invalid UTF-8 input"
@@ -164,29 +183,37 @@ bounded message limit n = if n<0 || n>limit || n>fromIntegral (maxBound::P.Int)
 arrayLength :: Int -> P.Int
 arrayLength = bounded "invalid array length" (9223372036854775807 `quot` 8)
 v_newSTArray :: Int -> a -> ST s (STArray s a)
-v_newSTArray n initial = pure n >>= \operand -> do
-  let size=arrayLength operand
-  cells <- size `pseq` A.newArray (0,size-1) initial
-  pure (STArray (fromIntegral size) cells)
+v_newSTArray n initial = GS.ST $ \state -> case arrayLength n of
+  size@(G.I# count#) -> case G.newArray# count# initial state of
+    (# next, cells #) -> (# next, STArray (fromIntegral size) cells #)
 stIndex :: Int -> Int -> P.Int
 stIndex size n =
   -- Array lengths are validated nonnegative and fit the host Int.
   if (fromIntegral n :: Word.Word64) < fromIntegral size
   then fromIntegral n else failure "array index out of bounds"
 v_readSTArray :: STArray s a -> Int -> ST s a
-v_readSTArray a n = pure a >>= \(STArray size cells) ->
-  AB.unsafeRead cells (stIndex size (a `pseq` n))
+v_readSTArray array index = GS.ST $ \state -> case array of
+  STArray size cells -> case stIndex size (array `pseq` index) of
+    G.I# i# -> G.readArray# cells i# state
 v_writeSTArray :: STArray s a -> Int -> a -> ST s ()
-v_writeSTArray a n value = pure a >>= \(STArray size cells) ->
-  AB.unsafeWrite cells (stIndex size (a `pseq` n)) value
+v_writeSTArray array index value = GS.ST $ \state -> case array of
+  STArray size cells -> case stIndex size (array `pseq` index) of
+    G.I# i# -> case G.writeArray# cells i# value state of
+      next -> (# next, () #)
 v_lengthSTArray :: STArray s a -> ST s Int
-v_lengthSTArray a = pure a >>= \(STArray size _) -> pure size
+v_lengthSTArray array = GS.ST $ \state -> case array of
+  STArray size _ -> (# state, size #)
 
--- freeze copies the boxed cells in this action, without evaluating their contents.
+-- Copy the cells at this point in the action. Stored values stay lazy,
+-- and later writes through aliases cannot change the immutable snapshot.
 v_freezeSTArray :: STArray s a -> ST s (Int -> a)
-v_freezeSTArray array = pure array >>= \(STArray size cells) -> do
-  snapshot <- A.freeze cells
-  pure (\index -> snapshot Boxed.! stIndex size index)
+v_freezeSTArray array = GS.ST $ \state -> case array of
+  STArray size cells -> case (fromIntegral size :: P.Int) of
+    G.I# count# -> case G.freezeArray# cells 0# count# state of
+      (# next, frozen #) ->
+        let get index = case stIndex size index of
+              G.I# i# -> case G.indexArray# frozen i# of (# value #) -> value
+        in (# next, get #)
 
 strict2 :: (a -> b -> c) -> a -> b -> c
 strict2 f a b = a `pseq` b `pseq` f a b
@@ -281,18 +308,39 @@ v_readDouble text = let s=unpack text in
         exponent _ = False
 v_concatString :: String -> String -> String
 v_concatString = orderedStrict (\(String a na _) (String b nb _) -> mkSizedText (na+nb) (T.append a b))
+-- The validation pass forces every piece in order and checks the exact
+-- byte total. Copy the same immutable slices into that single destination.
+copyStringPieces :: Bool -> P.Int -> [String] -> T.Text
+copyStringPieces framed total@(G.I# size#) pieces
+  | total == 0 = T.empty
+  | otherwise = G.runRW# $ \initial ->
+      case G.newByteArray# size# initial of
+        (# ready, target #) ->
+          let copy (TI.Text (TA.ByteArray src) (G.I# off#) (G.I# len#)) pos# state =
+                case G.copyByteArray# src off# target pos# len# state of
+                  next -> (# next, pos# G.+# len# #)
+              fill _ [] state = case G.unsafeFreezeByteArray# target state of
+                (# _, result #) -> TI.Text (TA.ByteArray result) 0 total
+              fill pos# (String text count _ : rest) state =
+                let payload start# previous = case copy text start# previous of
+                      (# next, end# #) -> fill end# rest next
+                in if framed then case fieldPrefix count of
+                     String prefix _ _ -> case copy prefix pos# state of
+                       (# next, end# #) -> payload end# next
+                   else payload pos# state
+          in fill 0# pieces ready
 -- Force each fragment before demanding the next list cell, matching the
--- balanced source join's observable failure order. Text.concat then copies
--- the validated fragments once rather than at every balanced-tree level.
+-- balanced source join's observable failure order. The validated byte and
+-- scalar lengths determine the allocation and the resulting scalar index.
 v_concatStringList :: [String] -> String
 v_concatStringList pieces = case pieces of
   [] -> literal ""
   first:rest -> first `pseq` case rest of
     [] -> first
-    _ -> collect 0 0 [] pieces
+    _ -> collect 0 0 pieces
   where
-    collect scalarCount byteCount chunks remaining = case remaining of
-      [] -> mkSizedText scalarCount (T.concat (reverse chunks))
+    collect scalarCount byteCount remaining = case remaining of
+      [] -> mkSizedText scalarCount (copyStringPieces False byteCount pieces)
       piece:rest -> piece `pseq` case piece of
         String text count _ -> case text of
           TI.Text _ _ bytes ->
@@ -301,13 +349,48 @@ v_concatStringList pieces = case pieces of
             else let nextScalars = scalarCount + count
                      nextBytes = byteCount + bytes
                  in nextScalars `pseq` nextBytes `pseq`
-                      collect nextScalars nextBytes (text:chunks) rest
+                      collect nextScalars nextBytes rest
+-- Canonical length-prefixed fields: decimal scalar length, colon, payload.
+-- Fuse framing with the fragment traversal without allocating a source list
+-- of three String wrappers per field. Validate heads before demanding tails.
+v_packStringFields :: [String] -> String
+v_packStringFields pieces = collect 0 0 pieces
+  where
+    collect scalarCount byteCount remaining = case remaining of
+      [] -> mkSizedText scalarCount (copyStringPieces True byteCount pieces)
+      piece:rest -> piece `pseq` case piece of
+        String text count _ -> case text of
+          TI.Text _ _ bytes -> case fieldPrefix count of
+            String _ extra _ ->
+              if extra > maxBound - scalarCount || count > maxBound - scalarCount - extra ||
+                   extra > maxBound - byteCount || bytes > maxBound - byteCount - extra
+              then failure "string too large"
+              else let nextScalars = scalarCount + extra + count
+                       nextBytes = byteCount + extra + bytes
+                   in nextScalars `pseq` nextBytes `pseq`
+                        collect nextScalars nextBytes rest
+-- Keep the decimal length and colon together. The fixed lazy table bounds
+-- sharing independently of input length; larger fields use the same framing.
+fieldPrefix :: P.Int -> String
+fieldPrefix count
+  | 0 <= count, count < 1024 = smallFieldPrefixes Array.! count
+  | otherwise = mkText (T.pack (show count ++ ":"))
+smallFieldPrefixes :: Array.Array P.Int String
+smallFieldPrefixes = Array.listArray (0,1023)
+  [mkText (T.pack (show count ++ ":")) | count <- [0..1023 :: P.Int]]
 v_eqString :: String -> String -> Bool
 v_eqString = orderedStrict (\(String a _ _) (String b _ _) -> a==b)
 v_compareString :: String -> String -> Int
-v_compareString = orderedStrict (\(String a _ _) (String b _ _) -> case compare a b of { LT -> -1; EQ -> 0; GT -> 1 })
+-- Establish left-to-right demand outside the comparison, avoiding a guarded
+-- right-operand thunk on hot map comparisons.
+v_compareString left right = left `pseq` case left of
+  String a _ _ -> case right of
+    String b _ _ -> case compare a b of { LT -> -1; EQ -> 0; GT -> 1 }
 v_stringLength :: String -> Int
 v_stringLength (String _ n _) = fromIntegral n
+-- String constructors validate Unicode and retain the exact UTF-8 byte count.
+v_stringUtf8Length :: String -> Int
+v_stringUtf8Length (String (TI.Text _ _ bytes) _ _) = fromIntegral bytes
 -- All String constructors are private and preserve valid UTF-8 plus exact
 -- scalar count. Equality of byte/scalar counts proves ASCII. Bounds precede
 -- unchecked byte indexing; slice copies to avoid retaining the source buffer.
@@ -319,8 +402,15 @@ v_stringCodeAt text@(String t size offsets) index =
      else case t of
        TI.Text bytes offset byteLength
          | byteLength == size -> fromIntegral (TA.unsafeIndex bytes (offset + fromIntegral n))
-         | otherwise -> let pos = scalarOffset t size offsets (fromIntegral n)
-                        in fromIntegral (ord (T.head (TI.text bytes (offset+pos) (byteLength-pos))))
+         | otherwise -> unicodeCodeAt t size offsets (fromIntegral n)
+{-# INLINE v_stringCodeAt #-}
+-- Keep the uncommon scalar-index path out of ASCII codec loops. The private
+-- String constructors already establish valid UTF-8; the caller checks bounds.
+unicodeCodeAt :: T.Text -> P.Int -> Array.UArray P.Int P.Int -> P.Int -> Int
+unicodeCodeAt t@(TI.Text bytes offset byteLength) size offsets index =
+  let pos = scalarOffset t size offsets index
+  in fromIntegral (ord (T.head (TI.text bytes (offset+pos) (byteLength-pos))))
+{-# NOINLINE unicodeCodeAt #-}
 v_stringSlice :: String -> Int -> Int -> String
 v_stringSlice text@(String t size characters) start count = text `pseq` start `pseq` count `pseq`
   let i=bounded "string slice out of bounds" (fromIntegral size) start
@@ -385,7 +475,22 @@ v_shiftRInt = orderedStrict (\x n -> if n<0 then failure "integer shift overflow
   else if n>=64 then if x<0 then -1 else 0 else Bits.shiftR x (fromIntegral n))
 v_unsignedShiftRInt = orderedStrict (\x n -> if n<0 then failure "integer shift overflow"
   else if n>=64 then 0 else fromIntegral (Bits.shiftR (fromIntegral x :: Word.Word64) (fromIntegral n)))
+-- Expose fixed codec shifts to the caller while retaining orderedStrict's
+-- operand barrier and the original negative/large-shift cases.
+{-# INLINE v_andInt #-}
+{-# INLINE v_orInt #-}
+{-# INLINE v_xorInt #-}
+{-# INLINE v_shiftLInt #-}
+{-# INLINE v_shiftRInt #-}
+{-# INLINE v_unsignedShiftRInt #-}
 v_countLeadingZerosInt, v_countTrailingZerosInt, v_popCountInt :: Int -> Int
 v_countLeadingZerosInt = fromIntegral . Bits.countLeadingZeros
 v_countTrailingZerosInt = fromIntegral . Bits.countTrailingZeros
 v_popCountInt = fromIntegral . Bits.popCount
+
+-- A boxed Int64 whose unlifted payload is available is already in normal
+-- form. Its lazy barrier has no remaining operand to order. Unknown boxed
+-- values keep pseq unchanged, including all possibly failing computations.
+{-# RULES
+"mlf/total-int/constructor" forall value. G.lazy (GI.I64# value) = GI.I64# value
+#-}

@@ -117,7 +117,12 @@ module Bootstrap.Std where {
         seq next (foldlStrict f next rest)
     };
   reverse :: forall a. [] a -> [] a;
-  reverse xs = foldl (\acc x -> (:) x acc) [] xs;
+  reverse xs = let {
+    collect reversed rest = case rest of {
+      [] -> reversed;
+      (:) x more -> collect ((:) x reversed) more
+    }
+  } in collect [] xs;
   concat :: forall a. [] ([] a) -> [] a;
   concat xs = foldr append [] xs;
   concatMap :: forall a b. (a -> [] b) -> [] a -> [] b;

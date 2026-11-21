@@ -139,21 +139,19 @@ jobs:
         if: matrix.optimization == '2'
         run: |
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-context-cache-guard python3 -B tools/shared/test_source_context_cache.py --legacy-query-only --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/source-context-cache-guard/results
-      # Low-cost coverage for the compiler shape benchmark, placed directly after
-      # the producer so it runs before the long suites: the contract test proves
-      # the analyzer refuses bad data, and the smoke matrix performs real
-      # same-source GHC/MLF compilations with a fresh target on every leg. The
-      # complete 10 x 3 matrix stays a manual, dedicated workflow run.
       - name: Check compiler shape benchmark contract
         if: matrix.suite == 'all' && matrix.optimization == '2'
-        run: python3 -B tools/performance/compiler-shapes/test_contract.py
-      - name: Compiler shape smoke (GHC vs MLF, 18 timed compilations)
+        run: python3 -B tools/dev.py check-tools
+      - name: Compile thirteen shapes at size 8 (GHC vs MLF, 156 timed builds)
         if: matrix.suite == 'all' && matrix.optimization == '2'
         run: |
-          set -euo pipefail
           python3 -B tools/performance/compiler-shapes/bench.py all \
-            --workdir .mlf-build/compiler-shapes-smoke --cohort smoke --matrix smoke \
-            --producer .mlf-build/shared-ghc --build-builtin
+            --workdir .mlf-build/compiler-shapes-smoke --cohort pr-size-8 \
+            --producer .mlf-build/shared-ghc --build-builtin --size 8 --repeats 6 --interleave-pairs \
+            --family flat_functions --family recursive_ring --family wide_case \
+            --family class_instances --family dependency_diamonds --family state_updates \
+            --family captured_closures --family wide_product --family rank2_arguments \
+            --family irregular_literal_table --family nested_poly_types --family rank2_callbacks --family decoder_pipeline
       - name: Check Int64 arithmetic and Patricia boundaries
         if: matrix.optimization == '2'
         run: |
@@ -164,6 +162,10 @@ jobs:
           python3 -O -B tools/performance/patricia/test_fingerprint_core.py
           python3 -B tools/performance/patricia/test_native_batches.py
           python3 -O -B tools/performance/patricia/test_native_batches.py
+          python3 -B tools/performance/patricia/test_design_controls.py
+          python3 -O -B tools/performance/patricia/test_design_controls.py
+          python3 -B tools/performance/artifact-binary/test_adapter_successor.py
+          python3 -O -B tools/performance/artifact-binary/test_adapter_successor.py
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-focused-guard python3 -B tools/performance/patricia/run_controls.py --reference-source "$PWD" --reference-producer .mlf-build/shared-ghc --output .mlf-build/patricia-focused
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-design-guard python3 -B tools/performance/patricia/run_design_controls.py --reference-source "$PWD" --reference-producer .mlf-build/shared-ghc --output .mlf-build/patricia-design
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-native-guard python3 -B tools/performance/patricia/run_native.py --producer .mlf-build/shared-ghc --output .mlf-build/patricia-native --mode standalone
@@ -200,7 +202,9 @@ jobs:
         if: matrix.optimization == '2'
         run: |
           set -euo pipefail
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/map-balance-guard python3 -B tools/performance/patricia/run_integrated.py --suite map-balance --producer .mlf-build/shared-ghc --output .mlf-build/map-balance-controls
+          MAP_POLICY_SOURCE="$PWD" python3 -B tools/performance/map-policy/test_prepare_map_policy.py
+          MAP_POLICY_SOURCE="$PWD" python3 -O -B tools/performance/map-policy/test_prepare_map_policy.py
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/map-balance-guard python3 -B tools/performance/map-policy/run_controls.py --source "$PWD" --producer .mlf-build/shared-ghc --output .mlf-build/map-balance-controls
       - name: Check generated graph validation boundary
         if: matrix.optimization == '2'
         run: |
@@ -232,7 +236,23 @@ jobs:
         if: matrix.suite == 'all' || matrix.suite == 'direct'
         run: |
           set -euo pipefail
-          python3 tools/shared/test_direct.py --bin-dir .mlf-build/shared-ghc/bin \
+          python3 -B tools/shared/test_crc_successor_entry.py
+          python3 -O -B tools/shared/test_crc_successor_entry.py
+          MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal python3 -B tools/shared/test_crc_process_supervisor.py
+          MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/optimized python3 -O -B tools/shared/test_crc_process_supervisor.py
+          python3 -B tools/shared/test_utf8_batch_contract.py
+          python3 -O -B tools/shared/test_utf8_batch_contract.py
+          python3 -B tools/shared/test_utf8_batch_worker.py
+          python3 -O -B tools/shared/test_utf8_batch_worker.py
+          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_direct_bounded_entry.py
+          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_bounded_entry.py
+          python3 -B tools/shared/test_candidate_batch_contract.py
+          python3 -O -B tools/shared/test_candidate_batch_contract.py
+          python3 -B tools/shared/test_candidate_batch_worker.py
+          python3 -O -B tools/shared/test_candidate_batch_worker.py
+          MLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/normal python3 -B tools/shared/test_direct_candidate_entry.py
+          MLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_candidate_entry.py
+          python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir .mlf-build/shared-ghc/bin \
             --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/direct-host-tests
           # The default/all framework gate executes this same no-argument
           # TupleList binary with its exact 305-observation completion oracle.
@@ -321,7 +341,16 @@ jobs:
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 640 --disk-free-mib 4096 .mlf-build/artifact-binary-guard python3 -B tools/shared/test_artifact_binary.py --source-root "$PWD" --build-receipt .mlf-build/shared-ghc/receipt.json --clang clang --gc-prefix "$PWD/.mlf-build/io-action-gc" --partial-write-sink /dev/full --output .mlf-build/artifact-binary-guard/results
       - name: Check fixed native library boundaries and lazy exports
         if: matrix.optimization == '2'
-        run: python3 tools/shared/test_native_library.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/native-library --clang clang --gc-prefix .mlf-build/io-action-gc
+        run: |
+          set -euo pipefail
+          mkdir .mlf-build/header-adapter-controls
+          git --no-replace-objects cat-file blob dd5b4630a80803c19afdb219dba2dc4bffc3ea1b > .mlf-build/header-adapter-controls/history.hs
+          export HEADER_FIXTURE="$PWD/tools/shared/fixtures/native/HeaderValidationTests.hs"
+          export HEADER_ORACLE="$PWD/tools/shared/fixtures/native/HeaderNamingOracle.hs"
+          export HEADER_HISTORY_SOURCE="$PWD/.mlf-build/header-adapter-controls/history.hs"
+          python3 -B tools/shared/test_header_validation_adapter.py
+          python3 -O -B tools/shared/test_header_validation_adapter.py
+          python3 tools/shared/test_native_library.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/native-library --clang clang --gc-prefix .mlf-build/io-action-gc
       - name: Build and check the default installed standard library
         if: matrix.optimization == '2' && matrix.suite == 'all'
         run: |
@@ -346,6 +375,14 @@ jobs:
           retention-days: 14
           path: |
             .mlf-build/ghc-install-cleanup.json
+            .mlf-build/native-library/receipt.json
+            .mlf-build/native-library/header-validation/
+            .mlf-build/native-library/*.stdout
+            .mlf-build/native-library/*.stderr
+            .mlf-build/stdlib-default-controls/receipt.json
+            .mlf-build/stdlib-default-controls/header-validation/
+            .mlf-build/stdlib-default-controls/*.stdout
+            .mlf-build/stdlib-default-controls/*.stderr
             .mlf-build/shared-ghc/receipt.json
             .mlf-build/shared-ghc/*.log
             .mlf-build/shared-ghc/packages.txt
@@ -390,6 +427,7 @@ jobs:
             .mlf-build/compiler-shapes-smoke/cohorts/**/*.json
             .mlf-build/compiler-shapes-smoke/cohorts/**/*.csv
             .mlf-build/compiler-shapes-smoke/cohorts/**/*.md
+            .mlf-build/compiler-shapes-smoke/cohorts/**/sources/**/Main.hs
             .mlf-build/compiler-shapes-smoke/cohorts/**/stdout
             .mlf-build/compiler-shapes-smoke/cohorts/**/stderr
             .mlf-build/compiler-shapes-smoke/results/
@@ -419,9 +457,13 @@ jobs:
             .mlf-build/map-balance-controls/**/stdout
             .mlf-build/map-balance-controls/**/stderr
             .mlf-build/map-balance-controls/**/*.hs
+            .mlf-build/map-balance-controls/**/*.c
+            .mlf-build/map-balance-controls/**/*.h
+            .mlf-build/map-balance-controls/**/*.d
             .mlf-build/map-balance-guard/
             .mlf-build/map-balance-controls/**/*.json
             .mlf-build/patricia-*/**/*.json
+            .mlf-build/patricia-*-guard/build.log
             .mlf-build/patricia-*/**/stdout
             .mlf-build/patricia-*/**/stderr
             .mlf-build/patricia-*/**/*.hs
@@ -451,6 +493,18 @@ jobs:
             .mlf-build/direct-host-tests/**/*.stdout
             .mlf-build/direct-host-tests/**/*.stderr
             .mlf-build/direct-host-tests/*.log
+            .mlf-build/direct-host-tests/utf8-length/**/*.hs
+            .mlf-build/direct-host-tests/utf8-length/**/*.o
+            .mlf-build/direct-host-tests/utf8-length/**/*.hi
+            .mlf-build/direct-host-tests/utf8-length/**/*.d
+            .mlf-build/direct-host-tests/utf8-length/**/stdout
+            .mlf-build/direct-host-tests/utf8-length/**/stderr
+            .mlf-build/direct-host-tests/utf8-length-supervisor.json
+            .mlf-build/crc-supervisor-controls/
+            .mlf-build/utf8-supervisor-controls/
+            .mlf-build/candidate-supervisor-controls/
+            .mlf-build/header-adapter-controls/
+            .mlf-build/direct-host-tests/candidate-selection/
             .mlf-build/framework-direct/*.json*
             .mlf-build/framework-direct/*.stdout
             .mlf-build/framework-direct/*.stderr

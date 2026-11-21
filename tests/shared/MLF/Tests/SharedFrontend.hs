@@ -7,10 +7,20 @@ module MLF.Tests.SharedFrontend where {
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Parser as P;
+  import qualified Bootstrap.Parsec as Parsing;
+  import qualified Bootstrap.Lexer as Lexer;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.CrateArtifact as Artifact;
   import qualified Bootstrap.CrateQuery as Query;
+  import qualified Bootstrap.CrateGraph as CrateGraph;
+  import qualified Bootstrap.QueryGraph as QueryGraph;
+  import qualified Bootstrap.Bitstream as Wire;
+  import qualified Bootstrap.ArtifactStructure as Structure;
   import qualified Bootstrap.InferenceUnit as Inference;
+  import qualified Bootstrap.SourceInference as Source;
+  import qualified Bootstrap.IntSet as IntSet;
+  import qualified Bootstrap.OpenFragment as Open;
+  import qualified Bootstrap.IndexVec as Index;
   import qualified Bootstrap.Lexer as L;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Surface as Surface;
@@ -45,6 +55,34 @@ module MLF.Tests.SharedFrontend where {
       Left _ -> False;
       Right m -> isRight (Modules.linkModules ImplicitPrelude ((:) m []))
     };
+  atomNameCase = case (,) (parse "main = true") (parse "main = True") of {
+    (,) (Right (SourceModule _ _ _ _ _ _ _ [((,,) _ _
+          (SCallSite label (SourceSpan _ _ _ 5 8 5 12) (SVar variable)))] _ _))
+        (Right (SourceModule _ _ _ _ _ _ _ [((,,) _ _ (SConstructor constructor))] _ _)) ->
+      eqString variable "true" && eqString label variable && eqString constructor "$MLF.Source.True";
+    _ -> False
+  };
+  openSymbolOrder = let {
+    iface names = Artifact.CrateInterface "crate" [] [] [] [] [] [] [] []
+      (map (\n -> (,) n (XCon "Int" [])) names) "" "" []
+  } in case (,) (Artifact.openIndex [iface ["z","a"]] [])
+                (Artifact.openIndex [iface ["x"],iface ["x"]] []) of {
+    (,) (Right (Artifact.OpenIndex ids _ _ _)) (Left message) ->
+      eqString message "duplicate crate crate symbol" &&
+      case (,) (M.lookup compareString "z" ids) (M.lookup compareString "a" ids) of {
+        (,) (Just first) (Just second) -> Index.toInt first == 0 && Index.toInt second == 1;
+        _ -> False
+      };
+    _ -> False
+  };
+  boundedDeclarationReads = let {
+    readId i = XVarTerm (XName i "same hint");
+    source = XLetRec [((,,) (XName 1 "binder") (XCon "Int" []) (readId (0 - 3)))]
+      (XApp (readId 5) (XApp (readId 4) (readId 90)));
+    before name = if X.nameId name < 5 then Set.singleton name else Set.empty;
+    ids names = map X.nameId (Set.toList names)
+  } in eqList eqInt (ids (Artifact.variableReadsWith before source)) [0 - 3,4] &&
+    eqList eqInt (ids (Artifact.declarationVariableReads source)) [0 - 3,4,5,90];
   forwardScope =
     case parse "main = let { x = y; y = 3 } in x" of {
       Right (SourceModule _ _ _ _ _ _ _ ((:) ((,,) _ _ (SLet y (SIntLit 3)
@@ -1496,10 +1534,643 @@ module MLF.Tests.SharedFrontend where {
       check "formatter same-indent operator rejected" (reject "main = 1 +\n2");
       check "formatter retains explicit boundary rejection" (reject "main = do { ioReturn 1; do\n  ioReturn 2 }")
   };
+  -- Compare the new partial checker with the retained general solver, then
+  -- ask the frozen target checker independently. Binder IDs may differ, so
+  -- erasure equality follows lexical binding rather than printed hints.
+  -- The general elaborator emits identity coercions and aliases. Compare
+  -- erasures modulo only those two administrative laws, not arbitrary beta
+  -- reduction or an optimizer supplied by the candidate.
+  monomorphicAdministrative names term = case term of {
+    XEVar name -> XEVar (M.findWithDefault X.compareName name name names);
+    XEAbs name body -> XEAbs name (monomorphicAdministrative (M.delete X.compareName name names) body);
+    XEApp function argument -> let { f = monomorphicAdministrative names function;
+      a = monomorphicAdministrative names argument } in case f of {
+        XEAbs x (XEVar y) -> if X.equalName x y then a else XEApp f a;
+        _ -> XEApp f a
+      };
+    XELet name rhs body -> case monomorphicAdministrative names rhs of {
+      XEVar original -> monomorphicAdministrative (M.insert X.compareName name original names) body;
+      value -> XELet name value (monomorphicAdministrative (M.delete X.compareName name names) body)
+    };
+    XELetRec bindings body -> let {
+      scope = foldl (\env binding -> M.delete X.compareName (fst binding) env) names bindings
+    } in XELetRec (map (\((,) name rhs) -> (,) name (monomorphicAdministrative scope rhs)) bindings)
+      (monomorphicAdministrative scope body);
+    _ -> term
+  };
+  monomorphicErasure names left right = case (,) left right of {
+    (,) (XEVar a) (XEVar b) -> case M.lookup X.compareName a names of {
+      Just actual -> X.equalName actual b; Nothing -> False
+    };
+    (,) (XEAbs a body) (XEAbs b other) ->
+      monomorphicErasure (M.insert X.compareName a b names) body other;
+    (,) (XEApp f a) (XEApp g b) -> monomorphicErasure names f g && monomorphicErasure names a b;
+    (,) (XELet a value body) (XELet b other rest) -> monomorphicErasure names value other &&
+      monomorphicErasure (M.insert X.compareName a b names) body rest;
+    (,) (XELetRec xs body) (XELetRec ys rest) ->
+      length xs == length ys && let {
+        scope = foldl (\env ((,) a b) -> M.insert X.compareName (fst a) (fst b) env) names (zip xs ys)
+      } in all (\((,) a b) -> monomorphicErasure scope (snd a) (snd b)) (zip xs ys) &&
+        monomorphicErasure scope body rest;
+    _ -> X.equalErased left right
+  };
+  monomorphicGroupCase = inferenceGroupCase Inference.monomorphicIndexed;
+  groundGroupCase = inferenceGroupCase Inference.groundIndexed;
+  inferenceGroupCase route label expectedFast parameters members = do {
+    prepared <- recursiveRight label (Inference.prepareIndexedGroup parameters [] members);
+    let { candidate = route parameters members (snd prepared) };
+    check (label ++ " route") (isRight candidate == expectedFast);
+    ordinary <- recursiveRight (label ++ " ordinary")
+      (Inference.finishOpenGroup (fst prepared) (map snd members) (snd prepared));
+    actual <- recursiveRight (label ++ " indexed")
+      (Inference.compileOpenGroupIndexed "control" parameters [] members);
+    let { a = Open.closedTerm actual; b = Open.closedTerm ordinary };
+    check (label ++ " erasure") (monomorphicErasure M.empty (monomorphicAdministrative M.empty (X.erase a))
+      (monomorphicAdministrative M.empty (X.erase b)));
+    check (label ++ " exported type")
+      (eqList (\((,) n ty) ((,) m other) -> eqString (X.nameHint n) (X.nameHint m) && XT.alphaEq ty other)
+        (Open.bindings actual) (Open.bindings ordinary));
+    actualType <- recursiveRight (label ++ " frozen target") (Independent.checkClosed a);
+    ordinaryType <- recursiveRight (label ++ " ordinary frozen target") (Independent.checkClosed b);
+    check (label ++ " independent type") (XT.alphaEq actualType ordinaryType)
+  };
+  templateGroupChecks = do {
+    let { a = XTyVar 100; ty = XForall a XBot
+          (XArrow (XArrow (XVar a) (XVar a)) (XArrow (XVar a) (XVar a)));
+      parameters = \identity name scheme -> [(,,) (Index.fromInt identity) name scheme];
+      member = \foreignId owner stepId argId name -> [(,) (Index.fromInt owner) ((,,) name Nothing
+        (SDeclScope [Index.fromInt stepId] (SLam "step" Nothing
+          (SDeclScope [Index.fromInt argId] (SLam "value" Nothing
+            (SApp (SGlobal (Index.fromInt stepId) "step")
+              (SApp (SApp (SGlobal (Index.fromInt foreignId) "wrong hint")
+                (SGlobal (Index.fromInt stepId) "step")) (SGlobal (Index.fromInt argId) "value"))))))))];
+      ps = parameters 3 "previous" ty;
+      first = member 3 10 11 12 "first";
+      second = member 23 30 31 32 "second" };
+    installed <- recursiveRight "template initial inference"
+      (CrateGraph.compileIndexedMemo "context" M.empty "first" ps [] first);
+    check "checked polymorphic template is retained" (M.size (snd installed) == 1);
+    repeated <- recursiveRight "template renamed inference"
+      (CrateGraph.compileIndexedMemo "context" (snd installed) "second"
+        (parameters 23 "otherPrevious" ty) [] second);
+    check "alpha-equivalent dependency and owner use one template" (M.size (snd repeated) == 1);
+    inferenceGroupCase (\inputs members _ -> mapEither fst
+        (CrateGraph.compileIndexedMemo "context" (snd installed) "second" inputs [] members))
+      "reused polymorphic template" True (parameters 23 "otherPrevious" ty) second;
+    key <- recursiveRight "template source key" (CrateGraph.inferenceTemplateKey "context" ps first);
+    let { b = XTyVar 200;
+      alpha = XForall b XBot (XArrow (XArrow (XVar b) (XVar b)) (XArrow (XVar b) (XVar b)));
+      bounded = XForall a (XCon "Int" [])
+        (XArrow (XArrow (XVar a) (XVar a)) (XArrow (XVar a) (XVar a)));
+      application = XForall a XBot (XForall b XBot
+        (XArrow (XArrow (XVar a) (XVar b)) (XArrow (XVar a) (XVar b))));
+      different label context inputs members = do {
+        other <- recursiveRight label (CrateGraph.inferenceTemplateKey context inputs members);
+        check label (not (eqString key other))
+      } };
+    renamedKey <- recursiveRight "template alpha-renamed key"
+      (CrateGraph.inferenceTemplateKey "context" (parameters 23 "otherPrevious" alpha) second);
+    check "template alpha-renaming preserves the key" (eqString key renamedKey);
+    different "template includes datatype context" "other-context" ps first;
+    different "template includes quantified bounds" "context" (parameters 3 "previous" bounded) first;
+    check "unsupported bounded dependency is not accepted through an older template"
+      (isLeft (Inference.compileOpenGroupIndexed "bounded" (parameters 3 "previous" bounded) [] first) &&
+       isLeft (CrateGraph.compileIndexedMemo "context" (snd installed) "bounded"
+         (parameters 3 "previous" bounded) [] first));
+    inferenceGroupCase (\inputs members _ -> mapEither fst
+        (CrateGraph.compileIndexedMemo "context" (snd installed) "application" inputs [] members))
+      "changed dependency scheme is inferred again" True (parameters 3 "previous" application) first;
+    let { two = append ps (parameters 4 "spare" ty) };
+    leftKey <- recursiveRight "first dependency position" (CrateGraph.inferenceTemplateKey "context" two first);
+    rightKey <- recursiveRight "second dependency position"
+      (CrateGraph.inferenceTemplateKey "context" two (member 4 10 11 12 "first"));
+    check "template distinguishes equally typed dependencies" (not (eqString leftKey rightKey));
+    check "template rejects unresolved identities"
+      (isLeft (CrateGraph.inferenceTemplateKey "context" ps (member 99 10 11 12 "first")));
+    check "template rejects binder identity capture"
+      (isLeft (CrateGraph.inferenceTemplateKey "context" ps (member 3 10 3 12 "first")));
+    check "template rejects recursive ownership"
+      (isLeft (CrateGraph.inferenceTemplateKey "context" ps (member 10 10 11 12 "first")));
+    let { full = M.fromList compareString (map (\i -> (,) (showInt i) (fst installed)) (range 1 64)) };
+    limited <- recursiveRight "bounded template inventory"
+      (CrateGraph.compileIndexedMemo "context" full "second" (parameters 23 "otherPrevious" ty) [] second);
+    check "template inventory stays bounded" (M.size (snd limited) == 64)
+  };
+  checkedGroundUses = do {
+    let { a = XTyVar 41; x = XName 10 "poly"; t = XVar a;
+      use target = XTypeApp (XVarTerm x) (XThen (XInner (XBottom target)) XElim);
+      scope signature = XEnv M.empty (M.singleton x signature);
+      same = XForall a XBot (XArrow t t); alwaysBool = XForall a XBot (XArrow t recursiveBool);
+      repeated = XApp (use recursiveInt) (XApp (use recursiveInt) (XIntTerm 7));
+      compare label signature term expected = do {
+        recursiveCheckedType label expected (Check.inferIn Data.emptyDataEnv (scope signature) term);
+        recursiveCheckedType (label ++ " independent") expected (Independent.inferIn Data.emptyDataEnv (scope signature) term)
+      }
+    };
+    compare "repeated ground instantiation" same repeated recursiveInt;
+    compare "same binder identity with a different scheme" alwaysBool (use recursiveInt) (XArrow recursiveInt recursiveBool);
+    compare "same binder with another type argument" same (use recursiveBool) (XArrow recursiveBool recursiveBool);
+    check "ground instantiation on a monomorphic variable still fails"
+      (case Check.inferIn Data.emptyDataEnv (scope recursiveInt) (use recursiveInt) of {
+        Left reason -> eqString reason "Inst-Inner requires a forall source"; Right _ -> False
+      })
+  };
+  groundGroupChecks = do {
+    checkedGroundUses;
+    groundAliasChecks;
+    groundRecursiveChecks;
+    let { a = XTyVar 100; b = XTyVar 101; c = XTyVar 102;
+      xa = XVar a; xb = XVar b; xc = XVar c;
+      int = SCon "Int" []; arrow = SArrow int int;
+      identity = XForall a XBot (XArrow xa xa);
+      constant = XForall a XBot (XForall b (XForall c XBot (XArrow xc xa)) (XArrow xa xb));
+      apply = XForall a XBot (XForall b XBot (XArrow (XArrow xa xb) (XArrow xa xb)));
+      composeTy = XForall a XBot (XForall b XBot
+        (XForall c (XForall (XTyVar 103) XBot
+          (XArrow (XArrow (XVar (XTyVar 103)) xa) (XArrow (XVar (XTyVar 103)) xb)))
+          (XArrow (XArrow xa xb) xc)));
+      parameter = \ty -> [(,,) (Index.fromInt 3) "poly" ty];
+      use = SGlobal (Index.fromInt 3) "wrong-hint";
+      localIdentity = SLam "v" Nothing (SVar "v");
+      row = \ty body -> [(,) (Index.fromInt 10) ((,,) "function" (Just (SAnnotation [] ty)) body)];
+      conditional = \p yes no -> SApp (SApp (SApp (SPrimitive PIfThenElse) p) yes) no };
+    let { ps = parameter identity; typed = row arrow (SLam "x" Nothing (SApp use (SVar "x"))) };
+    direct <- recursiveRight "direct unary import" (Inference.signedApplicationGroup ps [] typed);
+    elaborated <- recursiveRight "elaborated unary import" (Inference.compileElaboratedGroup ps [] typed);
+    check "direct unary import preserves the checked term"
+      (eqString (Open.fingerprint direct) (Open.fingerprint elaborated));
+    recursiveRight "frozen unary import" (Independent.checkClosed (Open.closedTerm direct));
+    check "bounded import requires full elaboration"
+      (isLeft (Inference.signedApplicationGroup (parameter constant) [] typed));
+    groundGroupCase "ground imported identity" True (parameter identity)
+      (row arrow (SLam "x" Nothing (SApp use (SVar "x"))));
+    groundGroupCase "ground independent Bool and Int instantiations" True (parameter identity)
+      (row int (conditional (SApp use (SBoolLit True)) (SApp use (SIntLit 7)) (SApp use (SIntLit 8))));
+    groundGroupCase "ground bounded constant scheme" True (parameter constant)
+      (row int (SApp (SApp use (SIntLit 7)) (SBoolLit True)));
+    groundGroupCase "ground function application" True (parameter apply)
+      (row int (SApp (SApp use localIdentity) (SIntLit 7)));
+    groundGroupCase "ground bounded composition scheme" True (parameter composeTy)
+      (row int (SApp (SApp (SApp use localIdentity) localIdentity) (SIntLit 7)));
+    groundGroupCase "ground resolved local identity" True (parameter identity)
+      (row arrow (SDeclScope [Index.fromInt 12]
+        (SLam "poly" Nothing (SApp use (SGlobal (Index.fromInt 12) "wrong-local")))));
+    groundGroupCase "ground specialization leaves polymorphic argument to solver" False (parameter constant)
+      (row int (SApp (SApp use (SIntLit 7)) localIdentity));
+    groundGroupCase "ground specialization leaves local generalization to solver" False []
+      (row int (SLet "id" localIdentity (SApp (SVar "id") (SIntLit 7))));
+    groundGroupCase "ground specialization never generalizes unsigned exports" False []
+      [(,) (Index.fromInt 10) ((,,) "function" Nothing localIdentity)];
+    groundGroupCase "ground specialization leaves higher-rank argument to solver" False
+      (parameter (XArrow identity (XCon "Int" [])))
+      (row int (SApp use (SAnn localIdentity
+        (SAnnotation [] (SForall Flexible "a" SBottom (SArrow (STVar "a") (STVar "a")))))));
+    let { bounded = parameter (XForall a (XCon "Int" []) (XArrow xa xa));
+      invalid = row (SCon "Bool" []) (SApp use (SBoolLit True)) };
+    boundedPrepared <- recursiveRight "bounded rejection preparation" (Inference.prepareIndexedGroup bounded [] invalid);
+    check "ground specialization respects non-bottom bound"
+      (isLeft (Inference.groundIndexed bounded invalid (snd boundedPrepared)));
+    check "ordinary solver rejects the same non-bottom bound"
+      (isLeft (Inference.finishOpenGroup (fst boundedPrepared) (map snd invalid) (snd boundedPrepared)));
+    check "combined route rejects the same non-bottom bound"
+      (isLeft (Inference.compileOpenGroupIndexed "control" bounded [] invalid));
+    let { bad = [row int (SApp (SApp use (SIntLit 7)) (SBoolLit True)),
+          row arrow (SLam "x" Nothing (SApp (SVar "x") (SVar "x"))),
+          row int (SGlobal (Index.fromInt 99) "poly")] };
+    mapM_ (\members -> do {
+      prepared <- recursiveRight "ground bad preparation" (Inference.prepareIndexedGroup (parameter identity) [] members);
+      check "ground invalid use rejects fast route"
+        (isLeft (Inference.groundIndexed (parameter identity) members (snd prepared)));
+      check "ground invalid use rejects ordinary route"
+        (isLeft (Inference.finishOpenGroup (fst prepared) (map snd members) (snd prepared)));
+      check "ground invalid use rejects combined route"
+        (isLeft (Inference.compileOpenGroupIndexed "control" (parameter identity) [] members))
+    }) bad
+  };
+  groundRecursiveChecks = do {
+    let { int = SCon "Int" []; bool = SCon "Bool" [];
+      sig = \ty -> Just (SAnnotation [] (SArrow int ty));
+      peer = \i -> SGlobal (Index.fromInt i) "non-authoritative hint";
+      member = \i name annotation rhs -> (,) (Index.fromInt i) ((,,) name annotation
+        (SDeclScope [Index.fromInt (i + 100)] (SLam "x" Nothing (rhs (peer (i + 100))))));
+      choose = \yes no -> SApp (SApp (SApp (SPrimitive PIfThenElse) (SBoolLit True)) yes) no;
+      left = member 20 "left" (sig int) (\x -> choose (SIntLit 7) (SApp (peer 10) x));
+      right = member 10 "right" (sig int) (\x -> SApp (peer 20) x);
+      self = member 40 "self" (sig int) (\x -> choose x (SApp (peer 40) x));
+      a = XTyVar 50; poly = [(,,) (Index.fromInt 3) "identity" (XForall a XBot (XArrow (XVar a) (XVar a)))];
+      imported = member 10 "right" (sig int) (\x -> SApp (peer 3) (SApp (peer 20) x));
+      wrong = member 10 "right" (sig bool) (\x -> SApp (peer 20) x);
+      mixed = member 10 "right" Nothing (\x -> SApp (peer 20) x);
+      route = inferenceGroupCase Inference.groundRecursiveIndexed };
+    route "recursive ground mutual by declaration identity" True [] [right,left];
+    route "recursive ground use of polymorphic import" True poly [imported,left];
+    route "recursive ground self edge" True [] [self];
+    prepared <- recursiveRight "recursive ground mixed preparation"
+      (Inference.prepareIndexedGroup [] [] [mixed,left]);
+    check "recursive ground requires every signature"
+      (isLeft (Inference.groundRecursiveIndexed [] [mixed,left] (snd prepared)));
+    invalid <- recursiveRight "recursive ground mismatched peer preparation"
+      (Inference.prepareIndexedGroup [] [] [wrong,left]);
+    check "recursive ground rejects a mismatched peer"
+      (isLeft (Inference.groundRecursiveIndexed [] [wrong,left] (snd invalid)));
+    check "recursive ground keeps ordinary error" (case (,)
+      (Inference.finishOpenGroup (fst invalid) (map snd [wrong,left]) (snd invalid))
+      (Inference.compileOpenGroupIndexed "control" [] [] [wrong,left]) of {
+        (,) (Left expected) (Left actual) -> eqString expected actual;
+        _ -> False
+      })
+  };
+  groundAliasDepth known identity = case IM.lookup identity known of {
+    Just (Inference.GroundVar next) -> 1 + groundAliasDepth known next;
+    _ -> 0
+  };
+  groundAliasChecks = do {
+    let { a = XTyVar 100; ty = XForall a XBot (XArrow (XVar a) (XVar a));
+      globals = M.singleton 3 (Inference.GroundImport (XName 0 "poly") ty);
+      call = \body -> SApp (SGlobal (Index.fromInt 3) "wrong") body;
+      body = SLam "x" Nothing (foldl (\body _ -> call body) (SVar "x") (range 0 255)) };
+    (,,) template actual inferred <- recursiveRight "nested ground uses"
+      (Inference.groundInfer globals M.empty (Inference.GroundState 0 IM.empty IM.empty 1) body);
+    wanted <- recursiveRight "nested ground target"
+      (Inference.groundType M.empty (XArrow (XCon "Int" []) (XCon "Int" [])));
+    solved <- recursiveRight "nested ground solve" (Inference.groundUnify inferred actual wanted);
+    case solved of { Inference.GroundState _ known _ _ ->
+      check "nested polymorphic uses do not build a linear type-alias chain"
+        (all (\identity -> groundAliasDepth known identity <= 16) (IM.keys known))
+    };
+    sealed <- recursiveRight "nested ground seal" (Inference.groundSeal solved template);
+    checked <- recursiveRight "nested ground independent check" (Independent.checkClosed (XAbs (XName 0 "poly") ty sealed));
+    check "nested polymorphic uses preserve their closed type"
+      (XT.alphaEq checked (XArrow ty (XArrow (XCon "Int" []) (XCon "Int" []))))
+  };
+  monomorphicGroupChecks = do {
+    let { int = SCon "Int" []; bool = SCon "Bool" []; arrow = SArrow int int;
+      row = \ty body -> [(,) (Index.fromInt 10) ((,,) "function" (Just (SAnnotation [] ty)) body)];
+      unsigned = \body -> [(,) (Index.fromInt 10) ((,,) "function" Nothing body)];
+      add = \a b -> SApp (SApp (SPrimitive PAddInt) a) b;
+      identity = SLam "x" Nothing (SVar "x") };
+    monomorphicGroupCase "signed primitive lambda" True []
+      (row arrow (SChecked arrow (SLam "x" Nothing (add (SVar "x") (SIntLit 7)))));
+    monomorphicGroupCase "signed boolean" True [] (row bool (SBoolLit True));
+    monomorphicGroupCase "signed Unicode text" True [] (row (SCon "String" []) (SStringLit "lambda λ"));
+    monomorphicGroupCase "signed floating value" True [] (row (SCon "Double" []) (SDoubleLit (doubleFromBits (-9223372036854775808))));
+    monomorphicGroupCase "signed higher order lambda" True []
+      (row (SArrow arrow arrow) (SLam "f" Nothing (SLam "x" Nothing (SApp (SVar "f") (SVar "x")))));
+    monomorphicGroupCase "signed application checks lambda argument" True []
+      (row int (SApp (SAnn (SLam "f" Nothing (SApp (SVar "f") (SIntLit 8)))
+        (SAnnotation [] (SArrow arrow int))) identity));
+    monomorphicGroupCase "signed local shadowing" True []
+      (row arrow (SLam "x" Nothing (SLet "x" (SIntLit 4) (SVar "x"))));
+    monomorphicGroupCase "signed resolved import ignores hint" True
+      [(,,) (Index.fromInt 3) "outside" (XCon "Int" [])]
+      (row arrow (SLam "x" Nothing (add (SVar "x") (SGlobal (Index.fromInt 3) "wrong-hint"))));
+    monomorphicGroupCase "signed named import is shadowed locally" True
+      [(,,) (Index.fromInt 3) "x" (XCon "Int" [])]
+      (row arrow identity);
+    monomorphicGroupCase "polymorphic annotation uses solver" False []
+      (row (SForall Flexible "a" SBottom (SArrow (STVar "a") (STVar "a"))) identity);
+    monomorphicGroupCase "unsigned declaration uses solver" False []
+      [(,) (Index.fromInt 10) ((,,) "function" Nothing identity)];
+    monomorphicGroupCase "inferred primitive lambda" True []
+      (unsigned (SLam "x" Nothing (add (SVar "x") (SIntLit 7))));
+    monomorphicGroupCase "inferred two arguments" True []
+      (unsigned (SLam "x" Nothing (SLam "y" Nothing (add (SVar "x") (SVar "y")))));
+    monomorphicGroupCase "inferred resolved parameter" True []
+      (unsigned (SDeclScope [Index.fromInt 12]
+        (SLam "x" Nothing (add (SGlobal (Index.fromInt 12) "wrong") (SIntLit 1)))));
+    monomorphicGroupCase "inferred closed global" True
+      [(,,) (Index.fromInt 3) "outside" (XArrow (XCon "Int" []) (XCon "Int" []))]
+      (unsigned (SLam "x" Nothing (SApp (SGlobal (Index.fromInt 3) "wrong") (SVar "x"))));
+    monomorphicGroupCase "inferred literal" True [] (unsigned (SIntLit 7));
+    monomorphicGroupCase "inferred boolean" True [] (unsigned (SBoolLit True));
+    monomorphicGroupCase "inferred Unicode" True [] (unsigned (SStringLit "λ"));
+    monomorphicGroupCase "inferred negative zero" True []
+      (unsigned (SDoubleLit (doubleFromBits (-9223372036854775808))));
+    monomorphicGroupCase "inferred inline lambda application uses solver" False []
+      (unsigned (SLam "x" Nothing (SApp (SLam "y" Nothing (add (SVar "y") (SIntLit 1))) (SVar "x"))));
+    monomorphicGroupCase "inferred unused parameter remains polymorphic" False []
+      (unsigned (SLam "x" Nothing (SIntLit 1)));
+    monomorphicGroupCase "inferred unknown function uses solver" False []
+      (unsigned (SLam "f" Nothing (SApp (SVar "f") (SIntLit 1))));
+    monomorphicGroupCase "inferred let generalization uses solver" False []
+      (unsigned (SLet "id" identity (SApp (SVar "id") (SIntLit 1))));
+    monomorphicGroupCase "inferred shadowing leaves outer parameter polymorphic" False []
+      (unsigned (SLam "x" Nothing (SLam "x" Nothing (add (SVar "x") (SIntLit 1)))));
+    monomorphicGroupCase "recursive declaration uses solver" False []
+      (row arrow (SLam "x" Nothing (SApp (SGlobal (Index.fromInt 10) "function") (SVar "x"))));
+    let { bad = [row int (SBoolLit True), row arrow (SLam "x" (Just (SAnnotation [] bool)) (SIntLit 1)),
+          row int (SGlobal (Index.fromInt 99) "outside"), row int (SVar "missing"),
+          row arrow (SChecked (SArrow bool bool) identity),
+          unsigned (SLam "x" Nothing (add (SVar "x") (SBoolLit True))),
+          unsigned (SLam "x" Nothing (add (SVar "x")
+            (SApp (SAnn (SLam "b" Nothing (SIntLit 1)) (SAnnotation [] (SArrow bool int))) (SVar "x"))))] };
+    mapM_ (\members -> do {
+      check "bad monomorphic declaration rejects"
+        (isLeft (Inference.compileOpenGroupIndexed "control" [] [] members));
+      case Inference.prepareIndexedGroup [] [] members of {
+        Left _ -> ioReturn ();
+        Right prepared -> check "bad monomorphic declaration ordinary rejects"
+          (isLeft (Inference.finishOpenGroup (fst prepared) (map snd members) (snd prepared)))
+      }
+    }) bad;
+    let { entry = Artifact.definitionName "entry-control" (Modules.Entity "Main" "<crate-entry>" Modules.Value);
+      plain = XCon "Int" []; legacy = XForall (XTyVar 1) XBot plain;
+      iface = \bindings -> Artifact.CrateInterface "entry-control" [] ["Main"] [(,) "Main" []]
+        [(,) "Main" []] [] [] [] [] bindings entry "checked" (map (\binding -> (,) (fst binding) False) bindings);
+      bindings = [(,) entry plain, (,) "select_legacy" legacy];
+      available = M.fromList compareString [(,) entry ((,) (XName 0 "main") plain),
+        (,) "select_legacy" ((,) (XName 2 "legacy") legacy)];
+      root = iface bindings };
+    check "direct entry preserves legacy import adaptation rejection"
+      (isLeft (Artifact.linkEntry 3 [root] root available entry));
+    let { ordinary = iface [(,) entry plain]; value = M.fromList compareString [(,) entry ((,) (XName 0 "main") plain)] };
+    check "direct entry accepts checked closed monotype"
+      (case Artifact.linkEntry 3 [ordinary] ordinary value entry of { Right (XVarTerm n) -> X.nameId n == 0; _ -> False });
+    check "direct entry rejects import type mismatch"
+      (isLeft (Artifact.linkEntry 3 [ordinary] ordinary (M.fromList compareString [(,) entry ((,) (XName 0 "main") (XCon "Bool" []))]) entry))
+  };
+  sourceCandidateChecks = do {
+    let { int = SCon "Int" [];
+      klass = SClassDecl "Probe" [(,) "a" Star] [] [(,) "probe" (SArrow (STVar "a") int)];
+      instanceValue = SInstanceDecl [] [] "Probe" [int] [(,) "probe" (SLam "x" Nothing (SVar "x"))];
+      members = [(,,) "plain" Nothing (SLam "x" Nothing (SApp (SApp (SPrimitive PAddInt) (SVar "x")) (SIntLit 1))),
+        (,,) "overloaded" Nothing (SLam "x" Nothing (SApp (SVar "probe") (SVar "x")))];
+      scope = IntSet.fromList [0] };
+    planned <- recursiveRight "candidate-demand source plan"
+      (Source.prepareSourcePlan M.empty [] [klass] [(,) "probeInt" instanceValue]
+        (M.fromList compareString [(,) "plain" scope,(,) "overloaded" scope]) [scope] members);
+    plan <- case planned of { Just value -> ioReturn value; Nothing -> panic "candidate-demand source plan fallback" };
+    dictionary <- case M.lookup compareString "Probe" (Classes.inventoryOrdinaryRegistry (Source.planInventory plan)) of {
+      Just value -> ioReturn value; Nothing -> panic "candidate-demand dictionary missing"
+    };
+    let { contracts = M.singleton "probeInt" (Source.SourceContract (XCon dictionary [XCon "Int" []]) [] False) };
+    plain <- recursiveRight "plain prepared source" (Source.prepareGroup plan contracts ["plain"]);
+    overloaded <- recursiveRight "overloaded prepared source" (Source.prepareGroup plan contracts ["overloaded"]);
+    check "unsigned root without evidence slots has no candidate dependencies" (null (Source.groupCandidateBindings plain));
+    check "unsigned overloaded root retains its exact candidate dependency"
+      (eqList eqString (map fst (Source.groupCandidateBindings overloaded)) ["probeInt"]);
+    check "unsigned overloaded root retains evidence slots" (case Source.groupAuthority overloaded of {
+      Just (Source.RootAuthority _ labels _ _ _) -> not (null labels); _ -> False
+    })
+  };
+  rebuiltHashChecks = do {
+    check "open group owner uses exact framing"
+      (eqString (Separate.openGroupName "c" ["a","b"])
+        "16:MLF-OPEN-GROUP-11:c6:1:a1:b");
+    let { owners = map (\((,) crate members) -> Separate.openGroupName crate members)
+          [(,) "c" ["a","b"],(,) "c" ["a","c"],(,) "c" ["a1:b"],
+           (,) "c" ["ab"],(,) "c1:a" ["b"],(,) "d" ["a","b"],(,) "λ" ["a",""]] };
+    check "open group owner retains crate, full membership, boundaries and Unicode"
+      (length (nubBy eqString owners) == length owners);
+    check "open group owner canonicalizes member order"
+      (eqString (Separate.openGroupName "c" ["a","b"]) (Separate.openGroupName "c" ["b","a"]));
+    check "open owner reader retains legacy admission"
+      (Artifact.openGroupOwnerMatches "c" ["a","b"] (Separate.queryGroupName "c" ["a","b"]));
+    check "open owner reader admits exact new ownership"
+      (Artifact.openGroupOwnerMatches "c" ["a","b"] (Separate.openGroupName "c" ["a","b"]));
+    check "open owner reader rejects empty ownership"
+      (not (Artifact.openGroupOwnerMatches "c" [] (Separate.openGroupName "c" [])));
+    check "open owner reader rejects changed ownership"
+      (all (\owner -> not (Artifact.openGroupOwnerMatches "c" ["a","b"] owner))
+        [Separate.openGroupName "d" ["a","b"],Separate.openGroupName "c" ["a"],
+         Separate.openGroupName "c" ["a","c"],Separate.openGroupName "c" ["a","b","c"]]);
+    let { prepared names original lowered metadata = Wire.VNode 421
+            [Wire.VText "v",Structure.toList Structure.toText names,Wire.VText original,
+             Wire.VText lowered,Structure.toList Structure.toText metadata];
+      finished group fragment bindings = Wire.VNode 427 [Wire.VText group,Wire.VText fragment,
+        Structure.toList (Structure.toPair Structure.toText Structure.toText) bindings];
+      preparedBase = prepared ["a"] "body" "lowered" ["metadata"];
+      finishBase = finished "g" "h" [(,) "a" "d"];
+      inventory fields = Wire.VNode 422 (map Wire.VText fields);
+      scope fields edges = Wire.VNode 423 [inventory fields,
+        Structure.toList (Structure.toPair Structure.toText Structure.toText) edges];
+      literal label value text = do {
+        bytes <- byteArrayFromString text;
+        expected <- byteArrayDigest bytes;
+        result <- CrateGraph.hashRebuiltValue value;
+        actual <- recursiveRight label result;
+        check label (eqString expected actual)
+      } };
+    literal "prepared input fixed framing" preparedBase
+      "25:MLF-PREPARED-INPUT-TEXT-11:v1:11:a4:body7:lowered1:18:metadata";
+    literal "finish receipt fixed framing" finishBase
+      "25:MLF-FINISH-RECEIPT-TEXT-11:g1:h1:11:a1:d";
+    literal "scope inventory fixed framing" (inventory ["a","bc"])
+      "26:MLF-SCOPE-INVENTORY-TEXT-11:21:a2:bc";
+    literal "scope dependencies fixed framing" (scope ["a"] [(,) "k" "h"])
+      "22:MLF-SCOPE-READS-TEXT-11:11:a1:11:k1:h";
+    let { variants = [preparedBase,prepared [] "body" "lowered" ["metadata"],
+          prepared [""] "body" "lowered" ["metadata"],
+          prepared ["a","b"] "body" "lowered" ["metadata"],
+          prepared ["a1:b"] "body" "lowered" ["metadata"],
+          prepared ["a"] "lowered" "body" ["metadata"],
+          prepared ["a"] "body" "lowered" ["meta","data"],
+          prepared ["a"] "body" "lowered" ["meta4:data"],
+          prepared ["a"] ("λ" ++ stringFromCode 0 ++ stringFromCode 128512) "lowered" ["metadata"],
+          finishBase,finished "h" "g" [(,) "a" "d"],finished "g" "h" [(,) "d" "a"],
+          inventory [],inventory [""],inventory ["a","bc"],inventory ["ab","c"],
+          inventory ["bc","a"],inventory ["λ" ++ stringFromCode 0 ++ stringFromCode 128512],
+          scope [] [],scope ["a"] [],scope ["a"] [(,) "k" "h"],
+          scope ["a"] [(,) "k" "changed"],scope ["b"] [(,) "k" "h"],
+          scope ["a"] [(,) "k" "h",(,) "j" "i"],scope ["a"] [(,) "j" "i",(,) "k" "h"]] };
+    hashes <- mapM (\value -> CrateGraph.hashRebuiltValue value >>= recursiveRight "rebuilt hash") variants;
+    check "rebuilt hashes retain domains, list boundaries, order and Unicode"
+      (length (nubBy eqString hashes) == length variants);
+    check "framed allocation bound accepts exact size"
+      (eqMaybe (\a b -> a == b) (CrateGraph.framedSize 6 0 ["a","b"]) (Just 6));
+    check "framed allocation bound rejects one byte short"
+      (isNothing (CrateGraph.framedSize 5 0 ["a","b"]));
+    let { ordinary = Wire.VNode 999 [Wire.VBits (-1)] };
+    expected <- QueryGraph.hashValue ordinary >>= recursiveRight "ordinary hash";
+    actual <- CrateGraph.hashRebuiltValue ordinary >>= recursiveRight "fallback hash";
+    check "unknown rebuilt shape retains ordinary encoding" (eqString expected actual);
+    let { unknownScope = Wire.VNode 422 [Wire.VBits 1] };
+    scopeExpected <- QueryGraph.hashValue unknownScope >>= recursiveRight "ordinary scope shape";
+    scopeActual <- CrateGraph.hashRebuiltValue unknownScope >>= recursiveRight "fallback scope shape";
+    check "non-text scope shape retains ordinary encoding" (eqString scopeExpected scopeActual);
+    first <- CrateGraph.hashRebuiltCached Nothing (scope ["a"] [(,) "k" "h"])
+      >>= recursiveRight "initial scope hash";
+    repeated <- CrateGraph.hashRebuiltCached (snd first) (scope ["a"] [(,) "k" "h"])
+      >>= recursiveRight "repeated scope hash";
+    check "exact scope reuses validated digest" (eqString (fst first) (fst repeated));
+    mapM_ (\value -> do {
+      fresh <- CrateGraph.hashRebuiltValue value >>= recursiveRight "changed scope fresh hash";
+      changed <- CrateGraph.hashRebuiltCached (snd repeated) value >>= recursiveRight "changed scope cached hash";
+      check "scope memo preserves changed metadata and dependency hashes"
+        (eqString fresh (fst changed) && not (eqString (fst repeated) (fst changed)))
+    }) [scope ["b"] [(,) "k" "h"],scope ["a"] [(,) "k" "new"],
+        scope ["a"] [],inventory ["a"],unknownScope];
+    invalidCached <- CrateGraph.hashRebuiltCached (snd repeated)
+      (Wire.VNode 423 [inventory ["a"],Wire.VNode 1 [Wire.VNode (-1) []]]);
+    check "scope memo still rejects invalid new wire value" (isLeft invalidCached);
+    invalid <- CrateGraph.hashRebuiltValue (Wire.VNode (-1) []);
+    check "rebuilt hash preserves wire admission rejection" (isLeft invalid)
+  };
+  declarationInventoryChecks :: IO ();
+  declarationInventoryChecks = do {
+    let { names = ["z", "alpha", "a", "last"];
+      equation name = P.Equation name [] Nothing (SIntLit 1);
+      declarations ns = map (\name -> (,,) name Nothing (SIntLit 1)) ns;
+      moduleFor ns ds cs = SourceModule "Inventory.hs" (Just "Inventory") Nothing
+        [] ds cs [] (declarations ns) Nothing SharedHaskellV1;
+      duplicate result = case result of {
+        Left message -> eqString message "Inventory: duplicate declaration";
+        Right _ -> False
+      } };
+    grouped <- recursiveRight "distinct declaration inventory" (P.groupValues (map equation names));
+    check "group inventory preserves source order"
+      (eqList eqString (map (\((,,) name _ _) -> name) grouped) names);
+    check "separated equations retain their duplicate diagnostic"
+      (case P.groupValues (map equation ["z", "a", "z"]) of {
+        Left message -> eqString message "function equations must be contiguous; duplicate value declaration";
+        Right _ -> False
+      });
+    check "preconstructed shared module rejects duplicate values"
+      (case P.validateSharedModule (moduleFor ["f", "f"] [] []) of {
+        Left message -> eqString message "duplicate value declaration"; Right _ -> False
+      });
+    let { open = Just (SAnnotation ["a"] (STVar "a"));
+          raw rhs = SourceModule "Inventory.hs" (Just "Inventory") Nothing [] [] [] []
+            [(,,) "f" open rhs] Nothing SharedHaskellV1 };
+    check "preconstructed recursive group requires a closed signature"
+      (case P.validateSharedModule (raw (SVar "f")) of {
+        Left message -> eqString message "recursive definition f requires an explicit closed signature";
+        Right _ -> False
+      });
+    check "preconstructed nonrecursive annotation keeps its scope"
+      (isRight (P.validateSharedModule (raw (SIntLit 1))));
+    let { slot = Index.fromInt 3; span = SourceSpan "pkg" "Inventory" "Inventory.hs" 1 1 1 2;
+          scoped rhs = SDeclScope [slot] (SLet "x" rhs (SCallSite "f" span (SGlobal slot "f")));
+          core = scoped (SIntLit 1) };
+    check "surface lowering preserves declaration IDs, hints and spans"
+      (case Surface.lowerExpression core of {
+        Right result -> SourceEquality.eqSExprBits result core; Left _ -> False
+      });
+    check "surface lowering finds equations inside a scope"
+      (case Surface.lowerExpression (scoped (SEquations [])) of {
+        Left message -> eqString message "function has no equations"; Right _ -> False
+      });
+    check "adjacent equations still form one declaration"
+      (accept "choose True = 1\nchoose False = 2");
+    let { large = map (\n -> "value" ++ showInt n) (range 0 1023) };
+    check "large distinct module inventory" (isRight (Modules.locals (moduleFor large [] [])));
+    check "identical duplicate entity cannot disappear in a set"
+      (duplicate (Modules.locals (moduleFor (append large ["value0"]) [] [])));
+    check "duplicate final key is rejected"
+      (duplicate (Modules.locals (moduleFor (append large ["value1023"]) [] [])));
+    let { thing = DataDecl "Thing" [] [ConstructorDecl "Thing" []] };
+    check "type and constructor may share their spelling"
+      (isRight (Modules.locals (moduleFor [] [thing] [])));
+    check "constructor and value share the term namespace"
+      (duplicate (Modules.locals (moduleFor ["Thing"] [thing] [])));
+    check "class and datatype share the type namespace"
+      (duplicate (Modules.locals (moduleFor [] [thing] [SClassDecl "Thing" [] [] []])));
+    check "method and value share the term namespace"
+      (duplicate (Modules.locals (moduleFor ["method"] []
+        [SClassDecl "Class" [] [] [(,) "method" (STVar "a")]])))
+  };
+  -- Reference precedence grammar before the delimiter shortcut. The operators,
+  -- associativity and non-associative comparison diagnostic are tested together.
+  precedenceParserChecks :: IO ();
+  precedenceParserChecks = let {
+    at choices = P.sharedOperatorParser choices;
+    product = Parsing.pChainl P.operand (at ["*","/","%"]);
+    sum = Parsing.pChainl product (at ["+","-"]);
+    concatOp = Parsing.pChoice (Parsing.pMap (\_ -> P.sourceConsExpression) (Parsing.pToken ":")) (at ["++"]);
+    joined = Parsing.pChainr sum concatOp;
+    level4 = do {
+      first <- joined;
+      rest <- Parsing.pMany (do { op <- P.sharedInfix P.sharedLevel4Operators; value <- joined; Parsing.pPure ((,) op value) });
+      when (length rest > 1 && any (\entry -> elem eqString (P.referenceLeaf (fst entry)) P.sharedComparisons) rest)
+        (Parsing.pFail "ambiguous use of a non-associative comparison operator");
+      Parsing.pPure (foldl (\left entry -> P.namedOperator (fst entry) left (snd entry)) first rest)
+    };
+    conjunction = Parsing.pChainr level4 (at ["&&"]);
+    disjunction = Parsing.pChainr conjunction (at ["||"]);
+    reference = Parsing.pChainl disjunction (at [">>=",">>"]);
+    remaining = \(Parsing.ParseState _ tokens _ _ _ _) -> map Lexer.tokenText tokens;
+    sameState = \a b -> Parsing.stateOffset a == Parsing.stateOffset b && eqList eqString (remaining a) (remaining b);
+    agrees = \spellings -> let {
+      tokens = zipWith (\index word -> Lexer.Token word 3 (index * 5) 3 (index * 5 + stringLength word))
+        (range 1 (length spellings)) spellings;
+      start = Parsing.ParseState "Prec.hs" tokens (Lexer.Token "" 4 1 4 1) SharedHaskellV1 "Prec" "pkg"
+    } in case (,) (Parsing.pRun reference start) (Parsing.pRun P.sharedBindExpr start) of {
+      (,) (Parsing.PSuccess a end used) (Parsing.PSuccess b next more) -> used == more && sameState end next && SourceEquality.eqSExpr a b;
+      (,) (Parsing.PFailure a end used) (Parsing.PFailure b next more) -> used == more && sameState end next && eqString a b;
+      _ -> False
+    };
+    operators = append [":"] Lexer.sharedValueOperators;
+    combinations = concatMap (\a -> map (\b -> ["x",a,"y",b,"z",")"]) operators) operators;
+    examples = [[],["x"],["x","M",".","+","y"],["x","M","."],["M",".","x","+","y"],["x","+"],
+      ["x","<","y","==","z"],["(","x","+","y",")","*","z"],["(",")"],["(","-","1",")"],
+      ["(","+",")","x"],["(",",",")"],["1.5",";"],["f","[","x",",","y","]"],["(","let"],["1","(","x"]]
+  } in check "shared infix precedence, associativity, spans, residual tokens and errors"
+         (all agrees (append examples combinations));
+  applicationParserChecks :: IO ();
+  applicationParserChecks = let {
+    reference = Parsing.pBind P.atom (\first -> Parsing.pMap (foldl SApp first) (Parsing.pMany P.atom));
+    remaining = \(Parsing.ParseState _ tokens _ _ _ _) -> map Lexer.tokenText tokens;
+    sameState = \a b -> Parsing.stateOffset a == Parsing.stateOffset b &&
+      eqList eqString (remaining a) (remaining b);
+    agrees expected actual syntax spellings = let {
+      tokens = zipWith (\col spelling -> Lexer.Token spelling 3 col 3 (col + stringLength spelling))
+        (range 1 (length spellings)) spellings;
+      state = Parsing.ParseState "App.hs" tokens (Lexer.Token "" 4 1 4 1) syntax "App" "pkg"
+    } in case (,) (Parsing.pRun expected state) (Parsing.pRun actual state) of {
+      (,) (Parsing.PSuccess a end used) (Parsing.PSuccess b next more) ->
+        used == more && sameState end next && SourceEquality.eqSExpr a b;
+      (,) (Parsing.PFailure a end used) (Parsing.PFailure b next more) ->
+        used == more && sameState end next && eqString a b;
+      _ -> False
+    };
+    examples = append (map (\stop -> ["f","x",stop,"y"]) [")",",",";","}","]"])
+      [[],[")"],["f"],["f","(","g","x",")","y"],["f","(",")"],
+       ["f","("],["f","[","x",","],["f","then"],["f","M",".","g"]];
+    equations = append examples [
+      ["Fork","(","Tip","x",")","(","Tip","x",")",";","next"],
+      ["Z9'","(","A_","(","B1","x",")",")","}"],["True","(","A","x",")",";"],
+      ["Node","M",".","Leaf",";"],["Node","(","x",",","Leaf",")"],["Node","(","Leaf"],
+      ["f","(","g","(","x",")",")","x",";","next"],["if","x","then","y","else","z"],
+      ["f","(","x",",","y",")"],["x","::","Int"],["x","+",")"],["x","}"],
+      ["f","0xff","3.25","9e-2"],["x","(","let","{","x","=","1","}","in","x",")"],
+      ["M",".","f","x"],["x",":::", "y"],["f","(","(","g","x",")",")","x",")"]];
+    profiles = [SharedHaskellV1,LegacyEmlfV1,MetadataSyntax]
+  } in do {
+    check "application tree, residual tokens and committed failures"
+      (all (\syntax -> all (agrees reference P.application syntax) examples) profiles);
+    check "equation RHS tree, coordinates, remaining tokens and committed failures"
+      (all (\syntax -> all (agrees P.expr P.equationExpression syntax) equations) profiles);
+    check "scanned source equation constructors, coordinates and general grammar fallback"
+      (all (\syntax -> all (agrees P.expr (P.equationExpressionWith True) syntax) equations) profiles)
+  };
+  finalGeometryChecks :: IO ();
+  finalGeometryChecks = do {
+    let { texts = \glyph -> Wire.VNode 8 (replicate 40 (Wire.VText
+              (concatStringList (replicate 65536 glyph))));
+      ascii = texts "a"; multibyte = texts (stringFromCode 128512) };
+    check "source geometry charges UTF-8 bytes independently of node count" (case
+      (,) (Source.smallFinalValue ascii) (Source.smallFinalValue multibyte) of {
+        (,) (Just False) Nothing -> True; _ -> False });
+    check "full graph admits the shared ASCII and multibyte trees"
+      (all (\raw -> isRight (Wire.planGraph Wire.defaultLimits [raw])) [ascii,multibyte]);
+    check "legacy task-list geometry preserves its four-unit scalar budget"
+      (case (,) (Source.smallFinalTasks [(,,) 1 False [Wire.VText "x"]] 5 1 False)
+                (Source.smallFinalTasks [(,,) 1 False [Wire.VText "x"]] 4 1 False) of {
+        (,) (Just False) Nothing -> True; _ -> False })
+  };
   frontendChecks :: IO ();
   frontendChecks =
     do {
+      declarationInventoryChecks;
+      applicationParserChecks;
+      precedenceParserChecks;
+      finalGeometryChecks;
       formatterChecks;
+      monomorphicGroupChecks;
+      groundGroupChecks;
+      templateGroupChecks;
+      sourceCandidateChecks;
+      rebuiltHashChecks;
       check "legacy malformed pragma comment"
         (isRight
            (P.parseModule "Legacy.emlf" "{-# LANGUAGE X, #-}\nmodule Legacy where\nmain = 1\n"));
@@ -1512,8 +2183,18 @@ module MLF.Tests.SharedFrontend where {
            (P.parseModule "Example.hs"
               (prologue ++
                "{-# LANGUAGE X, #-}\nmodule Example where\nimport MLF.Primitive\nmain = 1\n")));
+      let { plain = concatStringList (map (\_ -> "a") (range 1 257));
+            invalid = "x\n" ++ plain ++ "\t" } in
+        check "plain source run keeps the next error at its scalar column"
+          (case L.validateSharedSource "Run.hs" invalid (stringLength invalid) (L.Cursor 0 1 1) 0 of {
+            Left message -> eqString message "Run.hs:2:258: shared source requires LF and spaces-only whitespace";
+            Right _ -> False
+          });
       check "module metadata" (accept "main = 42");
       check "forward group scope" forwardScope;
+      check "ordinary true and constructor True" atomNameCase;
+      check "open symbol slot order and repeated names" openSymbolOrder;
+      check "bounded Prelude variable reads" boundedDeclarationReads;
       check "legacy sequential scope" legacyScope;
       check "fixed do identity" fixedDo;
       check "mixed per-file profiles" mixedGraph;

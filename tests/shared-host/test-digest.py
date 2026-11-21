@@ -17,12 +17,13 @@ with tempfile.TemporaryDirectory(prefix='mlf-digest-') as tmp:
     for name, data in cases.items():
         path = out/name; path.write_bytes(data); want = hashlib.sha256(data).hexdigest()+'\n'
         for variant in ['native', 'portable']:
-            result = subprocess.run([out/variant, path], capture_output=True, text=True)
-            assert result.returncode == 0 and result.stdout == want, (name, variant, result.stderr)
+            for mode in [[], ['--bytes']]:
+                result = subprocess.run([out/variant, *mode, path], capture_output=True, text=True)
+                assert result.returncode == 0 and result.stdout == want, (name, variant, mode, result.stderr)
     for path, message in [(out/'missing', 'IO error: fileDigest failed'),
                           (out, 'IO error: fileDigest failed'),
                           ('--nul-test', 'file path contains NUL')]:
         for variant in ['native', 'portable']:
             result = subprocess.run([out/variant, path], capture_output=True, text=True)
             assert result.returncode == 1 and result.stderr.strip() == message, (path, variant, result.stderr)
-print('digest native and portable controls passed')
+print('file and byte-array digest native and portable controls passed')

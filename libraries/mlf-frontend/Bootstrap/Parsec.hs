@@ -133,9 +133,11 @@ module Bootstrap.Parsec where {
      (":" ++
       (showInt (tokenLine token) ++ (":" ++ (showInt (tokenColumn token) ++ (": " ++ message))))));
   pSatisfy :: (String -> Bool) -> String -> Parser String;
-  pSatisfy predicate expected =
-    Parser
-      (\state ->
+  pSatisfy predicate expected = Parser (pSatisfyState predicate expected);
+  -- Keep token dispatch in a saturated worker. Its failure messages remain
+  -- lazy; constructing a parser need not allocate both diagnostic prefixes.
+  pSatisfyState :: (String -> Bool) -> String -> ParseState -> PResult String;
+  pSatisfyState predicate expected state =
          case state of {
            ParseState file tokens finish syntax sourceModule sourcePackage ->
              case tokens of {
@@ -146,7 +148,7 @@ module Bootstrap.Parsec where {
                  else PFailure ("unexpected " ++ (tokenText t ++ ("; expected " ++ expected))) state
                         False
              }
-         });
+         };
   pToken :: String -> Parser String;
   pToken spelling = pSatisfy (eqString spelling) spelling;
   pEof :: Parser ();

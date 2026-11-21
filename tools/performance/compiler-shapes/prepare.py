@@ -7,15 +7,17 @@ be mixed with installed-driver measurements.
 """
 from pathlib import Path
 import argparse
+import json
 import shlex
 import subprocess
-import types
+import command_runner
 
 ROOT=Path(__file__).resolve().parents[3]
 
 # Endpoint profiles that can be prepared here. emlf-source-v1 is declared in
 # matrix.json but has no preparation path in this revision, so it is not listed.
-PROFILES={'crate-bootstrap-v1':{'producer_kind':'empty','label':'bootstrap crate producer (no installed native data)'}}
+PROFILES={name:{'producer_kind':'empty','label':'bootstrap crate producer (no installed native data)'}
+          for name in ['crate-bootstrap-v1', 'crate-fused-v1']}
 
 
 def pack(values):
@@ -51,10 +53,9 @@ def main():
     p.add_argument('--output',type=Path,required=True)
     p.add_argument('--clang',default='/usr/bin/clang')
     p.add_argument('--ghc')
-    p.add_argument('--endpoint',default='crate-bootstrap-v1',choices=sorted(PROFILES))
+    p.add_argument('--endpoint',default=json.loads(Path(__file__).with_name('matrix.json').read_text())['default_endpoint'],choices=sorted(PROFILES))
     a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=False)
-    hp=ROOT/'tools/performance/a1-private-index/helper.py'
-    H=types.ModuleType('unchanged_resource_helper');H.__file__=str(hp);exec(compile(hp.read_bytes(),str(hp),'exec'),H.__dict__)
+    H=command_runner.load_helper()
     producer=a.producer.resolve();source=a.source.resolve();auth=H.authenticate(producer,source)
     receipt=H.load(producer/'receipt.json')
     profile=PROFILES[a.endpoint]

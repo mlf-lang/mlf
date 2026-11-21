@@ -2,10 +2,11 @@
 {-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
-module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, ioType, dataConstructors, constructorEntry, emitEntry, emitEntryChunks, emitCheckedChunks, entryCode, PreparedEntry, prepareChecked, emitPreparedChunks, preparedKey, checkedInputKey, crateInputKey, canonicalErasedKey) where {
+module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, ioType, dataConstructors, constructorEntry, emitEntry, emitEntryChunks, emitCheckedChunks, entryCode, PreparedEntry, prepareChecked, prepareCheckedProfiled, emitPreparedChunks, preparedKey, checkedInputKey, crateInputKey, canonicalErasedKey) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import qualified Bootstrap.Std as L;
+  import qualified Bootstrap.Host as Host;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as Set;
   import qualified Bootstrap.Data as D;
@@ -60,6 +61,42 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
   -- runtime code from an independently checked term, and cannot replace its
   -- erased program while retaining the successful check.
   data PreparedEntry = PreparedEntry Bool (Map String ((,) Int Int)) XErased;
+  -- Diagnostic demand, deliberately absent from ordinary emission. Forcing
+  -- Right/PreparedEntry alone would charge lazy optimization to LLVM output.
+  demandName (XName identity hint) = seq identity (seq (stringLength hint) ());
+  demandList force values = case values of {
+    [] -> ();
+    (:) value rest -> seq (force value) (demandList force rest)
+  };
+  demandPattern pattern = case pattern of {
+    XConstructorPattern name names -> seq (stringLength name)
+      (demandList (\optional -> case optional of { Nothing -> (); Just n -> demandName n }) names);
+    XDefaultPattern name -> case name of { Nothing -> (); Just n -> demandName n }
+  };
+  demandErased term = case term of {
+    XEVar name -> demandName name;
+    XEAbs name body -> seq (demandName name) (demandErased body);
+    XEApp function argument -> seq (demandErased function) (demandErased argument);
+    XELet name value body -> seq (demandName name) (seq (demandErased value) (demandErased body));
+    XELetRec definitions body -> seq (demandList (\((,) name value) ->
+      seq (demandName name) (demandErased value)) definitions) (demandErased body);
+    XEInt value -> seq value ();
+    XEDouble value -> seq value ();
+    XEBool value -> seq value ();
+    XEString value -> seq (stringLength value) ();
+    XEPrimitive value -> seq value ();
+    XEEvidenceHole value -> seq value ();
+    XEConstructor value -> seq (stringLength value) ();
+    XECase subject alternatives -> seq (demandErased subject)
+      (demandList (\(XErasedAlternative pattern body) ->
+        seq (demandPattern pattern) (demandErased body)) alternatives)
+  };
+  demandPrepared (PreparedEntry execute constructors term) = seq execute
+    (seq (demandList (\((,) name ((,) tag arity)) ->
+      seq (stringLength name) (seq tag (seq arity ()))) (M.toList constructors)) (demandErased term));
+  prepareCheckedProfiled profile requireIO checked =
+    Host.phaseValue profile "optimize_ms" (Host.phaseEither demandPrepared)
+      (prepareChecked requireIO checked);
   entryConstructors declarations =
     let {
       -- Boundary v3 reserves tags0..68: legacy tombstone, (), [], (:), tuples2..4,
@@ -93,7 +130,7 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
            constructors = entryConstructors declarations
          } in
          let {
-           optimized = Optimize.optimizeOwned (X.erase term)
+           optimized = Optimize.optimizeCheckedTerm term
          } in
          let {
            lowered = Wrappers.optimize declarations constructors optimized
@@ -341,9 +378,9 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
     let {
       abi = "mlf_require_haskell_boundary_v4_abi"
     } in
-    (:) ("declare void @" ++ (abi ++ "()\ndeclare void @mlf_require_byte_file_v2_abi()\ndeclare void @mlf_require_freeze_st_array_abi()\ndeclare void @mlf_require_st_to_io_abi()"))
+    (:) ("declare void @" ++ (abi ++ "()\ndeclare void @mlf_require_byte_file_v2_abi()\ndeclare void @mlf_require_freeze_st_array_abi()\ndeclare void @mlf_require_st_to_io_abi()\ndeclare void @mlf_require_byte_array_crc32_abi()"))
       ((:) "define ptr @mlf_entry() {"
-         ((:) ("  call void @" ++ (abi ++ "()\n  call void @mlf_require_byte_file_v2_abi()\n  call void @mlf_require_freeze_st_array_abi()\n  call void @mlf_require_st_to_io_abi()"))
+         ((:) ("  call void @" ++ (abi ++ "()\n  call void @mlf_require_byte_file_v2_abi()\n  call void @mlf_require_freeze_st_array_abi()\n  call void @mlf_require_st_to_io_abi()\n  call void @mlf_require_byte_array_crc32_abi()"))
             ((:) ("  %root = call ptr " ++ (entry ++ "(ptr null, ptr null)"))
                ((:) "  ret ptr %root"
                   ((:) "}"

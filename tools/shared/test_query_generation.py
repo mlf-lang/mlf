@@ -86,13 +86,14 @@ class GenerationTests(unittest.TestCase):
             with self.subTest(field=field, value=value), self.assertRaises(Invalid):
                 Generation(corrupted(field, value))
 
-    def test_depth_independent_of_row_order(self):
+    def test_deep_shared_graph_and_cycle_in_both_row_orders(self):
         graph = Generation.__new__(Generation)
-        graph.nodes = {str(i): {"reads": [(str(i-1), "h")] if i else []} for i in range(4097)}
-        with self.assertRaisesRegex(Invalid, "deep"):
+        for order in (range(8192), reversed(range(8192))):
+            graph.nodes = {i: {"reads": [(i-1, "h")] * 2 if i else []} for i in order}
             graph.check_cycles()
-        del graph.nodes["4096"]
-        graph.check_cycles()
+            graph.nodes[0]["reads"].append((8191, "h"))
+            with self.assertRaisesRegex(Invalid, "cycl"):
+                graph.check_cycles()
 
     def test_checksum_configuration_and_payload(self):
         fields, _ = fixture(["A.f", "B.f"])

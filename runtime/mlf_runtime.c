@@ -134,6 +134,7 @@ void mlf_require_haskell_boundary_v4_abi(void) {}
 void mlf_require_byte_file_v2_abi(void) {}
 void mlf_require_freeze_st_array_abi(void) {}
 void mlf_require_st_to_io_abi(void) {}
+void mlf_require_byte_array_crc32_abi(void) {}
 
 typedef enum {
     HOLE, BUSY, INDIRECT, THUNK, APPLICATION, CLOSURE,
@@ -144,7 +145,7 @@ typedef enum {
     SMALL_INT_TABLE, ST_ACTION, ST_ARRAY, CONSTRUCTOR_WIDE,
     ASYNC_SCOPE, COMPLETION, ASYNC_SUBSCRIPTION, ASYNC_ACTION,
     IO_ERROR_VALUE, IO_CATCH_FRAME, IO_ASYNC_FINISH_FRAME,
-    CALL_STACK, IO_HANDLER_FRAME, BIG_INTEGER, NATIVE_IO_VALUE
+    CALL_STACK, IO_HANDLER_FRAME, BIG_INTEGER, NATIVE_IO_VALUE, CRC32_ACTION
 } Tag;
 
 /* These numbers are shared with primitiveCode in MLF.LLVM. */
@@ -173,7 +174,7 @@ typedef enum {
     EMPTY_CALL_STACK, PUSH_CALL_STACK, PRETTY_CALL_STACK, IO_ERROR_WITH_STACK,
     CONCAT_STRING_LIST,
     OR_INT, XOR_INT, SHIFT_LINT, SHIFT_RINT, UNSIGNED_SHIFT_RINT, COUNT_LEADING_ZEROS_INT, COUNT_TRAILING_ZEROS_INT, POP_COUNT_INT, INT_TO_INTEGER, INTEGER_TO_INT, ADD_INTEGER, SUB_INTEGER, MUL_INTEGER, QUOT_INTEGER, REM_INTEGER, EQ_INTEGER, LT_INTEGER, SHOW_INTEGER, READ_INTEGER, INTEGER_TO_DOUBLE, UNSIGNED_LT_INT,
-    READ_BYTE_FILE_OR_ERROR, WRITE_BYTE_FILE_OR_ERROR, BYTE_ARRAY_DIGEST, FREEZE_ST_ARRAY, ST_TO_IO,
+    READ_BYTE_FILE_OR_ERROR, WRITE_BYTE_FILE_OR_ERROR, BYTE_ARRAY_DIGEST, FREEZE_ST_ARRAY, ST_TO_IO, BYTE_ARRAY_CRC32, PACK_STRING_FIELDS, STRING_UTF8_LENGTH,
     PRIMITIVE_COUNT
 } Primitive;
 
@@ -1080,6 +1081,16 @@ MlfValue *mlf_string_length(MlfValue *text) {
     return small((int64_t)string_length(expect(text, STRING)));
 }
 
+/* Native strings validate and cache scalar indices lazily. The codec already
+ * asks for scalar length before byte length; that established cache is reused.
+ * Standalone calls retain the same Unicode validation as stringLength. */
+MlfValue *mlf_string_utf8_length(MlfValue *text) {
+    text = expect(text, STRING);
+    if (text->as.string.length > INT64_MAX) fail("string too large");
+    (void)string_indices(text);
+    return small((int64_t)text->as.string.length);
+}
+
 MlfValue *mlf_string_code_at(MlfValue *text, MlfValue *index) {
     return string_code_at(text, index);
 }
@@ -1171,6 +1182,59 @@ MlfValue *mlf_concat_string_list(MlfValue *pieces) {
     }
     GC_reachable_here(roots[0]);
     MlfValue *result = roots[3];
+    mlf_roots_leave(&frame);
+    return result;
+}
+
+static size_t decimal_size(size_t number) {
+    size_t digits = 1;
+    while (number >= 10) { number /= 10; ++digits; }
+    return digits;
+}
+
+MlfValue *mlf_pack_string_fields(MlfValue *fields) {
+    /* Keep the source spine, current field and result rooted through forcing,
+     * Unicode indexing and output allocation, including without interior roots.
+     * Both passes visit fields in order; the first memoizes every lazy cell. */
+    MlfValue *roots[4] = {fields, fields, NULL, NULL};
+    MlfRoots frame;
+    mlf_roots_enter(&frame, 4, roots);
+    size_t length = 0, scalars = 0;
+    int64_t tag;
+    while ((tag = mlf_tag(roots[1])) != SOURCE_NIL) {
+        if (tag != SOURCE_CONS) fail("expected canonical string list");
+        roots[3] = expect(mlf_field(roots[1], 0), STRING);
+        size_t count = string_length(roots[3]);
+        size_t extra = decimal_size(count) + 1;
+        size_t bytes = roots[3]->as.string.length;
+        if (extra > INT64_MAX - scalars || count > INT64_MAX - scalars - extra ||
+            extra > INT64_MAX - length || bytes > INT64_MAX - length - extra)
+            fail("string too large");
+        length += extra + bytes;
+        scalars += extra + count;
+        roots[1] = mlf_field(roots[1], 1);
+    }
+    roots[2] = value(STRING);
+    roots[2]->as.string.length = length;
+    roots[2]->as.string.bytes = allocate_raw(length + 1);
+    roots[2]->as.string.indices = NULL;
+    size_t offset = 0;
+    roots[1] = roots[0];
+    while (mlf_tag(roots[1]) != SOURCE_NIL) {
+        roots[3] = expect(mlf_field(roots[1], 0), STRING);
+        size_t count = string_length(roots[3]), digits = decimal_size(count);
+        char *target = roots[2]->as.string.bytes + offset;
+        target[digits] = ':';
+        size_t position = digits;
+        do { target[--position] = (char)('0' + count % 10); count /= 10; } while (count);
+        offset += digits + 1;
+        memcpy(roots[2]->as.string.bytes + offset, roots[3]->as.string.bytes, roots[3]->as.string.length);
+        offset += roots[3]->as.string.length;
+        roots[1] = mlf_field(roots[1], 1);
+    }
+    roots[2]->as.string.bytes[length] = 0;
+    GC_reachable_here(roots[0]);
+    MlfValue *result = roots[2];
     mlf_roots_leave(&frame);
     return result;
 }
@@ -1427,12 +1491,14 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
     case WRITE_BYTE_ARRAY: return array_write_action(WRITE_BYTE_ACTION,a,b,c);
     case PUT_BYTES: return array_write_action(PUT_BYTES_ACTION,a,b,c);
     case WRITE_INT_TABLE: return array_write_action(WRITE_TABLE_ACTION,a,b,c);
+    case BYTE_ARRAY_CRC32: return array_write_action(CRC32_ACTION,a,b,c);
     case EMPTY_CALL_STACK: return value(CALL_STACK);
     case PUSH_CALL_STACK: return push_call_stack(a, b);
     case PRETTY_CALL_STACK: return pretty_call_stack(a);
     case TEXT_TO_CHARS: return text_to_chars(a);
     case TEXT_FROM_CHARS: return text_from_chars(a);
     case CONCAT_STRING_LIST: return mlf_concat_string_list(a);
+    case PACK_STRING_FIELDS: return mlf_pack_string_fields(a);
     case CHAR_CODE: case CHAR_FROM_CODE:
         return small((int64_t)bounded_integer(a, 0x10ffff, "invalid Char codepoint"));
     case USER_ERROR: {
@@ -1472,6 +1538,7 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
     case INTEGER_TO_DOUBLE: return mlf_double(big_integer_to_double(a));
     case READ_INT: return read_integer(a);
     case STRING_LENGTH: return small((int64_t)string_length(expect(a,STRING)));
+    case STRING_UTF8_LENGTH: return mlf_string_utf8_length(a);
     case STRING_CODE_AT: return string_code_at(a,b);
     case STRING_SLICE: return string_slice(a,b,c);
     case STRING_FROM_CODE: return string_from_code(a);
@@ -1521,7 +1588,7 @@ static MlfValue *primitive(Primitive p, MlfEnv *arguments) {
         1,2,3,1,2,1,1,1,2,1,1,2,1,1,0,1,1,1,0,0,
         1,2,1,2,2,3,1,
         1,2,1,2,1,1,1,1,1,1, 2,1,3,2,3,2,1,1,1,2,3,2, 1,1,1,1,1,1,2,1, 0,2,1,2, 1,
-        2,2,2,2,2,1,1,1,1,1,2,2,2,2,2,2,2,1,1,1,2,2,2,1,1,1
+        2,2,2,2,2,1,1,1,1,1,2,2,2,2,2,2,2,1,1,1,2,2,2,1,1,1,3,1,1
     };
     _Static_assert(sizeof(arities) / sizeof(arities[0]) == PRIMITIVE_COUNT,
                    "primitive arity inventory mismatch");
@@ -1628,12 +1695,12 @@ MlfValue *mlf_force(MlfValue *entry) {
 MlfValue *mlf_prim1(int64_t p, MlfValue *a) {
     switch (p) {
     case COUNT_LEADING_ZEROS_INT: case COUNT_TRAILING_ZEROS_INT: case POP_COUNT_INT: case INT_TO_INTEGER: case INTEGER_TO_INT: case SHOW_INTEGER: case READ_INTEGER: case INTEGER_TO_DOUBLE:
-    case TEXT_TO_CHARS: case TEXT_FROM_CHARS: case CHAR_CODE: case CHAR_FROM_CODE: case CONCAT_STRING_LIST:
+    case TEXT_TO_CHARS: case TEXT_FROM_CHARS: case CHAR_CODE: case CHAR_FROM_CODE: case CONCAT_STRING_LIST: case PACK_STRING_FIELDS:
     case USER_ERROR: case IO_ERROR: case IO_ERROR_STRING: case PRETTY_CALL_STACK:
     case IO_RETURN: case PUT_STR: case PUT_STR_LN: case PRINT_INT: case SHOW_INT: case READ_INT:
     case SQRT_DOUBLE: case INT_TO_DOUBLE: case LENGTH_INT_ARRAY: case LENGTH_DOUBLE_ARRAY:
     case LENGTH_BYTE_ARRAY: case BYTE_ARRAY_FROM_STRING:
-    case STRING_LENGTH: case STRING_FROM_CODE: case READ_DOUBLE: case DOUBLE_TO_BITS: case DOUBLE_FROM_BITS:
+    case STRING_LENGTH: case STRING_UTF8_LENGTH: case STRING_FROM_CODE: case READ_DOUBLE: case DOUBLE_TO_BITS: case DOUBLE_FROM_BITS:
     case BYTE_ARRAY_DIGEST:
     case PANIC: case READ_FILE: case FILE_EXISTS: case CANONICAL_PATH: case GET_ARG: case PUT_ERR: case EXIT_WITH:
     case GET_ENV: case UNSET_ENV: case LIST_DIRECTORY: case DIRECTORY_EXISTS: case FILE_DIGEST: case ACQUIRE_FILE_LOCK: case RELEASE_FILE_LOCK: case PROCESS_SUPERVISOR:
@@ -1666,7 +1733,7 @@ MlfValue *mlf_prim3(int64_t p, MlfValue *a, MlfValue *b, MlfValue *c) {
     switch (p) {
     case IF_THEN_ELSE: case WRITE_INT_ARRAY: case WRITE_DOUBLE_ARRAY: case WRITE_BYTE_ARRAY: case PUT_BYTES: case WRITE_INT_TABLE: case STRING_SLICE:
     case ASYNC_NEW_COMPLETION: case ASYNC_READ_COMPLETION: case ASYNC_DELAY:
-    case WRITE_ST_ARRAY:
+    case WRITE_ST_ARRAY: case BYTE_ARRAY_CRC32:
         return primitive_result((Primitive)p,a,b,c);
     default: fail("ternary primitive arity mismatch");
     }
@@ -1735,6 +1802,13 @@ static const char *file_path(MlfValue *entry) {
 
 #include "mlf_byte_file.h"
 #include "mlf_build_runner_hash.h"
+static MlfValue *byte_array_crc32(MlfValue *bytes, MlfValue *zero_start, MlfValue *zero_count) {
+    bytes = expect(bytes, BYTE_ARRAY);
+    size_t length = bytes->as.byte_array.length;
+    size_t start = bounded_integer(zero_start, length, "invalid CRC zero range");
+    size_t count = bounded_integer(zero_count, length-start, "invalid CRC zero range");
+    return small(mlf_crc32_zeros(bytes->as.byte_array.cells, length, start, count));
+}
 static MlfValue *byte_array_digest(MlfValue *bytes) {
     bytes = expect(bytes, BYTE_ARRAY);
     char hex[65];
@@ -2410,6 +2484,9 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
         else if (!immediate(operation) && operation->tag == PUT_BYTES_ACTION) {
             result = mlf_put_bytes(operation->as.array_write.array,operation->as.array_write.index,
                                    operation->as.array_write.entry);
+        } else if (!immediate(operation) && operation->tag == CRC32_ACTION) {
+            result = byte_array_crc32(operation->as.array_write.array, operation->as.array_write.index,
+                                     operation->as.array_write.entry);
         } else if (!immediate(operation) && operation->tag == WRITE_TABLE_ACTION) {
             result = mlf_write_int_table(operation->as.array_write.array,operation->as.array_write.index,
                                          operation->as.array_write.entry);
