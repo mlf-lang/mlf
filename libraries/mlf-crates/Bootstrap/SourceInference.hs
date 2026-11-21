@@ -2055,11 +2055,104 @@ module Bootstrap.SourceInference where {
     XBoolTerm _ -> Just Nothing; XStringTerm _ -> Just Nothing; XPrimitive _ _ -> Just Nothing;
     XConstructor _ _ -> Just Nothing; XLetRec _ _ -> Nothing; XCase _ _ _ -> Nothing
   };
+  -- A checked pair h :: forall a. a -> F a, u :: forall a. F a -> a can
+  -- enclose a polymorphic continuation. Applying that transformer n times
+  -- preserves every call in u^n (h^n x) without storing the n growing proofs.
+  -- The ordinary representation and its fingerprints take precedence whenever
+  -- admitted. This fallback operates only on already checked open fragments.
+  instantiatedCall term = case term of {
+    XApp (XTypeApp (XVarTerm name) (XThen (XInner (XBottom _)) XElim)) argument ->
+      Just ((,) name argument);
+    _ -> Nothing
+  };
+  takeInstantiated name count term = case instantiatedCall term of {
+    Just ((,) actual argument) -> if not (X.equalName name actual) then Just ((,) count term)
+      else if count >= Wire.maxNodes Wire.defaultLimits then Nothing else let { next = count + 1 }
+        in seq next (takeInstantiated name next argument);
+    Nothing -> Just ((,) count term)
+  };
+  unaryInstanceConstructor output scheme = case scheme of {
+    XForall binder bound (XArrow domain result) -> let {
+      scalar = if output then domain else result; applied = if output then result else domain
+    } in if not (Type.alphaEq bound XBot && Type.alphaEq scalar (XVar binder)) then Nothing
+      else case applied of {
+        XCon name [arg] -> if Type.alphaEq arg (XVar binder) then Just name else Nothing;
+        _ -> Nothing
+      };
+    _ -> Nothing
+  };
+  instantiateTerm term ty = XTypeApp term (XThen (XInner (XBottom ty)) XElim);
+  wrapCheckedCalls start count constructor outer inner inputTy input = let {
+    name i hint = XName (start + i) hint;
+    schemeVar = XTyVar start; valueVar = XTyVar (start + 1); a = XTyVar (start + 2);
+    av = XVar a; function = XForall schemeVar XBot (XArrow (XVar schemeVar) (XVar schemeVar));
+    identity = name 3 "identityArgument";
+    initial = XTypeAbs valueVar XBot (XAbs identity (XVar valueVar) (XVarTerm identity));
+    k = name 4 "continuation"; z = name 5 "argument";
+    step = name 6 "wrapCalls"; applied = XCon constructor [av];
+    inside = XApp (instantiateTerm (XVarTerm inner) av) (XVarTerm z);
+    continued = XApp (instantiateTerm (XVarTerm k) applied) inside;
+    layer = XAbs k function (XTypeAbs a XBot (XAbs z av
+      (XApp (instantiateTerm (XVarTerm outer) av) continued)));
+    -- Compose transformers, never the endomorphisms they produce. Each
+    -- selected bit adds outer calls before, and inner calls after, the rest.
+    powers bits serial current accumulated = let {
+      selected = if andInt bits 1 == 0 then accumulated else XApp (XVarTerm current) accumulated;
+      nextBits = quotInt bits 2
+    } in if nextBits == 0 then XApp (instantiateTerm selected inputTy) input
+      else let {
+        next = name serial "twice"; arg = name (serial + 1) "continuation";
+        call x = XApp (XVarTerm current) x;
+        double = XAbs arg function (call (call (XVarTerm arg)))
+      } in XLet next double (powers nextBits (serial + 2) next selected)
+  } in XLet step layer (powers count 7 step initial);
+  factorCheckedCalls object = case Open.body object of {
+    XLet owner (XAbs input inputTy rhs) rest -> do {
+      (,) outer argument <- instantiatedCall rhs;
+      (,) count midpoint <- takeInstantiated outer 1 argument;
+      (,) inner first <- instantiatedCall midpoint;
+      (,) innerCount seed <- takeInstantiated inner 1 first;
+      let { ps = Open.parameters object;
+        form direction n = bindMaybe (lookup X.equalName n ps) (unaryInstanceConstructor direction)
+      };
+      f <- form False outer; g <- form True inner;
+      case seed of {
+        XVarTerm actual -> if count /= innerCount || not (eqString f g && X.equalName actual input) ||
+          X.equalName input outer || X.equalName input inner then Nothing
+          else let {
+            -- Only the two resolved operators and the input occur in the
+            -- erased spine. Reserve every identity in the retained syntax and
+            -- interface. A 63-bit count needs at most two binders per bit.
+            skeleton = XLet owner (XAbs input inputTy seed) rest;
+            latest = foldlStrict (\n ((,) ref ty) -> Separate.foldTypeIdentities max ty
+              (max n (X.nameId ref))) (Separate.maximumTermIdentity 0 skeleton) ps;
+            reserve = 7 + 2 * 63
+          } in if latest > 9223372036854775807 - reserve then Nothing else Just
+            (XLet owner (XAbs input inputTy (wrapCheckedCalls (latest + 1) count f
+              outer inner inputTy seed)) rest);
+        _ -> Nothing
+      }
+    };
+    _ -> Nothing
+  };
+  factorOversizedOpen object message = case factorCheckedCalls object of {
+    Nothing -> Left message;
+    Just term -> do {
+      compact <- Open.normalize object term;
+      ensure (eqList (eqPair X.equalName Type.alphaEq) (Open.bindings object) (Open.bindings compact))
+        "factored open fragment changed exported types";
+      canonicalOpenPlanned compact
+    }
+  };
   canonicalOpen = canonicalOpenUsing False Open.storageValue;
   canonicalCheckedOpen = canonicalOpenUsing True Open.checkedStorageValue;
   canonicalOpenUsing spines storage object = let {
     geometry = finalTreeGeometryUsing spines (Wire.maxDepth Wire.defaultLimits);
-    planned = canonicalOpenPlanned object;
+    planned = case canonicalOpenPlanned object of {
+      Left e -> if spines && (eqString e "binary expanded-work limit exceeded" ||
+        eqString e "binary graph depth limit exceeded") then factorOversizedOpen object e else Left e;
+      Right admitted -> Right admitted
+    };
     rawGeometry = if spines then finalCheckedTreeGeometry (Wire.maxDepth Wire.defaultLimits) (Open.body object)
       else geometry False (Open.bodyValue object);
     ordinary = case rawGeometry of {

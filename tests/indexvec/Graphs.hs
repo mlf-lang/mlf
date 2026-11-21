@@ -1747,6 +1747,64 @@ knownConstructorFoldChecks = do
     T.Nothing -> pure ()
     _ -> fail "duplicate recursive field in constructor fold"
 
+-- Record calls on arbitrary higher-order functions rather than assuming
+-- the two polymorphic operations cancel or inspecting their implementations.
+data CallTrace = Calls String | TraceFunction (CallTrace -> CallTrace)
+
+factoredCallChecks = do
+  let checked (T.Left e) = fail (H.unpack e)
+      checked (T.Right value) = pure value
+      carrier t = T.XCon "Carrier" [t]
+      int = T.XCon "Int" []
+      xv = T.XTyVar 6
+      var = T.XVar xv
+      poly x y = T.XForall xv T.XBot (T.XArrow x y)
+      wrap = T.XName 2 "mapLayer"
+      peel = T.XName 4 "mapLayer"
+      arg = T.XName 8 "value"
+      owner = T.XName 30 "entry"
+      ps = [(wrap,poly var (carrier var)),(peel,poly (carrier var) var)]
+      source n m = let tys = iterate carrier int
+                       apply f ty t = T.XApp (T.XTypeApp (T.XVarTerm f)
+                         (T.XThen (T.XInner (T.XBottom ty)) T.XElim)) t
+                       inner = foldl (flip (apply wrap)) (T.XVarTerm arg) (take n tys)
+                       rhs = foldr (apply peel) inner (take m (drop (n-m) tys))
+                   in T.XLet owner (T.XAbs arg int rhs) (T.XConstructor "()" [])
+      apply (TraceFunction f) a = f a
+      apply _ _ = error "trace applied a scalar"
+      interpret env term = case term of
+        T.XEVar x -> env Map.! X.nameId x
+        T.XEAbs x b -> TraceFunction (\v -> interpret (Map.insert (X.nameId x) v env) b)
+        T.XEApp f a -> apply (interpret env f) (interpret env a)
+        T.XELet x v b -> interpret (Map.insert (X.nameId x) (interpret env v) env) b
+        _ -> error "unexpected form in factored call trace"
+      marker label = TraceFunction (\v -> case v of
+        Calls rest -> Calls (label:rest)
+        _ -> error "trace operator received a function")
+      order t = case X.erase t of
+        T.XELet _ rhs _ -> case apply (interpret (Map.fromList
+          [(X.nameId wrap,marker 'h'),(X.nameId peel,marker 'u')]) rhs) (Calls "") of
+            Calls result -> result
+            _ -> error "trace returned a function"
+        _ -> error "expected a declaration"
+  env <- checked (Open.environment [T.DataDecl "Carrier" ["a"] [T.ConstructorDecl "MakeCarrier" [T.Parameter "a"]]])
+  forM_ [1,2,3,7,8,19,60] $ \n -> do
+    original <- checked (Open.check env ps (source n n))
+    compact <- case Source.factorCheckedCalls original of
+      T.Just term -> checked (Open.normalize original term)
+      T.Nothing -> fail "checked unary polymorphic application pair was missed"
+    check "factoring preserves the order and multiplicity of unrelated functions"
+      (replicate n 'u' ++ replicate n 'h') (order (Open.body compact))
+    let exports fragment = [(X.nameId name,H.unpack (Pretty.prettyType ty)) | (name,ty) <- Open.bindings fragment]
+    check "factoring keeps the checked declaration interface" (exports original) (exports compact)
+    admitted <- checked (Source.canonicalCheckedOpen original)
+    check "small previously admissible checked fragments preserve their fingerprints"
+      (H.unpack (Open.fingerprint original)) (H.unpack (Open.fingerprint admitted))
+  mismatch <- checked (Open.check env ps (source 7 6))
+  case Source.factorCheckedCalls mismatch of
+    T.Nothing -> pure ()
+    _ -> fail "different counts were factored"
+
 -- A checked open fragment with no composable proofs can retain its
 -- original body up to the absolute wire depth and work limits.
 openGeometryChecks = do
@@ -3004,5 +3062,6 @@ main = do
   lambdaCaptureChecks
   constructorSubstitutionChecks
   openGeometryChecks
+  factoredCallChecks
   signedConstructorChecks
   putStrLn "1032 ordered SCC and reach comparisons, query DAG and package controls passed"
