@@ -879,15 +879,24 @@ module Bootstrap.LLVM.Optimize where {
       (UseLet name value body);
   useRec :: [] ((,) XName UseTree) -> UseTree -> UseTree;
   useRec bindings body =
-    let {
-      counts =
-        L.foldl (\current binding -> mergeUses current (useCounts (L.snd binding))) (useCounts body)
-          bindings
-    } in
+    let { counts = bindingUses bindings body } in
     UseTree
       (XELetRec (L.map (\((,) name value) -> (,) name (useTerm value)) bindings) (useTerm body))
       (deleteUses (L.map L.fst bindings) counts)
       (UseRec bindings body);
+  bindingUses bindings body = L.foldl
+    (\current binding -> mergeUses current (useCounts (L.snd binding))) (useCounts body) bindings;
+  -- Inlining a shared lambda with two free occurrences can multiply both
+  -- incoming and outgoing dependencies at every layer. A linear wrapper
+  -- forwards at most one free occurrence per use, so it can still inline.
+  branchesToFreeValues value = case useChildren value of {
+    UseAbs _ _ -> case M.toList (useCounts value) of {
+      [] -> False;
+      [(,) _ count] -> count > 1;
+      _ -> True
+    };
+    _ -> False
+  };
   useCase :: UseTree -> [] ((,) XPattern UseTree) -> UseTree;
   useCase subject alternatives =
     let {
@@ -1277,7 +1286,8 @@ module Bootstrap.LLVM.Optimize where {
   combineIntSummands :: XErased -> XErased -> Maybe XErased;
   combineIntSummands left right = addIntSummands affineIntTerm (intSummand left) (intSummand right);
   rewriteUsed :: UseTree -> Fresh UseTree;
-  rewriteUsed tree =
+  rewriteUsed = rewriteUsedFor False;
+  rewriteUsedFor checked tree =
     case useChildren tree of {
       UseApp function argument ->
         case useChildren function of {
@@ -1305,13 +1315,16 @@ module Bootstrap.LLVM.Optimize where {
       };
       UseRec bindings body ->
         let {
-          group = S.fromList compareName (L.map L.fst bindings)
+          group = S.fromList compareName (L.map L.fst bindings);
+          counts = bindingUses bindings body
         } in
         let {
           expandable =
             L.filter
-              (\((,) _ value) ->
+              (\((,) name value) ->
                  (smallValue (useTerm value) &&
+                  (L.not checked || L.not (branchesToFreeValues value) ||
+                   M.findWithDefault compareName 0 name counts < 2) &&
                   S.null (S.intersection compareName (free (useTerm value)) group)))
               bindings
         } in
@@ -1548,64 +1561,84 @@ module Bootstrap.LLVM.Optimize where {
       result <- rewriteUsed (useLet name value body);
       freshPure (beginPending result)
     };
+  -- Preserve a shared binding without forcing the substitutions queued for
+  -- the rest of the declaration spine. Its RHS is outside the binder scope.
+  delayCheckedLet name value pending = case pending of {
+    PendingBody body replacements counts calls ->
+      if M.findWithDefault compareName 0 name counts < 2 || L.not (branchesToFreeValues value)
+      then delayOwnedLet name value pending
+      else let {
+        retained = PendingBody (useLet name value body) replacements
+          (mergePendingUses (M.delete compareName name counts) (limitedUses value))
+          (S.union compareName (S.delete compareName name calls) (negativeCalls value))
+      } in if S.member compareName name calls then freshPure retained else do {
+        -- All calls with the same outer arguments can still share a single
+        -- specialized result. Inspect the effective body before deciding.
+        shared <- specializeSharedValue name value (materializePending pending);
+        freshPure (case shared of { Just result -> beginPending result; Nothing -> retained })
+      }
+  };
   -- Delay only while unwinding a contiguous nonrecursive let-body chain.
   -- Every other constructor and every unsupported let observes a fully
   -- materialized body. RHS normalization still precedes body normalization.
   passPendingRaw :: XErased -> Fresh PendingBody;
-  passPendingRaw expression = case expression of {
+  passPendingRaw = passPendingFor False;
+  passPendingFor checked expression = case expression of {
     XELet name value body -> do {
-      normalized <- passOwnedRaw value;
-      pending <- passPendingRaw body;
-      delayOwnedLet name normalized pending
+      normalized <- passOwnedFor checked value;
+      pending <- passPendingFor checked body;
+      if checked then delayCheckedLet name normalized pending else delayOwnedLet name normalized pending
     };
     _ -> do {
-      result <- passOwnedRaw expression;
+      result <- passOwnedFor checked expression;
       freshPure (beginPending result)
     }
   };
   passOwnedRaw :: XErased -> Fresh UseTree;
-  passOwnedRaw expression = case expression of {
+  passOwnedRaw = passOwnedFor False;
+  passOwnedFor checked expression = case expression of {
     XELet _ _ _ -> do {
-      pending <- passPendingRaw expression;
+      pending <- passPendingFor checked expression;
       freshPure (materializePending pending)
     };
     _ -> do {
       normalized <- case expression of {
         XEAbs name body -> do {
-          result <- passOwnedRaw body;
+          result <- passOwnedFor checked body;
           freshPure (useAbs name result)
         };
         XEApp function argument -> do {
-          a <- passOwnedRaw function;
-          b <- passOwnedRaw argument;
+          a <- passOwnedFor checked function;
+          b <- passOwnedFor checked argument;
           freshPure (useApp a b)
         };
         XELetRec bindings body -> do {
           values <- traverseFresh
             (\((,) name value) -> do {
-              result <- passOwnedRaw value;
+              result <- passOwnedFor checked value;
               freshPure ((,) name result)
             }) bindings;
-          result <- passOwnedRaw body;
+          result <- passOwnedFor checked body;
           freshPure (useRec values result)
         };
         XECase subject alternatives -> do {
-          value <- passOwnedRaw subject;
+          value <- passOwnedFor checked subject;
           branches <- traverseFresh
             (\(XErasedAlternative pattern body) -> do {
-              result <- passOwnedRaw body;
+              result <- passOwnedFor checked body;
               freshPure ((,) pattern result)
             }) alternatives;
           freshPure (useCase value branches)
         };
         _ -> freshPure (indexUses expression)
       };
-      rewriteUsed normalized
+      rewriteUsedFor checked normalized
     }
   };
   passOwned :: XErased -> Fresh XErased;
-  passOwned expression = do {
-    result <- passOwnedRaw expression;
+  passOwned = passOwnedUsing False;
+  passOwnedUsing checked expression = do {
+    result <- passOwnedFor checked expression;
     freshPure (useTerm result)
   };
   maxIdentity :: XErased -> Int;
@@ -1765,7 +1798,8 @@ module Bootstrap.LLVM.Optimize where {
       _ -> children (specializeBody original specialized key arity callback) expression
     };
   iterationsOwned :: Map String (Maybe Int) -> Int -> XErased -> Fresh XErased;
-  iterationsOwned arities count expression =
+  iterationsOwned = iterationsOwnedFor False;
+  iterationsOwnedFor checked arities count expression =
     if (count == 0)
     then freshPure expression
     else do {
@@ -1774,10 +1808,10 @@ module Bootstrap.LLVM.Optimize where {
            };
            projected <-
              if M.null facts then freshPure expression else projectConstructors facts expression;
-           next <- passOwned projected;
+           next <- passOwnedUsing checked projected;
            if X.equalErased expression next
            then freshPure expression
-           else iterationsOwned arities (count - 1) next
+           else iterationsOwnedFor checked arities (count - 1) next
          };
   -- Find references still needed by the entry before copying its declaration
   -- spine. A nonrecursive RHS is in the outer scope. A recursive group binds
@@ -1799,7 +1833,8 @@ module Bootstrap.LLVM.Optimize where {
   };
   optimizeOwnedWork :: XErased -> Fresh XErased;
   optimizeOwnedWork = optimizeOwnedUsing identities;
-  optimizeOwnedUsing cleanInput expression =
+  optimizeOwnedUsing = optimizeLetSharing False;
+  optimizeLetSharing checked cleanInput expression =
     do {
       unique <- copy M.empty (L.fst (liveDeclarationSpine expression));
       clean <- cleanInput unique;
@@ -1808,9 +1843,9 @@ module Bootstrap.LLVM.Optimize where {
         arities = constructorArities recursive
       };
       lifted <- liftConstructorFields arities recursive;
-      simple <- iterationsOwned arities 16 lifted;
+      simple <- iterationsOwnedFor checked arities 16 lifted;
       specialized <- specializeHigherOrder simple;
-      iterationsOwned arities 16 specialized
+      iterationsOwnedFor checked arities 16 specialized
     };
   -- Recognize finite nonrecursive iterators by binding identity. A summary is
   -- the number of applications of the first parameter to the second; it does
@@ -2006,7 +2041,7 @@ module Bootstrap.LLVM.Optimize where {
   -- introduce no binders and preserve evaluation of the single input value.
   optimizeChecked expression = optimizeAfterFields (foldScopedFields M.empty expression);
   optimizeCheckedTerm term = optimizeAfterFields (eraseScopedFields M.empty term);
-  optimizeAfterFields expression = optimizeOwnedWith (optimizeOwnedUsing (checkedIdentities M.empty))
+  optimizeAfterFields expression = optimizeOwnedWith (optimizeLetSharing True (checkedIdentities M.empty))
     (simplifyIterations M.empty (simplifyTranslations M.empty expression));
   -- A translation evaluates its one Int input once and adds a constant in
   -- the language's wrapping Int64 ring. Retain every unknown/effectful body.

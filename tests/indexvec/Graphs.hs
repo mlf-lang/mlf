@@ -1118,6 +1118,39 @@ signedConstructorChecks = do
     (T.Left a, T.Left b) -> check "constructor operand diagnostic" (H.unpack b) (H.unpack a)
     _ -> fail "invalid signed constructor operand admitted"
 
+-- Both arms call the previous layer with their own lambda parameters.
+-- Duplicating that captured function at each use unfolds a linear graph into
+-- a binary tree even when the program takes only one path at run time.
+sharedFunctionDiamondChecks = do
+  let n i = T.XName i "same"
+      v i = T.XEVar (n i)
+      app = T.XEApp
+      call f a b = app (app f a) b
+      fun i body = T.XEAbs (n i) (T.XEAbs (n (i+1)) (body (v i) (v (i+1))))
+      root = fun 1 (\_ x -> x)
+      layer i = let left = 10*i; right = left+3; join = left+6
+                    previous = if i == 1 then 0 else join-10
+                    branch op flag x = call (T.XEPrimitive op) (call (v previous) flag x) (T.XEInt i)
+                    choose flag x = app (call (T.XEPrimitive T.PIfThenElse) flag (call (v left) flag x))
+                                        (call (v right) flag x)
+                in [(n left,fun (left+1) (branch T.PAddInt)),
+                    (n right,fun (right+1) (branch T.PSubInt)),(n join,fun (join+1) choose)]
+      depth = 10
+      source bind = foldr bind (v (depth*10+6)) ((n 0,root):concatMap layer [1..depth])
+  env <- case Data.validateDeclarations [] of
+    T.Right ok -> pure ok
+    T.Left why -> fail (H.unpack why)
+  forM_ [uncurry T.XELet, \binding -> T.XELetRec [binding]] $ \bind -> do
+    let original = source bind
+        optimized = Optimize.optimizeChecked original
+    check "shared functions retain bounded code size" True (Optimize.remainingSize (depth*100) optimized >= 0)
+    forM_ [(True,62),(False,-48)] $ \(flag,expected) -> do
+      let run term = Runtime.integer (Runtime.evaluate env (Runtime.REnv M.empty)
+                       (call term (T.XEBool flag) (T.XEInt 7)))
+      forM_ [original,optimized] $ \term -> case run term of
+        T.Right value -> check "shared function branch result" expected value
+        T.Left why -> fail (H.unpack why)
+
 -- The checked fold uses the field order in the function's body. A field
 -- absent from that body may fail if demanded, including on a nested branch.
 knownConstructorFoldChecks = do
@@ -2416,6 +2449,7 @@ main = do
   signedDataChecks
   signedLocalChecks
   knownConstructorFoldChecks
+  sharedFunctionDiamondChecks
   openGeometryChecks
   signedConstructorChecks
   putStrLn "1032 ordered SCC and reach comparisons, query DAG and package controls passed"
