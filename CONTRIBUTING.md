@@ -52,6 +52,13 @@ compiler and a fresh output directory. The candidate defaults to
 and correctness-only selection. Workflow orchestration stays outside timed
 compilations and application runs.
 
+## Skipping pull request CI
+
+Maintainers can apply the `ci:skip` label to skip automated test jobs on a
+pull request. The required PR gate records the skip. Remove the label to
+trigger the checks again. Pushes to `main` and manual runs follow their usual
+CI settings.
+
 ## Where changes belong
 
 - Put compiler and package-manager implementation in `libraries/mlf-*/`. The

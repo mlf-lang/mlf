@@ -6,11 +6,16 @@ on:
       - .github/workflows/macos-dependencies.yml
       - tools/release/setup-macos.sh
       - tools/release/test-setup-macos.sh
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: macos-dependencies-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   producer:
+    if: github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')
     runs-on: macos-26
     timeout-minutes: 15
     steps:

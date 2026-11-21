@@ -25,7 +25,7 @@ const verify = text => {
   assert.ok(text.includes(clangLibraryProof));
   assert.ok(text.includes('.runner_protocol_version == 1'));
   assert.ok(text.includes('        if: always()\n'));
-  assert.equal((text.match(/^\s+if:/gm) || []).length, 1, 'Only artifact upload may be conditional');
+  assert.equal((text.match(/^        if:/gm) || []).length, 1, 'Only artifact upload may be conditional within the job');
   for (const path of ['macos-toolchain/', 'async-ghc/async-tools.json', 'async-ghc/receipt.json',
     'async-ghc/*.stderr', 'async-ghc/*.stdout', 'async-ghc/*.log', 'async-ghc/builtin-verification/']) {
     assert.ok(text.includes('            .mlf-build/' + path + '\n'));

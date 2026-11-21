@@ -28,6 +28,7 @@ concurrency:
 jobs:
   metadata:
     name: Release metadata
+    if: github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -73,7 +74,9 @@ jobs:
   native:
     # Preserve the required-check job ID, but label the producer honestly.
     name: Shared compiler source smoke (GHC O${{ matrix.optimization }}, ${{ matrix.suite }})
-    if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only
+    if: >-
+      (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')) &&
+      (github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only)
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     strategy:
@@ -570,7 +573,9 @@ jobs:
             .mlf-build/guest-state-laws/**/*.stderr
   build-runner:
     name: Native build runner (${{ matrix.os }})
-    if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only
+    if: >-
+      (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')) &&
+      (github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only)
     strategy:
       fail-fast: false
       matrix:
@@ -610,7 +615,9 @@ jobs:
             .mlf-build/build-runner-ci/evidence/**/*.result
   async-runtime:
     name: Native async completions (${{ matrix.os }})
-    if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only
+    if: >-
+      (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')) &&
+      (github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only)
     strategy:
       fail-fast: false
       matrix:
@@ -651,7 +658,9 @@ jobs:
           path: .mlf-build/async-native-ci/*.log
   async-language:
     name: Async interpreter and native parity (${{ matrix.os }})
-    if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only
+    if: >-
+      (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')) &&
+      (github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only)
     strategy:
       fail-fast: false
       matrix:
@@ -769,6 +778,7 @@ jobs:
             .mlf-build/async-package-parity/**/*.timed-out
   windows-runtime:
     name: Native Windows runtime
+    if: github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')
     runs-on: windows-2025
     timeout-minutes: 20
     defaults:
@@ -832,7 +842,15 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
+      - name: Record the CI skip label
+        if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci:skip')
+        env:
+          CHECKS: ${{ toJSON(needs) }}
+        run: |
+          printf '%s\n' "$CHECKS" | jq -e 'length == 6 and all(.[]; .result == "skipped")'
+          printf '%s\n' 'The ci:skip PR label skipped the CI test jobs.' >> "$GITHUB_STEP_SUMMARY"
       - name: Require every merge check to succeed
+        if: github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')
         env:
           CHECKS: ${{ toJSON(needs) }}
         run: |

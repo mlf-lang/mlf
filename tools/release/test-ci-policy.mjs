@@ -42,7 +42,32 @@ assert.doesNotMatch(ci,/if: \(github.event_name == 'push'.*inputs.full_validatio
 assert.match(ci,/uses: \.\/\.github\/workflows\/native-qualification.yml\n    with:\n      source: \$\{\{ github.sha \}\}\n      build_packages: false/);
 assert.match(ci,/needs: \[metadata, native, windows-runtime, build-runner, async-runtime, async-language\]/);
 assert.match(ci,/length == 6 and all/);
-const ciJob = name => ci.match(new RegExp(`^  ${name}:\\n[\\s\\S]*?(?=^  [a-z][a-z-]*:\\n|(?![\\s\\S]))`, 'm'))?.[0];
+const workflowJob = (workflow, name) => workflow.match(new RegExp(`^  ${name}:\\n[\\s\\S]*?(?=^  [a-z][a-z-]*:\\n|(?![\\s\\S]))`, 'm'))?.[0];
+const ciJob = name => workflowJob(ci, name);
+const runPrTests = "github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')";
+const normalDispatch = "github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only";
+for (const name of ['metadata', 'windows-runtime']) {
+  assert.ok(ciJob(name).includes(`    if: ${runPrTests}\n`), name);
+}
+for (const name of ['native', 'build-runner', 'async-runtime', 'async-language']) {
+  assert.ok(ciJob(name).includes(`    if: >-\n      (${runPrTests}) &&\n      (${normalDispatch})\n`), name);
+}
+for (const [name, jobName] of [
+  ['ci', 'metadata'],
+  ['formatter-compatibility', 'formatter-compatibility'],
+  ['macos-toolchain', 'provenance'],
+  ['macos-dependencies', 'producer'],
+]) {
+  const workflow = read(name);
+  assert.match(workflow, /^  pull_request:\n[\s\S]*?^    types: \[opened, synchronize, reopened, labeled, unlabeled\]$/m,
+    `Reevaluate PR labels in ${name}`);
+  assert.match(workflow, /^concurrency:\n  group: [^\n]+\n  cancel-in-progress: true$/m);
+  assert.ok(workflowJob(workflow, jobName).includes(`    if: ${runPrTests}\n`), jobName);
+}
+assert.match(workflowJob(read('macos-dependencies'), 'consumer'), /^    needs: producer$/m);
+const gate = ciJob('pr-gate');
+assert.ok(gate.includes("        if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci:skip')\n"));
+assert.ok(gate.includes(`      - name: Require every merge check to succeed\n        if: ${runPrTests}\n`));
 assert.match(ciJob('metadata'), /fetch-depth: 0/, 'Historical migration audits require full Git history');
 const requireHistoricalCheckouts = workflow => {
   const jobs = workflow.match(/^  [a-z][a-z-]*:\n[\s\S]*?(?=^  [a-z][a-z-]*:\n|(?![\s\S]))/gm) || [];

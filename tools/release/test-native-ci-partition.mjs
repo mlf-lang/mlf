@@ -65,8 +65,8 @@ const validate = text => {
   assert.match(native, /^    timeout-minutes: 120$/m, 'Every shard keeps the 120-minute outer bound');
   assert.match(native, /^      fail-fast: false$/m, 'One failure must not hide other shard evidence');
   assert.doesNotMatch(native, /continue-on-error/);
-  assert.equal(native.match(/^    if: (.+)$/m)?.[1], "github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only",
-    'No native leg may be skipped for a PR, merge queue, or main push');
+  assert.match(native, /^      \(github.event_name != 'workflow_dispatch' \|\| !inputs.windows_runtime_only\)$/m,
+    'The dispatch-only flag must leave automatic CI enabled');
   const matrix = native.match(/^      matrix:\n([\s\S]*?)(?=^    steps:\n)/m)?.[1];
   assert.ok(matrix, 'An explicit native matrix is required');
   const rows = [...matrix.matchAll(/^          - optimization: '([02])'\n            suite: (all|direct|default|framework)\n/gm)];
@@ -325,7 +325,7 @@ const validate = text => {
   assert.match(gate, /^    needs: \[metadata, native, windows-runtime, build-runner, async-runtime, async-language\]$/m,
     'The aggregate must depend on the entire native matrix, not a selected shard');
   assert.match(gate, /jq -e 'length == 6 and all\(\.\[\]; \.result == "success"\)'/,
-    'Skipped, cancelled, missing, or failed native matrix results must not pass');
+    'Ordinary runs require every required job to succeed');
 };
 
 validate(workflow);
@@ -510,7 +510,7 @@ const controls = [
   ['artifact collision', '-${{ matrix.suite }}\n', '\n'],
   ['aggregate missing matrix', 'needs: [metadata, native, windows-runtime', 'needs: [metadata, windows-runtime'],
   ['aggregate accepts skipped', '.result == "success"', '.result != "failure"'],
-  ['PR matrix skipped', "if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only", "if: github.event_name == 'workflow_dispatch'"],
+  ['PR matrix skipped', "(github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only)", "(github.event_name == 'workflow_dispatch')"],
   ['nonblocking failures', '    timeout-minutes: 120\n', '    timeout-minutes: 120\n    continue-on-error: true\n'],
 ];
 for (const [name, before, after] of controls) {

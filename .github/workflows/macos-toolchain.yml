@@ -6,6 +6,7 @@ on:
       - tools/shared/build.py
       - tools/shared/test_darwin_toolchain.py
       - tools/release/test-macos-toolchain-workflow.mjs
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
 permissions:
   contents: read
@@ -15,6 +16,7 @@ concurrency:
 jobs:
   provenance:
     name: GHC and LLVM toolchain provenance (macos-26)
+    if: github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')
     runs-on: macos-26
     timeout-minutes: 120
     steps:
