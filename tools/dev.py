@@ -60,7 +60,7 @@ def applications(args):
              '--timeout', '21600', 'build', '--target', 'bench']
     status = run_build(build, ROOT)
     if status:
-        return status if status > 0 else 128 - status
+        return status
     driver = args.driver_dir.resolve() / 'bin' / ('bench.exe' if os.name == 'nt' else 'bench')
     options = ['--check-only'] if args.check_only else [args.compile_limit, args.runtime_limit, *args.workload]
     return launch([driver, candidate, baseline, args.output, str(args.samples), clang, *options])
@@ -76,8 +76,11 @@ def check_tools():
     else:
         print('The compiler-shape harness is tested on macOS and Linux.', flush=True)
     for script in scripts:
-        subprocess.run(python(script), check=True)
-
+        # The cancellation tests run their own supervised process groups. Give
+        # their supervisors time to finish cleanup before killing the suite.
+        status = run_build(python(script), ROOT, cancellation_grace=2)
+        if status:
+            return status
 
 
 def main(argv):
@@ -125,8 +128,9 @@ def main(argv):
 
 if __name__ == '__main__':
     try:
-        sys.exit(main(sys.argv[1:]))
-    except subprocess.CalledProcessError as exc:
-        sys.exit(exc.returncode if exc.returncode >= 0 else 128 - exc.returncode)
+        status = main(sys.argv[1:]) or 0
+        sys.exit(status if status >= 0 else 128 - status)
+    except KeyboardInterrupt:
+        sys.exit(130)
     except OSError as exc:
         sys.exit(str(exc))

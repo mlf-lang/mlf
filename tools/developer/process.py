@@ -38,7 +38,7 @@ def signal_group(pid, sig):
             raise
 
 
-def run_build(argv, cwd):
+def run_build(argv, cwd, *, cancellation_grace=0.5):
     """Return the child's exit status. The POSIX CLI owns the child's process group.
 
     Native package workers in other sessions have their own supervisors, which
@@ -68,7 +68,7 @@ def run_build(argv, cwd):
                 if cancelled:
                     signal_group(child.pid, cancelled[0])
                     signal_group(child.pid, signal.SIGCONT)
-                    time.sleep(0.5)
+                    time.sleep(cancellation_grace)
             finally:
                 # A finished leader can still have stopped or signal-ignoring children.
                 try:

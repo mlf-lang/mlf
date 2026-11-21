@@ -26,6 +26,11 @@ build the stage-1 tools. Set `MLF_COMPILER` and `MLF_PACKAGE_MANAGER` to their
 absolute paths, and `MLF_GC_PREFIX` if required for your installation.
 The native launchers also work directly without Python.
 
+On macOS and Linux, interrupting `check-tools` stops the active test script
+and its workers. On Windows the developer commands share the console. Use
+Ctrl+C to interrupt the checks there. Forcibly terminating just the Windows
+launcher process can leave its active Python script running.
+
 The [compiler-shape benchmark](tools/performance/compiler-shapes/README.md)
 runs on macOS and Linux with GHC 9.14.1. Preview the matrix with
 `python3 tools/dev.py bench shapes list`. A fresh default run writes
