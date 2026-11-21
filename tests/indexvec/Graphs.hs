@@ -105,6 +105,28 @@ package name deps mods = P.Package (H.literal ("/packages/" ++ name ++ "/mlf-pac
              ("dependencies",J.Object [(H.literal n,J.empty) | n <- deps])]) mods
 modl owner name deps = P.Module name owner (H.v_concatString name ".hs") deps
 
+wantedBindingRoots = do
+  ds <- case Data.validateDeclarations [T.DataDecl "Dict" ["a"] [T.ConstructorDecl "DictValue" [T.Parameter "a"]]] of
+    T.Right ok -> pure ok
+    T.Left why -> fail (H.unpack why)
+  let hole = T.CWantedRefs "Dict" []
+      nested = T.CLet "value" hole (T.CLam "local" (T.CApp hole hole))
+  forM_ [37,901] $ \root -> do
+    let parent = root + 5
+        next = parent + 2
+        gen i b = (i,T.Node (T.GGen (i+1)) b T.Flexible)
+        body i = (i+1,T.Node T.GBot (T.Just i) T.Flexible)
+        graph = Graph.mkGraph (IntMap.fromList [gen root T.Nothing,body root,gen parent (T.Just root),body parent])
+          IntMap.empty next
+        state = C.Generation graph [] []
+        action = C.build ds M.empty (T.Just parent) M.empty nested
+    case C.runGenerate action state of
+      T.Left why -> fail (H.unpack why)
+      T.Right (_,C.Generation result _ _) -> do
+        let allocated = [(i,b) | (i,T.Node T.GBot (T.Just b) T.Flexible) <- IntMap.toList (Graph.nodes result), i>=next]
+        check "each nested dictionary parameter belongs to the input graph's outer binding root"
+          3 (length [i | (i,b)<-allocated,b==root])
+
 -- Generate against the same two module environments at many independent
 -- holes. A declaration shadow changes their graph bindings, a lexical lambda
 -- only changes the explicitly marked given frame.
@@ -3122,6 +3144,7 @@ main = do
     (unpackGroups (D.components (zip names (map (:[]) (tail names ++ [head names])))))
   packageChecks
   candidateSkeletonChecks
+  wantedBindingRoots
   queryChecks
   datatypeChecks
   let sourceTuples = ["(" ++ replicate (arity-1) ',' ++ ")" | arity <- [2..64]]

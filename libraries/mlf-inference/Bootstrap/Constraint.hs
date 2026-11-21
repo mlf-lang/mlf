@@ -386,18 +386,34 @@ module Bootstrap.Constraint where {
   build datatypes typeScope parent locals = buildIn datatypes typeScope parent (BindingEnv locals M.empty);
   buildIn :: DataEnv -> Map String Int -> Maybe Int -> BindingEnv -> Core -> Generate Typed;
   buildIn datatypes typeScope parent env core =
-    do {
-      gen <- newNode (GGen (-1)) parent Flexible;
-      root <- newNode GBot (Just gen) Flexible;
-      setNode gen (Node (GGen root) parent Flexible);
-      f <- buildCore datatypes typeScope env gen root core;
-      return (Typed gen f)
-    };
+    generalize parent (\gen root -> buildCore datatypes typeScope env gen root core);
+  generalize :: Maybe Int -> (Int -> Int -> Generate Form) -> Generate Typed;
+  generalize parent makeForm = do {
+    gen <- newNode (GGen (-1)) parent Flexible;
+    root <- newNode GBot (Just gen) Flexible;
+    setNode gen (Node (GGen root) parent Flexible);
+    f <- makeForm gen root;
+    return (Typed gen f)
+  };
+  -- Descendants are generated under the same binding root. An entry may
+  -- start inside an existing graph, including the crate import wrappers.
+  -- Derive its root from that graph once, only if a wanted type needs it.
+  withBindingRoot :: forall a. Int -> (Int -> Generate a) -> Generate a;
+  withBindingRoot gen action = do {
+    graph <- getGraph;
+    action (outermost graph gen)
+  };
+  buildUnder :: Int -> DataEnv -> Map String Int -> Int -> BindingEnv -> Core -> Generate Typed;
+  buildUnder scopeRoot datatypes typeScope parent env core =
+    generalize (Just parent) (\gen root -> buildCoreUnder scopeRoot datatypes typeScope env gen root core);
   buildCore :: DataEnv ->
                Map String Int -> BindingEnv -> Int -> Int -> Core -> Generate Form;
-  buildCore datatypes typeScope env gen root core =
+  buildCore datatypes typeScope env gen root core = withBindingRoot gen
+    (\scopeRoot -> buildCoreUnder scopeRoot datatypes typeScope env gen root core);
+  buildCoreUnder :: Int -> DataEnv -> Map String Int -> BindingEnv -> Int -> Int -> Core -> Generate Form;
+  buildCoreUnder scopeRoot datatypes typeScope env gen root core =
     let {
-      child = buildIn datatypes typeScope (Just gen)
+      child = buildUnder scopeRoot datatypes typeScope gen
     } in
     let {
       bottom = newNode GBot (Just gen) Flexible
@@ -409,7 +425,7 @@ module Bootstrap.Constraint where {
       variable ref = case lookupTerm env ref of {
           Nothing -> case ref of {
             LexicalRef x -> case P.lookupPrimitive x of {
-              Just primitive -> buildCore datatypes typeScope env gen root (CPrimitive primitive);
+              Just primitive -> buildCoreUnder scopeRoot datatypes typeScope env gen root (CPrimitive primitive);
               Nothing -> failGenerate ("unbound variable: " ++ x)
             };
             DeclRef _ hint -> failGenerate ("unbound variable: " ++ hint)
@@ -458,10 +474,6 @@ module Bootstrap.Constraint where {
       wanted dictionary evidence =
         do {
           declaration <- liftResult (D.lookupDatatype datatypes dictionary);
-          graph <- getGraph;
-          let {
-            scopeRoot = outermost graph gen
-          };
           parameters <-
             mapM (\parameter -> newNode (G.bottomTag (snd parameter)) (Just scopeRoot) Flexible)
               (D.datatypeBinders declaration);
@@ -479,7 +491,7 @@ module Bootstrap.Constraint where {
       CVar x -> variable (LexicalRef x);
       CGivenScope names body -> do {
         givens <- liftResult (traverseEither (\name -> evidenceBinding env ((,) GivenEvidence (LexicalRef name))) names);
-        enclosed <- buildCore datatypes typeScope env gen root body;
+        enclosed <- buildCoreUnder scopeRoot datatypes typeScope env gen root body;
         return (FWithGivens givens enclosed)
       };
       CGlobal i hint -> variable (DeclRef i hint);
@@ -488,7 +500,7 @@ module Bootstrap.Constraint where {
         (,) [i] (CLam x body) -> lambda (DeclRef i x) body;
         (,) [i] (CLet x a b) -> binding (DeclRef i x) a b;
         (,) slots (CRec defs body) -> if length slots == length defs
-          then withDeclarationScope (buildRecursive datatypes typeScope env gen root
+          then withDeclarationScope (buildRecursiveUnder scopeRoot datatypes typeScope env gen root
             (zipWith (\i ((,,) n mode rhs) -> (,,) (DeclRef i n) mode rhs) slots defs) body)
           else failGenerate "recursive declaration slot inventory mismatch";
         _ -> failGenerate "declaration scope requires a matching top-level binder"
@@ -504,7 +516,7 @@ module Bootstrap.Constraint where {
           return (FApply a' b' ea eb)
         };
       CLet x a b -> binding (LexicalRef x) a b;
-      CRec defs body -> buildRecursive datatypes typeScope env gen root
+      CRec defs body -> buildRecursiveUnder scopeRoot datatypes typeScope env gen root
         (map (\((,,) n mode rhs) -> (,,) (LexicalRef n) mode rhs) defs) body;
       CWanted dictionary candidates -> wanted dictionary
         (explicit (map (\((,) role n) -> (,) role (LexicalRef n)) candidates));
@@ -552,7 +564,7 @@ module Bootstrap.Constraint where {
           target <- embed datatypes local expected;
           attach gen Rigid target;
           checked <-
-            buildIn datatypes local (Just gen) env
+            buildUnder scopeRoot datatypes local gen env
               (desugar (SAnn (directed expected expression) (SAnnotation [] expected)));
           e <- edge (generalization checked) target;
           return
@@ -682,7 +694,7 @@ module Bootstrap.Constraint where {
           prepared <- mapM (prepareBranch datatypes gen domain parameters) alternatives;
           let { projections = concatMap preparedProjections prepared };
           unless (null projections) (projectCase projections);
-          branches <- mapM (buildPreparedBranch datatypes typeScope env gen root) prepared;
+          branches <- mapM (buildPreparedBranchUnder scopeRoot datatypes typeScope env gen root) prepared;
           return (FMatch a ea branches)
         }
     };
@@ -741,7 +753,9 @@ module Bootstrap.Constraint where {
     };
   buildRecursive :: DataEnv -> Map String Int -> BindingEnv -> Int -> Int ->
                     [] ((,,) TermRef RecursiveMode Core) -> Core -> Generate Form;
-  buildRecursive datatypes typeScope env gen root definitions body =
+  buildRecursive datatypes typeScope env gen root definitions body = withBindingRoot gen
+    (\scopeRoot -> buildRecursiveUnder scopeRoot datatypes typeScope env gen root definitions body);
+  buildRecursiveUnder scopeRoot datatypes typeScope env gen root definitions body =
     do {
       let { signed = filter checkedRecursive definitions };
       declarations <- mapM (\((,,) ref mode rhs) -> do {
@@ -763,8 +777,8 @@ module Bootstrap.Constraint where {
                (,) scope done ->
                  do {
                    result <- if any (\((,,) ref _ _) -> isDeclarationRef ref) names
-                     then withDeclarationScope (buildRecursiveGroup datatypes typeScope scope gen names)
-                     else buildRecursiveGroup datatypes typeScope scope gen names;
+                     then withDeclarationScope (buildRecursiveGroupUnder scopeRoot datatypes typeScope scope gen names)
+                     else buildRecursiveGroupUnder scopeRoot datatypes typeScope scope gen names;
                    case result of {
                      (,) scope2 values -> return ((,) scope2 (append done values))
                    }
@@ -778,7 +792,7 @@ module Bootstrap.Constraint where {
               mapM
                 (\((,) ((,,,) n name source target) ((,,) _ _ rhs)) ->
                    do {
-                     value <- buildIn datatypes typeScope (Just gen) scope rhs;
+                     value <- buildUnder scopeRoot datatypes typeScope gen scope rhs;
                      proof <- edge (generalization value) target;
                      return ((,) n (RecursiveDefinition name source value proof Nothing))
                    })
@@ -789,7 +803,7 @@ module Bootstrap.Constraint where {
                  Nothing -> failGenerate "recursive component lost a declaration";
                  Just value -> return value
                }) definitions;
-            continuation <- buildIn datatypes typeScope (Just gen) scope body;
+            continuation <- buildUnder scopeRoot datatypes typeScope gen scope body;
             proof <- edge (generalization continuation) root;
             return (FRecursive ordered continuation proof)
           }
@@ -798,7 +812,9 @@ module Bootstrap.Constraint where {
   buildRecursiveGroup :: DataEnv -> Map String Int -> BindingEnv -> Int ->
                          [] ((,,) TermRef RecursiveMode Core) ->
                          Generate ((,) BindingEnv ([] ((,) TermRef RecursiveDefinition)));
-  buildRecursiveGroup datatypes typeScope env parent definitions =
+  buildRecursiveGroup datatypes typeScope env parent definitions = withBindingRoot parent
+    (\scopeRoot -> buildRecursiveGroupUnder scopeRoot datatypes typeScope env parent definitions);
+  buildRecursiveGroupUnder scopeRoot datatypes typeScope env parent definitions =
     do {
       group <- newNode (GGen (-1)) (Just parent) Flexible;
       declarations <- mapM
@@ -815,7 +831,7 @@ module Bootstrap.Constraint where {
       };
       bodies <- mapM
         (\((,) ((,,,) _ _ shared _) ((,,) _ _ rhs)) -> do {
-           value <- buildIn datatypes typeScope (Just group) scope rhs;
+           value <- buildUnder scopeRoot datatypes typeScope group scope rhs;
            proof <- edge (generalization value) shared;
            return ((,) value proof)
          }) (zip declarations definitions);
@@ -948,10 +964,12 @@ module Bootstrap.Constraint where {
     };
   buildPreparedBranch :: DataEnv -> Map String Int -> BindingEnv ->
                          Int -> Int -> PreparedBranch -> Generate Branch;
-  buildPreparedBranch datatypes typeScope env gen root prepared =
+  buildPreparedBranch datatypes typeScope env gen root prepared = withBindingRoot gen
+    (\scopeRoot -> buildPreparedBranchUnder scopeRoot datatypes typeScope env gen root prepared);
+  buildPreparedBranchUnder scopeRoot datatypes typeScope env gen root prepared =
     case prepared of {
       PreparedBranch pattern bindings body _ -> do {
-        body' <- buildIn datatypes typeScope (Just gen)
+        body' <- buildUnder scopeRoot datatypes typeScope gen
           (bindTerms env (map (\((,) n binding) -> (,) (LexicalRef n) binding) bindings)) body;
         e <- edge (generalization body') root;
         return (Branch pattern body' e)
