@@ -2,9 +2,10 @@
 
 This benchmark compiles **the same generated shared-Haskell source bytes** with GHC
 and with GHC-hosted MLF, starting from fresh target outputs and ending at a native
-executable. It classifies where compile time goes for ten program shapes at three
-sizes. It is a maintained repository benchmark: one entry point, a frozen schedule,
-a machine-readable result format, and layered CI.
+executable. The standard matrix covers 21 program shapes at sizes 8, 32, 128,
+1,024 and 8,192, with six paired builds per size. Its 105 cells schedule 1,260
+native compilations. Each reported time is the median for one compiler, shape
+and size.
 
 It is **not** the C/MLF Benchmarks Game. The [native benchmark runner](../bench/README.md)
 builds and compares pinned application workloads through the package manager and
@@ -67,55 +68,59 @@ for package/cache regressions and a fresh paired growth comparison.
 
 ## Running it
 
-For growth experiments, `--interleave-pairs` visits every selected size once
-per round in seeded random order. Each MLF/GHC pair stays adjacent and the
-first compiler alternates. This spreads each size throughout the experiment.
-Large cohorts can set `--cohort-output-gib` to budget disk space for the
-retained build products. The default is 8 GiB.
-
-To fit the growth of one family, use an environment with NumPy and a completed
-cohort containing `baseline-0` and at least three positive sizes for that family.
+Run from the repository root with a bootstrap producer built at GHC `-O2`.
+The sweep runs one shape at a time, with a separate cohort for every size.
+It records failures and resource limits alongside completed cells and continues
+to the next cell. The command exits unsuccessfully if any selected cell failed.
+The comparison table and its CSV are written to `WORKDIR/summary.md` and
+`WORKDIR/summary.csv`.
 
 ```sh
-python3 tools/performance/compiler-shapes/fit_growth.py COHORT_DIRECTORY --family inferred_chain
-```
-
-The command validates the cohort, reports the per-size medians, the OLS and
-endpoint slopes in milliseconds per function, and fits `a + b*(n/nmax)^p` to
-complete-build seconds. For each of 2,000 bootstrap samples it resamples adjacent
-MLF/GHC pairs within each size. The reported exponent describes the measured
-size range. The descriptive `bench.py analyze` output is also available without
-NumPy.
-
-```sh
-# What would run? Prints endpoint, matrix, families and the cell/compile counts.
+# Show the standard matrix or a filtered selection.
 python3 -B tools/performance/compiler-shapes/bench.py list
-python3 -B tools/performance/compiler-shapes/bench.py list --matrix smoke
+python3 -B tools/performance/compiler-shapes/bench.py list --family wide_case --size 128
 
-# Prepare fixed dependencies once, run one cohort, write the analysis.
-python3 -B tools/performance/compiler-shapes/bench.py all \
-  --workdir .mlf-build/compiler-shapes --cohort default-20261031 \
-  --producer .mlf-build/shared-ghc --build-builtin
+# Prepare dependencies once, then run the full 105-cell sweep.
+python3 -B tools/performance/compiler-shapes/bench.py prepare \
+  --workdir .mlf-build/compiler-shapes --producer .mlf-build/shared-ghc --build-builtin
+python3 -B tools/performance/compiler-shapes/bench.py sweep \
+  --workdir .mlf-build/compiler-shapes --setup .mlf-build/compiler-shapes/setup/setup.json
 
-# Filters: families and sizes are repeatable; the baseline stays included.
-python3 -B tools/performance/compiler-shapes/bench.py all \
-  --workdir .mlf-build/shapes-512 --cohort flat-512 \
-  --producer .mlf-build/shared-ghc --build-builtin \
-  --family flat_functions --family local_functions --size 512
-
-# Separate phases when a setup is reused or a run must be resumed by hand.
-python3 -B tools/performance/compiler-shapes/bench.py prepare ...
-python3 -B tools/performance/compiler-shapes/bench.py run --workdir W --cohort C ...
-python3 -B tools/performance/compiler-shapes/bench.py analyze --workdir W --cohort C
+# Compare two shapes at two sizes with the same setup and a separate results table.
+python3 -B tools/performance/compiler-shapes/bench.py sweep \
+  --workdir .mlf-build/selected-shapes --setup .mlf-build/compiler-shapes/setup/setup.json \
+  --family wide_case --family dependency_diamonds --size 8 --size 128
 ```
 
-`local_functions`, `inferred_functions`, `inferred_poly_functions` and
-`inferred_poly_chain` are opt-in
-and never part of the default matrix. `--family` and `--size` replace the matrix
-selection; they do not add to it. `inferred_functions` removes only the generated function signatures
-from `flat_functions`; the entry/IO harness stays annotated. See the
+`--family` and `--size` each accept repeated values and replace their respective
+defaults. Each cell uses six pairs unless you set `--repeats`. Add
+`--prune-build-products` to a sweep to remove verified native executables and
+GHC target objects from successful cells after checking them. The receipts,
+sources and per-cell measurements remain available.
+
+For a growth fit, select the optional `baseline` and at least three positive
+sizes of one family **in a single cohort**. The baseline runs once per
+repetition at size zero. `--interleave-pairs` spreads sizes across rounds
+while keeping the two compilers adjacent. `all` prepares, runs and analyzes a
+cohort. A completed cohort can also be analyzed with `bench.py analyze`.
+
+```sh
+python3 -B tools/performance/compiler-shapes/bench.py all \
+  --workdir .mlf-build/compiler-shapes --cohort wide-case-growth --interleave-pairs \
+  --family baseline --family wide_case --size 8 --size 32 --size 128
+python3 tools/performance/compiler-shapes/fit_growth.py \
+  .mlf-build/compiler-shapes/cohorts/wide-case-growth --family wide_case
+```
+
+`fit_growth.py` requires NumPy. It reports per-size medians, OLS and endpoint
+slopes in milliseconds per unit of shape size, and a fitted exponent in the
+model `a + b*(n/nmax)^p`. Each of 2,000 bootstrap samples resamples adjacent
+MLF/GHC pairs within each size. The estimates describe the measured size range.
+
+`inferred_functions` removes the generated function signatures from
+`flat_functions` and retains the annotated entry and IO harness. See the
 [inferred-function study](../../../docs/compiler-inferred-functions-2026-11-15.md)
-for the measured range and qualification.
+for its measured range and qualification.
 
 `inferred_poly_functions` rotates identity, constant, application and composition
 definitions without signatures. Every generated function is instantiated at both
@@ -142,38 +147,46 @@ docker build -f tools/performance/compiler-shapes/linux-environment.dockerfile \
 docker run --rm -v "$PWD:/work" -w /work mlf-compiler-shapes:9.14.1 \
   bash -lc 'python3 tools/shared/build.py --bootstrap-only --optimization 2 \
     --build-dir .mlf-build/shared-ghc && \
-    python3 -B tools/performance/compiler-shapes/bench.py all \
-      --workdir .mlf-build/compiler-shapes --cohort linux-20261031 \
-      --producer .mlf-build/shared-ghc --build-builtin'
+    python3 -B tools/performance/compiler-shapes/bench.py prepare \
+      --workdir .mlf-build/compiler-shapes --producer .mlf-build/shared-ghc --build-builtin && \
+    python3 -B tools/performance/compiler-shapes/bench.py sweep \
+      --workdir .mlf-build/compiler-shapes --setup .mlf-build/compiler-shapes/setup/setup.json'
 ```
 
 ## Matrix
 
-| Matrix | Content | Cells | Timed compilations |
-| --- | --- | ---: | ---: |
-| `default` | 10 shape families x sizes 8, 32, 128, plus one minimal baseline | 31 | 186 |
-| `smoke` | 2 families at size 8, plus baseline (CI coverage) | 3 | 18 |
+The 21 families below make up the standard matrix. Each family has its own
+size unit. For example, `n` counts case arms in `wide_case` and fields in
+`wide_product`. Request `--family baseline` separately to include the minimal
+size-zero program that reads and prints its argument.
 
-| Family | Generated work | Default |
-| --- | --- | --- |
-| `flat_functions` | `n` annotated top-level functions summed in a balanced tree | yes |
-| `inferred_functions` | identical independent functions with their `n` signatures removed; entry/IO harness unchanged | opt in |
-| `inferred_poly_functions` | unsigned independent identity/constant/application/composition functions; each used at `Int` and `Bool` with runtime-dependent branches | opt in |
-| `dependency_chain` | `n` annotated functions in a strict chain | yes |
-| `inferred_chain` | the same chain with no signature on the generated functions | yes |
-| `inferred_poly_chain` | unsigned dependency chain applying a supplied step once per layer, used at both `Int` and `Bool` | opt in |
-| `recursive_ring` | `n` functions in a mutually recursive cycle | yes |
-| `mono_calls` | `n` monomorphic constructor pack/unpack calls | yes |
-| `poly_calls` | the same calls through a rank-1 `forall` | yes |
-| `tree_chain` | `n` leaves in a left-deep constructor tree | yes |
-| `balanced_tree` | the same leaves in a balanced constructor tree | yes |
-| `literal_table` | a generated constructor table of `n` items | yes |
-| `higher_order_chain` | `n` nested higher-order compositions | yes |
-| `local_functions` | flat functions inside one local `let` | no (opt-in) |
-| `baseline` | reads argv and prints it | added by the matrix |
+| Family | Generated work |
+| --- | --- |
+| `flat_functions` | `n` annotated top-level functions summed in a balanced tree |
+| `inferred_functions` | identical independent functions with their `n` signatures removed; entry/IO harness unchanged |
+| `inferred_poly_functions` | unsigned independent identity/constant/application/composition functions; each used at `Int` and `Bool` with runtime-dependent branches |
+| `dependency_chain` | `n` annotated functions in a strict chain |
+| `inferred_chain` | the same chain with no signature on the generated functions |
+| `inferred_poly_chain` | unsigned dependency chain applying a supplied step once per layer, used at both `Int` and `Bool` |
+| `recursive_ring` | `n` functions in a mutually recursive cycle |
+| `mono_calls` | `n` monomorphic constructor pack/unpack calls |
+| `poly_calls` | the same calls through a rank-1 `forall` |
+| `tree_chain` | `n` leaves in a left-deep constructor tree |
+| `balanced_tree` | the same leaves in a balanced constructor tree |
+| `literal_table` | a generated constructor table of `n` items |
+| `higher_order_chain` | `n` nested higher-order compositions |
+| `local_functions` | flat functions inside one local `let` |
+| `wide_case` | a datatype with `n` constructors and a matching case arm for each constructor, selected by a runtime input clamped to the constructor range |
+| `class_instances` | `n` concrete wrapper types, each with an instance of the same class, all called through one constrained function |
+| `dependency_diamonds` | `n` layers of branching and reconverging function dependencies, with one runtime path through each layer |
+| `state_updates` | `n` ordered integer-array updates in `IO`, with the result read back at runtime |
+| `captured_closures` | `n` closures capture runtime values, escape in a returned tree, and are applied in a separate consumer |
+| `wide_product` | one constructor holds `n` integer fields, all destructured once and read with distinct positional weights |
+| `rank2_arguments` | `n` call sites pass polymorphic functions to a rank-2 consumer that instantiates them at both `Int` and `Bool` |
 
-Every program is generated by `generate.py` and carries a closed-form expected
-output for three inputs, including a negative one for the ring family.
+The generator records each case's runtime inputs and independently computed
+expected output in the plan. Both executables must produce the expected value
+for every input.
 
 ## Measurement contract
 
@@ -189,14 +202,14 @@ output for three inputs, including a negative one for the ring family.
   `.mlfci`/`.mlfco` pairs.
 - **Correctness is not relaxed.** Each MLF repetition is compared as raw
   `.mlfci`/`.mlfco` bytes against the first one in the cell, ordered query-group
-  identities are compared, and every produced executable is run on all three inputs
+  identities are compared, and every produced executable is run on all its recorded inputs
   with an exact stdout/stderr comparison.
 - **One pipeline at a time, ordinary flags.** GHC runs
   `--make -j1 -O2 -fforce-recomp` with an isolated package DB; MLF runs the selected
   endpoint above; Clang runs plain `-O2`. All arguments are recorded in the plan and
   re-recorded per leg.
 - **Order is frozen before samples.** Cells are shuffled with seed `20261031`. Each
-  cell runs three paired rounds and alternates which compiler starts, so both
+  cell runs six paired rounds by default and alternates which compiler starts, so both
   within-cell and across-cell start positions are balanced.
 - **Guards stay in place.** 90 s wall limit per leg, 512 MiB per-command output
   budget, 8 GiB aggregate cohort budget, 5 GiB free-disk floor, 3 GiB available
@@ -267,15 +280,17 @@ the index mapping or closure and must be re-measured, not retroactively filled i
 
 - Every ordinary PR runs `test_contract.py` to check defaults, rejected inputs,
   graph evidence, schedule balance and matrix shape without invoking a compiler.
-  The GHC O2 job also runs the three-cell `smoke` matrix and uploads its results
-  and raw receipts for the 18 timed compilations, including on failure.
-- The complete matrix is manual: `.github/workflows/compiler-shapes.yml`
-  (`workflow_dispatch`) takes family, size, repeat and cohort inputs, runs the
-  full default matrix by default, and always uploads plan, receipt, per-leg
-  receipts, results and the human summary.
-- There is no schedule and no automatic pass/fail on wall time. Three samples on a
-  shared runner cannot resolve small differences, and a timing gate would reward
-  noise.
+  The GHC O2 job filters the standard matrix to size 8 for `flat_functions`,
+  `recursive_ring`, `wide_case`, `class_instances`, `dependency_diamonds`,
+  `state_updates`, `captured_closures`, `wide_product` and `rank2_arguments`.
+  Six paired builds per cell give 108 timed compilations in one cohort. CI
+  uploads the available receipts and measurements even if a build fails.
+- The manual `.github/workflows/compiler-shapes.yml` workflow runs the standard
+  sweep. Dispatch inputs can filter families and sizes or set the repeat count.
+  The job summary and uploaded CSV show the available results, including failed
+  cells. The workflow prunes verified build products to save disk space.
+- CI checks executable correctness and evidence integrity. Wall-clock medians
+  from a shared runner are descriptive.
 
 ## Measured cohort: 2026-10-31
 
@@ -388,8 +403,7 @@ retained legs are kept locally as an aborted cohort, carry `complete: false` wit
 their original records, and are excluded from every result above.
 
 
-Explicit `--size` values may range from 1 through 8192. The default matrix and
-all time, memory, disk and output guards are unchanged. A larger requested size
+Explicit `--size` values may range from 1 through 8192. A larger requested size
 is a qualification attempt, not a promise that every compiler shape supports
 it: preserve compiler depth-limit failures in the receipt and report them.
 `bench.py run --setup PATH` uses that existing setup (and still authenticates

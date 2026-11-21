@@ -97,6 +97,44 @@ def edit(folder, mutate):
     path.write_text(json.dumps(receipt, indent=2) + '\n')
 
 
+class BindingShapeTests(unittest.TestCase):
+    def test_closures_capture_runtime_values_and_escape_before_application(self):
+        for n in (1, 8, 32, 128):
+            with self.subTest(n=n):
+                source = generate.program('captured_closures', n)
+                build = next(line for line in source.splitlines() if line.startswith('makeClosures x ='))
+                leaves = re.findall(
+                    r'let \{ saved = subInt x (\d+) \} in Closure (\d+) \(\\arg -> mulInt saved arg\)', build
+                )
+                self.assertEqual(leaves, [(str(i), str(i)) for i in range(1, n + 1)])
+                self.assertEqual(build.count('Both ('), n - 1)
+                self.assertIn('Closure arg f -> f arg', source)
+                self.assertIn('Both l r -> addInt (applyClosures l) (applyClosures r)', source)
+                self.assertIn('entry x = applyClosures (makeClosures x);', source)
+                for x in (-n - 1, -1, 0, 1, n + 1):
+                    self.assertEqual(generate.expected('captured_closures', n, x),
+                                     sum(i * (x - i) for i in range(1, n + 1)))
+
+    def test_single_product_binds_and_weighs_every_position(self):
+        for n in (1, 8, 32, 128):
+            with self.subTest(n=n):
+                source = generate.program('wide_product', n)
+                self.assertIn('data Product = Product ' + ' '.join(['Int'] * n) + ';', source)
+                body = re.search(r'weigh p = case p of \{ Product (.*?) -> (.*?) \};', source)
+                self.assertIsNotNone(body)
+                fields = list(range(1, n + 1))
+                self.assertEqual(body[1].split(), [f'v{i}' for i in fields])
+                self.assertEqual(re.findall(r'mulInt (v\d+) (\d+)', body[2]),
+                                 [(f'v{i}', str(n + 1 - i)) for i in fields])
+                entry = next(line for line in source.splitlines() if line.startswith('entry x ='))
+                self.assertTrue(entry.startswith('entry x = weigh (Product '))
+                self.assertEqual(re.findall(r'\(addInt x (\d+)\)', entry), list(map(str, fields)))
+                for x in (-n - 1, -1, 0, 1, n + 1):
+                    values = [x + i for i in fields]
+                    self.assertEqual(generate.expected('wide_product', n, x),
+                                     sum(value * weight for value, weight in zip(values, reversed(fields))))
+
+
 class ScheduleTests(unittest.TestCase):
     def test_interleaving_visits_each_cell_once_per_round_and_keeps_pairs(self):
         cases = ['baseline', 'small', 'medium', 'large']
@@ -118,8 +156,7 @@ class ScheduleTests(unittest.TestCase):
                 self.assertEqual({first['lane'], second['lane']}, {'mlf', 'ghc'})
 
 
-    def test_explicit_large_sizes_preserve_default_matrix(self):
-        self.assertEqual(bench.resolve('default', None, None)[2], [8, 32, 128])
+    def test_explicit_sizes_are_bounded(self):
         self.assertEqual(bench.resolve('default', ['inferred_poly_chain'], [8192])[2], [8192])
         for n in [0, -1, 8193]:
             with self.assertRaises(SystemExit):
@@ -132,14 +169,19 @@ class ScheduleTests(unittest.TestCase):
             setup = root / 'existing-setup.json'
             setup.write_text('{}')
             args = argparse.Namespace(workdir=root / 'other', setup=setup,
-                cohort='explicit', matrix='smoke', family=None, size=None,
-                repeats=3, endpoint='crate-bootstrap-v1', interleave_pairs=True, cohort_output_gib=32)
+                cohort='explicit', matrix='default', family=None, size=None,
+                repeats=None, endpoint='crate-bootstrap-v1', interleave_pairs=True, cohort_output_gib=32)
             with mock.patch.object(bench, 'run') as run_command:
                 bench.command_run(args)
             argv = run_command.call_args.args[0]
             self.assertEqual(argv[argv.index('--setup') + 1], setup.resolve())
             self.assertIn('--interleave-pairs', argv)
             self.assertEqual(argv[argv.index('--cohort-output-gib') + 1], 32)
+            self.assertEqual(argv[argv.index('--repeats') + 1], 6)
+            self.assertCountEqual([argv[i + 1] for i, arg in enumerate(argv) if arg == '--family'],
+                                  generate.FAMILIES)
+            self.assertEqual([int(argv[i + 1]) for i, arg in enumerate(argv) if arg == '--size'],
+                             [8, 32, 128, 1024, 8192])
 
     def test_all_build_entry_parsers_default_to_fused_and_allow_two_stage(self):
         # Exercise the real CLI parsers, stopping before any build or filesystem
@@ -191,12 +233,6 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual([generate.expected('inferred_poly_chain', 1, x) for x in [-1, 0, 7]], [0, 1, 8])
         self.assertEqual([generate.expected('inferred_poly_chain', 4, x) for x in [-1, 0, 7]], [3, -4, -11])
 
-    def test_inferred_poly_chain_is_opt_in(self):
-        _, families, _, _ = bench.resolve('default', None, None)
-        self.assertNotIn('inferred_poly_chain', families)
-        _, chosen, _, _ = bench.resolve('default', ['inferred_poly_chain'], [512])
-        self.assertEqual(chosen, ['inferred_poly_chain'])
-
     def test_inferred_poly_functions_are_unsigned_independent_and_used_at_two_types(self):
         for size in [4, 32, 512]:
             source = generate.program('inferred_poly_functions', size)
@@ -215,12 +251,6 @@ class ScheduleTests(unittest.TestCase):
                                  sum(value + i if value < i else -(value + i) for i in range(size)))
         self.assertEqual([generate.expected('inferred_poly_functions', 4, x) for x in [-1, 0, 7]], [2, 6, -34])
 
-    def test_inferred_poly_functions_is_opt_in(self):
-        _, families, _, _ = bench.resolve('default', None, None)
-        self.assertNotIn('inferred_poly_functions', families)
-        _, chosen, _, _ = bench.resolve('default', ['inferred_poly_functions'], [512])
-        self.assertEqual(chosen, ['inferred_poly_functions'])
-
     def test_inferred_functions_only_remove_generated_signatures(self):
         for size in [1, 32, 512]:
             annotated = generate.program('flat_functions', size)
@@ -232,12 +262,6 @@ class ScheduleTests(unittest.TestCase):
                 self.assertEqual(generate.expected('inferred_functions', size, value),
                                  size * value + size * (size - 1) // 2)
 
-    def test_inferred_functions_is_opt_in(self):
-        _, families, _, _ = bench.resolve('default', None, None)
-        self.assertNotIn('inferred_functions', families)
-        _, chosen, _, _ = bench.resolve('default', ['inferred_functions'], [512])
-        self.assertEqual(chosen, ['inferred_functions'])
-
     def test_balanced_pairs(self):
         self.assertEqual(runner.lanes_for(0, 3), ['ghc', 'mlf', 'mlf', 'ghc', 'ghc', 'mlf'])
         self.assertEqual(runner.lanes_for(1, 3), ['mlf', 'ghc', 'ghc', 'mlf', 'mlf', 'ghc'])
@@ -246,16 +270,35 @@ class ScheduleTests(unittest.TestCase):
 
     def test_default_matrix_shape(self):
         matrix, families, sizes, baseline = bench.resolve('default', None, None)
-        self.assertEqual(len(families), 10)
-        self.assertEqual(sizes, [8, 32, 128])
-        self.assertTrue(baseline)
-        self.assertEqual(bench.compile_count(len(families) * len(sizes) + 1, matrix['repeats']), 186)
+        self.assertEqual(set(bench.registry()['matrices']), {'default'})
+        self.assertCountEqual(families, [
+            'flat_functions', 'inferred_functions', 'inferred_poly_functions', 'inferred_poly_chain',
+            'local_functions', 'dependency_chain', 'inferred_chain', 'recursive_ring', 'mono_calls',
+            'poly_calls', 'tree_chain', 'balanced_tree', 'literal_table', 'higher_order_chain',
+            'wide_case', 'class_instances', 'dependency_diamonds', 'state_updates',
+            'captured_closures', 'wide_product', 'rank2_arguments'])
+        self.assertEqual(sizes, [8, 32, 128, 1024, 8192])
+        self.assertEqual(matrix['repeats'], 6)
+        self.assertFalse(baseline)
+        listing = subprocess.check_output([sys.executable, '-B', HERE / 'bench.py', 'list'], text=True)
+        self.assertIn('cells:    105, timed compilations: 1260', listing)
+        with tempfile.TemporaryDirectory() as directory:
+            # Enumerate the whole public generator schedule without building 8,192-node sources.
+            with mock.patch.object(generate, 'program', return_value='module Main where\n'):
+                generated = generate.generate(Path(directory) / 'default')
+            self.assertCountEqual([(c['family'], c['size']) for c in generated],
+                                  [(family, n) for family in families for n in sizes])
 
-    def test_local_functions_is_opt_in(self):
-        _, families, _, _ = bench.resolve('default', None, None)
-        self.assertNotIn('local_functions', families)
-        _, chosen, _, _ = bench.resolve('default', ['local_functions'], [512])
-        self.assertEqual(chosen, ['local_functions'])
+    def test_filtered_families_and_explicit_legacy_baseline(self):
+        selected = ['inferred_functions', 'inferred_poly_functions', 'inferred_poly_chain', 'local_functions']
+        _, chosen, sizes, baseline = bench.resolve('default', selected, [512])
+        self.assertEqual((chosen, sizes, baseline), (selected, [512], False))
+        _, chosen, sizes, baseline = bench.resolve('default', ['baseline', 'wide_case'], [8])
+        self.assertEqual((chosen, sizes, baseline), (['wide_case'], [8], True))
+        with tempfile.TemporaryDirectory() as directory:
+            cases = generate.generate(Path(directory) / 'filtered', sizes=[8],
+                                      families=['baseline', 'wide_case'])
+            self.assertCountEqual([case['id'] for case in cases], ['baseline-0', 'wide_case-8'])
 
     def test_fused_endpoint_has_its_own_command_and_stages(self):
         endpoint = bench.measured_endpoint('crate-fused-v1')
@@ -272,6 +315,105 @@ class ScheduleTests(unittest.TestCase):
         self.assertIn('emlf-source-v1', bench.registry()['paired_endpoints'])
         with self.assertRaises(SystemExit):
             bench.measured_endpoint('emlf-source-v1')
+
+
+class LanguageFeatureShapeTests(unittest.TestCase):
+    families = ('wide_case', 'class_instances', 'dependency_diamonds', 'state_updates')
+
+    def test_explicit_generation_preserves_source_and_oracle(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cases = generate.generate(root / 'features', sizes=[1, 5], families=self.families)
+            self.assertCountEqual([case['id'] for case in cases],
+                                  [f'{family}-{n}' for family in self.families for n in (1, 5)])
+            for case in cases:
+                path = Path(case['source'])
+                self.assertEqual(digest(path), case['source_sha256'])
+                self.assertEqual(case['expected_stdout'], [
+                    f"{self.reference(case['family'], case['size'], x)}\n" for x in case['inputs']])
+
+    @staticmethod
+    def reference(family, size, x):
+        if family == 'wide_case':
+            arm = sum(x >= threshold for threshold in range(1, size))
+            return x + 2 * arm + 1
+        if family == 'class_instances':
+            return sum((i + 1) * (x + i) for i in range(size))
+        result = x
+        for i in range(size):
+            if family == 'state_updates':
+                result = i - result
+            elif family == 'dependency_diamonds':
+                result += (i + 1) if x < 0 else -(i + 1)
+            else:
+                raise ValueError(family)
+        return result
+
+    def test_oracles_cover_all_small_arms_both_branches_and_update_parities(self):
+        for family in self.families:
+            for size in (1, 2, 5, 8):
+                for x in range(-size - 1, size + 2):
+                    with self.subTest(family=family, size=size, x=x):
+                        self.assertEqual(generate.expected(family, size, x),
+                                         self.reference(family, size, x))
+
+    def test_every_diamond_forks_and_rejoins_the_previous_stage(self):
+        size = 5
+        source = generate.program('dependency_diamonds', size)
+        bodies = dict(re.findall(r'^([a-z]\w*) [\w ]+ = (.+);$', source, re.MULTILINE))
+
+        def calls(name):
+            return [word for word in re.findall(r'\b\w+\b', bodies[name]) if word in bodies]
+
+        stage, = calls('entry')
+        visited = set()
+        for _ in range(size):
+            left, right = calls(stage)
+            self.assertEqual(len({stage, left, right} - visited), 3)
+            visited.update((stage, left, right))
+            predecessor, = calls(left)
+            self.assertEqual(calls(right), [predecessor])
+            stage = predecessor
+        self.assertNotIn(stage, visited)
+        self.assertEqual(calls(stage), [])
+
+    def test_wide_case_constructs_and_matches_each_tag(self):
+        for size in (1, 5, 8):
+            source = generate.program('wide_case', size)
+            tags = [str(i) for i in range(size)]
+            data = re.search(r'\bdata Tag = ([^;]+);', source)
+            self.assertIsNotNone(data)
+            self.assertCountEqual(re.findall(r'\bTag(\d+)\b', data[1]), tags)
+            branches = re.findall(r'\bTag(\d+)\s*->\s*(\d+)', source)
+            self.assertCountEqual(branches, [(str(i), str(2 * i + 1)) for i in range(size)])
+            # Each alternative must also be produced somewhere on the selector path.
+            self.assertCountEqual(re.findall(r'\bTag(\d+)\b', source), tags * 3)
+            self.assertCountEqual(re.findall(r'ltInt x (\d+)', source), tags[1:])
+            self.assertIn('entry x = addInt x (score (pick x))', source)
+
+    def test_entry_calls_the_constrained_method_for_every_instance(self):
+        size = 5
+        source = generate.program('class_instances', size)
+        ids = [str(i) for i in range(size)]
+        self.assertEqual(source.count('class Score '), 1)
+        self.assertCountEqual(re.findall(r'\bdata Box(\d+)\b', source), ids)
+        self.assertCountEqual(re.findall(r'\binstance Score Box(\d+)\b', source), ids)
+        self.assertRegex(source, r'measure :: [^;]*Score [a-z]+[^;]*=>')
+        self.assertRegex(source, r'measure (\w+) = score \1;')
+        self.assertCountEqual(re.findall(r'\bmeasure \(Box(\d+)\b', source), ids)
+
+    def test_state_updates_read_and_replace_one_cell_in_source_order(self):
+        for size in (1, 5, 8):
+            source = generate.program('state_updates', size)
+            self.assertEqual(source.count('newIntArray '), 1)
+            self.assertIn('cell <- newIntArray 1 x', source)
+            self.assertEqual(source.count('readIntArray '), size + 1)
+            self.assertEqual(source.count('writeIntArray '), size)
+            updates = re.findall(r'(\w+) <- readIntArray cell 0;\s*'
+                                 r'writeIntArray cell 0 \(subInt (\d+) \1\)', source)
+            self.assertEqual([int(index) for _, index in updates], list(range(size)))
+            self.assertIn('readIntArray cell 0 };', source)
+            self.assertIn('ioBind (entry (readInt text)) printInt', source)
 
 
 class AnalyzerTests(unittest.TestCase):
@@ -846,6 +988,32 @@ class GraphReaderPinTests(unittest.TestCase):
         pinned = [node.value for node in ast.walk(inputs) if isinstance(node, ast.Constant)]
         for name in ['test_query_index.py', 'artifact_binary_open.py', 'command_runner.py', 'bench.py']:
             self.assertIn(name, pinned)
+
+
+class Rank2ArgumentTests(unittest.TestCase):
+    def test_sites_pass_polymorphic_selectors_used_at_int_and_bool(self):
+        for size in (1, 2, 5, 32):
+            with self.subTest(size=size):
+                source = generate.program('rank2_arguments', size)
+                self.assertIn('probe :: (forall a. a -> a -> a) -> Int -> Int -> Int', source)
+                self.assertIn('pick (addInt x offset) (addInt (mulInt 2 x) offset)', source)
+                self.assertIn('if pick (ltInt x 0) (ltInt 0 x)', source)
+                entry = next(line for line in source.splitlines() if line.startswith('entry x ='))
+                calls = re.findall(r'probe \(\\left right -> (left|right)\) x (\d+)', entry)
+                self.assertEqual(calls, [('left' if i % 2 == 0 else 'right', str(i))
+                                         for i in range(size)])
+
+    def test_closed_form_matches_first_and_second_projections(self):
+        for size in (1, 2, 3, 8, 31):
+            for x in (-13, -1, 0, 1, 7):
+                with self.subTest(size=size, x=x):
+                    total = 0
+                    for i in range(size):
+                        index = i % 2
+                        number = (x + i, 2 * x + i)[index]
+                        increment = (x < 0, x > 0)[index]
+                        total += number + int(increment)
+                    self.assertEqual(generate.expected('rank2_arguments', size, x), total)
 
 
 if __name__ == '__main__':

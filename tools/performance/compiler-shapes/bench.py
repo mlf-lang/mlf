@@ -6,6 +6,7 @@ Subcommands:
   prepare  build the fixed dependencies once (private GHC package DB, runtime,
            builtin checked pair) and write setup.json
   run      execute one frozen cohort (filters: --family, --size, --repeats)
+  sweep    run families one at a time and tabulate their paired build times
   installed  compare two public installations with GHC using fresh and warm targets
   analyze  write summary.json, summary.csv, samples.csv and summary.md
   all      prepare if needed, then run, then analyze
@@ -63,14 +64,13 @@ def resolve(matrix_name, families, sizes):
     unknown = [name for name in chosen_families if name not in data['families']]
     if unknown:
         raise SystemExit('unknown families: ' + ', '.join(unknown))
-    if 'baseline' in chosen_families:
-        raise SystemExit('baseline is added by the matrix flag, not by --family')
+    if len(set(chosen_families)) != len(chosen_families) or len(set(chosen_sizes)) != len(chosen_sizes):
+        raise SystemExit('families and sizes must be distinct')
     for size in chosen_sizes:
         if not 0 < size <= 8192:
             raise SystemExit('size out of the bounded range: ' + str(size))
-    include_baseline = bool(matrix['baseline'])
-    if families is None and not include_baseline:
-        raise SystemExit('matrix without baseline must be filtered explicitly')
+    include_baseline = 'baseline' in chosen_families or bool(matrix['baseline'])
+    chosen_families = [family for family in chosen_families if family != 'baseline']
     return matrix, chosen_families, chosen_sizes, include_baseline
 
 
@@ -82,9 +82,6 @@ def command_list(args):
     data = registry()
     matrix, families, sizes, include_baseline = resolve(args.matrix, args.family, args.size)
     cells = len(families) * len(sizes) + (1 if include_baseline else 0)
-    for family in families:
-        if data['families'][family]['default'] is False and args.family is None:
-            raise SystemExit('optional family reached the default matrix: ' + family)
     print('suite:    ' + data['title'])
     print('matrix:   ' + args.matrix + ' (' + matrix['description'] + ')')
     print('endpoint: ' + args.endpoint + ' (' + data['endpoints'][args.endpoint]['status'] + ')')
@@ -170,6 +167,11 @@ def command_analyze(args):
     return output
 
 
+def command_sweep(args):
+    import sweep
+    raise SystemExit(sweep.run(args))
+
+
 def main():
     if sys.argv[1:2] == ['installed']:
         run([sys.executable, '-B', HERE / 'installed.py', *sys.argv[2:]])
@@ -208,6 +210,17 @@ def main():
     runner.add_argument('--cohort-output-gib', type=int)
     runner.add_argument('--setup', type=Path)
     runner.set_defaults(func=command_run)
+
+    sweep = sub.add_parser('sweep', help='measure each shape and size in sequence and write a comparison table')
+    sweep.add_argument('--workdir', type=Path, required=True)
+    sweep.add_argument('--setup', type=Path)
+    sweep.add_argument('--endpoint', default=registry()['default_endpoint'], choices=sorted(registry()['endpoints']))
+    sweep.add_argument('--family', action='append')
+    sweep.add_argument('--size', action='append', type=int)
+    sweep.add_argument('--repeats', type=int)
+    sweep.add_argument('--cohort-output-gib', type=int)
+    sweep.add_argument('--prune-build-products', action='store_true')
+    sweep.set_defaults(func=command_sweep)
 
     analyzer = sub.add_parser('analyze', help='write the analysis outputs')
     analyzer.add_argument('--workdir', type=Path, required=True)

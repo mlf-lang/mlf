@@ -3,7 +3,7 @@ from pathlib import Path
 import hashlib
 import json
 
-ROOT = Path(__file__).resolve().parents[3]
+REGISTRY = json.loads(Path(__file__).with_name('matrix.json').read_text())
 HEADER = '''-- mlf:syntax shared-haskell-v1
 {-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
              KindSignatures, FlexibleContexts, FlexibleInstances,
@@ -16,9 +16,7 @@ main :: IO ();
 main = ioBind (getArg 0) (\text -> printInt (entry (readInt text)))
 }
 '''
-FAMILIES = ('flat_functions', 'inferred_functions', 'inferred_poly_functions', 'inferred_poly_chain', 'local_functions', 'dependency_chain', 'inferred_chain', 'recursive_ring',
-            'mono_calls', 'poly_calls', 'tree_chain', 'balanced_tree',
-            'literal_table', 'higher_order_chain')
+FAMILIES = tuple(name for name in REGISTRY['families'] if name != 'baseline')
 
 
 def balanced(expressions, combine):
@@ -26,6 +24,14 @@ def balanced(expressions, combine):
         return expressions[0]
     half = len(expressions) // 2
     return combine(balanced(expressions[:half], combine), balanced(expressions[half:], combine))
+
+
+def tag_selector(lo, hi):
+    """Pick a tag with logarithmic expression depth; bounds are inclusive."""
+    if lo == hi:
+        return f'Tag{lo}'
+    mid = (lo + hi + 1) // 2
+    return f'if ltInt x {mid} then ({tag_selector(lo, mid-1)}) else ({tag_selector(mid, hi)})'
 
 
 def program(family, n):
@@ -81,6 +87,78 @@ def program(family, n):
             for leaf in reversed(leaves[:-1]):
                 tree = f'Branch ({leaf}) ({tree})'
         expression = f'score ({tree})'
+    elif family == 'wide_case':
+        tags = ' | '.join(f'Tag{i}' for i in range(n))
+        arms = '; '.join(f'Tag{i} -> {2*i+1}' for i in range(n))
+        declarations = (f'data Tag = {tags};\npick :: Int -> Tag;\npick x = {tag_selector(0, n-1)};\n'
+                        f'score :: Tag -> Int;\nscore tag = case tag of {{ {arms} }};\n')
+        expression = 'addInt x (score (pick x))'
+    elif family == 'class_instances':
+        declarations = ('class Score a where { score :: a -> Int };\n'
+                        'measure :: forall a. Score a => a -> Int;\nmeasure value = score value;\n')
+        instances = [f'data Box{i} = Box{i} Int;\n'
+                     f'instance Score Box{i} where {{ score (Box{i} y) = mulInt y {i+1} }};\n'
+                     for i in range(n)]
+        declarations += ''.join(instances)
+        terms = [f'measure (Box{i} (addInt x {i}))' for i in range(n)]
+        expression = balanced(terms, lambda a,b: f'addInt ({a}) ({b})')
+    elif family == 'dependency_diamonds':
+        layers = ['start :: Bool -> Int -> Int;\nstart flag x = x;\n']
+        previous = 'start'
+        for i in range(n):
+            layers.append(f'left{i} :: Bool -> Int -> Int;\nleft{i} flag x = addInt ({previous} flag x) {i+1};\n'
+                          f'right{i} :: Bool -> Int -> Int;\nright{i} flag x = subInt ({previous} flag x) {i+1};\n'
+                          f'join{i} :: Bool -> Int -> Int;\njoin{i} flag x = if flag then left{i} flag x else right{i} flag x;\n')
+            previous = f'join{i}'
+        declarations = ''.join(layers)
+        expression = f'{previous} (ltInt x 0) x'
+    elif family == 'captured_closures':
+        leaves = [
+            f'let {{ saved = subInt x {i} }} in Closure {i} (\\arg -> mulInt saved arg)'
+            for i in range(1, n + 1)
+        ]
+        tree = balanced(leaves, lambda a, b: f'Both ({a}) ({b})')
+        declarations = (
+            'data Closures = Closure Int (Int -> Int) | Both Closures Closures;\n'
+            'makeClosures :: Int -> Closures;\n'
+            f'makeClosures x = {tree};\n'
+            'applyClosures :: Closures -> Int;\n'
+            'applyClosures cs = case cs of { Closure arg f -> f arg; '
+            'Both l r -> addInt (applyClosures l) (applyClosures r) };\n'
+        )
+        expression = 'applyClosures (makeClosures x)'
+
+    elif family == 'wide_product':
+        indices = range(1, n + 1)
+        types = ' '.join(['Int'] * n)
+        binders = ' '.join(f'v{i}' for i in indices)
+        fields = ' '.join(f'(addInt x {i})' for i in indices)
+        terms = [f'mulInt v{i} {n + 1 - i}' for i in indices]
+        total = balanced(terms, lambda a, b: f'addInt ({a}) ({b})')
+        declarations = (
+            f'data Product = Product {types};\n'
+            'weigh :: Product -> Int;\n'
+            f'weigh p = case p of {{ Product {binders} -> {total} }};\n'
+        )
+        expression = f'weigh (Product {fields})'
+    elif family == 'rank2_arguments':
+        declarations = (
+            'probe :: (forall a. a -> a -> a) -> Int -> Int -> Int;\n'
+            'probe pick x offset = let { value = pick (addInt x offset) '
+            '(addInt (mulInt 2 x) offset) } in '
+            'if pick (ltInt x 0) (ltInt 0 x) then addInt value 1 else value;\n'
+        )
+        terms = []
+        for i in range(n):
+            selected = 'left' if i % 2 == 0 else 'right'
+            terms.append(f'probe (\\left right -> {selected}) x {i}')
+        expression = balanced(terms, lambda a, b: f'addInt ({a}) ({b})')
+    elif family == 'state_updates':
+        updates = ''.join(f'v{i} <- readIntArray cell 0; writeIntArray cell 0 (subInt {i} v{i});\n'
+                          for i in range(n))
+        return (HEADER + 'entry :: Int -> IO Int;\nentry x = do { cell <- newIntArray 1 x;\n'
+                + updates + 'readIntArray cell 0 };\n'
+                + 'main :: IO ();\nmain = ioBind (getArg 0) (\\text -> ioBind (entry (readInt text)) printInt)\n}\n')
     elif family == 'literal_table':
         table = 'Nil'
         for i in reversed(range(n)):
@@ -116,36 +194,48 @@ def expected(family, n, x):
         return n*x + n*(n-1)//2 - 2*(negative*x + negative*(negative-1)//2)
     if family == 'recursive_ring':
         return max(0,x) % n
+    if family == 'wide_case':
+        return x + 2 * max(0, min(x, n-1)) + 1
+    if family == 'class_instances':
+        return x*n*(n+1)//2 + n*(n-1)*(n+1)//3
+    if family == 'dependency_diamonds':
+        change = n*(n+1)//2
+        return x + change if x < 0 else x - change
+    if family == 'captured_closures':
+        return x * n * (n + 1) // 2 - n * (n + 1) * (2 * n + 1) // 6
+    if family == 'wide_product':
+        return x * n * (n + 1) // 2 + n * (n + 1) * (n + 2) // 6
+    if family == 'rank2_arguments':
+        right_sites = n // 2
+        left_sites = n - right_sites
+        increments = (left_sites if x < 0 else 0) + (right_sites if x > 0 else 0)
+        return (left_sites + 2 * right_sites) * x + n * (n - 1) // 2 + increments
+    if family == 'state_updates':
+        return n//2 - x if n % 2 else x + n//2
     if family == 'literal_table':
         return x*n*(n-1)//2 + n*(n+1)//2
     raise ValueError(family)
 
 
-def generate(out, sizes=(8,32,128), families=None):
+def generate(out, sizes=None, families=None):
     out = Path(out); out.mkdir(parents=True, exist_ok=False)
     cases = []
-    if families is None:
-        # The default matrix keeps the ten shape families and one minimal baseline.
-        selected = [f for f in FAMILIES if f not in ('local_functions', 'inferred_functions', 'inferred_poly_functions', 'inferred_poly_chain')]
-        pairs = [('baseline', 0)]
-        for family in selected:
-            pairs.extend((family, n) for n in sizes)
-    else:
-        selected = list(families)
-        unknown = [f for f in selected if f != 'baseline' and f not in FAMILIES]
-        if unknown:
-            raise ValueError('unknown families: ' + ', '.join(unknown))
-        pairs = []
-        for family in selected:
-            if family == 'baseline':
-                pairs.append((family, 0))
-            else:
-                pairs.extend((family, n) for n in sizes)
+    if sizes is None:
+        sizes = REGISTRY['matrices']['default']['sizes']
+    selected = REGISTRY['matrices']['default']['families'] if families is None else list(families)
+    unknown = [f for f in selected if f != 'baseline' and f not in FAMILIES]
+    if unknown:
+        raise ValueError('unknown families: ' + ', '.join(unknown))
+    pairs = [(family, n) for family in selected for n in ((0,) if family == 'baseline' else sizes)]
     for family, n in pairs:
         identity = f'{family}-{n}'
         directory = out/identity; directory.mkdir()
         source = directory/'Main.hs'; source.write_text(program(family,n))
         inputs = [-1,0,n+3] if family == 'recursive_ring' else [-1,0,7]
+        if family == 'wide_case':
+            inputs = [-1, n//2, n]
+        elif family in ('captured_closures', 'wide_product'):
+            inputs = [-n-1, 0, n+1]
         cases.append({'id':identity,'family':family,'size':n,'source':str(source.resolve()),
             'source_sha256':hashlib.sha256(source.read_bytes()).hexdigest(),'source_bytes':source.stat().st_size,
             'inputs':inputs, 'expected_stdout':[f'{expected(family,n,x)}\n' for x in inputs],

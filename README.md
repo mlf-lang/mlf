@@ -1406,28 +1406,26 @@ reports the separate frozen-source comparison and diagnostic timing boundaries.
 ### Compiler shape classification benchmark
 
 The [compiler shape benchmark](tools/performance/compiler-shapes/README.md)
-answers a different question from the C/MLF Benchmark Game above. It compiles the
-same generated shared-Haskell program with GHC and with MLF for ten program shapes
-at sizes 8, 32 and 128, and reports where compile time goes per shape instead of
-gating pinned application workloads. One entry point drives the whole benchmark:
+measures cold compilation of identical shared-Haskell sources to native executables.
+The standard matrix covers 21 program shapes at 8, 32, 128, 1,024 and 8,192
+units. Each size has six paired MLF and GHC builds. The default MLF endpoint
+emits LLVM and checked artifacts with `--compile-crate-to-llvm-gc`, then links
+with Clang at `-O2`.
 
 ```sh
 python3 -B tools/performance/compiler-shapes/bench.py list
-python3 -B tools/performance/compiler-shapes/bench.py all \
-  --workdir .mlf-build/compiler-shapes --cohort default-20261031 \
-  --producer .mlf-build/shared-ghc --build-builtin
+python3 -B tools/performance/compiler-shapes/bench.py prepare \
+  --workdir .mlf-build/compiler-shapes --producer .mlf-build/shared-ghc --build-builtin
+python3 -B tools/performance/compiler-shapes/bench.py sweep \
+  --workdir .mlf-build/compiler-shapes
 ```
 
-`--family` and `--size` filter the matrix, `--matrix smoke` is the 18-compilation
-check that ordinary pull requests run, and `analyze.py` writes `summary.json`,
-`summary.csv`, `samples.csv` and a human `summary.md`. The measured endpoint is the
-bootstrap crate route (`--compile-crate`, then `--crate-to-llvm-gc`, then Clang
-`-O2`), not the installed `emlf SOURCE -o` driver; the setup, plan and report state
-that endpoint, and the analyzer refuses cohorts that differ in endpoint, toolchain,
-host or repeat count. The runner contract in [tools/bench](tools/bench/README.md)
-is unchanged.
+The sweep runs one family at a time and writes `summary.md` and `summary.csv`
+with median elapsed seconds and outcomes for each size. Repeat `--family` and
+`--size` to select a subset. Pull requests exercise a size-8 subset of the same
+matrix. The optional `--family baseline` selects the size-zero IO program.
 
-The current cohort (2026-10-31, `b81f9b0a`) completed the full 31-cell, 186-compilation
+The historical cohort (2026-10-31, `b81f9b0a`) completed the full 31-cell, 186-compilation
 matrix with no failures: MLF was slower in all 30 shaped cells, with ratios from
 2.28 to 5.03 and a mean that rises from 2.57 at n=8 to 3.19 at n=128. The minimal
 program alone costs 1.133 s versus 0.445 s for GHC, and the group-heavy families
