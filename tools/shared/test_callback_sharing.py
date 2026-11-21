@@ -43,9 +43,13 @@ CHECKS = [
     'large worker bounds cloning',
     'large numeric worker stays inline',
     'collecting numeric worker stays ordinary',
+    'kernel anchors reach whole cycle', 'kernel anchors match per-root traversal',
+    'saturated nested workers need no closure', 'partial nested workers retain closure',
+    'escaping and oversaturated workers retain closures', 'branched peer tail transfer',
+    'self or different ABI keeps inline choice', 'specialized or straight line calls keep inline choice',
 ]
 EXPECTED = (''.join('PASS ' + x + '\n' for x in CHECKS)
-            + 'Independent callback sharing audit: 27 checks passed\n').encode()
+            + f'Independent callback sharing audit: {len(CHECKS)} checks passed\n').encode()
 
 
 def verify_inventory(stdout):

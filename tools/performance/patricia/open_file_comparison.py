@@ -14,7 +14,7 @@ import hashlib
 # entire reader/schema triple byte-for-byte: this finite corpus uses the old
 # primitive domain. Actual artifacts still pass the current native reader,
 # linker and audit before this independent comparison.
-from frozen_file_oracles import load_oracles, dependency_oracle
+from frozen_file_oracles import load_oracles, dependency_oracle, dependency_v12_oracle
 
 ORACLE_PINS = {
     'artifact_binary_reference.py': 'de312e3415eba178b649d30b6fa2b113fc864455de16603a5902af034d036422',
@@ -24,6 +24,8 @@ ORACLE_PINS = {
 ORACLE_DIRECTORY, _reference, _typed = load_oracles(ORACLE_PINS)
 DEPENDENCY_ORACLE_PATH, _dependency_typed = dependency_oracle(
     ORACLE_DIRECTORY, _reference, ORACLE_PINS['artifact_binary_typed.py'])
+CURRENT_DEPENDENCY_ORACLE_PATH, _current_dependency_typed = dependency_v12_oracle(
+    ORACLE_DIRECTORY, _reference, ORACLE_PINS['artifact_binary_typed.py'], DEPENDENCY_ORACLE_PATH)
 Invalid, read_document, tree_document = (_reference.Invalid, _reference.read_document,
                                         _reference.tree_document)
 fields, items, text = _typed.value_node, _typed.list_values, _typed.text
@@ -80,6 +82,53 @@ def dependency_decoded(raw):
                 if code[1] in added:
                     require((text(owner), text(spelling)) == added[code[1]],
                             'exact added dependency primitive identity')
+    return values[0]
+
+
+# Fixed append-only identities: 132/133 from ABI134-v9, 134..136 from
+# ABI137-v12 (d8325d9 over 63fbd13). This is not a dynamic registry maximum.
+CURRENT_DEPENDENCY_PRIMITIVES = {
+    132: ('Prelude', 'freezeSTArray'), 133: ('Prelude', 'stToIO'),
+    134: ('Prelude', 'byteArrayCRC32'), 135: ('Prelude', 'packStringFields'),
+    136: ('Prelude', 'stringUtf8Length'),
+}
+
+def current_dependency_decoded(raw):
+    """Whole canonical dependency bytes plus exact bidirectional v12 identities.
+
+    The old dependency_decoded still uses 0..133 and its historical controls.
+    Own artifacts and linked terms retain the original 0..131 reader.
+    """
+    require(isinstance(raw, bytes), 'comparison input must be original bytes')
+    doc = read_document(raw, 3)
+    require(len(doc.roots) == 1, 'exactly one dependency interface root')
+    _current_dependency_typed.validate_type(doc, doc.roots[0], 'CrateInterfaceFields')
+    values = doc.values()
+    require(tree_document(values, 3) == raw, 'canonical whole dependency bytes')
+    reverse = {identity: code for code, identity in CURRENT_DEPENDENCY_PRIMITIVES.items()}
+    # Container module names describe exports, not defining owners. Legitimate
+    # reexports across modules are allowed. Aggregate repeated module rows so
+    # splitting one container cannot bypass duplicate/conflicting binding checks.
+    seen_by_module = {}
+    for module, entities in (fields(row, 2, 2) for row in items(fields(values[0], 242, 13)[3])):
+        seen = seen_by_module.setdefault(text(module), set())
+        for entity in items(entities):
+            owner, spelling, role = fields(entity, 189, 3)
+            identity = (text(owner), text(spelling))
+            code = None
+            if role[1] == 186:
+                primitive, = fields(role, 186, 1)
+                integer, = fields(primitive, 32, 1)
+                code = integer[1]
+            if code in CURRENT_DEPENDENCY_PRIMITIVES:
+                require(identity == CURRENT_DEPENDENCY_PRIMITIVES[code],
+                        'exact current dependency primitive identity')
+            if identity in reverse:
+                require(role[1] == 186 and code == reverse[identity],
+                        'current dependency primitive identity rebound')
+            if code in CURRENT_DEPENDENCY_PRIMITIVES or identity in reverse:
+                require(identity not in seen, 'duplicate current dependency primitive in container')
+                seen.add(identity)
     return values[0]
 
 OPEN_FORMATS = {7: 'MLF-OPEN-CRATE-1/checker-1', 8: 'MLF-OPEN-CRATE-2/checker-1'}
@@ -472,6 +521,49 @@ def compare_open_file(closed_files, open_files, dependency_interfaces,
     except Invalid as error:
         raise ComparisonError(str(error)) from error
 
+def compact_group_owner_v2(crate, members):
+    # Historical owner framing over the unchanged frozen codec/schema oracle.
+    prefix = ''.join(str(ord(char)) + '_' for char in crate) + 'z_'
+    def member(name):
+        for tag, start in [('value', 'module_' + prefix), ('type', 'Module_' + prefix)]:
+            if name.startswith(start):
+                return pack([tag, name[len(start):]])
+        return pack(['raw', name])
+    return pack(['MLF-OPEN-GROUP-2', crate, pack([member(n) for n in sorted(members)])])
+
+
+def compact_group_owner(crate, members):
+    escaped = ''.join(c if c.isascii() and c.isalnum() and c != 'z' else
+                      'zz' if c == 'z' else 'z' + format(ord(c), 'x') + 'z' for c in crate)
+    def member(name):
+        for tag, start in [('value', 'module_c1_' + escaped + '_'),
+                           ('type', 'Module_c1_' + escaped + '_')]:
+            if name.startswith(start):
+                return pack([tag, name[len(start):]])
+        return pack(['raw', name])
+    return pack(['MLF-OPEN-GROUP-3', crate, pack([member(n) for n in sorted(members)])])
+
+def match_group_identity(crate, legacy, opened, members):
+    if not members or len(set(members)) != len(members):
+        return False
+    encoded = lambda value: ''.join(str(ord(char)) + '_' for char in value)
+    expected_legacy = 'Query_' + encoded(crate) + 'z_' + encoded(members[0])
+    expected_open = pack(['MLF-OPEN-GROUP-1', crate, pack(sorted(members))])
+    return legacy == expected_legacy and opened in (expected_open, compact_group_owner_v2(crate, members),
+                                                   compact_group_owner(crate, members))
+
+
+def fragment_equal(parameters, opened_parameters, closed, opened):
+    require(len(parameters) == len(opened_parameters), 'fragment parameter count changed')
+    for (original, ty), current in reversed(list(zip(parameters, opened_parameters))):
+        closed = node(71, original, ty, closed)
+        opened = node(71, current, ty, opened)
+    try:
+        return linked_equal(closed, opened)
+    except ComparisonError as error:
+        raise ComparisonError('complete original fragment body changed: ' + str(error)) from error
+
+
 def _compare(closed_files, open_files, dependency_interfaces,
              audited_open_files, closed_linked_bytes, open_linked_bytes, entry_selection):
     suffixes = {'.mlfci', '.mlfco'}
@@ -489,7 +581,7 @@ def _compare(closed_files, open_files, dependency_interfaces,
     require(text(opened[0]) == OPEN_FORMATS[open_schema], 'wrong open package family')
     compatibility = compatibility_identity()
     require(text(opened[1]) == compatibility, 'wrong checker/compiler compatibility identity')
-    dependencies = [dependency_decoded(raw) for raw in dependency_interfaces]
+    dependencies = [current_dependency_decoded(raw) for raw in dependency_interfaces]
     depmap = keyed([(text(fields(i, 242, 13)[0]), i) for i in dependencies], 'dependency interface identity')
     rootid = text(of[0])
     require(rootid not in depmap, 'root included in imported interface closure')
@@ -527,11 +619,14 @@ def _compare(closed_files, open_files, dependency_interfaces,
     require(len(units) == len(fragments) and len(units) > 0, 'fragment inventory changed')
     groups, used_bindings, used_data, exports = [], set(), set(), []
     group_reports = []
+    all_bodies_exact = True
     for unit, fragment in zip(units, fragments):
         header, term = fields(unit, 241, 2)
         hf = fields(header, 240, 8)
         group, receipt, data_names, parameters, body, owned, used = fields(fragment, 401, 7)
-        require(group == hf[0], 'ordered fragment identity changed')
+        members = [name(value)[1] for value in items(owned)]
+        require(group == hf[0] or match_group_identity(rootid, text(hf[0]), text(group), members),
+                'ordered fragment identity changed')
         group_name = text(group)
         require(group_name not in groups, 'duplicate fragment group')
         groups.append(group_name)
@@ -544,9 +639,10 @@ def _compare(closed_files, open_files, dependency_interfaces,
         while term[0] == 'node' and term[1] == 71:
             parameter, ty, term = fields(term, 71, 3)
             ps.append((parameter, ty))
-        require(term == body, 'complete original fragment body changed')
         raw_parameters, raw_owned = list(items(parameters)), list(items(owned))
-        require(raw_parameters == [p for p, _ in ps], 'ordered parameter names changed')
+        exact_body = term == body and raw_parameters == [p for p, _ in ps]
+        all_bodies_exact = all_bodies_exact and exact_body
+        alpha_body = fragment_equal(ps, raw_parameters, term, body)
         require(len({name(p)[0] for p in raw_parameters}) == len(raw_parameters), 'duplicate parameter identity')
         external_alpha = 0
         for parameter, ty in ps:
@@ -576,7 +672,7 @@ def _compare(closed_files, open_files, dependency_interfaces,
             require(key in declarations, 'fragment datatype missing')
             star_pairs += same_declaration(declaration, declarations[key])
             used_data.add(key)
-        group_reports.append({'group': group_name, 'body_exact': True,
+        group_reports.append({'group': group_name, 'body_exact': exact_body, 'body_alpha': alpha_body,
             'external_alpha_schemes': external_alpha, 'all_star_representation_pairs': star_pairs})
     require(br == sorted(used_bindings), 'binding reference inventory is not complete/exact')
     require(dr == sorted(used_data), 'datatype reference inventory is not complete/exact')
@@ -598,7 +694,8 @@ def _compare(closed_files, open_files, dependency_interfaces,
             'audit_scope': 'exact same-format pair; not schema7-to-8 migration', 'groups': group_reports,
             'fragment_count': len(groups), 'group_count': len(groups), 'binding_reference_count': len(br),
             'datatype_reference_count': len(dr), 'compatibility_identity': compatibility,
-            'interface_content_exact': True, 'all_original_fragment_bodies_exact': True,
+            'interface_content_exact': True, 'all_original_fragment_bodies_exact': all_bodies_exact,
+            'all_original_fragment_bodies_lexically_equivalent': True,
             'audited_rebuild_original_bytes_equal': True, 'linked': linked,
             'entry_selection': selection,
             'native_validation_required': 'Public read/link of both originals, old checksums and Open.audit with returned fragments.'}

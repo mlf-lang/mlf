@@ -14,8 +14,8 @@ import qualified Bootstrap.CrateArtifact as Artifact
 import qualified Bootstrap.Separate as Separate
 import qualified Bootstrap.Std as Std
 import qualified Bootstrap.Map as Map
-import qualified Bootstrap.Set as Set
-import qualified FrozenIdentityInventory as FI
+import qualified FrozenDesignSet as Set
+import qualified FrozenDesignIdentityInventory as FI
 import qualified FrozenClassDemand as F
 import qualified Bootstrap.Runtime as R
 import qualified MLF.Tests.ClassDemand as QT

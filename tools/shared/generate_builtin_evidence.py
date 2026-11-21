@@ -9,6 +9,7 @@ The original failed verification, logs, and build receipt remain untouched.
 from __future__ import annotations
 import argparse
 import hashlib
+import inspect
 import json
 import math
 import os
@@ -102,11 +103,23 @@ def authenticate_failure(verifier, snapshot, path):
     return {'receipt': reference, 'error': record['error'], 'stdout': row['stdout'], 'stderr': row['stderr']}
 
 
+def build_link_flags(builder, name, optimization):
+    # The source root can be an archived checkout with an earlier driver.
+    policy = getattr(builder, 'executable_link_flags', None)
+    if policy is None:
+        return builder.LINK_FLAGS
+    if 'optimization' in inspect.signature(policy).parameters:
+        return policy(name, optimization)
+    return policy(name)
+
+
 def build_commands(builder, root, build, manifest, receipt):
     """Reconstruct current build.py commands; never execute receipt argv."""
     ghc, cc = receipt['ghc']['path'], receipt['cc']['path']
+    level = receipt['optimization']
+    optimization = builder.optimization_flags(level) if hasattr(builder, 'optimization_flags') else ['-O' + level]
     flags = ['-XHaskell2010', '-package-env', '-', '-clear-package-db', '-global-package-db',
-             '-no-user-package-db', '-hide-all-packages', '-O' + receipt['optimization'],
+             '-no-user-package-db', '-hide-all-packages', *optimization,
              *builder.DEMAND_FLAGS, '-i',
              *['-i' + str((root / value).resolve()) for value in manifest['source_roots']],
              '-odir', str(build / 'objects'), '-hidir', str(build / 'objects')]
@@ -123,7 +136,8 @@ def build_commands(builder, root, build, manifest, receipt):
                                     '-c', str(root / source), '-o', obj]))
         objects.append(obj)
     for row in manifest['executables']:
-        rows.append(('link-' + row['name'], [ghc, '--make', '-j1', *flags, *builder.LINK_FLAGS,
+        link_flags = build_link_flags(builder, row['name'], level)
+        rows.append(('link-' + row['name'], [ghc, '--make', '-j1', *flags, *link_flags,
                      str(root / row['wrapper']), *objects, '-o', str(build / 'bin' / row['name'])]))
     emlf = str(build / 'bin/emlf')
     rows += [('shared-profile', [emlf, '--check-shared', *shared]),

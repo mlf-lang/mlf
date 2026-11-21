@@ -1,5 +1,8 @@
 # Native MLF compiler tests
 
+For suite migration, CI deduplication and timing comparisons, follow the
+[test migration roadmap](../docs/test-migration-roadmap.md).
+
 The root `tuple-list` test target checks tuple/list sugar through the checkout
 frontend: fixed ASTs and types, malformed syntax, current and frozen target
 checking, serialized-target round trips, module scope and lazy interpretation.

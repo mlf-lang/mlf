@@ -4,14 +4,13 @@
              MultiParamTypeClasses, OverloadedStrings #-}
 module Bootstrap.BuiltinPreludeContext
   (RawPrelude(..), PreparedPrelude, prepareFresh, checkCompilerPrelude,
-   inputIdentity, rawTerm, preparedRaw, prepareObject, interface, linked, names, environment, sourceValues,
+   inputIdentity, rawTerm, preparedRaw, prepareObject, interface, linked, finishLinked, names, environment, sourceValues,
    protectedNames, contracts, sourceExternals) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as S;
-  import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Classes as Classes;
   import qualified Bootstrap.Data as D;
@@ -37,6 +36,50 @@ module Bootstrap.BuiltinPreludeContext
   preparedRaw (PreparedPrelude raw _ _) = raw;
   interface (PreparedPrelude (RawPrelude _ _ iface _ _ _ _ _ _ _ _ _) _ _) = iface;
   linked (PreparedPrelude _ _ state) = state;
+  -- All Prelude declarations have already passed the independent check above.
+  -- Retain only the transitive dependencies used by this linked continuation,
+  -- then independently check the complete retained term. Untrusted objects
+  -- never enter this fixed-literal path, and their ordinary admission is intact.
+  finishLinked (PreparedPrelude _ _ initial) state entry =
+    case finishSelectedPrelude initial state entry of {
+      Right result -> Right result;
+      Left _ -> Artifact.finishLinkedState state entry
+    };
+  finishSelectedPrelude initial state entry = do {
+    let { count = length (Artifact.fragmentBodies state) - length (Artifact.fragmentBodies initial) };
+    ensure (count >= 0) "prepared link lost its initial spine";
+    body <- foldEither (\rest declarations -> Separate.graft declarations rest) entry
+      (take count (Artifact.fragmentBodies state));
+    -- checkCompilerPrelude established that every Prelude binder is below
+    -- this serial. Higher identities in the user continuation cannot select
+    -- a declaration from the prepared spine.
+    let { serial = Artifact.fragmentSerial initial;
+      preludeRead name = if X.nameId name < serial then S.singleton name else S.empty };
+    selected <- foldEither (\rest declarations -> do {
+      chosen <- selectPreludeSpine (Artifact.variableReadsWith preludeRead rest) declarations;
+      Separate.graft (snd chosen) rest
+    }) body (Artifact.fragmentBodies initial);
+    Checked.check (XWithData (Artifact.fragmentData state) selected)
+  };
+  selectPreludeSpine :: Set XName -> XTerm -> Either String ((,) (Set XName) XTerm);
+  selectPreludeSpine needed source = case source of {
+    XLet name rhs rest -> do {
+      tail <- selectPreludeSpine needed rest;
+      if S.member X.compareName name (fst tail) then Right
+        ((,) (S.union X.compareName (S.delete X.compareName name (fst tail))
+          (Artifact.declarationVariableReads rhs)) (XLet name rhs (snd tail))) else Right tail
+    };
+    XLetRec definitions rest -> do {
+      tail <- selectPreludeSpine needed rest;
+      let { names = map (\((,,) name _ _) -> name) definitions };
+      if any (\name -> S.member X.compareName name (fst tail)) names then Right
+        ((,) (S.difference X.compareName
+          (S.unions X.compareName ((:) (fst tail) (map (\((,,) _ _ rhs) -> Artifact.declarationVariableReads rhs) definitions)))
+          (S.fromList X.compareName names)) (XLetRec definitions (snd tail))) else Right tail
+    };
+    XConstructor "()" [] -> Right ((,) needed source);
+    _ -> Left "prepared Prelude is not a declaration spine"
+  };
   names (PreparedPrelude (RawPrelude _ _ _ _ _ _ value _ _ _ _ _) _ _) = value;
   environment (PreparedPrelude (RawPrelude _ _ _ _ _ _ _ value _ _ _ _) _ _) = value;
   sourceValues (PreparedPrelude (RawPrelude _ _ _ _ _ _ _ _ value _ _ _) _ _) = value;
@@ -82,8 +125,7 @@ module Bootstrap.BuiltinPreludeContext
         ensure (T.alphaEq declared expected && T.alphaEq declared target)
           ("prepared Prelude export contract mismatch: " ++ key)
       }) (M.toList available);
-      let { identities = IS.toList (Separate.termIdentities term IS.empty) };
-      ensure (serial >= 0 && all (\identity -> identity < serial) identities)
+      ensure (serial >= 0 && Separate.maximumTermIdentity (-1) term < serial)
         "prepared Prelude fresh serial overlaps its checked term";
       case term of {
         XWithData declarations body -> Right (PreparedPrelude raw checked

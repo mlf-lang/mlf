@@ -8,6 +8,7 @@ module Bootstrap.SourceInference where {
   import Bootstrap.Std;
   import Bootstrap.Fresh;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.Set as Set;
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Classes as Classes;
@@ -550,31 +551,251 @@ module Bootstrap.SourceInference where {
   -- small unshared tree we can prove both identity and all wire bounds in
   -- one bounded scan. Shared/deep inputs still use the exact DAG planner.
   smallFinalValue :: Wire.Value -> Maybe Bool;
-  smallFinalValue raw = let {
+  smallFinalValue = smallFinalTree False;
+  smallFinalTree = finalTreeGeometry 256;
+  finalTreeGeometry = finalTreeGeometryUsing False;
+  finalTreeGeometryUsing spines depthLimit stored raw =
+    finalTreeBounds depthLimit (\chargeText maxDepth -> finalGeometryUsing spines stored
+      chargeText maxDepth [(,,) 1 False [raw]]);
+  finalCheckedTreeGeometry depthLimit term =
+    finalTreeBounds depthLimit (\chargeText maxDepth -> finalGeometryWalkUsing True True False
+      chargeText maxDepth (GeometryTerm 1 term (GeometryRoots [])));
+  finalTreeBounds depthLimit scan = let {
     limits = Wire.defaultLimits;
-    count = min (Wire.maxSymbols limits) (min (Wire.maxSymbolBytes limits)
-      (min (Wire.maxTotalSymbolBytes limits) (min (Wire.maxNodes limits / 4)
-        (min (Wire.maxEdges limits / 4) (Wire.maxExpandedWork limits / 4)))));
-    -- At most 32 bytes per expanded node/edge/text byte, even with maximal
-    -- varints. Header, root reference and final padding fit in 96 bytes.
-    allowance = min 1048576 (min count ((Wire.maxBytes limits - 96) / 32))
-  } in smallFinalTasks [(,,) 1 False [raw]] allowance (min 256 (Wire.maxDepth limits)) False;
-  smallFinalTasks pending remaining maxDepth nested = case pending of {
-    [] -> Just nested;
-    (:) ((,,) depth parentThen values) rest -> case values of {
-      [] -> smallFinalTasks rest remaining maxDepth nested;
-      (:) value more -> if remaining <= 0 || depth > maxDepth then Nothing else let {
-        tail = (:) ((,,) depth parentThen more) rest; next = remaining - 1
+    -- Bound expanded nodes independently of text bytes. A symbol can occupy
+    -- many bytes while contributing only one node and one symbol.
+    nodes = min 1048576 (min (Wire.maxSymbols limits)
+      (min (Wire.maxNodes limits / 4) (Wire.maxEdges limits / 4)));
+    -- One unit per node and per UTF-8 byte covers at most 32 encoded bytes
+    -- including entry tags and references. Keep the header/padding reserve.
+    work = min (Wire.maxTotalSymbolBytes limits)
+      (min (Wire.maxExpandedWork limits / 4) ((Wire.maxBytes limits - 96) / 32));
+    -- A single large text still goes through the full planner.
+    scalars = min ((nodes - 1) / 4) (Wire.maxSymbolBytes limits / 4);
+    chargeText = \text available -> let { bytes = stringUtf8Length text } in
+        if stringLength text > scalars || bytes > available then Nothing else Just (available - bytes)
+  } in scan chargeText (min depthLimit (Wire.maxDepth limits)) nodes work False;
+  -- Preserve the scalar-weighted budget of the existing task-list entry point.
+  smallFinalTasks pending remaining maxDepth nested = let {
+    chargeText = \text available -> let { count = stringLength text } in
+      if count > available / 4 then Nothing else Just (available - 4 * count)
+  } in finalGeometryTasks chargeText maxDepth pending remaining remaining nested;
+  -- Ground instantiations have a single XThen with two atomic components.
+  -- No template row contains a nested XThen. Charge every logical occurrence
+  -- using the same depth, node, text and UTF-8 limits as the ordinary tree.
+  -- This view comes only from a Fragment's own checked term.
+  applicationGeometry = applicationGeometryUsing False;
+  applicationGeometryUsing spines fields chargeText nodeLimit workLimit = case fields of {
+    [Wire.VNode 1 rows,_,Wire.VInt root] -> let {
+      collect i seen pending = case pending of {
+        [] -> IM.lookup root seen;
+        (:) row rest -> let {
+          save d n w = if n > nodeLimit || w > workLimit then Nothing else
+            let { next = IM.insert i ((,,) d n w) seen } in seq d (seq n (seq w (seq next (collect (i + 1) next rest))))
+        } in case row of {
+          Wire.VNode 87 [] -> save 2 2 2;
+          Wire.VNode 70 [Wire.VNode 31 [Wire.VInt _,Wire.VText hint]] -> case chargeText hint (workLimit - 4) of {
+            Just remaining -> save 3 4 (workLimit - remaining); Nothing -> Nothing
+          };
+          Wire.VNode 81 [Wire.VNode 32 [Wire.VInt _],Wire.VNode 1 []] -> save 3 4 4;
+          Wire.VNode 85 [Wire.VInt _,Wire.VText hint,Wire.VText ty] -> case chargeText hint (workLimit - 12) of {
+            Nothing -> Nothing;
+            Just left -> case chargeText ty left of {
+              Nothing -> Nothing; Just remaining -> save 6 12 (workLimit - remaining)
+            }
+          };
+          Wire.VNode 82 [Wire.VText name,Wire.VNode 1 []] -> if not spines then Nothing else
+            case chargeText name (workLimit - 3) of {
+              Just remaining -> save 2 3 (workLimit - remaining); Nothing -> Nothing
+            };
+          -- A repeated head contributes one application, its complete syntax
+          -- and its UTF-8 names each time. Prove the products fit first.
+          Wire.VNode 88 [Wire.VInt l,Wire.VInt r,Wire.VInt count] -> if not spines || count < 2 then Nothing else
+            case (,) (IM.lookup l seen) (IM.lookup r seen) of {
+              (,) (Just ((,,) ld ln lw)) (Just ((,,) rd rn rw)) ->
+                if count > Wire.maxDepth Wire.defaultLimits - max ld rd ||
+                   count > (nodeLimit - rn) / (1 + ln) || count > (workLimit - rw) / (1 + lw)
+                then Nothing else save (count + max ld rd) (rn + count * (1 + ln)) (rw + count * (1 + lw));
+              _ -> Nothing
+            };
+          Wire.VNode 88 [Wire.VInt l,Wire.VInt r] -> case (,) (IM.lookup l seen) (IM.lookup r seen) of {
+            (,) (Just ((,,) ld ln lw)) (Just ((,,) rd rn rw)) -> save (1 + max ld rd) (1 + ln + rn) (1 + lw + rw);
+            _ -> Nothing
+          };
+          _ -> Nothing
+        }
+      }
+    } in collect 0 IM.empty rows;
+    _ -> Nothing
+  };
+  finalGeometryTasks :: (String -> Int -> Maybe Int) -> Int ->
+    [] ((,,) Int Bool ([] Wire.Value)) -> Int -> Int -> Bool -> Maybe Bool;
+  finalGeometryTasks = finalGeometryWith False;
+  finalGeometryWith = finalGeometryUsing False;
+  -- A cursor points directly into the current constructor's child list.
+  -- Only descending into a nonempty constructor saves its remaining siblings.
+  data GeometryFrame = GeometrySiblings Int Bool ([] Wire.Value) GeometryFrame |
+    GeometryRoots ([] ((,,) Int Bool ([] Wire.Value))) |
+    GeometryTerm Int XTerm GeometryFrame | GeometryProof Int Bool XComputation GeometryFrame |
+    GeometryAfterHead Int XTerm XTerm Int Int GeometryFrame;
+  finalGeometryUsing spines stored chargeText maxDepth roots =
+    finalGeometryWalk spines stored chargeText maxDepth (GeometryRoots roots);
+  -- A positive height also proves that this entire bounded, already-visited
+  -- head is in the comparison grammar. Variable IDs are scalar nodes with
+  -- no geometry cost or demand. Exact hints and constructor names determine
+  -- the UTF-8 and scalar charges. Preserve every Then boundary.
+  geometryHeadHeight term = let {
+    pair a b = if a <= 0 || b <= 0 then 0 else 1 + max a b;
+    proof value = case value of {
+      XThen a b -> pair (proof a) (proof b);
+      XInner (XBottom (XCon _ [])) -> 4;
+      XElim -> 1;
+      _ -> 0
+    };
+    visit value = case value of {
+      XApp a b -> pair (visit a) (visit b);
+      XTypeApp a p -> pair (visit a) (proof p);
+      XVarTerm _ -> 3;
+      _ -> 0
+    }
+  } in visit term;
+  sameGeometryHead first other = let {
+    proof a b = case a of {
+      XThen p q -> case b of { XThen x y -> proof p x && proof q y; _ -> False };
+      XInner (XBottom (XCon name _)) -> case b of {
+        XInner (XBottom (XCon label args)) -> eqString name label && null args;
+        _ -> False
+      };
+      XElim -> case b of { XElim -> True; _ -> False };
+      _ -> False
+    };
+    visit a b = case a of {
+      XApp f x -> case b of { XApp g y -> visit f g && visit x y; _ -> False };
+      XTypeApp f p -> case b of { XTypeApp g q -> visit f g && proof p q; _ -> False };
+      XVarTerm (XName _ hint) -> case b of {
+        XVarTerm (XName _ label) -> eqString hint label; _ -> False
+      };
+      _ -> False
+    }
+  } in visit first other;
+  -- Only the checked tree entry point supplies the additive UTF-8 charge
+  -- that can be replayed. Ordinary wire and diagnostic callbacks run on
+  -- each occurrence exactly as before.
+  finalGeometryWalk = finalGeometryWalkUsing False;
+  finalGeometryWalkUsing repeatHeads spines stored chargeText maxDepth = let {
+    resume pending nodes work nested = case pending of {
+      GeometrySiblings depth parentThen fields rest -> visit depth parentThen fields rest nodes work nested;
+      GeometryRoots roots -> start roots nodes work nested;
+      GeometryTerm depth term rest -> visitTerm depth term rest nodes work nested;
+      GeometryProof depth parentThen proof rest -> visitProof depth parentThen proof rest nodes work nested;
+      GeometryAfterHead depth head tail beforeNodes beforeWork rest -> let {
+        size = beforeNodes - nodes; cost = beforeWork - work;
+        ordinary = visitTerm depth tail rest nodes work nested;
+        matches height level value n w =
+          if size >= n || cost >= w || level < 1 || level > maxDepth || height > maxDepth - level
+          then visitTerm level value rest n w nested else case value of {
+            XApp next more -> if sameGeometryHead head next then let {
+              nextLevel = level + 1; left = n - 1 - size; available = w - 1 - cost
+            } in seq nextLevel (seq left (seq available (matches height nextLevel more left available)))
+              else visitTerm level value rest n w nested;
+            _ -> visitTerm level value rest n w nested
+          }
+      } in if size < 8 || size > 96 || cost > 8192 || nodes <= 0 || work <= 0 || depth > maxDepth
+        then ordinary else case tail of {
+          XApp _ _ -> let { height = geometryHeadHeight head } in
+            if height <= 0 then ordinary else matches height depth tail nodes work;
+          _ -> ordinary
+        }
+    };
+    start roots nodes work nested = case roots of {
+      [] -> Just nested;
+      (:) ((,,) depth parentThen fields) rest -> visit depth parentThen fields (GeometryRoots rest) nodes work nested
+    };
+    -- This cursor receives the immutable checked term. Off the supported
+    -- path, resume on its exact wire projection with the same remaining
+    -- budgets. Scalar payloads and binder IDs retain ordinary wire demand.
+    visitTerm depth term rest nodes work nested =
+      if nodes <= 0 || work <= 0 || depth > maxDepth then Nothing else let {
+        d = depth + 1; n = nodes - 1; w = work - 1
+      } in case term of {
+        XLet name a b -> seq nested (visit d False [Structure.toXName name]
+          (GeometryTerm d a (GeometryTerm d b rest)) n w nested);
+        XAbs name ty body -> seq nested (visit d False [Structure.toXName name,Structure.toXType ty]
+          (GeometryTerm d body rest) n w nested);
+        XApp a b -> seq nested (visitTerm d a
+          (if repeatHeads then GeometryAfterHead d a b n w rest else GeometryTerm d b rest) n w nested);
+        XTypeApp a proof -> seq nested (visitTerm d a (GeometryProof d False proof rest) n w nested);
+        XVarTerm name -> if nodes >= 4 && work >= 4 && depth >= 0 && maxDepth - depth >= 2
+          then seq stored (seq nested (case name of {
+            XName _ hint -> case chargeText hint (work - 4) of {
+              Nothing -> Nothing; Just available -> resume rest (nodes - 4) available nested
+            }
+          })) else visit depth False [Structure.toXTerm term] rest nodes work nested;
+        _ -> visit depth False [Structure.toXTerm term] rest nodes work nested
+      };
+    -- Then schedules its right proof after its left. Unary proof nodes have
+    -- no siblings. Neither path changes proof grouping or constructs a term.
+    visitProof depth parentThen proof rest nodes work nested =
+      if nodes <= 0 || work <= 0 || depth > maxDepth then Nothing else let {
+        d = depth + 1; n = nodes - 1; w = work - 1;
+        changed = nested || (parentThen && isComposition proof)
+      } in case proof of {
+        XThen a b -> seq changed (let {
+          ordinary = visitProof d True a (GeometryProof d True b rest) n w changed
+        } in if nodes < 6 || work < 6 || depth < 0 || maxDepth - depth < 4 then ordinary
+          else case a of {
+            -- The guards cover Then, Inner, Bottom, Con, text and list.
+            -- Text must be charged before looking at the list or right proof.
+            XInner (XBottom (XCon name arguments)) -> case chargeText name (work - 5) of {
+              Nothing -> Nothing;
+              Just available -> if available <= 0 then Nothing else case arguments of {
+                [] -> visitProof d True b rest (nodes - 6) (available - 1) changed;
+                _ -> visit (depth + 5) False (map Structure.toXType arguments)
+                  (GeometryProof d True b rest) (nodes - 6) (available - 1) changed
+              }
+            };
+            _ -> ordinary
+          });
+        XInner a -> seq changed (visitProof d False a rest n w changed);
+        XBottom ty -> seq changed (visitBottom d ty rest n w changed);
+        XElim -> seq changed (resume rest n w changed);
+        _ -> visit depth parentThen [Structure.toXComputation proof] rest nodes work nested
+      };
+    -- Con contains a text node and an argument-list node at the same
+    -- depth. Charge the text before examining even the spine of that list.
+    visitBottom depth ty rest nodes work nested =
+      if nodes <= 0 || work <= 0 || depth > maxDepth then Nothing else case ty of {
+        XCon name arguments -> if nodes < 2 || work < 2 || depth >= maxDepth then Nothing
+          else case chargeText name (work - 2) of {
+            Nothing -> Nothing;
+            Just available -> if nodes < 3 || available <= 0 then Nothing
+              else visit (depth + 2) False (map Structure.toXType arguments) rest
+                (nodes - 3) (available - 1) nested
+          };
+        _ -> visit depth False [Structure.toXType ty] rest nodes work nested
+      };
+    visit depth parentThen fields rest nodes work nested = case fields of {
+      [] -> resume rest nodes work nested;
+      (:) value more -> if nodes <= 0 || work <= 0 || depth > maxDepth then Nothing else let {
+        left = nodes - 1; next = work - 1
       } in case value of {
-        Wire.VText text -> let { count = stringLength text } in
-          if count > next / 4 then Nothing else smallFinalTasks tail (next - 4 * count) maxDepth nested;
-        Wire.VNode tag children -> if tag < 0 || tag > 2147483647 then Nothing else let { changed = nested || (parentThen && tag == 58) } in
-          seq changed (smallFinalTasks ((:) ((,,) (depth + 1) (tag == 58) children) tail)
-            next maxDepth changed);
-        _ -> smallFinalTasks tail next maxDepth nested
+        Wire.VText text -> case chargeText text next of {
+          Nothing -> Nothing; Just available -> visit depth parentThen more rest left available nested
+        };
+        Wire.VNode tag children -> if stored && tag == 86 then case applicationGeometryUsing spines children chargeText nodes work of {
+          Just ((,,) height size cost) -> if height > maxDepth - depth + 1 then Nothing
+            else visit depth parentThen more rest (nodes - size) (work - cost) nested;
+          Nothing -> Nothing
+        } else if tag < 0 || tag > 2147483647 then Nothing else let {
+          changed = nested || (parentThen && tag == 58)
+        } in seq changed (case children of {
+          [] -> visit depth parentThen more rest left next changed;
+          _ -> visit (depth + 1) (tag == 58) children (GeometrySiblings depth parentThen more rest) left next changed
+        });
+        _ -> visit depth parentThen more rest left next nested
       }
     }
-  };
+  } in resume;
   -- On the certified small domain the only rewriting operation is still the
   -- same depth-aware XThen forest. Atom heights and child identities are local
   -- to each computation; header, datatype and unrelated term nodes cannot
@@ -876,7 +1097,7 @@ module Bootstrap.SourceInference where {
     XTerm -> [] ((,,) EvidenceRole String XType) -> Either String ([] Boundary.Candidate);
   candidateParameters parameters term candidates =
     let {
-      first = 1 + foldl max 0 (IS.toList (Separate.termIdentities term IS.empty))
+      first = 1 + Separate.maximumTermIdentity 0 term
     } in
     traverseEither
       (\((,) ordinal ((,,) role name ty)) -> do {
@@ -939,7 +1160,8 @@ module Bootstrap.SourceInference where {
   -- fallback or compatibility diagnostics, never to prepare source queries.
   data PlanInput = NamedInput ([] ((,,) String (Maybe SAnnotation) SExpr)) | ResolvedInput Dependency.BoundValues;
   data PlannedBinding = PlannedSource Int (Maybe SAnnotation) (R.Expr Declaration) |
-    PlannedSupport Int (Maybe SAnnotation) SExpr;
+    PlannedSupport Int (Maybe SAnnotation) SExpr |
+    ProjectedSource Int (Maybe SAnnotation) (R.Expr Declaration) SExpr;
   data PlanGraph = NamedPlan ([] ((,,) String (Maybe SAnnotation) SExpr))
     ([] ((,,) String (Maybe SAnnotation) SExpr)) ([] ([] String)) |
     IndexedPlan Dependency.Symbols (V.IndexVec Declaration PlannedBinding)
@@ -952,14 +1174,26 @@ module Bootstrap.SourceInference where {
   -- The inventory and persisted query envelopes consume named syntax. Select
   -- by ID first, projecting only the rows demanded by that consumer.
   namedBinding symbols = projectBinding (Dependency.symbolName symbols);
-  projectBinding name rows i = case V.at rows i of {
-    PlannedSource ordinal annotation rhs -> (,) ordinal ((,,) (name i) annotation (R.namedExpr name rhs));
+  projectBinding = projectBindingWith R.namedExpr;
+  indexedBinding symbols = indexedBindingWith (Dependency.symbolName symbols);
+  indexedBindingWith = projectBindingWith R.indexedExpr;
+  projectBindingWith project name rows i = let {
+    source ordinal annotation rhs = (,) ordinal ((,,) (name i) annotation (project name rhs))
+  } in case V.at rows i of {
+    PlannedSource ordinal annotation rhs -> source ordinal annotation rhs;
+    ProjectedSource ordinal annotation rhs _ -> source ordinal annotation rhs;
     PlannedSupport ordinal annotation rhs -> (,) ordinal ((,,) (name i) annotation rhs)
   };
-  indexedBinding symbols = indexedBindingWith (Dependency.symbolName symbols);
-  indexedBindingWith name rows i = case V.at rows i of {
-    PlannedSource ordinal annotation rhs -> (,) ordinal ((,,) (name i) annotation (R.indexedExpr name rhs));
-    PlannedSupport ordinal annotation rhs -> (,) ordinal ((,,) (name i) annotation rhs)
+  -- Reuse the inventory view only for its verified symbol-name prefix.
+  -- Explicit display projections still select names from the resolved term.
+  planIndexedBinding symbols rows i = case V.at rows i of {
+    ProjectedSource ordinal annotation _ rhs -> (,) ordinal ((,,) (Dependency.symbolName symbols i) annotation rhs);
+    _ -> indexedBinding symbols rows i
+  };
+  plannedReferences row = case row of {
+    PlannedSource _ _ rhs -> Just (R.references rhs);
+    ProjectedSource _ _ rhs _ -> Just (R.references rhs);
+    PlannedSupport _ _ _ -> Nothing
   };
   planSources plan = case planGraph plan of {
     NamedPlan sources _ _ -> sources;
@@ -967,7 +1201,7 @@ module Bootstrap.SourceInference where {
   };
   planSourceInputs plan = case planGraph plan of {
     NamedPlan sources _ _ -> sources;
-    IndexedPlan symbols rows ids _ _ -> map (compose snd (indexedBinding symbols rows)) ids
+    IndexedPlan symbols rows ids _ _ -> map (compose snd (planIndexedBinding symbols rows)) ids
   };
   planSupports plan = case planGraph plan of {
     NamedPlan _ supports _ -> supports;
@@ -1004,10 +1238,30 @@ module Bootstrap.SourceInference where {
   prepareResolvedSourcePlanWithImports conventions bindings = sourcePlanUsing conventions (ResolvedInput bindings);
   sourcePlanWith = sourcePlanUsing M.empty;
   sourcePlanUsing conventions input externals datatypes classes instances closedInstances valueScopes instanceScopes = do {
-    body <- case input of {
-      NamedInput members -> Surface.bindValues members (SConstructor "()");
-      ResolvedInput bindings -> Surface.bindIndexed bindings (SConstructor "()")
+    let {
+      entry = SConstructor "()";
+      parts = case input of {
+        NamedInput members -> (,) (Surface.bindValues members entry)
+          (\_ supports methods targets -> namedPlan members supports methods (Dependency.namedScopes targets));
+        ResolvedInput bindings@(Dependency.BoundValues base _) -> let {
+          edges = Dependency.checkedSourceEdges bindings;
+          indexed = Surface.projectedBindings Surface.indexedValue bindings;
+          row ordinal (Dependency.Bound i annotation rhs) = (,) i
+            (ProjectedSource ordinal annotation rhs (sourceRhs (V.at indexed i)));
+          graph inventory supports _ _ = case Classes.inventoryDeclarations inventory of {
+            Nothing -> Left "resolved source inventory lacks generated declaration slots";
+            Just generation -> let {
+              target = Dependency.generatedSymbols generation;
+              original = Dependency.symbolNodes base;
+              compatible = V.count original <= V.count (Dependency.symbolNodes target) &&
+                all (\i -> eqString (V.at original i) (Dependency.symbolName target i)) (V.indices original);
+              sourceRow = if compatible then row else plannedSourceRow
+            } in indexedPlanFrom sourceRow edges generation supports (\i -> map snd (Classes.inventoryCandidateIds inventory i))
+          }
+        } in (,) (Surface.bindResolvedEdgeRows SDeclScope edges (V.at indexed) entry) graph
+      }
     };
+    body <- fst parts;
     prepared <- Classes.withClassScopesAndImports conventions externals (map fst closedInstances)
       valueScopes instanceScopes
       (SClassProgram datatypes classes (map snd closedInstances) body)
@@ -1017,14 +1271,7 @@ module Bootstrap.SourceInference where {
       graph <- case inventory of { Classes.ClassInventory _ _ _ scopes _ methods definitions _ _ ->
         let { supports = map (\((,,) name annotation rhs) -> (,,) name (Just annotation) rhs) (Classes.supportDefinitions definitions);
               targets = Dependency.mapScopes (map snd) scopes
-        } in case input of {
-          NamedInput members -> namedPlan members supports methods (Dependency.namedScopes targets);
-          ResolvedInput bindings -> case Classes.inventoryDeclarations inventory of {
-            Nothing -> Left "resolved source inventory lacks generated declaration slots";
-            Just generation -> indexedPlanWith bindings generation supports
-              (\i -> map snd (Classes.inventoryCandidateIds inventory i))
-          }
-        }
+        } in snd parts inventory supports methods targets
       };
       Right ((,) (mapOptional (\g -> SourcePlan inventory g count used externals legacy instances M.empty) graph) legacy)
     } }
@@ -1056,15 +1303,17 @@ module Bootstrap.SourceInference where {
               Dependency.IndexedScopes _ _ _ _ _ -> Dependency.scopeAt scopes i
             }))
     } in indexedPlanWith bindings generation supports targets;
-  indexedPlanWith bindings@(Dependency.BoundValues base members) generation supports targets = do {
-    (,) symbols groups <- Dependency.resolvedGroupsWith bindings generation (Dependency.declarationEdges supports) targets;
+  plannedSourceRow ordinal (Dependency.Bound i annotation rhs) = (,) i (PlannedSource ordinal annotation rhs);
+  indexedPlanWith = indexedPlanUsing plannedSourceRow;
+  indexedPlanUsing sourceRow bindings = indexedPlanFrom sourceRow (Dependency.checkedSourceEdges bindings);
+  indexedPlanFrom sourceRow edges@(Dependency.SourceEdges (Dependency.BoundValues base members) _) generation supports targets = do {
+    (,) symbols groups <- Dependency.resolvedGroupsFrom edges generation (Dependency.declarationEdges supports) targets;
     let { baseCount = V.count (Dependency.symbolNodes base); count = V.count (Dependency.symbolNodes symbols);
           sources = map Dependency.boundId members; generated = Dependency.generatedSlots generation;
           source i = V.toInt i < baseCount;
           -- Groups are in lexical SCC order. Each input's ordinal recovers
           -- its original declaration order when preparing a multi-member SCC.
           mixed group = any (compose source fst) group && any (compose (compose not source) fst) group;
-          sourceRow ordinal (Dependency.Bound i annotation rhs) = (,) i (PlannedSource ordinal annotation rhs);
           supportRow i ((,,) _ annotation rhs) = (,) i (PlannedSupport (V.toInt i - baseCount) annotation rhs);
           entries = append (mapIndexed sourceRow members) (zipWith supportRow generated supports);
           rows = runST (stBind (V.filled count (panic "inactive source plan slot")) (\table ->
@@ -1078,14 +1327,13 @@ module Bootstrap.SourceInference where {
     R.Ann b _ -> copiedSource b; R.Signature b _ -> copiedSource b; _ -> False
   };
   initializeProtection :: SourcePlan -> Map String Bool -> Either String SourcePlan;
-  initializeProtection plan@(SourcePlan inventory graph count used externals legacy instances _) imported = do {
+  initializeProtection plan = initializeProtectionWithInputs (planSourceInputs plan) plan;
+  initializeProtectionWithInputs inputs (SourcePlan inventory graph count used externals legacy instances _) imported = do {
     let { sourceRefs = case graph of {
       NamedPlan _ _ _ -> Nothing;
-      IndexedPlan _ rows _ _ _ -> Just (\i -> case V.at rows i of {
-        PlannedSource _ _ rhs -> R.references rhs; PlannedSupport _ _ _ -> []
-      })
+      IndexedPlan _ rows _ _ _ -> Just (\i -> fromMaybe [] (plannedReferences (V.at rows i)))
     } };
-    flags <- Classes.inventoryProtectionWith sourceRefs inventory imported instances (planSourceInputs plan);
+    flags <- Classes.inventoryProtectionWith sourceRefs inventory imported instances inputs;
     Right (SourcePlan inventory graph count used externals legacy instances flags)
   };
   initialContracts :: SourcePlan -> Map String XType -> Map String Bool ->
@@ -1182,17 +1430,43 @@ module Bootstrap.SourceInference where {
   -- Lowered terms may introduce selector and dictionary uses. Admit these
   -- against the current declaration table; a recognized but unfinished read
   -- is an error, including a forward edge to a later SCC.
-  declarationRefs scope refs = mapMaybe (\ref -> case ref of {
+  declarationRef scope ref = case ref of {
     DeclRef i _ -> Just i; LexicalRef n -> lookupDecl scope n
-  }) refs;
-  expressionDeclarations scope body = declarationRefs scope (Dependency.valueRefs (Dependency.observeExpression body));
-  selectedContractIds scope owners members = let {
-    ordered = M.fromList compareString (concatMap (\member ->
-      map (\i -> (,) (declName scope i) i) (expressionDeclarations scope (sourceRhs member))) members)
+  };
+  declarationRefs scope = mapMaybe (declarationRef scope);
+  -- Visit accepted slots in encounter order, retaining the consumer's
+  -- accumulator across names that do not identify a declaration.
+  foldDeclarationRefs scope take = let {
+    visit acc refs = case refs of {
+      [] -> acc;
+      (:) ref rest -> case declarationRef scope ref of {
+        Nothing -> visit acc rest;
+        Just i -> let { next = take acc i } in seq next (visit next rest)
+      }
+    }
+  } in visit;
+  expressionDeclarations scope body = declarationRefs scope (Dependency.valueOccurrences True False body);
+  selectedContractIds = selectedContractIdsWith (Dependency.valueOccurrences True False);
+  selectedContractIdsWith references scope owners members = let {
+    -- Only the current winner for each spelling can be ignored on a repeat.
+    -- A distinct slot may shadow it, then the original slot may appear again.
+    select state@((,) current names) i = let { slot = V.toInt i } in
+      if IS.member slot current then state else let {
+        name = declName scope i;
+        replaced = case M.lookup compareString name names of {
+          Nothing -> current; Just previous -> IS.delete (V.toInt previous) current
+        };
+        next = IS.insert slot replaced;
+        entries = M.insert compareString name i names
+      } in seq name (seq next (seq entries ((,) next entries)));
+    selectMember state member =
+      foldDeclarationRefs scope select state (references (sourceRhs member));
+    ordered = snd (foldlStrict selectMember ((,) IS.empty M.empty) members)
   } in filter (\i -> not (elem (\a b -> compareDecl a b == 0) i owners)) (M.elems ordered);
-  slotPrepared checked owners (SlotPrepared _ named) = slotPrepared checked owners named;
-  slotPrepared checked owners (PreparedGroup original members _ registry specs authority _) = do {
-    let { scope = checkedScope checked; parameters = selectedContractIds scope owners members;
+  slotPrepared = slotPreparedWith (Dependency.valueOccurrences True False);
+  slotPreparedWith references checked owners (SlotPrepared _ named) = slotPreparedWith references checked owners named;
+  slotPreparedWith references checked owners (PreparedGroup original members _ registry specs authority _) = do {
+    let { scope = checkedScope checked; parameters = selectedContractIdsWith references scope owners members;
       materialize i = mapEither ((,) (declName scope i)) (checkedBinding checked i) };
     values <- traverseEither materialize parameters;
     let { resolveCandidate ((,,) role name _) = do {
@@ -1205,7 +1479,7 @@ module Bootstrap.SourceInference where {
       Just (RootAuthority owner labels protected candidates _) -> do {
         resolved <- case (,) scope owners of {
           (,) (DeclScope _ _ _ _ (ResolvedOrigin inventory)) [ownerId] -> do {
-            let { entries = Classes.inventoryCandidateIds inventory ownerId };
+            let { entries = if null labels then [] else Classes.inventoryCandidateIds inventory ownerId };
             ensure (length entries == length candidates) "definition candidate inventory changed";
             traverseEither (\((,) ((,) role i) ((,,) expected name _)) -> do {
               ensure (Evidence.sameRole role expected &&
@@ -1286,6 +1560,16 @@ module Bootstrap.SourceInference where {
       null (Classes.sourceDeclaredClasses Nothing rhs);
     _ -> False
   };
+  -- Indexed file groups carry the actual SCC self-edge result. A closed,
+  -- unqualified singleton signature can use the existing signed-expression
+  -- planner without first constructing and extracting a top-level let group.
+  eligibleIndexedSourceWith selfReference members =
+    eligibleSourceWith selfReference members || case members of {
+      [(,,) _ (Just annotation@(SAnnotation [] _)) rhs] ->
+        not selfReference && not (isCopied rhs) &&
+        null (Classes.sourceDeclaredClasses (Just annotation) rhs);
+      _ -> False
+    };
   prepareGroup :: SourcePlan -> Map String SourceContract -> [] String -> Either String PreparedGroup;
   prepareGroup = prepareGroupUsing structuralContractBindings;
   -- Only the file-owned query drivers select this route, with finite parsed
@@ -1296,13 +1580,17 @@ module Bootstrap.SourceInference where {
   -- printable names belong to the query key and the named inference boundary.
   planSteps plan = map (\((,) names prepare) -> (,) names (prepare Nothing))
     (planStepsUsing selectedContractBindings Dependency.symbolName plan);
-  planStepsUsing selectBindings projection plan = case planGraph plan of {
+  planStepsUsing selectBindings projection = planStepsWithRows selectBindings projection
+    (\symbols -> indexedBindingWith (projection symbols));
+  planStepsWithRows = planStepsReading (Dependency.valueOccurrences True False);
+  planStepsReading references selectBindings projection selectRows plan = case planGraph plan of {
     NamedPlan _ _ groups -> map (\names -> (,) names (\_ contracts -> prepareGroupUsing selectBindings plan contracts names)) groups;
     IndexedPlan symbols rows _ _ groups -> let {
+      row = selectRows symbols rows;
       step group = let {
         ids = map fst group; name = projection symbols; names = map name ids;
         entries = sortBy (\a b -> compareInt (fst (snd a)) (fst (snd b)))
-          (map (\i -> (,) i (indexedBindingWith name rows i)) ids);
+          (map (\i -> (,) i (row i)) ids);
         memberOrder = map fst entries; members = map (compose snd snd) entries;
         support = case ids of {
           (:) i _ -> case V.at rows i of {
@@ -1311,8 +1599,8 @@ module Bootstrap.SourceInference where {
           };
           [] -> False
         };
-        prepare checked contracts = prepareWithChecked checked (Just memberOrder) selectBindings Nothing (case ids of { [i] -> Just i; _ -> Nothing })
-          (eligibleSourceWith (any snd group)) plan contracts names
+        prepare checked contracts = prepareCheckedReading references checked (Just memberOrder) selectBindings Nothing (case ids of { [i] -> Just i; _ -> Nothing })
+          (eligibleIndexedSourceWith (any snd group)) plan contracts names
           (if support then [] else members) (if support then members else [])
           (contractOverloads contracts) (M.map contractProtected contracts)
       } in (,) names prepare
@@ -1320,13 +1608,42 @@ module Bootstrap.SourceInference where {
   };
   -- Executable query plans select members from the resolver's IDs. Only the
   -- compatibility named plan needs to admit its requested group by spelling.
-  querySteps plan scope = let {
-    steps = planStepsUsing (\_ _ -> []) (\_ -> declName scope) plan;
+  querySteps plan scope = queryStepsFrom plan scope
+    (planStepsUsing (\_ _ -> []) (\_ -> declName scope) plan);
+  queryStepsFrom plan scope steps = let {
     typed prepare checked = prepare (Just checked) (checkedNamed checked)
   } in case planGraph plan of {
     IndexedPlan _ _ _ _ groups -> Right (zipWith (\group step -> (,) (map fst group) (typed (snd step))) groups steps);
     NamedPlan _ _ _ -> traverseEither (\((,) names prepare) ->
       mapEither (\ids -> (,) ids (typed prepare)) (traverseEither (requireDecl scope) names)) steps
+  };
+  -- Protection uses the resolver's display names. The query scope created
+  -- below extends the same symbol table. With no ambiguous display names,
+  -- every source and pattern projects identically in both consumers.
+  protectedQueryPlan = protectedQueryPlanReading (Dependency.valueOccurrences True False);
+  protectedQueryPlanReading references original imported = let {
+    open contracts plan cached = let { scope = planScope plan (M.keys contracts) } in do {
+      checked <- installContracts scope contracts;
+      steps <- case (,) cached scope of {
+        (,) (Just rows) (DeclScope _ _ _ ambiguous _) -> if Set.size ambiguous == 0
+          then queryStepsFrom plan scope (planStepsReading references (\_ _ -> []) (\_ -> declName scope)
+            (\_ _ -> V.at rows) plan) else querySteps plan scope;
+        _ -> querySteps plan scope
+      };
+      Right ((,) checked steps)
+    }
+  } in case planGraph original of {
+    NamedPlan _ _ _ -> do {
+      plan <- initializeProtection original imported;
+      Right ((,) plan (\contracts -> open contracts plan Nothing))
+    };
+    IndexedPlan symbols bindings ids _ _ -> let {
+      rows = V.fromList (map (planIndexedBinding symbols bindings) (V.indices bindings));
+      inputs = map (compose snd (V.at rows)) ids
+    } in do {
+      plan <- initializeProtectionWithInputs inputs original imported;
+      Right ((,) plan (\contracts -> open contracts plan (Just rows)))
+    }
   };
   -- This context belongs to one finite parsed file and its checked predecessor
   -- map. Ordinals retain declaration order independently of SCC name order.
@@ -1418,9 +1735,12 @@ module Bootstrap.SourceInference where {
       (contractOverloads contracts) (M.map contractProtected contracts);
   prepareGroupWithViews selectBindings = prepareGroupWithReservation selectBindings Nothing Nothing eligibleSource;
   prepareGroupWithReservation = prepareWithChecked Nothing Nothing;
-  checkedFacts (CheckedContracts _ contracts _) i = mapOptional
-    (\c -> (,) (contractClasses c) (contractProtected c)) (M.lookup compareDecl i contracts);
-  prepareWithChecked checked memberOrder selectBindings reserved knownOwner eligible (SourcePlan base graph count used _ _ _ supportProtection)
+  checkedFacts current = let {
+    read = case current of { CheckedContracts _ contracts _ -> M.lookupProjectedId V.toInt
+      (\_ c -> (,) (contractClasses c) (contractProtected c)) contracts }
+  } in \i -> read i;
+  prepareWithChecked = prepareCheckedReading (Dependency.valueOccurrences True False);
+  prepareCheckedReading references checked memberOrder selectBindings reserved knownOwner eligible (SourcePlan base graph count used _ _ _ supportProtection)
     contracts names original support overloads protected = do {
     let { inventory = case checked of {
       Just current -> Classes.withCheckedClassContracts (checkedFacts current) base;
@@ -1445,9 +1765,9 @@ module Bootstrap.SourceInference where {
           };
           eligibleMember = case (,) knownOwner owner of {
             (,) Nothing (Just i) -> case graph of {
-              IndexedPlan _ rows _ _ _ -> case V.at rows i of {
-                PlannedSource _ _ rhs -> eligibleSourceWith (any (\ref -> V.toInt ref == V.toInt i) (R.references rhs));
-                PlannedSupport _ _ _ -> eligible
+              IndexedPlan _ rows _ _ _ -> case plannedReferences (V.at rows i) of {
+                Just refs -> eligibleSourceWith (any (\ref -> V.toInt ref == V.toInt i) refs);
+                Nothing -> eligible
               };
               _ -> eligible
             };
@@ -1468,25 +1788,31 @@ module Bootstrap.SourceInference where {
         (if eligibleMember original then case original of {
           (:) ((,,) name Nothing rhs) [] -> do {
             lowered <- (case reserved of {
-              Nothing -> Classes.lowerUnsignedRootAt
+              Nothing -> Classes.lowerUnsignedRootReading references
                 (\_ _ env suffix -> Classes.sourceEnvironmentNames env suffix) owner;
-              Just _ -> Classes.lowerUnsignedRootAt Classes.sourceOwnedEnvironmentNames owner
+              Just _ -> Classes.lowerUnsignedRootReading references Classes.sourceOwnedEnvironmentNames owner
             }) inventory overloads protected name rhs;
             case lowered of { Classes.SourceRootLowering body labels candidates protected -> do {
+              -- Lowering still sees the complete definition scope. Once it
+              -- produces no evidence slots, prepareOpenFinish cannot ask that
+              -- scope for an answer. Actual references in the lowered body
+              -- remain ordinary binding/layout dependencies. Roots with any
+              -- slots retain the complete conservative candidate inventory.
+              let { demanded = if null labels then [] else candidates };
               values <- freshLift (case (,) checked owner of {
                 (,) (Just current) (Just i) -> do {
-                  let { ids = Classes.inventoryCandidateIds inventory i };
-                  ensure (length candidates == length ids) "definition candidate inventory changed";
+                  let { ids = if null labels then [] else Classes.inventoryCandidateIds inventory i };
+                  ensure (length demanded == length ids) "definition candidate inventory changed";
                   traverseEither (\((,) ((,) role id) ((,) expected _)) -> do {
                     ensure (Evidence.sameRole role expected) "definition candidate role changed";
                     c <- checkedBinding current id;
                     Right ((,,) role (declName (checkedScope current) id) c)
-                  }) (zip ids candidates)
+                  }) (zip ids demanded)
                 };
                 _ -> traverseEither (\((,) role n) -> case M.lookup compareString n contracts of {
                   Nothing -> Left ("definition evidence support has not been checked: " ++ n);
                   Just c -> Right ((,,) role n c)
-                }) candidates
+                }) demanded
               });
               let { typed = map (\((,,) r n c) -> (,,) r n (contractType c)) values;
                 marked = mapMaybe (\((,,) _ n c) -> if contractProtected c then Just n else Nothing) values };
@@ -1495,6 +1821,23 @@ module Bootstrap.SourceInference where {
               freshPure (makePreparedUsing selectBindings original loweredMembers registry
                 ((:) ((,,) name (map (\((,,) _ cls _) -> cls) labels) protectedNow) [])
                 (Just (RootAuthority name labels protectedNow typed marked)) contracts)
+            } }
+          };
+          [(,,) name (Just annotation@(SAnnotation [] _)) rhs] -> do {
+            lowered <- (case reserved of {
+              Nothing -> Classes.lowerUnsignedRootReading references
+                (\_ _ env suffix -> Classes.sourceEnvironmentNames env suffix) owner;
+              Just _ -> Classes.lowerUnsignedRootReading references Classes.sourceOwnedEnvironmentNames owner
+            }) inventory overloads protected name (SSignature rhs annotation);
+            case lowered of { Classes.SourceRootLowering body labels _ protectedNow -> do {
+              freshLift (ensure (null labels) "signed source root leaked ordinary obligations");
+              case body of {
+                SSignature value translated ->
+                  freshPure (makePreparedUsing selectBindings original
+                    [(,,) name (Just translated) value] registry
+                    [(,,) name [] protectedNow] Nothing contracts);
+                _ -> freshFail "signed source root lost its explicit signature"
+              }
             } }
           };
           _ -> freshFail "invalid eligible source group"
@@ -1626,8 +1969,266 @@ module Bootstrap.SourceInference where {
       }
     }
   };
-  canonicalOpen object = do {
-    plan <- Wire.prepareGraphPlan Wire.defaultLimits [Structure.toXTerm (Open.body object)];
+  -- Checked open fragments can normalize complete ground arguments after the
+  -- geometry scan certifies the expanded tree. Other proof edits use the
+  -- graph finalizer. Standalone source objects keep their shallow editor.
+  -- In the finalizer's height-ordered forest, Inner (Bottom (Con n []))
+  -- has height four and Elim has height one. Before the next Inner, padding
+  -- joins the preceding Inner and Elim. Each complete argument is therefore
+  -- one block of equal height. The order and spelling of its leaves survive
+  -- the same binary carries as the general forest.
+  groundArgumentBlock :: XComputation -> Bool;
+  groundArgumentBlock proof = case proof of {
+    XThen (XInner (XBottom (XCon _ []))) XElim -> True;
+    _ -> False
+  };
+  -- The outer option records whether the bounded editor handled this proof.
+  groundProofEdit :: XComputation -> Maybe (Maybe XComputation);
+  groundProofEdit source = let {
+    carry height value stack = case stack of {
+      (:) ((,) previous first) rest -> if previous == height
+        then carry (height + 1) (XThen first value) rest else (:) ((,) height value) stack;
+      [] -> [(,) height value]
+    };
+    -- collection has already established exactly the same leaves in order.
+    sameShape a b = case (,) (groundArgumentBlock a) (groundArgumentBlock b) of {
+      (,) True yes -> yes;
+      (,) False True -> False;
+      _ -> case (,) a b of {
+        (,) (XThen al ar) (XThen bl br) -> sameShape al bl && sameShape ar br;
+        _ -> False
+      }
+    };
+    collect remaining pending stack = case pending of {
+      [] -> case stack of {
+        [] -> Nothing;
+        (:) ((,) _ lastBlock) rest -> let {
+          result = foldlStrict (\right block -> XThen (snd block) right) lastBlock rest
+        } in Just (if sameShape source result then Nothing else Just result)
+      };
+      (:) first rest -> if remaining <= 0 then Nothing else
+        if groundArgumentBlock first then let { next = carry 0 first stack } in seq next
+          (collect (remaining - 1) rest next)
+        else case first of {
+          XThen a b -> collect (remaining - 1) ((:) a ((:) b rest)) stack;
+          _ -> Nothing
+        }
+    }
+  } in if nestedComposition source then collect 127 [source] [] else Just Nothing;
+  -- Only a geometry-certified raw tree reaches this editor. Its right
+  -- application spines use an explicit pending list. Left nesting and
+  -- wrappers have a shallow bound; other shapes keep the graph finalizer.
+  editGroundTerm :: Int -> XTerm -> Maybe (Maybe XTerm);
+  editGroundTerm depth term = if depth > 128 then Nothing else let {
+    child = editGroundTerm (depth + 1);
+    one build body = mapOptional (mapOptional build) (child body);
+    pair build a b = case child a of {
+      Nothing -> Nothing;
+      Just left -> mapOptional (combineEdits build a b left) (child b)
+    };
+    spine f a functions changed = case child f of {
+      Nothing -> Nothing;
+      Just replacement -> let {
+        following = (:) (fromMaybe f replacement) functions;
+        different = changed || isJust replacement
+      } in seq different (case a of {
+        XApp g b -> spine g b following different;
+        _ -> case child a of {
+          Nothing -> Nothing;
+          Just tailEdit -> Just (if different || isJust tailEdit
+            then Just (foldlStrict (\value operator -> XApp operator value) (fromMaybe a tailEdit) following)
+            else Nothing)
+        }
+      })
+    }
+  } in case term of {
+    XApp f a -> spine f a [] False;
+    XTypeApp f proof -> case child f of {
+      Nothing -> Nothing;
+      Just left -> mapOptional (combineEdits XTypeApp f proof left) (groundProofEdit proof)
+    };
+    XLet name a b -> pair (XLet name) a b;
+    XAbs name ty body -> one (XAbs name ty) body;
+    XTypeAbs name ty body -> one (XTypeAbs name ty) body;
+    XWithData declarations body -> one (XWithData declarations) body;
+    XVarTerm _ -> Just Nothing; XIntTerm _ -> Just Nothing; XDoubleTerm _ -> Just Nothing;
+    XBoolTerm _ -> Just Nothing; XStringTerm _ -> Just Nothing; XPrimitive _ _ -> Just Nothing;
+    XConstructor _ _ -> Just Nothing; XLetRec _ _ -> Nothing; XCase _ _ _ -> Nothing
+  };
+  -- A checked pair h :: forall a. a -> F a, u :: forall a. F a -> a can
+  -- enclose a polymorphic continuation. Applying that transformer n times
+  -- preserves every call in u^n (h^n x) without storing the n growing proofs.
+  -- The ordinary representation and its fingerprints take precedence whenever
+  -- admitted. This fallback operates only on already checked open fragments.
+  instantiatedCall term = case term of {
+    XApp (XTypeApp (XVarTerm name) (XThen (XInner (XBottom _)) XElim)) argument ->
+      Just ((,) name argument);
+    _ -> Nothing
+  };
+  takeInstantiated name count term = case instantiatedCall term of {
+    Just ((,) actual argument) -> if not (X.equalName name actual) then Just ((,) count term)
+      else if count >= Wire.maxNodes Wire.defaultLimits then Nothing else let { next = count + 1 }
+        in seq next (takeInstantiated name next argument);
+    Nothing -> Just ((,) count term)
+  };
+  unaryInstanceConstructor output scheme = case scheme of {
+    XForall binder bound (XArrow domain result) -> let {
+      scalar = if output then domain else result; applied = if output then result else domain
+    } in if not (Type.alphaEq bound XBot && Type.alphaEq scalar (XVar binder)) then Nothing
+      else case applied of {
+        XCon name [arg] -> if Type.alphaEq arg (XVar binder) then Just name else Nothing;
+        _ -> Nothing
+      };
+    _ -> Nothing
+  };
+  instantiateTerm term ty = XTypeApp term (XThen (XInner (XBottom ty)) XElim);
+  wrapCheckedCalls start count constructor outer inner inputTy input = let {
+    name i hint = XName (start + i) hint;
+    schemeVar = XTyVar start; valueVar = XTyVar (start + 1); a = XTyVar (start + 2);
+    av = XVar a; function = XForall schemeVar XBot (XArrow (XVar schemeVar) (XVar schemeVar));
+    identity = name 3 "identityArgument";
+    initial = XTypeAbs valueVar XBot (XAbs identity (XVar valueVar) (XVarTerm identity));
+    k = name 4 "continuation"; z = name 5 "argument";
+    step = name 6 "wrapCalls"; applied = XCon constructor [av];
+    inside = XApp (instantiateTerm (XVarTerm inner) av) (XVarTerm z);
+    continued = XApp (instantiateTerm (XVarTerm k) applied) inside;
+    layer = XAbs k function (XTypeAbs a XBot (XAbs z av
+      (XApp (instantiateTerm (XVarTerm outer) av) continued)));
+    -- Compose transformers, never the endomorphisms they produce. Each
+    -- selected bit adds outer calls before, and inner calls after, the rest.
+    powers bits serial current accumulated = let {
+      selected = if andInt bits 1 == 0 then accumulated else XApp (XVarTerm current) accumulated;
+      nextBits = quotInt bits 2
+    } in if nextBits == 0 then XApp (instantiateTerm selected inputTy) input
+      else let {
+        next = name serial "twice"; arg = name (serial + 1) "continuation";
+        call x = XApp (XVarTerm current) x;
+        double = XAbs arg function (call (call (XVarTerm arg)))
+      } in XLet next double (powers nextBits (serial + 2) next selected)
+  } in XLet step layer (powers count 7 step initial);
+  factorCheckedCalls object = case Open.body object of {
+    XLet owner (XAbs input inputTy rhs) rest -> do {
+      (,) outer argument <- instantiatedCall rhs;
+      (,) count midpoint <- takeInstantiated outer 1 argument;
+      (,) inner first <- instantiatedCall midpoint;
+      (,) innerCount seed <- takeInstantiated inner 1 first;
+      let { ps = Open.parameters object;
+        form direction n = bindMaybe (lookup X.equalName n ps) (unaryInstanceConstructor direction)
+      };
+      f <- form False outer; g <- form True inner;
+      case seed of {
+        XVarTerm actual -> if count /= innerCount || not (eqString f g && X.equalName actual input) ||
+          X.equalName input outer || X.equalName input inner then Nothing
+          else let {
+            -- Only the two resolved operators and the input occur in the
+            -- erased spine. Reserve every identity in the retained syntax and
+            -- interface. A 63-bit count needs at most two binders per bit.
+            skeleton = XLet owner (XAbs input inputTy seed) rest;
+            latest = foldlStrict (\n ((,) ref ty) -> Separate.foldTypeIdentities max ty
+              (max n (X.nameId ref))) (Separate.maximumTermIdentity 0 skeleton) ps;
+            reserve = 7 + 2 * 63
+          } in if latest > 9223372036854775807 - reserve then Nothing else Just
+            (XLet owner (XAbs input inputTy (wrapCheckedCalls (latest + 1) count f
+              outer inner inputTy seed)) rest);
+        _ -> Nothing
+      }
+    };
+    _ -> Nothing
+  };
+  -- Move an existing lambda to a single-use local let at its original scope
+  -- or higher. The call position receives the new variable: the callback
+  -- body still executes on each application. Never move a definition across
+  -- a binder it reads. Type abstractions and all other constructs stop the
+  -- descent, so type binders cannot be captured by floating a continuation.
+  data ContinuationFrame = ContinuationArgument XTerm | ContinuationLambda XName XType |
+    ContinuationLet XName XTerm;
+  -- The two read sets contain original lexical IDs for the current term
+  -- and its pending helpers. Fresh helper references need no capture check.
+  -- A new helper can refer to earlier ones, so close their lets in reverse.
+  data ContinuationPart = ContinuationPart XTerm IntSet Int ([] ((,) XName XTerm)) IntSet Int Bool;
+  segmentContinuation width first term = let {
+    free t = IS.fromList (map X.nameId (Boundary.freeNames t));
+    close defs tail = foldlStrict (\body ((,) name rhs) -> XLet name rhs body) tail defs;
+    collect left value frames = if left <= 0 then Nothing else let {
+      more child frame = collect (left - 1) child ((:) frame frames)
+    } in case value of {
+      XApp f x -> more x (ContinuationArgument f);
+      XAbs n ty body -> more body (ContinuationLambda n ty);
+      XLet n rhs body -> more body (ContinuationLet n rhs);
+      _ -> restore frames (ContinuationPart value (free value) 1 [] IS.empty first False)
+    };
+    restore frames (ContinuationPart body names depth defs captured serial changed) = case frames of {
+      [] -> if changed then Just (close defs body) else Nothing;
+      (:) frame rest -> let {
+        step value refs height rows scope next did = seq height (seq refs
+          (restore rest (ContinuationPart value refs height rows scope next did)));
+        under binder done = if IS.member (X.nameId binder) captured
+          then done (close defs body) (IS.delete (X.nameId binder) (IS.union names captured)) [] IS.empty
+          else done body (IS.delete (X.nameId binder) names) defs captured
+      } in case frame of {
+        ContinuationArgument f -> step (XApp f body) (IS.union (free f) names)
+          (depth + 1) defs captured serial changed;
+        ContinuationLet n rhs -> under n (\inner vars rows scope ->
+          step (XLet n rhs inner) (IS.union (free rhs) vars) (depth + 1) rows scope serial changed);
+        ContinuationLambda n ty -> under n (\inner vars rows scope -> let {
+          fun = XAbs n ty inner
+        } in if depth < width then step fun vars (depth + 1) rows scope serial changed
+          else if serial >= 9223372036854775807 then Nothing else let {
+            helper = XName serial "continuation";
+            reads = IS.union vars scope
+          } in seq reads (step (XVarTerm helper) IS.empty 1 ((:) ((,) helper fun) rows) reads (serial + 1) True))
+      }
+    }
+  } in if width < 2 then Nothing else collect (Wire.maxNodes Wire.defaultLimits) term [];
+  segmentCheckedContinuations width object = case Open.body object of {
+    XLet owner rhs rest -> let {
+      latest = foldlStrict (\n ((,) ref ty) -> Separate.foldTypeIdentities max ty (max n (X.nameId ref)))
+        (Separate.maximumTermIdentity 0 (Open.body object)) (Open.parameters object);
+      first = if latest >= 9223372036854775806 then 9223372036854775807 else latest + 1
+    } in mapOptional (\result -> XLet owner result rest) (segmentContinuation width first rhs);
+    _ -> Nothing
+  };
+  factorOversizedOpen object message = let {
+    validate term = do {
+      compact <- Open.normalize object term;
+      ensure (eqList (eqPair X.equalName Type.alphaEq) (Open.bindings object) (Open.bindings compact))
+        "factored open fragment changed exported types";
+      canonicalOpenPlanned compact
+    }
+  } in case factorCheckedCalls object of {
+    Just term -> validate term;
+    Nothing -> if not (eqString message "binary graph depth limit exceeded") then Left message
+      else case segmentCheckedContinuations 512 object of {
+        Nothing -> Left message;
+        Just term -> mapLeft (\_ -> message) (validate term)
+      }
+  };
+  canonicalOpen = canonicalOpenUsing False Open.storageValue;
+  canonicalCheckedOpen = canonicalOpenUsing True Open.checkedStorageValue;
+  canonicalOpenUsing spines storage object = let {
+    geometry = finalTreeGeometryUsing spines (Wire.maxDepth Wire.defaultLimits);
+    planned = case canonicalOpenPlanned object of {
+      Left e -> if spines && (eqString e "binary expanded-work limit exceeded" ||
+        eqString e "binary graph depth limit exceeded") then factorOversizedOpen object e else Left e;
+      Right admitted -> Right admitted
+    };
+    rawGeometry = if spines then finalCheckedTreeGeometry (Wire.maxDepth Wire.defaultLimits) (Open.body object)
+      else geometry False (Open.bodyValue object);
+    ordinary = case rawGeometry of {
+      Just False -> Right object;
+      Just True -> if not spines then planned else case editGroundTerm 1 (Open.body object) of {
+        Just (Just result) -> Open.normalize object result;
+        Just Nothing -> Right object;
+        Nothing -> planned
+      };
+      Nothing -> planned
+    }
+  } in case storage object of {
+    Nothing -> ordinary;
+    Just stored -> case geometry True stored of { Just False -> Right object; _ -> ordinary }
+  };
+  canonicalOpenPlanned object = do {
+    plan <- Wire.prepareGraphPlanWithAtoms Structure.termAtomShapes Wire.defaultLimits [Open.bodyValue object];
     graph <- Wire.realizeGraphPlan plan;
     identity <- case Wire.graphRoots graph of { [root] -> Right root; _ -> Left "open raw root count" };
     normalized <- finalSyntaxRun graph [FinalVisit identity (FinalTerm (Open.body object))] []
@@ -1719,7 +2320,7 @@ module Bootstrap.SourceInference where {
             ensure (case Open.bindings final of {
               [(,) actual actualType] -> X.equalName actual binder && Type.alphaEq actualType result;
               _ -> False }) "checked evidence adapter type mismatch";
-            canonical <- canonicalOpen final;
+            canonical <- canonicalCheckedOpen final;
             Right (OpenFinalGroup (AdaptedBody canonical) [(,) owner (SourceContract result [] False)])
           } }
       }

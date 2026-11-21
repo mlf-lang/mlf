@@ -1478,6 +1478,9 @@ module Bootstrap.Graph where {
     };
   -- All tables share an offset. Graph identities themselves remain arbitrary
   -- precision; the dense guard limits only the number of allocated cells.
+  -- Each finished binding-tree entry records its depth and component root.
+  -- densePlace finishes every candidate before reading either field.
+  data BinderLevel = BinderLevel Int Int;
   data DenseRebinding s =
     DenseRebinding Graph Graph Int Int (STArray s (Maybe Node)) (STArray s (Maybe Node)) (STArray s
                                                                                           Int) (STArray
@@ -1493,7 +1496,7 @@ module Bootstrap.Graph where {
                                                                                                                        (Maybe
                                                                                                                         Int)) (STArray
                                                                                                                                s
-                                                                                                                               Int) (STArray
+                                                                                                                               BinderLevel) (STArray
                                                                                                                                      s
                                                                                                                                      Int) (STArray
                                                                                                                                            s
@@ -1525,7 +1528,7 @@ module Bootstrap.Graph where {
                                (\parents ->
                                   stBind (newSTArray count Nothing)
                                     (\tree ->
-                                       stBind (newSTArray count 0)
+                                       stBind (newSTArray count (BinderLevel 0 low))
                                          (\depths ->
                                             stBind (newSTArray count 0)
                                               (\colours ->
@@ -1583,7 +1586,7 @@ module Bootstrap.Graph where {
                                                                                          remaining)
                                                                                       (\final ->
                                                                                          ST.bindE
-                                                                                           (denseRaiseOriginals
+                                                                                           (denseRaiseBinders
                                                                                               state
                                                                                               originals)
                                                                                            (\up ->
@@ -1613,7 +1616,7 @@ module Bootstrap.Graph where {
                                                                                                              originals)
                                                                                                           (\checked ->
                                                                                                              ST.bindE
-                                                                                                               (denseCheckMergeEntries
+                                                                                                               (denseCheckMergeEntriesWith denseCheckClassMerges
                                                                                                                   low
                                                                                                                   classes
                                                                                                                   raised
@@ -1725,20 +1728,36 @@ module Bootstrap.Graph where {
     if (a == b)
     then ST.pureE a
     else case state of {
-           DenseRebinding old skeleton low high oldNodes newNodes images classes flags parents tree depths colours grafted oldBinders raised ->
-             stBind (readDense low depths a)
-               (\da ->
-                  stBind (readDense low depths b)
-                    (\db ->
-                       if (db < da)
-                       then ST.bindE (denseParent state a) (\p -> denseCommon state p b)
-                       else if (da < db)
-                            then ST.bindE (denseParent state b) (\q -> denseCommon state a q)
-                            else ST.bindE (denseParent state a)
-                                   (\p ->
-                                      ST.bindE (denseParent state b)
-                                        (\q -> denseCommon state p q))))
-         };
+      DenseRebinding _ _ low _ _ _ _ _ _ _ _ levels _ _ _ _ ->
+        stBind (readDense low levels a) (\left ->
+          stBind (readDense low levels b) (\right ->
+            case left of {
+              BinderLevel da rootA -> case right of {
+                BinderLevel db rootB ->
+                  if (rootA /= rootB)
+                  then ST.failE "binders have no common ancestor"
+                  else if (da == 0 || db == 0)
+                       then ST.pureE rootA
+                       else if (db < da)
+                            then ST.bindE (denseParent state a) (\p -> denseCommon state p b)
+                            else if (da < db)
+                                 then ST.bindE (denseParent state b) (\q -> denseCommon state a q)
+                                 else ST.bindE (denseParent state a) (\p ->
+                                        ST.bindE (denseParent state b) (\q ->
+                                          denseCommon state p q))
+              }
+            }))
+    };
+  denseBinderLevel :: forall s. Int -> STArray s BinderLevel -> Int -> Maybe Int -> ST s BinderLevel;
+  denseBinderLevel low levels n parent =
+    case parent of {
+      Nothing -> stReturn (BinderLevel 0 n);
+      Just p -> stBind (readDense low levels p) (\level ->
+        case level of {
+          BinderLevel depth root ->
+            let { next = depth + 1 } in seq next (stReturn (BinderLevel next root))
+        })
+    };
   denseCommonMany :: forall s. DenseRebinding s -> [] Int -> ST s (Either String (Maybe Int));
   denseCommonMany state candidates =
     case candidates of {
@@ -1779,22 +1798,13 @@ module Bootstrap.Graph where {
                                                             (denseCommonMany state candidates)
                                                             (\parent ->
                                                                stBind
-                                                                 (case parent of {
-                                                                    Nothing -> stReturn 0;
-                                                                    Just p ->
-                                                                      stBind
-                                                                        (readDense low depths p)
-                                                                        (\depth ->
-                                                                           stReturn (depth + 1))
-                                                                  })
-                                                                 (\depth ->
+                                                                 (denseBinderLevel low depths n parent)
+                                                                 (\level ->
                                                                     stBind
                                                                       (writeDense low tree n parent)
                                                                       (\bound ->
                                                                          stBind
-                                                                           (writeDenseInt low depths
-                                                                              n
-                                                                              depth)
+                                                                           (seq level (writeDense low depths n level))
                                                                            (\measured ->
                                                                               stBind
                                                                                 (writeDenseInt low
@@ -1850,6 +1860,40 @@ module Bootstrap.Graph where {
                      })
                     (\up -> ST.liftE (writeDense low raised n up))))
     };
+  -- Local unification typically needs just the immediate old binder. On a
+  -- large binding tree, answering each query with a separate climb can visit
+  -- the same long paths quadratically. Each old node instead sees its strict
+  -- ancestors indexed by their image, with the nearest occurrence winning.
+  denseRaiseBinders :: forall s. DenseRebinding s -> [] ((,) Int Node) -> ST s (Either String ());
+  denseRaiseBinders state originals = case state of {
+    DenseRebinding old skeleton low high oldNodes newNodes images classes flags parents tree depths colours grafted oldBinders raised ->
+      if IM.size (nodes old) <= 64 || IM.null (links skeleton)
+      then denseRaiseOriginals state originals
+      else let {
+        children = bindingChildrenMap old;
+        visit ancestors count n = stBind (readDense low images n) (\image ->
+          stBind (readDense low tree image) (\wanted ->
+            let {
+              descend up = stBind (writeDense low raised n up) (\_ -> let { next = count + 1 } in
+                seq next (ST.foldE (visit (IM.insert image n ancestors)) next
+                  (IM.findWithDefault [] n children)))
+            } in case wanted of {
+              Nothing -> descend Nothing;
+              Just target -> case IM.lookup target ancestors of {
+                Nothing -> ST.failE "a node's binder cannot be lowered";
+                Just nearest -> descend (Just nearest)
+              }
+            }));
+        root count ((,) n v) = case binder v of {
+          Nothing -> visit IM.empty count n;
+          Just _ -> ST.pureE count
+        }
+      } in stBind (ST.foldE root 0 originals) (\answer -> case answer of {
+        Right count -> if count == IM.size (nodes old) then ST.pureE ()
+                       else denseRaiseOriginals state originals;
+        Left _ -> denseRaiseOriginals state originals
+      })
+  };
   -- Permission components are memoized on demand, matching the seed's lazy
   -- immutable array knot without exporting mutable state out of runST.
   data DensePermissions s =
@@ -2037,6 +2081,35 @@ module Bootstrap.Graph where {
         ST.bindE (denseCheckMergeRest low raised permissions first rest)
           (\checked -> denseCheckMerges low raised permissions rest)
     };
+  -- These classes and raised binders were constructed by this rebinding
+  -- transaction. The pair rule rejects exactly when a binder occurs twice
+  -- and a member of that group is Red. Keep groups in first-occurrence order
+  -- and their members in original order, including the permission error stop.
+  denseCheckClassMerges low raised permissions members = case L.drop 7 members of {
+    [] -> denseCheckMerges low raised permissions members;
+    _ -> let {
+      collect ((,,) unbound bound order) n = stBind (readDense low raised n) (\parent ->
+        let { store missing present previous = let {
+          nextOrder = case previous of { [] -> (:) parent order; _ -> order }
+        } in seq present (seq nextOrder (stReturn ((,,) missing present nextOrder))) } in
+        case parent of {
+          Nothing -> store ((:) n unbound) bound unbound;
+          Just p -> let { previous = IM.findWithDefault [] p bound } in
+            store unbound (IM.insert p ((:) n previous) bound) previous
+        });
+      checkMember n = stBind (densePermission permissions n) (\p ->
+        ST.check (L.not (equalPermission p Red)) "cannot merge distinct protected type variables");
+      checkGroup reversed = case reversed of {
+        (:) _ ((:) _ _) -> ST.mapE_ checkMember (L.reverse reversed);
+        _ -> ST.pureE ()
+      }
+    } in stBind (ST.fold collect ((,,) [] IM.empty []) members) (\groups -> case groups of {
+      (,,) unbound bound order -> ST.mapE_ (\parent -> case parent of {
+        Nothing -> checkGroup unbound;
+        Just p -> checkGroup (IM.get p bound)
+      }) (L.reverse order)
+    })
+  };
   rebindSparse :: Graph -> Graph -> Either String Graph;
   -- raisedBinder retains the ascending identity from nodes old.
   rebindSparse old skeleton =
@@ -2924,7 +2997,8 @@ module Bootstrap.Graph where {
                                       STArray s (Maybe Int) ->
                                       DensePermissions s ->
                                       [] ((,) Int Node) -> ST s (Either String ());
-  denseCheckMergeEntries low classes raised raisedPermissions values =
+  denseCheckMergeEntries = denseCheckMergeEntriesWith denseCheckMerges;
+  denseCheckMergeEntriesWith checkClass low classes raised raisedPermissions values =
     case values of {
       [] -> ST.pureE ();
       (:) entry rest ->
@@ -2932,9 +3006,9 @@ module Bootstrap.Graph where {
           (case entry of {
              (,) n v ->
                stBind (readDense low classes n)
-                 (\members -> denseCheckMerges low raised raisedPermissions members)
+                 (\members -> checkClass low raised raisedPermissions members)
            })
-          (\ignored -> denseCheckMergeEntries low classes raised raisedPermissions rest)
+          (\ignored -> denseCheckMergeEntriesWith checkClass low classes raised raisedPermissions rest)
     };
   denseLoadParents :: forall s. Int -> STArray s ([] Int) -> Int -> [] Int -> ST s ();
   denseLoadParents low parents n values =

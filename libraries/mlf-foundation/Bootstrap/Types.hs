@@ -169,7 +169,10 @@ module Bootstrap.Types where {
     PWriteByteFileOrError |
     PByteArrayDigest |
     PFreezeSTArray |
-    PSTToIO;
+    PSTToIO |
+    PByteArrayCRC32 |
+    PPackStringFields |
+    PStringUtf8Length;
   data SType =
     STVar String |
     SBottom |
@@ -183,10 +186,19 @@ module Bootstrap.Types where {
   data RecursiveMode = InferRecursive | CheckRecursive SAnnotation;
   data SourceSpan = SourceSpan String String String Int Int Int Int;
   data TermRef = LexicalRef String | DeclRef (V.Index Declaration) String;
+  -- The owner identifies an immutable defining scope within one resolved file
+  -- graph. Persistent observations use the ordered declaration references.
+  data CandidateEnvironment = CandidateEnvironment Int ([] ((,) EvidenceRole TermRef));
+  wantedScopeRefs givens environment = case givens of {
+    [] -> case environment of { CandidateEnvironment _ candidates -> candidates };
+    (:) given rest -> (:) ((,) GivenEvidence (LexicalRef given)) (wantedScopeRefs rest environment)
+  };
   data SExpr =
     SGlobal (V.Index Declaration) String |
     SDeclScope ([] (V.Index Declaration)) SExpr |
     SWantedRefs String ([] ((,) EvidenceRole TermRef)) |
+    SWantedScope String CandidateEnvironment |
+    SGivenScope ([] String) SExpr |
     SVar String |
     SConstructor String |
     SLam String (Maybe SAnnotation) SExpr |
@@ -344,16 +356,21 @@ module Bootstrap.Types where {
     FMatch Typed Edge ([] Branch) |
     FRecursive ([] RecursiveDefinition) Typed Edge |
     FEvidence ([] EvidenceBinding) |
+    FScopedEvidence ResolvedCandidateEnvironment |
+    FWithGivens ([] EvidenceBinding) Form |
     FChecked ([] ((,) XTyVar Kind)) Typed Edge;
   data RecursiveClosure = RecursiveClosure Int (IntMap Int);
   data RecursiveDefinition = RecursiveDefinition XName Int Typed Edge (Maybe RecursiveClosure);
   data Branch = Branch XPattern Typed Edge;
+  data ResolvedCandidateEnvironment = ResolvedCandidateEnvironment Int ([] EvidenceBinding);
   data EvidenceBinding = EvidenceBinding EvidenceRole XName Int Bool | DeclaredEvidenceBinding EvidenceRole XName XType;
   data Constraints = Constraints Graph Typed ([] ((,) Int Int)) ([] SolveStep);
   data Core =
     CGlobal (V.Index Declaration) String |
     CDeclScope ([] (V.Index Declaration)) Core |
     CWantedRefs String ([] ((,) EvidenceRole TermRef)) |
+    CWantedScope String CandidateEnvironment |
+    CGivenScope ([] String) Core |
     CVar String |
     CLam String Core |
     CApp Core Core |

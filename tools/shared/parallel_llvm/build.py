@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Build an optional LLVM API splitter and a pinned ordinary-Clang driver."""
-import argparse, hashlib, json, os, shlex, shutil, subprocess
+import argparse, hashlib, json, shlex, shutil, subprocess
 from pathlib import Path
 HERE=Path(__file__).resolve().parent
 

@@ -71,7 +71,7 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures):
     binary_pair=((seed/'seed.mlfci').read_bytes(),(seed/'seed.mlfco').read_bytes())
     legacy_pair=((seed/'legacy.mlfci').read_bytes(),(seed/'legacy.mlfco').read_bytes())
     original_builtin_pair=((seed/'builtin.mlfci').read_bytes(),(seed/'builtin.mlfco').read_bytes())
-    typed.inspect_crate_pair(*original_builtin_pair,4)
+    typed.inspect_closed_pair(*original_builtin_pair)
     closed_pair=((seed/'closed.mlfci').read_bytes(),(seed/'closed.mlfco').read_bytes())
     dependency_interfaces=[(seed/'builtin.mlfci').read_bytes()]
     opened.inspect_pair(binary_pair,dependency_interfaces)
@@ -179,7 +179,7 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures):
     record['open_audit_negatives']=audit_negatives
 
     distro=output/'distribution';distro.mkdir();distribution=[]
-    builtin_id='mlf:builtin-shared-haskell-v1:13';root_id='binary-package/1/library'
+    builtin_id='mlf:builtin-shared-haskell-v1:15';root_id='binary-package/1/library'
     identities=(builtin_id,root_id)
     def pair_at(prefix):return tuple(prefix.with_suffix(suffix).read_bytes() for suffix in ('.mlfci','.mlfco'))
     def interface_summary(pair,dependencies=()):

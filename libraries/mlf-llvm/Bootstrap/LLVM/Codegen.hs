@@ -43,7 +43,7 @@ module Bootstrap.LLVM.Codegen where {
     } in
     let {
       output =
-        Output 0 [] "entry" [] [] cs fs S.empty M.empty ks S.empty (K.collecting fs ks) M.empty
+        Output 0 [] "entry" [] [] cs (FunctionScope fs (A.lambdaFreeTable term)) S.empty M.empty ks S.empty (K.collecting fs ks) M.empty
           True
           M.empty
           M.empty
@@ -64,7 +64,7 @@ module Bootstrap.LLVM.Codegen where {
              (L.concat
                 ((:) ((:) "declare ptr @mlf_thunk_new(ptr, i64)" runtimeDeclarations)
                    (args4
-                      (L.append allocationDefinition
+                      (L.append (constructorDefinitions (\symbol -> S.member compareString symbol (workers out)))
                          (L.append thunkAllocationDefinition forceDefinition))
                       aliasMetadata
                       (L.reverse (constants out))
@@ -427,11 +427,122 @@ module Bootstrap.LLVM.Codegen where {
                       names
                       registers)
              };
-             definition symbol (L.map pointer registers) (evaluate scope (A.functionBody f));
+             state <- get;
+             let { keepWorker = M.size (functions state) > 128 &&
+                     hasBranchTailTransfer state name (L.length names) (A.functionBody f) };
+             definitionBodyWithPolicy keepWorker "ptr" symbol (L.map pointer registers)
+               (finishOrdinary (L.length names) scope (A.functionBody f));
              modify (withInlinePrimitives inline)
            };
       cgPure symbol
     };
+  -- In a large module, preserve a branching worker's tail transfer to a peer.
+  -- Inlining these workers into each other duplicates the branches along the
+  -- chain. Straight-line wrappers and calls with a different ABI stay eligible.
+  hasBranchTailTransfer :: Output -> XName -> Int -> XErased -> Bool;
+  hasBranchTailTransfer state owner arity expression = let {
+    tailCall term = case O.applications term of {
+      (,) (XEVar name) args -> L.not (O.eqName owner name) && L.isJust (ordinaryTailTarget state arity name args);
+      _ -> False
+    }
+  } in case expression of {
+    XECase _ alternatives -> L.any (\(XErasedAlternative _ branch) -> tailCall branch) alternatives;
+    _ -> case O.applications expression of {
+      (,) (XEPrimitive PIfThenElse) [_,yes,no] -> tailCall yes || tailCall no;
+      _ -> False
+    }
+  };
+  ordinaryTailTarget :: Output -> Int -> XName -> [] XErased -> Maybe A.WorkerFunction;
+  ordinaryTailTarget state arity name args = case M.lookup O.compareName name (functions state) of {
+    Just f -> if L.length args == L.length (A.parameters f) && L.length (A.captures f) + L.length args == arity &&
+      L.not (S.member O.compareName name (numericKernels state)) && L.not (M.member O.compareName name (producerPlans state))
+      then Just f else Nothing;
+    Nothing -> Nothing
+  };
+  -- Ordinary boxed workers also need a real tail transfer at O0. Values and
+  -- capture environments are heap objects; CGSlot operands load their values,
+  -- never addresses in the caller's frame. Only equal all-pointer ABIs qualify.
+  -- Keep specialized entry selection, operand demand order and outlining rules.
+  finishOrdinary :: Int -> Map XName CGBinding -> XErased -> Build ();
+  finishOrdinary arity scope expression = do {
+    prior <- gets instructions;
+    if O.remainingSize 128 expression < 0 && workerBodyLimit 4097 prior then do {
+      value <- evaluate scope expression;
+      emit ("  ret ptr " ++ value)
+    } else finishOrdinaryBody arity scope expression
+  };
+  finishOrdinaryValue :: Map XName CGBinding -> XErased -> Build ();
+  finishOrdinaryValue scope expression = do {
+    value <- evaluateBody scope expression;
+    emit ("  ret ptr " ++ value)
+  };
+  finishOrdinaryBody :: Int -> Map XName CGBinding -> XErased -> Build ();
+  finishOrdinaryBody arity scope expression = case expression of {
+    XELet n rhs body -> do {
+      fs <- gets functions;
+      if M.member O.compareName n fs then finishOrdinary arity scope body else do {
+        plans <- gets producerPlans;
+        case recipePlan n plans of {
+          Just info -> do {
+            value <- evaluateDeferredProducer info scope;
+            emit ("  ret ptr " ++ value)
+          };
+          Nothing -> do {
+            strict <- letDemanded scope n body;
+            value <- if strict then evaluate scope rhs else thunk scope rhs;
+            finishOrdinary arity (M.insert O.compareName n (CGBinding value strict) scope) body
+          }
+        }
+      }
+    };
+    XELetRec bindings body -> do {
+      recursive <- recursiveBindings scope bindings body;
+      finishOrdinary arity recursive body
+    };
+    XECase scrutinee alternatives -> do {
+      -- Preserve admitted result-worker unboxing. Its existing result join is
+      -- intentional; ordinary constructor cases can return from each branch.
+      fs <- gets functions;
+      plans <- gets resultPlans;
+      let { specialized = case O.applications scrutinee of {
+        (,) (XEVar name) args -> case M.lookup O.compareName name plans of {
+          Just info -> case M.lookup O.compareName name fs of {
+            Just f -> L.length args == L.length (A.parameters f) && resultAlternatives info alternatives;
+            Nothing -> False
+          };
+          Nothing -> False
+        };
+        _ -> False
+      } };
+      if specialized then finishOrdinaryValue scope expression
+      else finishCase (finishOrdinary arity) scope scrutinee alternatives
+    };
+    _ -> case O.applications expression of {
+      (,) (XEPrimitive PIfThenElse) [condition,yes,no] -> do {
+        value <- evaluate scope condition;
+        test <- result ("icmp eq ptr " ++ value ++ ", " ++ immediate 6);
+        finishChoice test (finishOrdinary arity scope yes) (finishOrdinary arity scope no)
+      };
+      (,) (XEPrimitive PSeq) [first,next] -> do {
+        evaluate scope first;
+        finishOrdinary arity scope next
+      };
+      (,) (XEVar name) args -> do {
+        state <- get;
+        case ordinaryTailTarget state arity name args of {
+          Just f -> do {
+            symbol <- worker name f;
+            prepared <- workerArguments scope f args;
+            value <- result ("musttail call ptr " ++ symbol ++ "(" ++
+              L.intercalate ", " (L.map pointer (L.append (L.fst prepared) (L.snd prepared))) ++ ")");
+            emit ("  ret ptr " ++ value)
+          };
+          Nothing -> finishOrdinaryValue scope expression
+        }
+      };
+      _ -> finishOrdinaryValue scope expression
+    }
+  };
   wrapper :: XName -> A.WorkerFunction -> Build String;
   wrapper name f =
     do {
@@ -903,10 +1014,7 @@ module Bootstrap.LLVM.Codegen where {
         };
       XEAbs n body ->
         do {
-          fs <- gets functions;
-          let {
-            captures = S.toList (S.delete O.compareName n (A.needed fs body))
-          };
+          captures <- gets (\state -> callbackNames state n body);
           code <- callback captures (Just n) body;
           env <- environment scope captures;
           call "@mlf_closure" (args2 (pointer code) (pointer env))
@@ -937,7 +1045,25 @@ module Bootstrap.LLVM.Codegen where {
       XEApp f a -> application scope expression;
       XEEvidenceHole hole -> failure "LLVM unresolved dictionary evidence"
     };
-  -- In a large recursive scope retain function values once, rather than
+  -- A saturated call to a known worker can bypass its boxed closure. Scan each
+  -- complete application spine once, including uses inside suspended arguments.
+  escapingWorkers :: Map XName A.WorkerFunction -> Set XName -> XErased -> Set XName;
+  escapingWorkers fs found expression = case expression of {
+    XEApp _ _ -> case O.applications expression of {
+      (,) head args -> let { inArgs = L.foldlStrict (escapingWorkers fs) found args } in case head of {
+        XEVar name -> workerValueUse fs name args inArgs;
+        _ -> escapingWorkers fs inArgs head
+      }
+    };
+    XEVar name -> workerValueUse fs name [] found;
+    _ -> L.foldlStrict (escapingWorkers fs) found (A.children expression)
+  };
+  workerValueUse :: Map XName A.WorkerFunction -> XName -> [] XErased -> Set XName -> Set XName;
+  workerValueUse fs name args found = case M.lookup O.compareName name fs of {
+    Just f -> if L.length args == L.length (A.parameters f) then found else S.insert O.compareName name found;
+    Nothing -> found
+  };
+  -- In a large recursive scope retain escaping function values once, rather than
   -- rebuilding their environments at every lookup. Stack slots shorten the
   -- SSA lifetimes of recursive roots; only entry-block slots are allowed.
   -- Environments load their values and never capture addresses of these slots.
@@ -946,7 +1072,13 @@ module Bootstrap.LLVM.Codegen where {
     fs <- gets functions;
     let {
       large = M.size scope + L.length bindings > 128 || O.remainingSize 16384 body < 0;
-      values = L.filter (\((,) name _) -> large || L.not (M.member O.compareName name fs)) bindings
+      escapes = L.foldlStrict (\seen binding -> escapingWorkers fs seen (L.snd binding))
+        (escapingWorkers fs S.empty body) bindings;
+      needsHole entry = case M.lookup O.compareName (L.fst entry) fs of {
+        Nothing -> True;
+        Just f -> large && (L.not (L.null (A.captures f)) || S.member O.compareName (L.fst entry) escapes)
+      };
+      values = L.filter needsHole bindings
     };
     current <- gets block;
     holes <- L.mapM (\((,) name _) -> do {
@@ -1590,16 +1722,141 @@ module Bootstrap.LLVM.Codegen where {
             case constructor of {
               (,) tag arity ->
                 if (L.length args == arity)
-                then do {
-                       fields <- L.mapM (thunk scope) args;
-                       constructorValue tag fields
-                     }
+                then constructFields scope c tag args
                 else genericApplication scope expression
             }
           };
         _ -> genericApplication scope expression
       }
     };
+  -- A compact constructor with immediate fields is closed and total. Its
+  -- allocation can be delayed until its parent consumes the value.
+  data LiteralRow = LiteralRow Int ([] Int);
+  literalRow :: Map String ((,) Int Int) -> XErased -> Maybe LiteralRow;
+  literalRow cs expression = let {
+    word field = case field of {
+      XEInt n -> if N.smallBounds ((,) n n) then Just (2 * n + 1) else Nothing;
+      XEBool b -> Just (if b then 6 else 2);
+      XEConstructor name -> case M.lookup compareString name cs of {
+        Just ((,) tag 0) -> Just (tag * 8 + 4); _ -> Nothing
+      };
+      _ -> Nothing
+    };
+    row name arity fields = case M.lookup compareString name cs of {
+      Just ((,) tag n) -> if arity == n then do {
+        words <- L.mapM word fields; Just (LiteralRow tag words)
+      } else Nothing;
+      Nothing -> Nothing
+    }
+  } in case expression of {
+    XEApp (XEConstructor name) a -> row name 1 [a];
+    XEApp (XEApp (XEConstructor name) a) b -> row name 2 [a,b];
+    _ -> Nothing
+  };
+  -- Compact words in successive rows can form one arithmetic progression per
+  -- field. Keep the last row and the backward strides so construction still
+  -- proceeds from the tail toward the head. Each step uses wrapping Int64.
+  data RowProgression = RowProgression Int ([] Int) ([] Int) XErased;
+  rowProgression :: Map String ((,) Int Int) -> String -> LiteralRow -> XErased -> Maybe RowProgression;
+  rowProgression cs name (LiteralRow tag first) rest = let {
+    next term = case term of {
+      XEApp (XEApp (XEConstructor cell) field) tail ->
+        if eqString cell name then case literalRow cs field of {
+          Just (LiteralRow other words) -> if other == tag then Just ((,) words tail) else Nothing;
+          Nothing -> Nothing
+        } else Nothing;
+      _ -> Nothing
+    };
+    follows stride last words = case (,,) stride last words of {
+      (,,) [dx] [x] [a] -> a + dx == x;
+      (,,) [dx,dy] [x,y] [a,b] -> a + dx == x && b + dy == y;
+      _ -> False
+    };
+    collect stride count last term = let {
+      finish = if count >= 8 then Just (RowProgression count last stride term) else Nothing
+    } in seq count (case next term of {
+      Just ((,) words tail) -> if follows stride last words
+        then collect stride (count + 1) words tail else finish;
+      Nothing -> finish
+    })
+  } in case next rest of {
+    Just ((,) second tail) -> if L.length first == L.length second then
+      collect (L.zipWith (-) first second) 2 second tail else Nothing;
+    Nothing -> Nothing
+  };
+  literalConstructorField :: Map String ((,) Int Int) -> XErased -> Bool;
+  literalConstructorField cs expression = case literalRow cs expression of {
+    Just _ -> True; Nothing -> False
+  };
+  constructFields :: Map XName CGBinding -> String -> Int -> [] XErased -> Build String;
+  constructFields scope name tag args = let {
+    ordinary = do { fields <- L.mapM (thunk scope) args; constructorValue tag fields }
+  } in case args of {
+    [field, rest@(XEApp (XEApp (XEConstructor next) _) _)] ->
+      if eqString name next then do {
+        cs <- gets constructors;
+        case literalRow cs field of {
+          Just row@(LiteralRow rowTag _) -> case rowProgression cs name row rest of {
+            Just (RowProgression count words strides tail) -> do {
+              suffix <- thunk scope tail;
+              callConstructor ("@mlf.construct.strides." ++ showInt (L.length words))
+                (L.append (L.map number (L.append words strides)) [number count,number rowTag,number tag,pointer suffix])
+            };
+            Nothing -> literalConstructorPrefix scope cs name tag ((,) field row) rest
+          };
+          Nothing -> ordinary
+        }
+      } else ordinary;
+    _ -> ordinary
+  };
+  -- Emit a run of closed fields from its tail toward its head, so each field
+  -- stays live only until the following cell. Outline full chunks as functions
+  -- of the tail alone; the caller builds an arbitrary lazy tail exactly once.
+  literalConstructorPrefix :: Map XName CGBinding -> Map String ((,) Int Int) ->
+    String -> Int -> (,) XErased LiteralRow -> XErased -> Build String;
+  literalConstructorPrefix scope cs name tag first rest = let {
+    capacity = 128;
+    prepend tail ((,) field _) = do {
+      value <- thunk M.empty field;
+      constructorValue tag [value, tail]
+    };
+    emitRows tail fields = case fields of {
+      (:) ((,) _ (LiteralRow rowTag firstWords)) _ ->
+        let {
+          width = L.length firstWords;
+          same ((,) _ (LiteralRow other words)) = rowTag == other && L.length words == width;
+          columns ((,) _ (LiteralRow _ words)) = words
+        } in if L.not (L.null (L.drop 7 fields)) && L.all same fields then do {
+          table <- fresh "@mlf.literal.rows.";
+          let { words = L.concatMap columns fields; count = L.length fields };
+          let { declaration = L.concatStrings [table," = private unnamed_addr constant [",
+            showInt (count * width)," x i64] [",L.intercalate ", " (L.map number words),"], align 8"] };
+          modify (\state -> withConstants ((:) declaration (constants state)) state);
+          callConstructor ("@mlf.construct.rows." ++ showInt width)
+            [pointer table,number count,number rowTag,number tag,pointer tail]
+        } else L.foldM prepend tail fields;
+      [] -> cgPure tail
+    };
+    collect remaining fields chunks term =
+      if remaining == 0 then do {
+        symbol <- fresh "@mlf.constructor.prefix.";
+        definition symbol ["ptr %tail"] (emitRows "%tail" fields);
+        collect capacity [] ((:) symbol chunks) term
+      } else let {
+        finish = do {
+          tail <- thunk scope term;
+          suffix <- emitRows tail fields;
+          L.foldM (\value symbol -> call symbol [pointer value]) suffix chunks
+        }
+      } in case term of {
+        XEApp (XEApp (XEConstructor next) field) tail ->
+          if eqString name next then case literalRow cs field of {
+            Just row -> collect (remaining - 1) ((:) ((,) field row) fields) chunks tail;
+            Nothing -> finish
+          } else finish;
+        _ -> finish
+      }
+  } in collect (capacity - 1) [first] [] rest;
   primitiveApplication :: Map XName CGBinding -> Primitive -> [] XErased -> Build String;
   primitiveApplication scope p args =
     do {
@@ -1635,7 +1892,9 @@ module Bootstrap.LLVM.Codegen where {
              (:) a [] ->
                case p of {
                  PConcatStringList -> call "@mlf_concat_string_list" (args1 (pointer a));
+                 PPackStringFields -> call "@mlf_pack_string_fields" (args1 (pointer a));
                  PStringLength -> call "@mlf_string_length" (args1 (pointer a));
+                 PStringUtf8Length -> call "@mlf_string_utf8_length" (args1 (pointer a));
                  PSqrtDouble ->
                    do {
                      x <- loadAt "double" a 8;
@@ -1771,8 +2030,10 @@ module Bootstrap.LLVM.Codegen where {
   runtimeDeclarations :: [] String;
   runtimeDeclarations =
     L.append ["declare ptr @mlf_st_freeze_array(ptr)", "@mlf_ascii_string_indices = external global i64",
+      "declare ptr @mlf_string_utf8_length(ptr)",
       "declare ptr @mlf_string_length(ptr)", "declare ptr @mlf_string_code_at(ptr, ptr)",
-      "declare ptr @mlf_concat_string_list(ptr)"]
+      "declare ptr @mlf_concat_string_list(ptr)",
+      "declare ptr @mlf_pack_string_fields(ptr)"]
       runtimeBaseDeclarations;
   runtimeBaseDeclarations :: [] String;
   runtimeBaseDeclarations =
@@ -1877,99 +2138,122 @@ module Bootstrap.LLVM.Codegen where {
   -- them at each construction site. Managed field parameters remain live
   -- across allocation until the initialized object contains those fields.
   allocationDefinition :: [] String;
-  allocationDefinition =
-    (:) "@mlf_constructor_pending = external global [33 x ptr]"
-      ((:) "declare ptr @mlf_constructor_allocate(i64, i64)"
-         ((:)
-            "define private ptr @mlf.allocate.constructor(i64 %identity, i64 %count, i64 %size) noinline {"
-            ((:) "entry:"
-               ((:) "  %small = icmp ule i64 %size, 256"
-                  ((:) "  br i1 %small, label %batch, label %slow"
-                     ((:) "batch:"
-                        ((:) "  %index = lshr i64 %size, 3"
-                           ((:)
-                              "  %slot = getelementptr [33 x ptr], ptr @mlf_constructor_pending, i64 0, i64 %index"
-                              ((:) "  %value = load ptr, ptr %slot, align 8"
-                                 ((:) "  %empty = icmp eq ptr %value, null"
-                                    ((:) "  br i1 %empty, label %slow, label %ready"
-                                       ((:) "ready:"
-                                          ((:) "  %next = load ptr, ptr %value, align 8"
-                                             ((:) "  store ptr %next, ptr %slot, align 8"
-                                                ((:) "  store i64 0, ptr %value, align 8"
-                                                   ((:) "  ret ptr %value"
-                                                      ((:) "slow:"
-                                                         ((:)
-                                                            "  %allocated = call ptr @mlf_constructor_allocate(i64 %identity, i64 %count)"
-                                                            ((:) "  ret ptr %allocated"
-                                                               ((:) "}"
-                                                                  ((:)
-                                                                     "define private ptr @mlf.construct.1(i64 %identity, ptr %a) noinline {"
-                                                                     ((:) "entry:"
-                                                                        ((:)
-                                                                           "  %value = call ptr @mlf.allocate.constructor(i64 %identity, i64 1, i64 24)"
-                                                                           ((:)
-                                                                              "  store i32 12, ptr %value, align 4"
-                                                                              ((:)
-                                                                                 "  %id = getelementptr i8, ptr %value, i64 8"
-                                                                                 ((:)
-                                                                                    "  store i64 %identity, ptr %id, align 8"
-                                                                                    ((:)
-                                                                                       "  %first = getelementptr i8, ptr %value, i64 16"
-                                                                                       ((:)
-                                                                                          "  store ptr %a, ptr %first, align 8"
-                                                                                          ((:)
-                                                                                             "  ret ptr %value"
-                                                                                             ((:)
-                                                                                                "}"
-                                                                                                ((:)
-                                                                                                   "define private ptr @mlf.construct.2(i64 %identity, ptr %a, ptr %b) noinline {"
-                                                                                                   ((:)
-                                                                                                      "entry:"
-                                                                                                      ((:)
-                                                                                                         "  %value = call ptr @mlf.allocate.constructor(i64 %identity, i64 2, i64 32)"
-                                                                                                         ((:)
-                                                                                                            "  store i32 13, ptr %value, align 4"
-                                                                                                            ((:)
-                                                                                                               "  %id = getelementptr i8, ptr %value, i64 8"
-                                                                                                               ((:)
-                                                                                                                  "  store i64 %identity, ptr %id, align 8"
-                                                                                                                  ((:)
-                                                                                                                     "  %first = getelementptr i8, ptr %value, i64 16"
-                                                                                                                     ((:)
-                                                                                                                        "  store ptr %a, ptr %first, align 8"
-                                                                                                                        ((:)
-                                                                                                                           "  %second = getelementptr i8, ptr %value, i64 24"
-                                                                                                                           ((:)
-                                                                                                                              "  store ptr %b, ptr %second, align 8"
-                                                                                                                              ((:)
-                                                                                                                                 "  ret ptr %value"
-                                                                                                                                 ((:)
-                                                                                                                                    "}"
-                                                                                                                                    ((:)
-                                                                                                                                       "define private ptr @mlf.construct.wide(i64 %identity, i64 %count) noinline {"
-                                                                                                                                       ((:)
-                                                                                                                                          "entry:"
-                                                                                                                                          ((:)
-                                                                                                                                             "  %fields = mul i64 %count, 8"
-                                                                                                                                             ((:)
-                                                                                                                                                "  %size = add i64 %fields, 24"
-                                                                                                                                                ((:)
-                                                                                                                                                   "  %value = call ptr @mlf.allocate.constructor(i64 %identity, i64 %count, i64 %size)"
-                                                                                                                                                   ((:)
-                                                                                                                                                      "  store i32 28, ptr %value, align 4"
-                                                                                                                                                      ((:)
-                                                                                                                                                         "  %id = getelementptr i8, ptr %value, i64 8"
-                                                                                                                                                         ((:)
-                                                                                                                                                            "  store i64 %identity, ptr %id, align 8"
-                                                                                                                                                            ((:)
-                                                                                                                                                               "  %arity = getelementptr i8, ptr %value, i64 16"
-                                                                                                                                                               ((:)
-                                                                                                                                                                  "  store i64 %count, ptr %arity, align 8"
-                                                                                                                                                                  ((:)
-                                                                                                                                                                     "  ret ptr %value"
-                                                                                                                                                                     ((:)
-                                                                                                                                                                        "}"
-                                                                                                                                                                        []))))))))))))))))))))))))))))))))))))))))))))))))))))));
+  allocationDefinition = constructorDefinitions (\_ -> True);
+  constructorDefinitions :: (String -> Bool) -> [] String;
+  constructorDefinitions needs = let {
+    unaryRows = needs "@mlf.construct.rows.1";
+    binaryRows = needs "@mlf.construct.rows.2";
+    unaryStride = needs "@mlf.construct.strides.1";
+    binaryStride = needs "@mlf.construct.strides.2";
+    unary = needs "@mlf.construct.1" || unaryRows || unaryStride;
+    binary = needs "@mlf.construct.2" || unaryRows || binaryRows || unaryStride || binaryStride;
+    wide = needs "@mlf.construct.wide"
+  } in if unary || binary || wide then L.concat [
+    constructorAllocator, if unary then unaryConstructor else [],
+    if binary then binaryConstructor else [], if wide then wideConstructor else [],
+    if unaryRows then literalRowDefinition False False else [], if binaryRows then literalRowDefinition True False else [],
+    if unaryStride then literalRowDefinition False True else [], if binaryStride then literalRowDefinition True True else []
+  ] else [];
+  -- Each iteration reconstructs one row and one enclosing cell with the same
+  -- audited allocators. A strided run supplies immediate words in registers.
+  literalRowDefinition :: Bool -> Bool -> [] String;
+  literalRowDefinition binary strided = let {
+    width = if binary then "2" else "1";
+    header = if strided then if binary then "strides.2(i64 %startx, i64 %starty, i64 %dx, i64 %dy"
+      else "strides.1(i64 %startx, i64 %dx" else "rows." ++ width ++ "(ptr %data"
+  } in L.concat [
+    ["define private ptr @mlf.construct." ++ header ++ ", i64 %count, i64 %rowtag, i64 %celltag, ptr %tail) noinline {",
+     "entry:", "  br label %loop", "loop:"],
+    if strided then L.append ["  %x = phi i64 [ %startx, %entry ], [ %nextx, %loop ]"]
+      (if binary then ["  %y = phi i64 [ %starty, %entry ], [ %nexty, %loop ]"] else [])
+    else ["  %pos = phi ptr [ %data, %entry ], [ %next, %loop ]"],
+    ["  %n = phi i64 [ %count, %entry ], [ %left, %loop ]",
+     "  %suffix = phi ptr [ %tail, %entry ], [ %cell, %loop ]"],
+    if strided then [] else ["  %x = load i64, ptr %pos, align 8"],
+    ["  %a = inttoptr i64 %x to ptr"],
+    if binary && L.not strided then [
+      "  %second = getelementptr i64, ptr %pos, i64 1",
+      "  %y = load i64, ptr %second, align 8"] else [],
+    if binary then ["  %b = inttoptr i64 %y to ptr",
+      "  %row = call ptr @mlf.construct.2(i64 %rowtag, ptr %a, ptr %b)"]
+    else ["  %row = call ptr @mlf.construct.1(i64 %rowtag, ptr %a)"],
+    ["  %cell = call ptr @mlf.construct.2(i64 %celltag, ptr %row, ptr %suffix)"],
+    if strided then L.append ["  %nextx = add i64 %x, %dx"]
+      (if binary then ["  %nexty = add i64 %y, %dy"] else [])
+    else ["  %next = getelementptr i64, ptr %pos, i64 " ++ width],
+    [
+     "  %left = sub i64 %n, 1",
+     "  %done = icmp eq i64 %left, 0",
+     "  br i1 %done, label %exit, label %loop",
+     "exit:", "  ret ptr %cell", "}"]
+  ];
+  constructorAllocator :: [] String;
+  constructorAllocator = [
+    "@mlf_constructor_pending = external global [33 x ptr]",
+    "declare ptr @mlf_constructor_allocate(i64, i64)",
+    "define private ptr @mlf.allocate.constructor(i64 %identity, i64 %count, i64 %size) noinline {",
+    "entry:",
+    "  %small = icmp ule i64 %size, 256",
+    "  br i1 %small, label %batch, label %slow",
+    "batch:",
+    "  %index = lshr i64 %size, 3",
+    "  %slot = getelementptr [33 x ptr], ptr @mlf_constructor_pending, i64 0, i64 %index",
+    "  %value = load ptr, ptr %slot, align 8",
+    "  %empty = icmp eq ptr %value, null",
+    "  br i1 %empty, label %slow, label %ready",
+    "ready:",
+    "  %next = load ptr, ptr %value, align 8",
+    "  store ptr %next, ptr %slot, align 8",
+    "  store i64 0, ptr %value, align 8",
+    "  ret ptr %value",
+    "slow:",
+    "  %allocated = call ptr @mlf_constructor_allocate(i64 %identity, i64 %count)",
+    "  ret ptr %allocated",
+    "}"
+  ];
+  unaryConstructor :: [] String;
+  unaryConstructor = [
+    "define private ptr @mlf.construct.1(i64 %identity, ptr %a) noinline {",
+    "entry:",
+    "  %value = call ptr @mlf.allocate.constructor(i64 %identity, i64 1, i64 24)",
+    "  store i32 12, ptr %value, align 4",
+    "  %id = getelementptr i8, ptr %value, i64 8",
+    "  store i64 %identity, ptr %id, align 8",
+    "  %first = getelementptr i8, ptr %value, i64 16",
+    "  store ptr %a, ptr %first, align 8",
+    "  ret ptr %value",
+    "}"
+  ];
+  binaryConstructor :: [] String;
+  binaryConstructor = [
+    "define private ptr @mlf.construct.2(i64 %identity, ptr %a, ptr %b) noinline {",
+    "entry:",
+    "  %value = call ptr @mlf.allocate.constructor(i64 %identity, i64 2, i64 32)",
+    "  store i32 13, ptr %value, align 4",
+    "  %id = getelementptr i8, ptr %value, i64 8",
+    "  store i64 %identity, ptr %id, align 8",
+    "  %first = getelementptr i8, ptr %value, i64 16",
+    "  store ptr %a, ptr %first, align 8",
+    "  %second = getelementptr i8, ptr %value, i64 24",
+    "  store ptr %b, ptr %second, align 8",
+    "  ret ptr %value",
+    "}"
+  ];
+  wideConstructor :: [] String;
+  wideConstructor = [
+    "define private ptr @mlf.construct.wide(i64 %identity, i64 %count) noinline {",
+    "entry:",
+    "  %fields = mul i64 %count, 8",
+    "  %size = add i64 %fields, 24",
+    "  %value = call ptr @mlf.allocate.constructor(i64 %identity, i64 %count, i64 %size)",
+    "  store i32 28, ptr %value, align 4",
+    "  %id = getelementptr i8, ptr %value, i64 8",
+    "  store i64 %identity, ptr %id, align 8",
+    "  %arity = getelementptr i8, ptr %value, i64 16",
+    "  store i64 %count, ptr %arity, align 8",
+    "  ret ptr %value",
+    "}"
+  ];
   -- Only positive capture counts up to 28 reach this helper. They use the
   -- same rounded, traced allocation class as gc_malloc; captures start clear.
   -- The slow path handles initialization, refill and debug allocations.

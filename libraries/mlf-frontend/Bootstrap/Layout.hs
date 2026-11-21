@@ -194,7 +194,23 @@ module Bootstrap.Layout where {
       _ -> False
     };
   normal :: Bool -> [] Frame -> Maybe Token -> Token -> [] Token -> Token -> [] Token;
-  normal shared stack previous token rest finish =
+  normal shared stack previous token rest finish = case stack of {
+    (:) (Explicit delimiter) outer -> let {
+      text = tokenText token;
+      continue frames = (:) token (arrange shared frames Nothing (Just token) rest finish);
+      close expected = continue (if eqString delimiter expected then outer else stack)
+    } in if stringLength text /= 1 then normalLayout shared stack previous token rest finish
+      else case stringCodeAt text 0 of {
+        40 -> continue ((:) (Explicit text) stack);
+        91 -> continue ((:) (Explicit text) stack);
+        123 -> continue ((:) (Explicit text) stack);
+        41 -> close "("; 93 -> close "["; 125 -> close "{";
+        44 -> normalLayout shared stack previous token rest finish;
+        _ -> continue stack
+      };
+    _ -> normalLayout shared stack previous token rest finish
+  };
+  normalLayout shared stack previous token rest finish =
     let {
       text = tokenText token
     } in
@@ -398,6 +414,22 @@ module Bootstrap.Layout where {
   -- Shared Haskell layout opens let bindings on the same line as well as
   -- subsequent lines. Inline do/of/where use the same indentation and
   -- delimiter closures as multiline blocks; legacy let remains sequential.
+  -- No virtual token is emitted without a layout frame or a pending opener.
+  -- When the top level and each layout keyword have explicit braces, the
+  -- validated scanner tokens are already the arranged stream.
+  explicitLayoutStart program tokens = not program || case tokens of {
+    [] -> False;
+    (:) first _ -> eqString (tokenText first) "module" || eqString (tokenText first) "{"
+  };
+  explicitLayout program tokens = let {
+    blocks input = case input of {
+      [] -> True;
+      (:) token rest -> if sharedLayoutKeyword (tokenText token) then case rest of {
+        (:) brace more -> eqString (tokenText brace) "{" && blocks more;
+        [] -> False
+      } else blocks rest
+    }
+  } in explicitLayoutStart program tokens && blocks tokens;
   layoutTokensWithProfile :: SourceSyntax -> Bool -> String -> String -> Either String Scanned;
   layoutTokensWithProfile syntax program file source =
     if not (isSharedSyntax syntax)
@@ -405,20 +437,12 @@ module Bootstrap.Layout where {
            MetadataSyntax -> layoutTokens program file source;
            _ -> layoutTokensWithScanner scanSourceTokens program file source
          }
-    else do {
-           boundValueShared1 <- scanSourceTokens file source;
-           case boundValueShared1 of {
-             Scanned tokens finish ->
-               do {
-                 validateSharedTokens file tokens;
-                 arranged <- layoutTokensUsing True scanSourceTokens program file source;
-                 case arranged of {
-                   Scanned ordered _ -> validateSharedArranged file [] Nothing ordered
-                 };
-                 Right arranged
-               }
-           }
-         };
+    else scanSharedWithLayout (\tokens finish blocks -> let { scanned = Scanned tokens finish } in
+      if explicitLayoutStart program tokens && blocks then Right scanned else do {
+        arranged <- layoutTokensUsing True (\_ _ -> Right scanned) program file source;
+        case arranged of { Scanned ordered _ -> validateSharedArranged file [] Nothing ordered };
+        Right arranged
+      }) file source;
   virtualToken :: Token -> Bool;
   virtualToken token =
     ((tokenLine token == tokenEndLine token) && (tokenColumn token == tokenEndColumn token));

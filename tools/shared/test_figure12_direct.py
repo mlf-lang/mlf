@@ -10,7 +10,6 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
-import sys
 
 from figure12_data import decode
 from test_direct import authenticate_build
@@ -111,7 +110,7 @@ def main():
         run('link-harness', [ghc, *flags, '-rtsopts=ignoreAll', main_object, *link_objects, '-o', executable])
         record['executable_sha256'] = digest(executable)
         run('oracle-controls', [executable, fixture_path, 'oracle-controls', '0'], b'PASS oracle-controls\n')
-        record['source_oracle_controls'] = {'positive': 4, 'phase_rejection': 7}
+        record['source_oracle_controls'] = {'positive': 4, 'phase_rejection': 9}
         inventory = json.loads(run('inventory', [executable, fixture_path, 'inventory', '0']))
         assumptions, programs, aliases = inventory['assumptions'], inventory['programs'], inventory['aliases']
         if len(assumptions) != 29 or len(programs) != 43 or aliases != [['A12.1','A10.1'],['E3a','A12.2']]:

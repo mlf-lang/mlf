@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Fresh experimental host harness. Requires an authenticated official GHC build."""
-import argparse, json, pathlib, sys
+import argparse, sys
 from common import *
 def main():
     p=argparse.ArgumentParser(description=__doc__)

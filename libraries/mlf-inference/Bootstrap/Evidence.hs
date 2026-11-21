@@ -34,29 +34,84 @@ module Bootstrap.Evidence where {
   resolveDictionaryDetailed :: DataEnv ->
                        Map XTyVar XType ->
                        [] ((,,) EvidenceRole XName XType) -> XType -> Either EvidenceFailure XTerm;
-  resolveDictionaryDetailed datatypes gamma candidates wanted =
-    do {
-      let {
-        proofs = closeGiven datatypes gamma candidates [] (givenSeeds candidates)
-      };
-      term <- searchDetailed datatypes gamma candidates proofs [] wanted;
-      let {
-        terms =
-          M.fromList X.compareName
-            (map
-               (\candidate ->
-                  case candidate of {
-                    (,,) _ name ty -> (,) name ty
-                  })
-               candidates)
-      };
-      actual <- case Check.inferWithData datatypes (XEnv gamma terms) term of {
+  resolveDictionaryDetailed datatypes gamma candidates =
+    dictionaryResolver datatypes gamma candidates (\_ -> candidatePairs InstanceEvidence candidates);
+  -- Keep the complete environment for the independent proof checker. For a
+  -- repeated scope, its types, superclass closure and checker are shared.
+  candidateTerms candidates =
+    M.fromList X.compareName (map (\((,,) _ name ty) -> (,) name ty) candidates);
+  dictionaryResolver datatypes gamma candidates instances =
+    proveDictionary datatypes gamma (candidatePairs GivenEvidence candidates)
+      (candidatePairs SuperclassEvidence candidates) instances
+      (Check.checkerIn datatypes (XEnv gamma (candidateTerms candidates)));
+  proveDictionary datatypes gamma givens selectors instances checked = let {
+    seeds = map (\((,) name ty) -> (,,) (XVarTerm name) ty Set.empty) givens;
+    proofs = closeGivenWith datatypes gamma selectors [] seeds
+  } in \wanted -> do {
+    term <- searchWith datatypes gamma givens instances proofs [] wanted;
+    actual <- case checked of {
+      Left message -> Left (InvalidEvidence message);
+      Right check -> case check term of {
         Left message -> Left (InvalidEvidence message);
         Right ty -> Right ty
-      };
-      unless (T.alphaEq actual wanted) (Left (InvalidEvidence "dictionary evidence has the wrong type"));
-      Right term
+      }
     };
+    unless (T.alphaEq actual wanted) (Left (InvalidEvidence "dictionary evidence has the wrong type"));
+    Right term
+  };
+  -- Two visibly different constructor heads cannot unify. Flexible or
+  -- application-shaped heads remain available for every lookup. A bucket
+  -- affects only instance search, which requires exactly one matching row.
+  indexedResolver datatypes gamma candidates = dictionaryResolver datatypes gamma candidates
+    (instanceLookup (candidatePairs InstanceEvidence candidates));
+  instanceLookup instances = let {
+    concrete ty = case ty of {
+      XCon cls ((:) (XCon constructor _) _) -> Just ((,) cls constructor);
+      _ -> Nothing
+    };
+    compareKey ((,) c t) ((,) d u) = let { order = compareString c d } in
+      if order == 0 then compareString t u else order;
+    group ordinal rows index rest = case rows of {
+      [] -> (,) (M.map reverse index) (reverse rest);
+      (:) pair remaining -> let {
+        row = (,) ordinal pair;
+        next = ordinal + 1;
+        head = snd (arguments (snd (quantifiers (snd pair))))
+      } in seq next (case concrete head of {
+        Just key -> let { updated = M.insertWith compareKey append key [row] index } in
+          seq updated (group next remaining updated rest);
+        Nothing -> group next remaining index ((:) row rest)
+      })
+    };
+    grouped = group 0 instances M.empty [];
+    forGoal goal = case concrete goal of {
+      Nothing -> instances;
+      Just key -> let { bucket = M.findWithDefault compareKey [] key (fst grouped) } in
+        map snd (mergeBy (\a b -> compareInt (fst a) (fst b)) bucket (snd grouped))
+    }
+  } in forGoal;
+  -- This resolver belongs to one immutable module scope in one solved graph.
+  -- Its ordering and membership are independent of a request's type binders
+  -- and lexical parameters. Only those parameters change on scope entry.
+  scopedResolver datatypes globals = let {
+    instances = instanceLookup (candidatePairs InstanceEvidence globals);
+    givens = candidatePairs GivenEvidence globals;
+    selectors = candidatePairs SuperclassEvidence globals;
+    terms = candidateTerms globals;
+    inTypes gamma = let {
+      check = Check.checkerWithEarlierBindings datatypes (XEnv gamma terms);
+      base = proveDictionary datatypes gamma givens selectors instances (check M.empty)
+    } in \locals -> case locals of {
+      [] -> base;
+      _ -> let { localInstances = candidatePairs InstanceEvidence locals } in
+        proveDictionary datatypes gamma
+          (append (candidatePairs GivenEvidence locals) givens)
+          (append (candidatePairs SuperclassEvidence locals) selectors)
+          (\goal -> append localInstances (instances goal))
+          (check (candidateTerms locals))
+    };
+    closed = inTypes M.empty
+  } in \gamma -> if M.null gamma then closed else inTypes gamma;
   givenSeeds :: [] ((,,) EvidenceRole XName XType) -> [] ((,,) XTerm XType (Set XName));
   givenSeeds [] = [];
   givenSeeds ((:) ((,,) role name ty) rest) =
@@ -87,16 +142,18 @@ module Bootstrap.Evidence where {
             Map XTyVar XType ->
             [] ((,,) EvidenceRole XName XType) ->
             [] ((,) XTerm XType) -> [] XType -> XType -> Either EvidenceFailure XTerm;
-  searchDetailed datatypes gamma candidates proofs seen goal =
+  searchDetailed datatypes gamma candidates = searchWith datatypes gamma
+    (candidatePairs GivenEvidence candidates) (\_ -> candidatePairs InstanceEvidence candidates);
+  searchWith datatypes gamma givens instances proofs seen goal =
     if any (T.alphaEq goal) seen
     then Left (NoEntailment ("cyclic dictionary resolution: " ++ Pretty.prettyType goal))
-    else case matches datatypes gamma candidates GivenEvidence goal of {
+    else case matching datatypes gamma givens goal of {
            (:) ((,) term []) _ -> Right term;
            _ ->
              case find (\proof -> T.alphaEq goal (snd proof)) proofs of {
                Just proof -> Right (fst proof);
                Nothing ->
-                 case matches datatypes gamma candidates InstanceEvidence goal of {
+                 case matching datatypes gamma (instances goal) goal of {
                    [] ->
                      Left
                        (NoEntailment ("no instance or given constraint for " ++
@@ -106,7 +163,7 @@ module Bootstrap.Evidence where {
                        (\f predicate ->
                           do {
                             proof <-
-                              searchDetailed datatypes gamma candidates proofs ((:) goal seen) predicate;
+                              searchWith datatypes gamma givens instances proofs ((:) goal seen) predicate;
                             Right (XApp f proof)
                           })
                        term
@@ -119,20 +176,22 @@ module Bootstrap.Evidence where {
                 Map XTyVar XType ->
                 [] ((,,) EvidenceRole XName XType) ->
                 [] XType -> [] ((,,) XTerm XType (Set XName)) -> [] ((,) XTerm XType);
-  closeGiven _ _ _ _ [] = [];
-  closeGiven datatypes gamma candidates seen ((:) ((,,) proof ty path) rest) =
+  closeGiven datatypes gamma candidates = closeGivenWith datatypes gamma
+    (candidatePairs SuperclassEvidence candidates);
+  closeGivenWith _ _ _ _ [] = [];
+  closeGivenWith datatypes gamma available seen ((:) ((,,) proof ty path) rest) =
     if any (T.alphaEq ty) seen
-    then closeGiven datatypes gamma candidates seen rest
+    then closeGivenWith datatypes gamma available seen rest
     else let {
            selectors =
              filter (\candidate -> not (Set.member X.compareName (fst candidate) path))
-               (candidatePairs SuperclassEvidence candidates)
+               available
          } in
          let {
            projections = catMaybes (map (projectGiven datatypes gamma proof ty path) selectors)
          } in
          (:) ((,) proof ty)
-           (closeGiven datatypes gamma candidates ((:) ty seen) (append rest projections));
+           (closeGivenWith datatypes gamma available ((:) ty seen) (append rest projections));
   superclassArgument :: forall a p. [] a -> p -> Either String a;
   superclassArgument context _ =
     case context of {
@@ -162,7 +221,8 @@ module Bootstrap.Evidence where {
              [] ((,,) EvidenceRole XName XType) ->
              EvidenceRole -> XType -> [] ((,) XTerm ([] XType));
   matches datatypes gamma candidates role goal =
-    catMaybes (map (specialize datatypes gamma goal) (candidatePairs role candidates));
+    matching datatypes gamma (candidatePairs role candidates) goal;
+  matching datatypes gamma pairs goal = catMaybes (map (specialize datatypes gamma goal) pairs);
   specialize :: DataEnv ->
                 Map XTyVar XType -> XType -> (,) XName XType -> Maybe ((,) XTerm ([] XType));
   specialize datatypes gamma goal candidate =

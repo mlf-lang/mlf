@@ -26,8 +26,8 @@ module Bootstrap.LLVM.Analysis where {
   entryOrder :: WorkerFunction -> [] XName;
   entryOrder f = demandNames (entrySummary f);
   needed :: Map XName WorkerFunction -> XErased -> Set XName;
-  needed functions expression =
-    S.unions O.compareName (L.map (neededName functions) (S.toList (O.free expression)));
+  needed functions expression = neededFree functions (O.free expression);
+  neededFree functions names = S.unions O.compareName (L.map (neededName functions) (S.toList names));
   neededName :: Map XName WorkerFunction -> XName -> Set XName;
   neededName functions name =
     case M.lookup O.compareName name functions of {
@@ -76,6 +76,35 @@ module Bootstrap.LLVM.Analysis where {
     M.unions O.compareName
       ((:) (L.foldr collectBinding M.empty (bindings expression))
          (L.map collect (children expression)));
+  -- A callback may contain another callback as an argument. Analyze their
+  -- bodies inside out so outer lambdas can use the inner lexical free set.
+  -- Repeated binder identities in open input take the ordinary syntax path.
+  lambdaBodies pending reversed = case pending of {
+    [] -> reversed;
+    (:) term rest -> case term of {
+      XEAbs binder body -> lambdaBodies ((:) body rest) ((:) ((,) binder body) reversed);
+      _ -> lambdaBodies (L.append (children term) rest) reversed
+    }
+  };
+  lambdaFreeTable :: XErased -> Map XName (Maybe (Set XName));
+  lambdaFreeTable expression = L.foldlStrict addLambdaFree M.empty (lambdaBodies [expression] []);
+  addLambdaFree table ((,) binder body) = case M.lookup O.compareName binder table of {
+    Just _ -> M.insert O.compareName binder Nothing table;
+    Nothing -> let { names = nestedFree table body } in
+      seq (S.size names) (M.insert O.compareName binder (Just names) table)
+  };
+  nestedFree table term = case term of {
+    XEAbs binder body -> case M.lookup O.compareName binder table of {
+      Just (Just names) -> S.delete O.compareName binder names;
+      _ -> O.freeWith (nestedFree table) term
+    };
+    _ -> O.freeWith (nestedFree table) term
+  };
+  lambdaNeeded functions table binder body = S.delete O.compareName binder
+    (case M.lookup O.compareName binder table of {
+      Just (Just names) -> neededFree functions names;
+      _ -> needed functions body
+    });
   sameNames :: [] XName -> [] XName -> Bool;
   sameNames a b =
     case a of {

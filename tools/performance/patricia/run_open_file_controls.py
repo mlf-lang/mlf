@@ -25,6 +25,24 @@ def pack(values):
     return ''.join(str(len(value)) + ':' + value for value in values)
 
 
+def same_group_ownership(crate, expected, actual):
+    """Compare full ordered memberships while validating each format's owner."""
+    if len(expected) != len(actual):
+        return False
+    seen = set()
+    for closed, opened in zip(expected, actual):
+        members = closed['members']
+        if not members or members != opened['members'] or len(set(members)) != len(members):
+            return False
+        # Uniqueness is canonical ownership, even if the two wire versions
+        # occur together. Do not admit two spellings of the same group.
+        owner = tuple(sorted(members))
+        if not Comparison.match_group_identity(crate, closed['id'], opened['id'], members) or owner in seen:
+            return False
+        seen.add(owner)
+    return True
+
+
 def unpack(source):
     result = []
     while source:
@@ -225,6 +243,7 @@ def run_session_files(H, output, record, inputs, binaries, producer, source,
         H.require(H.sha(path) == digest, 'fixed independent oracle: ' + name)
         inputs[str(path)] = digest
     inputs[str(Comparison.DEPENDENCY_ORACLE_PATH)] = H.sha(Comparison.DEPENDENCY_ORACLE_PATH)
+    inputs[str(Comparison.CURRENT_DEPENDENCY_ORACLE_PATH)] = H.sha(Comparison.CURRENT_DEPENDENCY_ORACLE_PATH)
     for path in [Path(__file__), HERE / 'open_file_comparison.py',
                  HERE / 'frozen_file_oracles.py', fixture_path]:
         inputs[str(path)] = H.sha(path)
@@ -237,6 +256,29 @@ def run_session_files(H, output, record, inputs, binaries, producer, source,
         'adapted_sha256': H.sha(Comparison.DEPENDENCY_ORACLE_PATH),
         'scope': 'only dependency-interface primitive declarations 132/133 with exact Prelude owner and names; unchanged 0..131 reader for own artifacts and linked terms',
         'exact_source_inverse_verified': True}
+    rows['current_independent_dependency_schema_extension'] = {
+        'active_route': 'current_dependency_decoded',
+        'fixed_primitive_abi': 'mlf-primitive-137-v12',
+        'registry_provenance': {
+            'introduced_commit': 'd8325d909c249fd82d4ad6173d44d8818cc6f8bf',
+            'parent_commit': '63fbd13d253a3f1a54170311dcbe076f1d0718f4',
+            'observed_failed_ci_commit': 'c9a8da4d5ab66cb8364adf884e42ff8644c92257',
+            'primitive_registry_git_blob': 'ff57ced14bc134f072422fb83c8e49576be1ed90',
+            'shared_sources_git_blob': 'a55105aa0d14418b97f8df0e633e15a717d0f58c',
+            'entity_owner_source_git_blob': 'a196fb45e145db5bf272fa9087c0134229ea2715',
+            'scope': 'fixed historical registry endpoints; not dynamic code-range discovery'},
+        'scope': 'dependency interfaces only; exact bidirectional Prelude identities 132..136, per-container uniqueness; own/linked reader remains 0..131',
+        'historical_route_retained': 'dependency_decoded; 0..133; still rejects 134',
+        'source_chain': [
+            {'from_max': 131, 'to_max': 133,
+             'source_sha256': Comparison.ORACLE_PINS['artifact_binary_typed.py'],
+             'adapted_sha256': H.sha(Comparison.DEPENDENCY_ORACLE_PATH)},
+            {'from_max': 133, 'to_max': 136,
+             'source_sha256': H.sha(Comparison.DEPENDENCY_ORACLE_PATH),
+             'adapted_sha256': H.sha(Comparison.CURRENT_DEPENDENCY_ORACLE_PATH)}],
+        'each_complete_source_inverse_verified': True,
+        'primitive_identities': {str(code): list(identity) for code, identity in
+                                 Comparison.CURRENT_DEPENDENCY_PRIMITIVES.items()}}
     save()
 
     def run(label, argv, cwd, expected_exit=0):
@@ -332,8 +374,9 @@ def run_session_files(H, output, record, inputs, binaries, producer, source,
                     H.require(inferred > 0 and reused == 0 and len(groups) == inferred and
                               all(group['cached'] is False for group in groups),
                               'genuinely fresh inference')
-                H.require([{'id': group['id'], 'members': group['members']} for group in groups]
-                          == expected['groups'], 'complete ordered original inference groups')
+                H.require(report['crate'] == fields[1] and
+                          same_group_ownership(fields[1], expected['groups'], groups),
+                          'complete ordered original inference groups and exact owner formats')
                 actual = raw_files(prefix)
                 if mode == 'cold':
                     cold_files = actual

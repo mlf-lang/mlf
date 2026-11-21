@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Build finite C probes and a Main-only GHC eligibility fixture; not a benchmark."""
-import ast,hashlib,json,os,shutil,subprocess,sys
+import ast,json,shutil,subprocess
 from pathlib import Path
 import support as common
 args=common.arguments();common.check_pair(args)

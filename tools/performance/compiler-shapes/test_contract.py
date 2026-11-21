@@ -5,12 +5,16 @@ These tests use synthetic receipts to prove that the analyzer refuses missing,
 duplicate, non-finite, failed, qualified-only and incompatible data, and that the
 frozen schedule stays balanced.
 """
+import copy
 import hashlib
 import json
+import random
+import re
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -18,6 +22,10 @@ sys.path.insert(0, str(HERE))
 import analyze  # noqa: E402
 import bench  # noqa: E402
 import run as runner  # noqa: E402
+import generate  # noqa: E402
+import prepare  # noqa: E402
+
+import worker
 
 STAGES = ['source-to-checked', 'checked-to-llvm', 'llvm-to-executable']
 
@@ -49,7 +57,7 @@ def write_cohort(root, label='screen', family='flat_functions', size=8, repeats=
                           'families': [family], 'sizes': [size], 'cells': 1,
                           'timed_compilations': len(schedule), 'claim_limits': ['synthetic']},
             'source': {'commit': '0' * 40, 'branch': 'test', 'dirty': False,
-                       'patch_sha256': hashlib.sha256(b'').hexdigest()},
+                       'patch_bytes': 0, 'patch_sha256': hashlib.sha256(b'').hexdigest()},
             'toolchain': {'ghc': {'path': '/ghc', 'version': '9.14.1'},
                           'clang': {'path': '/clang', 'version': 'clang test'},
                           'producer': {'path': '/producer', 'receipt_sha256': 'a' * 64, 'emlf_sha256': 'b' * 64},
@@ -61,7 +69,7 @@ def write_cohort(root, label='screen', family='flat_functions', size=8, repeats=
         times = mlf_seconds if item['lane'] == 'mlf' else ghc_seconds
         wall = times[item['position'] // 2 if item['position'] // 2 < len(times) else 0]
         stages = [{'name': name, 'wall_seconds': wall / 3, 'user_seconds': wall / 4,
-                   'system_seconds': wall / 20} for name in STAGES] if item['lane'] == 'mlf' else []
+                   'system_seconds': wall / 20} for name in (worker.mlf_stage_names(endpoint) if endpoint in ['crate-bootstrap-v1','crate-fused-v1'] else STAGES)] if item['lane'] == 'mlf' else []
         runs.append({'case': case['id'], 'position': item['position'], 'lane': item['lane'], 'complete': True,
                      'output_correct': True, 'fresh': 1 if item['lane'] == 'mlf' else None,
                      'reused': 0 if item['lane'] == 'mlf' else None, 'max_group_members': 1,
@@ -89,7 +97,171 @@ def edit(folder, mutate):
     path.write_text(json.dumps(receipt, indent=2) + '\n')
 
 
+class BindingShapeTests(unittest.TestCase):
+    def test_closures_capture_runtime_values_and_escape_before_application(self):
+        for n in (1, 8, 32, 128):
+            with self.subTest(n=n):
+                source = generate.program('captured_closures', n)
+                build = next(line for line in source.splitlines() if line.startswith('makeClosures x ='))
+                leaves = re.findall(
+                    r'let \{ saved = subInt x (\d+) \} in Closure (\d+) \(\\arg -> mulInt saved arg\)', build
+                )
+                self.assertEqual(leaves, [(str(i), str(i)) for i in range(1, n + 1)])
+                self.assertEqual(build.count('Both ('), n - 1)
+                self.assertIn('Closure arg f -> f arg', source)
+                self.assertIn('Both l r -> addInt (applyClosures l) (applyClosures r)', source)
+                self.assertIn('entry x = applyClosures (makeClosures x);', source)
+                for x in (-n - 1, -1, 0, 1, n + 1):
+                    self.assertEqual(generate.expected('captured_closures', n, x),
+                                     sum(i * (x - i) for i in range(1, n + 1)))
+
+    def test_single_product_binds_and_weighs_every_position(self):
+        for n in (1, 8, 32, 128):
+            with self.subTest(n=n):
+                source = generate.program('wide_product', n)
+                self.assertIn('data Product = Product ' + ' '.join(['Int'] * n) + ';', source)
+                body = re.search(r'weigh p = case p of \{ Product (.*?) -> (.*?) \};', source)
+                self.assertIsNotNone(body)
+                fields = list(range(1, n + 1))
+                self.assertEqual(body[1].split(), [f'v{i}' for i in fields])
+                self.assertEqual(re.findall(r'mulInt (v\d+) (\d+)', body[2]),
+                                 [(f'v{i}', str(n + 1 - i)) for i in fields])
+                entry = next(line for line in source.splitlines() if line.startswith('entry x ='))
+                self.assertTrue(entry.startswith('entry x = weigh (Product '))
+                self.assertEqual(re.findall(r'\(addInt x (\d+)\)', entry), list(map(str, fields)))
+                for x in (-n - 1, -1, 0, 1, n + 1):
+                    values = [x + i for i in fields]
+                    self.assertEqual(generate.expected('wide_product', n, x),
+                                     sum(value * weight for value, weight in zip(values, reversed(fields))))
+
+
 class ScheduleTests(unittest.TestCase):
+    def test_interleaving_visits_each_cell_once_per_round_and_keeps_pairs(self):
+        cases = ['baseline', 'small', 'medium', 'large']
+        repeats = 7
+        grouped = [{'case': case, 'position': pos, 'lane': lane}
+                   for index, case in enumerate(cases)
+                   for pos, lane in enumerate(runner.lanes_for(index, repeats))]
+        schedule = runner.interleave_pairs(grouped, repeats, random.Random(41))
+        self.assertEqual(schedule, runner.interleave_pairs(grouped, repeats, random.Random(41)))
+        self.assertNotEqual(schedule, runner.interleave_pairs(grouped, repeats, random.Random(42)))
+        self.assertCountEqual(schedule, grouped)
+        for rep in range(repeats):
+            start = rep * 2 * len(cases)
+            subset = schedule[start:start + 2 * len(cases)]
+            self.assertCountEqual([row['case'] for row in subset[::2]], cases)
+            for first, second in zip(subset[::2], subset[1::2]):
+                self.assertEqual(first['case'], second['case'])
+                self.assertEqual((first['position'], second['position']), (2*rep, 2*rep+1))
+                self.assertEqual({first['lane'], second['lane']}, {'mlf', 'ghc'})
+
+
+    def test_explicit_sizes_are_bounded(self):
+        self.assertEqual(bench.resolve('default', ['inferred_poly_chain'], [8192])[2], [8192])
+        for n in [0, -1, 8193]:
+            with self.assertRaises(SystemExit):
+                bench.resolve('default', ['inferred_poly_chain'], [n])
+
+    def test_run_uses_explicit_setup(self):
+        import argparse
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            setup = root / 'existing-setup.json'
+            setup.write_text('{}')
+            args = argparse.Namespace(workdir=root / 'other', setup=setup,
+                cohort='explicit', matrix='default', family=None, size=None,
+                repeats=None, endpoint='crate-bootstrap-v1', interleave_pairs=True, cohort_output_gib=32)
+            with mock.patch.object(bench, 'run') as run_command:
+                bench.command_run(args)
+            argv = run_command.call_args.args[0]
+            self.assertEqual(argv[argv.index('--setup') + 1], setup.resolve())
+            self.assertIn('--interleave-pairs', argv)
+            self.assertEqual(argv[argv.index('--cohort-output-gib') + 1], 32)
+            self.assertEqual(argv[argv.index('--repeats') + 1], 6)
+            self.assertCountEqual([argv[i + 1] for i, arg in enumerate(argv) if arg == '--family'],
+                                  generate.FAMILIES)
+            self.assertEqual([int(argv[i + 1]) for i, arg in enumerate(argv) if arg == '--size'],
+                             [8, 32, 128, 1024, 8192])
+
+    def test_all_build_entry_parsers_default_to_fused_and_allow_two_stage(self):
+        # Exercise the real CLI parsers, stopping before any build or filesystem
+        # action. Old setups must still require explicit endpoint selection.
+        class Parsed(Exception):
+            pass
+
+        original = bench.argparse.ArgumentParser.parse_args
+        entries = [(bench, ['list']),
+                   (bench, ['prepare', '--workdir', '/unused']),
+                   (bench, ['run', '--workdir', '/unused', '--cohort', 'test']),
+                   (bench, ['all', '--workdir', '/unused', '--cohort', 'test']),
+                   (prepare, ['--producer', '/unused', '--output', '/unused']),
+                   (runner, ['--setup', '/unused', '--output', '/unused'])]
+        for module, arguments in entries:
+            for extra, expected in [([], 'crate-fused-v1'),
+                                    (['--endpoint', 'crate-bootstrap-v1'], 'crate-bootstrap-v1')]:
+                with self.subTest(module=module.__name__, arguments=arguments, extra=extra):
+                    found = []
+                    def capture(parser):
+                        found.append(original(parser, arguments + extra))
+                        raise Parsed()
+                    with mock.patch.object(bench.argparse.ArgumentParser, 'parse_args', capture), \
+                         mock.patch.object(sys, 'argv', [module.__name__, *arguments, *extra]):
+                        with self.assertRaises(Parsed):
+                            module.main()
+                    self.assertEqual(found[0].endpoint, expected)
+
+    def test_inferred_poly_chain_is_unsigned_and_every_layer_is_reached_at_two_types(self):
+        for size in [1, 3, 32, 512]:
+            source = generate.program('inferred_poly_chain', size)
+            declarations = re.findall(r'^(f\d+) (.*);$', source, re.MULTILINE)
+            self.assertEqual(len(declarations), size)
+            self.assertNotRegex(source, r'f\d+ ::')
+            for i, (name, body) in enumerate(declarations):
+                self.assertEqual(name, 'f' + str(i))
+                self.assertEqual(re.findall(r'\bf\d+\b', body), [] if i == 0 else ['f' + str(i - 1)])
+            entry = next(line for line in source.splitlines() if line.startswith('entry x ='))
+            self.assertEqual(re.findall(r'\bf\d+\b', entry), ['f' + str(size - 1)] * 3)
+            self.assertIn('addInt value 1', entry)
+            self.assertIn('if value then False else True', entry)
+            for value in [-1, 0, 7, size]:
+                integer, boolean = value, value < 0
+                for _ in range(size):
+                    integer += 1
+                    boolean = not boolean
+                self.assertEqual(generate.expected('inferred_poly_chain', size, value),
+                                 integer if boolean else -integer)
+        self.assertEqual([generate.expected('inferred_poly_chain', 1, x) for x in [-1, 0, 7]], [0, 1, 8])
+        self.assertEqual([generate.expected('inferred_poly_chain', 4, x) for x in [-1, 0, 7]], [3, -4, -11])
+
+    def test_inferred_poly_functions_are_unsigned_independent_and_used_at_two_types(self):
+        for size in [4, 32, 512]:
+            source = generate.program('inferred_poly_functions', size)
+            declarations = re.findall(r'^(f\d+) (.*);$', source, re.MULTILINE)
+            self.assertEqual(len(declarations), size)
+            self.assertNotRegex(source, r'f\d+ ::')
+            entry = next(line for line in source.splitlines() if line.startswith('entry x ='))
+            for i, (name, body) in enumerate(declarations):
+                self.assertEqual(name, 'f' + str(i))
+                self.assertEqual(body, ['y = y', 'y z = y', 'f y = f y', 'f g y = f (g y)'][i % 4])
+                self.assertNotRegex(body, r'\bf\d+\b')
+                self.assertEqual(len(re.findall(r'\b' + name + r'\b', entry)), 3)
+            self.assertEqual(entry.count('ltInt x '), size + 2 * (size // 4))
+            for value in [-1, 0, 7, size, size + 1]:
+                self.assertEqual(generate.expected('inferred_poly_functions', size, value),
+                                 sum(value + i if value < i else -(value + i) for i in range(size)))
+        self.assertEqual([generate.expected('inferred_poly_functions', 4, x) for x in [-1, 0, 7]], [2, 6, -34])
+
+    def test_inferred_functions_only_remove_generated_signatures(self):
+        for size in [1, 32, 512]:
+            annotated = generate.program('flat_functions', size)
+            inferred = generate.program('inferred_functions', size)
+            self.assertEqual(inferred, re.sub(r'^f\d+ :: Int -> Int;\n', '', annotated,
+                                              flags=re.MULTILINE))
+            self.assertEqual(len(re.findall(r'^f\d+ x =', inferred, re.MULTILINE)), size)
+            for value in [-1, 0, 7]:
+                self.assertEqual(generate.expected('inferred_functions', size, value),
+                                 size * value + size * (size - 1) // 2)
+
     def test_balanced_pairs(self):
         self.assertEqual(runner.lanes_for(0, 3), ['ghc', 'mlf', 'mlf', 'ghc', 'ghc', 'mlf'])
         self.assertEqual(runner.lanes_for(1, 3), ['mlf', 'ghc', 'ghc', 'mlf', 'mlf', 'ghc'])
@@ -98,21 +270,180 @@ class ScheduleTests(unittest.TestCase):
 
     def test_default_matrix_shape(self):
         matrix, families, sizes, baseline = bench.resolve('default', None, None)
-        self.assertEqual(len(families), 10)
-        self.assertEqual(sizes, [8, 32, 128])
-        self.assertTrue(baseline)
-        self.assertEqual(bench.compile_count(len(families) * len(sizes) + 1, matrix['repeats']), 186)
+        self.assertEqual(set(bench.registry()['matrices']), {'default'})
+        self.assertCountEqual(families, [
+            'flat_functions', 'inferred_functions', 'inferred_poly_functions', 'inferred_poly_chain',
+            'local_functions', 'dependency_chain', 'inferred_chain', 'recursive_ring', 'mono_calls',
+            'poly_calls', 'tree_chain', 'balanced_tree', 'literal_table', 'higher_order_chain',
+            'wide_case', 'class_instances', 'dependency_diamonds', 'state_updates',
+            'captured_closures', 'wide_product', 'rank2_arguments', 'irregular_literal_table',
+            'nested_poly_types', 'rank2_callbacks', 'decoder_pipeline'])
+        self.assertEqual(sizes, [8, 32, 128, 1024, 8192])
+        self.assertEqual(matrix['repeats'], 6)
+        self.assertFalse(baseline)
+        listing = subprocess.check_output([sys.executable, '-B', HERE / 'bench.py', 'list'], text=True)
+        self.assertIn('cells:    125, timed compilations: 1500', listing)
+        with tempfile.TemporaryDirectory() as directory:
+            # Enumerate the whole public generator schedule without building 8,192-node sources.
+            with mock.patch.object(generate, 'program', return_value='module Main where\n'):
+                generated = generate.generate(Path(directory) / 'default')
+            self.assertCountEqual([(c['family'], c['size']) for c in generated],
+                                  [(family, n) for family in families for n in sizes])
 
-    def test_local_functions_is_opt_in(self):
-        _, families, _, _ = bench.resolve('default', None, None)
-        self.assertNotIn('local_functions', families)
-        _, chosen, _, _ = bench.resolve('default', ['local_functions'], [512])
-        self.assertEqual(chosen, ['local_functions'])
+    def test_filtered_families_and_explicit_legacy_baseline(self):
+        selected = ['inferred_functions', 'inferred_poly_functions', 'inferred_poly_chain', 'local_functions']
+        _, chosen, sizes, baseline = bench.resolve('default', selected, [512])
+        self.assertEqual((chosen, sizes, baseline), (selected, [512], False))
+        _, chosen, sizes, baseline = bench.resolve('default', ['baseline', 'wide_case'], [8])
+        self.assertEqual((chosen, sizes, baseline), (['wide_case'], [8], True))
+        with tempfile.TemporaryDirectory() as directory:
+            cases = generate.generate(Path(directory) / 'filtered', sizes=[8],
+                                      families=['baseline', 'wide_case'])
+            self.assertCountEqual([case['id'] for case in cases], ['baseline-0', 'wide_case-8'])
+
+    def test_fused_endpoint_has_its_own_command_and_stages(self):
+        endpoint = bench.measured_endpoint('crate-fused-v1')
+        self.assertIn('--compile-crate-to-llvm-gc', endpoint['driver'])
+        self.assertEqual(worker.mlf_stage_names('crate-fused-v1'), ['source-to-llvm','llvm-to-executable'])
+        commands = worker.mlf_commands('crate-fused-v1', Path('/emlf'), Path('/spec'), Path('/out'))
+        self.assertEqual(commands[0][1], [Path('/emlf'),'--compile-crate-to-llvm-gc',Path('/spec'),'-o',Path('/out/unit')])
+        self.assertEqual(commands[0][2], Path('/out/unit.ll'))
+        self.assertEqual(worker.mlf_stage_names('crate-bootstrap-v1'), STAGES)
+        with self.assertRaises(ValueError):
+            worker.mlf_stage_names('unknown')
 
     def test_installed_endpoint_is_separate_from_crate_runner(self):
         self.assertIn('emlf-source-v1', bench.registry()['paired_endpoints'])
         with self.assertRaises(SystemExit):
             bench.measured_endpoint('emlf-source-v1')
+
+
+class LanguageFeatureShapeTests(unittest.TestCase):
+    families = ('wide_case', 'class_instances', 'dependency_diamonds', 'state_updates')
+
+    def test_explicit_generation_preserves_source_and_oracle(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cases = generate.generate(root / 'features', sizes=[1, 5], families=self.families)
+            self.assertCountEqual([case['id'] for case in cases],
+                                  [f'{family}-{n}' for family in self.families for n in (1, 5)])
+            for case in cases:
+                path = Path(case['source'])
+                self.assertEqual(digest(path), case['source_sha256'])
+                for argument, stdout in zip(case['inputs'], case['expected_stdout'], strict=True):
+                    if case['family'] == 'wide_case' and argument == '--all':
+                        self.assertEqual(stdout, ''.join(f'{v}\n' for v in range(1, 2*case['size'], 2)))
+                    else:
+                        self.assertEqual(stdout, f"{self.reference(case['family'], case['size'], argument)}\n")
+
+    @staticmethod
+    def reference(family, size, x):
+        if family == 'wide_case':
+            arm = sum(x >= threshold for threshold in range(1, size))
+            return x + 2 * arm + 1
+        if family == 'class_instances':
+            return sum((i + 1) * (x + i) for i in range(size))
+        result = x
+        for i in range(size):
+            if family == 'state_updates':
+                result = i - result
+            elif family == 'dependency_diamonds':
+                result += (i + 1) if x < 0 else -(i + 1)
+            else:
+                raise ValueError(family)
+        return result
+
+    def test_oracles_cover_all_small_arms_both_branches_and_update_parities(self):
+        for family in self.families:
+            for size in (1, 2, 5, 8):
+                for x in range(-size - 1, size + 2):
+                    with self.subTest(family=family, size=size, x=x):
+                        self.assertEqual(generate.expected(family, size, x),
+                                         self.reference(family, size, x))
+
+    def test_every_diamond_forks_and_rejoins_the_previous_stage(self):
+        size = 5
+        source = generate.program('dependency_diamonds', size)
+        bodies = dict(re.findall(r'^([a-z]\w*) [\w ]+ = (.+);$', source, re.MULTILINE))
+
+        def calls(name):
+            return [word for word in re.findall(r'\b\w+\b', bodies[name]) if word in bodies]
+
+        stage, = calls('entry')
+        visited = set()
+        for _ in range(size):
+            left, right = calls(stage)
+            self.assertEqual(len({stage, left, right} - visited), 3)
+            visited.update((stage, left, right))
+            predecessor, = calls(left)
+            self.assertEqual(calls(right), [predecessor])
+            stage = predecessor
+        self.assertNotIn(stage, visited)
+        self.assertEqual(calls(stage), [])
+
+    def test_wide_case_constructs_and_matches_each_tag(self):
+        for size in (1, 5, 8):
+            source = generate.program('wide_case', size)
+            tags = [str(i) for i in range(size)]
+            data = re.search(r'\bdata Tag = ([^;]+);', source)
+            self.assertIsNotNone(data)
+            self.assertCountEqual(re.findall(r'\bTag(\d+)\b', data[1]), tags)
+            branches = re.findall(r'\bTag(\d+)\s*->\s*(\d+)', source)
+            self.assertCountEqual(branches, [(str(i), str(2 * i + 1)) for i in range(size)])
+            # Each alternative must also be produced somewhere on the selector path.
+            self.assertCountEqual(re.findall(r'\bTag(\d+)\b', source), tags * 3)
+            self.assertCountEqual(re.findall(r'ltInt x (\d+)', source), tags[1:])
+            self.assertIn('selectedScore i = score (pick i)', source)
+            self.assertIn('entry x = addInt x (selectedScore x)', source)
+            self.assertIn('if eqString text "--all" then printAll 0 else printInt (entry (readInt text))', source)
+            self.assertIn(f'printAll i = if eqInt i {size} then ioReturn ()', source)
+            self.assertIn(r'ioBind (printInt (selectedScore i)) (\_ -> printAll (addInt i 1))', source)
+
+    def test_wide_case_batch_detects_missing_or_swapped_interior_arms(self):
+        n = 7
+        source = generate.program('wide_case', n)
+        original = 'Tag1 -> 3; Tag2 -> 5;'
+        self.assertIn(original, source)
+        with tempfile.TemporaryDirectory() as directory:
+            for label, replacement in [('omitted', 'Tag2 -> 5;'), ('swapped', 'Tag1 -> 5; Tag2 -> 3;')]:
+                with self.subTest(label=label), mock.patch.object(generate, 'program',
+                        return_value=source.replace(original, replacement)):
+                    case, = generate.generate(Path(directory)/label, sizes=[n], families=['wide_case'])
+                    arms = {int(i): int(v) for i, v in re.findall(r'\bTag(\d+) -> (\d+)',
+                                                                    Path(case['source']).read_text())}
+                    self.assertEqual(case['inputs'], [-1, 3, 7, '--all'])
+                    spots = [x + arms[min(n-1, max(x, 0))] for x in case['inputs'][:-1]]
+                    self.assertEqual(case['expected_stdout'][:-1], [f'{v}\n' for v in spots])
+                    batch = case['expected_stdout'][-1]
+                    self.assertEqual(batch, '1\n3\n5\n7\n9\n11\n13\n')
+                    self.assertNotEqual(batch, ''.join(f'{arms[i]}\n' for i in sorted(arms)))
+        largest = generate.expected_output('wide_case', 8192, '--all').splitlines()
+        self.assertEqual(len(largest), 8192)
+        self.assertEqual((largest[0], largest[4096], largest[-1]), ('1', '8193', '16383'))
+
+    def test_entry_calls_the_constrained_method_for_every_instance(self):
+        size = 5
+        source = generate.program('class_instances', size)
+        ids = [str(i) for i in range(size)]
+        self.assertEqual(source.count('class Score '), 1)
+        self.assertCountEqual(re.findall(r'\bdata Box(\d+)\b', source), ids)
+        self.assertCountEqual(re.findall(r'\binstance Score Box(\d+)\b', source), ids)
+        self.assertRegex(source, r'measure :: [^;]*Score [a-z]+[^;]*=>')
+        self.assertRegex(source, r'measure (\w+) = score \1;')
+        self.assertCountEqual(re.findall(r'\bmeasure \(Box(\d+)\b', source), ids)
+
+    def test_state_updates_read_and_replace_one_cell_in_source_order(self):
+        for size in (1, 5, 8):
+            source = generate.program('state_updates', size)
+            self.assertEqual(source.count('newIntArray '), 1)
+            self.assertIn('cell <- newIntArray 1 x', source)
+            self.assertEqual(source.count('readIntArray '), size + 1)
+            self.assertEqual(source.count('writeIntArray '), size)
+            updates = re.findall(r'(\w+) <- readIntArray cell 0;\s*'
+                                 r'writeIntArray cell 0 \(subInt (\d+) \1\)', source)
+            self.assertEqual([int(index) for _, index in updates], list(range(size)))
+            self.assertIn('readIntArray cell 0 };', source)
+            self.assertIn('ioBind (entry (readInt text)) printInt', source)
 
 
 class AnalyzerTests(unittest.TestCase):
@@ -205,9 +536,15 @@ class AnalyzerTests(unittest.TestCase):
             self.assertTrue((output / name).is_file(), name)
         self.assertIn('MLF median', (output / 'summary.md').read_text())
 
+    def test_fused_analysis_keeps_its_stage_inventory(self):
+        folder = write_cohort(self.root, endpoint='crate-fused-v1')
+        rows, _, _, _ = analyze.analyze(folder)
+        self.assertIn('source-to-llvm_wall_seconds_median', rows[0])
+        self.assertNotIn('source-to-checked_wall_seconds_median', rows[0])
+
     def test_cli_rejects_incompatible_cohorts(self):
         write_cohort(self.root, label='screen')
-        write_cohort(self.root, label='other', endpoint='emlf-source-v1')
+        write_cohort(self.root, label='other', endpoint='crate-fused-v1')
         process = subprocess.run([sys.executable, '-B', str(HERE / 'analyze.py'),
                                   str(self.root / 'screen'), str(self.root / 'other'),
                                   '--output', str(self.root / 'results')], capture_output=True, text=True)
@@ -233,7 +570,8 @@ class AnalyzerTests(unittest.TestCase):
 
 # Graph fixtures are independently encoded by the frozen wire-format reference,
 # not a compiler run and never a substitute for retained measurement evidence.
-def graph_fixture(groups=1, mutate_nodes=None, version=1, mutate_index=None):
+def graph_fixture(groups=1, mutate_nodes=None, version=1, mutate_index=None,
+                  members_per_group=None):
     import base64
     import query_cache as Q
     from artifact_binary_reference import tree_document
@@ -254,12 +592,12 @@ def graph_fixture(groups=1, mutate_nodes=None, version=1, mutate_index=None):
     report = {'format': 1, 'crate': crate, 'inferred_groups': groups,
               'reused_groups': 0, 'groups': []}
     for i in range(groups):
-        members = ['f' + str(i)]
-        key = Q.pack(['InferScc', Q.pack(members)])
+        members = members_per_group[i] if members_per_group is not None else ['f' + str(i)]
+        key = Q.pack(['InferScc', Q.pack(sorted(members))])
         nodes.append({'key': key, 'hash': raw_hash,
                       'reads': [(binding, binding_hash)], 'payload': raw_hash})
         identity = 'Query_' + ''.join(str(ord(c)) + '_' for c in crate) + 'z_' + ''.join(
-            str(ord(c)) + '_' for c in members[0])
+            str(ord(c)) + '_' for c in min(members))
         report['groups'].append({'id': identity, 'members': members,
                                 'cached': False, 'query_key': raw_hash})
     if mutate_nodes:
@@ -312,9 +650,47 @@ class GraphCacheTests(unittest.TestCase):
     def index_error(self, legacy, indexed):
         return legacy if self.version == 1 else indexed
 
-    def check(self, inventory, evidence, groups=1):
-        return analyze.Q.check_graph(inventory, evidence, groups, 1,
+    def check(self, inventory, evidence, groups=1, max_members=1):
+        return analyze.Q.check_graph(inventory, evidence, groups, max_members,
                                      'compiler-shapes/flat_functions-8', 'b' * 64)
+
+    def test_accepts_complete_framed_group_owner(self):
+        for members in [['f0'], ['bc', 'a'], ['中文', 'é']]:
+            inventory, evidence = self.fixture(members_per_group=[members])
+            change_report(evidence, lambda q: q['groups'][0].update(id=analyze.Q.pack([
+                'MLF-OPEN-GROUP-1', q['crate'], analyze.Q.pack(sorted(members))])))
+            with self.subTest(members=members):
+                self.check(inventory, evidence, max_members=len(members))
+
+    def test_rejects_framed_owner_with_different_full_membership(self):
+        crate = 'compiler-shapes/flat_functions-8'
+        for owner_crate, members in [
+            ('other', ['a', 'bc']), (crate, []), (crate, ['a']),
+            (crate, ['a', 'bc', 'd']), (crate, ['ab', 'c']),
+            (crate, ['bc', 'a']), (crate, ['a', 'a', 'bc']),
+        ]:
+            inventory, evidence = self.fixture(members_per_group=[['bc', 'a']])
+            owner = analyze.Q.pack(['MLF-OPEN-GROUP-1', owner_crate, analyze.Q.pack(members)])
+            change_report(evidence, lambda q: q['groups'][0].update(id=owner))
+            with self.subTest(crate=owner_crate, members=members), self.assertRaisesRegex(
+                    ValueError, 'group id matches'):
+                self.check(inventory, evidence, max_members=2)
+
+    def test_compact_owner_matches_complete_membership(self):
+        crate = 'compiler-shapes/flat_functions-8'
+        prefix = ''.join(str(ord(c)) + '_' for c in crate) + 'z_'
+        members = ['module_' + prefix + '97_', 'Module_' + prefix + '84_', 'raw:λ']
+        inventory, evidence = self.fixture(members_per_group=[members])
+        owner = analyze.Q.compact_group_owner(crate, members)
+        change_report(evidence, lambda q: q['groups'][0].update(id=owner))
+        self.check(inventory, evidence, max_members=3)
+        for wrong_crate, wrong_members in [(crate, members[:-1]), ('other', members),
+                                           (crate, members + ['extra']), (crate, [])]:
+            changed = copy.deepcopy(evidence)
+            wrong = analyze.Q.compact_group_owner(wrong_crate, wrong_members)
+            change_report(changed, lambda q: q['groups'][0].update(id=wrong))
+            with self.assertRaisesRegex(ValueError, 'group id matches'):
+                self.check(inventory, changed, max_members=3)
 
     def test_accepts_extra_nodes_and_content_deduplication(self):
         inventory, evidence = self.fixture(groups=3)
@@ -381,7 +757,7 @@ class GraphCacheTests(unittest.TestCase):
         def mutate(ns):
             ns[0]['reads'] = [(ns[1]['key'], ns[1]['hash'])]
         inventory, evidence = self.fixture(mutate_nodes=mutate)
-        with self.assertRaisesRegex(ValueError, self.index_error('cyclic/deep', 'cycle')):
+        with self.assertRaisesRegex(ValueError, self.index_error('cyclic query graph', 'cycle')):
             self.check(inventory, evidence)
 
     def test_rejects_wrong_infer_identity_or_hash(self):
@@ -639,9 +1015,35 @@ class GraphReaderPinTests(unittest.TestCase):
                       if isinstance(node, ast.Assign) and
                       any(isinstance(target, ast.Name) and target.id == 'inputs'
                           for target in node.targets))
-        self.assertIn('test_query_index.py',
-                      [node.value for node in ast.walk(inputs)
-                       if isinstance(node, ast.Constant)])
+        pinned = [node.value for node in ast.walk(inputs) if isinstance(node, ast.Constant)]
+        for name in ['test_query_index.py', 'artifact_binary_open.py', 'command_runner.py', 'bench.py']:
+            self.assertIn(name, pinned)
+
+
+class Rank2ArgumentTests(unittest.TestCase):
+    def test_sites_pass_polymorphic_selectors_used_at_int_and_bool(self):
+        for size in (1, 2, 5, 32):
+            with self.subTest(size=size):
+                source = generate.program('rank2_arguments', size)
+                self.assertIn('probe :: (forall a. a -> a -> a) -> Int -> Int -> Int', source)
+                self.assertIn('pick (addInt x offset) (addInt (mulInt 2 x) offset)', source)
+                self.assertIn('if pick (ltInt x 0) (ltInt 0 x)', source)
+                entry = next(line for line in source.splitlines() if line.startswith('entry x ='))
+                calls = re.findall(r'probe \(\\left right -> (left|right)\) x (\d+)', entry)
+                self.assertEqual(calls, [('left' if i % 2 == 0 else 'right', str(i))
+                                         for i in range(size)])
+
+    def test_closed_form_matches_first_and_second_projections(self):
+        for size in (1, 2, 3, 8, 31):
+            for x in (-13, -1, 0, 1, 7):
+                with self.subTest(size=size, x=x):
+                    total = 0
+                    for i in range(size):
+                        index = i % 2
+                        number = (x + i, 2 * x + i)[index]
+                        increment = (x < 0, x > 0)[index]
+                        total += number + int(increment)
+                    self.assertEqual(generate.expected('rank2_arguments', size, x), total)
 
 
 if __name__ == '__main__':

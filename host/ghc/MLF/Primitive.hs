@@ -10,15 +10,15 @@ module MLF.Primitive
   , mlfEmptyCallStack, mlfPushCallStack, mlfPrettyCallStack, mlfIOErrorWithStack
   , textToChars, textFromChars, charCode, charFromCode
   , userError, ioError, catchIOError, ioeGetErrorString
-  , ioReturn, ioBind, putStr, putStrLn, getLine, printInt, concatString, concatStringList
+  , ioReturn, ioBind, putStr, putStrLn, getLine, printInt, concatString, concatStringList, packStringFields
   , showInt, addInt, subInt, eqInt, ltInt, eqString, ifThenElse
   , mulInt, quotInt, remInt, readInt, addDouble, subDouble, mulDouble
   , divDouble, sqrtDouble, eqDouble, ltDouble, intToDouble, formatDouble, newIntArray
   , readIntArray, writeIntArray, lengthIntArray, newDoubleArray, readDoubleArray, writeDoubleArray, lengthDoubleArray
   , newByteArray, readByteArray, writeByteArray, lengthByteArray, byteArrayFromString, putBytes, getByteLine
-  , newIntTable, readIntTable, writeIntTable, andInt, stringLength, stringCodeAt, stringSlice
+  , newIntTable, readIntTable, writeIntTable, andInt, stringLength, stringUtf8Length, stringCodeAt, stringSlice
   , stringFromCode, compareString, readDouble, doubleToBits, doubleFromBits, seq, panic
-  , readByteFileOrError, writeByteFileOrError, byteArrayDigest
+  , readByteFileOrError, writeByteFileOrError, byteArrayDigest, byteArrayCRC32
   , readFile, writeFile, fileExists, canonicalPath, getArgCount, getArg, putErr
   , exitWith, getExecutablePath, getContents, stReturn, stBind, runST, stToIO, newSTArray
   , readSTArray, writeSTArray, lengthSTArray, freezeSTArray, getEnv, setEnv, unsetEnv, runProcess
@@ -77,6 +77,7 @@ ioReturn = Base.v_ioReturn
 
 ioBind :: IO a -> (a -> IO b) -> IO b
 ioBind = Base.v_ioBind
+{-# INLINE [1] ioBind #-}
 
 putStr :: String -> IO ()
 putStr = IO.v_putStr
@@ -95,6 +96,8 @@ concatString = Base.v_concatString
 
 concatStringList :: [String] -> String
 concatStringList = Base.v_concatStringList
+packStringFields :: [String] -> String
+packStringFields = Base.v_packStringFields
 
 showInt :: Int -> String
 showInt = Base.v_showInt
@@ -197,6 +200,7 @@ lengthByteArray = IO.v_lengthByteArray
 
 byteArrayFromString :: String -> IO ByteArray
 byteArrayFromString = IO.v_byteArrayFromString
+{-# INLINE [1] byteArrayFromString #-}
 
 putBytes :: ByteArray -> Int -> Int -> IO ()
 putBytes = IO.v_putBytes
@@ -218,6 +222,9 @@ andInt = Base.v_andInt
 
 stringLength :: String -> Int
 stringLength = Base.v_stringLength
+
+stringUtf8Length :: String -> Int
+stringUtf8Length = Base.v_stringUtf8Length
 
 stringCodeAt :: String -> Int -> Int
 stringCodeAt = Base.v_stringCodeAt
@@ -254,6 +261,15 @@ writeByteFileOrError = IO.v_writeByteFileOrError
 
 byteArrayDigest :: ByteArray -> IO String
 byteArrayDigest = IO.v_byteArrayDigest
+{-# INLINE [1] byteArrayDigest #-}
+-- The new array cannot escape this continuation. Ordinary callers keep a
+-- fresh mutable array, and a digest on an existing array takes its snapshot.
+{-# RULES "MLF/ioBind/immutable text digest" [~1] forall value.
+    ioBind (byteArrayFromString value) byteArrayDigest = IO.digestString value #-}
+
+-- CRC32/ISO-HDLC of the current bytes; the bounded range is logically zero.
+byteArrayCRC32 :: ByteArray -> Int -> Int -> IO Int
+byteArrayCRC32 = IO.v_byteArrayCRC32
 
 readFile :: String -> IO String
 readFile = IO.v_readFile

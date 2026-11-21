@@ -105,9 +105,14 @@ controls; its presence does not claim execution of that C3 suite.
 Python 3.11+, ordinary **GHC 9.14.1**, a C compiler and the maintained installed
 package closure (`base`, `array`, `bytestring`, `text`, `containers`, `directory`)
 are required for native control execution. Use the maintained ordinary O2
-producer, not profiling/counting overlays. The guard helper is reused unchanged
-from `../a1-private-index/helper.py`; source/object/toolchain authentication uses
-each source checkout's maintained `tools/shared/test_direct.py`.
+producer. Each source checkout's maintained
+`tools/shared/test_direct.py` authenticates its sources, objects and toolchain.
+
+The frozen C4 manifest pins the original A1 supervisor at its recorded base
+commit. The current runner authenticates `../a1-private-index/helper.py` from
+`84596b61` for Darwin process-group cleanup and records its SHA-256 in new
+receipts. The other shared support and historical oracle files retain their
+manifest pins.
 
 ```sh
 python3 -B tools/performance/c4-local-transaction/test_controls.py

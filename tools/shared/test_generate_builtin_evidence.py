@@ -204,6 +204,38 @@ class BuildAuthenticationTests(unittest.TestCase):
         self.assertNotIn('implementation_identity', f.receipt)
         self.assertFalse(f.receipt['complete'])
 
+    def test_reconstructs_current_optimized_compile_and_link_commands(self):
+        fixture = MemoryBuild()
+        driver = g.load_source(HELPER.with_name('build.py'))
+        fixture.builder.optimization_flags = driver.optimization_flags
+        fixture.builder.executable_link_flags = driver.executable_link_flags
+        for level, expected in [('0', ['-O0']), ('2', ['-O2', '-fstatic-argument-transformation'])]:
+            with self.subTest(level=level):
+                self.assertEqual(driver.optimization_flags(level), expected)
+                receipt = dict(fixture.receipt, optimization=level)
+                flags = list(receipt['flags'])
+                start = flags.index('-O0')
+                flags[start:start + 1] = expected
+                receipt['flags'] = flags
+                rows = dict(g.build_commands(fixture.builder, fixture.root, fixture.build, fixture.manifest, receipt))
+                self.assertEqual(rows['shared-compile'].count('-fstatic-argument-transformation'), int(level == '2'))
+                for item in fixture.manifest['executables']:
+                    name = item['name']
+                    link = rows['link-' + name]
+                    wrapper = link.index(str(fixture.root / item['wrapper']))
+                    self.assertEqual(link[3:wrapper], flags + driver.executable_link_flags(name, level))
+                receipt['flags'] = [*flags, '-fno-state-hack']
+                with self.assertRaises(ValueError):
+                    g.build_commands(fixture.builder, fixture.root, fixture.build, fixture.manifest, receipt)
+
+    def test_reconstructs_earlier_per_executable_link_policy(self):
+        fixture = MemoryBuild()
+        fixture.builder.executable_link_flags = lambda name: [*fixture.builder.LINK_FLAGS, '-with-rtsopts=-F4'] \
+            if name == 'emlf' else list(fixture.builder.LINK_FLAGS)
+        rows = dict(g.build_commands(fixture.builder, fixture.root, fixture.build, fixture.manifest, fixture.receipt))
+        self.assertIn('-with-rtsopts=-F4', rows['link-emlf'])
+        self.assertNotIn('-with-rtsopts=-F4', rows['link-builtin-prelude'])
+
     def test_rejects_receipt_contract_changes(self):
         changes = [('complete', True), ('typecheck_only', True), ('producer_host', 'other'),
                    ('builtin_verification', {}), ('optimization', '1'), ('implementation_identity', 'wrong'),

@@ -166,13 +166,13 @@ def main():
                 # Check the independent typed reader against actual emitted ABI
                 # roots, including the newest bridge and both closed bounds.
                 codes=[code for _,code in typed.CONTRACT['primitive_codes']]
-                require(codes==list(range(134)), 'exact current primitive ABI inventory')
+                require(codes==list(range(137)), 'exact current primitive ABI inventory')
                 primitive_roots=doc.roots[len(typed.CONTRACT['schema_fields']):]
-                require(len(primitive_roots)==134, 'actual complete primitive root inventory')
+                require(len(primitive_roots)==137, 'actual complete primitive root inventory')
                 for root in primitive_roots:
                     typed.validate_type(doc,root,'Primitive')
                 rejected=[]
-                for code in (-1,134,2147483647):
+                for code in (-1,137,2147483647):
                     negative=ref.read_document(ref.tree_document([typed.n(32,('int',code))],7),7)
                     try:
                         typed.validate_type(negative,negative.roots[0],'Primitive')

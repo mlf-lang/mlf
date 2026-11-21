@@ -1452,6 +1452,18 @@
     [
       "PSTToIO",
       133
+    ],
+    [
+      "PByteArrayCRC32",
+      134
+    ],
+    [
+      "PPackStringFields",
+      135
+    ],
+    [
+      "PStringUtf8Length",
+      136
     ]
   ],
   "schema_fields": [

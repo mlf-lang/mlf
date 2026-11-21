@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import unittest,types,json,subprocess,sys,tempfile,os,time
+import unittest,types,json,subprocess,sys,tempfile,time
 from pathlib import Path
 p=Path(__file__).with_name('driver.py');m=types.ModuleType('driver');m.__file__=str(p);exec(compile(p.read_bytes(),str(p),'exec'),m.__dict__)
 class Selection(unittest.TestCase):

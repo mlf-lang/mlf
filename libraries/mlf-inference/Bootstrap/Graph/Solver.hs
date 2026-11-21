@@ -2129,9 +2129,43 @@ module Bootstrap.Graph.Solver where {
                   (L.filter (\((,) n v) -> n >= first) restored) } in
                 Right (withGraph patched indexed)
             }));
+  -- Identical projected components and ordered equations have the same local
+  -- unifier. Keep at most four successful variants for each of the first
+  -- 64 node counts in this fold. Larger components remain uncached.
+  -- A hit still checks the current hidden roots and scopes, restores the
+  -- current original identities and updates the current reverse indices.
+  data ProjectedUnification = ProjectedUnification ([] ((,) Int Int)) Graph Graph;
+  data UnificationCache = Uncached | UnificationCache (IntMap ([] ProjectedUnification));
+  emptyUnificationCache = UnificationCache IM.empty;
+  solveProjected :: UnificationCache -> [] ((,) Int Int) -> Graph ->
+    Either String ((,) Graph UnificationCache);
+  solveProjected cache equations local = let {
+    size = G.nextId local;
+    uncached = G.bindE (G.unify equations local) (\solved -> Right ((,) solved cache))
+  } in case cache of {
+    Uncached -> uncached;
+    UnificationCache entries -> if size > 64 then uncached else let {
+      bucket = IM.findWithDefault [] size entries;
+      fresh = G.bindE (G.unify equations local) (\solved -> let {
+        updated = IM.insert size ((:) (ProjectedUnification equations local solved) (L.take 3 bucket)) entries
+      } in seq updated (Right ((,) solved (UnificationCache updated))));
+      match candidates = case candidates of {
+        [] -> fresh;
+        (:) (ProjectedUnification prior before result) rest ->
+          if L.eqList (L.eqPair eqInt eqInt) equations prior &&
+             IM.eqIntMap G.equalNode (G.nodes local) (G.nodes before) &&
+             IM.eqIntMap eqInt (G.links local) (G.links before)
+          then Right ((,) result cache) else match rest
+      }
+    } in match bucket
+  };
   unifyPreparedFallback :: [] ((,) Int Int) -> Solver -> Graph -> Int ->
                            [] ((,) Int Node) -> Either String Solver;
-  unifyPreparedFallback equations solver current first fresh =
+  unifyPreparedFallback equations solver current first fresh = L.mapEither L.fst
+    (unifyPreparedFallbackWith Uncached equations solver current first fresh);
+  unifyPreparedFallbackWith :: UnificationCache -> [] ((,) Int Int) -> Solver -> Graph -> Int ->
+    [] ((,) Int Node) -> Either String ((,) Solver UnificationCache);
+  unifyPreparedFallbackWith cache equations solver current first fresh =
     let { canonical = L.map
       (\((,) a b) -> (,) (G.resolve current a) (G.resolve current b)) equations } in
     G.bindE
@@ -2140,23 +2174,26 @@ module Bootstrap.Graph.Solver where {
       (\checked ->
         let { pending = L.filter (\((,) a b) -> L.not (a == b)) canonical } in
         case pending of {
-          [] -> Right (L.foldlStrict addNode (withGraph current solver) fresh);
+          [] -> Right ((,) (L.foldlStrict addNode (withGraph current solver) fresh) cache);
           (:) head tail -> G.bindE
             (preparedFallbackProjection solver current first fresh pending)
             (\((,,,) local localEquations originals ((,,) forward scopes stubs)) ->
-              G.bindE (G.unify localEquations local)
-                (\solved -> G.bindE
+              G.bindE (solveProjected cache localEquations local)
+                (\((,) solved updated) -> G.bindE
                   (G.mapE_ (\stub -> G.check
                     (matchesNode (G.nodes solved) stub (G.nodeAt local stub) &&
                       G.resolve solved stub == stub)
                     "local unification changed a hidden scope root") (IM.elems stubs))
                   (\checkedStubs -> G.bindE
                     (G.mapE_ (checkPreservedScope current solved forward scopes) originals)
-                    (\checkedScopes -> restoreExpandedProjection solver current first
-                      originals forward (L.length originals) solved))))
+                    (\checkedScopes -> L.mapEither (\result -> (,) result updated)
+                      (restoreExpandedProjection solver current first originals forward (L.length originals) solved)))))
         });
   instantiateExpandedPrepared :: Int -> Int -> Solver -> Either String Solver;
-  instantiateExpandedPrepared source target solver =
+  instantiateExpandedPrepared source target solver = L.mapEither L.fst
+    (instantiateExpandedWith Uncached source target solver);
+  instantiateExpandedWith :: UnificationCache -> Int -> Int -> Solver -> Either String ((,) Solver UnificationCache);
+  instantiateExpandedWith cache source target solver =
     G.bindE (expandedGraphPrepared source target solver)
       (\((,,,) root copies frontier current) ->
         let { first = G.nextId (graph solver);
@@ -2166,8 +2203,8 @@ module Bootstrap.Graph.Solver where {
           fallback = \next -> solverUnify equations next;
           oldTarget = G.resolve current target;
           ordinary = case expansionBottomGraft first target root frontier indexed of {
-            Just grafted -> Right grafted;
-            Nothing -> fallback indexed
+            Just grafted -> Right ((,) grafted cache);
+            Nothing -> L.mapEither (\result -> (,) result cache) (fallback indexed)
           }
         } in
         seq (G.strictGraph current)
@@ -2176,17 +2213,20 @@ module Bootstrap.Graph.Solver where {
              (if fallbackPrefixRejected current first
                    (IM.fromList (L.map (\((,) original proxy) -> (,) proxy original) frontier))
                    ((:) ((,) root oldTarget) [])
-              then unifyPreparedFallback equations solver current first fresh
+              then unifyPreparedFallbackWith cache equations solver current first fresh
               else ordinary)
            else ordinary));
   -- Actual callers complete prepare and solverUnify before this internal fold.
   -- Public instantiateClosed/evaluateStep remain unchanged for arbitrary input.
   -- No reusable certificate survives an operation or accepts a mutated graph.
   instantiateClosedPrepared :: Int -> Int -> Solver -> Either String Solver;
-  instantiateClosedPrepared source target solver =
+  instantiateClosedPrepared source target solver = L.mapEither L.fst
+    (instantiateClosedWith Uncached source target solver);
+  instantiateClosedWith :: UnificationCache -> Int -> Int -> Solver -> Either String ((,) Solver UnificationCache);
+  instantiateClosedWith cache source target solver =
     case groundGraft source target solver of {
-      Just grafted -> Right grafted;
+      Just grafted -> Right ((,) grafted cache);
       Nothing -> if groundInstance (graph solver) source target
-        then Right solver else instantiateExpandedPrepared source target solver
+        then Right ((,) solver cache) else instantiateExpandedWith cache source target solver
     }
 }

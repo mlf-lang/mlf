@@ -119,12 +119,17 @@ module Bootstrap.Data where {
   sourceBuiltinDeclarations :: [] DataDecl;
   sourceBuiltinDeclarations = (:) sourceUnitDeclaration ((:) sourceListDeclaration
     (map (\arity -> sourceTupleDeclaration (sourceTupleName arity) (sourceTupleParameters arity)) (range 2 64)));
+  -- Both expression and pattern resolution ask about this fixed inventory.
+  -- Build the source-only indexes directly from the wired declarations.
+  sourceBuiltinTypes :: Set String;
+  sourceBuiltinTypes = Set.fromList compareString (map datatypeName sourceBuiltinDeclarations);
+  sourceBuiltinConstructors :: Set String;
+  sourceBuiltinConstructors = Set.fromList compareString
+    (concatMap (\d -> map constructorName (datatypeConstructors d)) sourceBuiltinDeclarations);
   sourceBuiltinType :: String -> Bool;
-  sourceBuiltinType name = any (\d -> eqString (datatypeName d) name) sourceBuiltinDeclarations;
+  sourceBuiltinType name = Set.member compareString name sourceBuiltinTypes;
   sourceBuiltinConstructor :: String -> Bool;
-  sourceBuiltinConstructor name =
-    any (\d -> any (\c -> eqString (constructorName c) name) (datatypeConstructors d))
-      sourceBuiltinDeclarations;
+  sourceBuiltinConstructor name = Set.member compareString name sourceBuiltinConstructors;
   primitiveKinds :: Map String Kind;
   primitiveKinds =
     M.union compareString (M.fromList compareString
@@ -171,8 +176,9 @@ module Bootstrap.Data where {
       Just d -> Right d
     };
   lookupConstructor :: DataEnv -> String -> Either String ((,) DataDecl ConstructorDecl);
-  lookupConstructor (DataEnv _ cs _) n =
-    case M.lookup compareString n cs of {
+  lookupConstructor (DataEnv _ cs _) n = requireConstructor n (M.lookup compareString n cs);
+  requireConstructor :: forall a. String -> Maybe a -> Either String a;
+  requireConstructor n found = case found of {
       Nothing -> Left ("unknown data constructor: " ++ n);
       Just c -> Right c
     };

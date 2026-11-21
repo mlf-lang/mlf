@@ -114,19 +114,34 @@ static MLF_NOINLINE MlfValue *os_runProcess(MlfValue *directory, MlfValue *speci
     fflush(NULL);
 #if defined(__APPLE__)
     pid_t pid = -1;
-    /* Cache publications inherit cwd/stdio. Spawn avoids copying the compiler's
-     * address space, while retaining the command and the existing wait path.
-     * Other forms, or any spawn failure, keep fork/execvp (including its shell
-     * fallback for executable text files without a shebang). */
-    if (!*cwd && !*parts[1] && !*parts[2] && !*parts[3]) {
+    /* An explicit cwd is safe for an absolute executable with inherited
+     * streams. Relative executables still use execvp after chdir for PATH
+     * resolution. Any failed or unavailable spawn operation falls back. */
+    if ((!*cwd || parts[4][0] == '/') && !*parts[1] && !*parts[2] && !*parts[3]) {
         posix_spawnattr_t attributes;
         if (!posix_spawnattr_init(&attributes)) {
             int ready = supervised ||
                 (!posix_spawnattr_setpgroup(&attributes,0) &&
                  !posix_spawnattr_setflags(&attributes,POSIX_SPAWN_SETPGROUP));
+            posix_spawn_file_actions_t *actions = NULL;
+#if defined(__MAC_26_0) && __MAC_OS_X_VERSION_MAX_ALLOWED >= __MAC_26_0
+            posix_spawn_file_actions_t local;
+            if (*cwd && ready) {
+                ready = 0;
+                if (__builtin_available(macOS 26.0, *)) {
+                    if (!posix_spawn_file_actions_init(&local)) {
+                        actions = &local;
+                        ready = !posix_spawn_file_actions_addchdir(actions,cwd);
+                    }
+                }
+            }
+#else
+            if (*cwd) ready = 0;
+#endif
             pid_t spawned;
-            if (ready && !posix_spawnp(&spawned,parts[4],NULL,&attributes,
+            if (ready && !posix_spawnp(&spawned,parts[4],actions,&attributes,
                                       parts+4,*_NSGetEnviron())) pid = spawned;
+            if (actions) posix_spawn_file_actions_destroy(actions);
             /* A failed spawn leaves its PID unspecified; never use it. */
             posix_spawnattr_destroy(&attributes);
         }

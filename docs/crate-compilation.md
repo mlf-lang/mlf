@@ -31,12 +31,54 @@ nominal context needed by expressions, annotations, constructors and imported
 types. Candidate dictionary schemes are conservative dependencies because
 instance selection can depend on types still being inferred.
 
-Every fresh query uses the existing graph generation, solver, evidence,
-elaboration, inferred-type agreement, source-erasure agreement and independent
-xMLF checking pipeline. Its output has closed normalized schemes and an
-independently checked implementation abstracted over its imports. Solver graphs
-are transient. A cached fragment is decoded and checked again, including its
-owned symbols, parameter schemes and datatype context.
+Nonrecursive declarations with closed monomorphic types can use a partial
+type-directed checker. Unsigned declarations may first synthesize a monotype
+when known calls determine every lambda parameter. Unconstrained parameters,
+unknown callees and local generalization use the ordinary solver; no default
+type is invented. It checks exact argument and result types, preserves
+resolved declaration identities, and obtains its fragment from the independent
+xMLF checker. A signed monotype can additionally specialize polymorphic imports
+when all lambda types and instance arguments become closed monotypes. Fresh
+variables separate uses, an occurs check rejects recursive types, and non-bottom
+MLF bounds contribute constraints and explicit instance computations. Sealing
+resolves every required type before the independent checker admits a fragment.
+This route does not generalize unsigned exports, choose default types, or replace
+bounded MLF schemes with rank-1 schemes. Ambiguous arguments, local
+generalization, unsupported syntax and failed checks use the ordinary solver.
+The general path retains inferred-type and source-erasure agreement checks.
+All paths produce closed normalized schemes
+and independently checked implementations abstracted over their imports. Solver
+graphs are transient. A cached fragment is decoded and checked again, including
+its owned symbols, parameter schemes and datatype context.
+
+Imported binding and datatype input nodes are recorded when a query actually
+observes them. The initial imported contracts remain separate from local results:
+a missing local producer cannot be manufactured as an input. Observed versions,
+candidate dictionary dependencies and publication validation remain mandatory.
+After unsigned-root lowering, a root with no evidence slots needs no candidate
+inventory: finalization returns directly. Lowering still sees the complete
+definition scope, and actual references in its result remain binding/layout
+dependencies. A root with any evidence slot keeps all its candidates.
+Only inference and evidence results need persistent payload files. Scope,
+finish and binding values are reconstructed from current checked inputs; their
+content hashes and dependency edges still enter the authenticated generation.
+Prepared source inputs, evidence scopes and finish receipts hash their complete,
+domain-separated length-framed text after the ordinary wire planner validates
+all resource bounds.
+They do not encode an unused binary payload. A conservative framing-size bound
+keeps the temporary UTF-8 allocation within the existing byte limit; other shapes
+or larger frames use the ordinary binary hash. Persisted payloads keep their
+canonical binary encoding and checksum checks. The two scope-hash lanes each
+retain only their preceding validated wire value; exact structural equality
+reuses its digest and bounds check, while
+each query records its own key and dependency edges. Changed values receive the
+full checks before hashing.
+
+Open-fragment ownership uses a versioned length-framed crate identity and the
+complete sorted member names. These are wire strings rather than source-language
+identifiers, so they need no further decimal escaping. The reader verifies the
+full ownership set and still accepts the legacy owner encoding with its original
+checks. Ordinary separate-unit identifiers retain their existing encoding.
 
 A module import SCC does not require signatures. An actual recursive value
 SCC retains the compiler's existing requirement for closed signatures; this
@@ -54,11 +96,43 @@ not added by this migration. See the [migration evidence](crate-migration.md).
 | `PREFIX.mlfco` | Independently checked SCC fragments and their import parameters |
 | `PREFIX.queries` | Inferred/reused groups, stable member inventories and query fingerprints |
 
+`emlf --compile-crate-to-llvm-gc SPEC -o PREFIX > program.ll` writes the same
+artifacts and publishes the query generation, then links the retained checked
+root and emits LLVM in the same invocation. Dependency implementation objects
+still undergo ordinary admission against the metadata snapshot used for
+inference. The root comes from an opaque file-owned compilation receipt; it is
+not recovered from an unchecked AST or an LLVM cache. The existing linker and
+closed-program checks still run. A source or publication failure emits no LLVM;
+a later link/code-generation failure can leave the successfully published
+checked artifacts. `-Zincremental-verify-ich` is supported by this entry too.
+
+Add `--codegen-cache DIRECTORY --query-report FILE` to use the ordinary
+input/optimized LLVM caches and publish an invocation-owned report. The retained
+root and the disk CLI use the same admitted-Prelude linking path, canonical
+codegen keys and compiler-identity salt. A report is written only after successful
+emission; report publication failure produces no LLVM on stdout.
+
+The package manager uses this entry for fresh complete executable/test targets
+when the selected compiler advertises the `--codegen-cache` protocol. Library
+actions still use `--compile-crate`. The compile action stores retained LLVM and
+its report in its checksummed artifact; the separate emission action verifies
+the compiler, root metadata/object digests and retained-file digests before
+copying them into its own cache. The scheduler keeps both action boundaries.
+Outer cache hits do not invoke the compiler. Checked-only artifacts and older
+seed compilers retain the disk emission route and its codegen cache/report
+protocol. Failed compile/emission actions do not publish a new executable.
+
 Compilation reads dependency metadata recursively. It does not read upstream
 source or implementation objects. The linker subsequently loads implementation
 objects, rejects crate cycles and ownership conflicts, freshens binders, compares
 actual consumed schemes and nominal layouts, resolves the entry dictionaries,
 and checks the closed program. Reexports retain the original defining identity.
+The command-line linker can reuse the compiler-owned Prelude after both installed
+binary images match its build-verified images byte for byte. Its entire literal
+is independently checked at runtime; only its declarations transitively needed
+by the continuation enter the final closed check and code generation. Changed or
+unrecognized images use ordinary artifact admission. Other crates retain their
+normal metadata, object and import-boundary checks.
 Recorded dependency semantic fingerprints must still match: removing an export
 or changing a type, class, instance or namespace contract requires fresh consumer
 metadata. Implementation and private value changes leave that contract stable.
@@ -187,3 +261,56 @@ uses these counts and retains subtrees with no reference to the substituted
 variable. Child order, rewrite rules and fresh-name allocation order are
 unchanged. Permanent tests compare each index with independent scoped scans and
 compare complete normalized trees with the preceding rewrite algorithm.
+
+### Profiling the disk-to-LLVM entry
+
+Set `MLF_CRATE_PROFILE` to a JSON destination when invoking the uncached disk
+entry. This is diagnostic output, separate from LLVM stdout, checked artifacts
+and query cache identities:
+
+```sh
+MLF_CRATE_PROFILE=/tmp/crate-phases.json emlf --crate-to-llvm-gc build/unit.mlfci > build/unit.ll
+```
+
+The monotonic clock has millisecond resolution. Counters are exclusive, including
+nested phases; sum the fields to obtain the measured portion of the invocation.
+Process startup, report publication and the later Clang invocation are outside
+these counters. The current open-object reader reports:
+
+| Field | Work |
+| --- | --- |
+| `read_ms` | Bounded interface/object byte reads, including exact Prelude image reads |
+| `decode_ms` | Interface wire/UTF-8 decoding |
+| `wire_decode_ms` | Open-object wire graph decoding, CRC, canonicality and resource bounds |
+| `syntax_decode_ms` | Graph-local typed body reconstruction with its original work bound |
+| `image_decode_ms` | Decoding the compiler-owned Prelude images |
+| `validate_ms` | Remaining interface/dependency/object admission and exact image comparison |
+| `metadata_hash_ms` | Canonical interface association hashes |
+| `reference_validate_ms` | Reference inventory and dependency type/layout hash checks |
+| `fragment_validate_ms` | Restored fragment fingerprints, inventory and optional semantic audit |
+| `prelude_check_ms` | Independent checking of the compiler-owned Prelude witness |
+| `link_ms` | Dependency selection and linking preparation |
+| `final_check_ms` | Final spine materialization/Prelude selection and independent checking |
+| `optimize_ms` | Erasure, checked optimization and wrapper lowering |
+| `emit_ms` | LLVM generation and streaming stdout |
+| `other_ms` | Remaining disk-entry orchestration |
+
+To compare the five broad phases, sum the four decode fields and, separately,
+the four artifact validation fields. Keep Prelude and final independent checking
+visible as additional validation costs. Legacy text/v1 formats retain their
+existing combined syntax/admission steps under `validate_ms`; the envelope
+fallback keeps its combined linking/checking under `link_ms`. A zero counter
+can mean work below the clock's resolution, or work included in a documented
+combined phase.
+
+Pure results are demanded at phase boundaries, including the complete lowered
+runtime tree before LLVM emission. Profiling therefore changes demand and adds
+traversal/clock overhead; use runs with `MLF_CRATE_PROFILE` unset for end-to-end
+performance comparisons. This variable instruments the uncached disk entry,
+`--run-crate` and crate display. It does not instrument the codegen cache path.
+The ordinary independent checks and artifact limits remain in effect.
+
+Run `python3 tools/shared/test_crate_profile.py --build-receipt PRODUCER/receipt.json
+--builtin BUILTIN_PREFIX --output FRESH_DIR` for authenticated fused/disk LLVM
+parity, runtime output, artifact immutability, corrupt-object rejection and
+missing-file diagnostics with profiling both enabled and disabled.

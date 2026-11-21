@@ -33,11 +33,37 @@ def unpack(text):
 
 
 class ModularControls(unittest.TestCase):
+    def test_current_primitive_abi_is_append_only_and_closed(self):
+        import artifact_binary_reference as R
+        import artifact_binary_typed as T
+        self.assertEqual([code for _, code in T.CONTRACT['primitive_codes']], list(range(137)))
+        self.assertEqual(T.CONTRACT['primitive_codes'][-1], ['PStringUtf8Length', 136])
+        for code in range(137):
+            doc = R.read_document(R.tree_document([T.n(32, ('int', code))], 7), 7)
+            T.validate_type(doc, doc.roots[0], 'Primitive')
+        for value in [('int', -1), ('int', 137), ('int', 2147483647), ('bits', 136)]:
+            with self.subTest(value=value):
+                doc = R.read_document(R.tree_document([T.n(32, value)], 7), 7)
+                with self.assertRaises(R.Invalid):
+                    T.validate_type(doc, doc.roots[0], 'Primitive')
+
     @classmethod
     def setUpClass(cls):
         cls.manifest = json.loads((SOURCE / 'shared-sources.json').read_text())
         cls.fixture = SOURCE / 'tools/shared/fixtures/item4/RawBinaryShared.hs'
         cls.rows = M.native_source_closure(SOURCE, cls.fixture, cls.manifest)
+
+    def test_closed_companion_owner_checks_exact_crate_and_full_membership(self):
+        import artifact_binary_open as O
+        crate, members = 'crate/λ', ['a', 'bc']
+        encoded = lambda value: ''.join(str(ord(c)) + '_' for c in value)
+        legacy = 'Query_' + encoded(crate) + 'z_' + encoded(members[0])
+        owner = O.pack(['MLF-OPEN-GROUP-1', crate, O.pack(sorted(members))])
+        self.assertTrue(O.companion_group_matches(crate, legacy, owner, members))
+        self.assertFalse(O.companion_group_matches('other', legacy, owner, members))
+        self.assertFalse(O.companion_group_matches(crate, legacy, owner, ['a']))
+        self.assertFalse(O.companion_group_matches(crate, legacy, owner + 'x', members))
+        self.assertFalse(O.companion_group_matches(crate, 'wrong', owner, members))
 
     def test_query_fixture_separates_dictionary_and_legacy_payload_contracts(self):
         source = (SOURCE / 'tools/shared/fixtures/item4/QueryIndex.hs').read_text()
@@ -48,6 +74,119 @@ class ModularControls(unittest.TestCase):
         self.assertIn('oldRoot = legacyNode "root" hashB [("leaf",hashA)] (just (W.VText hashB))', source)
         self.assertIn('decodeReject "legacy duplicate" "duplicate" (legacy [oldLeaf,oldLeaf,oldRoot])', source)
         self.assertIn('decodeReject "legacy missing" "unpublished" (legacy [oldRoot])', source)
+
+    def test_compact_owner_preserves_full_names_and_canonical_tags(self):
+        import artifact_binary_open as O
+        for crate in ('crate', 'crate/λ', '9:a\0😀'):
+            for version, encode, stem, separator in [
+                ('MLF-OPEN-GROUP-2', lambda s: ''.join(str(ord(c)) + '_' for c in s), '', 'z_'),
+                ('MLF-OPEN-GROUP-3', O.compact_name, 'c1_', '_'),
+            ]:
+                prefix = stem + encode(crate) + separator
+                members = ['module_' + prefix + 'a', 'Module_' + prefix + 'T', 'raw:λ']
+                make = O.compact_group_owner_v2 if version.endswith('2') else O.compact_group_owner
+                owner = make(crate, members)
+                actual_version, actual_crate, body = O.unpack(owner)
+                self.assertEqual((actual_version, actual_crate), (version, crate))
+                prefixes = {'raw': '', 'value': 'module_' + prefix, 'type': 'Module_' + prefix}
+                expanded = [prefixes[tag] + suffix for tag, suffix in map(O.unpack, O.unpack(body))]
+                self.assertEqual(expanded, sorted(members))
+                encoded = lambda value: ''.join(str(ord(c)) + '_' for c in value)
+                legacy = 'Query_' + encoded(crate) + 'z_' + encoded(min(members))
+                self.assertTrue(O.companion_group_matches(crate, legacy, owner, members))
+                for changed in (members[:-1], members + ['extra'], [*members, members[0]]):
+                    self.assertFalse(O.companion_group_matches(crate, legacy, owner, changed))
+                self.assertFalse(O.companion_group_matches('other', legacy, owner, members))
+                self.assertFalse(O.companion_group_matches(crate, legacy, owner + 'x', members))
+
+    def test_ground_variable_preserves_evidence_and_utf8_work_at_each_use(self):
+        import artifact_binary_open as O
+        from artifact_binary_reference import read_document, tree_document
+        integer = lambda x: ('int', x)
+        hint, ty = O.string('xλ'), O.string('型')
+        ground = O.node(85, integer(-4), hint, ty)
+        join = lambda left, right: O.node(88, integer(left), integer(right))
+        rows = [O.node(87), ground, join(1, 0), join(2, 2), join(3, 3), join(4, 4)]
+        run = O.node(89, integer(-2), integer(1), integer(8))
+        def pattern(entries):
+            return O.node(86, O.sequence(entries), O.sequence([run]), integer(len(entries) - 1))
+        raw = pattern(rows)
+        doc = read_document(tree_document([raw, raw], 10), 10)
+        logical_leaf = O.node(74, O.node(70, O.node(31, integer(-4), hint)),
+                              O.node(58, O.node(53, O.node(51, O.node(44, ty, O.sequence([])))), O.node(55)))
+        terms = [O.node(72, logical_leaf, O.node(77, integer(i))) for i in range(-2, 6)]
+        while len(terms) > 1:
+            terms = [O.node(72, *terms[i:i+2]) for i in range(0, len(terms), 2)]
+        ordinary = read_document(tree_document(terms * 2, 8), 8)
+        budget = sum(ordinary.expanded_work[i] for i in ordinary.roots)
+        values, work = O.expand_application_document(doc, budget, allow_ground=True)
+        self.assertEqual((values, work), (tuple(terms * 2), budget))
+        with self.assertRaises(O.OpenPairError):
+            O.expand_application_document(doc, budget)
+        with self.assertRaises(O.OpenPairError):
+            O.expand_application_document(doc, budget - 1, allow_ground=True)
+        for broken in (O.node(85, integer(-4), hint), O.node(85, hint, integer(-4), ty),
+                       O.node(85, integer(-4), hint, O.sequence([]))):
+            with self.assertRaises(O.OpenPairError):
+                O._read_application_pattern(pattern([rows[0], broken, *rows[2:]])[2], allow_ground=True)
+
+    def test_application_pattern_restores_each_signed_literal_and_charges_each_root(self):
+        import artifact_binary_open as O
+        from artifact_binary_reference import Limits, read_document, tree_document
+        value = lambda n: ('int', n)
+        hole = O.node(87)
+        join = lambda a, b: O.node(88, value(a), value(b))
+        rows = [hole, join(0, 0), join(1, 1), join(2, 2)]
+
+        def document(entries, count, root):
+            run = O.node(89, value(2**63 - 1), value(1), value(count))
+            pattern = O.node(86, O.sequence(entries), O.sequence([run]), value(root))
+            return read_document(tree_document([pattern, pattern], 9), 9, Limits())
+
+        graph = document(rows, 8, 3)
+        logical, work = O.expand_application_document(graph, 46)
+        literals = [O.node(77, value((2**63 - 1 + i + 2**63) % 2**64 - 2**63)) for i in range(8)]
+        while len(literals) > 1:
+            literals = [O.node(72, a, b) for a, b in zip(literals[::2], literals[1::2])]
+        self.assertEqual((logical, work), ((literals[0], literals[0]), 46))
+        with self.assertRaises(ValueError):
+            O.expand_application_document(graph, 45)
+        for entries, count, root in [(rows, 7, 3), (rows, 9, 3), ([hole, join(0, 1)], 8, 1),
+                                     ([*rows, join(1, 1)], 8, 4)]:
+            with self.subTest(count=count, root=root), self.assertRaises(ValueError):
+                O.expand_application_document(document(entries, count, root), 1000)
+
+    def test_repeated_application_heads_preserve_order_and_logical_limits(self):
+        import artifact_binary_open as O
+        from artifact_binary_reference import read_document, tree_document
+        integer = lambda value: ('int', value)
+        ctor = O.node(82, ('text', 'C:λ'), O.sequence([]))
+        last = O.node(82, ('text', 'end'), O.sequence([]))
+        tables = [O.node(87), ctor, O.node(88, integer(1), integer(0)), last]
+
+        def graph(count):
+            repeat = O.node(88, integer(2), integer(3), integer(count))
+            run = O.node(89, integer(2**63 - 1), integer(1), integer(257))
+            pattern = O.node(86, O.sequence([*tables, repeat]), O.sequence([run]), integer(4))
+            return read_document(tree_document([pattern, pattern], 11), 11)
+
+        expected = last
+        for i in reversed(range(257)):
+            value = (2**63 - 1 + i + 2**63) % 2**64 - 2**63
+            expected = O.node(72, O.node(72, ctor, O.node(77, integer(value))), expected)
+        canonical = tree_document([expected, expected], 8)
+        old = read_document(canonical, 8)
+        bound = sum(old.expanded_work[i] for i in old.roots)
+        wire = graph(257)
+        values, charged = O.expand_application_document(wire, bound, allow_ground=True, allow_spines=True)
+        self.assertEqual((tree_document(values, 8), charged), (canonical, bound))
+        with self.assertRaises(O.OpenPairError):
+            O.expand_application_document(wire, bound, allow_ground=True)
+        with self.assertRaises(O.OpenPairError):
+            O.expand_application_document(wire, bound-1, allow_ground=True, allow_spines=True)
+        for n in (-1, 0, 1, 256, 16384, 2**63 - 1):
+            with self.subTest(n=n), self.assertRaises(O.OpenPairError):
+                O.expand_application_document(graph(n), bound, allow_ground=True, allow_spines=True)
 
     def test_stamp_syntax_and_semantic_mutations_remain_distinct(self):
         import artifact_binary_open as O
@@ -275,7 +414,7 @@ class ModularControls(unittest.TestCase):
         self.assertEqual(text.count(anchor), 1)
         text = text.replace(anchor, anchor + '\n  import ' + extra['module'] + ';', 1)
         with tempfile.TemporaryDirectory() as d:
-            p = Path(d) / 'Main.hs'; p.write_text(text)
+            p = Path(d).resolve() / 'Main.hs'; p.write_text(text)
             with self.assertRaisesRegex(ValueError, '^native fixture must retain exact reviewed 51-module closure$'):
                 M.native_source_closure(SOURCE, p, self.manifest)
 

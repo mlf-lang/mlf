@@ -11,6 +11,7 @@ module Bootstrap.Separate where {
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as Set;
   import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Classes as Classes;
@@ -62,11 +63,71 @@ module Bootstrap.Separate where {
       UnitObject _ term -> Checked.check term;
       CheckedUnitObject _ checked -> Right checked
     };
+  -- Each scalar ends in an underscore. Reuse that complete field for
+  -- ASCII identifiers while retaining decimal scalar spellings for Unicode.
+  encodedAscii :: V.IndexVec Int String;
+  encodedAscii = V.fromList (map (\code -> showInt code ++ "_") (range 0 127));
   encodedFrom :: String -> Int -> String;
-  encodedFrom text i = concatStringList (encodedChunks text i);
+  encodedFrom text start = let {
+    end = stringLength text;
+    fields i = if i >= end then [] else let {
+      code = stringCodeAt text i; rest = fields (i + 1)
+    } in if code < 128 then (:) (V.at encodedAscii (V.fromInt code)) rest
+      else (:) (showInt code) ((:) "_" rest)
+  } in concatStringList (fields start);
   encodedChunks text i = if i >= stringLength text then []
     else (:) (showInt (stringCodeAt text i)) ((:) "_" (encodedChunks text (i + 1)));
+  -- Versioned, injective identifier components. The result has only ASCII
+  -- letters/digits; underscore separates whole components. z introduces a
+  -- lowercase scalar hex escape terminated by z; a literal z is doubled.
+  compactNameCode code =
+    (code >= 48 && code <= 57) || (code >= 65 && code <= 90) ||
+    (code >= 97 && code < 122);
+  compactNameHex code = if code < 16 then stringFromCode
+    (if code < 10 then 48 + code else 87 + code)
+    else compactNameHex (unsignedShiftRInt code 4) ++ compactNameHex (andInt code 15);
+  compactNameChunks text start position =
+    if position == stringLength text then [stringSlice text start (position - start)]
+    -- Produce a list cell after a bounded ASCII run. Native O0 evaluation
+    -- need not tail-call the scan; never traverse an arbitrary name before
+    -- giving the consuming concat loop its next finite fragment.
+    else if position - start == 256 then
+      (:) (stringSlice text start 256) (compactNameChunks text position position)
+    else let { code = stringCodeAt text position } in
+      if compactNameCode code then compactNameChunks text start (position + 1)
+      else (:) (stringSlice text start (position - start))
+        ((:) (if code == 122 then "zz" else if code == 58 then "z3az" else "z" ++ compactNameHex code ++ "z")
+          (compactNameChunks text (position + 1) (position + 1)));
+  compactName text = concatStringList (compactNameChunks text 0 0);
   queryGroupName crateId members = "Query_" ++ encoded crateId ++ "z_" ++ encoded (head members);
+  -- Open-fragment owners are wire text, not generated source identifiers.
+  -- Frame the full canonical ownership set once instead of escaping its
+  -- already escaped declaration names. The legacy unit format stays separate.
+  openGroupName crateId members = pack ["MLF-OPEN-GROUP-1",crateId,pack (sortBy compareString members)];
+  -- The previous owner spelling remains available for explicit admission.
+  compactOpenGroupNameV2 crateId = let {
+    suffix = encoded crateId ++ "z_";
+    valuePrefix = "module_" ++ suffix; typePrefix = "Module_" ++ suffix;
+    begins prefix text = stringLength text >= stringLength prefix &&
+      eqString prefix (stringSlice text 0 (stringLength prefix));
+    after prefix text = stringSlice text (stringLength prefix) (stringLength text - stringLength prefix);
+    member text = if begins valuePrefix text then pack ["value",after valuePrefix text]
+      else if begins typePrefix text then pack ["type",after typePrefix text]
+      else pack ["raw",text]
+  } in \members -> pack ["MLF-OPEN-GROUP-2",crateId,pack (map member (sortBy compareString members))];
+  -- Version 3 factors the compact declaration-name prefix. The complete crate
+  -- and entity suffix remain; other names are framed verbatim. Sort before
+  -- factoring so the owner preserves the complete canonical member inventory.
+  compactOpenGroupName crateId = let {
+    suffix = compactName crateId ++ "_";
+    valuePrefix = "module_c1_" ++ suffix; typePrefix = "Module_c1_" ++ suffix;
+    begins prefix text = stringLength text >= stringLength prefix &&
+      eqString prefix (stringSlice text 0 (stringLength prefix));
+    after prefix text = stringSlice text (stringLength prefix) (stringLength text - stringLength prefix);
+    member text = if begins valuePrefix text then pack ["value",after valuePrefix text]
+      else if begins typePrefix text then pack ["type",after typePrefix text]
+      else pack ["raw",text]
+  } in \members -> pack ["MLF-OPEN-GROUP-3",crateId,pack (map member (sortBy compareString members))];
   encoded text = encodedFrom text 0;
   canonicalPreludeConstructor entity =
     (eqString (Modules.owner entity) "Prelude" &&
@@ -110,13 +171,15 @@ module Bootstrap.Separate where {
   managedIntrinsicName n = eqString n "$MLF.Stack.callStack";
   hygieneName env n =
     if managedIntrinsicName n then n else M.findWithDefault compareString n n env;
+  hygieneBinderPrefix :: String;
+  hygieneBinderPrefix = "separateLocal";
   hygieneBind env names =
     do {
       pairs <-
         mapM
           (\n ->
              do {
-               new <- freshName "separateLocal";
+               new <- freshName hygieneBinderPrefix;
                freshPure ((,) n new)
              })
           names;
@@ -140,19 +203,62 @@ module Bootstrap.Separate where {
       SLazyPattern pattern -> SLazyPattern (hygienePattern env pattern);
       _ -> p
     };
+  -- A binder-free application keeps the local name supply unchanged. Resolve
+  -- just its lexical occurrences, retaining locations and declared IDs.
+  plainHygiene term = case term of {
+    SApp f a -> plainHygiene f && plainHygiene a;
+    SCallSite _ _ e -> plainHygiene e;
+    SVar _ -> True; SGlobal _ _ -> True; SPrimitive _ -> True; SConstructor _ -> True;
+    SIntLit _ -> True; SBoolLit _ -> True; SDoubleLit _ -> True; SStringLit _ -> True;
+    _ -> False
+  };
+  renamePlain env term = case term of {
+    SApp f a -> SApp (renamePlain env f) (renamePlain env a);
+    SCallSite n span e -> SCallSite n span (renamePlain env e);
+    SVar n -> SVar (hygieneName env n);
+    _ -> term
+  };
+  -- A parsed application needs a new node only on a path to a renamed
+  -- lexical occurrence. Keep its original source spans and untouched
+  -- operands. General callers retain the original lazy tree mapping.
+  renameParsedPlain env expression = let {
+    -- A lexical name has one replacement in this scope. Keep its variable
+    -- leaf with the lookup result so every occurrence can share both.
+    replacement = M.lookupProjected compareString (\_ name -> SVar name) env;
+    changed term = case term of {
+      SVar name -> if managedIntrinsicName name then Nothing else replacement name;
+      SCallSite label span body -> mapOptional (SCallSite label span) (changed body);
+      SApp f a -> case changed f of {
+        Nothing -> mapOptional (SApp f) (changed a);
+        Just function -> Just (SApp function (fromMaybe a (changed a)))
+      };
+      _ -> Nothing
+    }
+  } in fromMaybe expression (changed expression);
+  hygieneApplication env term = hygieneApplicationWith hygieneIn env term;
+  hygieneApplicationWith walk env term = let { child = hygieneApplicationWith walk env } in case term of {
+    SApp f a -> do { x <- child f; y <- child a; freshPure (SApp x y) };
+    SCallSite n span e -> do { b <- child e; freshPure (SCallSite n span b) };
+    _ -> walk env term
+  };
   hygieneIn :: Map String String -> SExpr -> Fresh SExpr;
-  hygieneIn env expression =
-    case expression of {
+  hygieneIn env expression = hygieneWith renamePlain env expression;
+  hygieneWith rename env expression = let { walk = hygieneWith rename } in case expression of {
       SVar n -> freshPure (SVar (hygieneName env n));
       SGlobal _ _ -> freshPure expression;
+      SGivenScope names body -> do {
+        inner <- walk env body;
+        freshPure (SGivenScope (map (hygieneName env) names) inner)
+      };
+      SWantedScope _ _ -> freshPure expression;
       SWantedRefs n cs -> freshPure (SWantedRefs n (map (\((,) role r) -> (,) role (hygieneRef env r)) cs));
       SDeclScope ids enclosed -> do {
         b <- case enclosed of {
-          SLam n a body -> do { x <- hygieneIn env body; freshPure (SLam n a x) };
-          SLet n a body -> do { x <- hygieneIn env a; y <- hygieneIn env body; freshPure (SLet n x y) };
+          SLam n a body -> do { x <- walk env body; freshPure (SLam n a x) };
+          SLet n a body -> do { x <- walk env a; y <- walk env body; freshPure (SLet n x y) };
           SLetRec ds body -> do {
-            defs <- mapM (\((,,) n mode rhs) -> do { x <- hygieneIn env rhs; freshPure ((,,) n mode x) }) ds;
-            x <- hygieneIn env body; freshPure (SLetRec defs x)
+            defs <- mapM (\((,,) n mode rhs) -> do { x <- walk env rhs; freshPure ((,,) n mode x) }) ds;
+            x <- walk env body; freshPure (SLetRec defs x)
           };
           _ -> freshFail "invalid declaration binder in separate compilation"
         };
@@ -161,30 +267,27 @@ module Bootstrap.Separate where {
       SLam n a b ->
         do {
           scope <- hygieneBind env ((:) n []);
-          body <- hygieneIn scope b;
+          body <- walk scope b;
           freshPure (SLam (hygieneName scope n) a body)
         };
-      SApp f a ->
-        do {
-          x <- hygieneIn env f;
-          y <- hygieneIn env a;
-          freshPure (SApp x y)
-        };
+      SApp _ _ -> if plainHygiene expression
+        then freshPure (if M.null env then expression else rename env expression)
+        else hygieneApplicationWith walk env expression;
       SLet n a b ->
         do {
           scope <- hygieneBind env ((:) n []);
-          x <- hygieneIn env a;
-          y <- hygieneIn scope b;
+          x <- walk env a;
+          y <- walk scope b;
           freshPure (SLet (hygieneName scope n) x y)
         };
       SAnn a t ->
         do {
-          x <- hygieneIn env a;
+          x <- walk env a;
           freshPure (SAnn x t)
         };
       SSignature a t ->
         do {
-          x <- hygieneIn env a;
+          x <- walk env a;
           freshPure (SSignature x t)
         };
       SLetRec ds b ->
@@ -194,22 +297,22 @@ module Bootstrap.Separate where {
             mapM
               (\((,,) n mode a) ->
                  do {
-                   x <- hygieneIn scope a;
+                   x <- walk scope a;
                    freshPure ((,,) (hygieneName scope n) mode x)
                  })
               ds;
-          body <- hygieneIn scope b;
+          body <- walk scope b;
           freshPure (SLetRec definitions body)
         };
       SCase a bs ->
         do {
-          scrutinee <- hygieneIn env a;
+          scrutinee <- walk env a;
           branches <-
             mapM
               (\(SAlternative p b) ->
                  do {
                    scope <- hygieneBind env (Surface.patternVariables p);
-                   body <- hygieneIn scope b;
+                   body <- walk scope b;
                    freshPure (SAlternative (hygienePattern scope p) body)
                  })
               bs;
@@ -222,26 +325,29 @@ module Bootstrap.Separate where {
               (\((,) ps b) ->
                  do {
                    scope <- hygieneBind env (concatMap Surface.patternVariables ps);
-                   body <- hygieneIn scope b;
+                   body <- walk scope b;
                    freshPure ((,) (map (hygienePattern scope) ps) body)
                  })
               rows;
           freshPure (SEquations rows2)
         };
       SSourceDefinition body ->
-        do { result <- hygieneIn env body; freshPure (SSourceDefinition result) };
+        do { result <- walk env body; freshPure (SSourceDefinition result) };
       SCallSite label span body ->
-        do { result <- hygieneIn env body; freshPure (SCallSite label span result) };
+        do { result <- walk env body; freshPure (SCallSite label span result) };
       SSharedBind pattern action continuation bindMethod failure ->
         do {
           scope <- hygieneBind env (Surface.patternVariables pattern);
-          action2 <- hygieneIn env action;
-          continuation2 <- hygieneIn scope continuation;
-          bindMethod2 <- hygieneIn env bindMethod;
-          failure2 <- hygieneIn env failure;
+          action2 <- walk env action;
+          continuation2 <- walk scope continuation;
+          bindMethod2 <- walk env bindMethod;
+          failure2 <- walk env failure;
           freshPure (SSharedBind (hygienePattern scope pattern) action2 continuation2 bindMethod2 failure2)
         };
-      SDo _ _ -> hygieneIn env (Desugar.desugarDo expression);
+      SChecked ty body -> do { inner <- walk env body; freshPure (SChecked ty inner) };
+      SWanted dict candidates -> freshPure (SWanted dict
+        (map (\((,) role name) -> (,) role (hygieneName env name)) candidates));
+      SDo _ _ -> walk env (Desugar.desugarDo expression);
       _ -> freshPure expression
     };
   hygiene expression = runFresh (Desugar.allNames expression) (hygieneIn M.empty expression);
@@ -347,21 +453,36 @@ module Bootstrap.Separate where {
       Right t -> t;
       Left e -> panic e
     };
-  cleanSource (SourceModule path name exports imports ds cs is vs body syntax) =
+  cleanSource source = cleanSourceWith hygiene source;
+  cleanParsedSource = cleanParsedReserving True;
+  cleanParsedReserving possible = cleanSourceWith (\e ->
+    runFresh (if possible then Desugar.allNames e else []) (hygieneWith renameParsedPlain M.empty e));
+  -- Shared identifiers have literal token spellings. Qualification joins
+  -- components with dots. The parser's generated names use other prefixes.
+  -- A hit anywhere, including a comment or string, keeps full reservations.
+  sourceHasHygienePrefix text = let {
+    size = stringLength text; last = stringLength hygieneBinderPrefix - 1;
+    first = stringCodeAt hygieneBinderPrefix 0; final = stringCodeAt hygieneBinderPrefix last;
+    scan end = end < size &&
+      ((stringCodeAt text end == final && stringCodeAt text (end - last) == first &&
+        Lexer.textStartsAt text (end - last) hygieneBinderPrefix) ||
+       scan (end + 1))
+  } in scan last;
+  cleanSourceWith clean (SourceModule path name exports imports ds cs is vs body syntax) =
     do {
-      values <- traverseEither (\((,,) n a e) -> mapEither ((,,) n a) (hygiene e)) vs;
+      values <- traverseEither (\((,,) n a e) -> mapEither ((,,) n a) (clean e)) vs;
       instances <-
         traverseEither
           (\(SInstanceDecl vars context klass head methods) ->
              do {
-               methods2 <- traverseEither (\((,) n e) -> mapEither ((,) n) (hygiene e)) methods;
+               methods2 <- traverseEither (\((,) n e) -> mapEither ((,) n) (clean e)) methods;
                Right (SInstanceDecl vars context klass head methods2)
              })
           is;
       body2 <-
         case body of {
           Nothing -> Right Nothing;
-          Just e -> mapEither Just (hygiene e)
+          Just e -> mapEither Just (clean e)
         };
       Right (SourceModule path name exports imports ds cs instances values body2 syntax)
     };
@@ -452,10 +573,7 @@ module Bootstrap.Separate where {
         else Left "invalid inference fragment: expected declarations ending in ()";
       _ -> Left "invalid inference fragment: expected declarations ending in ()"
     };
-  pack fields = concatStringList (packChunks fields);
-  packChunks fields = case fields of {
-    [] -> []; (:) text rest -> (:) (showInt (stringLength text)) ((:) ":" ((:) text (packChunks rest)))
-  };
+  pack fields = packStringFields fields;
   digitEnd :: String -> Int -> Int;
   digitEnd text i =
     if (i >= stringLength text)
@@ -464,26 +582,29 @@ module Bootstrap.Separate where {
            c = stringCodeAt text i
          } in
          if ((c >= 48) && (c <= 57)) then digitEnd text (i + 1) else i;
+  -- Read each decimal length in one pass. A padded length still has a
+  -- valid frame boundary, so validate the rest before reporting its spelling.
+  unpackFields :: Maybe String -> String -> Int -> Either String ([] String);
+  unpackFields canonicalError text initial = let {
+    limit = stringLength text;
+    malformed = Left "malformed module artifact framing";
+    fields start = if start == limit then Right [] else digits start start 0;
+    digits start position n =
+      if position >= limit then malformed else let { c = stringCodeAt text position } in
+      if c == 58 && position > start then
+        if n > limit - position - 1 then Left "truncated module artifact" else do {
+          rest <- fields (position + 1 + n);
+          case canonicalError of {
+            Nothing -> Right ();
+            Just message -> ensure (position - start == 1 || stringCodeAt text start /= 48) message
+          };
+          Right ((:) (stringSlice text (position + 1) n) rest)
+        }
+      else if c < 48 || c > 57 || position - start >= 9 then malformed
+      else digits start (position + 1) (10 * n + (c - 48))
+  } in fields initial;
   unpackFrom :: String -> Int -> Either String ([] String);
-  unpackFrom text start =
-    if (start == stringLength text)
-    then Right []
-    else do {
-           let {
-             end = digitEnd text start
-           };
-           ensure
-             ((end > start) &&
-              (((end - start) <= 9) &&
-               ((end < stringLength text) && (stringCodeAt text end == 58))))
-             "malformed module artifact framing";
-           let {
-             n = readInt (stringSlice text start (end - start))
-           };
-           ensure (n <= ((stringLength text - end) - 1)) "truncated module artifact";
-           rest <- unpackFrom text ((end + 1) + n);
-           Right ((:) (stringSlice text (end + 1) n) rest)
-         };
+  unpackFrom text start = unpackFields Nothing text start;
   unpack text = unpackFrom text 0;
   fingerprintFrom :: String -> Int -> Int -> Int -> String;
   fingerprintFrom text i a b =
@@ -531,7 +652,21 @@ module Bootstrap.Separate where {
     } in seq nextA (seq nextB (canonicalFingerprintState rest nextA nextB));
     _ -> fingerprintStateChars chars a b
   };
-  fingerprint text = case canonicalFingerprintState (textToChars text) 0 1 of {
+  -- ASCII fields are common in artifacts. Read four scalars directly without
+  -- allocating a character-list cell for each byte. On the first non-ASCII
+  -- block, stream just the remaining suffix so Unicode stays a linear scan.
+  canonicalFingerprintText text index size a b =
+    if size - index < 4 then canonicalFingerprintState
+      (textToChars (stringSlice text index (size - index))) a b
+    else let {
+      x0 = stringCodeAt text index; x1 = stringCodeAt text (index + 1);
+      x2 = stringCodeAt text (index + 2); x3 = stringCodeAt text (index + 3)
+    } in if x0 < 128 && x1 < 128 && x2 < 128 && x3 < 128 then let {
+      nextA = (a * 1172642095 + x0 * 780718649 + x1 * 8261507 + x2 * 65599 + x3) % 2147483647;
+      nextB = (b * 294499921 + x0 * 2248091 + x1 * 17161 + x2 * 131 + x3) % 2147483629
+    } in seq nextA (seq nextB (canonicalFingerprintText text (index + 4) size nextA nextB))
+    else canonicalFingerprintState (textToChars (stringSlice text index (size - index))) a b;
+  fingerprint text = case canonicalFingerprintText text 0 (stringLength text) 0 1 of {
     (,) a b -> showInt a ++ "-" ++ showInt b
   };
   -- Exact summaries of the two existing rolling checksums. A summary composes
@@ -581,7 +716,7 @@ module Bootstrap.Separate where {
          if ((count % 2) == 0) then squared else ((squared * base) % modulus);
   fingerprintPart :: String -> (,,,) Int Int Int Int;
   fingerprintPart text =
-    case canonicalFingerprintState (textToChars text) 0 0 of {
+    case canonicalFingerprintText text 0 (stringLength text) 0 0 of {
       (,) a b ->
         (,,,) (fingerprintPower 65599 (stringLength text) 2147483647)
           (fingerprintPower 131 (stringLength text) 2147483629)
@@ -1240,83 +1375,98 @@ module Bootstrap.Separate where {
       XDefaultPattern n -> XDefaultPattern (mapMaybeValue name n)
     };
   mapTerm :: (XName -> XName) -> (XTyVar -> XTyVar) -> XTerm -> XTerm;
-  mapTerm name variable term =
+  mapTerm name variable = mapTermProof name variable (mapComputation variable);
+  -- Each proof operation remains lazy in its original XTypeApp field.
+  mapTermProof :: (XName -> XName) -> (XTyVar -> XTyVar) ->
+    (XComputation -> XComputation) -> XTerm -> XTerm;
+  mapTermProof name variable proof term = let {
+    walk = mapTermProof name variable proof
+  } in
     case term of {
       XVarTerm n -> XVarTerm (name n);
-      XAbs n ty b -> XAbs (name n) (mapType variable ty) (mapTerm name variable b);
-      XApp a b -> XApp (mapTerm name variable a) (mapTerm name variable b);
+      XAbs n ty b -> XAbs (name n) (mapType variable ty) (walk b);
+      XApp a b -> XApp (walk a) (walk b);
       XTypeAbs a bound b ->
-        XTypeAbs (variable a) (mapType variable bound) (mapTerm name variable b);
-      XTypeApp a p -> XTypeApp (mapTerm name variable a) (mapComputation variable p);
-      XLet n a b -> XLet (name n) (mapTerm name variable a) (mapTerm name variable b);
+        XTypeAbs (variable a) (mapType variable bound) (walk b);
+      XTypeApp a p -> XTypeApp (walk a) (proof p);
+      XLet n a b -> XLet (name n) (walk a) (walk b);
       XLetRec bs b ->
         XLetRec
-          (map (\((,,) n t a) -> (,,) (name n) (mapType variable t) (mapTerm name variable a))
+          (map (\((,,) n t a) -> (,,) (name n) (mapType variable t) (walk a))
              bs)
-          (mapTerm name variable b);
+          (walk b);
       XPrimitive p ts -> XPrimitive p (map (mapType variable) ts);
       XConstructor c ts -> XConstructor c (map (mapType variable) ts);
       XCase a t bs ->
-        XCase (mapTerm name variable a) (mapType variable t)
-          (map (\(XAlternative p b) -> XAlternative (mapPattern name p) (mapTerm name variable b))
+        XCase (walk a) (mapType variable t)
+          (map (\(XAlternative p b) -> XAlternative (mapPattern name p) (walk b))
              bs);
-      XWithData ds b -> XWithData ds (mapTerm name variable b);
+      XWithData ds b -> XWithData ds (walk b);
       _ -> term
     };
   -- Dense renumbering also handles valid object IDs near the parser's Int64
   -- limit. Adding an offset to original IDs would overflow that wire format.
   typeIdentities :: XType -> IntSet -> IntSet;
-  typeIdentities ty seen =
+  typeIdentities = foldTypeIdentities IS.insert;
+  foldTypeIdentities :: forall a. (Int -> a -> a) -> XType -> a -> a;
+  foldTypeIdentities add ty seen =
     case ty of {
-      XVar (XTyVar a) -> IS.insert a seen;
-      XArrow a b -> typeIdentities b (typeIdentities a seen);
-      XCon _ ts -> foldl (\acc t -> typeIdentities t acc) seen ts;
-      XApply a b -> typeIdentities b (typeIdentities a seen);
+      XVar (XTyVar a) -> add a seen;
+      XArrow a b -> foldTypeIdentities add b (foldTypeIdentities add a seen);
+      XCon _ ts -> foldl (\acc t -> foldTypeIdentities add t acc) seen ts;
+      XApply a b -> foldTypeIdentities add b (foldTypeIdentities add a seen);
       XForall (XTyVar a) bound b ->
-        typeIdentities b (typeIdentities bound (IS.insert a seen));
+        foldTypeIdentities add b (foldTypeIdentities add bound (add a seen));
       _ -> seen
     };
   computationIdentities :: XComputation -> IntSet -> IntSet;
-  computationIdentities p seen =
+  computationIdentities = foldComputationIdentities IS.insert;
+  foldComputationIdentities :: forall a. (Int -> a -> a) -> XComputation -> a -> a;
+  foldComputationIdentities add p seen =
     case p of {
-      XBottom t -> typeIdentities t seen;
-      XHyp (XTyVar a) -> IS.insert a seen;
-      XInner q -> computationIdentities q seen;
-      XOuter (XTyVar a) q -> computationIdentities q (IS.insert a seen);
-      XIntro (XTyVar a) -> IS.insert a seen;
-      XIntroKind (XTyVar a) _ -> IS.insert a seen;
-      XThen a b -> computationIdentities b (computationIdentities a seen);
+      XBottom t -> foldTypeIdentities add t seen;
+      XHyp (XTyVar a) -> add a seen;
+      XInner q -> foldComputationIdentities add q seen;
+      XOuter (XTyVar a) q -> foldComputationIdentities add q (add a seen);
+      XIntro (XTyVar a) -> add a seen;
+      XIntroKind (XTyVar a) _ -> add a seen;
+      XThen a b -> foldComputationIdentities add b (foldComputationIdentities add a seen);
       _ -> seen
     };
   termIdentities :: XTerm -> IntSet -> IntSet;
-  termIdentities term seen =
+  termIdentities = foldTermIdentities IS.insert;
+  foldTermIdentities :: forall a. (Int -> a -> a) -> XTerm -> a -> a;
+  foldTermIdentities add term seen =
     case term of {
-      XVarTerm n -> IS.insert (X.nameId n) seen;
-      XAbs n ty b -> termIdentities b (typeIdentities ty (IS.insert (X.nameId n) seen));
-      XApp a b -> termIdentities b (termIdentities a seen);
+      XVarTerm n -> add (X.nameId n) seen;
+      XAbs n ty b -> foldTermIdentities add b (foldTypeIdentities add ty (add (X.nameId n) seen));
+      XApp a b -> foldTermIdentities add b (foldTermIdentities add a seen);
       XTypeAbs (XTyVar a) bound b ->
-        termIdentities b (typeIdentities bound (IS.insert a seen));
-      XTypeApp a p -> computationIdentities p (termIdentities a seen);
-      XLet n a b -> termIdentities b (termIdentities a (IS.insert (X.nameId n) seen));
+        foldTermIdentities add b (foldTypeIdentities add bound (add a seen));
+      XTypeApp a p -> foldComputationIdentities add p (foldTermIdentities add a seen);
+      XLet n a b -> foldTermIdentities add b (foldTermIdentities add a (add (X.nameId n) seen));
       XLetRec bs b ->
-        termIdentities b
+        foldTermIdentities add b
           (foldl
              (\acc ((,,) n t a) ->
-                termIdentities a (typeIdentities t (IS.insert (X.nameId n) acc)))
+                foldTermIdentities add a (foldTypeIdentities add t (add (X.nameId n) acc)))
              seen
              bs);
-      XPrimitive _ ts -> foldl (\acc t -> typeIdentities t acc) seen ts;
-      XConstructor _ ts -> foldl (\acc t -> typeIdentities t acc) seen ts;
+      XPrimitive _ ts -> foldl (\acc t -> foldTypeIdentities add t acc) seen ts;
+      XConstructor _ ts -> foldl (\acc t -> foldTypeIdentities add t acc) seen ts;
       XCase a t bs ->
         foldl
           (\acc (XAlternative p b) ->
-             termIdentities b
-               (foldl (\ids n -> IS.insert (X.nameId n) ids) acc (X.patternNames p)))
-          (typeIdentities t (termIdentities a seen))
+             foldTermIdentities add b
+               (foldl (\ids n -> add (X.nameId n) ids) acc (X.patternNames p)))
+          (foldTypeIdentities add t (foldTermIdentities add a seen))
           bs;
-      XWithData _ b -> termIdentities b seen;
+      XWithData _ b -> foldTermIdentities add b seen;
       _ -> seen
     };
+  -- Checking an identity bound needs only a maximum. Use the same visit
+  -- order and binder, pattern, type and computation coverage as relocation.
+  maximumTermIdentity lower term = foldTermIdentities (\identity previous -> max previous identity) term lower;
   freshObject serial term =
     let {
       ids = IS.toList (termIdentities term IS.empty)

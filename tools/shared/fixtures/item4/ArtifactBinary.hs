@@ -4,7 +4,7 @@
 module Main where
 import Prelude
 import Control.Monad (unless, forM_, zipWithM_)
-import Control.Exception (try, evaluate, bracket)
+import Control.Exception (try, evaluate, bracket, SomeException, displayException)
 import System.Mem.StableName (makeStableName, eqStableName)
 import System.Environment (getArgs, getExecutablePath)
 import System.Directory (doesPathExist, createDirectory, renameFile)
@@ -435,7 +435,10 @@ constructorTests = sequence [
   checkCase "PWriteByteFileOrError" A.toPrimitive A.fromPrimitive T.PWriteByteFileOrError (W.VNode 32 [W.VInt 130]),
   checkCase "PByteArrayDigest" A.toPrimitive A.fromPrimitive T.PByteArrayDigest (W.VNode 32 [W.VInt 131]),
   checkCase "PFreezeSTArray" A.toPrimitive A.fromPrimitive T.PFreezeSTArray (W.VNode 32 [W.VInt 132]),
-  checkCase "PSTToIO" A.toPrimitive A.fromPrimitive T.PSTToIO (W.VNode 32 [W.VInt 133])
+  checkCase "PSTToIO" A.toPrimitive A.fromPrimitive T.PSTToIO (W.VNode 32 [W.VInt 133]),
+  checkCase "PByteArrayCRC32" A.toPrimitive A.fromPrimitive T.PByteArrayCRC32 (W.VNode 32 [W.VInt 134]),
+  checkCase "PPackStringFields" A.toPrimitive A.fromPrimitive T.PPackStringFields (W.VNode 32 [W.VInt 135]),
+  checkCase "PStringUtf8Length" A.toPrimitive A.fromPrimitive T.PStringUtf8Length (W.VNode 32 [W.VInt 136])
   ]
 
 graphChecks = [
@@ -705,7 +708,10 @@ graphChecks = [
   \g root -> checkGraph "PWriteByteFileOrError" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 130]),
   \g root -> checkGraph "PByteArrayDigest" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 131]),
   \g root -> checkGraph "PFreezeSTArray" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 132]),
-  \g root -> checkGraph "PSTToIO" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 133])
+  \g root -> checkGraph "PSTToIO" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 133]),
+  \g root -> checkGraph "PByteArrayCRC32" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 134]),
+  \g root -> checkGraph "PPackStringFields" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 135]),
+  \g root -> checkGraph "PStringUtf8Length" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 136])
   ]
 
 checkGraph label encode decode graph root expected = do
@@ -745,7 +751,7 @@ semanticEdges directory = do
     need "IEEE exact signed bits; not numeric equality" (P.doubleToBits value == bits && same (A.toDouble value) (W.VBits bits))
     term <- expect "IEEE term decode" (A.fromXTerm (W.VNode 78 [W.VBits bits]))
     case term of T.XDoubleTerm d -> need "IEEE term exact" (P.doubleToBits d == bits); _ -> error "IEEE wrong constructor"
-  forM_ [-1,134,2147483647] $ \code -> do
+  forM_ [-1,137,2147483647] $ \code -> do
     let value=W.VNode 32 [W.VInt code]
     reject "unknown primitive ABI code" (A.fromPrimitive value)
     bytes <- W.encode W.defaultLimits 7 [value] >>= expect "unknown primitive is valid wire"
@@ -942,6 +948,9 @@ main = do
       wireCheck (directory ++ "/constructors.bin") roots
       readBounded (directory ++ "/constructors.bin") >>= graphConstructorTests
       semanticEdges directory
+      phaseReaderControls
+      interfaceEqualityControls
+      interfaceInventoryControls
       rbSelfTests
       putStrLn ("PASS constructors " ++ show (length roots))
     ["source-admission",directory] -> sourceAdmissionTests directory
@@ -1170,10 +1179,10 @@ distributionSeed directory = do
     (CrateArtifact.encodeInterface builtinIface == CrateArtifact.encodeInterface (CrateArtifact.objectInterface canonicalBuiltin) &&
      CrateArtifact.encodeObject builtinObject == CrateArtifact.encodeObject canonicalBuiltin)
   need "release fixture exact builtin dependency and no entry"
-    (CrateArtifact.crateDependencies iface == [("mlf:builtin-shared-haskell-v1:13",builtinPath,CrateArtifact.semanticFingerprint builtinIface)] &&
+    (CrateArtifact.crateDependencies iface == [("mlf:builtin-shared-haskell-v1:15",builtinPath,CrateArtifact.semanticFingerprint builtinIface)] &&
      CrateArtifact.crateEntry iface == "")
   need "builtin leaf has no dependencies or entry"
-    (CrateArtifact.crateId builtinIface == "mlf:builtin-shared-haskell-v1:13" && null (CrateArtifact.crateDependencies builtinIface) && CrateArtifact.crateEntry builtinIface == "")
+    (CrateArtifact.crateId builtinIface == "mlf:builtin-shared-haskell-v1:15" && null (CrateArtifact.crateDependencies builtinIface) && CrateArtifact.crateEntry builtinIface == "")
   need "release fixture exact identity/module" (CrateArtifact.crateId iface == "binary-package/1/library" && CrateArtifact.crateModules iface == ["BinaryPackage"])
   need "actual Session keeps the open primary" (CrateArtifact.openMarked object)
   -- The explicit companion adds old-format coverage. The original Session
@@ -1217,10 +1226,10 @@ distributionSeed directory = do
   legacyMetadata <- P.fileDigest (B.literal (legacyBuiltinPrefix ++ ".mlfci"))
   legacyBody <- P.fileDigest (B.literal (legacyBuiltinPrefix ++ ".mlfco"))
   let legacyPath = Release.virtualPath (Release.pairKey legacyMetadata legacyBody)
-  portableLegacy <- expect "legacy root relocation" (Release.relocateObject [("mlf:builtin-shared-haskell-v1:13",legacyPath)] closed)
+  portableLegacy <- expect "legacy root relocation" (Release.relocateObject [("mlf:builtin-shared-haskell-v1:15",legacyPath)] closed)
   need "legacy closure exact relocated dependency"
     (CrateArtifact.crateDependencies (CrateArtifact.objectInterface portableLegacy) ==
-      [("mlf:builtin-shared-haskell-v1:13",legacyPath,CrateArtifact.semanticFingerprint builtinIface)])
+      [("mlf:builtin-shared-haskell-v1:15",legacyPath,CrateArtifact.semanticFingerprint builtinIface)])
   writeFile (directory ++ "/release-legacy-root.mlfci") (B.unpack (CrateArtifact.encodeInterface (CrateArtifact.objectInterface portableLegacy)))
   writeFile (directory ++ "/release-legacy-root.mlfco") (B.unpack (CrateArtifact.encodeObject portableLegacy))
   putStrLn "PASS actual-binary-library-and-legacy-formal"
@@ -1523,7 +1532,7 @@ releaseBuiltinBranches directory = do
       ownership label identity modules expected = case CrateArtifact.validateBuiltinOwnership (replaceIdentityModules identity modules builtin) of
         T.Left message -> need label (message == expected)
         T.Right _ -> error ("accepted ownership regression: " ++ label)
-  need "fixed current builtin authority" (current == "mlf:builtin-shared-haskell-v1:13")
+  need "fixed current builtin authority" (current == "mlf:builtin-shared-haskell-v1:15")
   need "builtin localPrefix uses canonical compiler cache"
     (Release.localPrefix "/cache" compiler (row current) == ("/cache/.queries/builtin-prelude/" P.++ compiler P.++ "/unit"))
   need "ordinary localPrefix keeps release key cache"
@@ -1554,7 +1563,7 @@ releaseForgedCurrent directory = do
   let forged = CrateArtifact.makeObject (CrateArtifact.objectInterface canonical) fragments
       iface = CrateArtifact.objectInterface forged
   need "forged control retains exact current identity and ownership"
-    (CrateArtifact.crateId iface == "mlf:builtin-shared-haskell-v1:13" &&
+    (CrateArtifact.crateId iface == "mlf:builtin-shared-haskell-v1:15" &&
      CrateArtifact.crateModules iface == CrateArtifact.crateModules (CrateArtifact.objectInterface canonical))
   _ <- expect "forged control passes complete ordinary typed linking" (CrateArtifact.linkCheckedObjects [forged] (CrateArtifact.crateId iface))
   need "forged control is genuinely noncanonical" (CrateArtifact.encodeObject forged /= CrateArtifact.encodeObject canonical)
@@ -1685,6 +1694,11 @@ rbRoundtrip name lim aggregate roots = do
   zipWithM_ (rbGraphValue graph) (W.graphRoots graph) roots
   stats <- rbExpect (name ++ " stats") (W.graphResourceStats graph)
   size <- P.lengthByteArray bytes
+  summarized <- rbExpect (name ++ " retained work summaries") (W.graphExpandedWork graph)
+  rbNeed (name ++ " exact retained work including repeated roots") (summarized == used)
+  plannedGraph <- rbExpect (name ++ " planned graph") (W.planGraph (rbWork aggregate lim) roots)
+  plannedWork <- rbExpect (name ++ " planned retained work") (W.graphExpandedWork plannedGraph)
+  rbNeed (name ++ " planned graph charges the same expanded forest") (plannedWork == used)
   rbNeed (name ++ " resource expansion")
     (W.resourceExpandedNodes stats == expandedNodes &&
      W.resourceExpandedTextBytes stats == expandedText &&
@@ -2002,6 +2016,10 @@ rbCompareGraph name original bounded = case (original,bounded) of
     rbNeed (name ++ " bounded-root root IDs") (W.graphRoots a == W.graphRoots b)
     sa <- rbExpect (name ++ " ordinary graph stats") (W.graphResourceStats a)
     sb <- rbExpect (name ++ " bounded graph stats") (W.graphResourceStats b)
+    wa <- rbExpect (name ++ " ordinary work summary") (W.graphExpandedWork a)
+    wb <- rbExpect (name ++ " bounded work summary") (W.graphExpandedWork b)
+    rbNeed (name ++ " both decoder routes preserve exact root charging")
+      (wa == W.resourceExpandedWork sa && wb == W.resourceExpandedWork sb)
     rbNeed (name ++ " bounded-root exact work")
       (W.resourceExpandedWork sa == W.resourceExpandedWork sb &&
        W.resourceBytes sa == W.resourceBytes sb)
@@ -2035,3 +2053,74 @@ auditStamp prefix = do
     _ -> error "audit seed requires one Int owner"
   let forged = T.XLet binder (T.XBoolTerm True) (T.XConstructor "()" [])
   putStrLn (B.unpack (stamp forged))
+
+-- Differential controls retain the original exported recurrence as oracle.
+observeBitRead action = do
+ result <- try (action >>= evaluate)
+ case result of
+  Left e -> pure (Left (takeWhile (/='\n') (displayException (e :: SomeException))))
+  Right (T.Left m) -> pure (Left (B.unpack m))
+  Right (T.Right (value,W.Cursor _ pos end)) -> evaluate (value+pos+end) >> pure (Right (value,pos,end))
+phaseReaderControls = do
+ array <- P.newByteArray 137 0
+ forM_ [0..136] $ \i -> P.writeByteArray array i ((37*i+11) `mod` 256)
+ forM_ [-1..64] $ \width -> forM_ [-9,-1,0,1,2,3,4,5,6,7,8,31,32,63,64,1031,1087,1095,1096] $ \pos ->
+  forM_ [pos-1,pos,pos+width-1,pos+width,1096,1104] $ \end -> do
+   let old = if width < 0 || width > 64 || width > end-pos then pure (T.Left "truncated binary bitstream") else W.getBitsAt array pos end width 0 0
+   a <- observeBitRead old
+   let W.Read read = W.getBits width
+   b <- observeBitRead (read (W.Cursor array pos end))
+   unless (a==b) (fail (show (width,pos,end,a,b)))
+ pure ()
+
+interfaceEqualityControls = do
+  let fromFields (A.CrateInterfaceFields a b c d e f g h i j k l m) =
+        CrateArtifact.CrateInterface a b c d e f g h i j k l m
+      base = fromFields (sampleCrateInterfaceFields 3)
+      CrateArtifact.CrateInterface a b c d e f g h i j k l m = base
+      make = CrateArtifact.CrateInterface
+      variants = [base, fromFields (sampleCrateInterfaceFields 4),
+        make "changed" b c d e f g h i j k l m,
+        make a [] c d e f g h i j k l m,
+        make a b [] d e f g h i j k l m,
+        make a b c [] e f g h i j k l m,
+        make a b c d [] f g h i j k l m,
+        make a b c d e [] g h i j k l m,
+        make a b c d e f [] h i j k l m,
+        make a b c d e f g [] i j k l m,
+        make a b c d e f g h [] j k l m,
+        make a b c d e f g h i [] k l m,
+        make a b c d e f g h i j "changed" l m,
+        make a b c d e f g h i j k "changed" m,
+        make a b c d e f g h i j k l [],
+        make a (reverse b) (reverse c) (reverse d) (reverse e)
+          (reverse f) (reverse g) (reverse h) (reverse i) (reverse j) k l (reverse m)]
+  forM_ variants $ \left -> forM_ variants $ \right ->
+    need "canonical interface field comparison equals full encoding comparison"
+      (CrateArtifact.sameInterface left right ==
+        (CrateArtifact.encodeInterface left == CrateArtifact.encodeInterface right))
+
+interfaceInventoryControls = do
+  let key n = CrateArtifact.definitionName "inventory" (M.Entity "Main" n M.Value)
+      entry = key "<crate-entry>"
+      bindings = [(key "a", T.XCon "Int" []), (entry, T.XCon "Int" [])]
+      protection = [(key "a", False), (entry, True)]
+      make bs ps e = CrateArtifact.CrateInterface "inventory" [] ["Main"]
+        [("Main",[])] [("Main",[])] [] [] [] [] bs e "object" ps
+      good label iface = CrateArtifact.validateInterface iface >>= \_ -> T.Right label
+      bad label wanted iface = case CrateArtifact.validateInterface iface of
+        T.Left message -> need label (message == wanted)
+        T.Right _ -> error ("accepted " ++ label)
+  expect "valid binding and entry inventory" (good "valid" (make bindings protection entry))
+  expect "protection order is not binding order" (good "reordered" (make bindings (reverse protection) entry))
+  expect "empty library inventory" (good "empty" (make [] [] ""))
+  bad "duplicate binding before inventory mismatch" "duplicate crate binding"
+    (make (bindings ++ [(key "a", T.XCon "Int" [])]) [] entry)
+  bad "duplicate protection before inventory mismatch" "duplicate crate binding protection"
+    (make bindings (protection ++ [(key "a", False)]) entry)
+  bad "missing protection" "crate protection inventory differs from owned bindings"
+    (make bindings [(entry, True)] entry)
+  bad "extra protection" "crate protection inventory differs from owned bindings"
+    (make bindings (protection ++ [(key "extra", False)]) entry)
+  bad "entry must be an admitted binding" "crate entry is not an owned binding"
+    (make bindings protection (key "missing"))

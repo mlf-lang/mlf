@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Offline descriptive analysis. Reject incomplete/duplicate/nonfinite/incompatible cohorts."""
 from pathlib import Path
+import worker
 import argparse
 import collections
 import csv
@@ -32,6 +33,7 @@ def compatibility(plan):
     benchmark=plan['benchmark'];toolchain=plan['toolchain']
     builtin={k:v for k,v in toolchain['builtin'].items() if k.endswith(('.mlfci','.mlfco'))}
     return {'endpoint':benchmark['endpoint']['id'],'suite':benchmark['suite'],'suite_version':benchmark['suite_version'],
+            'order':benchmark.get('order'),'order_seed':benchmark.get('order_seed'),
             'repeats':benchmark['repeats'],'ghc_version':toolchain['ghc']['version'],
             'ghc_path':toolchain['ghc']['path'],'clang_version':toolchain['clang']['version'],
             'producer_receipt_sha256':toolchain['producer']['receipt_sha256'],
@@ -85,7 +87,7 @@ def analyze(folder):
                 row['fresh']=rs[0]['fresh'];row['reused']=0;row['max_group_members']=rs[0]['max_group_members']
                 require(all(r['fresh']==row['fresh'] for r in rs),'stable query group count')
                 require(sum(r['raw_compared_with_first_mlf_leg'] for r in rs)==repeats-1,'actual raw-byte comparisons on every repetition')
-                for stage in ['source-to-checked','checked-to-llvm','llvm-to-executable']:
+                for stage in worker.mlf_stage_names(plan['benchmark']['endpoint']['id']):
                     ss=[next(s for s in r['stages']['stages'] if s['name']==stage) for r in rs]
                     for metric in ['wall_seconds','user_seconds','system_seconds']:
                         require(all(math.isfinite(s[metric]) and s[metric]>=0 for s in ss),'valid stage timings')
@@ -96,7 +98,7 @@ def analyze(folder):
                 graph=[any(k.startswith(Q.GRAPH) or k.endswith(('.mlfqg','.mlfqr')) for k in inv)
                        for inv in inventories]
                 require(all(graph) or not any(graph),'stable query storage format')
-                row['query_storage']=('query-graph-v2' if 'query-graph-v2/CURRENT' in inventories[0] else 'query-graph-v1') if all(graph) else 'legacy-mlfq'
+                row['query_storage']=next((f'query-graph-v{v}' for v in (3, 2, 1) if f'query-graph-v{v}/CURRENT' in inventories[0]), 'query-graph-v1') if all(graph) else 'legacy-mlfq'
                 if all(graph):
                     checks=[]
                     for directory,inventory in zip(directories,inventories):

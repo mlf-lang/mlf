@@ -18,7 +18,8 @@ SCRATCH = ROOT / '.mlf-build/batch-replacement-20261101'
 MODULE = 'libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs'
 BASELINE_REVISION = '7bf7ac6db5e3db2daff2e0a1c249e68ae0db2d0c'
 BASELINE_SHA256 = 'b1a1e81d21a81300e8df8be5c62d21c824496e77c8040e3ca5cc122c4334fee4'
-CHECKS = ['exact-pass-optimize-seeds', 'independent-counts', 'witness-implication',
+CHECKS = ['checked-iteration-algebra-and-scopes',
+          'exact-pass-optimize-seeds', 'independent-counts', 'witness-implication',
           'witness-nonvacuity', 'long-chain-admission', 'pending-materialization',
           'fresh-order', 'unsupported-contexts', 'common-call-success-fallback',
           'public-raw-laziness', 'io-lazy-semantics']

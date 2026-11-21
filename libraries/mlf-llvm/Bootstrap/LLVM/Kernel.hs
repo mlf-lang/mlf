@@ -111,18 +111,41 @@ module Bootstrap.LLVM.Kernel where {
            Just f -> anchor fs (S.insert O.compareName name seen) (A.functionBody f)
          };
   anchor :: Map XName A.WorkerFunction -> Set XName -> XErased -> Bool;
-  anchor fs seen expression =
-    case expression of {
-      XELet n a b -> anchor fs seen b;
-      XELetRec ds b -> anchor fs seen b;
-      _ ->
-        case O.applications expression of {
-          (,) (XEPrimitive PIfThenElse) args -> L.any (anchor fs seen) (L.drop 1 args);
-          (,) (XEPrimitive p) args -> (operation p && (L.length args == P.primitiveArity p));
-          (,) (XEVar n) args -> anchored fs seen n;
-          _ -> False
-        }
+  anchor fs seen expression = L.any (\site -> case site of {
+    Nothing -> True;
+    Just name -> anchored fs seen name
+  }) (anchorSites expression []);
+  -- Nothing is a primitive anchor. A name is a tail-position dependency.
+  -- The accumulator flattens nested branches without appending their lists.
+  anchorSites :: XErased -> [] (Maybe XName) -> [] (Maybe XName);
+  anchorSites expression rest = case expression of {
+    XELet _ _ body -> anchorSites body rest;
+    XELetRec _ body -> anchorSites body rest;
+    _ -> case O.applications expression of {
+      (,) (XEPrimitive PIfThenElse) args -> L.foldr anchorSites rest (L.drop 1 args);
+      (,) (XEPrimitive p) args -> if operation p && L.length args == P.primitiveArity p
+        then (:) Nothing rest else rest;
+      (,) (XEVar name) _ -> (:) (Just name) rest;
+      _ -> rest
+    }
+  };
+  data AnchorGraph = AnchorGraph ([] XName) (Map XName ([] XName));
+  anchoredWorkers :: Map XName A.WorkerFunction -> Set XName;
+  anchoredWorkers fs = let {
+    record owner (AnchorGraph roots callers) site = case site of {
+      Nothing -> AnchorGraph ((:) owner roots) callers;
+      Just target -> AnchorGraph roots (M.insertWith O.compareName L.append target [owner] callers)
     };
+    add graph owner f = L.foldlStrict (record owner) graph (anchorSites (A.functionBody f) []);
+    visit callers seen pending = case pending of {
+      [] -> seen;
+      (:) name rest -> if S.member O.compareName name seen then visit callers seen rest
+        else visit callers (S.insert O.compareName name seen)
+          (L.append (M.findWithDefault O.compareName [] name callers) rest)
+    }
+  } in case M.foldlWithKeyStrict add (AnchorGraph [] M.empty) fs of {
+    AnchorGraph roots callers -> visit callers S.empty roots
+  };
   eligible :: Map XName A.WorkerFunction -> Set XName -> XErased -> Bool;
   eligible fs names expression =
     case expression of {
@@ -169,7 +192,7 @@ module Bootstrap.LLVM.Kernel where {
     if A.sameNames (S.toList names) (S.toList next) then names else kernelFixed fs next;
   kernels :: Map XName A.WorkerFunction -> Set XName;
   kernels fs =
-    kernelFixed fs (S.fromList O.compareName (L.filter (anchored fs S.empty) (M.keys fs)));
+    kernelFixed fs (anchoredWorkers fs);
   allocation :: Primitive -> Bool;
   allocation p =
     case p of {

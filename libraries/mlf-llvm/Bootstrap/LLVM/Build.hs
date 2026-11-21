@@ -16,10 +16,9 @@ module Bootstrap.LLVM.Build where {
   data CGBinding = CGBinding String Bool | CGSlot String Bool;
   data Scalar = Boxed String | Floating String;
   data NativeMode = General | UnboxedDouble | NonnegativeInt | SmallIndex;
+  data FunctionScope = FunctionScope (Map XName A.WorkerFunction) (Map XName (Maybe (Set XName)));
   data Output =
-    Output Int ([] String) String ([] String) ([] String) (Map String ((,) Int Int)) (Map
-                                                                                             XName
-                                                                                             A.WorkerFunction) (Set
+    Output Int ([] String) String ([] String) ([] String) (Map String ((,) Int Int)) FunctionScope (Set
                                                                                                                 String) (Map
                                                                                                                         XName
                                                                                                                         String) (Set
@@ -87,10 +86,15 @@ module Bootstrap.LLVM.Build where {
   withConstructors value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) =
     Output f0 f1 f2 f3 f4 value f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22;
   functions :: Output -> Map XName A.WorkerFunction;
-  functions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) = f6;
+  functions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) = case f6 of { FunctionScope fs _ -> fs };
   withFunctions :: Map XName A.WorkerFunction -> Output -> Output;
   withFunctions value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) =
-    Output f0 f1 f2 f3 f4 f5 value f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22;
+    case f6 of { FunctionScope _ names ->
+      Output f0 f1 f2 f3 f4 f5 (FunctionScope value names) f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 };
+  callbackNames :: Output -> XName -> XErased -> [] XName;
+  callbackNames (Output _ _ _ _ _ _ (FunctionScope fs names) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) binder body =
+    S.toList (A.lambdaNeeded fs names binder body);
+
   workers :: Output -> Set String;
   workers (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) = f7;
   withWorkers :: Set String -> Output -> Output;
@@ -343,7 +347,9 @@ module Bootstrap.LLVM.Build where {
   definitionBody :: String -> [] String -> Build () -> Build ();
   definitionBody name args body = definitionBodyTyped "ptr" name args body;
   definitionBodyTyped :: String -> String -> [] String -> Build () -> Build ();
-  definitionBodyTyped ty name args body =
+  definitionBodyTyped = definitionBodyWithPolicy False;
+  definitionBodyWithPolicy :: Bool -> String -> String -> [] String -> Build () -> Build ();
+  definitionBodyWithPolicy keepWorker ty name args body =
     do {
       saved <- get;
       modify
@@ -365,7 +371,7 @@ module Bootstrap.LLVM.Build where {
           if (startsWith "@mlf.numeric." name &&
               (L.not (startsWith "@mlf.numeric.entry." name) && L.not collectingWorker))
           then " alwaysinline"
-          else if startsWith "@mlf.worker." name && workerBodyLimit 64 code
+          else if startsWith "@mlf.worker." name && (keepWorker || workerBodyLimit 64 code)
                then " noinline"
                else ""
       };
@@ -677,15 +683,23 @@ module Bootstrap.LLVM.Build where {
          };
   -- Compact constructor initialization uses shared allocation helpers. Refill,
   -- allocator debugging and constructor audits remain runtime responsibilities.
+  -- Constructor allocation functions are private to each LLVM module.
+  -- Record their symbols with the other module-wide worker definitions.
+  callConstructor :: String -> [] String -> Build String;
+  callConstructor symbol arguments = do {
+    modify (\state -> let { known = workers state } in if S.member compareString symbol known
+      then state else withWorkers (S.insert compareString symbol known) state);
+    call symbol arguments
+  };
   compactConstructor :: Int -> [] String -> Build String;
   compactConstructor tag fields =
     case fields of {
       [] -> cgPure (immediate ((tag * 8) + 4));
-      (:) a [] -> call "@mlf.construct.1" (args2 (number tag) (pointer a));
-      (:) a ((:) b []) -> call "@mlf.construct.2" (args3 (number tag) (pointer a) (pointer b));
+      (:) a [] -> callConstructor "@mlf.construct.1" (args2 (number tag) (pointer a));
+      (:) a ((:) b []) -> callConstructor "@mlf.construct.2" (args3 (number tag) (pointer a) (pointer b));
       _ ->
         do {
-          value <- call "@mlf.construct.wide" (args2 (number tag) (number (L.length fields)));
+          value <- callConstructor "@mlf.construct.wide" (args2 (number tag) (number (L.length fields)));
           L.mapM_
             (\entry ->
                case entry of {

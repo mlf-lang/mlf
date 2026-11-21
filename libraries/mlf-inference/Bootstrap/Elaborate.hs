@@ -384,82 +384,81 @@ module Bootstrap.Elaborate where {
       DeclaredEvidenceBinding role name declaration ->
         (,,) role name (declaredTypeIn context IS.empty declaration)
     };
-  mergeEvidence results = foldl IM.union IM.empty results;
   resolveEvidence graph typed = resolveEvidenceIn (prepareTypes graph) typed;
   resolveEvidenceIn context typed =
     resolveWithinIn context (graphDatatypes (contextGraph context)) M.empty typed;
   resolveWithinIn :: TypeContext ->
                      DataEnv -> Map XTyVar XType -> Typed -> Either String (IntMap XTerm);
   resolveWithinIn context datatypes outer typed =
-    let {
-      graph = contextGraph context
-    } in
-    let {
-      gen = C.generalization typed
-    } in
-    let {
-      env = extendEnvironment outer (boundsAtIn context gen)
-    } in
-    let {
-      child = resolveWithinIn context datatypes env
-    } in
-    case C.form typed of {
-      FEvidence candidates ->
-        do {
-          term <-
-            Evidence.resolveDictionary datatypes env (map (candidateTypeIn context) candidates)
-              (referenceIn context (G.genRoot graph gen));
-          Right (IM.singleton gen term)
+    resolveRequests context datatypes Nothing IM.empty IM.empty (evidenceRequests context outer [] typed []);
+  -- The graph is immutable during resolution. Rows with the same identity
+  -- and binding mode denote the same translated type. Check the whole
+  -- ordered authorization, including target name hints used in artifacts.
+  sameGraphCandidate (EvidenceBinding role name identity poly)
+                     (EvidenceBinding other target source polymorphic) =
+    Evidence.sameRole role other && identity == source && (if poly then polymorphic else not polymorphic) &&
+      X.equalName name target && eqString (X.nameHint name) (X.nameHint target);
+  sameGraphCandidate _ _ = False;
+  data EvidenceContext = EvidenceContext (Map XTyVar XType) ([] ((,,) EvidenceRole XName XType));
+  data EvidenceInventory = ExplicitEvidence ([] EvidenceBinding) | ScopedEvidence ResolvedCandidateEnvironment;
+  resolveRequests context datatypes previous modules results requests = case requests of {
+    [] -> Right results;
+    (:) ((,,) gen (EvidenceContext env locals) inventory) rest -> let {
+      wanted = referenceIn context (G.genRoot (contextGraph context) gen);
+      finish answer lastScope scopes = case answer of {
+        Left failure -> Left (Evidence.evidenceFailureMessage failure);
+        Right term -> let { next = IM.insertWith (\_ old -> old) gen term results }
+          in seq next (resolveRequests context datatypes lastScope scopes next rest)
+      }
+    } in case inventory of {
+      -- Constraint generation allocates the token when it resolves this
+      -- module's binding identities. The memo belongs to this solved graph.
+      ScopedEvidence (ResolvedCandidateEnvironment token bindings) ->
+        case IM.lookup token modules of {
+          Just resolve -> finish (resolve env locals wanted) previous modules;
+          Nothing -> let {
+            resolve = Evidence.scopedResolver datatypes (map (candidateTypeIn context) bindings);
+            scopes = IM.insert token resolve modules
+          } in seq scopes (finish (resolve env locals wanted) previous scopes)
         };
-      FLambda _ _ body _ -> child body;
-      FApply a b _ _ ->
-        do {
-          left <- child a;
-          right <- child b;
-          Right (IM.union left right)
-        };
-      FBinding _ a b _ ->
-        do {
-          left <- child a;
-          right <- child b;
-          Right (IM.union left right)
-        };
-      FMatch scrutinee _ branches ->
-        do {
-          results <-
-            mapM child
-              ((:) scrutinee
-                 (map
-                    (\branch ->
-                       case branch of {
-                         Branch _ body _ -> body
-                       })
-                    branches));
-          Right (mergeEvidence results)
-        };
-      FRecursive definitions body _ ->
-        do {
-          continuation <- child body;
-          results <- mapM
-            (\definition ->
-               case definition of {
-                 RecursiveDefinition _ _ rhs _ closure ->
-                   case closure of {
-                     Nothing -> child rhs;
-                     Just (RecursiveClosure group _) ->
-                       resolveWithinIn context datatypes
-                         (extendEnvironment env (boundsAtIn context group)) rhs
-                   }
-               }) definitions;
-          Right (mergeEvidence ((:) continuation results))
-        };
-      FChecked variables body _ ->
-        resolveWithinIn context datatypes
-          (extendEnvironment env
-             (map (\variable -> (,) (fst variable) (T.bottomKind (snd variable))) variables))
-          body;
-      _ -> Right IM.empty
-    };
+      ExplicitEvidence candidates -> let {
+        types = map (candidateTypeIn context) candidates;
+        fresh = Evidence.indexedResolver datatypes M.empty types;
+        start = finish (fresh wanted) (Just ((,) candidates fresh)) modules
+      } in if M.null env then case previous of {
+        Just ((,) scope resolve) -> if eqList sameGraphCandidate candidates scope
+          then finish (resolve wanted) previous modules else start;
+        Nothing -> start
+      } else finish (Evidence.resolveDictionaryDetailed datatypes env types wanted) previous modules
+    }
+  };
+  -- A given frame declares the complete local inventory, including an
+  -- explicitly empty frame. Siblings always resume their enclosing frame.
+  evidenceRequests context outer locals typed rest = let {
+    gen = C.generalization typed;
+    env = extendEnvironment outer (boundsAtIn context gen);
+    visit givens form = let { child = evidenceRequests context env givens } in case form of {
+      FWithGivens bindings body -> visit (map (candidateTypeIn context) bindings) body;
+      FScopedEvidence scope -> (:) ((,,) gen (EvidenceContext env givens) (ScopedEvidence scope)) rest;
+      FEvidence candidates -> (:) ((,,) gen (EvidenceContext env givens) (ExplicitEvidence candidates)) rest;
+      FLambda _ _ body _ -> child body rest;
+      FApply a b _ _ -> child a (child b rest);
+      FBinding _ a b _ -> child a (child b rest);
+      FMatch scrutinee _ branches -> child scrutinee
+        (foldr (\(Branch _ body _) more -> child body more) rest branches);
+      FRecursive definitions body _ -> child body
+        (foldr (\(RecursiveDefinition _ _ rhs _ closure) more -> case closure of {
+          Nothing -> child rhs more;
+          Just (RecursiveClosure group _) -> evidenceRequests context
+            (extendEnvironment env (boundsAtIn context group)) givens rhs more
+        }) rest definitions);
+      FChecked variables body _ -> evidenceRequests context
+        (extendEnvironment env
+          (map (\variable -> (,) (fst variable) (T.bottomKind (snd variable))) variables))
+        givens body rest;
+      _ -> rest
+    }
+  } in visit locals (C.rawForm typed);
   elaborate graph typed =
     do {
       evidence <- resolveEvidence graph typed;
@@ -519,8 +518,12 @@ module Bootstrap.Elaborate where {
       let {
         childEdge = elaborateEdgeIn context datatypes evidence solver env
       };
-      body <-
-        case C.form typed of {
+      let { dictionary = case IM.lookup gen evidence of {
+        Nothing -> Left "unresolved dictionary evidence";
+        Just term -> Right term
+      } };
+      let { elaborateForm current = case current of {
+          FWithGivens _ enclosed -> elaborateForm enclosed;
           FVariable name Nothing -> Right (XVarTerm name);
           FVariable name (Just edge) ->
             instantiateEdgeIn context datatypes solver env (XVarTerm name) edge;
@@ -614,11 +617,8 @@ module Bootstrap.Elaborate where {
               body' <- childEdge body edge;
               Right (XLetRec definitions' body')
             };
-          FEvidence _ ->
-            case IM.lookup gen evidence of {
-              Nothing -> Left "unresolved dictionary evidence";
-              Just term -> Right term
-            };
+          FEvidence _ -> dictionary;
+          FScopedEvidence _ -> dictionary;
           FChecked variables body edge ->
             do {
               let {
@@ -657,7 +657,8 @@ module Bootstrap.Elaborate where {
                   expected;
               Right (X.instantiate abstracted adaptation)
             }
-        };
+        } };
+      body <- elaborateForm (C.rawForm typed);
       Right (foldr (\bound inner -> XTypeAbs (fst bound) (snd bound) inner) body bounds)
     };
   -- Projection replacements are planned in telescope order. In particular,

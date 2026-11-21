@@ -6,7 +6,10 @@ module Bootstrap.Lexer where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
+  import qualified Bootstrap.IndexVec as V;
+  import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.Unicode as U;
+  import qualified Bootstrap.Set as Set;
   data Token = Token String Int Int Int Int;
   data Cursor = Cursor Int Int Int;
   data Scanned = Scanned ([] Token) Token;
@@ -46,28 +49,15 @@ module Bootstrap.Lexer where {
   isIdentChar :: Int -> Bool;
   isIdentChar c = (U.isAlphaNum c || ((c == 95) || (c == 39)));
   isOperator :: Int -> Bool;
-  isOperator c =
-    elem eqInt c
-      ((:) 58
-         ((:) 33
-            ((:) 35
-               ((:) 36
-                  ((:) 37
-                     ((:) 38
-                        ((:) 42
-                           ((:) 43
-                              ((:) 46
-                                 ((:) 47
-                                    ((:) 60
-                                       ((:) 61
-                                          ((:) 62
-                                             ((:) 63
-                                                ((:) 64
-                                                   ((:) 92
-                                                      ((:) 94
-                                                         ((:) 124
-                                                            ((:) 45
-                                                               ((:) 126 []))))))))))))))))))));
+  -- This finite alphabet is independent of source size. Direct dispatch avoids
+  -- repeated linear searches for each scanned character.
+  isOperator c = case c of {
+    33 -> True; 35 -> True; 36 -> True; 37 -> True; 38 -> True;
+    42 -> True; 43 -> True; 45 -> True; 46 -> True; 47 -> True;
+    58 -> True; 60 -> True; 61 -> True; 62 -> True; 63 -> True;
+    64 -> True; 92 -> True; 94 -> True; 124 -> True; 126 -> True;
+    _ -> False
+  };
   starts :: String -> Int -> Int -> Int -> Bool;
   starts source size i c = (codeAt source size i == c);
   skipLine :: String -> Int -> Cursor -> Cursor;
@@ -175,6 +165,12 @@ module Bootstrap.Lexer where {
   advanceSourceTo source end cursor =
     if cursorIndex cursor >= end then cursor
     else advanceSourceTo source end (advance (stringCodeAt source (cursorIndex cursor)) cursor);
+  -- Identifier, number and operator characters always advance one source
+  -- column. Keep only the scalar index while scanning an uninterrupted run.
+  consumeRun predicate source size (Cursor start line column) = let {
+    endAt i = if i < size && predicate (stringCodeAt source i) then endAt (i + 1) else i;
+    end = endAt start; lastColumn = column + (end - start)
+  } in seq end (seq lastColumn (Cursor end line lastColumn));
   scanNumber :: String -> Int -> Cursor -> Cursor;
   scanNumber source size cursor =
     let {
@@ -182,14 +178,14 @@ module Bootstrap.Lexer where {
     } in
     if (starts source size i 48 &&
         (starts source size (i + 1) 120 || starts source size (i + 1) 88))
-    then consumeWhile isHexDigit source size
+    then consumeRun isHexDigit source size
            (advance (codeAt source size (i + 1)) (advance 48 cursor))
     else if (starts source size i 48 &&
              (starts source size (i + 1) 111 || starts source size (i + 1) 79))
-         then consumeWhile (\c -> ((c >= 48) && (c <= 55))) source size
+         then consumeRun (\c -> ((c >= 48) && (c <= 55))) source size
                 (advance (codeAt source size (i + 1)) (advance 48 cursor))
          else let {
-                digits = consumeWhile isDigit source size cursor
+                digits = consumeRun isDigit source size cursor
               } in
               let {
                 j = cursorIndex digits
@@ -197,7 +193,7 @@ module Bootstrap.Lexer where {
               let {
                 fraction =
                   if (starts source size j 46 && isDigit (codeAt source size (j + 1)))
-                  then consumeWhile isDigit source size (advance 46 digits)
+                  then consumeRun isDigit source size (advance 46 digits)
                   else digits
               } in
               let {
@@ -217,25 +213,150 @@ module Bootstrap.Lexer where {
                        else exponent
                    } in
                    if isDigit (codeAt source size (cursorIndex signed))
-                   then consumeWhile isDigit source size signed
+                   then consumeRun isDigit source size signed
                    else fraction
               else fraction;
+  -- Every one-scalar ASCII token can share its immutable spelling.
+  singleAsciiTokens :: V.IndexVec Int String;
+  singleAsciiTokens = V.fromList (map stringFromCode (range 0 127));
+  tokenSpelling source i end code = if end - i == 1 && code >= 0 && code < 128
+    then V.at singleAsciiTokens (V.fromInt code) else stringSlice source i (end - i);
   scanTokens :: String -> String -> Either String Scanned;
   scanTokens file source = scanMore file source (stringLength source) (Cursor 0 1 1);
   scanSourceTokens :: String -> String -> Either String Scanned;
   scanSourceTokens file source = scanMoreWith scanSourceQuoted file source (stringLength source) (Cursor 0 1 1);
   scanMore :: String -> String -> Int -> Cursor -> Either String Scanned;
   scanMore = scanMoreWith scanQuoted;
+  sharedSpelling source start end first known = let {
+    width = end - start;
+    matches name position = if position >= width then True else
+      stringCodeAt name position == stringCodeAt source (start + position) && matches name (position + 1);
+    key = (width - 2) * 128 + first;
+    fresh = tokenSpelling source start end first;
+    store = seq fresh ((,) fresh (IM.insert key fresh known))
+  } in if width < 2 || width > 32 || first < 65 || first > 122 then (,) fresh known
+    else case IM.lookup key known of {
+      Just name -> if matches name 0 then (,) name known else store; Nothing -> store
+    };
+  -- A scanner consumer chooses how to collect ordinary ASCII words, decimal
+  -- tokens, punctuation and the full lexer branch. The public raw scanner
+  -- retains its lazy token list, including an explicitly supplied prefix.
+  data TokenOutput h = TokenOutput (Int -> Token -> h -> h) (Int -> Token -> h -> h)
+    (Token -> h -> h) (Token -> h -> h) (h -> Token -> Either String Scanned);
+  rawTokenOutput = TokenOutput (\_ -> (:)) (\_ -> (:)) (:) (:)
+    (\seen end -> Right (Scanned (reverse seen) end));
+  -- Fast lowercase words and single punctuation have no shared-grammar
+  -- lookahead. A plain decimal needs it only before a letter or dot. Other
+  -- tokens retain the full spelling and neighbor checks. Lexing reaches EOF
+  -- first, so a later scanner failure still takes precedence.
+  data SharedTokenHistory = NoSharedTokens | PlainSharedToken Token SharedTokenHistory |
+    CheckedSharedToken Token SharedTokenHistory | CapitalSharedToken Token SharedTokenHistory |
+    PossibleLayoutWord Token SharedTokenHistory;
+  data SharedTokenChecks = NoSharedChecks | SharedTokenCheck Token ([] Token) SharedTokenChecks;
+  scanValidatedSharedTokens = scanSharedWithLayout (\tokens end _ -> Right (Scanned tokens end));
+  sharedLayoutKeyword text = case stringLength text of {
+    2 -> eqString text "of" || eqString text "do";
+    3 -> eqString text "let";
+    5 -> eqString text "where";
+    _ -> False
+  };
+  scanSharedWithLayout complete file source = let {
+    word first = if first == 100 || first == 108 || first == 111 || first == 119 then PossibleLayoutWord
+      else if first >= 97 && first <= 122 then PlainSharedToken
+      else if first >= 65 && first <= 90 then CapitalSharedToken else CheckedSharedToken;
+    number next = if sharedIdentifierFirst next || next == 46 then CheckedSharedToken else PlainSharedToken;
+    validate todo = case todo of {
+      NoSharedChecks -> Right ();
+      SharedTokenCheck token following rest -> do { validateSharedAt file token following; validate rest }
+    };
+    -- Reverse the scanner's history once. Each deferred check sees its real
+    -- following tokens, and validation still visits them in source order.
+    -- During reversal the following token is already available. Only a
+    -- keyword can open an implicit block. Full-scanner tokens can follow
+    -- comments or tabs and must be checked as well.
+    braced token following rest = if sharedLayoutKeyword (tokenText token) then case following of {
+      (:) next _ -> eqString (tokenText next) "{" && rest; [] -> False
+    } else rest;
+    finish end history ordered checks blocks = case history of {
+      NoSharedTokens -> do { validate checks; complete ordered end blocks };
+      PlainSharedToken token rest -> finish end rest ((:) token ordered) checks blocks;
+      PossibleLayoutWord token rest -> finish end rest ((:) token ordered) checks (braced token ordered blocks);
+      -- Only a token from the full-check branch can start with a dot.
+      -- While reversing it, schedule a preceding capital's qualification
+      -- check before this token's own check.
+      CheckedSharedToken token rest -> let {
+        following = (:) token ordered;
+        pending = SharedTokenCheck token ordered checks;
+        explicit = braced token ordered blocks
+      } in case rest of {
+        CapitalSharedToken prefix more -> let {
+          name = tokenText token;
+          startsDot = stringLength name > 0 && stringCodeAt name 0 == 46
+        } in finish end more ((:) prefix following)
+          (if startsDot then SharedTokenCheck prefix following pending else pending) explicit;
+        _ -> finish end rest following pending explicit
+      };
+      CapitalSharedToken token rest -> finish end rest ((:) token ordered) checks blocks
+    };
+    output = TokenOutput word number PlainSharedToken CheckedSharedToken
+      (\history end -> finish end history [] NoSharedChecks True)
+  } in collectTokensWith output scanSourceQuoted file source (stringLength source) IM.empty NoSharedTokens (Cursor 0 1 1);
   scanMoreWith :: (String -> String -> Int -> Cursor -> Either String Cursor) ->
                   String -> String -> Int -> Cursor -> Either String Scanned;
-  scanMoreWith quoted file source size cursor =
+  scanMoreWith quoted file source size = collectTokens quoted file source size IM.empty [];
+  -- Plain ASCII tokens and whitespace remain on the same indexed input.
+  -- Fall back at comments, quoted forms, numeric prefixes or a Unicode
+  -- continuation, where the full lexer owns the decision and diagnostic.
+  collectTokens = collectTokensWith rawTokenOutput;
+  collectTokensWith output@(TokenOutput word number punctuation _ finish) quoted file source size table tokens (Cursor start row col) = let {
+    letter c = (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95 || c == 39;
+    identEnd i = if i >= size then i else let { c = stringCodeAt source i } in
+      if letter c || isDigit c then identEnd (i + 1) else i;
+    digitsEnd i = if i < size && isDigit (stringCodeAt source i) then digitsEnd (i + 1) else i;
+    -- The scanner supplies the scalar separately so a word or decimal
+    -- consumer receives all its arguments directly at each token.
+    punctuationAt _ token seen = punctuation token seen;
+    loop i line column known seen = if i >= size then finish seen (Token "" line column line column)
+      else let {
+        c = stringCodeAt source i;
+        next = i + 1;
+        slow = collectFullTokenWith output quoted file source size known seen (Cursor i line column);
+        emit save scalar end names spelling = let {
+          lastColumn = column + (end - i);
+          token = Token spelling line column line lastColumn;
+          more = save scalar token seen
+        } in seq lastColumn (seq more (loop end line lastColumn names more));
+        found end = case sharedSpelling source i end c known of { (,) spelling names -> emit word c end names spelling };
+        decimal = let { end = digitsEnd next; after = codeAt source size end } in
+          if after == 46 || after == 69 || after == 101 ||
+            (c == 48 && end == next && (after == 88 || after == 120 || after == 79 || after == 111))
+          then slow else emit number after end known (tokenSpelling source i end c);
+        -- Dispatch supplies the immutable spelling directly. Only an opening
+        -- brace needs lookahead, since it can introduce a block comment.
+        punct spelling = emit punctuationAt c next known spelling
+      } in if c == 32 then let { colNext = column + 1 } in seq colNext (loop next line colNext known seen)
+        else if c == 10 then let { rowNext = line + 1 } in seq rowNext (loop next rowNext 1 known seen)
+        else if letter c then let { end = identEnd next } in
+          if end < size && stringCodeAt source end >= 128 then slow
+          else if end == next then emit word c next known (V.at singleAsciiTokens (V.fromInt c))
+          else found end
+        else if isDigit c then decimal
+        else case c of {
+          40 -> punct "("; 41 -> punct ")"; 44 -> punct ","; 59 -> punct ";";
+          91 -> punct "["; 93 -> punct "]"; 125 -> punct "}";
+          123 -> if codeAt source size next == 45 then slow else punct "{";
+          _ -> slow
+        }
+  } in loop start row col table tokens;
+  collectFullToken = collectFullTokenWith rawTokenOutput;
+  collectFullTokenWith output@(TokenOutput _ _ _ save finish) quoted file source size known seen cursor =
     case skipWhite file source size cursor of {
       Left e -> Left e;
       Right begin ->
         case begin of {
           Cursor i line column ->
             if (i >= size)
-            then Right (Scanned [] (Token "" line column line column))
+            then finish seen (Token "" line column line column)
             else let {
                    c = codeAt source size i
                  } in
@@ -245,11 +366,11 @@ module Bootstrap.Lexer where {
                      then quoted file source size (advance c begin)
                      else Right
                             (if (U.isAlpha c || ((c == 95) || (c == 39)))
-                             then consumeWhile isIdentChar source size begin
+                             then consumeRun isIdentChar source size begin
                              else if isDigit c
                                   then scanNumber source size begin
                                   else if isOperator c
-                                       then consumeWhile isOperator source size begin
+                                       then consumeRun isOperator source size begin
                                        else advance c begin)
                  } in
                  case next of {
@@ -257,17 +378,10 @@ module Bootstrap.Lexer where {
                    Right end ->
                      case end of {
                        Cursor j lastLine lastColumn ->
-                         case scanMoreWith quoted file source size end of {
-                           Left e -> Left e;
-                           Right (Scanned rest finish) ->
-                             Right
-                               (Scanned
-                                  ((:)
-                                     (Token (stringSlice source i (j - i)) line column lastLine
-                                        lastColumn)
-                                     rest)
-                                  finish)
-                         }
+                         case sharedSpelling source i j c known of { (,) spelling nextKnown -> let {
+                           token = Token spelling line column lastLine lastColumn;
+                           more = save token seen
+                         } in seq more (collectTokensWith output quoted file source size nextKnown more end) }
                      }
                  }
         }
@@ -750,6 +864,14 @@ module Bootstrap.Lexer where {
               then Right ((:) name [])
               else mapEither ((:) name) (pragmaExtensionsAt text (i + 1) (i + 1))
     else pragmaExtensionsAt text begin (i + 1);
+  -- Printable ASCII with no quote or comment opener stays on the same line.
+  -- Walk a run with a scalar index and advance the source column once.
+  plainSharedChar :: Int -> Bool;
+  plainSharedChar c = c >= 32 && c < 127 && c /= 34 && c /= 45 && c /= 123;
+  plainSharedEnd :: String -> Int -> Int -> Int;
+  plainSharedEnd source size index =
+    if index < size && plainSharedChar (stringCodeAt source index)
+    then plainSharedEnd source size (index + 1) else index;
   validateSharedSource :: String -> String -> Int -> Cursor -> Int -> Either String ();
   validateSharedSource file source size cursor prologueEnd =
     let {
@@ -760,8 +882,13 @@ module Bootstrap.Lexer where {
     else let {
            c = codeAt source size i
          } in
-         if ((c == 32) || (c == 10))
-         then validateSharedSource file source size (advance c cursor) prologueEnd
+         if plainSharedChar c then case advance c cursor of {
+           Cursor start line column -> let {
+             end = plainSharedEnd source size start;
+             nextColumn = column + (end - start)
+           } in seq nextColumn (validateSharedSource file source size (Cursor end line nextColumn) prologueEnd)
+         }
+         else if c == 10 then validateSharedSource file source size (advance c cursor) prologueEnd
          else if U.isSpace c
               then Left
                      (lexError file cursor "shared source requires LF and spaces-only whitespace")
@@ -829,12 +956,11 @@ module Bootstrap.Lexer where {
          then sharedGapEnd source (i + 1) end
          else if (c == 92) then Right i else Left "shared string gaps allow only spaces and LF";
   sharedIdentifier :: String -> Bool;
-  sharedIdentifier text =
-    ((stringLength text > 0) &&
-     (sharedIdentifierFirst (stringCodeAt text 0) &&
-      not
-        (stringAny (\c -> not (sharedIdentifierFirst c || (isDigit c || ((c == 95) || (c == 39)))))
-           text)));
+  sharedIdentifier text = let {
+    size = stringLength text;
+    invalid c = not (sharedIdentifierFirst c || isDigit c || c == 95 || c == 39)
+  } in size > 0 && sharedIdentifierFirst (stringCodeAt text 0) &&
+    not (stringAnyAt invalid text 1 size);
   sharedIdentifierFirst :: Int -> Bool;
   sharedIdentifierFirst c = (((c >= 65) && (c <= 90)) || ((c >= 97) && (c <= 122)));
   sharedValueOperators :: [] String;
@@ -843,54 +969,65 @@ module Bootstrap.Lexer where {
      "&&", "||", ">>=", ">>", "<*>", "<$", "*>", "<*"];
   sharedPunctuation :: [] String;
   sharedPunctuation = append ((:) "@" ((:) "~" ((:) "[" ((:) "]" ((:) ":" sharedValueOperators))))) ((:) ("::") ((:) ("->") ((:) ("<-") ((:) ("=>") ((:) ("=") ((:) ("|") ((:) (".") ((:) ("..") ((:) ("\\") ((:) ("(") ((:) (")") ((:) ("{") ((:) ("}") ((:) (";") ((:) (",") ((:) ("_") ([])))))))))))))))));
+  sharedValueOperatorSet :: Set String;
+  sharedValueOperatorSet = Set.fromList compareString sharedValueOperators;
+  sharedPunctuationSet :: Set String;
+  sharedPunctuationSet = Set.fromList compareString sharedPunctuation;
   sharedQualifiedOperator text =
-    stringLength text > 1 && stringCodeAt text 0 == 46 && elem eqString (stringSlice text 1 (stringLength text - 1)) sharedValueOperators;
+    stringLength text > 1 && stringCodeAt text 0 == 46 && Set.member compareString (stringSlice text 1 (stringLength text - 1)) sharedValueOperatorSet;
+  -- The finite punctuation vocabulary is also the source of the ASCII
+  -- dispatch table. Boundary checks and their diagnostics still use token spans.
+  simpleSharedToken :: V.IndexVec Int Bool;
+  simpleSharedToken = V.fromList (map (\c -> sharedIdentifierFirst c || isDigit c || c == 34 ||
+    Set.member compareString (stringFromCode c) sharedPunctuationSet) (range 0 127));
+  sharedTokenAllowed :: String -> Int -> Int -> Bool;
+  sharedTokenAllowed text size first =
+    if size == 0 then False else if size == 1 && first >= 0 && first < 128
+    then V.at simpleSharedToken (V.fromInt first)
+    else if isDigit first || first == 34 then True
+    else if sharedIdentifierFirst first then sharedIdentifier text
+    else Set.member compareString text sharedPunctuationSet || sharedQualifiedOperator text;
   validateSharedTokens :: String -> [] Token -> Either String ();
-  validateSharedTokens file tokens =
-    case tokens of {
-      [] -> Right ();
-      (:) token rest ->
-        do {
-          let {
-            text = tokenText token
-          };
-          unless
-            (sharedIdentifier text ||
-             (elem eqString text sharedPunctuation || sharedQualifiedOperator text ||
-              ((stringLength text > 0) &&
-               (isDigit (stringCodeAt text 0) || (stringCodeAt text 0 == 34)))))
-            (Left
-               (file ++
-                (":" ++
-                 (showInt (tokenLine token) ++
-                  (":" ++
-                   (showInt (tokenColumn token) ++
-                    (": token is outside shared-haskell-v1: " ++ text)))))));
-          case rest of {
-            (:) next following -> do {
-              when (stringLength text > 0 && stringCodeAt text 0 >= 65 && stringCodeAt text 0 <= 90 && (eqString (tokenText next) "." || sharedQualifiedOperator (tokenText next))) (do {
-                unless (tokenEndLine token == tokenLine next && tokenEndColumn token == tokenColumn next) (Left (file ++ ": qualified names must not contain whitespace before the dot"));
-                when (eqString (tokenText next) ".") (case following of {
-                  (:) final _ -> unless (tokenEndLine next == tokenLine final && tokenEndColumn next == tokenColumn final) (Left (file ++ ": qualified names must not contain whitespace after the dot"));
-                  [] -> Left (file ++ ": incomplete qualified name")
-                })
-              });
-              when
-                ((stringLength text > 0) &&
-                 (isDigit (stringCodeAt text 0) &&
-                  ((tokenEndLine token == tokenLine next) &&
-                   ((tokenEndColumn token == tokenColumn next) &&
-                    (sharedIdentifier (tokenText next) || eqString (tokenText next) ".")))))
-                (Left (file ++ ": malformed numeric token boundary"))
-              };
-            _ -> Right ()
-          };
-          validateSharedTokens file rest
-        }
+  validateSharedTokens file tokens = case tokens of {
+    [] -> Right ();
+    (:) token rest -> do { validateSharedAt file token rest; validateSharedTokens file rest }
+  };
+  validateSharedAt file token rest = do {
+    let {
+      text = tokenText token;
+      size = stringLength text;
+      first = if size > 0 then stringCodeAt text 0 else (0 - 1)
     };
+    unless (sharedTokenAllowed text size first)
+      (Left
+         (file ++
+          (":" ++
+           (showInt (tokenLine token) ++
+            (":" ++
+             (showInt (tokenColumn token) ++
+              (": token is outside shared-haskell-v1: " ++ text)))))));
+    case rest of {
+      (:) next following -> do {
+        when (first >= 65 && first <= 90 && (eqString (tokenText next) "." || sharedQualifiedOperator (tokenText next))) (do {
+          unless (tokenEndLine token == tokenLine next && tokenEndColumn token == tokenColumn next) (Left (file ++ ": qualified names must not contain whitespace before the dot"));
+          when (eqString (tokenText next) ".") (case following of {
+            (:) final _ -> unless (tokenEndLine next == tokenLine final && tokenEndColumn next == tokenColumn final) (Left (file ++ ": qualified names must not contain whitespace after the dot"));
+            [] -> Left (file ++ ": incomplete qualified name")
+          })
+        });
+        when
+          (isDigit first &&
+            ((tokenEndLine token == tokenLine next) &&
+             ((tokenEndColumn token == tokenColumn next) &&
+              (sharedIdentifier (tokenText next) || eqString (tokenText next) "."))))
+          (Left (file ++ ": malformed numeric token boundary"))
+        };
+      _ -> Right ()
+    }
+  };
   -- Cache consumers must bind this semantic identity as well as raw source bytes.
   frontendSemanticVersion :: String;
   frontendSemanticVersion = "mlf-frontend/shared-haskell-v1/9";
   builtinInterfaceVersion :: String;
-  builtinInterfaceVersion = "mlf-primitive/shared-haskell-v1/14"
+  builtinInterfaceVersion = "mlf-primitive/shared-haskell-v1/17"
 }

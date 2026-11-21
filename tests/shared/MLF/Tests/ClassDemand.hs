@@ -9,6 +9,8 @@ module MLF.Tests.ClassDemand where {
   import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.ClassDemand as Q;
+  import qualified Bootstrap.Classes as C;
+  import qualified Bootstrap.Fresh as F;
 
   frames :: [] Q.Frame;
   frames = (:) (Q.Frame 0 Nothing 100)
@@ -195,8 +197,60 @@ module MLF.Tests.ClassDemand where {
           ((:) ((,) 1 (Q.InstantiateNode 100 0)) []))));
       Right ()
     };
+  plainApplication :: Either String ();
+  plainApplication = do {
+    (,,) plain left right <- F.runFresh [] (do {
+      f <- C.qualifiedPlain (SVar "f");
+      x <- C.qualifiedPlain (SIntLit 3);
+      fx <- C.qualifiedApplication f x;
+      y <- C.qualifiedPlain (SIntLit 5);
+      plain <- C.qualifiedApplication fx y;
+      needed <- C.qualifiedMake (C.QualifiedVariable (LexicalRef "method") Nothing)
+        (Q.SeedNode 10) (C.QualifiedBuild [] oneSeed [] []);
+      left <- C.qualifiedApplication needed plain;
+      right <- C.qualifiedApplication plain needed;
+      F.freshPure ((,,) plain left right)
+    });
+    case (,) (C.qualifiedExpression plain) (C.qualifiedBuild plain) of {
+      (,) (C.QualifiedExpr 4 (C.QualifiedPlain (SApp (SApp (SVar name) (SIntLit 3)) (SIntLit 5))))
+          (C.QualifiedBuild [] [] [] ((:) ((,) 4 Q.Empty) [])) ->
+        ensure (eqString name "f") "plain application changed the callee";
+      _ -> Left "plain application changed its tree, fresh supply or root demand"
+    };
+    mapM_ (\((,) expected result) -> case C.qualifiedBuild result of {
+      C.QualifiedBuild [] seeds [] nodes -> do {
+        ensure (C.qualifiedNode (C.qualifiedExpression result) == expected &&
+          eqList eqInt (IM.keys (IM.fromList nodes)) [4,5,expected])
+          "mixed application lost a reachable node";
+        plan <- Q.solve frames seeds [] (IM.fromList nodes);
+        slot <- Q.seedSlot plan 10;
+        assertSlots plan 4 [];
+        assertSlots plan expected [slot]
+      };
+      _ -> Left "mixed application changed its frame or use table"
+    }) [(,) 6 left,(,) 7 right]
+  };
+  orderedSeedEquations :: Either String ();
+  orderedSeedEquations = do {
+    let { seeds = [Q.Seed 30 "Unused" 2,Q.Seed 20 "Inspect" 2,Q.Seed 10 "Inspect" 2] };
+    let { nodes = IM.fromList [(,) 1 Q.Empty,(,) 3 (Q.SeedNode 20),
+      (,) 5 (Q.RefNode 1),(,) 7 (Q.SeedNode 10),(,) 8 (Q.UnionNodes [7,3,7]),
+      (,) 9 (Q.RefNode 8),(,) 12 (Q.UnionNodes [9,5,8]),(,) 14 (Q.SeedNode 20)] };
+    plan <- Q.solve frames seeds [Q.Use 100 2 1] nodes;
+    let { universe = Q.allocateSeeds (IM.fromList (map (\seed -> (,) (Q.seedId seed) seed) seeds)) };
+    (,) fixed updates <- Q.saturate universe (IM.keysSet (Q.universeSlots universe))
+      nodes (Q.dependentNodes nodes) (IM.keysSet nodes) (IM.map (\_ -> IS.empty) nodes) 0;
+    ensure (IM.eqIntMap IS.eqIntSet fixed (Q.nodeSets plan) && Q.saturationUpdates plan == updates &&
+      updates == 6 && Q.universeSize plan == 3 && Q.transitionCount plan == 0)
+      "ordered demand equations disagree with immutable saturation";
+    first <- Q.seedSlot plan 10;
+    second <- Q.seedSlot plan 20;
+    ensure (first == 0 && second == 1) "seed slots changed allocation order";
+    assertSlots plan 9 [first,second]
+  };
   checks :: [] ((,) String (Either String ()));
-  checks = append
+  checks = append [(,) "ordered seed equations share final slot sets" orderedSeedEquations,
+    (,) "plain applications and evidence boundaries" plainApplication] (append
     ((:) ((,) "slot supply independent of cardinality" independentSupply)
       ((:) ((,) "seedless exact plan across all demand forms" emptyDemandKinds)
         ((:) ((,) "seedless exact validation and error order" emptyValidation) [])))
@@ -207,7 +261,7 @@ module MLF.Tests.ClassDemand where {
           ((:) ((,) "completed sibling full lineage" siblingLineage)
             ((:) ((,) "captured ancestor origin" capturedOrigin)
               ((:) ((,) "no unreachable Cartesian expansion" unreachableUses)
-                ((:) ((,) "invalid rank and reference rejection" validation) []))))))));
+                ((:) ((,) "invalid rank and reference rejection" validation) [])))))))));
   independentSupply :: Either String ();
   independentSupply = do {
     let { frameMap = IM.fromList (map (\frame -> (,) (Q.frameId frame) frame) frames) };

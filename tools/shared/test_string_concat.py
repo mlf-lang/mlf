@@ -25,7 +25,7 @@ REFERENCE_SHA256 = '308a131b9dd34dba11d816d5c26d08c05147296332ab5ee05f13bec9d3d9
 REFERENCE_BODY_SHA256 = 'b0a5d2a2b997e629a96290786fc5173d575921e0b35e8e219c362a55e392167d'
 HOST_EXPECTED = (
     b'PASS concat-engines 3\n'
-    b'PASS concat-metadata 8\n'
+    b'PASS concat-metadata 9\n'
     b'PASS concat-interpreter-payload 3\n'
     b'PASS concat-literals 16\n'
     b'PASS concat-finite 1555\n'
@@ -213,7 +213,7 @@ def main():
                        overrides={'GHC_ENVIRONMENT': '-'})
             artifact(binary)
             runner.run('run-ghc', [binary], expected=HOST_EXPECTED, timeout=180)
-            record['ghc_inventory'] = {'engines': 3, 'metadata_oracles': 8, 'interpreter_payload_oracles': 3,
+            record['ghc_inventory'] = {'engines': 3, 'metadata_oracles': 9, 'interpreter_payload_oracles': 3,
                                        'literal_cases': 16,
                                        'finite_cases': 1555, 'large_cases': 5, 'demand_cases': 13,
                                        'demand_evaluations': 39}

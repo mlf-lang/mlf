@@ -17,6 +17,15 @@ paths and requires Clang plus GMP/BDWGC development dependencies. Its normal
 source, toolchain, and independent-generation gates still apply on either host.
 A legacy release seed is not a substitute for the current shared sources.
 
+For a checkout with a selected package manager and native build runner, the
+[developer command](../../CONTRIBUTING.md#developer-commands) builds the bench
+target and invokes it from the repository root:
+
+```sh
+python3 tools/dev.py bench apps --candidate /absolute/candidate/emlf \
+  --baseline /absolute/baseline/emlf --output .mlf-build/app-benchmarks
+```
+
 On macOS, install Clang/LLVM, GMP, pkg-config and BDWGC; for example:
 
 ```sh

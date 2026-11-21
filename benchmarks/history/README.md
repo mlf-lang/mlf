@@ -44,3 +44,18 @@ At integrated source commit `620225f1a17b177e3d1a93f926c889639e207c88`,
 `Bootstrap.Resolved` add two paths. The loader checks all 198 physical file
 identities and the resulting 137-module registry. The benchmark gate also
 reconstructs both historical benchmark dependencies byte for byte.
+
+## Signed-chain performance successor
+
+The live benchmark manifest now follows the already authenticated performance
+transition in `pr43-reconciliation-migration.json` for `Bootstrap.Types` and
+`Bootstrap.Map`. The former adds the current source primitives; the latter
+contains the ordered-run map construction change. The source adapter validates
+both endpoints and the complete current inventory before the benchmark bridge
+admits these live pins. The bridge also reconstructs the historical Map bytes
+and checks their unchanged historical manifest SHA, alongside Types and Std.
+Only these three explicitly named source pins and the two existing archive
+pins may differ from the archived manifest. Workload definitions, flags,
+upstream provenance, historical source fixtures and measurements are unchanged.
+This is source provenance maintenance, not a new benchmark measurement or a
+claim that current performance is unchanged.

@@ -81,11 +81,11 @@ module Bootstrap.CrateArtifact where {
   objectFragments (EnvelopeCrateObject _ _ fs) = fs;
   objectFragments (OpenCrateObject _ _) = panic "open crate requires explicit fragment references";
   definitionName :: String -> Modules.Entity -> String;
-  definitionName identity = definitionNameEncoded (Separate.encoded identity);
+  definitionName identity = definitionNameEncoded (Separate.compactName identity);
   ordinaryDefinitionName :: String -> Modules.Entity -> String;
-  ordinaryDefinitionName identity = ordinaryDefinitionNameEncoded (Separate.encoded identity);
+  ordinaryDefinitionName identity = ordinaryDefinitionNameEncoded (Separate.compactName identity);
   -- Partial application shares the immutable crate prefix across its exports.
-  -- The ordinary encoder and complete entity identity remain unchanged.
+  -- The versioned component codec preserves the complete crate/entity identity.
   definitionNameEncoded :: String -> Modules.Entity -> String;
   definitionNameEncoded encodedIdentity entity =
     case Separate.managedBuiltinName entity of {
@@ -101,10 +101,10 @@ module Bootstrap.CrateArtifact where {
                   Modules.Constructor _ -> True;
                   _ -> False
                 }))
-           then "Module_"
-           else "module_") ++
+           then "Module_c1_"
+           else "module_c1_") ++
           (encodedIdentity ++
-           ("z_" ++ Separate.encoded (Separate.entityEncoding entity))));
+           ("_" ++ Separate.compactName (Separate.entityEncoding entity))));
   startsWith prefix text =
     ((stringLength text >= stringLength prefix) &&
      eqString prefix (stringSlice text 0 (stringLength prefix)));
@@ -155,7 +155,7 @@ module Bootstrap.CrateArtifact where {
       (map
          (\((,) n entities) ->
             Separate.pairEncoding
-              ((,) n (Separate.pack (map Separate.entityEncoding (sortEntities entities)))))
+              ((,) n (Separate.pack (sortStrings (map Separate.entityEncoding entities)))))
          (sortPairs es));
   encodeImports is =
     Separate.pack
@@ -172,7 +172,7 @@ module Bootstrap.CrateArtifact where {
       exported = concatMap snd (crateExports iface)
     } in
     let {
-      publicNames = Set.fromList compareString (map (definitionNameEncoded (Separate.encoded (crateId iface))) exported)
+      publicNames = Set.fromList compareString (map (definitionNameEncoded (Separate.compactName (crateId iface))) exported)
     } in
     let {
       public = filter (\p -> Set.member compareString (fst p) publicNames) (crateBindings iface)
@@ -237,6 +237,31 @@ module Bootstrap.CrateArtifact where {
       fields = interfaceFields iface
     } in
     Separate.pack (snoc fields (Separate.fingerprint (Separate.pack fields)));
+  -- pack is injective, and the trailing checksum is determined by these
+  -- fields. Comparing the canonical fields is therefore exactly equivalent
+  -- to comparing encodeInterface, without two whole-interface fingerprints.
+  sameInterface a b = eqList eqString (interfaceFields a) (interfaceFields b);
+  -- Both inputs at the prepared linker are already admitted. Exact typed
+  -- equality implies equality of every canonical field. A representational
+  -- difference still uses the ordinary sorted and normalized comparison.
+  sameAdmittedInterface a b = let {
+    pairs = eqPair eqString;
+    entities = eqList (\x y -> Modules.compareEntity x y == 0);
+    strings = eqList eqString;
+    identical = eqString (crateId a) (crateId b) &&
+      eqList (Equality.eqTriple eqString eqString eqString) (crateDependencies a) (crateDependencies b) &&
+      strings (crateModules a) (crateModules b) &&
+      eqList (pairs entities) (crateExports a) (crateExports b) &&
+      eqList (pairs strings) (crateImports a) (crateImports b) &&
+      eqList Equality.eqDataDecl (crateData a) (crateData b) &&
+      eqList Equality.eqSClassDecl (crateClasses a) (crateClasses b) &&
+      eqList (pairs Equality.eqSInstanceDecl) (crateInstances a) (crateInstances b) &&
+      eqList Equality.eqDataDecl (crateLoweredData a) (crateLoweredData b) &&
+      eqList (pairs Structure.sameEncodedXType) (crateBindings a) (crateBindings b) &&
+      eqString (crateEntry a) (crateEntry b) &&
+      eqString (crateObjectFingerprint a) (crateObjectFingerprint b) &&
+      eqList (pairs Equality.eqBool) (crateProtection a) (crateProtection b)
+  } in identical || sameInterface a b;
   decodeDependency text =
     do {
       fields <- Separate.unpack text;
@@ -358,7 +383,7 @@ module Bootstrap.CrateArtifact where {
            ensure declared ("crate exports an undeclared entity: " ++ Modules.label entity)
          };
   builtinCrateIdentity :: String;
-  builtinCrateIdentity = "mlf:builtin-shared-haskell-v1:13";
+  builtinCrateIdentity = "mlf:builtin-shared-haskell-v1:15";
   validateBuiltinOwnership iface =
     if (any Modules.isBuiltinModule (crateModules iface) ||
         ((stringLength (crateId iface) >= stringLength "mlf:builtin-shared-haskell-v1:") &&
@@ -382,10 +407,15 @@ module Bootstrap.CrateArtifact where {
       uniqueNames "module" (crateModules iface);
       uniqueNames "module exports" (map fst (crateExports iface));
       uniqueNames "module reach" (map fst (crateImports iface));
-      uniqueNames "binding" (map fst (crateBindings iface));
-      uniqueNames "binding protection" (map fst (crateProtection iface));
-      ensure (eqList eqString (sortStrings (map fst (crateProtection iface)))
-        (sortStrings (map fst (crateBindings iface))))
+      -- Keep the admitted inventories for equality and entry membership;
+      -- rebuilding sorted lists and a value map repeats the same key work.
+      let { bindingNames = map fst (crateBindings iface);
+        protectionNames = map fst (crateProtection iface);
+        bindingSet = Set.fromList compareString bindingNames;
+        protectionSet = Set.fromList compareString protectionNames };
+      ensure (length bindingNames == Set.size bindingSet) "duplicate crate binding";
+      ensure (length protectionNames == Set.size protectionSet) "duplicate crate binding protection";
+      ensure (Set.eqSet eqString protectionSet bindingSet)
         "crate protection inventory differs from owned bindings";
       uniqueNames "instance" (map fst (crateInstances iface));
       uniqueNames "datatype" (map D.datatypeName (crateLoweredData iface));
@@ -402,7 +432,7 @@ module Bootstrap.CrateArtifact where {
       traverseEither Separate.validModuleName (crateModules iface);
       traverseEither (\((,) _ modules) -> traverseEither Separate.validModuleName modules)
         (crateImports iface);
-      traverseEither (validateOwnExportNamed (definitionNameEncoded (Separate.encoded (crateId iface))) iface (exportInventory iface))
+      traverseEither (validateOwnExportNamed (definitionNameEncoded (Separate.compactName (crateId iface))) iface (exportInventory iface))
         (concatMap snd (crateExports iface));
       traverseEither
         (\((,) n ty) ->
@@ -419,7 +449,7 @@ module Bootstrap.CrateArtifact where {
         (crateInstances iface);
       ensure
         (eqString (crateEntry iface) "" ||
-         M.member compareString (crateEntry iface) (M.fromList compareString (crateBindings iface)))
+         Set.member compareString (crateEntry iface) bindingSet)
         "crate entry is not an owned binding";
       if eqString (crateEntry iface) ""
       then Right ()
@@ -645,16 +675,18 @@ module Bootstrap.CrateArtifact where {
   -- Prelude has one shared crate identity even when several independent leaf
   -- crates use it. Its bootstrap object is translated once; user crates still
   -- compile their own declarations through the ordinary SCC query pipeline.
-  declarationVariableReads source = let {
-    child = declarationVariableReads;
+  declarationVariableReads = variableReadsWith Set.singleton;
+  variableReadsWith :: (XName -> Set XName) -> XTerm -> Set XName;
+  variableReadsWith one source = let {
+    child = variableReadsWith one;
     join = Set.unions X.compareName
   } in case source of {
-    XVarTerm name -> Set.singleton name;
+    XVarTerm name -> one name;
     XAbs _ _ body -> child body;
-    XApp a b -> join [child a, child b];
+    XApp a b -> Set.union X.compareName (child a) (child b);
     XTypeAbs _ _ body -> child body;
     XTypeApp body _ -> child body;
-    XLet _ rhs body -> join [child rhs, child body];
+    XLet _ rhs body -> Set.union X.compareName (child rhs) (child body);
     XLetRec definitions body -> join ((:) (child body)
       (map (\((,,) _ _ rhs) -> child rhs) definitions));
     XCase subject _ alternatives -> join ((:) (child subject)
@@ -1653,6 +1685,41 @@ module Bootstrap.CrateArtifact where {
          (eqString name entry ||
           (startsWith "select_" name || (startsWith "super_" name || startsWith "instance_" name))))
       bindings;
+  -- A closed monotype has no type instantiation or dictionary application at
+  -- the entry use. The linked binding already carries the checked type; keep
+  -- the import-boundary checks, but do not infer fake declarations for it.
+  directEntryType dictionaries ty = case ty of {
+    XCon name arguments -> not (M.member compareString name dictionaries) &&
+      all (directEntryType dictionaries) arguments;
+    XArrow argument result -> directEntryType dictionaries argument &&
+      directEntryType dictionaries result;
+    XApply function argument -> directEntryType dictionaries function &&
+      directEntryType dictionaries argument;
+    _ -> False
+  };
+  -- Preserve the old import adapter's rejection of noncanonical legacy
+  -- schemes (including dead quantifiers). Bounded schemes use inference.
+  directEntryImport ty = case ty of {
+    XVar _ -> True;
+    XArrow a b -> directEntryImport a && directEntryImport b;
+    XCon _ arguments -> all directEntryImport arguments;
+    XApply f a -> directEntryImport f && directEntryImport a;
+    XForall variable XBot body -> Set.member T.compareTyVar variable (T.freeVars body) && directEntryImport body;
+    XForall variable (XBotKind _) body -> Set.member T.compareTyVar variable (T.freeVars body) && directEntryImport body;
+    _ -> False
+  };
+  directEntry signatures available entry = do {
+    _ <- traverseEither (\((,) name expected) ->
+      case M.lookup compareString name available of {
+        Nothing -> Left ("missing entry symbol: " ++ name);
+        Just ((,) _ actual) -> ensure (T.alphaEq expected actual)
+          ("entry parameter type mismatch: " ++ name)
+      }) (M.toList signatures);
+    case M.lookup compareString entry available of {
+      Nothing -> Left ("missing entry symbol: " ++ entry);
+      Just ((,) name _) -> Right (XVarTerm name)
+    }
+  };
   -- Entry inference instantiates one already checked value. Its closed
   -- implementation dependencies are linked above and need no fake source
   -- parameters here. Keep every generated selector/dictionary external so
@@ -1706,6 +1773,15 @@ module Bootstrap.CrateArtifact where {
                     Separate.sourceScheme (importDictionaries n) ty)
                  signatures
            };
+           case M.lookup compareString entry signatures of {
+             Just ty -> if directEntryType dictionaries ty && all (compose directEntryImport snd) (M.toList signatures)
+               then directEntry signatures available entry
+               else inferEntry serial interfaces available entry visibleInstances signatures conventions externals;
+             Nothing -> inferEntry serial interfaces available entry visibleInstances signatures conventions externals
+           }
+         };
+  inferEntry serial interfaces available entry visibleInstances signatures conventions externals = do {
+           let { classes = concatMap crateClasses interfaces };
            lowered <-
              Classes.lowerSeparateClassesWithImports conventions externals (map fst visibleInstances)
                (SClassProgram (concatMap crateData interfaces) classes (map snd visibleInstances)
@@ -1714,16 +1790,40 @@ module Bootstrap.CrateArtifact where {
            Separate.removeEntryParameters signatures available
              (snd (Separate.freshObject serial (Compiler.compiledTerm compiled)))
          };
-  linkCheckedObjectsV1 objects root =
+  linkCheckedObjectsV1 objects root = linkCheckedObjectsV1From
+    (FragmentState 0 M.empty [] [] Set.empty) [] objects root;
+  -- Compiler-owned closed spines can seed linking after exact installed-image
+  -- admission. Ordinary artifact APIs always start with the empty state above.
+  -- The complete assembled term still receives the final independent check.
+  linkCheckedObjectsV1From = linkCheckedObjectsV1Using finishLinkedState;
+  linkCheckedObjectsV1Using finish initial prelinked objects root = do {
+    parts <- linkedObjectParts initial prelinked objects root;
+    finish (fst parts) (snd parts)
+  };
+  linkCheckedObjectsV1Profiled profile finish initial prelinked objects root = do {
+    parts <- Host.phaseValue profile "link_ms" (Host.phaseEither (\pair -> seq (fst pair) (seq (snd pair) ())))
+      (linkedObjectParts initial prelinked objects root);
+    case parts of {
+      Left message -> ioReturn (Left message);
+      Right ((,) state entry) -> Host.phaseValue profile "final_check_ms" (Host.phaseEither (\value -> seq value ()))
+        (finish state entry)
+    }
+  };
+  linkedObjectParts initial prelinked objects root =
     do {
-      uniqueNames "object identity" (map (\o -> crateId (objectInterface o)) objects);
       let {
-        interfaces = map objectInterface objects
+        interfaces = append prelinked (map objectInterface objects)
       };
+      uniqueNames "object identity" (map crateId interfaces);
+      ensure (all (compose null crateDependencies) prelinked)
+        "prelinked crate must have no dependencies";
       let {
         byName = interfaceMap interfaces
       };
       ordered <- dependencyClosure byName [] [] ((:) root []);
+      let { ready = map crateId prelinked };
+      ensure (all (\identity -> elem eqString identity (map crateId ordered)) ready)
+        "prelinked crate is outside the dependency closure";
       traverseEither (validateDependencies byName) ordered;
       traverseEither (validateExportBoundary byName) ordered;
       dataEnv <- validateLayouts ordered;
@@ -1737,7 +1837,7 @@ module Bootstrap.CrateArtifact where {
         objectMap =
           M.fromList compareString (map (\o -> (,) (crateId (objectInterface o)) o) objects)
       };
-      program <- openProgram ordered objectMap root;
+      program <- openProgramFrom ready ordered objectMap root;
       state <-
         foldEither
           (\s i ->
@@ -1745,19 +1845,21 @@ module Bootstrap.CrateArtifact where {
                Nothing -> Left "missing crate object";
                Just o -> linkProgramCrate program byName layouts s o
              })
-          (FragmentState 0 M.empty [] [] Set.empty)
-          ordered;
+          initial
+          (filter (\iface -> not (elem eqString (crateId iface) ready)) ordered);
       let {
         rootInterface = M.findWithDefault compareString (panic "missing root crate") root byName
       };
       entry <-
         linkEntry (fragmentSerial state) ordered rootInterface (fragmentBindings state)
           (crateEntry rootInterface);
-      body <-
-        foldEither (\body declarations -> Separate.graft declarations body) entry
-          (fragmentBodies state);
-      Checked.check (XWithData (fragmentData state) body)
+      Right ((,) state entry)
     };
+  finishLinkedState state entry = do {
+    body <- foldEither (\body declarations -> Separate.graft declarations body) entry
+      (fragmentBodies state);
+    Checked.check (XWithData (fragmentData state) body)
+  };
   linkObjects objects root = mapEither Checked.term (linkCheckedObjects objects root);
   binaryInterfaceFields :: CrateInterface -> Structure.CrateInterfaceFields;
   binaryInterfaceFields (CrateInterface a b c d e f g h i j k l m) =
@@ -1790,7 +1892,7 @@ module Bootstrap.CrateArtifact where {
         actual <- fromBinaryInterfaceFields metadata;
         validateInterface expected;
         ensure (eqString (crateId actual) (crateId expected)) "crate object identity mismatch";
-        ensure (eqString (encodeInterface actual) (encodeInterface expected))
+        ensure (sameInterface actual expected)
           "crate object metadata mismatch";
         fragments <- traverseEither Storage.checkUnit raw;
         -- Preserve global datatype-name consistency from the old pooled and
@@ -1811,14 +1913,19 @@ module Bootstrap.CrateArtifact where {
     };
     _ -> Left "malformed binary crate object roots"
   };
-  readInterface path = do {
-    input <- Storage.read 3 path;
+  readInterface = readInterfaceProfiled Nothing;
+  readInterfaceProfiled profile path = Host.phaseIO profile "validate_ms" (do {
+    raw <- Host.phaseIO profile "read_ms" (Storage.readRaw path);
+    input <- case raw of {
+      Left message -> ioReturn (Left message);
+      Right bytes -> Host.phaseIO profile "decode_ms" (Storage.decode 3 bytes)
+    };
     ioReturn (mapLeft (\error -> path ++ ": " ++ error)
       (bindEither input (\decoded -> case decoded of {
         Storage.LegacyText text -> decodeInterface text;
         Storage.BinaryInput roots -> decodeBinaryInterface roots
       })))
-  };
+  });
   readObjectV1 path iface = do {
     input <- Storage.read 4 path;
     ioReturn (mapLeft (\error -> path ++ ": " ++ error)
@@ -1831,7 +1938,8 @@ module Bootstrap.CrateArtifact where {
   loadGraph :: [] String ->
                [] ((,) String CrateInterface) ->
                [] String -> IO (Either String ([] ((,) String CrateInterface)));
-  loadGraph trail done paths =
+  loadGraph = loadGraphProfiled Nothing;
+  loadGraphProfiled profile trail done paths = Host.phaseIO profile "validate_ms" (
     case paths of {
       [] -> ioReturn (Right done);
       (:) requested rest ->
@@ -1847,9 +1955,9 @@ module Bootstrap.CrateArtifact where {
                            ("cyclic crate metadata paths: " ++
                             intercalate " -> " (snoc trail path)))
                  else if any (\p -> eqString path (fst p)) done
-                      then loadGraph trail done rest
+                      then loadGraphProfiled profile trail done rest
                       else do {
-                             read <- readInterface path;
+                             read <- readInterfaceProfiled profile path;
                              case read of {
                                Left e -> ioReturn (Left e);
                                Right iface ->
@@ -1860,7 +1968,7 @@ module Bootstrap.CrateArtifact where {
                                             crateId iface))
                                  else do {
                                         children <-
-                                          loadGraph (snoc trail path) done
+                                          loadGraphProfiled profile (snoc trail path) done
                                             (map dependencyPath (crateDependencies iface));
                                         case bindEither children
                                                (\xs ->
@@ -1874,31 +1982,38 @@ module Bootstrap.CrateArtifact where {
                                                   }) of {
                                           Left e -> ioReturn (Left e);
                                           Right xs ->
-                                            loadGraph trail (snoc xs ((,) path iface)) rest
+                                            loadGraphProfiled profile trail (snoc xs ((,) path iface)) rest
                                         }
                                       }
                              }
                            }
                }
         }
-    };
-  loadInterfaces paths = loadGraph [] [] paths;
-  linkCheckedFile path =
+    });
+  loadInterfaces = loadInterfacesProfiled Nothing;
+  loadInterfacesProfiled profile paths = loadGraphProfiled profile [] [] paths;
+  linkCheckedFile = linkCheckedFileProfiled Nothing;
+  linkCheckedFileProfiled profile path =
     do {
-      loaded <- loadInterfaces ((:) path []);
+      loaded <- loadInterfacesProfiled profile ((:) path []);
       case loaded of {
         Left e -> ioReturn (Left e);
         Right interfaces ->
           do {
             objects <-
-              mapM (\((,) metadata iface) -> readObject (objectPath metadata) iface) interfaces;
-            ioReturn
-              (bindEither (sequenceEither objects)
-                 (\os ->
-                    case reverse interfaces of {
-                      [] -> Left "no root crate metadata";
-                      (:) ((,) _ root) _ -> linkCheckedObjects os (crateId root)
-                    }))
+              mapM (\((,) metadata iface) ->
+                readObjectWithInterfacesProfiled profile (map snd interfaces) (objectPath metadata) iface) interfaces;
+            case sequenceEither objects of {
+              Left message -> ioReturn (Left message);
+              Right os -> case reverse interfaces of {
+                [] -> ioReturn (Left "no root crate metadata");
+                (:) ((,) _ root) _ -> if any envelopeMarked os
+                  then Host.phaseValue profile "link_ms" (Host.phaseEither (\value -> seq value ()))
+                    (linkCheckedObjects os (crateId root))
+                  else linkCheckedObjectsV1Profiled profile finishLinkedState
+                    (FragmentState 0 M.empty [] [] Set.empty) [] os (crateId root)
+              }
+            }
           }
       }
     };
@@ -2484,9 +2599,9 @@ module Bootstrap.CrateArtifact where {
     encodedCount <- envelopeMultiply "metadata encoded entity key" (envelopeMaxRender limits) 8
       (Storage.renderBoundScalars key);
     let { encodedKey = envelopeBounds encodedCount encodedCount };
-    -- Ordinary names use a7-character prefix plus 'z_'; stable-name and
+    -- Ordinary names use a10-character versioned prefix plus '_'; stable-name and
     -- managed-builtin branches are bounded by the same key-based allowance.
-    name <- envelopeBoundsSum limits [envelopeBounds 9 9,encodedIdentity,encodedKey];
+    name <- envelopeBoundsSum limits [envelopeBounds 11 11,encodedIdentity,encodedKey];
     envelopeBoundsSum limits [key,encodedKey,name]
   };
   envelopeInstancePrefixReservation limits encodedIdentity owner = do {
@@ -3181,14 +3296,14 @@ module Bootstrap.CrateArtifact where {
   envelopeEncodedIdentity limits budget identity = do {
     bound <- envelopeMultiply "semantic identity rendering" (envelopeMaxRender limits) 8 (stringLength identity);
     charged <- envelopeChargeRender limits 2 (envelopeBounds bound bound) budget;
-    let { encoded = Separate.encoded identity };
+    let { encoded = Separate.compactName identity };
     ensure (stringLength encoded <= bound) "crate envelope encoded identity exceeds reservation";
     Right ((,) charged encoded)
   };
   envelopePublicName limits budget encodedIdentity entity key = do {
     encodedKey <- envelopeMultiply "semantic entity name" (envelopeMaxRender limits) 8 (stringLength key);
     bound <- envelopeAdd "semantic entity name" (envelopeMaxRender limits) encodedKey (stringLength encodedIdentity + 128);
-    -- Separate.encoded(key), or the stable branch's encoded owner/spelling,
+    -- Separate.compactName(key), or the stable branch's encoded owner/spelling,
     -- is a materialized temporary in addition to the final generated name.
     reservation <- envelopeBoundsAdd limits (envelopeBounds encodedKey encodedKey) (envelopeBounds bound bound);
     charged <- envelopeChargeRender limits 2 reservation budget;
@@ -3198,7 +3313,7 @@ module Bootstrap.CrateArtifact where {
         then Separate.stableName entity
         else (if Modules.compareSpace (Modules.space entity) Modules.Types == 0 ||
           (case Modules.role entity of { Modules.Constructor _ -> True; _ -> False })
-          then "Module_" else "module_") ++ encodedIdentity ++ "z_" ++ Separate.encoded key
+          then "Module_c1_" else "module_c1_") ++ encodedIdentity ++ "_" ++ Separate.compactName key
     } };
     actual <- envelopeTextBounds limits name;
     ensure (Storage.renderBoundScalars actual <= bound && Storage.renderBoundUtf8 actual <= bound)
@@ -3672,8 +3787,9 @@ module Bootstrap.CrateArtifact where {
   -- Existing bundle callers supply an inventory that may include this root.
   -- Select its closure, then use the same strict portable dependency admission.
   readObjectWithInterfaces :: [] CrateInterface -> String -> CrateInterface -> IO (Either String CrateObject);
-  readObjectWithInterfaces available = readObjectWithOpenReader
-    (\bytes iface -> decodeOpenObject bytes iface (openInterfaceDependencies available iface));
+  readObjectWithInterfaces = readObjectWithInterfacesProfiled Nothing;
+  readObjectWithInterfacesProfiled profile available = readObjectWithOpenReaderProfiled profile
+    (\bytes iface -> decodeOpenObjectProfiled profile bytes iface (openInterfaceDependencies available iface));
   openInterfaceDependencies :: [] CrateInterface -> CrateInterface -> Either String ([] CrateInterface);
   openInterfaceDependencies available iface = do {
     uniqueNames "supplied crate identity" (map crateId available);
@@ -3681,7 +3797,7 @@ module Bootstrap.CrateArtifact where {
     let { supplied = interfaceMap available };
     case M.lookup compareString (crateId iface) supplied of {
       Nothing -> Right ();
-      Just actual -> ensure (eqString (encodeInterface actual) (encodeInterface iface))
+      Just actual -> ensure (sameInterface actual iface)
         "open crate supplied root metadata mismatch"
     };
     closure <- dependencyClosure supplied [crateId iface] [] (map dependencyId (crateDependencies iface));
@@ -3690,8 +3806,9 @@ module Bootstrap.CrateArtifact where {
   readObjectWithOpenReader ::
     (ByteArray -> CrateInterface -> IO (Either String CrateObject)) ->
     String -> CrateInterface -> IO (Either String CrateObject);
-  readObjectWithOpenReader openReader path iface = do {
-    raw <- Storage.readRaw path;
+  readObjectWithOpenReader = readObjectWithOpenReaderProfiled Nothing;
+  readObjectWithOpenReaderProfiled profile openReader path iface = Host.phaseIO profile "validate_ms" (do {
+    raw <- Host.phaseIO profile "read_ms" (Storage.readRaw path);
     result <- case raw of {
       Left message -> ioReturn (Left message);
       Right bytes -> do {
@@ -3699,7 +3816,7 @@ module Bootstrap.CrateArtifact where {
         recognized <- envelopeHasFamily bytes;
         if open then openReader bytes iface
         else if recognized then envelopeDecode crateEnvelopeLimits iface bytes else do {
-          input <- Storage.decode 4 bytes;
+          input <- Host.phaseIO profile "decode_ms" (Storage.decode 4 bytes);
           ioReturn (bindEither input (\decoded -> case decoded of {
             Storage.LegacyText text -> decodeObject iface text;
             Storage.BinaryInput graph -> decodeBinaryObject iface graph
@@ -3708,7 +3825,7 @@ module Bootstrap.CrateArtifact where {
       }
     };
     ioReturn (mapLeft (\message -> path ++ ": " ++ message) result)
-  };
+  });
   writeObjectEither :: String -> CrateObject -> IO (Either String ());
   writeObjectEither prefix object =
     if Storage.hasNul prefix 0 then ioReturn (Left "file path contains NUL") else do {
@@ -3782,38 +3899,59 @@ module Bootstrap.CrateArtifact where {
   legacyObject object = case object of {
     OpenCrateObject iface package -> makeObject iface (map (\((,) name fragment) -> let {
       term = Open.closedTerm fragment;
-      metadata = Separate.UnitInterface name [] [] (Open.declarations (Open.context fragment)) [] []
-        (map (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty)) (Open.bindings fragment))
+      bindings = map (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty)) (Open.bindings fragment);
+      members = sortStrings (map fst bindings);
+      -- Open owners are wire text, whereas a legacy unit name must satisfy
+      -- the compiled module-name grammar. Preserve already-legacy names and
+      -- translate only an exact owner of this crate and its full binding set.
+      unitName = if not (null members) &&
+        (eqString name (Separate.openGroupName (crateId iface) members) ||
+         eqString name (Separate.compactOpenGroupName (crateId iface) members) ||
+         eqString name (Separate.compactOpenGroupNameV2 (crateId iface) members))
+        then Separate.queryGroupName (crateId iface) members else name;
+      metadata = Separate.UnitInterface unitName [] [] (Open.declarations (Open.context fragment)) [] []
+        bindings
         (Separate.fingerprint (Pretty.prettyTerm term))
     } in Separate.UnitObject metadata term) (Open.packageFragments package));
     _ -> object
   };
   -- Physical metadata paths are relocatable. The exact semantic interface,
   -- including contracts and ownership, is bound independently of those paths.
-  openMetadata iface = QueryGraph.hashValue (Structure.toCrateInterfaceFields
-    (binaryInterfaceFields (case iface of {
+  openMetadataFields iface = binaryInterfaceFields (case iface of {
       CrateInterface n deps ms es is ds cs ins layouts bs entry _ protected ->
         CrateInterface n (map (\((,,) key _ semantic) -> (,,) key "" semantic) deps)
           ms es is ds cs ins layouts bs entry "open-object" protected
-    })));
-  openPackageMetadata iface dependencies = do {
-    own <- openMetadata iface;
+    });
+  openMetadataValue iface = Structure.toCrateInterfaceFields (openMetadataFields iface);
+  openMetadata iface = QueryGraph.hashValue (openMetadataValue iface);
+  openPackageMetadataReceipt iface dependencies = do {
+    own <- Open.makeMetadataReceipt (openMetadataFields iface);
     imported <- mapM openMetadata (sortBy (\a b -> compareString (crateId a) (crateId b)) dependencies);
     ioReturn (do { root <- own; closure <- sequenceEither imported;
-      Right (Separate.pack ((:) root closure)) })
+      Right ((,) (Separate.pack ((:) (Open.metadataReceiptHash root) closure)) root) })
+  };
+  openPackageMetadata iface dependencies = do {
+    result <- openPackageMetadataReceipt iface dependencies;
+    ioReturn (mapEither fst result)
   };
   makeOpenObject iface dependencies fragments = do {
-    metadata <- openPackageMetadata iface dependencies;
+    metadata <- openPackageMetadataReceipt iface dependencies;
     compatibility <- Open.compatibilityIdentity;
     case do { digest <- metadata; identity <- compatibility; Right ((,) digest identity) } of {
-    Left e -> ioReturn (Left e); Right ((,) digest compiler) -> do {
-      packed <- Open.makePackage compiler digest fragments;
-      ioReturn (mapEither (\package -> OpenCrateObject
-        (withObjectFingerprint iface (Open.packageHash package)) package) packed)
+    Left e -> ioReturn (Left e); Right ((,) ((,) digest receipt) compiler) -> do {
+      packed <- Open.makeCheckedPackage compiler digest fragments;
+      ioReturn (do {
+        package <- packed;
+        retained <- Open.withMetadataReceipt receipt package;
+        Right (OpenCrateObject (withObjectFingerprint iface (Open.packageHash retained)) retained)
+      })
     } }
   };
   writeOpenObject prefix iface package = do {
-    actual <- openMetadata iface;
+    actual <- case Open.cachedMetadata (openMetadataFields iface) package of {
+      Just digest -> ioReturn (Right digest);
+      Nothing -> openMetadata iface
+    };
     case do { digest <- actual;
       manifest <- Separate.unpack (Open.packageMetadata package);
       ensure ((case manifest of { (:) root _ -> eqString root digest; [] -> False }) &&
@@ -3856,7 +3994,8 @@ module Bootstrap.CrateArtifact where {
   -- Keep load errors and compatibility lookup in the ordinary reader's order.
   decodeOpenObject :: ByteArray -> CrateInterface -> Either String ([] CrateInterface) ->
     IO (Either String CrateObject);
-  decodeOpenObject bytes iface dependencies = do {
+  decodeOpenObject = decodeOpenObjectProfiled Nothing;
+  decodeOpenObjectProfiled profile bytes iface dependencies = do {
     compatibility <- Open.compatibilityIdentity;
     case do {
       imported <- dependencies;
@@ -3867,9 +4006,9 @@ module Bootstrap.CrateArtifact where {
     } of {
       Left e -> ioReturn (Left e);
       Right ((,) compiler interfaces) -> do {
-        metadata <- openPackageMetadata iface (filter (\i -> not (eqString (crateId i) (crateId iface))) interfaces);
+        metadata <- Host.phaseIO profile "metadata_hash_ms" (openPackageMetadata iface (filter (\i -> not (eqString (crateId i) (crateId iface))) interfaces));
         loaded <- case metadata of { Left e -> ioReturn (Left e); Right digest ->
-          Open.readPackage bytes (crateObjectFingerprint iface) compiler digest
+          Open.readPackageProfiled profile bytes (crateObjectFingerprint iface) compiler digest
           (M.fromList compareString (map (\((,) name ty) -> (,) name (Separate.normalType ty))
             (concatMap crateBindings interfaces)))
           (M.fromList compareString (map (\d -> (,) (D.datatypeName d) d)
@@ -3880,7 +4019,7 @@ module Bootstrap.CrateArtifact where {
             (\((,) n ty) -> (,) (X.nameHint n) ty) (Open.bindings fragment)) (Open.packageFragments package) };
           mapM_ (\((,) owner fragment) -> let {
             keys = sortStrings (map (compose X.nameHint fst) (Open.bindings fragment))
-          } in ensure (not (null keys) && eqString owner (Separate.queryGroupName (crateId iface) keys))
+          } in ensure (openGroupOwnerMatches (crateId iface) keys owner)
             "open crate fragment owner mismatch") (Open.packageFragments package);
           uniqueNames "open crate binding" (map fst actual);
           ensure (eqList Separate.sameSignature actual (crateBindings iface)) "open crate ownership/type inventory mismatch";
@@ -3889,6 +4028,11 @@ module Bootstrap.CrateArtifact where {
       }
     }
   };
+  openGroupOwnerMatches crate keys owner = not (null keys) &&
+    (eqString owner (Separate.compactOpenGroupName crate keys) ||
+     eqString owner (Separate.compactOpenGroupNameV2 crate keys) ||
+     eqString owner (Separate.openGroupName crate keys) ||
+     eqString owner (Separate.queryGroupName crate (sortStrings keys)));
   -- Object files name declarations by stable, crate-qualified identities. Only
   -- this link owns the slots below. Never reuse a producer's resolver slot.
   data OpenUnit = OpenUnit;
@@ -3900,10 +4044,11 @@ module Bootstrap.CrateArtifact where {
     Just slot -> Right slot; Nothing -> Left ("unresolved crate symbol: " ++ name)
   };
   openIndex interfaces objects = do {
-    let { definitions = concatMap crateBindings interfaces; keys = map fst definitions };
-    uniqueNames "crate symbol" keys;
-    let { ids = M.fromList compareString (zip keys (map V.fromInt (range 0 (length keys - 1))));
-          byName = interfaceMap interfaces;
+    let { keys = concatMap (compose (map fst) crateBindings) interfaces;
+          count = length keys;
+          ids = M.fromList compareString (zip keys (map V.fromInt (range 0 (count - 1)))) };
+    ensure (M.size ids == count) "duplicate crate crate symbol";
+    let { byName = interfaceMap interfaces;
           collect object = case object of {
             OpenCrateObject iface package -> do {
               validateInterface iface;
@@ -3954,10 +4099,11 @@ module Bootstrap.CrateArtifact where {
   };
   -- Closed object formats link their entire bodies. In a mixed session, keep
   -- every export of their open dependencies available for those bodies.
-  openProgram ordered objectMap root = do {
+  openProgram ordered objectMap root = openProgramFrom [] ordered objectMap root;
+  openProgramFrom prelinked ordered objectMap root = do {
     objects <- traverseEither (\i -> case M.lookup compareString (crateId i) objectMap of {
       Nothing -> Left "missing crate object"; Just object -> Right object
-    }) ordered;
+    }) (filter (\iface -> not (elem eqString (crateId iface) prelinked)) ordered);
     if not (any openMarked objects) then Right Nothing else do {
     index <- openIndex ordered objects;
     let { byName = interfaceMap ordered; rootIface = M.findWithDefault compareString (panic "missing root crate") root byName;
@@ -4004,8 +4150,7 @@ module Bootstrap.CrateArtifact where {
   linkOpenFragment allowedLayouts ((,) indexed (FragmentState serial available bodies allData groups))
       (IndexedFragment group fragment parameters members) = do {
     ensure (not (Set.member compareString group groups)) "duplicate crate inference fragment";
-    let { renamed = Open.fresh serial fragment; fresh = snd renamed;
-      ds = Open.declarations (Open.context fresh) };
+    let { ds = Open.declarations (Open.context fragment) };
     mapM_ (\d -> case M.lookup compareString (D.datatypeName d) allowedLayouts of {
       Nothing -> Left ("open fragment has undeclared datatype: " ++ D.datatypeName d);
       Just expected -> ensure (eqString (D.prettyDeclaration d) (fst expected)) "open fragment datatype layout mismatch"
@@ -4016,15 +4161,18 @@ module Bootstrap.CrateArtifact where {
         ensure (T.alphaEq ty expected) ("open fragment import type mismatch: " ++ X.nameHint n);
         Right ((,) n actual)
       }
-    }) (zip parameters (Open.parameters fresh));
-    let { provided = zip members (Open.bindings fresh) };
-    ensure (all (\entry -> not (IM.member (V.toInt (fst entry)) indexed)) provided) "duplicate crate symbol";
-    let { substitution = M.fromList X.compareName replacements;
-      linked = Separate.mapTerm (\n -> M.findWithDefault X.compareName n n substitution) (\a -> a) (Open.body fresh);
-      updated = foldlStrict (\table ((,) d binding) -> IM.insert (V.toInt d) binding table) indexed provided;
-      added = M.fromList compareString (map (\((,) n ty) -> (,) (X.nameHint n) ((,) n ty)) (Open.bindings fresh)) };
-    combined <- foldEither Separate.mergeDeclaration allData ds;
-    Right ((,) updated (FragmentState (fst renamed) (M.union compareString added available) ((:) linked bodies)
-      combined (Set.insert compareString group groups)))
+    }) (zip parameters (Open.parameters fragment));
+    let { substitution = M.fromList X.compareName replacements };
+    case Open.linkBody serial substitution fragment of {
+      (,,) next exports linked -> do {
+        let { provided = zip members exports };
+        ensure (all (\entry -> not (IM.member (V.toInt (fst entry)) indexed)) provided) "duplicate crate symbol";
+        let { updated = foldlStrict (\table ((,) d binding) -> IM.insert (V.toInt d) binding table) indexed provided;
+          added = M.fromList compareString (map (\((,) n ty) -> (,) (X.nameHint n) ((,) n ty)) exports) };
+        combined <- foldEither Separate.mergeDeclaration allData ds;
+        Right ((,) updated (FragmentState next (M.union compareString added available) ((:) linked bodies)
+          combined (Set.insert compareString group groups)))
+      }
+    }
   };
 }

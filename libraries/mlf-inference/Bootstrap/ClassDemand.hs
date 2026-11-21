@@ -337,6 +337,26 @@ module Bootstrap.ClassDemand where {
           }
         }
     };
+  -- Without instantiation the seed universe is already complete. If each
+  -- input precedes its output, the ascending saturation worklist visits
+  -- every node once, after all its inputs have reached their final sets.
+  -- Keep those sets shared instead of forwarding each slot along every edge.
+  orderedEquation node demand = case demand of {
+    InstantiateNode _ _ -> False;
+    _ -> all (\input -> input < node) (dependencies demand)
+  };
+  solveOrdered seeds nodes = let {
+    universe = allocateSeeds seeds;
+    step ((,) values updates) ((,) node demand) = do {
+      result <- evaluate universe values demand;
+      let { next = IM.insert node result values };
+      let { count = if IS.null result then updates else updates + 1 };
+      seq next (seq count (Right ((,) next count)))
+    }
+  } in do {
+    (,) values updates <- foldM step ((,) IM.empty 0) (IM.toAscList nodes);
+    Right (Plan universe values updates)
+  };
   solve :: [] Frame -> [] Seed -> [] Use -> IntMap Demand -> Either String Plan;
   solve frameList seedList useList nodes =
     do {
@@ -359,6 +379,8 @@ module Bootstrap.ClassDemand where {
       if IM.null seeds
       then Right (Plan emptyUniverse
         (IM.map (\_ -> IS.empty) nodes) 0)
+      else if IM.foldrWithKey (\n d rest -> orderedEquation n d && rest) True nodes
+      then solveOrdered seeds nodes
       else do {
         let { dependents = dependentNodes nodes };
         discovered <- discoverUniverse frames seeds uses nodes dependents;

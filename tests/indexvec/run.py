@@ -75,7 +75,7 @@ def main():
     for name in ["Graphs", "Vector", "World", "DeclQueryControls", "ImportBindings", "PreparedImports", "FragmentAdmission", "DeclCore"]:
         obj = out / name
         obj.mkdir()
-        run([*ghc, "-odir", obj, "-hidir", obj, HERE / (name + ".hs"), *host, "-o", obj / "probe"])
+        run([*ghc, *(["-i" + str(ROOT / "tests/shared")] if name == "Graphs" else []), "-odir", obj, "-hidir", obj, HERE / (name + ".hs"), *host, "-o", obj / "probe"])
     run(
         [out / "Graphs/probe"],
         expected=b"1032 ordered SCC and reach comparisons, query DAG and package controls passed\n",

@@ -301,8 +301,6 @@ module Bootstrap.PreparedLibraries
     Artifact.uniqueNames "native export" (map fst entries);
     Right (map snd (M.toList (M.fromList compareString numbered)))
   };
-  nativeLibraryDeclarationsV1 raw = foldEither Separate.mergeDeclaration []
-    (concatMap Artifact.crateLoweredData (interfaces raw));
   nativeExportSignatures raw = M.toList (M.fromList compareString
     (concatMap Artifact.crateBindings (interfaces raw)));
   nativeLibraryV1 raw = do {
@@ -436,7 +434,7 @@ module Bootstrap.PreparedLibraries
     let { conventions = M.mapWithKey (\name ty -> if S.member compareString name sourceValues
             then Separate.importClasses dictionaries ty else []) signatures };
     full <- sourcePhase Inference (Classes.lowerSeparateClassesAndSlotsWithImports conventions externals (map fst instances)
-      (Modules.resolvedValueScopesIn resolution own) (Modules.resolvedCrateInstanceScopes resolution)
+      (Modules.resolvedModuleScopesIn resolution own) (Modules.resolvedCrateInstanceScopes resolution)
       (SClassProgram (fst parts) (snd parts) (map snd instances) body));
     imports <- sourcePhase Verification (wrapperImports full signatures);
     selected <- sourcePhase Verification (Parameters.select imports (fst full));
@@ -503,7 +501,7 @@ module Bootstrap.PreparedLibraries
     let { conventions = M.mapWithKey (\name ty -> if S.member compareString name sourceValues
             then Separate.importClasses dictionaries ty else []) signatures };
     full <- sourcePhase Inference (Classes.lowerSeparateClassesAndSlotsWithImports conventions externals (map fst instances)
-      (Modules.resolvedValueScopesIn resolution own) (Modules.resolvedCrateInstanceScopes resolution)
+      (Modules.resolvedModuleScopesIn resolution own) (Modules.resolvedCrateInstanceScopes resolution)
       (SClassProgram (fst parts) (snd parts) (map snd instances) body));
     imports <- sourcePhase Verification (wrapperImports full signatures);
     selected <- sourcePhase Verification (Parameters.select imports (fst full));

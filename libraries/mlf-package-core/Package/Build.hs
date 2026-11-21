@@ -270,6 +270,11 @@ module Package.Build where {
       let {
         queryReport = S.elem eqString "--query-report" (O.words help)
       };
+      let {
+        fusedCodegen = queryReport &&
+          S.elem eqString "--compile-crate-to-llvm-gc" (O.words help) &&
+          S.elem eqString "--codegen-cache" (O.words help)
+      };
       implementation <-
         if S.elem eqString "--implementation-identity" (O.words help)
         then raw buildDirectory
@@ -343,7 +348,8 @@ module Package.Build where {
       let {
         identity =
           J.set "implementation-identity" (J.str (O.trim implementation))
-            (J.set "compiler-query-report" (J.Boolean queryReport)
+            (J.set "compiler-fused-codegen" (J.Boolean fusedCodegen)
+             (J.set "compiler-query-report" (J.Boolean queryReport)
                (J.set "ir-flags" (J.stringArray irFlags)
                   (if windows
                    then J.set "windows"
@@ -352,7 +358,7 @@ module Package.Build where {
                                 ((:) ((,) "prefix" (J.str prefix))
                                    ((:) ((,) "dlls" dlls) []))))
                           baseIdentity
-                   else baseIdentity)))
+                   else baseIdentity))))
       };
       let {
         b =
@@ -920,7 +926,15 @@ module Package.Build where {
                         String -> String -> [] M.Module -> [] String -> Bool -> IO J.Json;
   -- Keep query storage outside content-addressed crate artifacts so source edits
   -- can reuse checked declaration groups. Compiler identities isolate schemas.
-  compileCrateResult b p kind entry modules dependencies noPrelude =
+  compileCrateResult = compileCrateResultUsing Nothing;
+  -- Only complete executable/test targets request emission. Library actions
+  -- and older seed compilers retain the checked-artifact-only interface.
+  compileTargetCrateResult b p kind codegenIdentity entry modules dependencies noPrelude =
+    compileCrateResultUsing
+      (if J.getBool "compiler-fused-codegen" False (tools b) && S.not (eqString entry "")
+       then Just codegenIdentity else Nothing)
+      b p kind entry modules dependencies noPrelude;
+  compileCrateResultUsing codegenIdentity b p kind entry modules dependencies noPrelude =
     do {
       let {
         identity = M.crateIdentity p kind
@@ -959,7 +973,7 @@ module Package.Build where {
              })
           dependencies;
       let {
-        inputs =
+        checkedInputs =
           info
             ((:) ((,) "compiler" (J.get "compiler" (tools b)))
                ((:) ((,) "manager" (J.get "manager" (tools b)))
@@ -968,6 +982,12 @@ module Package.Build where {
                         ((:) ((,) "no-prelude" (J.Boolean noPrelude))
                            ((:) ((,) "sources" (J.Object sources))
                               ((:) ((,) "dependencies" (J.Array imports)) [])))))))
+      };
+      let {
+        inputs = case codegenIdentity of {
+          Nothing -> checkedInputs;
+          Just _ -> J.set "emission" (J.str "retained-root-v1") checkedInputs
+        }
       };
       let {
         queries =
@@ -1006,13 +1026,23 @@ module Package.Build where {
                                        ((:) queries ((:) builtin []))))))))
                };
                writeFile (work ++ "/crate.spec") spec;
-               ignored <-
-                 capture b work
-                   ((:) (compiler b)
-                      ((:) "--compile-crate"
-                         ((:) (work ++ "/crate.spec") ((:) "-o" ((:) (work ++ "/unit") [])))))
-                   ""
-                   "";
+               case codegenIdentity of {
+                 Nothing -> do {
+                   ignored <- capture b work
+                     [compiler b, "--compile-crate", work ++ "/crate.spec", "-o", work ++ "/unit"] "" "";
+                   ioReturn ()
+                 };
+                 Just identity -> do {
+                   codegen <- codegenDirectory b identity;
+                   O.mkdir codegen;
+                   ignored <- capture b work
+                     [compiler b, "--compile-crate-to-llvm-gc", work ++ "/crate.spec", "-o", work ++ "/unit",
+                      "--codegen-cache", codegen, "--query-report", work ++ "/retained-codegen-query.json"]
+                     "" (work ++ "/retained.ll");
+                   present <- fileExists (work ++ "/retained-codegen-query.json");
+                   O.require present "compiler did not report retained-root LLVM emission"
+                 }
+               };
                S.mapM_
                  (\extension ->
                     do {
@@ -1250,6 +1280,47 @@ module Package.Build where {
       result <- emitCrateResult b "legacy" crate metadataHash objectHash;
       ioReturn (artifactPath result)
     };
+  codegenDirectory :: Builder -> String -> IO String;
+  codegenDirectory b targetIdentity = do {
+    partition <- fingerprint b (J.str targetIdentity);
+    let { explicitReport = J.getBool "compiler-query-report" False (tools b) };
+    ioReturn
+      ((if explicitReport then cacheDirectory b ++ "/.codegen/" ++ partition
+        else directory b ++ "/codegen-cache/" ++ partition) ++
+       "/" ++ J.getText "sha256" "" (J.get "compiler" (tools b)))
+  };
+  -- The compile action publishes these outputs in its ordinary immutable
+  -- artifact receipt. File existence alone is not evidence that LLVM belongs
+  -- to the current checked root and compiler. Older/checked-only artifacts
+  -- continue through the independently cached disk emission path.
+  validRetainedEmission :: Builder -> String -> String -> String -> IO Bool;
+  validRetainedEmission b crate metadataHash objectHash = do {
+    stampExists <- fileExists (crate ++ "/artifact.json");
+    if S.not stampExists then ioReturn False else do {
+      text <- readFile (crate ++ "/artifact.json");
+      case J.parse text of {
+        Left _ -> ioReturn False;
+        Right stamp -> do {
+          let { inputs = J.get "inputs" stamp; files = J.get "files" stamp };
+          if S.not (eqString (J.getText "emission" "" inputs) "retained-root-v1" &&
+                  J.equal (J.get "compiler" inputs) (J.get "compiler" (tools b)) &&
+                  eqString (J.getText "unit.mlfci" "" files) metadataHash &&
+                  eqString (J.getText "unit.mlfco" "" files) objectHash)
+          then ioReturn False else do {
+            matches <- S.mapM (\name -> do {
+              let { expected = J.get name files; path = crate ++ "/" ++ name };
+              present <- fileExists path;
+              if S.not (present && validDigest expected) then ioReturn False else do {
+                actual <- fileDigest path;
+                ioReturn (J.equal expected (J.str actual))
+              }
+            }) ["retained.ll", "retained-codegen-query.json"];
+            ioReturn (S.and matches)
+          }
+        }
+      }
+    }
+  };
   emitCrateResult :: Builder -> String -> String -> String -> String -> IO J.Json;
   -- Query storage follows a stable target identity, never invocation IDs or the
   -- worker count. Independent targets therefore do not share an emission lock.
@@ -1266,18 +1337,12 @@ module Package.Build where {
                      ((:) ((,) "object" (J.str objectHash))
                         ((:) ((,) "abi" (J.str "compact-bdwgc-v1")) [])))))
       };
-      partition <- fingerprint b (J.str targetIdentity);
       let {
         explicitReport = J.getBool "compiler-query-report" False (tools b)
       };
-      let {
-        codegen =
-          ((if explicitReport
-            then (cacheDirectory b ++ ("/.codegen/" ++ partition))
-            else (directory b ++ ("/codegen-cache/" ++ partition))) ++
-           ("/" ++ J.getText "sha256" "" (J.get "compiler" (tools b))))
-      };
+      codegen <- codegenDirectory b targetIdentity;
       O.mkdir codegen;
+      retained <- validRetainedEmission b crate metadataHash objectHash;
       result <-
         cachedResult b "LLVM emission" inputs
           (\work ->
@@ -1296,12 +1361,14 @@ module Package.Build where {
                                   then (:) "--query-report" ((:) report [])
                                   else [])))))
                };
-               ignored <- capture b work arguments "" (work ++ "/program.ll");
-               if explicitReport
-               then ioReturn ()
-               else do {
-                      O.copy (codegen ++ "/last-query.json") report
-                    };
+               if retained then do {
+                 O.copy (crate ++ "/retained.ll") (work ++ "/program.ll");
+                 O.copy (crate ++ "/retained-codegen-query.json") report
+               } else do {
+                 ignored <- capture b work arguments "" (work ++ "/program.ll");
+                 if explicitReport then ioReturn ()
+                 else O.copy (codegen ++ "/last-query.json") report
+               };
                present <- fileExists report;
                O.require present "compiler did not report the LLVM cache query"
              });
@@ -1323,7 +1390,8 @@ module Package.Build where {
         queries =
           J.set "outer_cached" (J.Boolean reused)
             (J.set "cache_source"
-               (J.str (if reused then "emission-artifact" else "codegen-queries"))
+               (J.str (if reused then "emission-artifact"
+                       else if retained then "retained-root" else "codegen-queries"))
                current)
       };
       let {
@@ -1462,7 +1530,9 @@ module Package.Build where {
                      (S.maybe [] (\path -> (:) path [])
                         (S.lookup eqString (M.packageName p) built)))
             };
-            crate <- compileCrate b p ("target-" ++ name) entry ms dependencies noPrelude;
+            compilation <- compileTargetCrateResult b p ("target-" ++ name)
+              (M.crateIdentity p ("target-" ++ name)) entry ms dependencies noPrelude;
+            let { crate = artifactPath compilation };
             metadataHash <- fileDigest (crate ++ "/unit.mlfci");
             objectHash <- fileDigest (crate ++ "/unit.mlfco");
             emission <-

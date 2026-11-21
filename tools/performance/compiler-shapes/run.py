@@ -6,11 +6,12 @@ import hashlib
 import json
 import random
 import shutil
-import subprocess
 import sys
-import types
+import command_runner
 import generate as G
 import query_cache as Q
+import provenance
+import worker
 
 ROOT=Path(__file__).resolve().parents[3]
 HERE=Path(__file__).resolve().parent
@@ -20,29 +21,6 @@ def registry():
     return json.loads((HERE/'matrix.json').read_text())
 
 
-def git(*argv):
-    return subprocess.run(['git',*argv],cwd=ROOT,capture_output=True,text=True)
-
-
-def source_identity(out):
-    """Record the exact measured source state, including uncommitted patches."""
-    commit=git('rev-parse','HEAD').stdout.strip()
-    branch=git('rev-parse','--abbrev-ref','HEAD').stdout.strip()
-    status=git('status','--porcelain').stdout
-    patch=git('diff','HEAD').stdout.encode()
-    untracked={}
-    for name in git('ls-files','--others','--exclude-standard').stdout.splitlines():
-        path=ROOT/name
-        if path.is_file():untracked[name]=hashlib.sha256(path.read_bytes()).hexdigest()
-    record={'commit':commit,'branch':branch,'dirty':bool(status.strip()),
-        'status_porcelain':status.splitlines(),'patch_sha256':hashlib.sha256(patch).hexdigest(),
-        'patch_bytes':len(patch),'untracked':untracked}
-    if patch:
-        (out/'source-patch.diff').write_bytes(patch)
-        record['patch_file']=str(out/'source-patch.diff')
-    return record
-
-
 def lanes_for(index,repeats):
     """Three paired rounds; balance which compiler starts within and across cells."""
     lanes=[]
@@ -50,6 +28,20 @@ def lanes_for(index,repeats):
         first='ghc' if (round_index+index)%2==0 else 'mlf'
         lanes.extend([first,'mlf' if first=='ghc' else 'ghc'])
     return lanes
+
+
+def interleave_pairs(schedule, repeats, rng):
+    """Visit every cell once per round, keeping each compiler pair adjacent."""
+    rounds = [[] for _ in range(repeats)]
+    for index in range(0, len(schedule), 2):
+        pair = schedule[index:index + 2]
+        rounds[pair[0]['position'] // 2].append(pair)
+    interleaved = []
+    for pairs in rounds:
+        rng.shuffle(pairs)
+        for pair in pairs:
+            interleaved.extend(pair)
+    return interleaved
 
 
 def main():
@@ -62,10 +54,16 @@ def main():
     parser.add_argument('--size',action='append',type=int)
     parser.add_argument('--repeats',type=int,default=data['repeats'])
     parser.add_argument('--cohort')
-    parser.add_argument('--endpoint',default='crate-bootstrap-v1',choices=sorted(data['endpoints']))
-    args=parser.parse_args(); out=args.output.resolve(); out.mkdir(parents=True,exist_ok=False)
-    hp=ROOT/'tools/performance/a1-private-index/helper.py'
-    H=types.ModuleType('unchanged_resource_helper');H.__file__=str(hp);exec(compile(hp.read_bytes(),str(hp),'exec'),H.__dict__)
+    parser.add_argument('--interleave-pairs',action='store_true',
+                        help='visit each case once per paired round in seeded random order')
+    parser.add_argument('--cohort-output-gib',type=int,default=8,
+                        help='aggregate retained evidence budget in GiB (default 8)')
+    parser.add_argument('--endpoint',default=data['default_endpoint'],choices=sorted(data['endpoints']))
+    args=parser.parse_args()
+    if args.cohort_output_gib <= 0:
+        parser.error('--cohort-output-gib must be positive')
+    out=args.output.resolve(); out.mkdir(parents=True,exist_ok=False)
+    H=command_runner.load_helper()
     setup=H.load(args.setup.resolve()); H.require(setup['complete'],'qualified fixed dependencies')
     H.require(setup.get('endpoint')==args.endpoint,'setup belongs to endpoint profile '+str(setup.get('endpoint'))
               +', not '+args.endpoint)
@@ -74,7 +72,7 @@ def main():
     repeats=1 if args.pilot else args.repeats
     H.require(repeats>=1,'positive repeats')
     sizes=args.size or ((8,) if args.pilot else tuple(data['sizes']))
-    H.require(all(0<n<=1024 for n in sizes),'bounded positive sizes')
+    H.require(all(0<n<=8192 for n in sizes),'bounded positive sizes')
     cases=G.generate(out/'sources',sizes=sizes,families=args.family)
     seed=data['seed']; rng=random.Random(seed); order=list(cases);rng.shuffle(order)
     schedule=[]
@@ -82,9 +80,12 @@ def main():
         lanes=['ghc','mlf'] if args.pilot else lanes_for(index,repeats)
         for position,lane in enumerate(lanes):
             schedule.append({'case':case['id'],'position':position,'lane':lane})
-    inputs={str(p.resolve()):H.sha(p) for p in [args.setup,hp,HERE/'run.py',HERE/'worker.py',HERE/'generate.py',
-        HERE/'matrix.json',HERE/'query_cache.py',Q.SHARED/'artifact_binary_reference.py',
-        Q.SHARED/'test_query_index.py',
+    if args.interleave_pairs:
+        schedule=interleave_pairs(schedule,repeats,rng)
+    inputs={str(p.resolve()):H.sha(p) for p in [args.setup,Path(H.__file__),HERE/'command_runner.py',HERE/'bench.py',HERE/'run.py',HERE/'worker.py',HERE/'generate.py',
+        HERE/'data_shapes.py',HERE/'rank_shapes.py',
+        HERE/'matrix.json',HERE/'query_cache.py',HERE/'provenance.py',Q.SHARED/'artifact_binary_reference.py',
+        Q.SHARED/'test_query_index.py',Q.SHARED/'artifact_binary_open.py',
         Path(setup['producer'])/'receipt.json',Path(setup['producer'])/'bin/emlf',
         Path(setup['ghc']),Path(setup['clang']),Path(setup['runtime']),Path(setup['builtin']+'.mlfci'),
         Path(setup['builtin']+'.mlfco')]}
@@ -95,15 +96,16 @@ def main():
     # objects for 31 cells). It is a bound, not a target: a 31-cell cohort uses
     # about 2.6 GiB, and the earlier 2 GiB carry-over stopped a run at leg 149.
     limits={**setup['limits'],'wall_seconds':90,'max_work_bytes':512*1024**2,
-            'aggregate_cohort_bytes':8*1024**3}
-    identity=source_identity(out)
+            'aggregate_cohort_bytes':args.cohort_output_gib*1024**3}
+    identity=provenance.source_identity(ROOT, out)
     cohort=args.cohort or out.name
     plan={'purpose':'generator/transport qualification' if args.pilot else 'fixed measured shape matrix; descriptive medians only',
         'benchmark':{'schema':2,'suite':data['suite'],'suite_version':data['version'],'cohort':cohort,
             'endpoint':{'id':args.endpoint,**endpoint},'repeats':repeats,
             'families':sorted({c['family'] for c in cases}),'sizes':sorted({c['size'] for c in cases}),
             'cells':len(cases),'timed_compilations':0 if args.pilot else len(schedule),
-            'order':'seeded shuffle of cells; each cell runs paired rounds and alternates which compiler starts',
+            'order':('one pair per cell each round in seeded random order' if args.interleave_pairs else
+                     'seeded shuffle of cells; each cell runs paired rounds and alternates which compiler starts'),
             'order_seed':seed,'parallel_compilers':1,'claim_limits':data['claim_limits']},
         'source_commit':identity['commit'],'source':identity,
         'toolchain':{'ghc':{'path':setup['ghc'],'version':auth['ghc']['version']},
@@ -120,13 +122,11 @@ def main():
         'ghc_arguments':['--make','-j1','-O2','-fforce-recomp','-package-env','-','-clear-package-db',
             '-global-package-db','-package-db',setup['package_db'],'-no-user-package-db','-hide-all-packages',
             '-package','base','-package','mlf-shape-primitives','-i','-odir','<leg>','-hidir','<leg>','<source>','-o','<leg>/program'],
-        'mlf_stages':['source-to-checked: PRODUCER/bin/emlf --compile-crate <spec> -o <leg>/unit',
-            'checked-to-llvm: PRODUCER/bin/emlf --crate-to-llvm-gc <leg>/unit.mlfci',
-            'llvm-to-executable: CLANG -O2 -Wno-override-module <leg>/unit.ll <runtime.o> <gc/gmp libs> -lm -lpthread -ldl'],
+        'mlf_stages':worker.mlf_stage_names(args.endpoint),
         'timing_boundary':'exact-child worker launch through wait4; common Python dispatcher included; preparation and validation excluded'}
     plan_path=out/'plan.json';H.save(plan_path,plan);plan_sha=H.sha(plan_path)
     scripts=out/'scripts';scripts.mkdir()
-    for name in ['run.py','worker.py','generate.py','query_cache.py']:
+    for name in ['run.py','worker.py','generate.py','data_shapes.py','rank_shapes.py','matrix.json','query_cache.py','provenance.py']:
         shutil.copy2(HERE/name,scripts/name)
     record={'complete':False,'plan_sha256':plan_sha,'runs':[],'failures':[]}; refs={};blocked=set()
     def save():H.save(out/'receipt.json',record)
