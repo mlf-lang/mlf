@@ -757,7 +757,7 @@ class GraphCacheTests(unittest.TestCase):
         def mutate(ns):
             ns[0]['reads'] = [(ns[1]['key'], ns[1]['hash'])]
         inventory, evidence = self.fixture(mutate_nodes=mutate)
-        with self.assertRaisesRegex(ValueError, self.index_error('cyclic/deep', 'cycle')):
+        with self.assertRaisesRegex(ValueError, self.index_error('cyclic query graph', 'cycle')):
             self.check(inventory, evidence)
 
     def test_rejects_wrong_infer_identity_or_hash(self):
