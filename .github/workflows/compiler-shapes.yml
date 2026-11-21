@@ -47,39 +47,16 @@ jobs:
           (cd "$RUNNER_TEMP/ghc-9.14.1-x86_64-unknown-linux" && ./configure --prefix="$RUNNER_TEMP/ghc" && make install)
           test "$("$RUNNER_TEMP/ghc/bin/ghc" --numeric-version)" = 9.14.1
           echo "$RUNNER_TEMP/ghc/bin" >> "$GITHUB_PATH"
-      - name: Build the authenticated bootstrap producer
-        run: |
-          set -euo pipefail
-          python3 tools/shared/build.py --bootstrap-only --optimization 2 --build-dir .mlf-build/shared-ghc
-          python3 -c "import json;r=json.load(open('.mlf-build/shared-ghc/receipt.json'));assert r['complete'] and r['optimization']=='2',r"
-      - name: Check benchmark contract
-        run: |
-          python3 -B tools/performance/compiler-shapes/test_contract.py
-          python3 -B tools/performance/compiler-shapes/test_sweep.py
-          python3 -B tools/performance/compiler-shapes/test_data_shapes.py
-          python3 -B tools/performance/compiler-shapes/test_rank_shapes.py
-      - name: Prepare fixed dependencies
-        run: |
-          python3 -B tools/performance/compiler-shapes/bench.py prepare \
-            --workdir .mlf-build/compiler-shapes --producer .mlf-build/shared-ghc --build-builtin
-      - name: Measure the requested matrix
+      - name: Check developer and compiler benchmark commands
+        run: python3 -B tools/dev.py check-tools
+      - name: Build, prepare and measure the requested matrix
         env:
           FAMILIES: ${{ inputs.families }}
           SIZES: ${{ inputs.sizes }}
           REPEATS: ${{ inputs.repeats }}
         run: |
-          set -euo pipefail
-          args=(--workdir .mlf-build/compiler-shapes --setup .mlf-build/compiler-shapes/setup/setup.json
-                --repeats "$REPEATS" --prune-build-products)
-          if [ -n "${FAMILIES//[[:space:]]/}" ]; then
-            IFS=',' read -ra names <<< "$FAMILIES"
-            for name in "${names[@]}"; do args+=(--family "${name//[[:space:]]/}"); done
-          fi
-          if [ -n "${SIZES//[[:space:]]/}" ]; then
-            IFS=',' read -ra values <<< "$SIZES"
-            for value in "${values[@]}"; do args+=(--size "${value//[[:space:]]/}"); done
-          fi
-          python3 -B tools/performance/compiler-shapes/bench.py sweep "${args[@]}"
+          python3 -B tools/dev.py bench shapes --prune-build-products \
+            --family "$FAMILIES" --size "$SIZES" --repeats "$REPEATS"
       - name: Show the human summary
         if: always()
         run: |
@@ -95,7 +72,7 @@ jobs:
           include-hidden-files: true
           retention-days: 30
           path: |
-            .mlf-build/shared-ghc/receipt.json
+            .mlf-build/compiler-shapes/producer/receipt.json
             .mlf-build/compiler-shapes/summary.md
             .mlf-build/compiler-shapes/summary.csv
             .mlf-build/compiler-shapes/setup/setup.json

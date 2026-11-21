@@ -1,8 +1,6 @@
 """Pure route controls plus three REAL bounded synthetic Linux supervisor cases.
 No GHC/emlf/native fixture. Synthetic receipts are not project qualification.
 """
-import copy
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -90,6 +88,7 @@ class EntryControls(unittest.TestCase):
             (root/'utf8-length').symlink_to(root/'absent')
             with self.assertRaises(RuntimeError):E.fresh_destinations(root)
 
+@unittest.skipUnless(sys.platform == 'linux', 'real supervisor requires Linux pidfds and procfs')
 class RealSyntheticControls(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

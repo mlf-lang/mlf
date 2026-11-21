@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Focused fault controls for the static local manifest auditor only."""
-import copy
 import json
 import tempfile
 import subprocess

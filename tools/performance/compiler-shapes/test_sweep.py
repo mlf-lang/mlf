@@ -3,11 +3,14 @@ import csv
 import hashlib
 import json
 import tempfile
+import sys
 import unittest
 from pathlib import Path
 from unittest import mock
 
 import sweep
+sys.path.insert(0, str(sweep.bench.ROOT / 'tools'))
+from developer import process
 from test_contract import write_cohort
 
 
@@ -15,9 +18,9 @@ class SweepTests(unittest.TestCase):
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
-        self.root = Path(temp.name)
+        self.root = Path(temp.name).resolve()
         self.args = argparse.Namespace(workdir=self.root, setup=self.root / 'setup.json',
-                                      repeats=3, endpoint='crate-fused-v1', prune_build_products=False,
+                                      producer=None, repeats=3, endpoint='crate-fused-v1', prune_build_products=False,
                                       family=['flat_functions', 'mono_calls'], size=[8, 32],
                                       cohort_output_gib=None)
         self.args.setup.write_text(json.dumps({'complete': True, 'endpoint': self.args.endpoint}))
@@ -138,6 +141,46 @@ class SweepTests(unittest.TestCase):
             with self.subTest(field=next(iter(change))):
                 with self.assertRaisesRegex(ValueError, 'peak RSS requires'):
                     sweep.peak_rss_medians({**receipt, **change}, 3)
+
+    def test_fresh_sweep_prepares_only_missing_inputs(self):
+        self.args.setup = None
+        producer = self.root / 'producer'
+        setup = self.root / 'setup/setup.json'
+        with mock.patch.object(process, 'run_build', return_value=0) as bootstrap, \
+             mock.patch.object(sweep.bench, 'run') as run:
+            self.assertEqual(sweep.bench.sweep_setup(self.args), setup)
+            bootstrap.assert_called_once()
+            self.assertIn('--bootstrap-only', bootstrap.call_args.args[0])
+            self.assertIn(producer, bootstrap.call_args.args[0])
+            run.assert_called_once()
+            self.assertIn('--build-builtin', run.call_args.args[0])
+            self.assertIn(producer, run.call_args.args[0])
+            run.reset_mock()
+            self.args.producer = self.root / 'existing producer'
+            self.assertEqual(sweep.bench.sweep_setup(self.args), setup)
+            run.assert_called_once()
+            self.assertIn(self.args.producer, run.call_args.args[0])
+            run.reset_mock()
+            setup.parent.mkdir()
+            setup.write_text(json.dumps({'producer': str(self.args.producer)}))
+            self.assertEqual(sweep.bench.sweep_setup(self.args), setup)
+            run.assert_not_called()
+            self.args.producer = producer
+            with self.assertRaisesRegex(SystemExit, 'another producer'):
+                sweep.bench.sweep_setup(self.args)
+            run.assert_not_called()
+            bootstrap.assert_called_once()
+
+    def test_missing_explicit_setup_and_invalid_selection_do_not_prepare(self):
+        self.args.setup.unlink()
+        with mock.patch.object(sweep.bench, 'run') as run:
+            with self.assertRaisesRegex(SystemExit, 'missing setup'):
+                sweep.run(self.args)
+            self.args.setup = None
+            self.args.size = [0]
+            with self.assertRaisesRegex(SystemExit, 'size'):
+                sweep.run(self.args)
+            run.assert_not_called()
 
     def test_baseline_runs_once_and_changed_inputs_are_reported(self):
         self.changed_inputs.add('flat_functions-32')

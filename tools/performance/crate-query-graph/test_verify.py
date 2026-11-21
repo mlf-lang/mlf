@@ -2,7 +2,6 @@
 """Pure verifier adapters and attack fixtures; no compiler or production imports."""
 from pathlib import Path
 import ast
-import hashlib
 import inspect
 import re
 import tempfile
@@ -13,7 +12,7 @@ from test_finish_receipts_latest import LatestReceiptTests
 
 import verify as v
 from artifact_binary_reference import Invalid, read_document, tree_document
-from test_query_index import read_index, fields, node, text, integer, listing, row, index
+from test_query_index import read_index, node, text, integer, listing, row, index
 
 H1, H2, H3 = 'a' * 64, 'b' * 64, 'c' * 64
 
@@ -157,7 +156,6 @@ class VerifierTests(unittest.TestCase):
 
     def test_v2_id_types_ranges_hash_and_location_rejected(self):
         strings = [H1, 'leaf']
-        rows = [row(1, 0)]
         for bad in (-1, 2, (1 << 63) - 1):
             with self.assertRaisesRegex(Invalid, 'ID range'):
                 v.index_data(tree_document([index(strings, [row(1, bad)])], schema=6))

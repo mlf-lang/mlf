@@ -1,7 +1,6 @@
 """End-to-end manifest discovery, diagnostics and worker-plan fixtures."""
 
 import json
-from pathlib import Path
 import subprocess
 
 

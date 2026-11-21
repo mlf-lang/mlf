@@ -183,18 +183,25 @@ def run(args):
     if repeats < 3 or (args.cohort_output_gib is not None and args.cohort_output_gib <= 0):
         raise SystemExit('sweep requires at least three repetitions and a positive output budget')
     root = args.workdir.resolve()
-    setup = (args.setup or root / 'setup' / 'setup.json').resolve()
-    if not setup.is_file():
-        raise SystemExit(f'missing setup {setup}')
     cells = ([('baseline', 0)] if baseline else []) + [(f, n) for f in families for n in sizes]
     if not cells or len(set(cells)) != len(cells):
         raise SystemExit('sweep requires distinct family/size cells')
-    setup_record = analyze.load(setup)
-    if not setup_record.get('complete') or setup_record.get('endpoint') != args.endpoint:
-        raise SystemExit(f'incomplete or incompatible benchmark setup {setup}')
     if any((root / name).exists() for name in ('summary.csv', 'summary.md', 'cohorts')):
         raise SystemExit(f'choose a fresh sweep output directory: {root}')
-    (root / 'cohorts').mkdir(parents=True)
+    # Reserve the output before preparing inputs. Concurrent sweeps cannot both
+    # build into the same producer or replace one another's table.
+    cohorts = root / 'cohorts'
+    cohorts.mkdir(parents=True)
+    try:
+        setup = bench.sweep_setup(args)
+        if not setup.is_file():
+            raise SystemExit(f'missing setup {setup}')
+        setup_record = analyze.load(setup)
+        if not setup_record.get('complete') or setup_record.get('endpoint') != args.endpoint:
+            raise SystemExit(f'incomplete or incompatible benchmark setup {setup}')
+    except BaseException:
+        cohorts.rmdir()
+        raise
     rows = [dict(family=family, size=size, status='pending', completed_pairs=0,
                  mlf_seconds='', ghc_seconds='', mlf_over_ghc='', mlf_peak_rss_bytes='', ghc_peak_rss_bytes='',
                  lane='', reason='',

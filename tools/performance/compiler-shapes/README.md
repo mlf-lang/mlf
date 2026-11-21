@@ -7,7 +7,7 @@ executable. The standard matrix covers 25 program shapes at sizes 8, 32, 128,
 native compilations. Each reported time is the median for one compiler, shape
 and size.
 
-It is **not** the C/MLF Benchmarks Game. The [native benchmark runner](../bench/README.md)
+It is **not** the C/MLF Benchmarks Game. The [native benchmark runner](../../bench/README.md)
 builds and compares pinned application workloads through the package manager and
 keeps its own runner contract; nothing here changes it. This suite generates its
 own programs, has no application inputs, and reports per-shape compilation ratios
@@ -68,7 +68,7 @@ for package/cache regressions and a fresh paired growth comparison.
 
 ## Running it
 
-Run from the repository root with a bootstrap producer built at GHC `-O2`.
+Run from the repository root. The default command builds a bootstrap-only GHC `-O2` producer and prepares the fixed inputs under the sweep directory. Supply `--producer DIR` for an existing bootstrap build, or `--setup FILE` to reuse a prepared setup.
 The sweep runs one shape at a time, with a separate cohort for every size.
 It records failures and resource limits alongside completed cells and continues
 to the next cell. The command exits unsuccessfully if any selected cell failed.
@@ -77,19 +77,16 @@ The comparison table and its CSV are written to `WORKDIR/summary.md` and
 
 ```sh
 # Show the standard matrix or a filtered selection.
-python3 -B tools/performance/compiler-shapes/bench.py list
-python3 -B tools/performance/compiler-shapes/bench.py list --family wide_case --size 128
+python3 tools/dev.py bench shapes list
+python3 tools/dev.py bench shapes list --family wide_case --size 128
 
-# Prepare dependencies once, then run the full 125-cell sweep.
-python3 -B tools/performance/compiler-shapes/bench.py prepare \
-  --workdir .mlf-build/compiler-shapes --producer .mlf-build/shared-ghc --build-builtin
-python3 -B tools/performance/compiler-shapes/bench.py sweep \
-  --workdir .mlf-build/compiler-shapes --setup .mlf-build/compiler-shapes/setup/setup.json
+# Build, prepare and measure all 125 cells.
+python3 tools/dev.py bench shapes
 
-# Compare two shapes at two sizes with the same setup and a separate results table.
-python3 -B tools/performance/compiler-shapes/bench.py sweep \
-  --workdir .mlf-build/selected-shapes --setup .mlf-build/compiler-shapes/setup/setup.json \
-  --family wide_case --family dependency_diamonds --size 8 --size 128
+# Reuse the exact setup for a separate table.
+python3 tools/dev.py bench shapes --workdir .mlf-build/selected-shapes \
+  --setup .mlf-build/compiler-shapes/setup/setup.json \
+  --family wide_case,dependency_diamonds --size 8,128
 ```
 
 `--family` and `--size` each accept repeated values and replace their respective
@@ -287,8 +284,9 @@ the index mapping or closure and must be re-measured, not retroactively filled i
 
 ## CI
 
-- Every ordinary PR runs `test_contract.py` to check defaults, rejected inputs,
-  graph evidence, schedule balance and matrix shape without invoking a compiler.
+- Every ordinary PR runs `python3 tools/dev.py check-tools`. The compiler-shape
+  tests cover the matrix defaults, generated programs and oracles, graph evidence,
+  schedule balance, sweep reports and cancellation without invoking a compiler.
   The GHC O2 job filters the standard matrix to size 8 for `flat_functions`,
   `recursive_ring`, `wide_case`, `class_instances`, `dependency_diamonds`,
   `state_updates`, `captured_closures`, `wide_product`, `rank2_arguments`,

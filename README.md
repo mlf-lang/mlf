@@ -26,6 +26,8 @@ checksums, installation and validation coverage.
 
 ## Build and run
 
+The [developer commands](CONTRIBUTING.md#developer-commands) cover native builds, tests and benchmarks from one entry point.
+
 For native Windows `.exe` tools, see the [Windows bootstrap](docs/windows.md).
 It builds the compiler and package manager, supports `plan`, `lock`, `build`,
 package `test` and `run`, and checks the independent compiler parity corpus.
@@ -1259,8 +1261,9 @@ This larger example takes longer to compile than the small examples. To play
 again without recompiling, save the xMLF once and run that file:
 
 ```sh
-"$EMLF_BIN" examples/snake.emlf > snake.xmlf
-"$EMLF_BIN" --run-xmlf snake.xmlf
+mkdir -p .mlf-build
+"$EMLF_BIN" examples/snake.emlf > .mlf-build/snake.xmlf
+"$EMLF_BIN" --run-xmlf .mlf-build/snake.xmlf
 ```
 
 Type `w`, `a`, `s`, or `d`, then press Enter to move up, left, down, or right.
@@ -1413,11 +1416,8 @@ emits LLVM and checked artifacts with `--compile-crate-to-llvm-gc`, then links
 with Clang at `-O2`.
 
 ```sh
-python3 -B tools/performance/compiler-shapes/bench.py list
-python3 -B tools/performance/compiler-shapes/bench.py prepare \
-  --workdir .mlf-build/compiler-shapes --producer .mlf-build/shared-ghc --build-builtin
-python3 -B tools/performance/compiler-shapes/bench.py sweep \
-  --workdir .mlf-build/compiler-shapes
+python3 tools/dev.py bench shapes list
+python3 tools/dev.py bench shapes
 ```
 
 The sweep runs one family at a time and writes `summary.md` and `summary.csv`

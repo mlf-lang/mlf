@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Small final-tree check-only smoke; native qualification is separately documented."""
-import argparse, json, pathlib, subprocess, sys
+import argparse, pathlib, subprocess, sys
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]))
 from common import *
 def main():
