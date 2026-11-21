@@ -1616,7 +1616,7 @@ module Bootstrap.Graph where {
                                                                                                              originals)
                                                                                                           (\checked ->
                                                                                                              ST.bindE
-                                                                                                               (denseCheckMergeEntries
+                                                                                                               (denseCheckMergeEntriesWith denseCheckClassMerges
                                                                                                                   low
                                                                                                                   classes
                                                                                                                   raised
@@ -2081,6 +2081,35 @@ module Bootstrap.Graph where {
         ST.bindE (denseCheckMergeRest low raised permissions first rest)
           (\checked -> denseCheckMerges low raised permissions rest)
     };
+  -- These classes and raised binders were constructed by this rebinding
+  -- transaction. The pair rule rejects exactly when a binder occurs twice
+  -- and a member of that group is Red. Keep groups in first-occurrence order
+  -- and their members in original order, including the permission error stop.
+  denseCheckClassMerges low raised permissions members = case L.drop 7 members of {
+    [] -> denseCheckMerges low raised permissions members;
+    _ -> let {
+      collect ((,,) unbound bound order) n = stBind (readDense low raised n) (\parent ->
+        let { store missing present previous = let {
+          nextOrder = case previous of { [] -> (:) parent order; _ -> order }
+        } in seq present (seq nextOrder (stReturn ((,,) missing present nextOrder))) } in
+        case parent of {
+          Nothing -> store ((:) n unbound) bound unbound;
+          Just p -> let { previous = IM.findWithDefault [] p bound } in
+            store unbound (IM.insert p ((:) n previous) bound) previous
+        });
+      checkMember n = stBind (densePermission permissions n) (\p ->
+        ST.check (L.not (equalPermission p Red)) "cannot merge distinct protected type variables");
+      checkGroup reversed = case reversed of {
+        (:) _ ((:) _ _) -> ST.mapE_ checkMember (L.reverse reversed);
+        _ -> ST.pureE ()
+      }
+    } in stBind (ST.fold collect ((,,) [] IM.empty []) members) (\groups -> case groups of {
+      (,,) unbound bound order -> ST.mapE_ (\parent -> case parent of {
+        Nothing -> checkGroup unbound;
+        Just p -> checkGroup (IM.get p bound)
+      }) (L.reverse order)
+    })
+  };
   rebindSparse :: Graph -> Graph -> Either String Graph;
   -- raisedBinder retains the ascending identity from nodes old.
   rebindSparse old skeleton =
@@ -2968,7 +2997,8 @@ module Bootstrap.Graph where {
                                       STArray s (Maybe Int) ->
                                       DensePermissions s ->
                                       [] ((,) Int Node) -> ST s (Either String ());
-  denseCheckMergeEntries low classes raised raisedPermissions values =
+  denseCheckMergeEntries = denseCheckMergeEntriesWith denseCheckMerges;
+  denseCheckMergeEntriesWith checkClass low classes raised raisedPermissions values =
     case values of {
       [] -> ST.pureE ();
       (:) entry rest ->
@@ -2976,9 +3006,9 @@ module Bootstrap.Graph where {
           (case entry of {
              (,) n v ->
                stBind (readDense low classes n)
-                 (\members -> denseCheckMerges low raised raisedPermissions members)
+                 (\members -> checkClass low raised raisedPermissions members)
            })
-          (\ignored -> denseCheckMergeEntries low classes raised raisedPermissions rest)
+          (\ignored -> denseCheckMergeEntriesWith checkClass low classes raised raisedPermissions rest)
     };
   denseLoadParents :: forall s. Int -> STArray s ([] Int) -> Int -> [] Int -> ST s ();
   denseLoadParents low parents n values =

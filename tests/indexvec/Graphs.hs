@@ -105,6 +105,36 @@ package name deps mods = P.Package (H.literal ("/packages/" ++ name ++ "/mlf-pac
              ("dependencies",J.Object [(H.literal n,J.empty) | n <- deps])]) mods
 modl owner name deps = P.Module name owner (H.v_concatString name ".hs") deps
 
+groupedMergePermissions = do
+  let run grouped parents permissions members = Prim.runST $ do
+        let count=fromIntegral (length parents)
+            unused=error "merge permission read an unrelated scratch array"
+        raised <- Prim.newSTArray count T.Nothing
+        cache <- Prim.newSTArray count T.Nothing
+        forM_ (zip3 [0..] parents permissions) $ \(i,parent,permission) -> do
+          Prim.writeSTArray raised i parent
+          Prim.writeSTArray cache i (T.Just permission)
+        let state=Graph.DensePermissions 0 unused unused unused unused unused cache
+            checkClass=if grouped then Graph.denseCheckClassMerges else Graph.denseCheckMerges
+        result <- checkClass 0 raised state members
+        pure (case result of T.Left err -> Left (H.unpack err); T.Right () -> Right ())
+      absent=T.Nothing
+      lo=T.Just minBound
+      hi=T.Just maxBound
+      skip=error "permission accessed before its group or for a singleton"
+      parents=[lo,absent,hi,absent,lo,T.Just 4,hi,lo]
+      members=[0..7]
+      compareChecks ps perms ms=check "grouped and pairwise protected merge checks agree"
+        (run False ps perms ms) (run True ps perms ms)
+  forM_ [0..255::Int] $ \bits -> do
+    let perms=[if testBit bits i then T.Red else [T.Inert,T.Green,T.Orange]!!(i `mod` 3) | i<-[0..7]]
+    compareChecks parents perms members
+    compareChecks parents perms (reverse members)
+    compareChecks parents perms [0,1,2,3,3,2,1,0]
+  compareChecks parents [T.Green,skip,T.Orange,T.Green,T.Red,skip,T.Green,T.Green] members
+  compareChecks parents (replicate 5 T.Green++[skip,T.Green,T.Orange]) members
+  compareChecks (map T.Just [0..7]) (replicate 8 skip) members
+
 denseRaisedAncestors = do
   let low = -41
       count = 128
@@ -3220,6 +3250,7 @@ main = do
   candidateSkeletonChecks
   wantedBindingRoots
   denseRaisedAncestors
+  groupedMergePermissions
   queryChecks
   datatypeChecks
   let sourceTuples = ["(" ++ replicate (arity-1) ',' ++ ")" | arity <- [2..64]]
