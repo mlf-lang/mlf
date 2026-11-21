@@ -105,6 +105,50 @@ package name deps mods = P.Package (H.literal ("/packages/" ++ name ++ "/mlf-pac
              ("dependencies",J.Object [(H.literal n,J.empty) | n <- deps])]) mods
 modl owner name deps = P.Module name owner (H.v_concatString name ".hs") deps
 
+denseRaisedAncestors = do
+  let low = -41
+      count = 128
+      ids = [low .. low+count-1]
+      index n = (n-low) `mod` 64
+      parent n
+        | index n==0 = T.Nothing
+        | index n==33 = T.Just (n-33)
+        | otherwise = T.Just (n-1)
+      image n = if index n `elem` [0,8,40] then low else low+1
+      entries = [(n,T.Node T.GBot (parent n) T.Flexible) | n<-ids]
+      old = Graph.mkGraph (IntMap.fromDistinctAscList entries) IntMap.empty (low+count)
+      quotient = Graph.mkGraph (IntMap.fromDistinctAscList (take 2 entries))
+        (IntMap.fromList [(n,image n) | n<-ids,n/=image n]) (low+count)
+      solve indexed wanted = Prim.runST $ do
+        images <- Prim.newSTArray count low
+        tree <- Prim.newSTArray count T.Nothing
+        binders <- Prim.newSTArray count T.Nothing
+        raised <- Prim.newSTArray count T.Nothing
+        let unused = error "binder lifting read an unrelated rebinding field"
+            state = Graph.DenseRebinding old quotient low (low+count-1) unused unused images
+              unused unused unused tree unused unused unused binders raised
+        forM_ ids $ \n -> do
+          Graph.writeDenseInt low images n (image n)
+          Graph.writeDense low binders n (parent n)
+        Graph.writeDense low tree (low+1) (T.Just wanted)
+        result <- (if indexed then Graph.denseRaiseBinders else Graph.denseRaiseOriginals) state entries
+        case result of
+          T.Left why -> pure (Left (H.unpack why))
+          T.Right () -> Right <$> mapM (\n -> do
+            up <- Graph.readDense low raised n
+            pure (case up of T.Nothing -> Nothing; T.Just v -> Just v)) ids
+      expected n
+        | image n==low = Nothing
+        | offset<8 || (offset>=33 && offset<40) = Just start
+        | offset<33 = Just (start+8)
+        | otherwise = Just (start+40)
+        where offset=index n; start=n-offset
+  check "duplicate images choose the nearest strict ancestor in their own binding tree"
+    (Right (map expected ids)) (solve True low)
+  forM_ [low,low+1,low+2] $ \wanted ->
+    check "indexed lifting preserves missing and self-only ancestor diagnostics"
+      (solve False wanted) (solve True wanted)
+
 wantedBindingRoots = do
   ds <- case Data.validateDeclarations [T.DataDecl "Dict" ["a"] [T.ConstructorDecl "DictValue" [T.Parameter "a"]]] of
     T.Right ok -> pure ok
@@ -3145,6 +3189,7 @@ main = do
   packageChecks
   candidateSkeletonChecks
   wantedBindingRoots
+  denseRaisedAncestors
   queryChecks
   datatypeChecks
   let sourceTuples = ["(" ++ replicate (arity-1) ',' ++ ")" | arity <- [2..64]]

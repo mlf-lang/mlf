@@ -1583,7 +1583,7 @@ module Bootstrap.Graph where {
                                                                                          remaining)
                                                                                       (\final ->
                                                                                          ST.bindE
-                                                                                           (denseRaiseOriginals
+                                                                                           (denseRaiseBinders
                                                                                               state
                                                                                               originals)
                                                                                            (\up ->
@@ -1850,6 +1850,40 @@ module Bootstrap.Graph where {
                      })
                     (\up -> ST.liftE (writeDense low raised n up))))
     };
+  -- Local unification typically needs just the immediate old binder. On a
+  -- large binding tree, answering each query with a separate climb can visit
+  -- the same long paths quadratically. Each old node instead sees its strict
+  -- ancestors indexed by their image, with the nearest occurrence winning.
+  denseRaiseBinders :: forall s. DenseRebinding s -> [] ((,) Int Node) -> ST s (Either String ());
+  denseRaiseBinders state originals = case state of {
+    DenseRebinding old skeleton low high oldNodes newNodes images classes flags parents tree depths colours grafted oldBinders raised ->
+      if IM.size (nodes old) <= 64 || IM.null (links skeleton)
+      then denseRaiseOriginals state originals
+      else let {
+        children = bindingChildrenMap old;
+        visit ancestors count n = stBind (readDense low images n) (\image ->
+          stBind (readDense low tree image) (\wanted ->
+            let {
+              descend up = stBind (writeDense low raised n up) (\_ -> let { next = count + 1 } in
+                seq next (ST.foldE (visit (IM.insert image n ancestors)) next
+                  (IM.findWithDefault [] n children)))
+            } in case wanted of {
+              Nothing -> descend Nothing;
+              Just target -> case IM.lookup target ancestors of {
+                Nothing -> ST.failE "a node's binder cannot be lowered";
+                Just nearest -> descend (Just nearest)
+              }
+            }));
+        root count ((,) n v) = case binder v of {
+          Nothing -> visit IM.empty count n;
+          Just _ -> ST.pureE count
+        }
+      } in stBind (ST.foldE root 0 originals) (\answer -> case answer of {
+        Right count -> if count == IM.size (nodes old) then ST.pureE ()
+                       else denseRaiseOriginals state originals;
+        Left _ -> denseRaiseOriginals state originals
+      })
+  };
   -- Permission components are memoized on demand, matching the seed's lazy
   -- immutable array knot without exporting mutable state out of runST.
   data DensePermissions s =
