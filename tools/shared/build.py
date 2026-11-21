@@ -42,7 +42,11 @@ def optimization_flags(level):
 def executable_link_flags(name, optimization):
     # The compiler's larger nursery reduces copying of short-lived syntax trees.
     if name == 'emlf':
-        flags = [*LINK_FLAGS, '-with-rtsopts=-F4 -A48m']
+        # The Darwin RTS joins its sleeping ticker at process exit.
+        settings = '-F4 -A48m'
+        if sys.platform == 'darwin':
+            settings += ' -V0.002'
+        flags = [*LINK_FLAGS, '-with-rtsopts=' + settings]
         # Each cold build hashes the compiler image for its cache identity.
         if sys.platform == 'darwin' and optimization == '2':
             flags.append('-optl-Wl,-x,-exported_symbol,_main')
