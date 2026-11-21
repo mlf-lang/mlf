@@ -2,7 +2,7 @@
 
 On this Apple M1 Max, 120 of 125 standard comparisons completed all six pairs. MLF had the lower median compile time in 106 of those 120 comparisons. The matrix covers 25 shapes at 8, 32, 128, 1,024, and 8,192 units. The two additional nested-type checks at depths 4 and 16 also completed.
 
-The tables include 30 standard comparisons rerun after the initial sweep. Each rerun replaces that shape’s five earlier cells. Every cell uses its own six-pair schedule. The code, runtime arguments and expected outputs for each fixture match the initial run.
+The tables include 35 standard comparisons rerun after the initial sweep. Each rerun replaces that shape’s five earlier cells. Every cell uses its own six-pair schedule. The code, runtime arguments and expected outputs for each fixture match the initial run.
 
 Including the two additional depths, these measurements account for 1,465 successful builds, 5 failed attempts and 54 scheduled builds skipped after a failure. The recorder completed 732 pairs and verified 117,183 output lines in 4,635 untimed executable invocations.
 
@@ -20,6 +20,7 @@ The initial sweep used MLF `c8eaf641ec1d27a1fce126fdb6f722ec2d2f089c`. The two a
 | `dependency_diamonds` | 5/5 | `d893e3dd5fce35cad9ac838a9666557b780078d6` | `2afbcad29d73562395e0fef5cc64f6d669c745841e3c54ddc4805730d7e7e8b8` |
 | `inferred_chain` | 5/5 | `d893e3dd5fce35cad9ac838a9666557b780078d6` | `2afbcad29d73562395e0fef5cc64f6d669c745841e3c54ddc4805730d7e7e8b8` |
 | `inferred_poly_chain` | 5/5 | `d893e3dd5fce35cad9ac838a9666557b780078d6` | `2afbcad29d73562395e0fef5cc64f6d669c745841e3c54ddc4805730d7e7e8b8` |
+| `inferred_poly_functions` | 4/5 | `e3dd70fc8ab1120c94782116b58be17356f81589` | `22048893e314b4c2df277d17b15e7f3717963a7346ca7e35fac92892b2ffbe15` |
 
 **class_instances**. A defining module shares its instance environment across declarations and methods. Lexical givens keep their order at each qualified body, including copied helpers.
 
@@ -33,6 +34,8 @@ The initial sweep used MLF `c8eaf641ec1d27a1fce126fdb6f722ec2d2f089c`. The two a
 
 **inferred_poly_chain**. The previous 8,192-unit MLF build stopped during query-graph validation. This rerun uses the explicit traversal of deep acyclic dependencies.
 
+**inferred_poly_functions**. At 8,192 functions GHC reached the 5 GiB process-tree guard on the first leg. Its process group was empty after cleanup. A separate cold MLF worker compiled, linked and passed all three output checks in 25.388 s at 1,634.7 MiB. Dropping an unused checked lambda now preserves pending substitutions. The warm MLF build reused all 8,195 groups.
+
 ## Elapsed compile time
 
 Each cell shows MLF / GHC median wall time in seconds for the six full builds per compiler. The timed interval includes the build worker, compilation and native linking.
@@ -41,7 +44,7 @@ Each cell shows MLF / GHC median wall time in seconds for the six full builds pe
 | --- | ---: | ---: | ---: | ---: | ---: |
 | `flat_functions` | 0.266 / 0.562 | 0.274 / 0.523 | 0.313 / 0.565 | 0.669 / 0.786 | 4.996 / 5.251 |
 | `inferred_functions` | 0.271 / 0.509 | 0.274 / 0.524 | 0.306 / 0.562 | 0.669 / 0.780 | 5.081 / 4.098 |
-| `inferred_poly_functions` | 0.293 / 0.568 | 0.338 / 0.581 | 0.556 / 0.848 | 4.191 / 5.684 | Recorder EPERM |
+| `inferred_poly_functions` | 0.286 / 0.587 | 0.332 / 0.616 | 0.530 / 0.857 | 2.803 / 5.758 | GHC leg stopped |
 | `dependency_chain` | 0.288 / 0.576 | 0.284 / 0.583 | 0.296 / 0.595 | 0.450 / 0.848 | 1.687 / 3.908 |
 | `inferred_chain` | 0.290 / 0.581 | 0.282 / 0.572 | 0.294 / 0.566 | 0.425 / 0.744 | 1.644 / 2.999 |
 | `inferred_poly_chain` | 0.293 / 0.568 | 0.287 / 0.595 | 0.304 / 0.615 | 0.445 / 1.045 | 1.837 / 5.463 |
@@ -73,7 +76,7 @@ Each cell shows MLF / GHC in MiB. The recorder sampled the resident set size (RS
 | --- | ---: | ---: | ---: | ---: | ---: |
 | `flat_functions` | 96.3 / 342.9 | 86.9 / 345.1 | 95.3 / 341.2 | 117.9 / 382.7 | 372.7 / 627.9 |
 | `inferred_functions` | 92.4 / 343.5 | 87.1 / 342.9 | 95.1 / 337.2 | 117.9 / 384.3 | 324.1 / 680.2 |
-| `inferred_poly_functions` | 87.4 / 332.0 | 103.5 / 375.6 | 100.2 / 457.7 | 205.3 / 676.2 | Recorder EPERM |
+| `inferred_poly_functions` | 88.1 / 433.4 | 106.3 / 423.4 | 107.3 / 458.5 | 215.6 / 656.7 | GHC leg stopped |
 | `dependency_chain` | 86.5 / 340.3 | 86.5 / 329.9 | 86.3 / 332.7 | 109.0 / 371.8 | 246.1 / 619.4 |
 | `inferred_chain` | 86.8 / 382.3 | 86.6 / 337.3 | 86.4 / 322.4 | 110.6 / 463.4 | 283.1 / 569.6 |
 | `inferred_poly_chain` | 87.7 / 335.4 | 87.6 / 432.4 | 88.5 / 370.2 | 114.5 / 387.9 | 302.3 / 607.6 |
@@ -112,7 +115,7 @@ A failure stops the remaining builds in that cell. The CSV retains the successfu
 
 | Shape | Size | Completed pairs | Stopped leg | Skipped MLF / GHC | Recorded reason |
 | --- | ---: | ---: | --- | ---: | --- |
-| `inferred_poly_functions` | 8,192 | 0/6 | GHC | 6 / 5 | PermissionError(1, 'Operation not permitted') |
+| `inferred_poly_functions` | 8,192 | 0/6 | GHC | 6 / 5 | process-tree RSS limit |
 | `state_updates` | 8,192 | 0/6 | GHC | 6 / 5 | PermissionError(1, 'Operation not permitted') |
 | `nested_poly_types` | 1,024 | 0/6 | MLF | 5 / 5 | source-to-llvm exit 1 binary expanded-work limit exceeded |
 | `nested_poly_types` | 8,192 | 0/6 | GHC | 6 / 5 | process-tree RSS limit |
