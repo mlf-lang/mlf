@@ -378,7 +378,8 @@ class StaticControls(unittest.TestCase):
                 'show', revision + ':' + helper_path], timeout=30)
 
         old = version(MANIFEST['base_commit'])
-        successor = version('84596b6188585c6aafc8f518d92ecd649152543d')
+        successor = subprocess.check_output(['git', '--no-replace-objects', '-C', str(HERE),
+            'cat-file', 'blob', 'e92e28da1fc60d7dc5f59c9bbfec83164762daa8'], timeout=30)
         self.assertEqual(C.sha_bytes(old), MANIFEST['shared_support_pins']['helper.py'])
         helper, current = R.load_helper(CURRENT_MANIFEST)
         self.assertEqual(current, {**MANIFEST['shared_support_pins'], 'helper.py': C.sha_bytes(successor)})

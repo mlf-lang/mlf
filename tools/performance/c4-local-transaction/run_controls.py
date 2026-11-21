@@ -31,9 +31,9 @@ SPAWN_CONTRACT_SHA = '9f1cbe37799f4db70cdd6fcf441e3fd72d6b654861cf4ec57493f9a7db
 COMPARISON_CONTRACT = HERE.parent / 'integer-compare/source_contract.py'
 COMPARISON_CONTRACT_SHA = '912676a53b8059b334018f186290490f7675e8f79eab8315c03c2fc401adef8a'
 # The frozen C4 manifest records the original A1 supervisor. The current
-# supervisor was introduced in 84596b6188585c6aafc8f518d92ecd649152543d.
+# supervisor also confirms transient Darwin exit states before reporting a leak.
 HISTORICAL_HELPER_SHA = '0d11b29419a32fc9832096951aa085cc317c8a304b9db110ee96ba411a4ce7cc'
-CURRENT_HELPER_SHA = '692ac002d72a333ad6e9af0fd252917c6a462a8c8d99d1269bea207ea3266f1d'
+CURRENT_HELPER_SHA = '4bfd66b18a43557523027403f2766b37e8c172b03085830f1f42bb62e14baee1'
 BUILTIN_STDOUT = b'PASS current builtin: canonical literal, full check, exact wire, 7 malformed/mismatch rejections\n'
 
 

@@ -345,6 +345,51 @@ class GroupTermination(unittest.TestCase):
                  mock.patch.object(HELPER.os, 'killpg', side_effect=PermissionError):
                 HELPER.kill_group(31, members=lambda group: members)
 
+    def test_darwin_eperm_rechecks_exiting_members(self):
+        exiting = [{'pid': 31, 'state': '?E', 'rss': 0}]
+        zombie = [{'pid': 31, 'state': 'Z+', 'rss': 0}]
+        for final in ([], zombie):
+            inventory = mock.Mock(side_effect=[exiting, final])
+            with self.subTest(final=final), mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
+                 mock.patch.object(HELPER.os, 'killpg', side_effect=PermissionError), \
+                 mock.patch.object(HELPER.time, 'sleep'), mock.patch.object(HELPER.os, 'kill') as kill:
+                HELPER.kill_group(31, members=inventory)
+                self.assertEqual(inventory.call_args_list, [mock.call(31)] * 2)
+                kill.assert_not_called()
+
+    def test_persistent_or_unconfirmed_exit_does_not_hide_eperm(self):
+        exiting = {'pid': 31, 'state': '?E', 'rss': 0}
+        stopped = {'pid': 32, 'state': 'T', 'rss': 0}
+        for label, platform, rows in [
+                ('persistent', 'darwin', [exiting]), ('mixed', 'darwin', [exiting, stopped]),
+                ('unknown', 'darwin', [dict(exiting, state='?')]),
+                ('resident', 'darwin', [dict(exiting, rss=4096)]), ('Linux', 'linux', [exiting])]:
+            with self.subTest(label=label), mock.patch.object(HELPER.sys, 'platform', platform), \
+                 mock.patch.object(HELPER.os, 'killpg', side_effect=PermissionError), \
+                 mock.patch.object(HELPER.os, 'getpgid', return_value=31), \
+                 mock.patch.object(HELPER.os, 'kill') as kill, mock.patch.object(HELPER.time, 'sleep'):
+                inventory = mock.Mock(return_value=rows)
+                with self.assertRaises(PermissionError):
+                    HELPER.kill_group(31, members=inventory)
+                if label == 'persistent':
+                    self.assertGreater(inventory.call_count, 1)
+                    self.assertLessEqual(inventory.call_count, 6)
+                else:
+                    inventory.assert_called_once_with(31)
+                self.assertEqual(kill.call_count, len(rows))
+
+    def test_exit_recheck_reports_a_stopped_member_or_inspection_error(self):
+        exiting = [{'pid': 31, 'state': '?E', 'rss': 0}]
+        stopped = [{'pid': 31, 'state': 'T', 'rss': 0}]
+        for result, error in [(stopped, PermissionError), (RuntimeError('failed inventory'), RuntimeError)]:
+            inventory = mock.Mock(side_effect=[exiting, result])
+            with self.subTest(result=result), mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
+                 mock.patch.object(HELPER.os, 'killpg', side_effect=PermissionError), \
+                 mock.patch.object(HELPER.os, 'getpgid', return_value=31), \
+                 mock.patch.object(HELPER.os, 'kill'), mock.patch.object(HELPER.time, 'sleep'):
+                with self.assertRaises(error):
+                    HELPER.kill_group(31, members=inventory)
+
     def test_live_group_denial_is_reported_after_best_effort_cleanup(self):
         rows = [{'pid': 31, 'state': 'S'}, {'pid': 32, 'state': 'R'}, {'pid': 35, 'state': 'Z'}]
         with mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
@@ -495,6 +540,32 @@ class RunnerAccounting(unittest.TestCase):
         self.assertTrue(receipt['child_reaped'])
         self.assertEqual(receipt['exit_code'], -9)
         self.assertEqual(receipt['reason'], 'process-tree RSS limit')
+        self.assertEqual(receipt['terminal_live_descendants'], [])
+        self.assertNotIn('supervision_errors', receipt)
+
+    def test_successful_darwin_leader_with_exiting_descendant(self):
+        exiting = [{'pid': 322, 'state': '?NEs+', 'rss': 0}]
+        with mock.patch.object(HELPER.time, 'sleep'):
+            receipt, _, kills, failure = self.run_mock('darwin', group_replies=[exiting, []])
+        self.assertIsNone(failure)
+        self.assertTrue(receipt['complete'])
+        self.assertEqual(receipt['terminal_live_descendants'], [])
+        self.assertEqual(kills, [])
+
+    def test_guarded_darwin_exiting_descendant_vanishes_after_wait4(self):
+        busy = [{'pid': 321, 'state': 'R', 'rss': 5121}]
+        exiting = [{'pid': 322, 'state': '?E', 'rss': 0}]
+        with mock.patch.object(HELPER.time, 'sleep'), mock.patch.object(HELPER.os, 'getpgid', return_value=321), \
+             mock.patch.object(HELPER.os, 'kill'):
+            receipt, _, kills, failure = self.run_mock('darwin', sampled_overflow=True, wait_status=9,
+                group_replies=[busy, exiting, exiting, []], kill_error=[None, PermissionError('exiting')])
+        self.assertIsInstance(failure, RuntimeError)
+        self.assertEqual(kills, [mock.call(321, signal.SIGKILL)])
+        self.assertFalse(receipt['complete'])
+        self.assertEqual(receipt['reason'], 'process-tree RSS limit')
+        self.assertEqual(receipt['sampled_process_tree_peak_rss_bytes'], 5121)
+        self.assertTrue(receipt['child_reaped'])
+        self.assertEqual(receipt['exit_code'], -9)
         self.assertEqual(receipt['terminal_live_descendants'], [])
         self.assertNotIn('supervision_errors', receipt)
 

@@ -158,15 +158,34 @@ def process_group(group):
     return rows
 
 
+def live_group_members(group, members, *, settle_exit=False):
+    def snapshot():
+        return [row for row in members(group) if not row['state'].startswith('Z')]
+
+    live = snapshot()
+    if settle_exit and sys.platform == 'darwin':
+        # After exit starts, Darwin ps can briefly report "?E" with zero RSS.
+        # Keep the row live until an independent inventory confirms it is gone
+        # or a zombie. A stopped, runnable or persistently exiting member still
+        # requires cleanup. Resource sampling never takes this grace period.
+        for _ in range(3):
+            if not live or not all(row['state'].startswith('?') and 'E' in row['state'][1:]
+                                   and row.get('rss') == 0 for row in live):
+                break
+            time.sleep(0.05)
+            live = snapshot()
+    return live
+
+
 def kill_group(group, *, members=None):
-    """Stop this group. Darwin reports EPERM for groups containing only zombies."""
+    """Stop this group. Darwin can report EPERM as its last members exit."""
     members = process_group if members is None else members
     try:
         os.killpg(group, signal.SIGKILL)
     except ProcessLookupError:
         return
     except PermissionError:
-        live = [row for row in members(group) if not row['state'].startswith('Z')]
+        live = live_group_members(group, members, settle_exit=True)
         if sys.platform == 'darwin' and not live:
             return
         # A real denial is a supervision failure, even if individual signals are
@@ -301,16 +320,14 @@ class Runner:
                 if not reaped:
                     errors.append(RuntimeError('worker did not exit within five seconds of cleanup'))
                 try:
-                    def live_members():
-                        return [row for row in process_group(process.pid) if not row['state'].startswith('Z')]
-                    survivors = live_members()
+                    survivors = live_group_members(process.pid, process_group, settle_exit=True)
                     record['terminal_live_descendants'] = survivors
                     if survivors:
                         record['reason'] = reason or 'live descendants after leader completion'
                         stop_worker_group()
                         deadline = time.monotonic() + 5
                         while survivors and time.monotonic() < deadline:
-                            survivors = live_members()
+                            survivors = live_group_members(process.pid, process_group)
                             if survivors:
                                 time.sleep(0.05)
                         record['remaining_live_after_cleanup'] = survivors
