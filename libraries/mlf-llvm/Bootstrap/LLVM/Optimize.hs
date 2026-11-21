@@ -1521,6 +1521,13 @@ module Bootstrap.LLVM.Optimize where {
   materializePending :: PendingBody -> UseTree;
   materializePending (PendingBody body replacements _ _) =
     if M.null replacements then body else L.fst (materializeBody replacements body);
+  queueSubstitution :: XName -> [] UseTree -> Int -> PendingBody -> PendingBody;
+  queueSubstitution name copies uses (PendingBody body replacements counts calls) =
+    let { replacement = L.head copies } in
+      PendingBody body (M.insert compareName name copies replacements)
+        (mergePendingUses (M.delete compareName name counts)
+          (M.map (\count -> L.min 4 (count * uses)) (limitedUses replacement)))
+        (S.union compareName (S.delete compareName name calls) (negativeCalls replacement));
   delayOwnedLet :: XName -> UseTree -> PendingBody -> Fresh PendingBody;
   delayOwnedLet name value pending =
     let {
@@ -1536,16 +1543,7 @@ module Bootstrap.LLVM.Optimize where {
     if eligible
     then do {
       copies <- traverseFresh (\_ -> copy M.empty (useTerm value)) (L.range 1 uses);
-      let { replacementsHere = L.map indexUses copies;
-        replacement = L.head replacementsHere };
-      case pending of {
-        PendingBody body replacements counts calls ->
-          freshPure
-            (PendingBody body (M.insert compareName name replacementsHere replacements)
-               (mergePendingUses (M.delete compareName name counts)
-                 (M.map (\count -> L.min 4 (count * uses)) (limitedUses replacement)))
-               (S.union compareName (S.delete compareName name calls) (negativeCalls replacement)))
-      }
+      freshPure (queueSubstitution name (L.map indexUses copies) uses pending)
     }
     else do {
       let { body = materializePending pending };
@@ -1556,8 +1554,15 @@ module Bootstrap.LLVM.Optimize where {
   -- the rest of the declaration spine. Its RHS is outside the binder scope.
   delayCheckedLet name value pending = case pending of {
     PendingBody body replacements counts calls ->
-      if M.findWithDefault compareName 0 name counts < 2 || L.not (branchesToFreeValues value)
-      then delayOwnedLet name value pending
+      let { uses = M.findWithDefault compareName 0 name counts;
+        -- A constructor applied only to atoms has no binders to freshen.
+        -- The ordinary rule substitutes it immediately. Queue its sole use
+        -- without rebuilding all later declarations and their use counts.
+        constructorValue = case useTerm value of {
+          XEApp _ _ -> smallValue (useTerm value); _ -> False
+        } } in
+      if uses == 1 && constructorValue then freshPure (queueSubstitution name [value] 1 pending)
+      else if uses < 2 || L.not (branchesToFreeValues value) then delayOwnedLet name value pending
       else let {
         retained = PendingBody (useLet name value body) replacements
           (mergePendingUses (M.delete compareName name counts) (limitedUses value))

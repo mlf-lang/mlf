@@ -1181,6 +1181,37 @@ continuationPipelineChecks = do
         T.Right result -> check "callback pipeline exits at first invalid field" expected result
         T.Left why -> fail (H.unpack why)
 
+-- Every dictionary-like constructor value on this spine is used once.
+-- Preserve the ordinary pass's tree, counts and fresh names while deferring
+-- all substitutions to a single walk of the caller.
+constructorSubstitutionChecks = do
+  let name i = T.XName i "same hint"
+      var i = T.XEVar (name i)
+      ctor i = T.XEApp (T.XEConstructor "Record") (var (100+i))
+      pair x y = T.XEApp (T.XEApp (T.XEConstructor "Pair") x) y
+      spine size = foldr (\i -> T.XELet (name i) (ctor i))
+        (foldr1 pair [var i | i <- [1..size]]) [1..size]
+      test term =
+        let (pending,seed) = Optimize.runFresh (Optimize.passPendingFor True term) 300
+            (ordinary,expectedSeed) = Optimize.runFresh (Optimize.passRaw term) 300
+            counts tree = [(Optimize.nameId k,v) | (k,v) <- M.toList (Optimize.useCounts tree)]
+            Optimize.PendingBody _ replacements _ _ = pending
+            materialized = Optimize.materializePending pending
+        in (M.size replacements,seed == expectedSeed &&
+             X.equalErased (Optimize.useTerm ordinary) (Optimize.useTerm materialized) &&
+             counts materialized == counts ordinary)
+  forM_ [1,4,32] $ \size ->
+    check "deferred constructors preserve ordinary substitution" (size,True) (test (spine size))
+  let linked = foldr (\i -> T.XELet (name i) (T.XEApp (T.XEConstructor "Wrap") (var (i-1))))
+                 (var 32) [1..32]
+  check "deferred RHSs expand earlier constructor values" (32,True) (test linked)
+  let value = ctor 1
+      unused = T.XELet (name 1) value (T.XEInt 0)
+      repeated = T.XELet (name 1) value (pair (var 1) (var 1))
+      nonAtom = T.XELet (name 1) (T.XEApp (T.XEConstructor "Record") (T.XEApp (var 100) (var 101))) (var 1)
+  forM_ [unused,repeated,nonAtom] $ \term ->
+    check "constructor fallback retains ordinary multiplicity and effects" (0,True) (test term)
+
 -- Compare each emitted callback's capture set to a fresh traversal. Include
 -- repeated open-term identities and transitive captures through static workers.
 lambdaCaptureChecks = do
@@ -2549,6 +2580,7 @@ main = do
   sharedFunctionDiamondChecks
   continuationPipelineChecks
   lambdaCaptureChecks
+  constructorSubstitutionChecks
   openGeometryChecks
   signedConstructorChecks
   putStrLn "1032 ordered SCC and reach comparisons, query DAG and package controls passed"
