@@ -1,18 +1,22 @@
-# MLF and GHC compilation across program shapes, 21 November 2026
+# MLF and GHC compilation across program shapes
 
-MLF had the lower median compile time in 99 of the 110 standard comparisons that completed all six pairs on this Apple M1 Max. The standard matrix contains 25 shapes at 8, 32, 128, 1,024 and 8,192 units. Fifteen comparisons stopped at a limit or recorder failure. The two additional nested-type measurements at depths 4 and 16 also completed.
+On this Apple M1 Max, 114 of 125 standard comparisons completed all six pairs. MLF had the lower median compile time in 102 of those 114 comparisons. The matrix covers 25 shapes at 8, 32, 128, 1,024, and 8,192 units. The two additional nested-type checks at depths 4 and 16 also completed.
 
-At 8,192 rows, the irregular literal table compiled in 0.428 s with MLF and 6.153 s with GHC. For 8,192 escaping closures the medians were much closer, 26.174 s and 26.764 s. The wide constructor case favored GHC at that size, 11.786 s versus 16.121 s with MLF.
+The tables include 5 standard comparisons rerun after the initial sweep. Each rerun replaces that shape’s five earlier cells. Every cell uses its own six-pair schedule. The code, runtime arguments and expected outputs for each fixture match the initial run.
 
-Across all 127 comparisons, 1,355 of 1,524 scheduled builds succeeded. Fifteen attempts failed and the recorder skipped the remaining 154 builds in those cells. The follow-up tables record what each compiler could finish independently.
+Including the two additional depths, these measurements account for 1,399 successful builds, 11 failed attempts and 114 scheduled builds skipped after a failure. The recorder completed 696 pairs and verified 116,952 output lines in 4,404 untimed executable invocations.
 
-Each pair compiled identical source bytes to two fresh native executables. The MLF compiler came from `c8eaf641ec1d27a1fce126fdb6f722ec2d2f089c` and used the `crate-fused-v1` endpoint. The toolchain used GHC 9.14.1 and Homebrew clang version 23.1.3 at optimization level 2 on `macOS-26.6.2-arm64-arm-64bit-Mach-O`. The recorder ran each compiler serially and alternated which compiler ran first in adjacent pairs.
+## Compiler revisions
 
-The report reuses 98 cells across 20 shapes from benchmark revision `939968bd7c6d0064433520261879a72455825a8f`. Revision `64e4140e509c20f4bb61aad7b070c8be1ad6cdfc` reproduced their source bytes, inputs and expected output, and supplied 29 fresh cells. Those cover four additional shapes, the revised `wide_case` workload, and two `rank2_arguments` sizes. The revised `wide_case` checks every constructor arm in one extra executable invocation. Its original three-input measurements remain in the earlier run.
+Each paired build uses the same program source for MLF and GHC. MLF uses the GHC-hosted `crate-fused-v1` compiler and Clang with `-O2`. GHC 9.14.1 uses `--make -O2`. Both builds include native linking. The compilers run serially and alternate which starts the next pair. The CSV identifies the recorder revision, compiler source revision, executable SHA-256 and producer receipt for every row.
 
-The original sweep held back 2 `rank2_arguments` cells at sizes 1,024 and 8,192. Each completed 12 builds and verified their program outputs. The sweep detected a tracked edit to `CONTRIBUTING.md` and declined to combine those cells with its earlier measurements. The audit confirmed that only the contributor guide changed and that the measured inputs retained their recorded hashes. The main tables use fresh runs from a clean tracked checkout for those two sizes and retain the three smaller cells from the original sweep.
+The initial sweep used MLF `c8eaf641ec1d27a1fce126fdb6f722ec2d2f089c`. The two additional nested-type depths retain that original compiler. The following rows identify the compiler for the standard reruns.
 
-The primary measurements contain 672 complete pairs. After successful builds, 4,272 untimed executable invocations produced 116,820 verified output lines.
+| Remeasured shape | Six-pair comparisons completed | MLF compiler commit | Executable SHA-256 |
+| --- | ---: | --- | --- |
+| `dependency_diamonds` | 5/5 | `d893e3dd5fce35cad9ac838a9666557b780078d6` | `2afbcad29d73562395e0fef5cc64f6d669c745841e3c54ddc4805730d7e7e8b8` |
+
+**dependency_diamonds**. The checked LLVM optimizer now preserves multiply used functions whose bodies branch to shared dependencies. Query publication and cache validation traverse deep acyclic paths with explicit frames, while continuing to reject cycles.
 
 ## Elapsed compile time
 
@@ -36,7 +40,7 @@ Each cell shows MLF / GHC median wall time in seconds for the six full builds pe
 | `local_functions` | 0.266 / 0.536 | 0.274 / 0.542 | 0.289 / 0.585 | 0.385 / 0.819 | 1.437 / 6.957 |
 | `wide_case` | 0.371 / 0.588 | 0.390 / 0.602 | 0.943 / 1.225 | 1.534 / 1.693 | 16.121 / 11.786 |
 | `class_instances` | 0.512 / 0.596 | 0.617 / 0.677 | 1.331 / 0.956 | MLF leg stopped | MLF leg stopped |
-| `dependency_diamonds` | 0.370 / 0.568 | Recorder EPERM | Recorder EPERM | MLF leg stopped | MLF leg stopped |
+| `dependency_diamonds` | 0.290 / 0.571 | 0.346 / 0.576 | 0.547 / 0.632 | 2.366 / 1.372 | 19.367 / 41.840 |
 | `state_updates` | 0.413 / 0.612 | 0.561 / 0.707 | 1.213 / 1.389 | 11.949 / 23.242 | Recorder EPERM |
 | `captured_closures` | 0.330 / 0.626 | 0.352 / 0.622 | 0.584 / 0.858 | 2.985 / 3.458 | 26.174 / 26.764 |
 | `wide_product` | 0.322 / 0.645 | 0.394 / 0.687 | 0.712 / 0.699 | 3.533 / 1.615 | 39.878 / 26.353 |
@@ -68,7 +72,7 @@ Each cell shows MLF / GHC in MiB. The recorder sampled the resident set size (RS
 | `local_functions` | 96.8 / 340.5 | 87.0 / 343.5 | 86.5 / 366.8 | 95.6 / 366.4 | 372.2 / 629.7 |
 | `wide_case` | 93.8 / 320.6 | 93.9 / 369.4 | 103.1 / 378.8 | 189.5 / 460.1 | 1,442.4 / 874.8 |
 | `class_instances` | 102.8 / 310.9 | 111.7 / 346.5 | 134.8 / 372.6 | MLF leg stopped | MLF leg stopped |
-| `dependency_diamonds` | 87.4 / 344.2 | Recorder EPERM | Recorder EPERM | MLF leg stopped | MLF leg stopped |
+| `dependency_diamonds` | 86.5 / 342.6 | 98.4 / 319.1 | 100.3 / 360.5 | 178.7 / 454.5 | 926.4 / 1,418.5 |
 | `state_updates` | 94.7 / 428.7 | 107.7 / 373.4 | 146.8 / 400.7 | 490.1 / 881.4 | Recorder EPERM |
 | `captured_closures` | 87.5 / 383.4 | 99.8 / 359.9 | 113.9 / 452.0 | 318.1 / 532.9 | 2,878.0 / 1,646.9 |
 | `wide_product` | 87.4 / 429.4 | 104.2 / 403.7 | 137.7 / 348.9 | 297.0 / 403.9 | 1,538.0 / 1,444.6 |
@@ -88,6 +92,32 @@ These additional sizes use the same six-pair schedule. Depth counts the nested `
 | 16 | 0.288 / 0.556 | 86.8 / 339.1 |
 
 ## Incomplete paired measurements
+
+A failure stops the remaining builds in that cell. The CSV retains the successful and skipped counts for both compilers.
+
+| Shape | Size | Completed pairs | Stopped leg | Skipped MLF / GHC | Recorded reason |
+| --- | ---: | ---: | --- | ---: | --- |
+| `inferred_poly_functions` | 8,192 | 0/6 | GHC | 6 / 5 | PermissionError(1, 'Operation not permitted') |
+| `dependency_chain` | 8,192 | 0/6 | MLF | 5 / 5 | source-to-llvm exit 1 cyclic/deep query graph |
+| `inferred_chain` | 8,192 | 0/6 | MLF | 5 / 5 | source-to-llvm exit 1 cyclic/deep query graph |
+| `inferred_poly_chain` | 8,192 | 0/6 | MLF | 5 / 5 | source-to-llvm exit 1 cyclic/deep query graph |
+| `class_instances` | 1,024 | 0/6 | MLF | 5 / 5 | source-to-llvm exit 1 binary symbol byte limit exceeded |
+| `class_instances` | 8,192 | 0/6 | MLF | 5 / 5 | wall limit |
+| `state_updates` | 8,192 | 0/6 | GHC | 6 / 5 | PermissionError(1, 'Operation not permitted') |
+| `nested_poly_types` | 1,024 | 0/6 | MLF | 5 / 5 | source-to-llvm exit 1 binary expanded-work limit exceeded |
+| `nested_poly_types` | 8,192 | 0/6 | GHC | 6 / 5 | process-tree RSS limit |
+| `rank2_callbacks` | 8,192 | 0/6 | GHC | 6 / 5 | wall limit |
+| `decoder_pipeline` | 8,192 | 0/6 | MLF | 5 / 5 | source-to-llvm exit 1 cyclic/deep query graph |
+
+## Initial sweep and follow-ups
+
+These results document the 21 November 2026 sweep on MLF `c8eaf641ec1d27a1fce126fdb6f722ec2d2f089c`. Its standard matrix completed 110 of 125 comparisons. The historical diagnostics and separate follow-ups below retain the original measurements for superseded rows.
+
+The initial report reused 98 cells across 20 shapes from benchmark revision `939968bd7c6d0064433520261879a72455825a8f`. Revision `64e4140e509c20f4bb61aad7b070c8be1ad6cdfc` reproduced their source bytes, inputs and expected output, and supplied 29 fresh cells. Those cover four additional shapes, the revised `wide_case` workload, and two `rank2_arguments` sizes. The revised `wide_case` checks every constructor arm in one extra executable invocation. Its original three-input measurements remain in the earlier run.
+
+The original sweep held back 2 `rank2_arguments` cells at sizes 1,024 and 8,192. Each completed 12 builds and verified their program outputs. The sweep detected a tracked edit to `CONTRIBUTING.md` and declined to combine those cells with its earlier measurements. The audit confirmed that only the contributor guide changed and that the measured inputs retained their recorded hashes. The initial tables used fresh runs from a clean tracked checkout for those two sizes and retain the three smaller cells from the original sweep.
+
+### Initial incomplete paired measurements
 
 The recorder stopped a cell at its first failure. A paired median requires all six pairs. The skipped counts show how many scheduled builds remained for each compiler.
 
@@ -111,7 +141,7 @@ The recorder stopped a cell at its first failure. A paired median requires all s
 
 The original EPERM record contains a permission error from the recorder and no terminal resource reading or compiler diagnostic that establishes its cause.
 
-## Separate follow-up measurements
+### Follow-ups on the initial compiler
 
 A single-compiler follow-up repeats the other compiler after a paired cell stopped. An original-monitor retry repeats all six pairs under the original supervisor. A fixed-monitor rerun uses the same source, ordinary compiler, per-command limits and schedule with the updated Darwin process monitor. A guard reported by that monitor belongs to that rerun. The cause of the original EPERM remains undetermined. Each row uses only its own measurements. A dash marks an unavailable median.
 
@@ -141,4 +171,4 @@ A single-compiler follow-up repeats the other compiler after a paired cell stopp
 | `dependency_diamonds` | 128 | Fixed-monitor rerun | — / — | — / — | MLF · process-tree RSS limit |
 | `state_updates` | 8,192 | Fixed-monitor rerun | — / — | — / — | GHC · wall limit |
 
-The primary measurements are available at full precision in the [results CSV](compiler-shapes-2026-11-21.csv). It includes per-cell plan, generated-source and receipt hashes. Run `python3 tools/dev.py bench shapes` to collect a new standard matrix using the [benchmark instructions](../tools/performance/compiler-shapes/README.md).
+The [full-precision CSV](compiler-shapes-2026-11-21.csv) contains the measurements used in the current tables. Run `python3 tools/dev.py bench shapes` to collect the standard matrix. [Benchmark instructions](../tools/performance/compiler-shapes/README.md).
