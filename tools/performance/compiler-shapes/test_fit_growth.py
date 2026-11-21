@@ -141,12 +141,13 @@ class MatrixGrowthTests(unittest.TestCase):
 
 
     def test_sweep_failure_checks_the_plan_digest_before_reporting_its_producer(self):
-        row = dict(family='example', size=8192, status='failed', lane='ghc', reason='RSS limit')
-        _, values, reason = matrix_growth.sweep_cell(self.root, row, 6, {})
-        self.assertIsNone(values)
-        self.assertIn('ghc: RSS limit', reason)
-        folder = self.root / 'cohorts/example-8192'
+        row = dict(family='example', size=8192, status='failed', lane='', completed_pairs=0,
+                   reason='recorder exit 1; incomplete recording', evidence='cohorts/example-8192')
+        ident, values, issue = matrix_growth.sweep_cell(self.root, row, 6, {})
+        self.assertEqual((None, None, 'failed: incomplete recording'), (ident, values, issue))
+        folder = self.root / row['evidence']
         folder.mkdir(parents=True)
+        row.update(lane='ghc', reason='RSS limit', evidence=row['evidence']+'/receipt.json')
         plan = {'cases': [{'family': 'example', 'size': 8192}], 'benchmark': {'repeats': 6},
                 'toolchain': {'producer': {'emlf_sha256':'b'*64, 'receipt_sha256':'c'*64}}}
         plan_path = folder / 'plan.json'
@@ -155,9 +156,23 @@ class MatrixGrowthTests(unittest.TestCase):
         receipt.write_text(json.dumps({'plan_sha256': '0'*64}))
         with self.assertRaisesRegex(ValueError, 'frozen plan digest'):
             matrix_growth.sweep_cell(self.root, row, 6, {})
-        receipt.write_text(json.dumps({'plan_sha256': matrix_growth.analyze.sha(plan_path)}))
+        failed = dict(plan_sha256=matrix_growth.analyze.sha(plan_path), complete=True, all_cases_passed=False,
+                      runs=[], failures=[dict(case='example-8192', position=0, lane='ghc', error='worker error')])
+        receipt.write_text(json.dumps(failed))
+        command = folder / 'legs/000-example-8192-ghc/command'
+        command.mkdir(parents=True)
+        (command/'command.json').write_text(json.dumps({'reason': 'RSS limit'}))
         with patch.object(matrix_growth.analyze, 'compatibility', return_value={}):
-            ident, values, _ = matrix_growth.sweep_cell(self.root, row, 6, {})
+            ident, values, issue = matrix_growth.sweep_cell(self.root, row, 6, {})
+            self.assertEqual('failed: ghc: RSS limit', issue)
+            for field, wrong in [('lane', 'mlf'), ('reason', 'worker error'), ('completed_pairs', 3)]:
+                with self.subTest(field=field), patch.dict(row, {field: wrong}), self.assertRaises(ValueError):
+                    matrix_growth.sweep_cell(self.root, row, 6, {})
+            with patch.dict(row, {'reason': 'recorder exit 1; RSS limit'}):
+                self.assertEqual(issue, matrix_growth.sweep_cell(self.root, row, 6, {})[2])
+        receipt.write_text(json.dumps(dict(failed, all_cases_passed=True, failures=[])))
+        with self.assertRaisesRegex(ValueError, 'failed qualified cell'):
+            matrix_growth.sweep_cell(self.root, row, 6, {})
         self.assertEqual(('', 'b'*64, 'c'*64), ident)
         self.assertIsNone(values)
 

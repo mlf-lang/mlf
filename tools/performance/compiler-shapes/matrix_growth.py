@@ -7,7 +7,7 @@ import numpy as np
 
 import analyze
 from fit_growth import LANES, power_fit
-from sweep import completed_pairs
+from sweep import completed_pairs, failure_detail
 
 
 def producer(revision, binary, receipt):
@@ -41,12 +41,29 @@ def sweep_cell(root, row, repeats, profiles):
     if status in ('pending', 'running'):
         return None, None, status
     if status == 'failed':
-        issue = ': '.join(filter(None, (status, row['lane'], row['reason'])))
         plan_path, receipt_path = folder / 'plan.json', folder / 'receipt.json'
-        if not (plan_path.is_file() and receipt_path.is_file()):
+        has_receipt = receipt_path.is_file()
+        evidence = folder.relative_to(root) / 'receipt.json' if has_receipt else folder.relative_to(root)
+        analyze.require(row['evidence'] == str(evidence), 'summary failure evidence path mismatch')
+        receipt = analyze.load(receipt_path) if has_receipt else {}
+        if has_receipt:
+            analyze.require(plan_path.is_file() and receipt['plan_sha256'] == analyze.sha(plan_path),
+                            'frozen plan digest')
+            analyze.require(not (receipt['complete'] and receipt.get('all_cases_passed') and not receipt['failures']),
+                            'summary reports a failed qualified cell')
+        count = completed_pairs(receipt['runs']) if has_receipt else 0
+        analyze.require(int(row['completed_pairs']) == count, 'summary failed-cell pair count mismatch')
+        lane, reason = failure_detail(folder, receipt)
+        # The recorder's process exit status is available only to the sweep.
+        # Use the recorded lane diagnostic in the point report.
+        summary_reason = row['reason']
+        analyze.require(row['lane'] == lane and (summary_reason == reason or
+                        re.sub(r'^recorder exit [1-9][0-9]*; ', '', summary_reason) == reason),
+                        'summary failure detail mismatch')
+        issue = ': '.join(filter(None, (status, lane, reason)))
+        if not has_receipt:
             return None, None, issue
-        plan, receipt = analyze.load(plan_path), analyze.load(receipt_path)
-        analyze.require(receipt['plan_sha256'] == analyze.sha(plan_path), 'frozen plan digest')
+        plan = analyze.load(plan_path)
         measurements = None
     else:
         analyze.require(status == 'passed', 'unknown sweep status')
