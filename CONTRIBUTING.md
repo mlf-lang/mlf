@@ -1,5 +1,8 @@
 # Contributing
 
+For routine cleanup, tool and test consolidation, or directory improvements,
+follow the [daily housekeeping guide](docs/housekeeping.md).
+
 Use issues for reproducible compiler or tooling defects and
 [discussions](https://github.com/orgs/mlf-lang/discussions) for language design
 and ecosystem questions. Include a small `.emlf` program, the command, expected
