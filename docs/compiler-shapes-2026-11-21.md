@@ -1,10 +1,10 @@
 # MLF and GHC compilation across program shapes
 
-On this Apple M1 Max, 114 of 125 standard comparisons completed all six pairs. MLF had the lower median compile time in 102 of those 114 comparisons. The matrix covers 25 shapes at 8, 32, 128, 1,024, and 8,192 units. The two additional nested-type checks at depths 4 and 16 also completed.
+On this Apple M1 Max, 115 of 125 standard comparisons completed all six pairs. MLF had the lower median compile time in 103 of those 115 comparisons. The matrix covers 25 shapes at 8, 32, 128, 1,024, and 8,192 units. The two additional nested-type checks at depths 4 and 16 also completed.
 
-The tables include 5 standard comparisons rerun after the initial sweep. Each rerun replaces that shape’s five earlier cells. Every cell uses its own six-pair schedule. The code, runtime arguments and expected outputs for each fixture match the initial run.
+The tables include 10 standard comparisons rerun after the initial sweep. Each rerun replaces that shape’s five earlier cells. Every cell uses its own six-pair schedule. The code, runtime arguments and expected outputs for each fixture match the initial run.
 
-Including the two additional depths, these measurements account for 1,399 successful builds, 11 failed attempts and 114 scheduled builds skipped after a failure. The recorder completed 696 pairs and verified 116,952 output lines in 4,404 untimed executable invocations.
+Including the two additional depths, these measurements account for 1,410 successful builds, 10 failed attempts and 104 scheduled builds skipped after a failure. The recorder completed 702 pairs and verified 116,985 output lines in 4,437 untimed executable invocations.
 
 ## Compiler revisions
 
@@ -14,7 +14,10 @@ The initial sweep used MLF `c8eaf641ec1d27a1fce126fdb6f722ec2d2f089c`. The two a
 
 | Remeasured shape | Six-pair comparisons completed | MLF compiler commit | Executable SHA-256 |
 | --- | ---: | --- | --- |
+| `dependency_chain` | 5/5 | `d893e3dd5fce35cad9ac838a9666557b780078d6` | `2afbcad29d73562395e0fef5cc64f6d669c745841e3c54ddc4805730d7e7e8b8` |
 | `dependency_diamonds` | 5/5 | `d893e3dd5fce35cad9ac838a9666557b780078d6` | `2afbcad29d73562395e0fef5cc64f6d669c745841e3c54ddc4805730d7e7e8b8` |
+
+**dependency_chain**. The previous 8,192-unit MLF build stopped during query-graph validation. This rerun uses the explicit traversal of deep acyclic dependencies.
 
 **dependency_diamonds**. The checked LLVM optimizer now preserves multiply used functions whose bodies branch to shared dependencies. Query publication and cache validation traverse deep acyclic paths with explicit frames, while continuing to reject cycles.
 
@@ -27,7 +30,7 @@ Each cell shows MLF / GHC median wall time in seconds for the six full builds pe
 | `flat_functions` | 0.266 / 0.562 | 0.274 / 0.523 | 0.313 / 0.565 | 0.669 / 0.786 | 4.996 / 5.251 |
 | `inferred_functions` | 0.271 / 0.509 | 0.274 / 0.524 | 0.306 / 0.562 | 0.669 / 0.780 | 5.081 / 4.098 |
 | `inferred_poly_functions` | 0.293 / 0.568 | 0.338 / 0.581 | 0.556 / 0.848 | 4.191 / 5.684 | Recorder EPERM |
-| `dependency_chain` | 0.258 / 0.512 | 0.271 / 0.530 | 0.280 / 0.543 | 0.409 / 0.719 | MLF leg stopped |
+| `dependency_chain` | 0.288 / 0.576 | 0.284 / 0.583 | 0.296 / 0.595 | 0.450 / 0.848 | 1.687 / 3.908 |
 | `inferred_chain` | 0.274 / 0.556 | 0.269 / 0.530 | 0.279 / 0.534 | 0.410 / 0.723 | MLF leg stopped |
 | `inferred_poly_chain` | 0.279 / 0.561 | 0.283 / 0.583 | 0.297 / 0.601 | 0.448 / 1.063 | MLF leg stopped |
 | `recursive_ring` | 0.274 / 0.548 | 0.289 / 0.567 | 0.352 / 0.630 | 0.901 / 1.534 | 7.852 / 14.333 |
@@ -59,7 +62,7 @@ Each cell shows MLF / GHC in MiB. The recorder sampled the resident set size (RS
 | `flat_functions` | 96.3 / 342.9 | 86.9 / 345.1 | 95.3 / 341.2 | 117.9 / 382.7 | 372.7 / 627.9 |
 | `inferred_functions` | 92.4 / 343.5 | 87.1 / 342.9 | 95.1 / 337.2 | 117.9 / 384.3 | 324.1 / 680.2 |
 | `inferred_poly_functions` | 87.4 / 332.0 | 103.5 / 375.6 | 100.2 / 457.7 | 205.3 / 676.2 | Recorder EPERM |
-| `dependency_chain` | 96.8 / 341.1 | 86.7 / 348.4 | 88.6 / 334.9 | 111.2 / 436.2 | MLF leg stopped |
+| `dependency_chain` | 86.5 / 340.3 | 86.5 / 329.9 | 86.3 / 332.7 | 109.0 / 371.8 | 246.1 / 619.4 |
 | `inferred_chain` | 87.4 / 339.3 | 92.9 / 345.6 | 93.0 / 337.5 | 111.5 / 463.1 | MLF leg stopped |
 | `inferred_poly_chain` | 87.7 / 332.0 | 87.7 / 432.1 | 91.7 / 387.0 | 114.4 / 377.8 | MLF leg stopped |
 | `recursive_ring` | 87.1 / 336.9 | 86.9 / 331.1 | 104.7 / 365.2 | 164.5 / 379.4 | 624.0 / 762.9 |
@@ -98,7 +101,6 @@ A failure stops the remaining builds in that cell. The CSV retains the successfu
 | Shape | Size | Completed pairs | Stopped leg | Skipped MLF / GHC | Recorded reason |
 | --- | ---: | ---: | --- | ---: | --- |
 | `inferred_poly_functions` | 8,192 | 0/6 | GHC | 6 / 5 | PermissionError(1, 'Operation not permitted') |
-| `dependency_chain` | 8,192 | 0/6 | MLF | 5 / 5 | source-to-llvm exit 1 cyclic/deep query graph |
 | `inferred_chain` | 8,192 | 0/6 | MLF | 5 / 5 | source-to-llvm exit 1 cyclic/deep query graph |
 | `inferred_poly_chain` | 8,192 | 0/6 | MLF | 5 / 5 | source-to-llvm exit 1 cyclic/deep query graph |
 | `class_instances` | 1,024 | 0/6 | MLF | 5 / 5 | source-to-llvm exit 1 binary symbol byte limit exceeded |
