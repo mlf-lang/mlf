@@ -149,6 +149,35 @@ denseRaisedAncestors = do
     check "indexed lifting preserves missing and self-only ancestor diagnostics"
       (solve False wanted) (solve True wanted)
 
+rebindingAncestors = do
+  let bot parent = T.Node T.GBot parent T.Flexible
+      sameGraph a b = Graph.nextId a == Graph.nextId b &&
+        IntMap.eqIntMap Graph.equalNode (Graph.nodes a) (Graph.nodes b) &&
+        IntMap.eqIntMap (==) (Graph.links a) (Graph.links b)
+      cases = [(0,8,Just 0),(15,0,Just 0),(9,17,Just 5),(14,12,Just 12),
+               (17,17,Just 17),(19,26,Just 19),(0,19,Nothing),(2,26,Nothing)]
+  forM_ [(37,1),(-103,1),(2^60,701)] $ \(offset,stride) -> do
+    let at i = offset + i*stride
+        parent i | i == 0 || i == 19 = T.Nothing
+                 | i == 10 = T.Just (at 5)
+                 | otherwise = T.Just (at (i-1))
+        -- Two chains fork at 5; a separate chain starts at 19. The final
+        -- two nodes merge, requiring the LCA of their original binders.
+        forest = [(at i,bot (parent i)) | i <- [0..26]]
+        fresh = at 29
+        source a b = Graph.mkGraph (IntMap.fromList
+          (forest ++ [(at 27,bot (T.Just (at a))), (at 28,bot (T.Just (at b)))]))
+          IntMap.empty fresh
+        merged p = Graph.mkGraph (IntMap.fromList (forest ++ [(at 27,bot (T.Just (at p)))]))
+          (IntMap.fromList [(at 28,at 27)]) fresh
+    forM_ cases $ \(a,b,expected) -> do
+      let label = "rebind ancestors " ++ show (offset,stride,a,b)
+      case (expected, Graph.rebind (source a b) (merged a)) of
+        (Just p,T.Right graph) -> check label True (sameGraph (merged p) graph)
+        (Nothing,T.Left why) -> check label "binders have no common ancestor" (H.unpack why)
+        (_,T.Left why) -> fail (label ++ ": " ++ H.unpack why)
+        (Nothing,T.Right _) -> fail (label ++ ": merged disconnected binders")
+
 wantedBindingRoots = do
   ds <- case Data.validateDeclarations [T.DataDecl "Dict" ["a"] [T.ConstructorDecl "DictValue" [T.Parameter "a"]]] of
     T.Right ok -> pure ok
@@ -3120,6 +3149,7 @@ evidenceScopeChecks = do
     check "different graph authorities keep separate resolvers" False (Elaborate.sameGraphCandidate source other)
 
 main = do
+  rebindingAncestors
   preparedScopeFingerprintChecks
   methodOwnerChecks
   sharedWantedProjectionChecks
