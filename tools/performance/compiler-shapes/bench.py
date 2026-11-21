@@ -7,6 +7,7 @@ Subcommands:
            builtin checked pair) and write setup.json
   run      execute one frozen cohort (filters: --family, --size, --repeats)
   sweep    run families one at a time and tabulate their paired build times
+  growth   fit standard-size point exponents from a published CSV or sweep directory
   installed  compare two public installations with GHC using fresh and warm targets
   analyze  write summary.json, summary.csv, samples.csv and summary.md
   all      prepare if needed, then run, then analyze
@@ -76,6 +77,23 @@ def resolve(matrix_name, families, sizes):
 
 def compile_count(cells, repeats):
     return cells * repeats * 2
+
+
+def command_growth(args):
+    import csv
+    try:
+        from matrix_growth import points
+    except ModuleNotFoundError as err:
+        if err.name != 'numpy':
+            raise
+        raise SystemExit('growth analysis requires NumPy') from err
+    try:
+        rows = list(points(args.input, registry()['matrices']['default']))
+    except (OSError, KeyError, ValueError) as err:
+        raise SystemExit(f'cannot analyze {args.input}: {err}') from err
+    writer = csv.DictWriter(sys.stdout, fieldnames=list(rows[0]), lineterminator='\n')
+    writer.writeheader()
+    writer.writerows(rows)
 
 
 def command_list(args):
@@ -266,6 +284,10 @@ def main():
     sweep.add_argument('--cohort-output-gib', type=int)
     sweep.add_argument('--prune-build-products', action='store_true')
     sweep.set_defaults(func=command_sweep)
+
+    growth = sub.add_parser('growth', help='fit standard-matrix point exponents and print CSV')
+    growth.add_argument('input', type=Path, help='full-precision published CSV or sweep directory')
+    growth.set_defaults(func=command_growth)
 
     analyzer = sub.add_parser('analyze', help='write the analysis outputs')
     analyzer.add_argument('--workdir', type=Path, required=True)

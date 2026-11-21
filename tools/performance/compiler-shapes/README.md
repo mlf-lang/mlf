@@ -106,8 +106,24 @@ defaults. Each cell uses six pairs unless you set `--repeats`. Add
 GHC target objects from successful cells after checking them. The receipts,
 sources and per-cell measurements remain available.
 
-For a growth fit, select the optional `baseline` and at least three positive
-sizes of one family **in a single cohort**. The baseline runs once per
+Fit the standard five-size point exponents offline with NumPy installed:
+
+```sh
+python3 tools/dev.py bench shapes growth docs/compiler-shapes-2026-11-21.csv
+```
+
+The command also accepts a sweep directory containing `summary.csv` and its
+per-cell evidence. It prints CSV with one row per shape. Each fit uses six
+paired builds at 8, 32, 128, 1,024 and 8,192 and estimates the nonnegative
+offset and scale in `a + b*(n/nmax)^p` from those five medians. The
+`met` and `higher` outcomes compare the unrounded MLF and GHC point
+exponents. An estimate outside the fitter’s interior [0.101, 2.999] or a
+zero growth scale yields `indeterminate`. Missing or failed standard cells
+yield `incomplete`. The compiler columns identify the measured binary and
+producer receipt. Published rows also supply its Git revision.
+
+For a paired bootstrap interval, select the optional `baseline` and at least
+three positive sizes of one family **in a single cohort**. The baseline runs once per
 repetition at size zero. `--interleave-pairs` spreads sizes across rounds
 while keeping the two compilers adjacent. `all` prepares, runs and analyzes a
 cohort. A completed cohort can also be analyzed with `bench.py analyze`.

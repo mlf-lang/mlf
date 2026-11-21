@@ -88,8 +88,8 @@ def main(argv):
     if argv[:1] == ['build-host']:
         return launch(python(ROOT / 'tools/shared/build.py', *argv[1:]))
     if argv[:2] == ['bench', 'shapes']:
-        if argv[2:3] == ['list']:
-            return launch(python(SHAPES / 'bench.py', 'list', *argv[3:]))
+        if len(argv) > 2 and argv[2] in ('list', 'growth'):
+            return launch(python(SHAPES / 'bench.py', *argv[2:]))
         return launch(python(SHAPES / 'bench.py', 'sweep', *argv[2:]))
 
     parser = argparse.ArgumentParser(description=__doc__)
@@ -105,7 +105,7 @@ def main(argv):
     commands.add_parser('check-tools', help='test the developer commands and compiler benchmark harness')
     bench = commands.add_parser('bench', help='compile shapes against GHC or benchmark native applications')
     suites = bench.add_subparsers(dest='suite', required=True)
-    suites.add_parser('shapes', help='run the paired compiler sweep, or use shapes list')
+    suites.add_parser('shapes', help='run the paired compiler sweep, or use shapes list or growth')
     apps = suites.add_parser('apps', help='run the native candidate / baseline / C comparison')
     apps.add_argument('--candidate', type=Path, default=ROOT / '.mlf-build/bin/emlf',
                       help='candidate compiler (default: .mlf-build/bin/emlf)')

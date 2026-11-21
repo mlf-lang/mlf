@@ -63,7 +63,7 @@ def nonnegative_line(x, y):
 
 
 def power_fit(sizes, times):
-    """Fit a + b*(n/nmax)**p on the original seconds scale, including n=0."""
+    """Fit a + b*(n/nmax)**p on the original seconds scale at the supplied sizes."""
     scale = sizes / max(sizes)
 
     def error(power):
