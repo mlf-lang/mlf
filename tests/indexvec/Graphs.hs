@@ -1118,6 +1118,40 @@ signedConstructorChecks = do
     (T.Left a, T.Left b) -> check "constructor operand diagnostic" (H.unpack b) (H.unpack a)
     _ -> fail "invalid signed constructor operand admitted"
 
+-- Passing a function as a value prevents all calls to that binder from
+-- being saturated calls on the same outer arguments. A pipeline of such
+-- callbacks should queue each substitution and materialize the spine once.
+continuationPipelineChecks = do
+  let n i = T.XName i "callback"
+      v i = T.XEVar (n i)
+      app = T.XEApp
+      prim op = foldl app (T.XEPrimitive op)
+      lambda i = T.XEAbs (n i)
+      int = T.XEInt
+      depth = 12
+      field = 100
+      finish = 0
+      step i = lambda (20+i) (foldl app (v field) [int i,v (i-1),v (20+i)])
+      pipeline input = foldr (\i -> T.XELet (n i) (step i)) (app (v depth) (int input)) [1..depth]
+      (pending,batchedSeed) = Optimize.runFresh (Optimize.passPendingFor True (pipeline 0)) 200
+      Optimize.PendingBody _ replacements _ _ = pending
+      (ordinary,ordinarySeed) = Optimize.runFresh (Optimize.passRaw (pipeline 0)) 200
+  check "every first-class continuation is queued" depth (M.size replacements)
+  check "queued callbacks preserve substitution order and binders" (True,ordinarySeed)
+    (X.equalErased (Optimize.useTerm ordinary) (Optimize.useTerm (Optimize.materializePending pending)), batchedSeed)
+  env <- case Data.validateDeclarations [] of
+    T.Right ok -> pure ok
+    T.Left why -> fail (H.unpack why)
+  let reader = lambda 101 (lambda 102 (lambda 103 (prim T.PIfThenElse
+                 [prim T.PLtInt [v 103,v 101],prim T.PSubInt [int 0,v 101],
+                  app (v 102) (prim T.PSubInt [v 103,v 101])])))
+      closed input = T.XELet (n field) reader (T.XELet (n finish) (lambda 104 (v 104)) (pipeline input))
+  forM_ [(-1,-depth),(depth,1-depth),(depth*(depth+1) `div` 2 + 5,5)] $ \(input,expected) ->
+    forM_ [closed input,Optimize.optimizeChecked (closed input)] $ \term ->
+      case Runtime.integer (Runtime.evaluate env (Runtime.REnv M.empty) term) of
+        T.Right result -> check "callback pipeline exits at first invalid field" expected result
+        T.Left why -> fail (H.unpack why)
+
 -- Both arms call the previous layer with their own lambda parameters.
 -- Duplicating that captured function at each use unfolds a linear graph into
 -- a binary tree even when the program takes only one path at run time.
@@ -2450,6 +2484,7 @@ main = do
   signedLocalChecks
   knownConstructorFoldChecks
   sharedFunctionDiamondChecks
+  continuationPipelineChecks
   openGeometryChecks
   signedConstructorChecks
   putStrLn "1032 ordered SCC and reach comparisons, query DAG and package controls passed"

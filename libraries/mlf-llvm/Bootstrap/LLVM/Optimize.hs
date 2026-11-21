@@ -1420,10 +1420,9 @@ module Bootstrap.LLVM.Optimize where {
   -- This route is reserved for finite checked input, after the optimizer's
   -- initial copy establishes globally unique binders. Legacy raw/partial tree
   -- entry points above retain their original traversal and demand behavior.
-  -- A witness records a free callee whose first argument is not an outer
-  -- variable: either a non-variable or a variable absent from the root's free
-  -- names. Every containing complete spine fails commonCalls at any positive
-  -- arity. Owned binder uniqueness keeps these witnesses valid after copying.
+  -- A variable passed as an argument is used as a value. A callee whose
+  -- first argument is not an outer variable also fails commonCalls at every
+  -- positive arity. Scope-aware traversal excludes locally bound witnesses.
   negativeCalls :: UseTree -> Set XName;
   negativeCalls tree = negativeCallsIn (useCounts tree) tree;
   negativeCallsIn outer tree =
@@ -1432,13 +1431,17 @@ module Bootstrap.LLVM.Optimize where {
       UseAbs name body -> S.delete compareName name (negativeCallsIn outer body);
       UseApp function argument ->
         let { nested = S.union compareName (negativeCallsIn outer function) (negativeCallsIn outer argument) } in
-        case useTerm function of {
-          XEVar name -> case useTerm argument of {
-            XEVar argumentName -> if M.member compareName argumentName outer then nested
-              else S.insert compareName name nested;
-            _ -> S.insert compareName name nested
-          };
-          _ -> nested
+        case useTerm argument of {
+          XEVar argumentName -> let { passed = S.insert compareName argumentName nested } in
+            case useTerm function of {
+              XEVar name -> if M.member compareName argumentName outer then passed
+                else S.insert compareName name passed;
+              _ -> passed
+            };
+          _ -> case useTerm function of {
+            XEVar name -> S.insert compareName name nested;
+            _ -> nested
+          }
         };
       UseLet name value body ->
         S.union compareName (negativeCallsIn outer value)
