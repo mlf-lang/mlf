@@ -294,7 +294,9 @@ def main():
         save()
         if integrity_error is not None and 'error' not in record:
             raise integrity_error
-    print(str(output / 'receipt.json') + ': passed (18 checks)')
+    count = record['passing_checks']
+    unit = 'check' if count == 1 else 'checks'
+    print(f"{output / 'receipt.json'}: passed ({count} {unit})")
 
 
 if __name__ == '__main__':

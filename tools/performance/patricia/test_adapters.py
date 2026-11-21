@@ -42,8 +42,11 @@ def prebinary_hosts(base):
 
 
 def prebinary_read_bytes(path):
-    raw = path.read_bytes()
     relative = str(path.resolve().relative_to(ROOT.resolve()))
+    if relative in _HISTORICAL_BINARY.removed_paths:
+        previous = _HISTORICAL_BINARY.previous
+        return previous.restore_path((previous.source_root / relative).read_bytes(), relative)
+    raw = path.read_bytes()
     # The authenticated implementation registry also owns shared modules under
     # tests/ and testing/. Directory spelling must not bypass their exact live
     # SHA or the complete historical source/API transition (CompilerTests is a
@@ -1723,7 +1726,10 @@ class BinarySourceBoundaryTests(unittest.TestCase):
         actual = {row['module']: hashlib.sha256((ROOT / row['path']).read_bytes()).hexdigest()
                   for row in manifest['modules']}
         binary.require_registry(actual, 'current')
-        self.assertEqual(len(actual), 137)
+        previous = binary.previous.value['current_registry']
+        self.assertEqual(len(previous), 137)
+        self.assertEqual(previous.keys() - actual.keys(), {'Tests.TupleListLegacy'})
+        self.assertFalse(actual.keys() - previous.keys())
         self.assertIn('Bootstrap.SourceUnit', actual)
         # Fixture preparation must not replace coverage of public live gates.
         historical = json.loads((migration.HERE / 'source-migration.json').read_bytes())
@@ -1744,7 +1750,8 @@ class BinarySourceBoundaryTests(unittest.TestCase):
             binary.require_registry(mixed, 'current')
 
     def test_reviewed_source_repairs_project_all_declared_owners(self):
-        binary = migration.binary_contract()
+        framework = migration.binary_contract()
+        binary = framework.previous
         # DeclId, formatter compatibility and the performance successor remain
         # separate authenticated endpoints. Layout alone overlaps these owners;
         # prove both transitions instead of relabeling live bytes as historical.
@@ -1783,11 +1790,11 @@ class BinarySourceBoundaryTests(unittest.TestCase):
                 self.assertEqual(hashlib.sha256(previous_layout).hexdigest(), old)
                 self.assertEqual(current_layout, old)
                 current_layout = new
-        self.assertEqual(hashlib.sha256((ROOT / layout).read_bytes()).hexdigest(), current_layout)
+        self.assertEqual(hashlib.sha256((binary.source_root / layout).read_bytes()).hexdigest(), current_layout)
         self.assertEqual(binary.changes[layout], [formatter[0], current_layout])
         for module in names:
             path = binary.value['module_paths'][module]
-            live = (ROOT / path).read_bytes()
+            live = (binary.source_root / path).read_bytes()
             with self.subTest(module=module):
                 # Both endpoints are authenticated independently: exact new
                 # bytes from the live source manifest and exact old Git bytes,
@@ -1811,6 +1818,9 @@ class BinarySourceBoundaryTests(unittest.TestCase):
                 self.assertEqual(repairs.project_owner(repaired, module), historical)
                 self.assertEqual(repairs.advance_path(historical, path), repaired)
                 self.assertEqual(prebinary_read_bytes(ROOT / path), historical)
+                current = (ROOT / path).read_bytes()
+                self.assertEqual(framework.project_owner(current, module), historical)
+                self.assertEqual(framework.advance_path(historical, path), current)
                 self.assertEqual(binary.project_owner(live, module), historical)
                 self.assertEqual(binary.advance_path(historical, path), live)
                 # Mutations of either endpoint and cross-owner substitution
@@ -1834,7 +1844,7 @@ class BinarySourceBoundaryTests(unittest.TestCase):
             owners = [row for row in registry['modules'] if row['path'].startswith(prefix)]
             self.assertTrue(owners)
             for row in owners:
-                self.assertIn(row['path'], binary.value['current_files'])
+                self.assertIn(row['path'], binary.value['current_files'].keys() | binary.removed_paths)
         # Even a plausible production path absent from the manifest must not
         # become an unguarded passthrough when the declared path route changes.
         with tempfile.TemporaryDirectory() as directory:

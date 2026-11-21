@@ -10,7 +10,7 @@ import sys
 import tempfile
 import unittest
 
-from source_migration_adapter import live_contract
+from source_migration_adapter import historical_contract, live_contract
 
 ROOT = Path(__file__).resolve().parents[3]
 HISTORY = ROOT / 'tools/performance'
@@ -25,6 +25,7 @@ PERFORMANCE_BASE = 'fc300bc9fdc389b585cbef0630fc8915d53e89c5'
 ADAPTER_ENDPOINT = '798282547f3169d6d729d17c088f5cc29ac3eab0'
 CHAIN_ENDPOINT = 'ee495d5783fca3c26a3c0e659ebeac1bab76a37d'
 PUBLISHED_CHAIN = 'd37094188cbee0c4335c35cf1e22d45830dbd386'
+PRE_MIGRATION = '720dd649627fbf8b19c7447493a4fdf6fd05eb39'
 
 def performance_base_bytes(path):
     return subprocess.check_output(['git', '--no-replace-objects', '-C', str(ROOT),
@@ -48,7 +49,7 @@ def main_bytes(path):
 class PR43SourceReconciliation(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.contract = live_contract(HISTORY)
+        cls.contract = historical_contract(HISTORY)
 
     def test_macos_repair_is_exactly_the_declared_main_follow_on(self):
         c = self.contract
@@ -105,7 +106,7 @@ class PR43SourceReconciliation(unittest.TestCase):
 
     def test_macos_source_rejects_prior_mutated_and_wrong_layer_bytes(self):
         c = self.contract
-        live = (ROOT / MACOS_PATH).read_bytes()
+        live = (c.source_root / MACOS_PATH).read_bytes()
         prior = main_bytes(MACOS_PATH)
         predecessor = (c.archived / MACOS_PATH).read_bytes()
         ancestor = c.restore_path(live, MACOS_PATH)
@@ -118,7 +119,7 @@ class PR43SourceReconciliation(unittest.TestCase):
                 c.advance_path(raw, MACOS_PATH)
         with self.assertRaises(ValueError):
             c.previous.restore_path(live, MACOS_PATH)
-        raw = {p: (ROOT / p).read_bytes() for p in c.value['current_files']}
+        raw = {p: (c.source_root / p).read_bytes() for p in c.value['current_files']}
         with self.assertRaises(ValueError):
             c.project_tree_bytes({**raw, MACOS_PATH: prior})
 
@@ -154,7 +155,7 @@ class PR43SourceReconciliation(unittest.TestCase):
             old = archived(path)
             self.assertEqual(hashlib.sha256(old).hexdigest(), previous_endpoint[path])
             # A previous-endpoint source or unreviewed byte must not pass as live.
-            for wrong in (old, (ROOT / path).read_bytes() + b' '):
+            for wrong in (old, (c.source_root / path).read_bytes() + b' '):
                 with self.subTest(path=path), self.assertRaises(ValueError):
                     c.restore_path(wrong, path)
         current = base_spec()
@@ -196,7 +197,7 @@ class PR43SourceReconciliation(unittest.TestCase):
             self.assertEqual(new, hashlib.sha256(frozen).hexdigest())
             self.assertEqual(new, endpoint[path])
             with self.subTest(path=path), self.assertRaises(ValueError):
-                c.restore_path((ROOT / path).read_bytes() + b' ', path)
+                c.restore_path((c.source_root / path).read_bytes() + b' ', path)
             with self.subTest(previous=path), self.assertRaises(ValueError):
                 c.restore_path(performance_base_bytes(path), path)
         for mutation in ('old', 'new', 'missing', 'extra', 'base', 'tree', 'manifest'):
@@ -223,7 +224,7 @@ class PR43SourceReconciliation(unittest.TestCase):
         physical = performance_base_bytes('tools/performance/' + name)
         git = ['git', '--no-replace-objects', '-C', str(ROOT), 'show']
         performance_source = subprocess.check_output([*git, ADAPTER_ENDPOINT + ':tools/performance/' + name])
-        live = (HISTORY / name).read_bytes()
+        live = (c.source_root / 'tools/performance' / name).read_bytes()
         old_sha = hashlib.sha256(physical).hexdigest()
         new_sha = hashlib.sha256(performance_source).hexdigest()
         self.assertEqual(old_sha, prior['maintenance'][name][1])
@@ -277,7 +278,7 @@ class PR43SourceReconciliation(unittest.TestCase):
 
     def test_complete_tree_projections_recover_exact_predecessor_and_live_inputs(self):
         c = self.contract
-        raw = {p: (ROOT / p).read_bytes() for p in c.value['current_files']}
+        raw = {p: (c.source_root / p).read_bytes() for p in c.value['current_files']}
         ancestor = c.project_tree_bytes(raw)
         added = {p: raw[p] for p in c.added_paths}
         self.assertEqual(c.advance_tree_bytes(ancestor, added), raw)
@@ -316,17 +317,17 @@ class PR43SourceReconciliation(unittest.TestCase):
         module = sys.modules[type(c).__module__]
         spec = json.loads((c.directory / module.MANIFEST).read_bytes())
         git = ['git', '--no-replace-objects', '-C', str(ROOT)]
-        inventory = c.live_source_inventory(ROOT)
+        inventory = c.live_source_inventory(c.source_root)
         edges = spec['compiler_source_transitions']
         self.assertEqual(edges[0]['predecessor'], PUBLISHED_CHAIN)
         for index, edge in enumerate(edges):
             before = edge['predecessor']
-            after = [edges[index+1]['predecessor']] if index+1 < len(edges) else []
-            paths = subprocess.check_output([*git, 'diff', '--name-only', before, *after], text=True).splitlines()
+            after = edges[index+1]['predecessor'] if index+1 < len(edges) else PRE_MIGRATION
+            paths = subprocess.check_output([*git, 'diff', '--name-only', before, after], text=True).splitlines()
             self.assertEqual(set(paths) & set(inventory), set(edge['changes']))
             for path, row in edge['changes'].items():
                 old = subprocess.check_output([*git, 'show', before + ':' + path])
-                new = subprocess.check_output([*git, 'show', after[0] + ':' + path]) if after else (ROOT / path).read_bytes()
+                new = subprocess.check_output([*git, 'show', after + ':' + path])
                 with self.subTest(path=path):
                     self.assertEqual(row, [hashlib.sha256(old).hexdigest(), hashlib.sha256(new).hexdigest()])
                     self.assertNotEqual(old, new)
@@ -340,7 +341,7 @@ class PR43SourceReconciliation(unittest.TestCase):
         path = 'tools/shared/test_direct.py'
         original = subprocess.check_output(['git', '--no-replace-objects', '-C', str(ROOT),
                                              'show', ADAPTER_ENDPOINT + ':' + path])
-        live = (ROOT / path).read_bytes()
+        live = (self.contract.source_root / path).read_bytes()
         additions = [
             b"                   ROOT / 'tools/shared/test_metadata_receipt.py',\n"
             b"                   ROOT / 'tools/shared/fixtures/MetadataReceiptControls.hs',\n",
@@ -354,19 +355,19 @@ class PR43SourceReconciliation(unittest.TestCase):
 
     def test_current_registry_host_and_runtime_round_trips(self):
         c = self.contract
-        current = c.live_registry(ROOT)
+        current = c.live_registry(c.source_root)
         self.assertIn('Bootstrap.IndexVec', current)
         self.assertIn('Bootstrap.Resolved', current)
-        restored = c.registry_to_parent(current, c.added_source_bytes(ROOT))
+        restored = c.registry_to_parent(current, c.added_source_bytes(c.source_root))
         self.assertEqual(c.advance_registry(restored), current)
         with self.assertRaises(ValueError):
             c.require_registry(c.previous.value['current_registry'], 'current')
-        host = c.live_host_inventory(ROOT)
+        host = c.live_host_inventory(c.source_root)
         self.assertEqual(c.advance_host_inventory(c.host_inventory_to_parent(host)), host)
         with self.assertRaises(ValueError):
             c.host_inventory_to_parent({})
         rt = {p: h for p, h in c.value['current_files'].items() if p.startswith('runtime/')}
-        parent = c.runtime_inventory_to_parent(rt, (ROOT / 'runtime/mlf_byte_file.h').read_bytes())
+        parent = c.runtime_inventory_to_parent(rt, (c.source_root / 'runtime/mlf_byte_file.h').read_bytes())
         self.assertEqual(c.advance_runtime_inventory(parent), rt)
         with self.assertRaises(ValueError):
             c.runtime_inventory_to_parent(rt, b'wrong header')
@@ -378,26 +379,26 @@ class PR43SourceReconciliation(unittest.TestCase):
             for path in c.value['current_files']:
                 file = root / path
                 file.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(ROOT / path, file)
+                shutil.copyfile(c.source_root / path, file)
             self.assertEqual(c.live_source_inventory(root), c.value['current_files'])
             build = root / MACOS_PATH
             build.write_bytes(main_bytes(MACOS_PATH))
             with self.assertRaises(ValueError):
                 c.live_source_inventory(root)
             with self.assertRaises(ValueError):
-                live_contract(HISTORY, source_root=root)
-            shutil.copyfile(ROOT / MACOS_PATH, build)
+                historical_contract(HISTORY, source_root=root)
+            shutil.copyfile(c.source_root / MACOS_PATH, build)
             for path in ('shared-sources.json', 'libraries/mlf-foundation/Bootstrap/IndexVec.hs', 'mlf.lock', MACOS_PATH):
                 file = root / path
                 file.write_bytes(file.read_bytes() + b'\n')
                 with self.subTest(path=path), self.assertRaises(ValueError):
                     c.live_source_inventory(root)
                 file.unlink()
-                file.symlink_to(ROOT / path)
+                file.symlink_to(c.source_root / path)
                 with self.subTest(symlink=path), self.assertRaises(ValueError):
                     c.live_source_inventory(root)
                 file.unlink()
-                shutil.copyfile(ROOT / path, file)
+                shutil.copyfile(c.source_root / path, file)
 
     def test_rehashed_manifest_cannot_admit_a_different_source(self):
         c = self.contract
@@ -422,7 +423,7 @@ class PR43SourceReconciliation(unittest.TestCase):
                 self.assertNotEqual(wrong, c.manifest_sha256)
                 for digest in (c.manifest_sha256, wrong):
                     with self.subTest(label=label, digest=digest), self.assertRaises(ValueError):
-                        type(c)(directory, digest, HISTORY, source_root=ROOT)
+                        type(c)(directory, digest, HISTORY, source_root=c.source_root)
             spec = json.loads(original)
             for field in ('predecessor', 'measured', 'measured_tree', 'changes'):
                 bad = copy.deepcopy(spec)
@@ -431,7 +432,7 @@ class PR43SourceReconciliation(unittest.TestCase):
                 manifest.write_bytes(raw)
                 for digest in (c.manifest_sha256, hashlib.sha256(raw).hexdigest()):
                     with self.subTest(field=field, digest=digest), self.assertRaises(ValueError):
-                        type(c)(directory, digest, HISTORY, source_root=ROOT)
+                        type(c)(directory, digest, HISTORY, source_root=c.source_root)
 
     def test_rejected_manifest_does_not_materialize_a_predecessor(self):
         from unittest.mock import patch
@@ -443,7 +444,7 @@ class PR43SourceReconciliation(unittest.TestCase):
             with patch.object(module, 'archived_checkout',
                               side_effect=AssertionError('invalid manifest reached archive')):
                 with self.assertRaisesRegex(ValueError, 'successor manifest SHA'):
-                    type(c)(directory, c.manifest_sha256, HISTORY, source_root=ROOT)
+                    type(c)(directory, c.manifest_sha256, HISTORY, source_root=c.source_root)
 
     def test_verified_predecessor_module_reuses_its_original_cache(self):
         c = self.contract
@@ -454,7 +455,7 @@ class PR43SourceReconciliation(unittest.TestCase):
     def test_changed_maintenance_files_reconstruct_the_original_oracles(self):
         c = self.contract
         for name in c.maintenance:
-            live = (HISTORY / name).read_bytes()
+            live = (c.source_root / 'tools/performance' / name).read_bytes()
             previous = (c.archived / 'tools/performance' / name).read_bytes()
             self.assertEqual(c.restore_maintenance(live, name), c.previous.restore_maintenance(previous, name))
             for wrong in (previous, live + b' '):
@@ -465,10 +466,44 @@ class PR43SourceReconciliation(unittest.TestCase):
         c = self.contract
         for name in ('test_declid_migration.py',):
             script = Path('tools/performance/artifact-binary', name)
-            self.assertEqual((ROOT / script).read_bytes(), (c.archived / script).read_bytes())
+            self.assertEqual((c.source_root / script).read_bytes(), (c.archived / script).read_bytes())
             # The unchanged suite runs in a separate process after this one
             # exits, so its own archive does not overlap this contract's two.
             self.assertTrue((c.archived / script).is_file())
+
+
+class TestFrameworkSourceReconciliation(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.contract = live_contract(HISTORY)
+
+    def test_current_tree_and_registry_round_trip_across_retired_assertion_module(self):
+        c = self.contract
+        current = {p: (ROOT / p).read_bytes() for p in c.value['current_files']}
+        historical = c.project_tree_bytes(current)
+        retired = 'tests/Tests/TupleListLegacy.hs'
+        self.assertNotIn(retired, current)
+        self.assertIn(retired, historical)
+        self.assertEqual(c.advance_tree_bytes(historical, {p: current[p] for p in c.added_paths}), current)
+        registry = c.live_registry(ROOT)
+        self.assertNotIn('Tests.TupleListLegacy', registry)
+        self.assertEqual(c.advance_registry(c.registry_to_parent(registry, c.added_source_bytes(ROOT))),
+                         registry)
+        for invalid in ({**current, retired: historical[retired]},
+                        {**current, 'mlf.lock': (c.archived / 'mlf.lock').read_bytes()}):
+            with self.assertRaises(ValueError):
+                c.project_tree_bytes(invalid)
+
+    def test_migrated_adapter_restores_the_frozen_maintenance_source(self):
+        c = self.contract
+        name = 'patricia/run_integrated.py'
+        live = (HISTORY / name).read_bytes()
+        previous = (c.archived / 'tools/performance' / name).read_bytes()
+        self.assertNotEqual(live, previous)
+        self.assertEqual(c.restore_maintenance(live, name), c.previous.restore_maintenance(previous, name))
+        for invalid in (previous, live + b'\n'):
+            with self.assertRaises(ValueError):
+                c.restore_maintenance(invalid, name)
 
 
 if __name__ == '__main__':
