@@ -68,7 +68,7 @@ for package/cache regressions and a fresh paired growth comparison.
 
 ## Running it
 
-Run from the repository root with a bootstrap producer built at GHC `-O2`.
+Run from the repository root. The default command builds a bootstrap-only GHC `-O2` producer and prepares the fixed inputs under the sweep directory. Supply `--producer DIR` for an existing bootstrap build, or `--setup FILE` to reuse a prepared setup.
 The sweep runs one shape at a time, with a separate cohort for every size.
 It records failures and resource limits alongside completed cells and continues
 to the next cell. The command exits unsuccessfully if any selected cell failed.
@@ -77,19 +77,16 @@ The comparison table and its CSV are written to `WORKDIR/summary.md` and
 
 ```sh
 # Show the standard matrix or a filtered selection.
-python3 -B tools/performance/compiler-shapes/bench.py list
-python3 -B tools/performance/compiler-shapes/bench.py list --family wide_case --size 128
+python3 tools/dev.py bench shapes list
+python3 tools/dev.py bench shapes list --family wide_case --size 128
 
-# Prepare dependencies once, then run the full 105-cell sweep.
-python3 -B tools/performance/compiler-shapes/bench.py prepare \
-  --workdir .mlf-build/compiler-shapes --producer .mlf-build/shared-ghc --build-builtin
-python3 -B tools/performance/compiler-shapes/bench.py sweep \
-  --workdir .mlf-build/compiler-shapes --setup .mlf-build/compiler-shapes/setup/setup.json
+# Build, prepare and measure all 105 cells.
+python3 tools/dev.py bench shapes
 
-# Compare two shapes at two sizes with the same setup and a separate results table.
-python3 -B tools/performance/compiler-shapes/bench.py sweep \
-  --workdir .mlf-build/selected-shapes --setup .mlf-build/compiler-shapes/setup/setup.json \
-  --family wide_case --family dependency_diamonds --size 8 --size 128
+# Reuse the exact setup for a separate table.
+python3 tools/dev.py bench shapes --workdir .mlf-build/selected-shapes \
+  --setup .mlf-build/compiler-shapes/setup/setup.json \
+  --family wide_case,dependency_diamonds --size 8,128
 ```
 
 `--family` and `--size` each accept repeated values and replace their respective

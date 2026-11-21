@@ -100,27 +100,72 @@ def command_list(args):
         print('  - ' + limit)
 
 
-def command_prepare(args):
-    workdir = args.workdir.resolve()
-    setup = workdir / 'setup'
-    argv = [sys.executable, '-B', HERE / 'prepare.py', '--output', setup, '--endpoint', args.endpoint]
-    if args.producer:
-        argv += ['--producer', args.producer]
-    if args.source:
-        argv += ['--source', args.source]
-    if args.builtin_prefix:
-        argv += ['--builtin-prefix', args.builtin_prefix]
-    if args.build_builtin:
-        argv += ['--build-builtin']
-    if not args.producer and not args.builtin_prefix:
+def prepare_setup(workdir, endpoint, producer, *, source=None, builtin_prefix=None,
+                  build_builtin=False, ghc=None, clang=None):
+    if not producer or bool(builtin_prefix) == build_builtin:
         raise SystemExit('prepare needs --producer and either --builtin-prefix or --build-builtin')
-    if args.ghc:
-        argv += ['--ghc', args.ghc]
-    if args.clang:
-        argv += ['--clang', args.clang]
-    measured_endpoint(args.endpoint)
+    setup = workdir.resolve() / 'setup'
+    argv = [sys.executable, '-B', HERE / 'prepare.py', '--output', setup,
+            '--endpoint', endpoint, '--producer', producer]
+    if source:
+        argv += ['--source', source]
+    if builtin_prefix:
+        argv += ['--builtin-prefix', builtin_prefix]
+    if build_builtin:
+        argv += ['--build-builtin']
+    if ghc:
+        argv += ['--ghc', ghc]
+    if clang:
+        argv += ['--clang', clang]
+    measured_endpoint(endpoint)
     run(argv, recorder=True)
     return setup / 'setup.json'
+
+
+def command_prepare(args):
+    return prepare_setup(args.workdir, args.endpoint, args.producer, source=args.source,
+                         builtin_prefix=args.builtin_prefix, build_builtin=args.build_builtin,
+                         ghc=args.ghc, clang=args.clang)
+
+
+def sweep_setup(args):
+    root = args.workdir.resolve()
+    setup = (args.setup or root / 'setup' / 'setup.json').resolve()
+    selected_producer = getattr(args, 'producer', None)
+    if args.setup or setup.is_file():
+        if selected_producer and Path(json.loads(setup.read_text())['producer']).resolve() != selected_producer.resolve():
+            raise SystemExit('existing setup uses another producer: ' + str(setup))
+        return setup
+    if setup.parent.exists():
+        raise SystemExit(f'incomplete preparation at {setup.parent}; select a fresh --workdir or pass --setup')
+    producer = selected_producer or root / 'producer'
+    if not selected_producer and not producer.exists():
+        # Keep cold bootstrap builds out of the public installed-compiler directory.
+        sys.path.insert(0, str(ROOT / 'tools'))
+        from developer.process import run_build
+        command = [sys.executable, '-B', ROOT / 'tools/shared/build.py', '--bootstrap-only',
+                   '--optimization', '2', '--build-dir', producer]
+        status = run_build(command, ROOT)
+        if status:
+            raise SystemExit(status if status > 0 else 128 - status)
+    return prepare_setup(root, args.endpoint, producer, build_builtin=True)
+
+
+def comma_values(value):
+    """Accept repeated filters locally and comma-separated dispatch inputs in CI."""
+    if not value.strip():
+        return []
+    values = [part.strip() for part in value.split(',')]
+    if not all(values):
+        raise argparse.ArgumentTypeError('empty value in selection')
+    return values
+
+
+def add_filters(parser):
+    parser.add_argument('--family', action='extend', type=comma_values,
+                        help='repeat or comma-separate families')
+    parser.add_argument('--size', action='extend', type=lambda value: list(map(int, comma_values(value))),
+                        help='repeat or comma-separate sizes')
 
 
 def command_run(args, setup=None):
@@ -183,8 +228,7 @@ def main():
     listing = sub.add_parser('list', help='show the resolved matrix without running anything')
     listing.add_argument('--matrix', default='default')
     listing.add_argument('--endpoint', default=registry()['default_endpoint'])
-    listing.add_argument('--family', action='append')
-    listing.add_argument('--size', action='append', type=int)
+    add_filters(listing)
     listing.set_defaults(func=command_list)
 
     prepare = sub.add_parser('prepare', help='build fixed dependencies once')
@@ -203,8 +247,7 @@ def main():
     runner.add_argument('--cohort', required=True)
     runner.add_argument('--matrix', default='default')
     runner.add_argument('--endpoint', default=registry()['default_endpoint'])
-    runner.add_argument('--family', action='append')
-    runner.add_argument('--size', action='append', type=int)
+    add_filters(runner)
     runner.add_argument('--repeats', type=int)
     runner.add_argument('--interleave-pairs', action='store_true')
     runner.add_argument('--cohort-output-gib', type=int)
@@ -212,11 +255,13 @@ def main():
     runner.set_defaults(func=command_run)
 
     sweep = sub.add_parser('sweep', help='measure each shape and size in sequence and write a comparison table')
-    sweep.add_argument('--workdir', type=Path, required=True)
-    sweep.add_argument('--setup', type=Path)
+    sweep.add_argument('--workdir', type=Path, default=ROOT / '.mlf-build/compiler-shapes',
+                       help='fresh sweep output (default: .mlf-build/compiler-shapes)')
+    inputs = sweep.add_mutually_exclusive_group()
+    inputs.add_argument('--setup', type=Path, help='reuse an existing setup.json')
+    inputs.add_argument('--producer', type=Path, help='prepare with an existing O2 bootstrap producer')
     sweep.add_argument('--endpoint', default=registry()['default_endpoint'], choices=sorted(registry()['endpoints']))
-    sweep.add_argument('--family', action='append')
-    sweep.add_argument('--size', action='append', type=int)
+    add_filters(sweep)
     sweep.add_argument('--repeats', type=int)
     sweep.add_argument('--cohort-output-gib', type=int)
     sweep.add_argument('--prune-build-products', action='store_true')
@@ -234,8 +279,7 @@ def main():
     everything.add_argument('--cohort', required=True)
     everything.add_argument('--matrix', default='default')
     everything.add_argument('--endpoint', default=registry()['default_endpoint'])
-    everything.add_argument('--family', action='append')
-    everything.add_argument('--size', action='append', type=int)
+    add_filters(everything)
     everything.add_argument('--repeats', type=int)
     everything.add_argument('--interleave-pairs', action='store_true')
     everything.add_argument('--cohort-output-gib', type=int)
