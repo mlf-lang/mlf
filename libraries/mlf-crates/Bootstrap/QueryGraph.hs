@@ -92,7 +92,7 @@ module Bootstrap.QueryGraph where {
     Right [kind,_] -> eqString kind "Input";
     _ -> True
   };
-  validate wanted session = validateAt S.empty 0 wanted session;
+  validate wanted session = validateAt wanted S.empty [] session;
   -- A provider can select a different authority key while the old shared key
   -- remains live for another group. Validate both the old dependencies and
   -- the complete current read list before using the old inference result.
@@ -101,27 +101,30 @@ module Bootstrap.QueryGraph where {
     (,) (Just node) current -> (,) (if eqList (eqPair eqString eqString)
       expected (nodeReads node) then Just node else Nothing) current
   };
-  validateAt visiting depth wanted session@(Session path config generation old current pending) =
+  -- Restore old rows only after every observed dependency is current. A frame
+  -- retains the next read, so depth costs one heap frame per active query even
+  -- when multiple reads refer to the same dependency.
+  data ReadFrame = ReadFrame QueryNode String ([] ((,) String String));
+  validateAt wanted visiting parents session@(Session _ _ _ old current _) =
     case M.lookup compareString wanted current of {
-      Just node -> (,) (Just node) session;
-      Nothing -> if depth >= 4096 || S.member compareString wanted visiting || isInput wanted
-        then (,) Nothing session else case M.lookup compareString wanted old of {
+      Just node -> validateReady node visiting parents session;
+      Nothing -> if S.member compareString wanted visiting || isInput wanted then (,) Nothing session
+        else case M.lookup compareString wanted old of {
           Nothing -> (,) Nothing session;
-          Just node -> case validateReads (S.insert compareString wanted visiting) (depth + 1)
-            (nodeReads node) session of {
-            (,) False next -> (,) Nothing next;
-            (,) True (Session p c g previous active queued) ->
-              (,) (Just node) (Session p c g previous (M.insert compareString wanted node active) queued)
-          }
+          Just node -> validateReads node (nodeReads node)
+            (S.insert compareString wanted visiting) parents session
         }
     };
-  validateReads visiting depth reads session = case reads of {
-    [] -> (,) True session;
-    (:) ((,) wanted expected) rest -> case validateAt visiting depth wanted session of {
-      (,) Nothing next -> (,) False next;
-      (,) (Just node) next -> if eqString (nodeHash node) expected
-        then validateReads visiting depth rest next else (,) False next
-    }
+  validateReads node reads visiting parents session@(Session path config generation old current pending) = case reads of {
+    [] -> let { wanted = nodeKey node; remaining = S.delete compareString wanted visiting;
+      active = M.insert compareString wanted node current } in
+      seq remaining (seq active (validateReady node remaining parents (Session path config generation old active pending)));
+    (:) ((,) wanted expected) rest -> validateAt wanted visiting ((:) (ReadFrame node expected rest) parents) session
+  };
+  validateReady node visiting parents session = case parents of {
+    [] -> (,) (Just node) session;
+    (:) (ReadFrame parent expected rest) outer -> if eqString (nodeHash node) expected
+      then validateReads parent rest visiting outer session else (,) Nothing session
   };
   -- reads are accumulated by the provider in execution order. Hashes describe
   -- values only: recomputing with different reads may still produce green data.
@@ -903,25 +906,29 @@ module Bootstrap.QueryGraph where {
     };
     rows <- traverseEither (\node -> traverseEither resolve (nodeReads node)) ordered;
     let { edges = V.fromList rows };
-    _ <- runST (stBind (V.filled (V.count edges) Unseen) (\marks ->
-      ST.mapE_ (visit edges marks 0) (V.indices edges)));
+    _ <- runST (stBind (V.fixedFilled (V.count edges) Unseen) (\marks ->
+      visit edges marks (V.indices edges) []));
     Right rows
   };
-  -- Memoize the longest suffix, since a previously visited short path can
-  -- also be reached from a longer prefix in a different lexical DFS root.
-  data Colour = Unseen | Visiting | Done Int;
-  visit :: forall s. V.IndexVec QueryId ([] (V.Index QueryId)) -> V.Builder s QueryId Colour ->
-    Int -> V.Index QueryId -> ST s (Either String Int);
-  visit rows marks depth i = stBind (V.get marks i) (\colour -> case colour of {
-    Done height -> if depth + height <= 4096 then ST.pureE height else ST.failE "cyclic/deep query graph";
-    Visiting -> ST.failE "cyclic/deep query graph";
-    Unseen -> if depth >= 4096 then ST.failE "cyclic/deep query graph"
-      else stBind (V.set marks i Visiting) (\_ ->
-        let { child longest target = ST.bindE (visit rows marks (depth + 1) target)
-               (\height -> let { next = max longest (height + 1) } in seq next (ST.pureE next)) }
-        in ST.bindE (ST.foldE child 1 (V.at rows i)) (\height ->
-          stBind (V.set marks i (Done height)) (\_ -> ST.pureE height)))
-  });
+  -- Roots and reads are already bounded by the row and edge inventories. Keep
+  -- a cursor into the siblings of each active vertex instead of recursing down
+  -- the path. Each vertex is expanded once, including shared diamond tails.
+  data Colour = Unseen | Visiting | Done;
+  visit :: forall s. V.IndexVec QueryId ([] (V.Index QueryId)) -> V.FixedBuilder s QueryId Colour ->
+    [] (V.Index QueryId) -> [] ((,) (V.Index QueryId) ([] (V.Index QueryId))) -> ST s (Either String ());
+  visit rows marks pending parents = case pending of {
+    [] -> case parents of {
+      [] -> ST.pureE ();
+      (:) ((,) finished siblings) outer -> stBind (V.fixedSet marks finished Done)
+        (\_ -> visit rows marks siblings outer)
+    };
+    (:) i siblings -> stBind (V.fixedGet marks i) (\colour -> case colour of {
+      Done -> visit rows marks siblings parents;
+      Visiting -> ST.failE "cyclic query graph";
+      Unseen -> stBind (V.fixedSet marks i Visiting)
+        (\_ -> visit rows marks (V.at rows i) ((:) ((,) i siblings) parents))
+    })
+  };
   verifyPayloads :: Session -> [] QueryNode -> IO (Either String ());
   verifyPayloads session@(Session _ _ _ _ _ pending) nodes =
     verifyPayloadsAfter session (S.fromList compareString (M.keys pending)) nodes;

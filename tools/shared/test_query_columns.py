@@ -53,7 +53,7 @@ class Columns(unittest.TestCase):
             with self.assertRaises(Invalid):Generation(document(changed))
         single=[s(V3),s('cfg'),l(s('A.f')),l(),l(),l(),l(i(0)),
                 l(s('1'*64)),l(i(1)),l(i(0)),l()]
-        with self.assertRaisesRegex(Invalid,'cyclic/deep'):Generation(document(single))
+        with self.assertRaisesRegex(Invalid,'cyclic query graph'):Generation(document(single))
 
 
 class ConstantScopes(unittest.TestCase):

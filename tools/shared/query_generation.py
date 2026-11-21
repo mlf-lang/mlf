@@ -204,21 +204,25 @@ class Generation:
         return key
 
     def check_cycles(self):
-        heights = {}
-        for key in self.nodes:
-            pending, visiting = [(key, False)], set()
-            while pending:
-                name, leaving = pending.pop()
-                if leaving:
-                    visiting.remove(name)
-                    height = 1 + max((heights[k] for k, _ in self.nodes[name]["reads"]), default=0)
-                    require(height <= 4096, "cyclic/deep query graph")
-                    heights[name] = height
-                elif name not in heights:
-                    require(name not in visiting and len(visiting) < 4096, "cyclic/deep query graph")
-                    visiting.add(name)
-                    pending.append((name, True))
-                    pending.extend((k, False) for k, _ in reversed(self.nodes[name]["reads"]))
+        done, visiting = set(), set()
+        for root in self.nodes:
+            if root in done:
+                continue
+            visiting.add(root)
+            stack = [(root, iter(self.nodes[root]["reads"]))]
+            while stack:
+                key, reads = stack[-1]
+                dependency = next(reads, None)
+                if dependency is None:
+                    stack.pop()
+                    visiting.remove(key)
+                    done.add(key)
+                    continue
+                child, _ = dependency
+                require(child not in visiting, "cyclic query graph")
+                if child not in done:
+                    visiting.add(child)
+                    stack.append((child, iter(self.nodes[child]["reads"])))
 
     def legacy_bytes(self):
         return tree_document([n(411, ("text", V1), self.config, n(1, *self.rows))], schema=6)

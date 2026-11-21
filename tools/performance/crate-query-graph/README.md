@@ -40,6 +40,14 @@ The Windows file helper retains single-file moves with exact destination paths.
 Only the final `CURRENT` switch makes the new generation visible. Good existing
 results keep their bytes and modification times. The disk format is unchanged.
 
+Publication checks every observed edge version before walking the dependency
+graph. An explicit depth-first stack accepts long acyclic paths and detects a
+cycle when an edge reaches an active ancestor. Completed nodes are shared.
+Cache reuse checks each saved row's dependencies in their recorded order and
+marks the row current only when they all match. The wire reader still enforces
+its byte, work, and nesting limits. The historical four-field dictionary index
+also retains its original logical depth limit.
+
 ## Reproduce
 
 Build the pinned baseline and candidate in separate checkouts, using GHC 9.14.1

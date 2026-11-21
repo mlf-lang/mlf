@@ -271,7 +271,7 @@ queryChecks = do
   check "payload location" False (Q.sameNode a (Q.QueryNode "a" sha [] (T.Just sha)))
   forM_ [([a,node "b" [("a",other)]], "query publication has stale dependency version"),
          ([a,node "b" [("missing",sha)]], "unpublished query dependency"),
-         ([node "a" [("b",sha)],node "b" [("a",sha)]], "cyclic/deep query graph"),
+         ([node "a" [("b",sha)],node "b" [("a",sha)]], "cyclic query graph"),
          ([a,node "b" [("a","bad")]], "invalid query graph digest")] $ \(ns,err) ->
     check err (Left err) (result (admitted ns))
   let stable (Q.QueryNode k h edges location) = Q.QueryNode (Q.key "Binding" k) h
@@ -348,12 +348,29 @@ queryChecks = do
     (result (Q.checkIdentityBudget 3 ["a","bcd"]))
   let chain n = [node (key i) [(key (i+1),sha) | i+1 < n] | i <- [0..n-1]]
       key i = H.literal (show (10000+i :: Int))
-  check "last legal query DFS depth" (Right ()) (result (Q.validateClosure (table (chain 4096))))
-  check "query DFS depth limit" (Left "cyclic/deep query graph")
-    (result (Q.validateClosure (table (chain 4097))))
+  check "unbroken dependency path beyond 4096 nodes" (Right ())
+    (result (Q.validateClosure (table (chain 16384))))
   let reverseChain n = [node (key i) [(key (i-1),sha) | i > 0] | i <- [0..n-1]]
-  check "reaching an already-complete tail cannot hide excess depth" (Left "cyclic/deep query graph")
-    (result (Q.validateClosure (table (reverseChain 4097))))
+  check "already-complete tails remain shareable" (Right ())
+    (result (Q.validateClosure (table (reverseChain 16384))))
+  let size = 8192
+      query i = Q.key "Q" (key i)
+      input = Q.inputKey "root"
+      links i = if i == size-1 then [(input,sha)] else [(query (i+1),sha), (query (i+1),sha)]
+      queries = [node (query i) (links i) | i <- [0..size-1]]
+      session old active = Q.Session "" "" "" (table old) (table active) M.empty
+      validate old active = Q.validate (query 0) (session old active)
+      reused (answer,stable) = (case answer of { T.Just _ -> True; T.Nothing -> False },
+                                M.size (Q.currentNodes stable))
+  check "deep shared reads restore every verified row exactly once" (True,fromIntegral size+1)
+    (reused (validate queries [node input []]))
+  check "a changed input invalidates the entire dependent path" (False,1)
+    (reused (validate queries [Q.QueryNode input other [] T.Nothing]))
+  let backEdge = node (query (size-1)) [(query 0,sha)]
+      cyclic = backEdge : init queries
+  check "a deep back edge rejects publication" (Left "cyclic query graph")
+    (result (Q.validateClosure (table cyclic)))
+  check "a deep back edge rejects cache reuse" (False,0) (reused (validate cyclic []))
 
 datatypeChecks = do
   let decl name constructor children = T.DataDecl name []
