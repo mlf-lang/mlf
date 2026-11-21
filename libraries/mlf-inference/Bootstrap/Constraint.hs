@@ -1312,8 +1312,9 @@ module Bootstrap.Constraint where {
   };
   eraseSource typed = eraseSourceWith IM.empty typed;
   eraseSourceWith :: IntMap XTerm -> Typed -> XErased;
-  eraseSourceWith evidence typed =
-    case form typed of {
+  eraseSourceWith evidence typed = let {
+    erase current = case current of {
+      FWithGivens _ body -> erase body;
       FVariable name _ -> XEVar name;
       FDeclaredVariable name _ _ -> XEVar name;
       FLambda name _ body _ -> XEAbs name (eraseSourceWith evidence body);
@@ -1348,4 +1349,5 @@ module Bootstrap.Constraint where {
       FScopedEvidence _ -> eraseEvidence evidence typed;
       FChecked _ body _ -> eraseSourceWith evidence body
     }
+  } in erase (rawForm typed)
 }

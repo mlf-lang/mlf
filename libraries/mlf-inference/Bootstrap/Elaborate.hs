@@ -522,8 +522,8 @@ module Bootstrap.Elaborate where {
         Nothing -> Left "unresolved dictionary evidence";
         Just term -> Right term
       } };
-      body <-
-        case C.form typed of {
+      let { elaborateForm current = case current of {
+          FWithGivens _ enclosed -> elaborateForm enclosed;
           FVariable name Nothing -> Right (XVarTerm name);
           FVariable name (Just edge) ->
             instantiateEdgeIn context datatypes solver env (XVarTerm name) edge;
@@ -657,7 +657,8 @@ module Bootstrap.Elaborate where {
                   expected;
               Right (X.instantiate abstracted adaptation)
             }
-        };
+        } };
+      body <- elaborateForm (C.rawForm typed);
       Right (foldr (\bound inner -> XTypeAbs (fst bound) (snd bound) inner) body bounds)
     };
   -- Projection replacements are planned in telescope order. In particular,
