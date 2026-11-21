@@ -1,10 +1,10 @@
 # MLF and GHC compilation across program shapes
 
-On this Apple M1 Max, 118 of 125 standard comparisons completed all six pairs. MLF had the lower median compile time in 106 of those 118 comparisons. The matrix covers 25 shapes at 8, 32, 128, 1,024, and 8,192 units. The two additional nested-type checks at depths 4 and 16 also completed.
+On this Apple M1 Max, 120 of 125 standard comparisons completed all six pairs. MLF had the lower median compile time in 106 of those 120 comparisons. The matrix covers 25 shapes at 8, 32, 128, 1,024, and 8,192 units. The two additional nested-type checks at depths 4 and 16 also completed.
 
-The tables include 25 standard comparisons rerun after the initial sweep. Each rerun replaces that shape’s five earlier cells. Every cell uses its own six-pair schedule. The code, runtime arguments and expected outputs for each fixture match the initial run.
+The tables include 30 standard comparisons rerun after the initial sweep. Each rerun replaces that shape’s five earlier cells. Every cell uses its own six-pair schedule. The code, runtime arguments and expected outputs for each fixture match the initial run.
 
-Including the two additional depths, these measurements account for 1,443 successful builds, 7 failed attempts and 74 scheduled builds skipped after a failure. The recorder completed 720 pairs and verified 117,117 output lines in 4,569 untimed executable invocations.
+Including the two additional depths, these measurements account for 1,465 successful builds, 5 failed attempts and 54 scheduled builds skipped after a failure. The recorder completed 732 pairs and verified 117,183 output lines in 4,635 untimed executable invocations.
 
 ## Compiler revisions
 
@@ -14,11 +14,14 @@ The initial sweep used MLF `c8eaf641ec1d27a1fce126fdb6f722ec2d2f089c`. The two a
 
 | Remeasured shape | Six-pair comparisons completed | MLF compiler commit | Executable SHA-256 |
 | --- | ---: | --- | --- |
+| `class_instances` | 5/5 | `052906a8e0749b26a0d69b0cfd5d8f0c8973cf77` | `ba210fbddf22d9edaa9e2af1ec337155d42eb7df65bdbc8cde2f401bfc6ef226` |
 | `decoder_pipeline` | 5/5 | `ac54c40db1019b1a9956e5b49dd4dbca61643071` | `efe67ae5a7c044891699606ea0cf3b18dc49c6d931ccf45ed9f0122f0cbf2201` |
 | `dependency_chain` | 5/5 | `d893e3dd5fce35cad9ac838a9666557b780078d6` | `2afbcad29d73562395e0fef5cc64f6d669c745841e3c54ddc4805730d7e7e8b8` |
 | `dependency_diamonds` | 5/5 | `d893e3dd5fce35cad9ac838a9666557b780078d6` | `2afbcad29d73562395e0fef5cc64f6d669c745841e3c54ddc4805730d7e7e8b8` |
 | `inferred_chain` | 5/5 | `d893e3dd5fce35cad9ac838a9666557b780078d6` | `2afbcad29d73562395e0fef5cc64f6d669c745841e3c54ddc4805730d7e7e8b8` |
 | `inferred_poly_chain` | 5/5 | `d893e3dd5fce35cad9ac838a9666557b780078d6` | `2afbcad29d73562395e0fef5cc64f6d669c745841e3c54ddc4805730d7e7e8b8` |
+
+**class_instances**. A defining module shares its instance environment across declarations and methods. Lexical givens keep their order at each qualified body, including copied helpers.
 
 **decoder_pipeline**. The earlier compiler rejected the deep query graph. After query publication succeeded, a standard rerun reached the 90-second MLF wall. The checked optimizer now reuses callback-use information and LLVM emission reuses the free-variable sets of nested functions; the generated LLVM matched byte for byte.
 
@@ -51,7 +54,7 @@ Each cell shows MLF / GHC median wall time in seconds for the six full builds pe
 | `higher_order_chain` | 0.272 / 0.553 | 0.269 / 0.536 | 0.277 / 0.549 | 0.292 / 0.651 | 0.352 / 0.744 |
 | `local_functions` | 0.266 / 0.536 | 0.274 / 0.542 | 0.289 / 0.585 | 0.385 / 0.819 | 1.437 / 6.957 |
 | `wide_case` | 0.371 / 0.588 | 0.390 / 0.602 | 0.943 / 1.225 | 1.534 / 1.693 | 16.121 / 11.786 |
-| `class_instances` | 0.512 / 0.596 | 0.617 / 0.677 | 1.331 / 0.956 | MLF leg stopped | MLF leg stopped |
+| `class_instances` | 0.466 / 0.643 | 0.596 / 0.679 | 1.209 / 1.037 | 7.206 / 4.551 | 62.802 / 39.571 |
 | `dependency_diamonds` | 0.290 / 0.571 | 0.346 / 0.576 | 0.547 / 0.632 | 2.366 / 1.372 | 19.367 / 41.840 |
 | `state_updates` | 0.413 / 0.612 | 0.561 / 0.707 | 1.213 / 1.389 | 11.949 / 23.242 | Recorder EPERM |
 | `captured_closures` | 0.330 / 0.626 | 0.352 / 0.622 | 0.584 / 0.858 | 2.985 / 3.458 | 26.174 / 26.764 |
@@ -83,7 +86,7 @@ Each cell shows MLF / GHC in MiB. The recorder sampled the resident set size (RS
 | `higher_order_chain` | 88.7 / 339.2 | 95.3 / 336.7 | 87.3 / 331.9 | 88.1 / 343.3 | 92.7 / 426.6 |
 | `local_functions` | 96.8 / 340.5 | 87.0 / 343.5 | 86.5 / 366.8 | 95.6 / 366.4 | 372.2 / 629.7 |
 | `wide_case` | 93.8 / 320.6 | 93.9 / 369.4 | 103.1 / 378.8 | 189.5 / 460.1 | 1,442.4 / 874.8 |
-| `class_instances` | 102.8 / 310.9 | 111.7 / 346.5 | 134.8 / 372.6 | MLF leg stopped | MLF leg stopped |
+| `class_instances` | 105.8 / 421.4 | 114.7 / 347.7 | 139.0 / 452.8 | 497.3 / 522.7 | 3,201.9 / 2,202.2 |
 | `dependency_diamonds` | 86.5 / 342.6 | 98.4 / 319.1 | 100.3 / 360.5 | 178.7 / 454.5 | 926.4 / 1,418.5 |
 | `state_updates` | 94.7 / 428.7 | 107.7 / 373.4 | 146.8 / 400.7 | 490.1 / 881.4 | Recorder EPERM |
 | `captured_closures` | 87.5 / 383.4 | 99.8 / 359.9 | 113.9 / 452.0 | 318.1 / 532.9 | 2,878.0 / 1,646.9 |
@@ -110,8 +113,6 @@ A failure stops the remaining builds in that cell. The CSV retains the successfu
 | Shape | Size | Completed pairs | Stopped leg | Skipped MLF / GHC | Recorded reason |
 | --- | ---: | ---: | --- | ---: | --- |
 | `inferred_poly_functions` | 8,192 | 0/6 | GHC | 6 / 5 | PermissionError(1, 'Operation not permitted') |
-| `class_instances` | 1,024 | 0/6 | MLF | 5 / 5 | source-to-llvm exit 1 binary symbol byte limit exceeded |
-| `class_instances` | 8,192 | 0/6 | MLF | 5 / 5 | wall limit |
 | `state_updates` | 8,192 | 0/6 | GHC | 6 / 5 | PermissionError(1, 'Operation not permitted') |
 | `nested_poly_types` | 1,024 | 0/6 | MLF | 5 / 5 | source-to-llvm exit 1 binary expanded-work limit exceeded |
 | `nested_poly_types` | 8,192 | 0/6 | GHC | 6 / 5 | process-tree RSS limit |
