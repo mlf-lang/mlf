@@ -1774,6 +1774,25 @@ applicationPatternChecks = do
     expected <- encoded (W.encode limits 8 names)
     actual <- encoded (W.encodeAtoms Structure.termAtomShapes limits 8 names)
     check "named constructor atoms preserve bytes and resource diagnostics" expected actual
+  let groundArg name = Structure.toXComputation (T.XThen (T.XInner (T.XBottom (T.XCon name []))) T.XElim)
+      composeArgs a b = W.VNode 58 [a,b]
+      smallA = groundArg "Int"
+      wideB = groundArg "λ😀"
+      emptyC = groundArg ""
+      leftProof = composeArgs (composeArgs smallA wideB) emptyC
+      rightProof = composeArgs smallA (composeArgs wideB emptyC)
+      proofRoots = [leftProof,leftProof,rightProof,rightProof]
+      partialProof = composeArgs (composeArgs (W.VNode (-1) (error "forced invalid child fields")) wideB)
+        (error "forced a later proof")
+  forM_ [127,128,130] $ \budget -> do
+    expected <- encoded (W.encodeRootBounded W.defaultLimits budget 8 proofRoots)
+    actual <- encoded (W.encodeRootsWithAtoms Structure.termAtomShapes W.defaultLimits budget 8 proofRoots)
+    check "repeated ground compositions preserve UTF-8 costs, grouping and canonical bytes" expected actual
+    check "four mixed-name proof triples cost exactly 128 work units"
+      (budget >= 128) (case actual of Right _ -> True; _ -> False)
+  rejectedProof <- encoded (W.encodeAtoms Structure.termAtomShapes W.defaultLimits 8 [leftProof,leftProof,partialProof])
+  check "a cached composition miss preserves the first invalid tag before the right subtree"
+    (Left "binary constructor tag out of range") rejectedProof
   let v n = T.XTyVar n
       ty n = T.XVar (v n)
       groundScheme vars lastBound = foldr (\(i,lower) body -> T.XForall (v i) lower body)

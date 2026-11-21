@@ -191,8 +191,8 @@ module Bootstrap.Bitstream (
   -- Descriptors name common generated shapes. A hit reuses only a
   -- completely admitted node with the same tags and scalar payloads.
   data AtomShapes = AtomShapes Int Int Int Int Int | NamedAtomShapes Int Int Int Int Int Int |
-    WithGroundProofTags AtomShapes Int Int Int Int Int;
-  data ProofAtoms = NoProofAtoms | ProofAtoms Int Int Int Int Int (Maybe ((,,) String Int Int));
+    WithGroundProofTags AtomShapes Int Int Int Int Int | WithProofCompositions AtomShapes;
+  data ProofAtoms = NoProofAtoms | ProofAtoms Int Int Int Int Int (Maybe ((,,) String Int Int)) ProofCache;
   data NamedAtoms = NoNamedAtoms | NamedAtoms Int (Map String ((,) Int Int));
   data AtomIds = NoAtomIds | AtomIds Int Int Int Int Int
     (Maybe ((,) Int Int)) (IntMap ((,,) String Int Int)) NamedAtoms ProofAtoms;
@@ -202,8 +202,14 @@ module Bootstrap.Bitstream (
       AtomIds n pair p opcode empty Nothing IM.empty (NamedAtoms named M.empty) NoProofAtoms;
     WithGroundProofTags other thenTag inner bottom ctor elim -> case emptyAtomIds other of {
       AtomIds n pair p opcode empty prim names named _ -> AtomIds n pair p opcode empty prim names named
-        (ProofAtoms thenTag inner bottom ctor elim Nothing);
+        (ProofAtoms thenTag inner bottom ctor elim Nothing NoProofCache);
       NoAtomIds -> NoAtomIds
+    };
+    -- A legacy descriptor keeps its original demand for every field.
+    WithProofCompositions shapes -> case emptyAtomIds shapes of {
+      AtomIds n np p op empty prim names named (ProofAtoms t i b c e previous _) ->
+        AtomIds n np p op empty prim names named (ProofAtoms t i b c e previous EmptyProofCache);
+      other -> other
     }
   };
   -- A hash narrows structural lookup; it never establishes equality. Exact
@@ -307,7 +313,7 @@ module Bootstrap.Bitstream (
   data PlanState = PlanState SymbolState NodeState Int;
   data Tables = Tables ([] Symbol) ([] Entry) ([] Int) Int Int Int Int;
   data EncodeTask = EncodeValues Int ([] Value) | EncodeOne Int Value | EncodeClose Int Int | EncodeRemember Int ([] Value) |
-    EncodeRight Int Int Value | EncodePair Int Int;
+    EncodeRight Int Int Value | EncodePair Int Int | EncodeComposition ([] Value);
   charge :: Limits -> Int -> PlanState -> Either String PlanState;
   charge limits amount (PlanState symbols nodes work) =
     if amount < 0 || amount > maxExpandedWork limits - work
@@ -486,11 +492,11 @@ module Bootstrap.Bitstream (
         NoNamedAtoms -> saved
       }
     } in case proofs of {
-      ProofAtoms thenTag inner bottom ctor elim _ -> if tag /= thenTag then ordinary else case children of {
+      ProofAtoms thenTag inner bottom ctor elim _ cache -> if tag /= thenTag then ordinary else case children of {
         [first,end] -> case proofField inner bottom ctor first of {
           Just ((,) text args) -> if atomEmpty emptyTag args && atomEmpty elim end then
             AtomIds nameTag namePair primTag opcodeTag emptyTag prim names named
-              (ProofAtoms thenTag inner bottom ctor elim (Just ((,,) text (stringUtf8Length text) index)))
+              (ProofAtoms thenTag inner bottom ctor elim (Just ((,,) text (stringUtf8Length text) index)) cache)
             else ordinary;
           Nothing -> ordinary
         };
@@ -537,7 +543,72 @@ module Bootstrap.Bitstream (
     };
     _ -> Nothing
   }));
-  tryAtom limits depth tag children stack rest state@(PlanState _ (Nodes _ _ count edges saved _) work) ordinary =
+  -- Describe only a previously admitted subtree, up to three composition
+  -- levels (eight complete arguments). Cache both the exact grouping and
+  -- the last elementary atom the ordinary traversal would leave available.
+  data ProofKey = ProofLeaf String | ProofPair ProofKey ProofKey;
+  data ProofSize = ProofSize ProofKey Int Int Int String;
+  data ProofCache = NoProofCache | EmptyProofCache |
+    LastProof ProofKey Int Int Int Int ((,,) String Int Int);
+  captureProof thenTag inner bottom ctor empty elim = let {
+    child room node = case node of {
+      VNode tag fields -> if tag == thenTag then capture room fields else Nothing;
+      _ -> Nothing
+    };
+    capture room fields = case fields of {
+      [a,b] -> case proofField inner bottom ctor a of {
+        Just ((,) name args) -> if atomEmpty empty args && atomEmpty elim b then
+          Just (ProofSize (ProofLeaf name) 5 7 (7 + stringUtf8Length name) name) else Nothing;
+        Nothing -> if room == 0 then Nothing else case child (room - 1) a of {
+          Nothing -> Nothing;
+          Just (ProofSize x dx nx wx _) -> case child (room - 1) b of {
+            Nothing -> Nothing;
+            Just (ProofSize y dy ny wy last) ->
+              Just (ProofSize (ProofPair x y) (1 + max dx dy) (1 + nx + ny) (1 + wx + wy) last)
+          }
+        }
+      };
+      _ -> Nothing
+    }
+  } in capture 3;
+  matchesProof thenTag inner bottom ctor empty elim = let {
+    child key node = case node of {
+      VNode actual fields -> actual == thenTag && same key fields;
+      _ -> False
+    };
+    same key fields = case fields of {
+      [a,b] -> case key of {
+        ProofPair x y -> child x a && child y b;
+        ProofLeaf expected -> case proofField inner bottom ctor a of {
+          Just ((,) name args) -> eqString expected name && atomEmpty empty args && atomEmpty elim b;
+          Nothing -> False
+        }
+      };
+      _ -> False
+    }
+  } in same;
+  rememberComposition children identity saved = case saved of {
+    AtomIds n np p op empty prim names named (ProofAtoms t i b c e previous cache) -> case previous of {
+      -- An admitted leaf has already demanded all six proof tags. With
+      -- distinct tags, at least three descendant tags took the ordinary
+      -- atom path on its first admission, so its root descriptors are also
+      -- known. A colliding schema stays on the original traversal.
+      Just last@((,,) lastName _ _) -> let {
+        roles = [t,i,b,c,e,empty];
+        allowed role = role /= n && role /= p &&
+          (case named of { NoNamedAtoms -> True; NamedAtoms k _ -> role /= k });
+        usable = length (nubBy (==) roles) == 6 && all allowed roles;
+        store value = AtomIds n np p op empty prim names named (ProofAtoms t i b c e previous value)
+      } in if not usable then store NoProofCache else case captureProof t i b c empty e children of {
+        Just (ProofSize key@(ProofPair _ _) height nodes work lastLeaf) ->
+          if eqString lastName lastLeaf then store (LastProof key height nodes work identity last) else saved;
+        _ -> saved
+      };
+      Nothing -> saved
+    };
+    _ -> saved
+  };
+  tryAtom limits depth tag children stack rest state@(PlanState symbols (Nodes keys entries count edges saved pages) work) ordinary =
     case saved of {
       NoAtomIds -> ordinary rest;
       AtomIds nameTag namePair primitiveTag opcodeTag emptyTag primitive names named proofs -> let {
@@ -582,9 +653,30 @@ module Bootstrap.Bitstream (
         };
         -- Check room for the whole shape before looking into it. Only an
         -- already admitted name may skip the six descendant node charges.
-        tryProof inner bottom ctor elim previous = case children of {
+        compound inner bottom ctor elim cache first = case cache of {
+          NoProofCache -> ordinary rest;
+          _ -> case first of {
+            VNode firstTag _ -> if firstTag /= tag then ordinary rest else let {
+              record = ordinary ((:) (EncodeComposition children) rest)
+            } in case cache of {
+              LastProof key height size cost identity last ->
+                if height > maxDepth limits - depth + 1 || size > maxNodes limits - count ||
+                    size - 1 > maxEdges limits - edges || cost - 1 > available then ordinary rest
+                else if matchesProof tag inner bottom ctor emptyTag elim key children then let {
+                  atoms = AtomIds nameTag namePair primitiveTag opcodeTag emptyTag primitive names named
+                    (ProofAtoms tag inner bottom ctor elim (Just last) cache)
+                } in do {
+                  next <- charge limits (cost - 1) (PlanState symbols (Nodes keys entries count edges atoms pages) work);
+                  planId limits rest stack identity next
+                } else record;
+              _ -> record
+            };
+            _ -> ordinary rest
+          }
+        };
+        tryProof inner bottom ctor elim previous cache = case children of {
           [first,end] -> case proofField inner bottom ctor first of {
-            Nothing -> ordinary rest;
+            Nothing -> compound inner bottom ctor elim cache first;
             Just ((,) name args) -> case previous of {
               Nothing -> remember;
               Just ((,,) expected bytes index) -> if bytes > available - 6 then ordinary rest
@@ -607,9 +699,9 @@ module Bootstrap.Bitstream (
           } else ordinary rest
         }
       } in case proofs of {
-        ProofAtoms thenTag inner bottom ctor elim previous -> if tag == thenTag &&
+        ProofAtoms thenTag inner bottom ctor elim previous cache -> if tag == thenTag &&
           depth <= maxDepth limits - 4 && available >= 6 && maxNodes limits - count >= 7 &&
-          maxEdges limits - edges >= 6 then tryProof inner bottom ctor elim previous else ordinaryAtoms;
+          maxEdges limits - edges >= 6 then tryProof inner bottom ctor elim previous cache else ordinaryAtoms;
         NoProofAtoms -> ordinaryAtoms
       }
     };
@@ -625,6 +717,12 @@ module Bootstrap.Bitstream (
         [] -> Left "binary encoder internal reference stack underflow"
       }
     } in case task of {
+      EncodeComposition children -> case (,) stack state of {
+        (,) ((:) index _) (PlanState symbols (Nodes keys entries count edges saved pages) work) -> let {
+          atoms = rememberComposition children index saved
+        } in seq atoms (planTasks limits rest stack (PlanState symbols (Nodes keys entries count edges atoms pages) work));
+        _ -> Left "binary reference stack underflow"
+      };
       EncodeRemember tag children -> case (,) stack state of {
         (,) ((:) index _) (PlanState symbols (Nodes keys entries count edges saved pages) work) -> let {
           atoms = rememberAtom tag children index saved
