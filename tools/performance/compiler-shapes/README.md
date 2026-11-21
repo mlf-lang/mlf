@@ -13,6 +13,8 @@ keeps its own runner contract; nothing here changes it. This suite generates its
 own programs, has no application inputs, and reports per-shape compilation ratios
 rather than workload gates.
 
+The [21 November 2026 comparison](../../../docs/compiler-shapes-2026-11-21.md) reports elapsed time, peak memory and incomplete builds for the 25-shape standard matrix.
+
 ## Compile endpoint
 
 The default measured endpoint is `crate-fused-v1`:
