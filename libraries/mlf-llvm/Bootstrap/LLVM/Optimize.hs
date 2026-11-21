@@ -1554,7 +1554,10 @@ module Bootstrap.LLVM.Optimize where {
   -- the rest of the declaration spine. Its RHS is outside the binder scope.
   delayCheckedLet name value pending = case pending of {
     PendingBody body replacements counts calls ->
-      let { uses = M.findWithDefault compareName 0 name counts;
+      -- With no queued substitutions, the indexed body's existing 0/1/many
+      -- count suffices for all of the comparisons below.
+      let { uses = M.findWithDefault compareName 0 name
+              (if M.null replacements then useCounts body else counts);
         -- A constructor applied only to atoms has no binders to freshen.
         -- The ordinary rule substitutes it immediately. Queue its sole use
         -- without rebuilding all later declarations and their use counts.
