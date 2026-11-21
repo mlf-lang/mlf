@@ -610,6 +610,18 @@ evidenceReadChecks = do
     [(False,0,"x"),(False,0,"x"),(True,V.toInt a,"first"),(True,V.toInt b,"second")]
     (map label (D.fileLastValueOccurrences False (T.SGivenScope ["x"] (T.SApp hole hole))))
 
+  let nested 0 = hole
+      nested n = T.SApp hole (T.SLam (H.literal ("unused" ++ show n)) T.Nothing (nested (n - 1)))
+  check "unrelated lexical binders cannot contribute another read of the same candidate environment"
+    (map label (D.fileValueOccurrences False hole))
+    (map label (D.fileLastValueOccurrences False (nested (256 :: Int))))
+  let mixed = T.SWantedScope "D" (T.CandidateEnvironment 17 ((T.GivenEvidence,T.LexicalRef "hidden") : entries))
+      shadowed = T.SApp mixed (T.SLam "hidden" T.Nothing mixed)
+  forM_ [False, True] $ \inventory ->
+    check "an earlier free lexical candidate survives a later binder of the same name"
+      (lastReads (D.fileValueOccurrences inventory shadowed))
+      (lastReads (D.fileLastValueOccurrences inventory shadowed))
+
 -- A visible alias can admit only the method of its own class. Reusing a
 -- module's method index must keep distinct owners with the same spellings.
 instanceVisibilityChecks = do

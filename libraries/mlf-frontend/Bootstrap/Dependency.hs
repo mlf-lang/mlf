@@ -153,13 +153,22 @@ module Bootstrap.Dependency where {
     one ref ((,) scopes refs) = (,) scopes ((:) ref refs);
     group visible names ids (CandidateEnvironment key entries) ((,) scopes refs) = let {
       include next = (,) next (foldr (\((,) _ ref) tail ->
-        if visible ref then (:) ref tail else tail) refs entries)
+        if visible ref then (:) ref tail else tail) refs entries);
+      -- Only a masked candidate can become a new read at an earlier site.
+      -- Capturing every enclosing binder here compares long, irrelevant
+      -- lexical scopes at each wanted under a chain of do continuations.
+      maskedCandidate masks@((,) hidden masked) ((,) _ ref) = case ref of {
+        LexicalRef n -> if lexical && S.member compareString n names
+          then let { next = S.insert compareString n hidden } in seq next ((,) next masked) else masks;
+        DeclRef i _ -> if IS.member (V.toInt i) ids
+          then let { next = IS.insert (V.toInt i) masked } in seq next ((,) hidden next) else masks
+      }
     } in case IM.lookup key scopes of {
-      Nothing -> include (IM.insert key ((,) names ids) scopes);
+      Nothing -> include (IM.insert key (foldlStrict maskedCandidate ((,) S.empty IS.empty) entries) scopes);
       Just ((,) hidden masked) ->
         if IS.isSubsetOf masked ids && S.isSubsetOf compareString hidden names
         then (,) scopes refs
-        else include (IM.insert key ((,) (S.intersection compareString names hidden)
+        else include (IM.insert key ((,) (S.intersection compareString hidden names)
           (IS.intersection ids masked)) scopes)
     }
   } in snd (fileOccurrencesUsing lexical inventory one group ((,) IM.empty []) expression);
