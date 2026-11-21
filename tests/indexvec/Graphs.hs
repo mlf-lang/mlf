@@ -517,6 +517,15 @@ resolverChecks = do
       ids = Map.fromList [(H.unpack (V.at names i),V.toInt i) | D.Bound i _ _ <- bindings]
       uses = Map.fromList [(H.unpack (V.at names i),map V.toInt (R.references rhs)) | D.Bound i _ rhs <- bindings]
       target k = ids Map.! k
+  let declaringModule = D.mapScopesWithId (\owner _ -> case owner of
+        T.Just i -> V.toInt i; T.Nothing -> error "missing defining module owner")
+        (Modules.resolvedCrateValueScopes crate)
+      scopeOf name = case D.scopeAt declaringModule (V.fromInt (target name)) of
+        T.Just i -> i; T.Nothing -> error ("missing scope for " ++ name)
+  check "recursive and nonrecursive SCCs share the defining module scope"
+    (scopeOf "Main.self") (scopeOf "Main.first")
+  check "a re-export does not merge two defining module scopes" False
+    (scopeOf "Main.again" == scopeOf "A.value")
   check "qualified alias" [target "A.value"] (uses Map.! "Main.first")
   check "re-export keeps its defining ID" (uses Map.! "Main.first") (uses Map.! "Main.again")
   check "same spelling, different defining module" [target "B.value"] (uses Map.! "Main.second")
@@ -639,6 +648,12 @@ resolverChecks = do
     T.Nothing -> True; _ -> False)
   check "local shadow inherits lexical candidates" "lexical" (D.bindingScope nested "same" False "lexical")
   check "copied global helper keeps its own candidates" "local scope" (D.bindingScope nested "same" True "lexical")
+  let shared = D.mapScopesWithId (\owner _ -> case owner of
+        T.Just i -> V.toInt i; T.Nothing -> -1)
+        (D.indexedScopeGroups slots [([own,method],True),([],False),([external],True)])
+      scopeOwner i = case D.scopeAt shared i of { T.Just n -> n; T.Nothing -> -2 }
+  check "one owner across declarations in a defining scope" (V.toInt own) (scopeOwner method)
+  check "equal masks in separate defining scopes keep their own owners" (V.toInt external) (scopeOwner external)
   let primitive = T.SourceModule "<MLF.Primitive>" (T.Just "MLF.Primitive") T.Nothing [] [] [] [] [] T.Nothing T.LegacyEmlfV1
   let runScoped imports = do
         modules <- mapM parsed [("Inspect","module Inspect where\nclass Inspect a where { inspect : a -> Bool }\n"),

@@ -470,32 +470,52 @@ module Bootstrap.Dependency where {
   -- Visibility belongs to the defining declaration. Only active definitions
   -- enter the adapter used by the named surface/class lowering boundary.
   data ClassContext = ClassContext GeneratedTable Bool (V.Index Declaration -> Maybe ((,) ([] String) Bool));
+  data DefiningScope = DefiningScope;
+  data ScopeRows a = ScopeRows (V.IndexVec Declaration (Maybe (V.Index DefiningScope)))
+    (V.IndexVec DefiningScope ((,) (V.Index Declaration) a));
   data ValueScopes a = NamedScopes (Map String a) |
-    IndexedScopes Bool (Maybe ClassContext) Symbols (Map String (V.Index Declaration)) (V.IndexVec Declaration (Maybe a));
-  indexedScopes symbols entries = let {
-    names = M.fromList compareString (map (\((,) i _) -> (,) (symbolName symbols i) i) entries);
-    table = runST (stBind (V.filled (V.count (symbolNodes symbols)) Nothing) (\rows ->
-      stBind (ST.map_ (\((,) i a) -> V.set rows i (Just a)) entries) (\_ -> V.freeze rows)))
-  } in IndexedScopes True Nothing symbols names table;
-  mapScopes f scopes = case scopes of {
-    NamedScopes named -> NamedScopes (M.map f named);
-    IndexedScopes top tableId symbols names table -> IndexedScopes top tableId symbols names
-      (V.fromList (map (mapOptional f) (V.toList table)))
+    IndexedScopes Bool (Maybe ClassContext) Symbols (Map String (V.Index Declaration)) (ScopeRows a);
+  indexedScopes symbols entries =
+    indexedScopeGroups symbols (map (\((,) i value) -> (,) [i] value) entries);
+  -- Each nonempty group comes from one defining module. Its first declaration
+  -- identifies that environment within this resolved graph, across all SCCs.
+  indexedScopeGroups :: forall a. Symbols -> [] ((,) ([] (V.Index Declaration)) a) -> ValueScopes a;
+  indexedScopeGroups symbols groups = let {
+    active = V.fromList (mapMaybe (\((,) ids value) -> case ids of {
+      [] -> Nothing; (:) owner _ -> Just ((,,) owner ids value)
+    }) groups);
+    members = concatMap (\group -> case V.at active group of {
+      (,,) _ ids _ -> map (\i -> (,) i group) ids
+    }) (V.indices active);
+    names = M.fromList compareString (map (\((,) i _) -> (,) (symbolName symbols i) i) members);
+    owners = runST (stBind (V.filled (V.count (symbolNodes symbols)) Nothing) (\rows ->
+      stBind (ST.map_ (\((,) i group) -> V.set rows i (Just group)) members) (\_ -> V.freeze rows)));
+    values = V.fromList (map (\((,,) owner _ value) -> (,) owner value) (V.toList active))
+  } in IndexedScopes True Nothing symbols names (ScopeRows owners values);
+  rowScope (ScopeRows owners values) i =
+    mapOptional (\group -> snd (V.at values group)) (V.at owners i);
+  mapScopes f = mapScopesWithId (\_ value -> f value);
+  mapScopesWithId :: forall a b. (Maybe (V.Index Declaration) -> a -> b) -> ValueScopes a -> ValueScopes b;
+  mapScopesWithId f scopes = case scopes of {
+    NamedScopes named -> NamedScopes (M.map (f Nothing) named);
+    IndexedScopes top tableId symbols names (ScopeRows owners values) -> let {
+      project ((,) owner value) = (,) owner (f (Just owner) value)
+    } in IndexedScopes top tableId symbols names (ScopeRows owners (V.fromList (map project (V.toList values))))
   };
   namedScopes scopes = case scopes of {
     NamedScopes named -> named;
-    IndexedScopes _ _ _ names table -> M.map (\i -> case V.at table i of {
+    IndexedScopes _ _ _ names table -> M.map (\i -> case rowScope table i of {
       Just a -> a; Nothing -> panic "inactive declaration scope"
     }) names
   };
   lookupScope name scopes = case scopes of {
     NamedScopes named -> M.lookup compareString name named;
     IndexedScopes _ _ _ names table -> case M.lookup compareString name names of {
-      Nothing -> Nothing; Just i -> V.at table i
+      Nothing -> Nothing; Just i -> rowScope table i
     }
   };
   scopeAt scopes i = case scopes of {
-    IndexedScopes _ _ _ _ table -> V.at table i;
+    IndexedScopes _ _ _ _ table -> rowScope table i;
     NamedScopes _ -> panic "named visibility has no declaration IDs"
   };
   scopeContext scopes = case scopes of {
@@ -519,7 +539,8 @@ module Bootstrap.Dependency where {
   };
   lookupSourceScope scopes i = case scopes of {
     NamedScopes _ -> Nothing;
-    IndexedScopes _ _ _ _ rows -> if V.toInt i < 0 || V.toInt i >= V.count rows then Nothing else V.at rows i
+    IndexedScopes _ _ _ _ rows@(ScopeRows owners _) ->
+      if V.toInt i < 0 || V.toInt i >= V.count owners then Nothing else rowScope rows i
   };
   scopeForBinder scopes ref copied fallback = case ref of {
     DeclRef i name -> case scopes of {

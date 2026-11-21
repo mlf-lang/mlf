@@ -409,9 +409,13 @@ module Bootstrap.Crate where {
             };
             let {
               valueScopes = case bindings of { Dependency.BoundValues symbols _ ->
-                Dependency.indexedScopes symbols (append (concatMap (\unit -> let { scope = candidates (compilationName unit) } in
-                  map (\binding -> (,) (Dependency.boundId binding) scope) (compilationBindings unit)) resolved)
-                  (case entry of { NoEntry -> []; CrateEntry _ i -> [(,) i (candidates (specEntry spec))] }))
+                let { group unit = let {
+                  name = compilationName unit;
+                  extra = case entry of {
+                    CrateEntry _ i -> if eqString name (specEntry spec) then [i] else []; NoEntry -> []
+                  }
+                } in (,) (append (map Dependency.boundId (compilationBindings unit)) extra) (candidates name)
+                } in Dependency.indexedScopeGroups symbols (map group resolved)
               }
             };
             let {

@@ -351,11 +351,10 @@ module Bootstrap.Module where {
     (resolvedCrateModules crate);
   instanceValue crate = R.namedInstance (Dependency.symbolName (bindingSymbols (resolvedCrateBindings crate)));
   resolvedCrateInstances crate = map (\((,) owner inst) -> (,) owner (instanceValue crate inst)) (resolvedInstanceRows crate);
-  resolvedScopeRows modules scopeOf = concatMap (\entry ->
-    let { scope = scopeOf (moduleIdentity (resolvedSource entry)) } in
-    map (\binding -> (,) (Dependency.boundId binding) scope) (renamedBindings (resolvedContents entry))) modules;
   resolvedValueScopesIn (ResolvedCrate bindings _ masks _) modules =
-    Dependency.indexedScopes (bindingSymbols bindings) (resolvedScopeRows modules (\name -> M.get compareString name masks));
+    Dependency.indexedScopeGroups (bindingSymbols bindings) (map (\entry -> (,)
+      (map Dependency.boundId (renamedBindings (resolvedContents entry)))
+      (M.get compareString (moduleIdentity (resolvedSource entry)) masks)) modules);
   resolvedCrateValueScopes crate = resolvedValueScopesIn crate (resolvedCrateModules crate);
   resolvedCrateInstanceScopes (ResolvedCrate _ modules masks _) = concatMap (\entry ->
     map (\_ -> M.get compareString (moduleIdentity (resolvedSource entry)) masks)
