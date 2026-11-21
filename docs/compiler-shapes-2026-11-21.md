@@ -2,7 +2,7 @@
 
 On this Apple M1 Max, 121 of 125 standard comparisons completed all six pairs. MLF had the lower median compile time in 107 of those 121 comparisons. The matrix covers 25 shapes at 8, 32, 128, 1,024, and 8,192 units. The two additional nested-type checks at depths 4 and 16 also completed.
 
-The tables include 45 standard comparisons rerun after the initial sweep. Each rerun replaces that shape’s five earlier cells. Every cell uses its own six-pair schedule. The code, runtime arguments and expected outputs for each fixture match the initial run.
+The tables include 50 standard comparisons rerun after the initial sweep. Each rerun replaces that shape’s five earlier cells. Every cell uses its own six-pair schedule. The code, runtime arguments and expected outputs for each fixture match the initial run.
 
 Including the two additional depths, these measurements account for 1,476 successful builds, 4 failed attempts and 44 scheduled builds skipped after a failure. The recorder completed 738 pairs and verified 117,216 output lines in 4,668 untimed executable invocations.
 
@@ -22,6 +22,7 @@ The initial sweep used MLF `c8eaf641ec1d27a1fce126fdb6f722ec2d2f089c`. The two a
 | `inferred_poly_chain` | 5/5 | `d893e3dd5fce35cad9ac838a9666557b780078d6` | `2afbcad29d73562395e0fef5cc64f6d669c745841e3c54ddc4805730d7e7e8b8` |
 | `inferred_poly_functions` | 4/5 | `e3dd70fc8ab1120c94782116b58be17356f81589` | `22048893e314b4c2df277d17b15e7f3717963a7346ca7e35fac92892b2ffbe15` |
 | `nested_poly_types` | 4/5 | `e41d3abdee68abf81d5cb707a7021345f35a4223` | `73c092499b461bace49e0639519ac1f1851d344fb9717fd826443281438f7df6` |
+| `rank2_callbacks` | 4/5 | `c0883708f96d44ef37170299be19734b179c30e2` | `9623bdc8b042829b770907f086a896a81db5c1d5071fe1fcc7e038fa1dff07d3` |
 | `state_updates` | 4/5 | `c0883708f96d44ef37170299be19734b179c30e2` | `9623bdc8b042829b770907f086a896a81db5c1d5071fe1fcc7e038fa1dff07d3` |
 
 **class_instances**. A defining module shares its instance environment across declarations and methods. Lexical givens keep their order at each qualified body, including copied helpers.
@@ -39,6 +40,8 @@ The initial sweep used MLF `c8eaf641ec1d27a1fce126fdb6f722ec2d2f089c`. The two a
 **inferred_poly_functions**. At 8,192 functions GHC reached the 5 GiB process-tree guard on the first leg. Its process group was empty after cleanup. A separate cold MLF worker compiled, linked and passed all three output checks in 25.388 s at 1,634.7 MiB. Dropping an unused checked lambda now preserves pending substitutions. The warm MLF build reused all 8,195 groups.
 
 **nested_poly_types**. MLF now checks and stores long chains of nested polymorphic calls within the existing artifact limits. All six pairs completed at depth 1,024. At depth 8,192 GHC reached the 5 GiB guard on the first leg. A separate cold MLF worker compiled, linked and passed all three outputs in 3.401 s at 248.2 MiB.
+
+**rank2_callbacks**. All six pairs completed through 1,024 callbacks. At 8,192 the first GHC leg exceeded 5 GiB. A separate cold MLF worker compiled, linked and passed all three outputs in 55.869 s at 2,436.2 MiB. The warm build reused all 8,196 declaration groups and reproduced the checked artifacts byte for byte.
 
 **state_updates**. The graph rebinder previously checked every pair of merged type variables. It now groups those checks by binder and reuses ancestor information. At 1,024 updates the six-pair medians were 6.250 s for MLF and 23.228 s for GHC. At 8,192 the first GHC leg reached the 90-second wall limit. A separate cold MLF worker compiled, linked and passed all three outputs in 55.234 s at 3,928.0 MiB. The warm build reused all three declaration groups and reproduced both checked artifacts byte for byte.
 
@@ -71,7 +74,7 @@ Each cell shows MLF / GHC median wall time in seconds for the six full builds pe
 | `rank2_arguments` | 0.320 / 0.624 | 0.350 / 0.588 | 0.499 / 0.683 | 1.938 / 1.739 | 15.419 / 11.719 |
 | `irregular_literal_table` | 0.283 / 0.567 | 0.287 / 0.593 | 0.292 / 0.614 | 0.304 / 1.149 | 0.428 / 6.153 |
 | `nested_poly_types` | 0.269 / 0.535 | 0.270 / 0.540 | 0.282 / 0.537 | 0.625 / 5.989 | GHC leg stopped |
-| `rank2_callbacks` | 0.325 / 0.562 | 0.459 / 0.604 | 1.089 / 0.840 | 7.130 / 5.803 | GHC leg stopped |
+| `rank2_callbacks` | 0.298 / 0.558 | 0.414 / 0.581 | 0.935 / 0.777 | 6.360 / 5.419 | GHC leg stopped |
 | `decoder_pipeline` | 0.340 / 0.624 | 0.364 / 0.640 | 0.477 / 0.708 | 2.880 / 1.901 | 11.575 / 15.623 |
 
 ## Peak resident memory
@@ -103,7 +106,7 @@ Each cell shows MLF / GHC in MiB. The recorder sampled the resident set size (RS
 | `rank2_arguments` | 87.5 / 422.0 | 93.0 / 353.9 | 105.2 / 347.5 | 251.3 / 414.8 | 1,771.8 / 969.8 |
 | `irregular_literal_table` | 86.8 / 322.2 | 86.9 / 347.7 | 87.8 / 379.6 | 88.8 / 400.0 | 106.8 / 548.1 |
 | `nested_poly_types` | 88.1 / 339.2 | 89.9 / 341.6 | 94.9 / 340.4 | 203.0 / 548.6 | GHC leg stopped |
-| `rank2_callbacks` | 92.6 / 326.9 | 106.4 / 399.0 | 129.5 / 355.2 | 332.5 / 612.1 | GHC leg stopped |
+| `rank2_callbacks` | 93.0 / 345.4 | 93.0 / 424.7 | 119.2 / 371.0 | 336.7 / 608.2 | GHC leg stopped |
 | `decoder_pipeline` | 108.9 / 410.8 | 98.9 / 392.7 | 119.2 / 351.1 | 212.6 / 431.0 | 972.5 / 721.3 |
 
 ## Additional nested type depths
@@ -124,7 +127,7 @@ A failure stops the remaining builds in that cell. The CSV retains the successfu
 | `inferred_poly_functions` | 8,192 | 0/6 | GHC | 6 / 5 | process-tree RSS limit |
 | `state_updates` | 8,192 | 0/6 | GHC | 6 / 5 | wall limit |
 | `nested_poly_types` | 8,192 | 0/6 | GHC | 6 / 5 | process-tree RSS limit |
-| `rank2_callbacks` | 8,192 | 0/6 | GHC | 6 / 5 | wall limit |
+| `rank2_callbacks` | 8,192 | 0/6 | GHC | 6 / 5 | process-tree RSS limit |
 
 ## Initial sweep and follow-ups
 
