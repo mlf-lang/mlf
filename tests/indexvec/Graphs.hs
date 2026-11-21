@@ -2325,6 +2325,37 @@ fragmentFingerprintChecks = do
   check "repeated operator uses retain proof text, hint spelling and right-child parentheses"
     (H.unpack expected) (H.unpack (Open.fingerprint actual))
 
+nestedInstantiationChecks = do
+  let a = T.XTyVar 0
+      b = T.XTyVar 1
+      int = T.XCon "Int" []
+      star = T.Star
+      unary = T.KArrow star star
+      env = M.singleton b T.XBot
+      kinds = Data.withKinds [("Wrap",unary),("Higher",T.KArrow unary star),("Partial",T.KArrow star unary)]
+      via name t = T.XCon name [t]
+      wrap = via "Wrap"
+      scheme = T.XForall a T.XBot (T.XArrow (T.XVar a) (wrap (T.XVar a)))
+      instantiate t = T.XThen (T.XInner (T.XBottom t)) T.XElim
+      observe result = case result of
+        T.Left reason -> Left (H.unpack reason)
+        T.Right ty -> Right (H.unpack (Pretty.prettyType ty))
+      compareProof source proof = check "kind-preserving instantiation agrees with the independent checker"
+        (observe (Independent.checkComputationIn kinds env proof source))
+        (observe (XCheck.checkComputationIn kinds env proof source))
+  forM_ [int,T.XVar b,iterate wrap int !! 48,via "Unknown" (via "Unknown" int),
+         via "Higher" (via "Partial" int),via "Higher" (via "Higher" (T.XCon "Wrap" [])),
+         via "Partial" (via "Partial" int),wrap (via "Higher" int),wrap (T.XVar (T.XTyVar 4)),
+         wrap (T.XCon "Wrap" [int,int]),T.XArrow (via "Partial" int) int] $ \arg ->
+    compareProof scheme (instantiate arg)
+  let capture = T.XForall a T.XBot (T.XForall b T.XBot (T.XArrow (T.XVar a) (T.XVar b)))
+      higher = T.XForall a (T.XCon "Wrap" []) (T.XApply (T.XVar a) int)
+  compareProof capture (instantiate (wrap (T.XVar b)))
+  compareProof higher T.XElim
+  compareProof scheme (T.XThen (T.XInner (T.XBottom (wrap int))) (T.XOuter a T.XRefl))
+  compareProof scheme (T.XThen (T.XInner (T.XBottom (via "Higher" int))) (error "forced later proof"))
+  compareProof int (T.XInner (error "forced inner proof of non-quantifier"))
+
 applicationPatternChecks = do
   let named text fields = W.VNode 82 [W.VText text,W.VNode 1 fields]
       names = [named "A" [],named "長😀" [],named "A" [],named "長😀" [W.VInt 2],named "A" []]
@@ -2961,6 +2992,7 @@ main = do
   projectedBindingChecks
   fragmentFingerprintChecks
   applicationPatternChecks
+  nestedInstantiationChecks
   importConventionChecks
   typedClassChecks
   evidenceScopeChecks

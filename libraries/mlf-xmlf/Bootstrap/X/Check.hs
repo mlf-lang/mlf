@@ -64,19 +64,35 @@ module Bootstrap.X.Check where {
     };
   -- The source has passed kind checking in this exact environment. Each
   -- composition passes its checked result to the next computation.
-  checkedComputationResult ds env p source = case p of {
-    XRefl -> Right source;
-    -- Inst-Bot already checks the target kind against its bottom source.
-    XBottom _ -> computeResult ds env p source;
-    XThen first second -> do {
-      middle <- checkedComputationResult ds env first source;
-      checkedComputationResult ds env second middle
-    };
-    _ -> do {
+  checkedComputationResult ds env p source = let {
+    checkedResult = do {
       result <- computeResult ds env p source;
       wellFormedIn ds env result;
       Right result
     }
+  } in case p of {
+    XRefl -> Right source;
+    -- Inst-Bot already checks the target kind against its bottom source.
+    XBottom _ -> computeResult ds env p source;
+    -- Substituting the admitted bound for its binder preserves the
+    -- kind of the body. XElim performs the capture-avoiding substitution.
+    XElim -> computeResult ds env p source;
+    XInner inner -> case source of {
+      XForall binder XBot body -> case inner of {
+        XBottom argument -> do {
+          termType ds env argument;
+          -- The admitted binder and its new bound both have kind *.
+          Right (XForall binder argument body)
+        };
+        _ -> checkedResult
+      };
+      _ -> checkedResult
+    };
+    XThen first second -> do {
+      middle <- checkedComputationResult ds env first source;
+      checkedComputationResult ds env second middle
+    };
+    _ -> checkedResult
   };
   computeResult :: DataEnv -> Map XTyVar XType -> XComputation -> XType -> Either String XType;
   computeResult ds env p source =

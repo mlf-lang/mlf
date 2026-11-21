@@ -220,6 +220,7 @@ module Bootstrap.X.Type where {
           then Right Star
           else Left "function types require kind * arguments"
         };
+      XCon c ((:) arg []) -> unaryConstructorKinds ds env ((:) c []) arg;
       XCon c args ->
         do {
           ks <- L.mapM (kindIn ds env) args;
@@ -237,6 +238,29 @@ module Bootstrap.X.Type where {
           kindIn ds (M.insert compareTyVar a k env) body
         }
     };
+  -- Check the spine's argument first, then apply constructors from the
+  -- inside out. Applying a constructor to its own result once validates
+  -- all later adjacent repetitions because its codomain is fixed.
+  unaryConstructorKinds ds env names ty = case ty of {
+    XCon name ((:) arg []) -> unaryConstructorKinds ds env ((:) name names) arg;
+    _ -> do {
+      base <- kindIn ds env ty;
+      applyUnaryKinds ds base names
+    }
+  };
+  applyUnaryKinds ds base names = case names of {
+    [] -> Right base;
+    (:) name rest -> let { constructor = D.constructorKind ds name 1 } in do {
+      result <- applyKind constructor base;
+      case rest of {
+        (:) next more -> if eqString name next then do {
+          repeated <- applyKind constructor result;
+          applyUnaryKinds ds repeated (L.dropWhile (eqString name) more)
+        } else applyUnaryKinds ds result rest;
+        [] -> Right result
+      }
+    }
+  };
   instantiateField :: Map String XType -> Field -> Either String XType;
   instantiateField env field =
     case field of {
