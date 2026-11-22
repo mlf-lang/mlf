@@ -263,6 +263,19 @@ const validate = text => {
   assert.match(hostedMatrix, /"\$toolset\/compiler-tests" "\$suite" --manager "\$toolset\/mlfpkg" --compiler "\$toolset\/emlf"/);
   const hostedTuple = commandStep('tools/release/test-tuple-list.sh');
   assert.match(hostedTuple, /\.mlf-build\/shared-ghc/);
+  const lifecycle = commandStep('--locked test --target lifecycle');
+  const figure12 = commandStep('tools/shared/test_figure12_direct.py');
+  assert.ok(steps.indexOf(figure12) < steps.indexOf(lifecycle),
+    'Hosted Figure12 runs before the native fixture build');
+  const indexvec = commandStep('tests/indexvec/run.py');
+  assert.equal(indexvec.match(/^        if: (.+)$/m)?.[1],
+    "${{ !cancelled() && steps.shared_build.outcome == 'success' && matrix.optimization == '2' }}",
+    'IndexVec runs even after earlier suite failures with an authenticated O2 producer');
+  assert.match(indexvec, /tests\/indexvec\/run.py --compiler \.mlf-build\/shared-ghc\/bin\/emlf --output \.mlf-build\/indexvec-controls\n/);
+  for (const step of [optimizedFramework, ...o2Only.map(commandStep)]) {
+    assert.ok(steps.indexOf(step) < steps.indexOf(indexvec),
+      'The codec timeout must not block independent optimized suites');
+  }
   for (const leg of legs) {
     for (const command of [...direct, ...o2Only]) {
       assert.equal(selected(commandStep(command), leg), direct.includes(command) === (leg.suite === 'routine'),
@@ -519,7 +532,7 @@ const prefix = 'release/native-ci-partition/';
 const cases = [
   [prefix + 'schedule', () => {
     const actual = job(workflowSource, 'native');
-    for (const adapter of ['source-smoke', 'direct-candidate', 'framework-direct', 'release-build-receipts', 'figure12-direct', 'tuple-list-native']) {
+    for (const adapter of ['source-smoke', 'direct-candidate', 'framework-direct', 'release-build-receipts', 'figure12-direct', 'tuple-list-native', 'indexvec']) {
       assert.match(actual, new RegExp('tools/testing/run[.]py ' + adapter + '\\b'));
     }
     validate(workflow);

@@ -17,7 +17,9 @@ import qualified Bootstrap.LLVM.Optimize as O
 import qualified MLF.Primitive as P
 n i = T.XName i "test"
 a = n 10; b = n 20; x = n 30; y = n 40; f = n 50; g = n 60
-state = B.Output 0 [] "entry" [] [] M.empty M.empty Set.empty M.empty Set.empty Set.empty Set.empty M.empty True M.empty M.empty M.empty M.empty M.empty Set.empty M.empty M.empty M.empty
+state = B.Output 0 [] "entry" [] [] M.empty (B.FunctionScope M.empty M.empty)
+ Set.empty M.empty Set.empty Set.empty Set.empty M.empty True M.empty M.empty
+ M.empty M.empty M.empty Set.empty M.empty M.empty M.empty
 key st clear caps arg expr = C.callbackKey st clear caps arg expr
 same a b = case (a,b) of { (T.Just x,T.Just y) -> S.eqList P.eqString x y; _ -> False }
 assert label value = if value then putStrLn ("PASS "++label) else error label
