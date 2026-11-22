@@ -309,6 +309,55 @@ class ScheduleTests(unittest.TestCase):
                                  for offset in range(value, value + size)]
                 self.assertEqual(generate.expected(family, size, value), sum(contributions))
 
+    def test_curried_environment_prefix_reuses_all_boxed_arguments(self):
+        family = 'curried_environment_prefix'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        for width in (1, 8, 40, 64):
+            source = generate.program(family, width)
+            self.assertEqual(source.count('mulInt (unbox arg'), width)
+            self.assertEqual(source.count('(panic "unused argument")'), 2)
+            for x in (-2**63, -7, 0, 11, 2**63 - 1):
+                weighted = sum((x+i)*i for i in range(1, width+1))
+                answers = (weighted+x, weighted-x)
+                self.assertEqual(generate.expected(family, width, x), self.signed_int(sum(answers)))
+
+    def test_captured_application_spines_select_the_ordered_operands(self):
+        family = 'captured_application_spines'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        for count in (1, 12, 13, 64):
+            source = generate.program(family, count)
+            self.assertEqual(len(re.findall(r'^site\d+ \(Op f\) \(Inputs ', source, re.M)), count)
+            for x in (-2**63, -5, 0, 7, 2**63 - 1):
+                fields = list(range(x, x+12))
+                result = 0
+                for site in range(count):
+                    result += fields[0] + site if x < 0 else fields[-1] - site
+                    fields.append(fields.pop(0))
+                self.assertEqual(generate.expected(family, count, x), self.signed_int(result))
+
+    def test_escaping_curried_jobs_store_distinct_order_sensitive_functions(self):
+        family = 'escaping_curried_jobs'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        for count in (1, 12, 13, 64):
+            source = generate.program(family, count)
+            self.assertEqual(len(re.findall(r'More \(Job job\d+\)', source)), count)
+            self.assertEqual(source.count('(saved '), 2)
+            for x in (-2**63, -1, 0, 7, 2**63 - 1):
+                result = 0
+                for sign in (1, -1):
+                    args = [x+j for j in range(1, 9)] + [x+sign*j for j in range(9, 13)]
+                    for job in range(count):
+                        score = 0
+                        for value in args:
+                            score = 2*score + value
+                        result += score + job
+                        args.append(args.pop(0))
+                self.assertEqual(generate.expected(family, count, x), self.signed_int(result))
+
+    @staticmethod
+    def signed_int(value):
+        return int.from_bytes((value & (2**64-1)).to_bytes(8, 'big'), 'big', signed=True)
+
     def test_mixed_parser_recursion_keeps_one_alternating_cycle(self):
         family = 'mixed_parser_recursion'
         self.assertFalse(generate.REGISTRY['families'][family]['default'])
