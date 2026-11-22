@@ -29,6 +29,28 @@ auditLiveScopeState label value@(T.Solver graph _ _ _) = do
   checked <- right (label ++ " raw live index audit") (S.finish value)
   assert (label ++ " live finish preserves physical graph") (sameGraphPhysical graph checked)
 
+-- The private openSession fixture hook imports its indexes verbatim. Adapt
+-- only the input scope prefix of an independently audited historical state.
+-- The live result must still pass its original raw audit after the operation.
+compactHistoricalScopeInput :: T.Solver -> Maybe T.Solver
+compactHistoricalScopeInput value@(T.Solver graph parents bindings (T.ScopeIndex intervals frozenJumps)) =
+  case (FS.finish value, S.indexScopes graph) of
+    (T.Right checked, T.ScopeIndex liveIntervals liveJumps)
+      | sameGraphPhysical graph checked &&
+        sameMapPhysical (==) intervals liveIntervals &&
+        length liveJumps <= length frozenJumps &&
+        and (zipWith (sameMapPhysical (==)) liveJumps frozenJumps) ->
+          let compact = T.Solver graph parents bindings (T.ScopeIndex intervals (take (length liveJumps) frozenJumps))
+          in case S.finish compact of
+            T.Right admitted | sameGraphPhysical graph admitted -> Just compact
+            _ -> Nothing
+    _ -> Nothing
+
+liveScopeInput :: T.Solver -> T.Solver
+liveScopeInput value = case compactHistoricalScopeInput value of
+  Just admitted -> admitted
+  Nothing -> errorWithoutStackTrace "historical session input is not a valid live scope prefix"
+
 -- Live indexes retain only the levels required by the scope depth.
 -- Audit the raw state and use the frozen solver solely for the omitted tail.
 withFrozenScopeTail :: String -> T.Solver -> IO T.Solver
@@ -90,6 +112,34 @@ def adapt_compact_scope_checks(H, directory):
             '    _<-right (label++" frozen final index audit") (FS.finish new)\n':
                 '    forAudit<-withFrozenScopeTail label new\n'
                 '    _<-right (label++" frozen final index audit") (FS.finish forAudit)\n',
+        },
+        'SessionTests.hs': {
+            ' s<-N.openSession old\n':
+                ' s<-N.openSession(liveScopeInput old)\n',
+            ' initial<-right "literal prepare"(FS.prepare bottom)\n':
+                ' initial<-right "literal prepare"(FS.prepare bottom)\n'
+                ' checkScopeInputBridge initial\n',
+            '       s<-N.openSession initial\n       expansion<-':
+                '       s<-N.openSession(liveScopeInput initial)\n       expansion<-',
+            '       s<-N.openSession initial\n       probe<-':
+                '       s<-N.openSession(liveScopeInput initial)\n       probe<-',
+            '       s<-N.openSession before\n       expansion<-':
+                '       s<-N.openSession(liveScopeInput before)\n       expansion<-',
+            '       s<-N.openSession before\n       expanded<-':
+                '       s<-N.openSession(liveScopeInput before)\n       expanded<-',
+            '     answer=P.runST $ do\n      s<-N.openSession forged\n':
+                '     compactForged=T.Solver(S.graph forged)(S.structuralParents forged)(S.bindingChildren forged)(S.scopeIndex(liveScopeInput good))\n'
+                '     answer=P.runST $ do\n      s<-N.openSession compactForged\n',
+            ' let final=P.runST $ do s<-N.openSession forged;N.finishNormalized s\n':
+                ' let final=P.runST $ do s<-N.openSession compactForged;N.finishNormalized s\n',
+            'literalControls :: IO ()\n':
+                'checkScopeInputBridge :: T.Solver -> IO ()\n'
+                'checkScopeInputBridge original@(T.Solver graph parents bindings (T.ScopeIndex intervals jumps))=do\n'
+                ' assert "literal historical scope tail is not valid live input"(case S.finish original of T.Left _->True;T.Right _->False)\n'
+                ' forM_ [IM.insert 0 (0,0) intervals,IM.insert 999 (0,0) intervals] $ \\invalid->\n'
+                '  assert "scope input bridge refuses invalid intervals"(case compactHistoricalScopeInput(T.Solver graph parents bindings (T.ScopeIndex invalid jumps)) of Nothing->True;Just _->False)\n'
+                '\n'
+                'literalControls :: IO ()\n',
         },
         'TransactionOracle.hs': transaction_edits,
         'C4TransactionOracle.hs': transaction_edits,
