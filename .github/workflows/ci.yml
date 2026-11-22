@@ -730,9 +730,9 @@ jobs:
           set -euo pipefail
           compiler="$PWD/.mlf-build/async-ghc/bin/emlf"
           EMLF="$compiler" python3 -B tools/testing/run.py async-completion
-          # The typed Process fixture took about 1452s to compile with GHC O0.
+          # Local arm64 GHC O0 source times were 1452s for Process and 1842s for Task Processes.
           MLF_ASYNC_SOURCE_COMPILE_TIMEOUT=1800 python3 -B tools/testing/run.py async-process -- "$compiler" .mlf-build/async-process-parity
-          MLF_ASYNC_SOURCE_COMPILE_TIMEOUT=1800 python3 -B tools/testing/run.py async-task -- "$compiler" .mlf-build/async-task-parity
+          MLF_ASYNC_SOURCE_COMPILE_TIMEOUT=2100 python3 -B tools/testing/run.py async-task -- "$compiler" .mlf-build/async-task-parity
           jq -e '.complete == true and .backends == ["source-interpreter", "target-interpreter", "llvm"]' .mlf-build/async-completion-gate/result.json
           for suite in async-process-parity async-task-parity; do
             jq -e '.complete == true and .backends == ["interpreter", "llvm"]' ".mlf-build/$suite/result.json"
