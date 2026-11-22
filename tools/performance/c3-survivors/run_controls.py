@@ -7,7 +7,7 @@ import importlib.util
 HERE=Path(__file__).resolve().parent
 RETAINED=HERE.parent/'c3-delayed-index'
 # Keep the complete authored control, not a copied selection of its cases.
-CONTROL_SHA='c761352b58d2f9f3fde1c702c686ff76289527e061331091fafddb34a4c1c6d9'
+CONTROL_SHA='32b887ede21a124ae7f9c8c5e544e65aa9d548998e3a213176c8cfdb47ddf102'
 
 
 def main():

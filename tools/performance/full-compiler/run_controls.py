@@ -4,7 +4,7 @@ from pathlib import Path
 import hashlib,importlib.util
 HERE=Path(__file__).resolve().parent
 RETAINED=HERE.parent/'c3-delayed-index'
-PINS={'c3-delayed-index/Main.hs': 'c761352b58d2f9f3fde1c702c686ff76289527e061331091fafddb34a4c1c6d9', 'c3-survivors/Main.hs': 'cd829eb6a8c7d1ef012bbda03edbaaffe07c2b596454fae4bf759fd7aa7a404b'}
+PINS={'c3-delayed-index/Main.hs': '32b887ede21a124ae7f9c8c5e544e65aa9d548998e3a213176c8cfdb47ddf102', 'c3-survivors/Main.hs': 'cd829eb6a8c7d1ef012bbda03edbaaffe07c2b596454fae4bf759fd7aa7a404b'}
 
 
 def main():
