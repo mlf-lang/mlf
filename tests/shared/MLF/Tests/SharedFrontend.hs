@@ -196,7 +196,7 @@ module MLF.Tests.SharedFrontend where {
     form = mapEither (compose Constraint.form Constraint.skeleton)
   } in case (,) (form (Constraint.generateFileProgram program)) (form (Constraint.generateProgram program)) of {
     (,) (Right (FApplyPrimitive PIfThenElse [_]
-      [((,) (Typed _ (FApplyPrimitive PEqInt [] [_,_])) _),_,_])) (Right (FApply _ _ _ _)) -> True;
+      [PrimitiveUse (Typed _ (FApplyPrimitive PEqInt [] [_,_])) _,_,_])) (Right (FApply _ _ _ _)) -> True;
     _ -> False
   };
   boxFunctor :: String;

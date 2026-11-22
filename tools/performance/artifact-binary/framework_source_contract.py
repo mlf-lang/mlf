@@ -27,6 +27,11 @@ HEAP_FORCE = '8558f0ff37425a3b432a87b0c9cb82ac7e77e1e8'
 HEAP_FORCE_TREE = '67932b8d16df683bd53e6715923fe49b51d488ec'
 HEAP_FORCE_FRAMEWORK_PARENT = 'e3ea95192453cb49965d6c9bedd0a45effe5bae9'
 HEAP_FORCE_FRAMEWORK_PARENT_TREE = '577aef9b8bf17e127dc245614d70d56eb5c6a5fb'
+DICTIONARY_DEMAND_MANIFEST = 'foundation-dictionary-demand-source-migration.json'
+DICTIONARY_DEMAND = 'ca21a467577d31465607f1354b810e1374db93ce'
+DICTIONARY_DEMAND_TREE = '0908efeb9e9b070d41f543c94d2d8d35dc9c63d8'
+DICTIONARY_DEMAND_FRAMEWORK_PARENT = 'fa863042fe3fe16ca7e0a9d43b43a0d8abe728de'
+DICTIONARY_DEMAND_FRAMEWORK_PARENT_TREE = '9d48c05097b968ce7d13d74b3403873750420c00'
 FOUNDATION_MERGE_PATHS = {'mlf.lock', 'tests/shared/MLF/Tests/SharedFrontend.hs'}
 HOSTED_PARITY_CHANGES = {
     'mlf.lock': (
@@ -150,7 +155,7 @@ def phase2_changes(spec, repository, files, predecessor_pin, pin_key, branch, tr
 
 
 def successor_type(predecessor_type, predecessor_manifest, framework_pin, foundation_pin,
-                   phase2_pin, heap_force_pin, read_implementation):
+                   phase2_pin, heap_force_pin, dictionary_demand_pin, read_implementation):
     """Reuse exact projection operations, adding a locally reviewed inventory edge."""
 
     class Contract(predecessor_type):
@@ -163,8 +168,10 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, founda
             phase2_raw = read_implementation(self.directory / PHASE2_MANIFEST)
             require(sha(phase2_raw) == phase2_pin, 'pinned Phase 2 manifest SHA')
             heap_force_raw = read_implementation(self.directory / HEAP_FORCE_MANIFEST)
-            require(sha(heap_force_raw) == heap_force_pin == manifest_sha256,
-                    'pinned heap-force manifest SHA')
+            require(sha(heap_force_raw) == heap_force_pin, 'pinned heap-force manifest SHA')
+            dictionary_demand_raw = read_implementation(self.directory / DICTIONARY_DEMAND_MANIFEST)
+            require(sha(dictionary_demand_raw) == dictionary_demand_pin == manifest_sha256,
+                    'pinned dictionary-demand manifest SHA')
             self.manifest_sha256 = manifest_sha256
             self.source_root = Path(source_root or Path(history_root).parents[1]).resolve(strict=True)
             repository = source_repository(history_root)
@@ -209,7 +216,10 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, founda
                      PHASE2_FRAMEWORK_PARENT, PHASE2_FRAMEWORK_PARENT_TREE,
                      (PHASE2_INTERMEDIATE, PHASE2_BRANCH_PARENT)),
                     (heap_force_raw, phase2_pin, 'phase2_manifest_sha256', HEAP_FORCE, HEAP_FORCE_TREE,
-                     HEAP_FORCE_FRAMEWORK_PARENT, HEAP_FORCE_FRAMEWORK_PARENT_TREE, (PHASE2,))):
+                     HEAP_FORCE_FRAMEWORK_PARENT, HEAP_FORCE_FRAMEWORK_PARENT_TREE, (PHASE2,)),
+                    (dictionary_demand_raw, heap_force_pin, 'heap_force_manifest_sha256',
+                     DICTIONARY_DEMAND, DICTIONARY_DEMAND_TREE, DICTIONARY_DEMAND_FRAMEWORK_PARENT,
+                     DICTIONARY_DEMAND_FRAMEWORK_PARENT_TREE, (HEAP_FORCE,))):
                 edge = phase2_changes(self.core.strict_json(data), repository, files, pin, key,
                                       branch, tree, framework, framework_tree, parents)
                 self.changes.update({path: [old_files[path], new] for path, new in edge.items()})
@@ -232,7 +242,8 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, founda
             require(not self.removed_paths.intersection(self.added_paths),
                     'retirement leaves historical addition evidence intact')
             self.metadata_paths = (*self.previous.metadata_paths, MANIFEST, FOUNDATION_MANIFEST,
-                                   PHASE2_MANIFEST, HEAP_FORCE_MANIFEST, Path(__file__).name)
+                                   PHASE2_MANIFEST, HEAP_FORCE_MANIFEST, DICTIONARY_DEMAND_MANIFEST,
+                                   Path(__file__).name)
             history_names = set(self.parent['frozen_history']) | set(self.maintenance_parent['files'])
             require(self.maintenance.keys() <= history_names, 'unknown maintenance owner')
             for name in history_names:

@@ -1411,12 +1411,18 @@ module Bootstrap.SourceInference where {
   -- keys of all current contracts. Local binders and method targets stay in
   -- the reservation of the individual group that uses them.
   data CheckedContracts = CheckedContracts DeclScope
-    (Map (V.Index Declaration) SourceContract) (Map String SourceContract) (Maybe (Set String));
+    (Map (V.Index Declaration) SourceContract) (Map String SourceContract) (Maybe (Set String)) |
+    TrialChecked CheckedContracts;
+  checkedScope (TrialChecked c) = checkedScope c;
   checkedScope (CheckedContracts scope _ _ _) = scope;
+  checkedNamed (TrialChecked c) = checkedNamed c;
   checkedNamed (CheckedContracts _ _ contracts _) = contracts;
+  checkedIndexed (TrialChecked c) = checkedIndexed c;
   checkedIndexed (CheckedContracts _ contracts _ _) = contracts;
+  checkedReservation (TrialChecked c) = checkedReservation c;
   checkedReservation (CheckedContracts _ _ _ reserved) = reserved;
   contractSymbols = compose declSymbols checkedScope;
+  checkedBinding (TrialChecked c) i = checkedBinding c i;
   checkedBinding (CheckedContracts scope byId _ _) i = case M.lookup compareDecl i byId of {
     Just value -> Right value;
     Nothing -> Left ("query dependency is not available: " ++ Dependency.symbolDisplay (declSymbols scope) i)
@@ -1428,6 +1434,7 @@ module Bootstrap.SourceInference where {
     Right (CheckedContracts scope (M.fromList compareDecl entries) named
       (mapOptional (reserveContractKeys named) reserved))
   };
+  publishContracts (TrialChecked c) entries = publishContracts c entries;
   publishContracts (CheckedContracts scope byId named reserved) entries = let {
     decoded = map (\((,) i c) -> (,) (declName scope i) c) entries;
     reserve = \initial -> foldlStrict
@@ -1801,18 +1808,80 @@ module Bootstrap.SourceInference where {
     read = M.lookupProjectedId V.toInt
       (\_ c -> (,) (contractClasses c) (contractProtected c)) (checkedIndexed current)
   } in \i -> read i;
+  -- Only equal, closed dictionary domains from the issued predecessor contract
+  -- can share a want at one variable occurrence. All term arguments are emitted.
+  checkedDuplicateArguments registry current i = case checkedBinding current i of {
+    Left _ -> Nothing;
+    Right (SourceContract signature classes protected) -> let {
+      closed ty = case ty of {
+        XCon _ arguments -> all closed arguments; XApply f x -> closed f && closed x; _ -> False
+      };
+      ground ty = case ty of {
+        XArrow a b -> ground a && ground b;
+        XCon _ fields -> all ground fields;
+        XApply a b -> ground a && ground b;
+        _ -> False
+      };
+      leading ty = case ty of { XForall _ XBot rest -> leading rest; _ -> ty };
+      findDomain label ty previous = case previous of {
+        [] -> Nothing;
+        (:) ((,,) knownLabel known ordinal) rest -> if eqString label knownLabel && Type.alphaEq known ty
+          then Just ordinal else findDomain label ty rest
+      };
+      walk position changed previous labels ty = case labels of {
+        [] -> if changed then Just [] else Nothing;
+        (:) label rest -> case ty of {
+          XArrow domain@(XCon name arguments) body -> case M.lookup compareString label registry of {
+            Just expected -> if not (eqString expected name) then Nothing else let {
+              eligible = all closed arguments;
+              earlier = if eligible then findDomain label domain previous else Nothing;
+              ordinal = fromMaybe position earlier;
+              next = if eligible && ordinal == position then (:) ((,,) label domain position) previous else previous
+            } in mapOptional ((:) ordinal) (walk (position + 1) (changed || ordinal /= position) next rest body);
+            Nothing -> Nothing
+          };
+          _ -> Nothing
+        }
+      }
+    } in if protected || length classes < 2 || elem eqString Classes.callStackPredicate classes then Nothing
+         else mapOptional (\ordinals -> (,) (ground signature) ordinals)
+           (walk 0 False [] classes (leading signature))
+  };
+  sharedArgumentCandidate contracts slots group = case groupAuthority group of {
+    Just (RootAuthority _ labels False _ _) -> case labels of {
+      (:) _ ((:) _ _) -> any (\i -> isJust (checkedDuplicateArguments (groupRegistry group) contracts i)) (parameterIds slots);
+      _ -> False
+    };
+    _ -> False
+  };
+  sharedArgumentReduction first second = case (,) (groupAuthority first) (groupAuthority second) of {
+    (,) (Just (RootAuthority _ old False _ _)) (Just (RootAuthority _ new False _ _)) ->
+      not (null new) && length new < length old;
+    _ -> False
+  };
+  fullyDischarged result = case result of {
+    OpenFinalGroup (AdaptedBody _) [(,) _ (SourceContract ty [] False)] -> let {
+      closed current = case current of {
+        XArrow a b -> closed a && closed b; XCon _ fields -> all closed fields;
+        XApply a b -> closed a && closed b; _ -> False
+      }
+    } in closed ty;
+    _ -> False
+  };
   prepareWithChecked = prepareCheckedReading (Dependency.valueOccurrences True False);
-  prepareCheckedReading references checked memberOrder selectBindings reserved knownOwner eligible (SourcePlan base graph count used _ _ _ supportProtection)
+  prepareCheckedReading references supplied memberOrder selectBindings reserved knownOwner eligible (SourcePlan base graph count used _ _ _ supportProtection)
     contracts names original support overloads protected = do {
-    let { inventory = case checked of {
+    let { trial = case supplied of { Just (TrialChecked _) -> True; _ -> False };
+          checked = case supplied of { Just (TrialChecked accepted) -> Just accepted; _ -> supplied };
+          inventory = case checked of {
       Just current -> Classes.withCheckedClassContracts (checkedFacts current) base;
       Nothing -> Classes.withNamedClassContracts overloads protected base
     } };
     ensure (length original + length support == length names) "source SCC ownership mismatch";
     traverseEither (\name -> case checked of {
-      Just (CheckedContracts scope byId _ _) -> do {
-        i <- requireDecl scope name;
-        ensure (not (M.member compareDecl i byId)) "source SCC imports its own checked predecessor"
+      Just current -> do {
+        i <- requireDecl (checkedScope current) name;
+        ensure (not (M.member compareDecl i (checkedIndexed current))) "source SCC imports its own checked predecessor"
       };
       Nothing -> ensure (not (M.member compareString name contracts)) "source SCC imports its own checked predecessor"
     }) names;
@@ -1849,10 +1918,14 @@ module Bootstrap.SourceInference where {
       outcome <- runFreshState
         (if eligibleMember original then case original of {
           (:) ((,,) name Nothing rhs) [] -> do {
+            let { lower = case checked of {
+              Nothing -> Classes.lowerUnsignedRootReading;
+              Just current -> if trial then Classes.lowerUnsignedRootWithDuplicates (checkedDuplicateArguments registry current) else Classes.lowerUnsignedRootReading
+            } };
             lowered <- (case reserved of {
-              Nothing -> Classes.lowerUnsignedRootReading references
+              Nothing -> lower references
                 (\_ _ env suffix -> Classes.sourceEnvironmentNames env suffix) owner;
-              Just _ -> Classes.lowerUnsignedRootReading references Classes.sourceOwnedEnvironmentNames owner
+              Just _ -> lower references Classes.sourceOwnedEnvironmentNames owner
             }) inventory overloads protected name rhs;
             case lowered of { Classes.SourceRootLowering body labels candidates protected -> do {
               -- Lowering still sees the complete definition scope. Once it

@@ -858,7 +858,10 @@ candidateSkeletonChecks = do
         T.FBinding _ a b _ -> wanted active a ++ wanted active b
         T.FLambda _ _ b _ -> wanted active b
         T.FApply a b _ _ -> wanted active a ++ wanted active b
-        T.FApplyPrimitive _ _ arguments -> concatMap (\(argument, _) -> wanted active argument) arguments
+        T.FApplyPrimitive _ _ arguments -> concatMap (\operand -> case operand of
+          T.PrimitiveUse argument _ -> wanted active argument
+          T.ClosedPrimitiveForm nested -> walk active nested) arguments
+        T.FPrimitiveStringConversion _ _ _ argument _ _ -> wanted active argument
         T.FApplyVariable _ _ argument _ -> wanted active argument
         _ -> []
       file = C.SharedEnvironments IntMap.empty

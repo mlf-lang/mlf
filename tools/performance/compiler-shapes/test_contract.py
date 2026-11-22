@@ -403,6 +403,19 @@ class ScheduleTests(unittest.TestCase):
                             for i in range(count))
                 self.assertEqual(generate.expected(family, count, value), total)
 
+    def test_repeated_ground_dictionary_demands_preserve_call_paths(self):
+        family = 'repeated_ground_dictionary_demands'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        for count in (1, 4, 7, 16, 64):
+            source = generate.program(family, count)
+            self.assertEqual(source.count('stringLength "'), count)
+            self.assertIn('next x = producer x;', source)
+            self.assertIn('then next (subInt 0 x)', source)
+            lengths = sum(i % 4 + 1 for i in range(count))
+            for value in (-8, -1, 0, 1, 7):
+                outputs = [abs(j if j < 0 else j + 1) + lengths for j in (value, -value)]
+                self.assertEqual(generate.expected(family, count, value), sum(outputs))
+
     def test_local_dictionary_branch_fanout_keeps_literal_sites_fixed(self):
         family = 'local_dictionary_branch_fanout'
         self.assertFalse(generate.REGISTRY['families'][family]['default'])

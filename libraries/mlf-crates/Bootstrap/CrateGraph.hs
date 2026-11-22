@@ -1033,14 +1033,42 @@ module Bootstrap.CrateGraph where {
   runGroupsWithOwner = runGroupsUsing Q.requiredDataIn;
   runGroupsUsing = runGroupsReading (Dependency.valueOccurrences True) (Dependency.valueOccurrences True False);
   runGroupsReading = runCheckedGroups False;
+  data CheckedStep = ReplayOrdinary | CheckedStep ((,) (Maybe RebuiltHash) (Maybe RebuiltHash)) State;
+  -- Rejection is a source/evidence decision. Cache, hash, input and publication
+  -- errors remain errors on both paths. A rejected step never returns its
+  -- session or its pending raw/evidence payloads to the caller.
+  rejectedStep trial message = if trial then ioReturn (Right ReplayOrdinary) else ioReturn (Left message);
   runCheckedGroups owned occurrences declarationReads selectData verify audit groupName inventory initial scopeHashes groups state = case groups of {
     [] -> ioReturn (Right state);
     (:) ((,) owners prepare) rest -> case state of {
+      State _ contracts _ _ _ _ _ _ -> let {
+        readGroup input = bindEither (prepare input) (Source.slotPreparedWith (occurrences False) contracts owners);
+        step = runOneCheckedGroup owned occurrences declarationReads selectData verify audit groupName inventory initial scopeHashes owners state
+      } in case readGroup contracts of {
+        Left e -> ioReturn (Left e); Right ordinary@((,) slots prepared) -> do {
+          let { original = step False ordinary };
+          selected <- if not owned || not (Source.usesIndexedTerms (Source.slotScope slots)) ||
+            not (Source.sharedArgumentCandidate contracts slots prepared) then original else
+              case readGroup (Source.TrialChecked contracts) of {
+                Right alternate -> if Source.sharedArgumentReduction prepared (snd alternate) then do {
+                  trial <- step True alternate;
+                  case trial of { Right ReplayOrdinary -> original; _ -> ioReturn trial }
+                } else original;
+                Left _ -> original
+              };
+          case selected of {
+            Left e -> ioReturn (Left e);
+            Right ReplayOrdinary -> ioReturn (Left "ordinary checking requested a replay");
+            Right (CheckedStep hashes next) -> runCheckedGroups owned occurrences declarationReads selectData verify audit groupName inventory initial hashes rest next
+          }
+        }
+      }
+    }
+  };
+  runOneCheckedGroup owned occurrences declarationReads selectData verify audit groupName inventory initial scopeHashes owners state trial ((,) slots prepared) =
+    case state of {
       State session contracts (InferenceCaches contexts templates payloads contractHash preparedCache) objects inferred reused reports statistics ->
-        let { scope = Source.checkedScope contracts; names = map (Source.declName scope) owners } in
-        case bindEither (prepare contracts) (Source.slotPreparedWith (occurrences False) contracts owners) of {
-          Left e -> ioReturn (Left e);
-          Right ((,) slots prepared) -> do {
+        let { scope = Source.checkedScope contracts; names = map (Source.declName scope) owners } in do {
             let { declarations = selectData inventory (Source.groupMembers prepared)
                     (append (Source.groupBindings prepared) (Source.groupCandidateBindings prepared));
               group = groupName names;
@@ -1138,7 +1166,7 @@ module Bootstrap.CrateGraph where {
                               Right ((,) canonical (snd inferredResult))
                             }
                           } };
-                        case raw of { Left e -> ioReturn (Left e); Right ((,) fragment nextTemplates) -> do {
+                        case raw of { Left e -> rejectedStep trial e; Right ((,) fragment nextTemplates) -> do {
                           recorded <- if hit then case previous of {
                             Just node -> ioReturn (Right ((,) ((,) node active) payloads));
                             Nothing -> ioReturn (Left "missing validated source query")
@@ -1147,14 +1175,15 @@ module Bootstrap.CrateGraph where {
                           finishStarted <- G.clock statistics;
                           case recorded of { Left e -> ioReturn (Left e); Right ((,) ((,) rawNode fourth) nextPayloads) ->
                             case Source.prepareOpenFinish slots contracts prepared fragment of {
-                              Left e -> ioReturn (Left e);
+                              Left e -> rejectedStep trial e;
                               Right finish -> do {
-                                evidence <- resolveRequests env slots ((:) (G.edge scopeNode) (map G.edge dataNodes))
+                                evidence <- resolveRequestsUsing trial env slots ((:) (G.edge scopeNode) (map G.edge dataNodes))
                                   (Source.openFinishRequests finish) fourth;
                                 case evidence of { Left e -> ioReturn (Left e); Right ((,,) answers evidenceReads afterEvidence) ->
                                 case Source.completeOpenFinish contracts finish answers of {
-                                Left e -> ioReturn (Left e);
-                                Right (Source.OpenFinalGroup body delta) -> do {
+                                Left e -> rejectedStep trial e;
+                                Right completed@(Source.OpenFinalGroup body delta) -> if trial && not (Source.fullyDischarged completed)
+                                  then ioReturn (Right ReplayOrdinary) else do {
                                 let { final = Source.openFinalObject fragment body };
                                 demanded <- case Source.finalParameterIds slots contracts final of {
                                   Left e -> ioReturn (Left e);
@@ -1177,13 +1206,13 @@ module Bootstrap.CrateGraph where {
                                     evidenceReads delta reads afterInputs };
                                 case supplied of { Left e -> ioReturn (Left e); Right ((,) next nextContractHash) -> do {
                                     G.elapsed statistics 3 finishStarted;
-                                    runCheckedGroups owned occurrences declarationReads selectData verify audit groupName inventory initial ((,) inventoryHash scopeHash) rest
+                                    ioReturn (Right (CheckedStep ((,) inventoryHash scopeHash)
                                       (State next (Source.publishContracts contracts delta) (InferenceCaches currentContexts nextTemplates nextPayloads nextContractHash nextPreparedCache)
                                         ((:) ((,,) group final (map fst delta)) objects)
                                         (inferred + if hit then 0 else 1) (reused + if hit then 1 else 0)
                                         ((:) (Q.GroupResult group names hit
                                           (Separate.fingerprint (Q.list Q.encodeSourceContract (map (\((,) i c) -> (,) (Source.declName scope i) c) (sortedDelta slots delta))))
-                                          (G.nodeHash rawNode)) reports) statistics)
+                                          (G.nodeHash rawNode)) reports) statistics)))
                                   } }
                                 }
                                 }
@@ -1200,9 +1229,7 @@ module Bootstrap.CrateGraph where {
               }
             } }
           }
-        }
-    }
-  };
+    };
   -- One canonical content address for a fragment and its ordered environment,
   -- regardless of how it was produced. KeepRawBody proves the body is exactly
   -- the one obtained from InferScc. A changed environment invalidates reuse.
@@ -1353,7 +1380,8 @@ module Bootstrap.CrateGraph where {
       _ -> Left "invalid stable evidence record"
     }
   };
-  resolveRequests env slots dependencies requests session = case requests of {
+  resolveRequests = resolveRequestsUsing False;
+  resolveRequestsUsing trial env slots dependencies requests session = case requests of {
     [] -> ioReturn (Right ((,,) [] [] session));
     (:) ((,,) ordinal goal candidates) rest -> case evidenceNames slots candidates of {
       Left e -> ioReturn (Left e); Right aliases -> do {
@@ -1374,7 +1402,8 @@ module Bootstrap.CrateGraph where {
         Left _ -> case Evidence.resolveDictionaryDetailed (Open.dataEnvironment env) M.empty
           (map Boundary.candidateTriple candidates) goal of {
           Left (Evidence.NoEntailment _) -> Right Nothing;
-          Left (Evidence.InvalidEvidence message) -> Left message;
+          Left (Evidence.InvalidEvidence message) ->
+            if trial then Right Nothing else Left message;
           Right proof -> Right (Just proof)
         }
       } };
@@ -1387,7 +1416,7 @@ module Bootstrap.CrateGraph where {
           Left _ -> G.record wanted dependencies True (evidenceValue goal dependencies aliases proof) current
         };
         case recorded of { Left e -> ioReturn (Left e); Right ((,) node next) -> do {
-          tail <- resolveRequests env slots dependencies rest next;
+          tail <- resolveRequestsUsing trial env slots dependencies rest next;
           ioReturn (mapEither (\((,,) answers edges final) ->
             (,,) ((:) ((,) ordinal proof) answers) ((:) (G.edge node) edges) final) tail)
         } }

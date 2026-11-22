@@ -109,6 +109,18 @@ packet x = if eqInt x 0 then Missing else Payload (addInt x 3) (subInt 3 x);
         terms = [f'(probe{i} payload)' for i in range(n)]
         total = balanced(terms, lambda a, b: f'(addInt {a} {b})')
         return HEADER + declarations + f'entry x = let {{ payload = packet x }} in {total};\n' + MAIN
+    elif family == 'repeated_ground_dictionary_demands':
+        terms = [f'stringLength "{"s" * (i % 4 + 1)}"' for i in range(n)]
+        total = balanced(terms, lambda a, b: f'addInt ({a}) ({b})')
+        declarations = f'''next :: Int -> Int;
+next x = producer x;
+producer x = if ltInt x 0 then next (subInt 0 x) else addInt x ({total});
+'''
+        expression = '''let {
+  run z = producer z;
+  choose z = if ltInt z 0 then run z else run (addInt z 1)
+} in addInt (choose x) (choose (subInt 0 x))'''
+        return HEADER + declarations + f'entry x = {expression};\n' + MAIN
     elif family == 'local_dictionary_branch_fanout':
         definitions = ['level0 z = if ltInt z 0 then stringLength "a" else stringLength "bb"']
         for i in range(1, n + 1):
@@ -450,6 +462,10 @@ def expected(family, n, x):
         right_count = min(n, max(0, x + 4))
         right_offsets = right_count*(right_count-1)//2
         return right_count*(3-x) + (n-right_count)*(x+3) + offsets - 2*right_offsets
+    if family == 'repeated_ground_dictionary_demands':
+        turns, rest = divmod(n, 4)
+        lengths = 10 * turns + rest * (rest + 1) // 2
+        return 2 * (abs(x) + lengths) + (2 if x == 0 else 1)
     if family == 'local_dictionary_branch_fanout':
         for threshold in range(n, 0, -1):
             x += threshold if x < threshold else -threshold

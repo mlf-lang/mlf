@@ -1,4 +1,4 @@
-"""Maintain the historical query bytes while compiling against either pinned AST."""
+"""Maintain the historical query bytes across the three pinned host source endpoints."""
 import hashlib
 import json
 from pathlib import Path
@@ -11,6 +11,7 @@ from frozen_query import prepare_frozen_query
 ROOT = Path(__file__).resolve().parents[3]
 TYPES = Path('libraries/mlf-foundation/Bootstrap/Types.hs')
 BASE = '720dd649627fbf8b19c7447493a4fdf6fd05eb39'
+DICTIONARY_AST = 'fa863042fe3fe16ca7e0a9d43b43a0d8abe728de'
 DATA = ROOT / 'tools/performance/datatype-context'
 SPARSE = ROOT / 'tools/performance/sparse-contracts'
 EXCLUSIONS = [b'\n      ' + ctor + b' -> panic "indexed syntax in historical named query oracle";'
@@ -25,6 +26,9 @@ class FrozenQueryTests(unittest.TestCase):
                 named = out / 'Named.hs'
                 named.write_bytes(subprocess.check_output(['git', '-C', str(ROOT), 'show',
                                                            f'{BASE}:{TYPES.as_posix()}']))
+                dictionary = out / 'Dictionary.hs'
+                dictionary.write_bytes(subprocess.check_output(['git', '-C', str(ROOT), 'show',
+                                                                f'{DICTIONARY_AST}:{TYPES.as_posix()}']))
                 source = folder / 'FrozenCrateQuery.hs'
                 orig = source.read_bytes()
                 oracle = json.loads((folder / 'oracle.json').read_text())
@@ -34,6 +38,8 @@ class FrozenQueryTests(unittest.TestCase):
                 self.assertEqual(hashlib.sha256(orig).hexdigest(), pin)
                 old = prepare_frozen_query(source, out, expected_sha256=pin, types_source=named).read_bytes()
                 new = prepare_frozen_query(source, out, expected_sha256=pin, types_source=ROOT / TYPES).read_bytes()
+                previous = prepare_frozen_query(source, out, expected_sha256=pin, types_source=dictionary).read_bytes()
+                self.assertEqual(new, previous)
                 for branch in EXCLUSIONS:
                     self.assertNotIn(branch, old)
                     self.assertEqual(new.count(branch), 3)
