@@ -11,7 +11,7 @@ from unittest import mock
 import sweep
 sys.path.insert(0, str(sweep.bench.ROOT / 'tools'))
 from developer import process
-from test_contract import write_cohort
+from test_contract import edit, write_cohort
 
 
 class SweepTests(unittest.TestCase):
@@ -37,9 +37,11 @@ class SweepTests(unittest.TestCase):
         folder = Path(option('--output'))
         self.seen.append((family, size))
         self.assertEqual(cwd, sweep.bench.ROOT)
-        self.assertEqual(int(option('--repeats')), self.args.repeats)
+        repeats = int(option('--repeats'))
+        self.assertEqual(repeats, 2 if self.args.repeats is None else self.args.repeats)
         self.assertNotIn('--pilot', argv)
-        write_cohort(folder.parent, folder.name, family, size, repeats=self.args.repeats, endpoint=self.args.endpoint)
+        self.assertIn('--record-only', argv)
+        write_cohort(folder.parent, folder.name, family, size, repeats=repeats, endpoint=self.args.endpoint)
         plan = sweep.analyze.load(folder / 'plan.json')
         receipt = sweep.analyze.load(folder / 'receipt.json')
         plan['source']['commit'] = self.commit
@@ -50,7 +52,7 @@ class SweepTests(unittest.TestCase):
         for run in receipt['runs']:
             pair = run['position'] // 2
             scale = 2 if run['lane'] == 'mlf' else 1
-            peak = (9, 1, 7, 3, 5, 0)[pair] * scale * 2**20
+            peak = (9, 1, 7, 3, 5, 2)[pair] * scale * 2**20
             run['command']['sampled_process_tree_peak_rss_bytes'] = peak + (1 if pair == 4 else 0)
             run['command']['max_individual_child_rss_bytes'] = 33 * 2**20
             leg = folder / 'legs' / f"{run['position']:03d}-{folder.name}-{run['lane']}"
@@ -116,33 +118,56 @@ class SweepTests(unittest.TestCase):
         report = (self.root / 'summary.md').read_text()
         self.assertIn('Median elapsed time (seconds)', report)
         self.assertIn('Median sampled peak process-group RSS (MiB)', report)
-        self.assertIn(f"[8.00 / 4.00]({row['evidence']})", report)
+        self.assertIn(f"[8.00 / 4.00 (2.000)]({row['evidence']})", report)
+        growth, = json.loads((self.root / 'growth.json').read_text())['growth']
+        self.assertEqual(growth['status'], 'incomplete')
+        self.assertFalse(growth['checks']['all_positive_medians_lower'])
+        self.assertFalse(growth['checks']['peak_rss_at_most_ghc'])
+        self.assertIsNone(growth['checks']['lower_power_95'])
 
-    def test_rejects_missing_negative_and_noninteger_rss(self):
-        folder = write_cohort(self.root)
-        receipt = sweep.analyze.load(folder / 'receipt.json')
-        for run in receipt['runs']:
-            run['command']['sampled_process_tree_peak_rss_bytes'] = 0
-        command = receipt['runs'][4]['command']
-        for value in [None, False, -1, 1.5, float('inf'), float('nan'), '10']:
-            with self.subTest(value=value):
-                command['sampled_process_tree_peak_rss_bytes'] = value
-                with self.assertRaisesRegex(ValueError, 'invalid sampled peak RSS for ghc at position 4'):
-                    sweep.peak_rss_medians(receipt, 3)
-        del command['sampled_process_tree_peak_rss_bytes']
-        with self.assertRaisesRegex(ValueError, 'invalid sampled peak RSS for ghc at position 4'):
-            sweep.peak_rss_medians(receipt, 3)
+    def test_multisize_sweep_reports_every_check_from_qualified_pairs(self):
+        self.args.family = ['flat_functions']
+        self.args.size = [8, 16, 32]
+        self.args.repeats = None
+        with mock.patch.object(sweep.command_runner, 'run_recorder', side_effect=self.recorder), \
+             mock.patch.object(sweep.fit_growth, 'REPLICATES', 12):
+            sweep.run(self.args)
+        self.assertEqual(self.seen, [('baseline', 0), ('flat_functions', 8),
+                                     ('flat_functions', 16), ('flat_functions', 32)])
+        result, = json.loads((self.root / 'growth.json').read_text())['growth']
+        self.assertEqual(result['sizes'], [0, 8, 16, 32])
+        self.assertEqual(result['pairs_per_size'], 2)
+        self.assertEqual(set(result['checks']), set(sweep.fit_growth.CHECKS))
+        self.assertEqual(result['status'], 'indeterminate')
+        for check in ('lower_power_point', 'lower_power_95'):
+            self.assertIsNone(result['checks'][check])
+        self.assertIsNotNone(result['checks']['lower_ols_95'])
+        self.assertFalse(result['checks']['peak_rss_at_most_ghc'])
+        self.assertFalse(result['accepted'])
+        self.assertIn('## Build performance checks', (self.root / 'summary.md').read_text())
 
-    def test_raw_reader_rejects_failed_or_incomplete_receipts(self):
-        folder = write_cohort(self.root)
-        receipt = sweep.analyze.load(folder / 'receipt.json')
-        for run in receipt['runs']:
-            run['command']['sampled_process_tree_peak_rss_bytes'] = 0
-        for change in ({'complete': False}, {'all_cases_passed': False}, {'failures': ['failed']},
-                       {'runs': receipt['runs'][:-1]}, {'runs': receipt['runs'] + receipt['runs'][:1]}):
-            with self.subTest(field=next(iter(change))):
-                with self.assertRaisesRegex(ValueError, 'peak RSS requires'):
-                    sweep.peak_rss_medians({**receipt, **change}, 3)
+    def test_unobserved_rss_leaves_timing_available(self):
+        self.args.family = ['flat_functions']
+        def recorder(argv, cwd):
+            status = self.recorder(argv, cwd)
+            folder = Path(argv[argv.index('--output') + 1])
+            def omit_samples(receipt):
+                receipt['runs'][1]['command'][sweep.analyze.RSS_SAMPLE] = 0
+                receipt['runs'][3]['command'].pop(sweep.analyze.RSS_SAMPLE)
+            edit(folder, omit_samples)
+            return status
+
+        with mock.patch.object(sweep.command_runner, 'run_recorder', side_effect=recorder):
+            sweep.run(self.args)
+        for row in self.rows():
+            self.assertEqual((row['status'], row['mlf_seconds']), ('passed', '2.2'))
+            self.assertEqual(row['mlf_peak_rss_bytes'], '')
+            self.assertEqual(row['ghc_peak_rss_bytes'], str(7 * 2**20))
+            self.assertEqual(row['mlf_over_ghc_peak_rss'], '')
+        result, = json.loads((self.root / 'growth.json').read_text())['growth']
+        self.assertEqual(result['status'], 'incomplete')
+        self.assertIsNone(result['checks']['peak_rss_at_most_ghc'])
+        self.assertIn('peak build RSS unavailable at sizes 8, 32', result['reason'])
 
     def test_fresh_sweep_prepares_only_missing_inputs(self):
         self.args.setup = None

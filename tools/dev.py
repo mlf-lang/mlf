@@ -71,7 +71,7 @@ def check_tools():
     if sys.platform in ('linux', 'darwin'):
         scripts.extend(SHAPES / name for name in (
             'test_contract.py', 'test_sweep.py', 'test_cancellation.py',
-            'test_data_shapes.py', 'test_rank_shapes.py',
+            'test_data_shapes.py', 'test_rank_shapes.py', 'test_fit_growth.py',
         ))
     else:
         print('The compiler-shape harness is tested on macOS and Linux.', flush=True)

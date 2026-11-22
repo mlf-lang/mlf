@@ -1860,39 +1860,54 @@ module Bootstrap.Graph where {
                      })
                     (\up -> ST.liftE (writeDense low raised n up))))
     };
-  -- Local unification typically needs just the immediate old binder. On a
-  -- large binding tree, answering each query with a separate climb can visit
-  -- the same long paths quadratically. Each old node instead sees its strict
-  -- ancestors indexed by their image, with the nearest occurrence winning.
+  -- Outside small components, index strict ancestors by their canonical image
+  -- during a depth-first walk. The scratch bound is the same as for dense
+  -- rebinding. Each image slot shadows its previous value until that subtree
+  -- finishes, so the lookup returns the nearest strict ancestor on this path.
   denseRaiseBinders :: forall s. DenseRebinding s -> [] ((,) Int Node) -> ST s (Either String ());
   denseRaiseBinders state originals = case state of {
     DenseRebinding old skeleton low high oldNodes newNodes images classes flags parents tree depths colours grafted oldBinders raised ->
       if IM.size (nodes old) <= 64 || IM.null (links skeleton)
       then denseRaiseOriginals state originals
       else let {
-        children = bindingChildrenMap old;
-        visit ancestors count n = stBind (readDense low images n) (\image ->
+        width = (high - low) + 1;
+        -- The old graph has already validated each binder against this range.
+        addChild children ((,) child node) = case binder node of {
+          Nothing -> stReturn ();
+          Just parent -> stBind (readDense low children parent)
+            (\previous -> writeDense low children parent ((:) child previous))
+        };
+        visit children nearest count n = stBind (readDense low images n) (\image ->
           stBind (readDense low tree image) (\wanted ->
             let {
-              descend up = stBind (writeDense low raised n up) (\_ -> let { next = count + 1 } in
-                seq next (ST.foldE (visit (IM.insert image n ancestors)) next
-                  (IM.findWithDefault [] n children)))
+              descend up = stBind (writeDense low raised n up) (\_ ->
+                let { next = count + 1 } in seq next
+                  (stBind (readDense low children n) (\descendants -> case descendants of {
+                    [] -> ST.pureE next;
+                    _ -> stBind (readDense low nearest image) (\previous ->
+                      stBind (writeDense low nearest image (Just n)) (\_ ->
+                        stBind (ST.foldE (visit children nearest) next descendants) (\answer ->
+                          stBind (writeDense low nearest image previous) (\_ -> stReturn answer))))
+                  })))
             } in case wanted of {
               Nothing -> descend Nothing;
-              Just target -> case IM.lookup target ancestors of {
+              Just target -> stBind (readDense low nearest target) (\up -> case up of {
                 Nothing -> ST.failE "a node's binder cannot be lowered";
-                Just nearest -> descend (Just nearest)
-              }
+                Just _ -> descend up
+              })
             }));
-        root count ((,) n v) = case binder v of {
-          Nothing -> visit IM.empty count n;
+        root children nearest count ((,) n v) = case binder v of {
+          Nothing -> visit children nearest count n;
           Just _ -> ST.pureE count
         }
-      } in stBind (ST.foldE root 0 originals) (\answer -> case answer of {
-        Right count -> if count == IM.size (nodes old) then ST.pureE ()
-                       else denseRaiseOriginals state originals;
-        Left _ -> denseRaiseOriginals state originals
-      })
+      } in stBind (newSTArray width []) (\children ->
+        stBind (ST.map_ (addChild children) originals) (\_ ->
+          stBind (newSTArray width Nothing) (\nearest ->
+            stBind (ST.foldE (root children nearest) 0 originals) (\answer -> case answer of {
+              Right count -> if count == IM.size (nodes old) then ST.pureE ()
+                             else denseRaiseOriginals state originals;
+              Left _ -> denseRaiseOriginals state originals
+            }))))
   };
   -- Permission components are memoized on demand, matching the seed's lazy
   -- immutable array knot without exporting mutable state out of runST.
@@ -2175,26 +2190,36 @@ module Bootstrap.Graph where {
                              (nextId skeleton))))));
   insideScope :: Graph ->
                  Int -> IntMap ((,) Int Int) -> IntMap Bool -> Int -> (,) Bool (IntMap Bool);
-  insideScope graph generalization intervals known identity =
+  insideScope graph generalization intervals =
+    let { gen = resolve graph generalization } in
+    insideScopeFrom graph gen (IM.lookup gen intervals) intervals;
+  insideScopeFrom :: Graph -> Int -> Maybe ((,) Int Int) -> IntMap ((,) Int Int) ->
+    IntMap Bool -> Int -> (,) Bool (IntMap Bool);
+  insideScopeFrom graph gen bounds intervals known identity =
+    insideScopeNode graph gen bounds intervals known identity (nodeAt graph identity);
+  insideScopeNode :: Graph -> Int -> Maybe ((,) Int Int) -> IntMap ((,) Int Int) ->
+    IntMap Bool -> Int -> Node -> (,) Bool (IntMap Bool);
+  insideScopeNode graph gen bounds intervals known identity node =
     case IM.lookup identity known of {
       Just answer -> (,) answer known;
       Nothing ->
         let {
           answer =
-            case binder (nodeAt graph identity) of {
+            case binder node of {
               Nothing -> (,) False known;
               Just parent ->
                 let {
                   p = resolve graph parent
                 } in
-                let {
-                  gen = resolve graph generalization
-                } in
                 if (p == gen)
                 then (,) True known
-                else if (IM.member gen intervals && IM.member p intervals)
-                     then (,) (intervalContains intervals gen p) known
-                     else insideScope graph generalization intervals known p
+                else case bounds of {
+                  Nothing -> insideScopeFrom graph gen bounds intervals known p;
+                  Just ((,) start end) -> case IM.lookup p intervals of {
+                    Nothing -> insideScopeFrom graph gen bounds intervals known p;
+                    Just ((,) position _) -> (,) (start <= position && position < end) known
+                  }
+                }
             }
         } in
         case answer of {
@@ -2205,26 +2230,24 @@ module Bootstrap.Graph where {
                           Int ->
                           IntMap ((,) Int Int) ->
                           (,) IntSet (IntMap Bool) -> [] Int -> (,) IntSet (IntMap Bool);
-  expansionVisitCached graph generalization intervals state pending =
-    case pending of {
-      [] -> state;
-      (:) original rest ->
-        case state of {
+  expansionVisitCached graph generalization intervals =
+    let {
+      gen = resolve graph generalization;
+      bounds = IM.lookup gen intervals;
+      visit state pending = case pending of {
+        [] -> state;
+        (:) original rest -> case state of {
           (,) seen scopes ->
-            let {
-              identity = resolve graph original
-            } in
-            if IS.member identity seen
-            then expansionVisitCached graph generalization intervals state rest
-            else case insideScope graph generalization intervals scopes identity of {
-                   (,) local known ->
-                     expansionVisitCached graph generalization intervals
-                       ((,) (IS.insert identity seen) known)
-                       (L.append (if local then children (tag (nodeAt graph identity)) else [])
-                          rest)
-                 }
+            let { identity = resolve graph original } in
+            if IS.member identity seen then visit state rest else
+            let { node = nodeAt graph identity } in
+            case insideScopeNode graph gen bounds intervals scopes identity node of {
+              (,) local known -> visit ((,) (IS.insert identity seen) known)
+                (if local then L.append (children (tag node)) rest else rest)
+            }
+          }
         }
-    };
+    } in visit;
   expansionVisit :: Graph -> Int -> IntSet -> [] Int -> IntSet;
   expansionVisit graph generalization seen pending =
     case expansionVisitCached graph generalization IM.empty ((,) seen IM.empty) pending of {
@@ -2365,6 +2388,34 @@ module Bootstrap.Graph where {
                    ((,) ((,,) (copy source) copies (L.map (\n -> (,) n (copy n)) frontier))
                       result)
              })
+    };
+  data PreparedExpansion = PreparedExpansion Int (IntMap Int) ([] ((,) Int Int))
+    ([] ((,) Int Node)) Graph;
+  -- The solver has already validated the input graph. Copied tags retain
+  -- their kinds, so only the frontier proxies need a kind calculation.
+  -- Their fresh identities are contiguous and disjoint from the old graph.
+  expandPreparedWithScopes :: IntMap ((,) Int Int) -> Int -> Int -> Graph -> Either String PreparedExpansion;
+  expandPreparedWithScopes intervals generalization destination graph =
+    let { source = genRoot graph generalization; first = nextId graph } in
+    case expansionVisitCached graph generalization intervals ((,) IS.empty IM.empty) ((:) source []) of {
+      (,) visited scopes ->
+        let {
+          originals = IS.toList visited;
+          external = L.filter (\n -> L.not (IM.findWithDefault False n scopes)) originals
+        } in do {
+          kinds <- kindsAt graph external;
+          let {
+            copies = IM.fromDistinctAscList (freshCopyEntries first originals);
+            stop = L.advanceIdentity first (L.length originals);
+            fresh = L.zipWith (\n identity -> (,) identity
+              (expansionNode graph generalization destination source copies kinds scopes n))
+              originals (L.range first (stop - 1));
+            expanded = mkGraph (IM.union (nodes graph) (nodesFromDistinctAscList fresh)) (links graph) stop;
+            root = IM.get source copies;
+            frontier = L.map (\n -> (,) n (IM.get n copies)) external
+          };
+          Right (PreparedExpansion root copies frontier fresh expanded)
+        }
     };
   -- Freeze one solved recursive member without instantiating its environment.
   -- Unlike expansion, the traversal's outer frontier retains its identities:

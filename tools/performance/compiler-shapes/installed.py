@@ -13,6 +13,7 @@ import sys
 import time
 
 import generate
+from fit_growth import median_peak_rss, peak_rss_ratio
 from prepare import prepare_host_package
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -198,7 +199,16 @@ def summarize(cases, samples, repeats, states):
                         field: statistics.median(s[field] for s in group)
                         for field in ("wall_s", "user_s", "system_s", "peak_rss_bytes")
                     }
+                    medians[lane]["sampled_group_rss_bytes"] = median_peak_rss(
+                        [s.get("sampled_group_rss_bytes") for s in group]
+                    )
             row = {"case": name, "state": state, "medians": medians}
+            ghc_rss = medians.get("ghc", {}).get("sampled_group_rss_bytes")
+            for lane in ("before", "after"):
+                mlf_rss = medians.get(lane, {}).get("sampled_group_rss_bytes")
+                ratio = peak_rss_ratio(mlf_rss, ghc_rss)
+                row[lane + "_over_ghc_peak_rss"] = ratio
+                row[lane + "_peak_rss_at_most_ghc"] = None if ratio is None else ratio <= 1.
             if len(medians) == 3:
                 times = {k: v["wall_s"] for k, v in medians.items()}
                 row.update(
@@ -401,7 +411,9 @@ def main():
         )
     results["complete"] = all(s["passed"] for s in results["samples"])
     results["summary"] = summarize(cases, results["samples"], args.repeats, states)
+    results["growth"] = {"status": "incomplete", "reason": "each installed workload has one size"}
     dump(out / "receipt.json", results)
+    print("Compile-time growth checks require several sizes of the same workload", flush=True)
     return 0 if results["complete"] else 1
 
 

@@ -1840,7 +1840,8 @@ module Bootstrap.LLVM.Optimize where {
          };
   -- Find references still needed by the entry before copying its declaration
   -- spine. A nonrecursive RHS is in the outer scope. A recursive group binds
-  -- its names in every RHS and in the continuation.
+  -- its names in every RHS and in the continuation. Any reference from the
+  -- continuation keeps the whole recursive group.
   liveDeclarationSpine :: XErased -> (,) XErased (Set XName);
   liveDeclarationSpine expression = case expression of {
     XELet name rhs rest -> case liveDeclarationSpine rest of {
@@ -1849,10 +1850,13 @@ module Bootstrap.LLVM.Optimize where {
         else (,) body live
     };
     XELetRec bindings rest -> case liveDeclarationSpine rest of {
-      (,) body live -> let {
-        used = L.foldl (\names entry -> S.union compareName names (free (L.snd entry))) live bindings;
-        bound = S.fromList compareName (L.map L.fst bindings)
-      } in (,) (XELetRec bindings body) (S.difference compareName used bound)
+      (,) body live ->
+        if L.any (\entry -> S.member compareName (L.fst entry) live) bindings
+        then let {
+          used = L.foldl (\names entry -> S.union compareName names (free (L.snd entry))) live bindings;
+          bound = S.fromList compareName (L.map L.fst bindings)
+        } in (,) (XELetRec bindings body) (S.difference compareName used bound)
+        else (,) body live
     };
     _ -> (,) expression (free expression)
   };

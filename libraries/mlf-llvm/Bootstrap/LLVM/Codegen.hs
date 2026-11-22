@@ -431,11 +431,114 @@ module Bootstrap.LLVM.Codegen where {
              let { keepWorker = M.size (functions state) > 128 &&
                      hasBranchTailTransfer state name (L.length names) (A.functionBody f) };
              definitionBodyWithPolicy keepWorker "ptr" symbol (L.map pointer registers)
-               (finishOrdinary (L.length names) scope (A.functionBody f));
+               (finishWorker (L.length names) scope (A.functionBody f));
              modify (withInlinePrimitives inline)
            };
       cgPure symbol
     };
+  finishWorker :: Int -> Map XName CGBinding -> XErased -> Build ();
+  finishWorker arity scope expression = do {
+    state <- get;
+    case integerReduction state scope expression of {
+      Nothing -> finishOrdinary arity scope expression;
+      Just ((,,,) template start step count) -> do {
+        value <- emitIntegerReduction scope template start step count;
+        emit ("  ret ptr " ++ value)
+      }
+    }
+  };
+  -- Wrapping Int addition permits a left fold. Evaluate the leaves in their
+  -- original order and share one loop body when only a compact literal varies
+  -- as a progression. The template preserves the leaves' lazy lets and calls.
+  reductionLiteral :: XName;
+  reductionLiteral = XName (0 - 9223372036854775807 - 1) "reduction literal";
+  integerSumLeaves :: [] XErased -> [] XErased;
+  integerSumLeaves pending = case pending of {
+    [] -> [];
+    (:) expression rest -> case expression of {
+      XEApp (XEApp (XEPrimitive PAddInt) left) right -> integerSumLeaves ((:) left ((:) right rest));
+      _ -> (:) expression (integerSumLeaves rest)
+    }
+  };
+  literalTemplate :: XErased -> Maybe ((,) XErased (Maybe Int));
+  literalTemplate expression = let {
+    intact = Just ((,) expression Nothing);
+    matchPair merge left right = do {
+      (,) a first <- literalTemplate left;
+      (,) b second <- literalTemplate right;
+      constant <- case first of {
+        Nothing -> Just second;
+        Just _ -> case second of { Nothing -> Just first; Just _ -> Nothing }
+      };
+      Just ((,) (merge a b) constant)
+    }
+  } in case expression of {
+    XEInt n -> if n >= (0 - 4611686018427387904) && n < 4611686018427387904
+      then Just ((,) (XEVar reductionLiteral) (Just n)) else Nothing;
+    XEVar n -> if O.eqName n reductionLiteral then Nothing else intact;
+    XEPrimitive _ -> intact;
+    XEApp f a -> matchPair XEApp f a;
+    XELet n a b -> if O.eqName n reductionLiteral then Nothing else matchPair (XELet n) a b;
+    _ -> Nothing
+  };
+  matchReductionLeaf :: Output -> XErased -> Maybe ((,,) XErased ([] String) Int);
+  matchReductionLeaf state leaf = case literalTemplate leaf of {
+    Just ((,) template (Just literal)) -> do {
+      fields <- callbackTerm state M.empty template;
+      Just ((,,) template fields literal)
+    };
+    _ -> Nothing
+  };
+  integerReduction :: Output -> Map XName CGBinding -> XErased -> Maybe ((,,,) XErased Int Int Int);
+  integerReduction state scope expression =
+    if M.member O.compareName reductionLiteral scope ||
+       M.member O.compareName reductionLiteral (functions state)
+    then Nothing else case integerSumLeaves [expression] of {
+        (:) first ((:) second rest) -> if L.null (L.drop 5 rest) then Nothing else do {
+          (,,) template key start <- matchReductionLeaf state first;
+          (,,) _ other next <- matchReductionLeaf state second;
+          let {
+            step = next - start;
+            match ((,) preceding count) leaf = do {
+              (,,) _ keyHere value <- matchReductionLeaf state leaf;
+              if value == preceding + step && L.eqList eqString key keyHere
+              then let { size = count + 1 } in seq size (Just ((,) value size))
+              else Nothing
+            }
+          };
+          if L.not (L.eqList eqString key other) then Nothing else do {
+            (,) _ count <- L.foldM match ((,) next 2) rest;
+            Just ((,,,) template start step count)
+          }
+        };
+        _ -> Nothing
+    };
+  emitIntegerReduction :: Map XName CGBinding -> XErased -> Int -> Int -> Int -> Build String;
+  emitIntegerReduction scope template start step count = do {
+    origin <- gets block;
+    loop <- fresh "sum.loop.";
+    continue <- fresh "sum.next.";
+    done <- fresh "sum.done.";
+    nextBits <- fresh "%v";
+    nextCount <- fresh "%v";
+    nextSum <- fresh "%v";
+    emit ("  br label %" ++ loop);
+    label loop;
+    bits <- phi "i64" [((,) (showInt (2 * start + 1)) origin), ((,) nextBits continue)];
+    remaining <- phi "i64" [((,) (showInt count) origin), ((,) nextCount continue)];
+    total <- phi "ptr" [((,) (immediate 1) origin), ((,) nextSum continue)];
+    literal <- result ("inttoptr i64 " ++ bits ++ " to ptr");
+    term <- evaluate (M.insert O.compareName reductionLiteral (CGBinding literal True) scope) template;
+    emit ("  br label %" ++ continue);
+    label continue;
+    emit ("  " ++ nextSum ++ " = call ptr @mlf_add_int(ptr " ++ total ++ ", ptr " ++ term ++ ")");
+    emit ("  " ++ nextBits ++ " = add i64 " ++ bits ++ ", " ++ showInt (2 * step));
+    emit ("  " ++ nextCount ++ " = sub i64 " ++ remaining ++ ", 1");
+    test <- result ("icmp eq i64 " ++ nextCount ++ ", 0");
+    emit ("  br i1 " ++ test ++ ", label %" ++ done ++ ", label %" ++ loop);
+    label done;
+    cgPure nextSum
+  };
   -- In a large module, preserve a branching worker's tail transfer to a peer.
   -- Inlining these workers into each other duplicates the branches along the
   -- chain. Straight-line wrappers and calls with a different ABI stay eligible.
@@ -1949,7 +2052,9 @@ module Bootstrap.LLVM.Codegen where {
           function <- thunk scope f;
           argument <- thunk scope a;
           app <- call "@mlf_application" (args2 (pointer function) (pointer argument));
-          forceValue app
+          -- Application cells take the runtime path even in the inline
+          -- force helper. Call it directly when this is known at emission.
+          call "@mlf_force" (args1 (pointer app))
         };
       _ -> failure "LLVM expected application"
     };

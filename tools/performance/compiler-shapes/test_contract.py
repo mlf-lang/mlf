@@ -177,11 +177,23 @@ class ScheduleTests(unittest.TestCase):
             self.assertEqual(argv[argv.index('--setup') + 1], setup.resolve())
             self.assertIn('--interleave-pairs', argv)
             self.assertEqual(argv[argv.index('--cohort-output-gib') + 1], 32)
-            self.assertEqual(argv[argv.index('--repeats') + 1], 6)
+            self.assertEqual(argv[argv.index('--repeats') + 1], 2)
             self.assertCountEqual([argv[i + 1] for i, arg in enumerate(argv) if arg == '--family'],
-                                  generate.FAMILIES)
+                                  ['baseline', *generate.REGISTRY['matrices']['default']['families']])
             self.assertEqual([int(argv[i + 1]) for i, arg in enumerate(argv) if arg == '--size'],
                              [8, 32, 128, 1024, 8192])
+
+            with mock.patch.object(bench, 'run') as run_command:
+                args.repeats = 6
+                bench.command_run(args)
+                argv = run_command.call_args.args[0]
+                self.assertEqual(argv[argv.index('--repeats') + 1], 6)
+                run_command.reset_mock()
+                for repeats in (0, 1):
+                    args.repeats = repeats
+                    with self.subTest(repeats=repeats), self.assertRaisesRegex(SystemExit, 'at least 2 pairs'):
+                        bench.command_run(args)
+                run_command.assert_not_called()
 
     def test_all_build_entry_parsers_default_to_fused_and_allow_two_stage(self):
         # Exercise the real CLI parsers, stopping before any build or filesystem
@@ -262,6 +274,35 @@ class ScheduleTests(unittest.TestCase):
                 self.assertEqual(generate.expected('inferred_functions', size, value),
                                  size * value + size * (size - 1) // 2)
 
+    def test_polymorphic_fanout_uses_one_inferred_group_and_both_argument_types(self):
+        family = 'polymorphic_fanout'
+        self.assertEqual(bench.resolve('default', [family], [32])[1], [family])
+        for size in (1, 8, 32, 128):
+            source = generate.program(family, size)
+            self.assertIn('apply f value = f value;', source)
+            self.assertNotRegex(source, r'(apply|fanout) ::')
+            body, = re.findall(r'^fanout measure value base = (.*);$', source, re.MULTILINE)
+            offsets = re.findall(r'apply \(apply measure value\) \(addInt base (\d+)\)', body)
+            self.assertEqual(list(map(int, offsets)), list(range(size)))
+            self.assertIn('fanout addInt x x', source)
+            self.assertIn('(ltInt x 0) x', source)
+            for value in (-3, 0, 7):
+                contributions = [value + offset + (offset if value < 0 else -offset)
+                                 for offset in range(value, value + size)]
+                self.assertEqual(generate.expected(family, size, value), sum(contributions))
+
+    def test_polymorphic_tree_fold_sites_and_oracle(self):
+        family = 'polymorphic_tree_fold'
+        for size in (1, 32, 512):
+            source = generate.program(family, size)
+            self.assertNotIn('entry ::', source)
+            offsets = re.findall(r'foldPair addInt x \(addInt x (\d+)\) x', source)
+            self.assertEqual(list(map(int, offsets)), list(range(size)))
+            for value in (-2**63, -1, 0, 7, 2**63 - 1):
+                total = sum(value + (value + i) + value for i in range(size))
+                wrapped = int.from_bytes((total & (2**64 - 1)).to_bytes(8, 'big'), 'big', signed=True)
+                self.assertEqual(generate.expected(family, size, value), wrapped)
+
     def test_balanced_pairs(self):
         self.assertEqual(runner.lanes_for(0, 3), ['ghc', 'mlf', 'mlf', 'ghc', 'ghc', 'mlf'])
         self.assertEqual(runner.lanes_for(1, 3), ['mlf', 'ghc', 'ghc', 'mlf', 'mlf', 'ghc'])
@@ -279,10 +320,10 @@ class ScheduleTests(unittest.TestCase):
             'captured_closures', 'wide_product', 'rank2_arguments', 'irregular_literal_table',
             'nested_poly_types', 'rank2_callbacks', 'decoder_pipeline'])
         self.assertEqual(sizes, [8, 32, 128, 1024, 8192])
-        self.assertEqual(matrix['repeats'], 6)
-        self.assertFalse(baseline)
+        self.assertEqual(matrix['repeats'], 2)
+        self.assertTrue(baseline)
         listing = subprocess.check_output([sys.executable, '-B', HERE / 'bench.py', 'list'], text=True)
-        self.assertIn('cells:    125, timed compilations: 1500', listing)
+        self.assertIn('cells:    126, timed compilations: 504', listing)
         with tempfile.TemporaryDirectory() as directory:
             # Enumerate the whole public generator schedule without building 8,192-node sources.
             with mock.patch.object(generate, 'program', return_value='module Main where\n'):
@@ -480,6 +521,14 @@ class AnalyzerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'finite nonnegative'):
             analyze.analyze(folder)
 
+    def test_rejects_invalid_sampled_peak_rss(self):
+        folder = write_cohort(self.root)
+        for peak in (False, -1, 1.5, float('inf'), float('nan'), '10'):
+            with self.subTest(peak=peak):
+                edit(folder, lambda r: r['runs'][0]['command'].update({analyze.RSS_SAMPLE: peak}))
+                with self.assertRaisesRegex(ValueError, 'invalid sampled peak RSS.*ghc at position 0'):
+                    analyze.analyze(folder)
+
     def test_rejects_reused_groups(self):
         folder = write_cohort(self.root)
         def mutate(receipt):
@@ -528,13 +577,66 @@ class AnalyzerTests(unittest.TestCase):
 
     def test_cli_writes_all_outputs(self):
         folder = write_cohort(self.root)
+        def add_rss(receipt):
+            mib = 2**20
+            peaks = {'mlf': (3, 1, 2), 'ghc': (6, 5, 4)}
+            for run in receipt['runs']:
+                run['command'][analyze.RSS_SAMPLE] = mib * peaks[run['lane']][run['position'] // 2]
+                run['command']['max_individual_child_rss_bytes'] = 7 * mib
+        edit(folder, add_rss)
         output = self.root / 'results'
         process = subprocess.run([sys.executable, '-B', str(HERE / 'analyze.py'), str(folder),
                                   '--output', str(output)], capture_output=True, text=True)
         self.assertEqual(process.returncode, 0, process.stderr)
         for name in ['summary.json', 'summary.csv', 'samples.csv', 'summary.md']:
             self.assertTrue((output / name).is_file(), name)
-        self.assertIn('MLF median', (output / 'summary.md').read_text())
+        summary = (output / 'summary.md').read_text()
+        self.assertIn('MLF median', summary)
+        self.assertIn('Build performance checks', summary)
+        self.assertIn('| `flat_functions` | 8 | 2.00 | 5.00 | 0.400 |', summary)
+        report = analyze.load(output / 'summary.json')
+        record, = report['cohorts'][0]['growth']
+        self.assertEqual(record['status'], 'incomplete')
+        self.assertFalse(record['checks']['all_positive_medians_lower'])
+        self.assertTrue(record['checks']['peak_rss_at_most_ghc'])
+        self.assertEqual(record['peak_rss'][0]['mlf_over_ghc_peak_rss'], .4)
+        self.assertIn('sampled_process_tree_peak_rss_bytes', (output / 'samples.csv').read_text().splitlines()[0])
+
+        standalone = analyze.save_recorded_growth(folder)
+        self.assertIn('| `flat_functions` | 8 | 2.00 | 5.00 | 0.400 |', standalone.read_text())
+        self.assertEqual(analyze.load(folder / 'growth.json')['growth'], [record])
+
+    def test_recorded_growth_reports_failed_cohorts_without_estimates(self):
+        folder = write_cohort(self.root)
+        edit(folder, lambda r: r.update(all_cases_passed=False, failures=[{'case': 'flat_functions-8'}]))
+        report = analyze.save_recorded_growth(folder)
+        self.assertTrue(report.is_file())
+        data, = analyze.load(folder / 'growth.json')['growth']
+        self.assertEqual(data['status'], 'incomplete')
+        self.assertIn('flat_functions-8', data['reason'])
+        self.assertTrue(all(value is None for value in data['checks'].values()))
+
+    def test_installed_summary_compares_sampled_build_group_peaks(self):
+        with mock.patch.object(sys, 'path', sys.path.copy()):
+            from installed import summarize
+
+        peaks = {'before': (100, 300, 200), 'after': (500, 350, 450), 'ghc': (400, 200, 300)}
+        samples = [dict(case='shape', state='fresh', lane=lane, passed=True,
+                        wall_s=1.0, user_s=.5, system_s=.1,
+                        peak_rss_bytes=900, sampled_group_rss_bytes=peak)
+                   for lane, group in peaks.items() for peak in group]
+        row, = summarize(['shape'], samples, 3, ['fresh'])
+        self.assertEqual(row['medians']['before']['sampled_group_rss_bytes'], 200)
+        self.assertEqual(row['medians']['before']['peak_rss_bytes'], 900)
+        self.assertAlmostEqual(row['before_over_ghc_peak_rss'], 2 / 3)
+        self.assertTrue(row['before_peak_rss_at_most_ghc'])
+        self.assertEqual(row['after_over_ghc_peak_rss'], 1.5)
+        self.assertFalse(row['after_peak_rss_at_most_ghc'])
+
+        samples[0]['sampled_group_rss_bytes'] = 0
+        row, = summarize(['shape'], samples, 3, ['fresh'])
+        self.assertIsNone(row['before_peak_rss_at_most_ghc'])
+        self.assertIsNone(row['before_over_ghc_peak_rss'])
 
     def test_fused_analysis_keeps_its_stage_inventory(self):
         folder = write_cohort(self.root, endpoint='crate-fused-v1')
@@ -1016,7 +1118,8 @@ class GraphReaderPinTests(unittest.TestCase):
                       any(isinstance(target, ast.Name) and target.id == 'inputs'
                           for target in node.targets))
         pinned = [node.value for node in ast.walk(inputs) if isinstance(node, ast.Constant)]
-        for name in ['test_query_index.py', 'artifact_binary_open.py', 'command_runner.py', 'bench.py']:
+        for name in ['test_query_index.py', 'artifact_binary_open.py', 'command_runner.py', 'bench.py',
+                     'fit_growth.py', 'analyze.py']:
             self.assertIn(name, pinned)
 
 

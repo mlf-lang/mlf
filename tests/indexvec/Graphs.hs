@@ -2,10 +2,11 @@
 module Main where
 
 import Control.Exception (ErrorCall, displayException, evaluate, try)
-import Control.Monad (forM_, unless)
+import Control.Monad (filterM, forM_, unless)
 import Data.Bits (testBit)
 import Data.List (intercalate, isInfixOf, nub, sort)
 import qualified Data.Map.Strict as Map
+import Data.Maybe (listToMaybe)
 import qualified Data.Set as Set
 import qualified Bootstrap.ArtifactStorage as Storage
 import qualified Bootstrap.ArtifactStructure as Structure
@@ -13,6 +14,7 @@ import qualified Bootstrap.Bitstream as W
 import qualified Bootstrap.BuiltinPreludeLiteral as BuiltinLiteral
 import qualified Bootstrap.Constraint as C
 import qualified Bootstrap.Graph as Graph
+import qualified Bootstrap.Graph.Solver as Solver
 import qualified Bootstrap.Classes as Classes
 import qualified Bootstrap.Compiler as Compiler
 import qualified Bootstrap.CompilerCore as CompilerCore
@@ -178,6 +180,143 @@ denseRaisedAncestors = do
   forM_ [low,low+1,low+2] $ \wanted ->
     check "indexed lifting preserves missing and self-only ancestor diagnostics"
       (solve False wanted) (solve True wanted)
+
+scopeProjectionChecks :: IO ()
+scopeProjectionChecks = do
+  let parents = Map.fromList
+        [(17,17), (4,17), (-2,4), (11,-2), (6,11), (8,4), (22,17), (13,22), (-5,-5), (5,-5)]
+      gen (n,parent) = (n,T.Node (T.GGen n) (if n == parent then T.Nothing else T.Just parent) T.Flexible)
+      index = Solver.indexScopes (T.Graph (IntMap.fromList (map gen (Map.toList parents))) IntMap.empty 23)
+      ancestors n = n : if n == parent then [] else ancestors parent
+        where parent = parents Map.! n
+      common a b = take 1 (filter (`elem` ancestors b) (ancestors a))
+      projected seeds = seeds ++ map (last . ancestors) seeds ++
+        concat [common a b | a <- seeds, b <- seeds, a < b]
+      reference seeds =
+        let selected = Set.fromList (projected seeds)
+            nearest = listToMaybe . filter (`Set.member` selected) . tail . ancestors
+        in [(n,nearest n) | n <- Set.toAscList selected]
+      hostMaybe T.Nothing = Nothing
+      hostMaybe (T.Just n) = Just n
+  -- Enumerate every boundary in a branching forest with sparse, signed IDs.
+  -- The oracle uses parent walks and all pairs, independent of DFS ordering.
+  forM_ (filterM (const [False,True]) (Map.keys parents)) $ \seeds ->
+    check ("scope projection for " ++ show seeds) (reference seeds)
+      [(n,hostMaybe parent) | (n,parent) <- IntMap.toList (Solver.projectScopes index (I.fromList seeds))]
+
+localExpansionChecks :: IO ()
+localExpansionChecks = do
+  let right label answer = case answer of
+        T.Left why -> fail (label ++ ": " ++ H.unpack why)
+        T.Right value -> pure value
+      outcome actual = case actual of
+        T.Left why -> Left (H.unpack why)
+        T.Right _ -> Right ()
+      same a b = IntMap.eqIntMap Graph.equalNode (Graph.nodes a) (Graph.nodes b) &&
+        IntMap.eqIntMap (==) (Graph.links a) (Graph.links b) && Graph.nextId a == Graph.nextId b
+  forM_ [(0,1),(-101,8192)] $ \(offset,stride) -> do
+    let at n = offset + stride*n
+        node tag parent flag = T.Node (Graph.mapTag at tag) (maybe T.Nothing (T.Just . at) parent) flag
+        gen n parent = node (T.GGen n) parent T.Flexible
+        original flag tag = Graph.mkGraph (IntMap.fromList [(at n,v) | (n,v) <-
+          [(0,gen 1 Nothing), (1,node T.GBot (Just 0) T.Flexible),
+           (2,gen 3 (Just 0)), (3,node (T.GArr 4 4) (Just 2) T.Flexible),
+           (4,node T.GBot (Just 3) T.Flexible), (5,gen 6 (Just 0)),
+           (6,node (T.GArr 8 11) (Just 5) T.Flexible), (8,node T.GBot (Just 0) flag),
+           (11,node tag (Just 5) T.Flexible), (12,node (T.GCon "Int" []) (Just 5) T.Rigid),
+           (13,gen 14 (Just 5)), (14,node (T.GArr 11 11) (Just 13) T.Flexible)]])
+          (IntMap.fromList [(at 16,at 6),(at 17,at 16)]) (at 18)
+        source = at 2
+        destination = at 17
+    initial <- right "prepare local expansion" (Solver.prepare (original T.Flexible (T.GArr 12 12)))
+    (root,_,frontier,expanded) <- right "expand shared variable" (Solver.expandedGraphPrepared source destination initial)
+    let first = Graph.nextId (Solver.graph initial)
+        fresh = Solver.allocatedNodes first (Graph.nextId expanded) (Graph.nodes expanded)
+        equations = frontier ++ [(root,destination)]
+    expected <- right "raw graph unification" (Graph.unify equations expanded)
+    local <- right "unify local expansion" (Solver.unifyExpandedLocally equations initial expanded (at 5) fresh root)
+    actual <- right "finish local expansion" (Solver.finish local)
+    check "local expansion preserves the full graph and alias chain" True (same expected actual)
+    prepared <- right "unify prepared expansion" (Solver.instantiateExpandedPrepared source destination initial)
+    integrated <- right "finish prepared expansion" (Solver.finish prepared)
+    check "prepared expansion publishes exact tags, binders and flags" True (same expected integrated)
+    forM_ [(T.Rigid,T.GArr 12 12),(T.Flexible,T.GArr 8 8)] $ \(flag,tag) -> do
+      invalid <- right "prepare rejected expansion" (Solver.prepare (original flag tag))
+      let expectedError = outcome (Solver.instantiateWithFreshBottom source destination invalid)
+      case expectedError of
+        Left _ -> check "prepared expansion retains the original diagnostic" expectedError
+          (outcome (Solver.instantiateExpandedPrepared source destination invalid))
+        Right () -> fail "expected the reference expansion to reject the input"
+    let scopedArrow = Graph.mkGraph (IntMap.fromList [(at n,v) | (n,v) <-
+          [(0,gen 1 Nothing), (1,node T.GBot (Just 0) T.Flexible),
+           (2,gen 3 (Just 0)), (3,node (T.GArr 4 5) (Just 2) T.Flexible),
+           (4,node (T.GCon "Int" []) (Just 3) T.Rigid),
+           (5,node (T.GArr 6 7) (Just 3) T.Rigid),
+           (6,node (T.GCon "Int" []) (Just 5) T.Rigid),
+           (7,node (T.GCon "Int" []) (Just 5) T.Rigid),
+           (10,gen 11 (Just 0)), (11,node T.GBot (Just 10) T.Flexible),
+           (12,node (T.GArr 13 14) (Just 10) T.Flexible),
+           (13,node T.GBot (Just 10) T.Flexible), (14,node T.GBot (Just 10) T.Flexible),
+           (20,gen 21 (Just 10)), (21,node (T.GArr 13 14) (Just 20) T.Flexible)]])
+          IntMap.empty (at 22)
+        ancestorBound = Graph.setNode (at 6) (node (T.GCon "Int" []) (Just 3) T.Rigid) scopedArrow
+    forM_ [(True, scopedArrow), (False, ancestorBound)] $ \(tree,initialArrow) -> do
+      arrowSolver <- right "prepare scoped arrow" (Solver.prepare initialArrow)
+      (copy,_,outside,expandedArrow) <- right "expand closed arrow"
+        (Solver.expandedGraphPrepared source (at 12) arrowSolver)
+      component <- case Solver.closedArrowComponent expandedArrow (at 22) (at 10) copy (at 12) of
+        T.Just nodes -> pure nodes
+        T.Nothing -> fail "closed arrow projection rejected an endpoint with external parents"
+      let arrowFresh = Solver.allocatedNodes (at 22) (Graph.nextId expandedArrow) (Graph.nodes expandedArrow)
+      rawArrow <- right "raw closed-arrow unification" (Graph.unify (outside ++ [(copy,at 12)]) expandedArrow)
+      case Solver.graftClosedArrowTree arrowSolver expandedArrow arrowFresh (at 10) copy (at 12) component of
+        T.Nothing -> check "direct graft requires immediate binders" False tree
+        T.Just grafted -> do
+          check "direct graft requires immediate binders" True tree
+          checked <- right "finish direct closed-arrow graft" (Solver.finish grafted)
+          check "direct graft preserves the complete raw graph" True (same rawArrow checked)
+      (_,cache) <- right "solve closed-arrow unification"
+        (Solver.instantiateExpandedWith Solver.emptyUnificationCache source (at 12) arrowSolver)
+      (cached,_) <- right "repeat closed-arrow unification" (Solver.instantiateExpandedWith cache source (at 12) arrowSolver)
+      restored <- right "finish closed-arrow unification" (Solver.finish cached)
+      check "closed-arrow unification preserves external parents and hidden scope roots" True
+        (same rawArrow restored)
+  forM_ [0,-55] $ \base -> do
+    let root = base + 82
+        entries = [(base, T.Node (T.GGen root) T.Nothing T.Flexible),
+                   (base+1, T.Node (T.GCon "Wide" [base+2..base+81]) (T.Just base) T.Flexible)] ++
+          [(n,T.Node T.GBot (T.Just base) T.Flexible) | n <- [base+2..root]]
+        initialGraph = Graph.mkGraph (IntMap.fromList entries)
+          (IntMap.fromList [(base+90,base+2)]) (base+91)
+        equations = [(base+90,base+81),(base+79,base+3)]
+    initial <- right "prepare dense component" (Solver.prepare initialGraph)
+    raw <- right "raw dense-component unification" (Graph.unify equations initialGraph)
+    solved <- right "solve dense component with a hidden scope root" (Solver.unify equations initial)
+    restored <- right "finish dense component" (Solver.finish solved)
+    check "the dense projection preserves signed identities and an outside scope root" True
+      (same raw restored)
+
+integerReductionChecks :: IO ()
+integerReductionChecks = do
+  let base = T.XName 1 "base"
+      callback = T.XName 2 "callback"
+      worker = T.XName 3 "worker"
+      supplied = T.XName 4 "supplied"
+      add a b = T.XEApp (T.XEApp (T.XEPrimitive T.PAddInt) a) b
+      leaf i n = let arg = T.XName i "arg" in
+        T.XELet arg (add (T.XEVar base) (T.XEInt n)) (T.XEApp (T.XEVar callback) (T.XEVar arg))
+      term values = T.XELet worker (T.XEAbs base (T.XEAbs callback (foldr1 add (zipWith leaf [10..] values))))
+        (T.XEAbs supplied (T.XEApp (T.XEApp (T.XEVar worker) (T.XEInt 91)) (T.XEVar supplied)))
+  forM_ [(True,[8,6..(-6)]), (False,[0..6]), (False,[0,1,2,3,4,5,6,9]),
+         (False,[4611686018427387897..4611686018427387904])] $ \(loop,values) ->
+    case Codegen.generate M.empty (term values) of
+      T.Left why -> fail (H.unpack why)
+      T.Right (_,chunks) -> do
+        let ir = unlines (map H.unpack chunks)
+        check "integer reductions require alpha-equivalent leaves and a compact progression" loop
+          ("br label %sum.loop." `isInfixOf` ir)
+        check "immediately entered application cells call the runtime force routine" True
+          ("call ptr @mlf_force(ptr %" `isInfixOf` ir)
 
 rebindingAncestors = do
   let bot parent = T.Node T.GBot parent T.Flexible
@@ -1540,6 +1679,20 @@ signedConstructorChecks = do
   case (Inference.compileOpenGroupIndexed "test" [] ds bad, Inference.compileElaboratedGroup [] ds bad) of
     (T.Left a, T.Left b) -> check "constructor operand diagnostic" (H.unpack b) (H.unpack a)
     _ -> fail "invalid signed constructor operand admitted"
+
+liveDeclarationSpineChecks = do
+  let dependency = T.XName 1 "dependency"
+      first = T.XName 2 "first"
+      second = T.XName 3 "second"
+      definitions = [(first, T.XEVar second), (second, T.XEVar dependency)]
+      linked entry = T.XELet dependency (T.XEInt 42) (T.XELetRec definitions entry)
+      trim = fst . Optimize.liveDeclarationSpine
+      unit = T.XEConstructor "()"
+      entry = linked (T.XEVar first)
+  check "dead recursive groups release their outer dependencies" True
+    (X.equalErased unit (trim (linked unit)))
+  check "a reachable recursive group retains its outer dependencies" True
+    (X.equalErased entry (trim entry))
 
 -- Passing a function as a value prevents all calls to that binder from
 -- being saturated calls on the same outer arguments. A pipeline of such
@@ -3179,6 +3332,7 @@ evidenceScopeChecks = do
     check "different graph authorities keep separate resolvers" False (Elaborate.sameGraphCandidate source other)
 
 main = do
+  liveDeclarationSpineChecks
   rebindingAncestors
   preparedScopeFingerprintChecks
   methodOwnerChecks
@@ -3250,6 +3404,9 @@ main = do
   candidateSkeletonChecks
   wantedBindingRoots
   denseRaisedAncestors
+  scopeProjectionChecks
+  localExpansionChecks
+  integerReductionChecks
   groupedMergePermissions
   queryChecks
   datatypeChecks

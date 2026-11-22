@@ -22,7 +22,7 @@ class DeveloperCommands(unittest.TestCase):
                                   '--size', '8,32', cwd=tmp)
             host = self.run_cli('build-host', '--help', cwd=tmp)
         self.assertEqual(matrix.returncode, 0, matrix.stderr)
-        self.assertIn('cells:    4, timed compilations: 48', matrix.stdout)
+        self.assertIn('cells:    4, timed compilations: 16', matrix.stdout)
         self.assertEqual(host.returncode, 0, host.stderr)
         self.assertIn('--bootstrap-only', host.stdout)
 
