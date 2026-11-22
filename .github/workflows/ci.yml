@@ -142,12 +142,12 @@ jobs:
       - name: Check compiler shape benchmark contract
         if: matrix.suite == 'optimizer'
         run: python3 -B tools/dev.py check-tools
-      - name: Compile thirteen shapes at size 8 (GHC vs MLF, 156 timed builds)
+      - name: Compile thirteen shapes at size 8 (GHC vs MLF, 52 timed builds)
         if: matrix.suite == 'optimizer'
         run: |
           python3 -B tools/testing/run.py compiler-shapes --report .mlf-build/test-framework/compiler-shapes-smoke.json -- all \
             --workdir .mlf-build/compiler-shapes-smoke --cohort pr-size-8 \
-            --producer .mlf-build/shared-ghc --build-builtin --size 8 --repeats 6 --interleave-pairs \
+            --producer .mlf-build/shared-ghc --build-builtin --size 8 --interleave-pairs \
             --family flat_functions --family recursive_ring --family wide_case \
             --family class_instances --family dependency_diamonds --family state_updates \
             --family captured_closures --family wide_product --family rank2_arguments \

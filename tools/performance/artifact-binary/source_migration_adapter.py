@@ -8,8 +8,9 @@ import sys
 
 FINAL_MANIFEST_SHA256 = '4d8ada0eae02aee9e3f93cea6670a59f51e1f8b5d49d2c5a7d8e2ecbe66432cb'
 CONTRACT_SOURCE_SHA256 = '52067d6ba346927ea257ddc45bb52b37d4b66520500d1013f242018e67d240b7'
-FRAMEWORK_SOURCE_SHA256 = '9b26885f4b7d429a9a273decb4ad377e32c1925619de64d362f99f8a03ef4f12'
+FRAMEWORK_SOURCE_SHA256 = '4eb4d29cd61e5c3ff5265fb95ffeb95f7bfd1ce0268f259e9e212cd8825525d9'
 FRAMEWORK_MANIFEST_SHA256 = '7dadb5521dec305170eca4169fe9a1195a9a35d5e1eface09bc6edcae1ee05cd'
+FOUNDATION_MANIFEST_SHA256 = '4c51f5a1c1825d04ffae830e5b260366c3239d810d9a85809c386f1860128ca3'
 
 
 def read_implementation(path):
@@ -65,5 +66,6 @@ def historical_contract(history_root, source_root=None):
 def live_contract(history_root, source_root=None):
     directory, previous, current = contracts()
     contract = current.successor_type(previous, FINAL_MANIFEST_SHA256,
-                                      FRAMEWORK_MANIFEST_SHA256, read_implementation)
-    return contract(directory, FRAMEWORK_MANIFEST_SHA256, history_root, source_root=source_root)
+                                      FRAMEWORK_MANIFEST_SHA256, FOUNDATION_MANIFEST_SHA256,
+                                      read_implementation)
+    return contract(directory, FOUNDATION_MANIFEST_SHA256, history_root, source_root=source_root)

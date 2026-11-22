@@ -72,6 +72,35 @@ def program(family, n):
             integer_call = call(integer, boolean)
             terms.append(f'if {call(boolean, integer)} then {integer_call} else subInt 0 ({integer_call})')
         expression = balanced(terms, lambda a,b:f'addInt ({a}) ({b})')
+    elif family == 'polymorphic_fanout':
+        terms = [f'apply (apply measure value) (addInt base {i})' for i in range(n)]
+        total = balanced(terms, lambda left, right: f'addInt ({left}) ({right})')
+        declarations = f'apply f value = f value;\nfanout measure value base = {total};\n'
+        expression = ('addInt (fanout addInt x x) '
+                      '(fanout (\\flag offset -> if flag then offset else subInt 0 offset) (ltInt x 0) x)')
+    elif family == 'polymorphic_tree_fold':
+        declarations = '''data Tree a = Leaf a | Branch (Tree a) (Tree a);
+foldTree :: forall a b. (a -> b -> b) -> b -> Tree a -> b;
+foldTree step seed tree = case tree of {
+  Leaf value -> step value seed;
+  Branch left right -> foldTree step (foldTree step seed right) left
+};
+foldPair step seed left right = foldTree step seed (Branch (Leaf left) (Leaf right));
+'''
+        calls = [f'foldPair addInt x (addInt x {i}) x' for i in range(n)]
+        total = balanced(calls, lambda left, right: f'addInt ({left}) ({right})')
+        return HEADER + declarations + f'entry x = {total};\n' + MAIN
+    elif family == 'signed_constructor_cases':
+        declarations = '''data Path a = End | Step a (Path a);
+build :: Int -> Int -> Path Int;
+build count base = if ltInt count 1 then End else
+  Step (addInt base count) (build (subInt count 1) base);
+'''
+        for i in range(n):
+            value = 'item' if i == 0 else f'f{i-1} item rest'
+            declarations += (f'f{i} :: forall a. a -> Path a -> a;\n'
+                             f'f{i} prior path = case path of {{ End -> prior; Step item rest -> {value} }};\n')
+        expression = f'f{n-1} x (build (if ltInt x 0 then {n//2} else {n}) x)'
     elif family == 'recursive_ring':
         declarations = ''.join(f'f{i} :: Int -> Int;\nf{i} x = if ltInt x 1 then {i} else f{(i+1)%n} (subInt x 1);\n' for i in range(n))
         expression = 'f0 x'
@@ -206,6 +235,14 @@ def expected(family, n, x):
     if family == 'inferred_poly_functions':
         negative = max(0, min(n, x + 1))
         return n*x + n*(n-1)//2 - 2*(negative*x + negative*(negative-1)//2)
+    if family == 'polymorphic_fanout':
+        offsets = n*x + n*(n-1)//2
+        return n*x + offsets + (offsets if x < 0 else -offsets)
+    if family == 'polymorphic_tree_fold':
+        total = 3*n*x + n*(n-1)//2
+        return (total + 2**63) % 2**64 - 2**63
+    if family == 'signed_constructor_cases':
+        return x + int(x >= 0 or n >= 2)
     if family == 'recursive_ring':
         return max(0,x) % n
     if family == 'wide_case':

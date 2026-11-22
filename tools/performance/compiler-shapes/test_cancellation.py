@@ -83,7 +83,7 @@ def launcher_argv(root, mode, signum):
     stages = root / 'tools/performance/compiler-shapes'
     stages.mkdir(parents=True)
     shutil.copy(here / 'bench.py', stages)
-    for name in ('matrix.json', 'command_runner.py'):
+    for name in ('matrix.json', 'command_runner.py', 'fit_growth.py'):
         (stages / name).symlink_to(here / name)
     fixture = ('from pathlib import Path\nimport sys, signal, os\n'
                f'sys.path.insert(0, {str(here)!r})\nfrom test_cancellation import record\n'

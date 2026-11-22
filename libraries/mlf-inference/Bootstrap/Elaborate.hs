@@ -39,11 +39,17 @@ module Bootstrap.Elaborate where {
     let {
       context :: TypeContext;
       context =
-        TypeContext graph (IM.mapWithKey (\n ignored -> typeAtRaw context n) (G.nodes graph))
-          (IM.mapWithKey (\n ignored -> boundsAtRaw context n) (G.nodes graph))
+        TypeContext graph (IM.mapWithKey renderType (G.nodes graph))
+          (IM.mapWithKey renderBounds (G.nodes graph))
           (IS.fromList
              (concatMap (\v -> if isFlexible (G.flag v) then maybeToList (G.binder v) else [])
-                (IM.elems (G.nodes graph))))
+                (IM.elems (G.nodes graph))));
+      -- The traversal already has the node. Raw contexts can still contain
+      -- alias keys, so those use the resolving queries.
+      renderType n node = if IM.notMember n (G.links graph)
+        then typeAtNode context n node else typeAtRaw context n;
+      renderBounds n node = if IM.notMember n (G.links graph)
+        then boundsAtNode context n node else boundsAtRaw context n
     } in
     context;
   typeAtIn :: TypeContext -> Int -> XType;
@@ -54,16 +60,15 @@ module Bootstrap.Elaborate where {
     IM.get (G.resolve graph identity) bounds;
   -- Flexible graph nodes become target binders; rigid bounds remain structure.
   typeAtRaw :: TypeContext -> Int -> XType;
-  typeAtRaw context identity =
-    let {
-      graph = contextGraph context
-    } in
-    let {
-      resolved = G.resolve graph identity
-    } in
+  typeAtRaw context identity = let {
+    graph = contextGraph context;
+    resolved = G.resolve graph identity
+  } in typeAtNode context resolved (G.nodeAt graph resolved);
+  typeAtNode :: TypeContext -> Int -> Node -> XType;
+  typeAtNode context@(TypeContext _ _ bounds _) identity node =
     let {
       structure =
-        case G.tag (G.nodeAt graph resolved) of {
+        case G.tag node of {
           GBot -> XBot;
           GBotK kind -> T.bottomKind kind;
           GArr a b -> XArrow (childTypeIn context a) (childTypeIn context b);
@@ -75,7 +80,7 @@ module Bootstrap.Elaborate where {
         }
     } in
     foldr (\bound body -> XForall (fst bound) (snd bound) body) structure
-      (boundsAtIn context resolved);
+      (IM.get identity bounds);
   childTypeIn :: TypeContext -> Int -> XType;
   childTypeIn context identity =
     let {
@@ -107,14 +112,17 @@ module Bootstrap.Elaborate where {
     then XVar (XTyVar (G.resolve graph identity))
     else typeAtIn context identity;
   boundsAtRaw :: TypeContext -> Int -> [] ((,) XTyVar XType);
-  boundsAtRaw context parent =
+  boundsAtRaw context parent = boundsAtNode context parent (G.nodeAt (contextGraph context) parent);
+  boundsAtNode :: TypeContext -> Int -> Node -> [] ((,) XTyVar XType);
+  boundsAtNode context parent node =
     case context of {
       TypeContext graph types bounds parents ->
         if IS.notMember parent parents
         then []
         else let {
+               resolvedParent = G.resolve graph parent;
                root =
-                 case G.tag (G.nodeAt graph parent) of {
+                 case G.tag node of {
                    GGen identity -> identity;
                    _ -> parent
                  }
@@ -122,7 +130,7 @@ module Bootstrap.Elaborate where {
              map (\identity -> (,) (XTyVar identity) (typeAtIn context identity))
                (filter
                   (\identity ->
-                     (sameParent (G.resolve graph parent) (G.binder (G.nodeAt graph identity)) &&
+                     (sameParent resolvedParent (G.binder (G.nodeAt graph identity)) &&
                       isFlexible (G.flag (G.nodeAt graph identity))))
                   (G.orderedBelow graph root))
     };

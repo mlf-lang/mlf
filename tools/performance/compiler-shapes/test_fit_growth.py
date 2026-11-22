@@ -6,8 +6,6 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-import numpy as np
-
 import fit_growth as fit
 import matrix_growth
 
@@ -29,10 +27,8 @@ class GrowthTests(unittest.TestCase):
 
     def test_selects_only_requested_family_and_preserves_pairs(self):
         sizes, times = fit.paired_times(self.rows, self.samples[::-1], 'chain', 2)
-        np.testing.assert_array_equal(sizes, [0, 8, 16, 32])
-        np.testing.assert_array_equal(times[:, 0, 0], sizes)
-        np.testing.assert_array_equal(times[:, 1, 1], sizes + 3)
-        np.testing.assert_array_equal(times[:, :, 1], times[:, :, 0] + 1)
+        self.assertEqual(sizes, [0, 8, 16, 32])
+        self.assertEqual(times, [[(n, n + 1), (n + 2, n + 3)] for n in sizes])
 
     def test_rejects_unusable_pairs(self):
         _, second = self.samples[-2:]
@@ -46,17 +42,69 @@ class GrowthTests(unittest.TestCase):
             fit.paired_times(self.rows, self.samples, 'absent', 2)
 
     def test_known_curves_and_boundary(self):
-        sizes = np.array([0, 32, 128, 256, 1024])
-        small = .3 + .12 * (sizes / 1024) ** 1.1
-        large = .6 + .3 * (sizes / 1024) ** 1.4
-        times = np.repeat(np.column_stack((small, large))[:, None, :], 3, axis=1)
+        sizes = [0, 32, 128, 256, 1024]
+        times = [[(.3 + .12 * (n / 1024) ** 1.1, .6 + .3 * (n / 1024) ** 1.4)] * 3 for n in sizes]
         with patch.object(fit, 'REPLICATES', 12):
             result = fit.growth(sizes, times)
         self.assertTrue(result['accepted'])
         self.assertAlmostEqual(result['estimates']['mlf']['power']['p'], 1.1, places=5)
         self.assertAlmostEqual(result['estimates']['ghc']['power']['offset_seconds'], .6, places=6)
-        np.testing.assert_allclose(result['paired_bootstrap']['p_delta_95'], [-.3, -.3], atol=1e-5)
-        self.assertFalse(fit.power_fit(sizes, 1 + (sizes / 1024) ** 4)['interior'])
+        for bound in result['paired_bootstrap']['p_delta_95']:
+            self.assertAlmostEqual(bound, -.3, places=5)
+        self.assertFalse(fit.power_fit(sizes, [1 + (n / 1024) ** 4 for n in sizes])['interior'])
+
+    def test_missing_or_failed_cells_do_not_supply_growth_estimates(self):
+        small = [row for row in self.rows if row['family'] == 'chain' and row['size'] == 8]
+        result, = fit.family_reports(small, self.samples, 2)
+        self.assertEqual(result['status'], 'incomplete')
+        self.assertTrue(result['checks']['all_positive_medians_lower'])
+        self.assertIsNone(result['checks']['lower_ols_point'])
+
+        with patch.dict(self.rows[1], {'status': 'failed'}), patch.object(fit, 'REPLICATES', 12):
+            chain, flat = fit.family_reports(self.rows, self.samples, 2)
+        self.assertEqual(chain['status'], 'incomplete')
+        self.assertIn('chain-8', chain['reason'])
+        self.assertIsNone(chain['checks']['all_positive_medians_lower'])
+        self.assertEqual(flat['sizes'], [0, 8, 16, 32])
+        self.assertIsNotNone(flat['checks']['lower_ols_95'])
+
+    def test_memory_gate_applies_to_every_positive_size_and_allows_a_tie(self):
+        rows = [row.copy() for row in self.rows if row['family'] in ('baseline', 'chain')]
+        for row in rows[1:]:
+            row.update(mlf_peak_rss_bytes=128, ghc_peak_rss_bytes=128, mlf_over_ghc_peak_rss=1.)
+        times = {'mlf': (.3, .12, 1.1), 'ghc': (.6, .3, 1.4)}
+        samples = []
+        for sample in self.samples:
+            size = int(sample['case'].rsplit('-', 1)[1])
+            startup, scale, exponent = times[sample['lane']]
+            samples.append(dict(sample, wall_seconds=startup + scale * (size / 32)**exponent))
+
+        with patch.object(fit, 'REPLICATES', 12):
+            tied, = fit.family_reports(rows, samples, 2)
+            with patch.dict(rows[1], mlf_peak_rss_bytes=256, mlf_over_ghc_peak_rss=2.):
+                over_budget, = fit.family_reports(rows, samples, 2)
+            with patch.dict(rows[1], mlf_peak_rss_bytes=None, mlf_over_ghc_peak_rss=None):
+                missing, = fit.family_reports(rows, samples, 2)
+        self.assertTrue(tied['accepted'])
+        self.assertTrue(tied['checks'][fit.PEAK_RSS_CHECK])
+        self.assertEqual(tied['status'], 'met')
+        self.assertEqual(over_budget['status'], 'unmet')
+        self.assertFalse(over_budget['accepted'])
+        self.assertFalse(over_budget['checks'][fit.PEAK_RSS_CHECK])
+        self.assertTrue(all(over_budget['checks'][key] for key in fit.TIMING_CHECKS))
+        self.assertIsNone(missing['accepted'])
+        self.assertIsNone(missing['checks'][fit.PEAK_RSS_CHECK])
+        self.assertEqual(missing['status'], 'incomplete')
+        self.assertIn('RSS unavailable at sizes 8', missing['reason'])
+
+    def test_pair_bootstrap_preserves_perfectly_correlated_lanes(self):
+        sizes = [0, 8, 16, 32]
+        times = [[(1 + n * factor, 2 + n * factor) for factor in (1., 2., 3.)] for n in sizes]
+        with patch.object(fit, 'REPLICATES', 32):
+            result = fit.growth(sizes, times)
+        self.assertEqual(result['paired_bootstrap']['ols_delta_ms_95'], [0., 0.])
+        self.assertFalse(result['checks']['lower_ols_95'])
+        self.assertFalse(result['accepted'])
 
 
 class MatrixGrowthTests(unittest.TestCase):
@@ -64,7 +112,7 @@ class MatrixGrowthTests(unittest.TestCase):
         scratch = TemporaryDirectory()
         self.addCleanup(scratch.cleanup)
         self.root = Path(scratch.name)
-        self.matrix = {'sizes': [8, 32, 128, 1024, 8192], 'families': ['example'], 'repeats': 6}
+        self.matrix = {'sizes': [8, 32, 128, 1024, 8192], 'families': ['example'], 'repeats': 2}
         self.rows = [dict(family='example', size=n, passed='True', completed_pairs=6,
                           successful_mlf=6, successful_ghc=6, skipped_mlf=0, skipped_ghc=0,
                           mlf_seconds=.3 + (n / 8192)**1.2, ghc_seconds=.7 + (n / 8192)**1.4,
@@ -130,20 +178,24 @@ class MatrixGrowthTests(unittest.TestCase):
         receipt = {'runs': [dict(position=p, lane=fit.LANES[p%2], complete=True, output_correct=True)
                             for p in range(12)]}
         with patch.object(matrix_growth.analyze, 'analyze', return_value=(metrics, plan, receipt, [])), \
-             patch.object(matrix_growth.analyze, 'compatibility', return_value={'ghc_version': '9.14.1'}):
+             patch.object(matrix_growth.analyze, 'compatibility',
+                          side_effect=lambda p: {'repeats': p['benchmark']['repeats']}):
             profiles = {}
-            ident, _, _ = matrix_growth.sweep_cell(self.root, row, 6, profiles)
+            ident, _, _ = matrix_growth.sweep_cell(self.root, row, profiles)
             self.assertEqual(('', 'b'*64, 'c'*64), ident)
-            with self.assertRaisesRegex(ValueError, 'incompatible measurements'):
-                matrix_growth.sweep_cell(self.root, row, 6, {'example': {'ghc_version':'older'}})
             with patch.dict(row, {'mlf_seconds': 42}), self.assertRaisesRegex(ValueError, 'median mismatch'):
-                matrix_growth.sweep_cell(self.root, row, 6, profiles)
+                matrix_growth.sweep_cell(self.root, row, profiles)
+            with patch.dict(plan['benchmark'], repeats=2), patch.dict(row, completed_pairs=2), \
+                 patch.dict(receipt, runs=receipt['runs'][:4]):
+                self.assertEqual(ident, matrix_growth.sweep_cell(self.root, row, {})[0])
+                with self.assertRaisesRegex(ValueError, 'incompatible measurements'):
+                    matrix_growth.sweep_cell(self.root, row, profiles)
 
 
     def test_sweep_failure_checks_the_plan_digest_before_reporting_its_producer(self):
         row = dict(family='example', size=8192, status='failed', lane='', completed_pairs=0,
                    reason='recorder exit 1; incomplete recording', evidence='cohorts/example-8192')
-        ident, values, issue = matrix_growth.sweep_cell(self.root, row, 6, {})
+        ident, values, issue = matrix_growth.sweep_cell(self.root, row, {})
         self.assertEqual((None, None, 'failed: incomplete recording'), (ident, values, issue))
         folder = self.root / row['evidence']
         folder.mkdir(parents=True)
@@ -155,7 +207,7 @@ class MatrixGrowthTests(unittest.TestCase):
         receipt = folder / 'receipt.json'
         receipt.write_text(json.dumps({'plan_sha256': '0'*64}))
         with self.assertRaisesRegex(ValueError, 'frozen plan digest'):
-            matrix_growth.sweep_cell(self.root, row, 6, {})
+            matrix_growth.sweep_cell(self.root, row, {})
         failed = dict(plan_sha256=matrix_growth.analyze.sha(plan_path), complete=True, all_cases_passed=False,
                       runs=[], failures=[dict(case='example-8192', position=0, lane='ghc', error='worker error')])
         receipt.write_text(json.dumps(failed))
@@ -163,16 +215,16 @@ class MatrixGrowthTests(unittest.TestCase):
         command.mkdir(parents=True)
         (command/'command.json').write_text(json.dumps({'reason': 'RSS limit'}))
         with patch.object(matrix_growth.analyze, 'compatibility', return_value={}):
-            ident, values, issue = matrix_growth.sweep_cell(self.root, row, 6, {})
+            ident, values, issue = matrix_growth.sweep_cell(self.root, row, {})
             self.assertEqual('failed: ghc: RSS limit', issue)
             for field, wrong in [('lane', 'mlf'), ('reason', 'worker error'), ('completed_pairs', 3)]:
                 with self.subTest(field=field), patch.dict(row, {field: wrong}), self.assertRaises(ValueError):
-                    matrix_growth.sweep_cell(self.root, row, 6, {})
+                    matrix_growth.sweep_cell(self.root, row, {})
             with patch.dict(row, {'reason': 'recorder exit 1; RSS limit'}):
-                self.assertEqual(issue, matrix_growth.sweep_cell(self.root, row, 6, {})[2])
+                self.assertEqual(issue, matrix_growth.sweep_cell(self.root, row, {})[2])
         receipt.write_text(json.dumps(dict(failed, all_cases_passed=True, failures=[])))
         with self.assertRaisesRegex(ValueError, 'failed qualified cell'):
-            matrix_growth.sweep_cell(self.root, row, 6, {})
+            matrix_growth.sweep_cell(self.root, row, {})
         self.assertEqual(('', 'b'*64, 'c'*64), ident)
         self.assertIsNone(values)
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Serial same-source shape matrix; no optimization acceptance claim."""
+"""Record serial same-source shape builds and report their performance checks."""
 from pathlib import Path
 import argparse
 import hashlib
@@ -8,6 +8,7 @@ import random
 import shutil
 import sys
 import command_runner
+import fit_growth
 import framework_results as framework
 import generate as G
 import query_cache as Q
@@ -23,7 +24,7 @@ def registry():
 
 
 def lanes_for(index,repeats):
-    """Three paired rounds; balance which compiler starts within and across cells."""
+    """Alternate which compiler starts each pair within and across cells."""
     lanes=[]
     for round_index in range(repeats):
         first='ghc' if (round_index+index)%2==0 else 'mlf'
@@ -54,6 +55,8 @@ def main():
     parser.add_argument('--output',type=Path,required=not listing)
     parser.add_argument('--pilot',action='store_true')
     parser.add_argument('--framework-child',action='store_true',help=argparse.SUPPRESS)
+    parser.add_argument('--record-only',action='store_true',
+                        help='leave growth reporting to the caller')
     parser.add_argument('--family',action='append',choices=G.FAMILIES+('baseline',))
     parser.add_argument('--size',action='append',type=int)
     parser.add_argument('--repeats',type=int,default=data['repeats'])
@@ -69,7 +72,11 @@ def main():
     sizes=args.size or ((8,) if args.pilot else tuple(data['sizes']))
     if not all(0<n<=8192 for n in sizes):
         parser.error('sizes must be bounded and positive')
-    cells = G.coordinates(sizes, args.family)
+    matrix=data['matrices']['default']
+    families=args.family or matrix['families']
+    if 'baseline' not in families and fit_growth.include_baseline(families,sizes,matrix['baseline'] and not args.pilot):
+        families=['baseline', *families]
+    cells = G.coordinates(sizes, families)
     if args.framework_list:
         framework.list_cases(cells, args.pilot)
         return
@@ -100,7 +107,8 @@ def main():
     if args.interleave_pairs:
         schedule=interleave_pairs(schedule,repeats,rng)
     inputs={str(p.resolve()):H.sha(p) for p in [args.setup,Path(H.__file__),HERE/'command_runner.py',HERE/'bench.py',HERE/'run.py',HERE/'worker.py',HERE/'generate.py',
-        HERE/'data_shapes.py',HERE/'rank_shapes.py',HERE/'framework_results.py',ROOT/'tools/testing/events.py',
+        HERE/'data_shapes.py',HERE/'rank_shapes.py',HERE/'fit_growth.py',HERE/'analyze.py',
+        HERE/'framework_results.py',ROOT/'tools/testing/events.py',
         HERE/'matrix.json',HERE/'query_cache.py',HERE/'provenance.py',Q.SHARED/'artifact_binary_reference.py',
         Q.SHARED/'test_query_index.py',Q.SHARED/'artifact_binary_open.py',
         Path(setup['producer'])/'receipt.json',Path(setup['producer'])/'bin/emlf',
@@ -116,7 +124,7 @@ def main():
             'aggregate_cohort_bytes':args.cohort_output_gib*1024**3}
     identity=provenance.source_identity(ROOT, out)
     cohort=args.cohort or out.name
-    plan={'purpose':'generator/transport qualification' if args.pilot else 'fixed measured shape matrix; descriptive medians only',
+    plan={'purpose':'generator/transport qualification' if args.pilot else 'fixed measured shape matrix; paired build-time observations',
         'benchmark':{'schema':2,'suite':data['suite'],'suite_version':data['version'],'cohort':cohort,
             'endpoint':{'id':args.endpoint,**endpoint},'repeats':repeats,
             'families':sorted({c['family'] for c in cases}),'sizes':sorted({c['size'] for c in cases}),
@@ -143,7 +151,8 @@ def main():
         'timing_boundary':'exact-child worker launch through wait4; common Python dispatcher included; preparation and validation excluded'}
     plan_path=out/'plan.json';H.save(plan_path,plan);plan_sha=H.sha(plan_path)
     scripts=out/'scripts';scripts.mkdir()
-    for name in ['run.py','worker.py','generate.py','data_shapes.py','rank_shapes.py','matrix.json','query_cache.py','provenance.py','framework_results.py']:
+    for name in ['run.py','worker.py','generate.py','data_shapes.py','rank_shapes.py','fit_growth.py','analyze.py',
+                 'matrix.json','query_cache.py','provenance.py','framework_results.py']:
         shutil.copy2(HERE/name,scripts/name)
     shutil.copy2(ROOT/'tools/testing/events.py', scripts/'events.py')
     record={'complete':False,'plan_sha256':plan_sha,'runs':[],'failures':[]}; refs={};blocked=set()
@@ -218,6 +227,9 @@ def main():
         H.require(H.authenticate(Path(setup['producer']),Path(setup.get('source',ROOT)))==auth,'ordinary producer unchanged')
     record.update(complete=True,all_cases_passed=not blocked,failed_cases=sorted(blocked));save()
     print('Completed; failures retained:',len(record['failures']),flush=True)
+    if not args.pilot and not args.record_only:
+        from analyze import save_recorded_growth
+        print(save_recorded_growth(out), flush=True)
 
 
 if __name__=='__main__':main()

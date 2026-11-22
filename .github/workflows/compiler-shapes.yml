@@ -14,9 +14,9 @@ on:
         type: string
         default: ''
       repeats:
-        description: Repetitions per compiler per cell (minimum 3)
+        description: Paired builds per size (minimum 2)
         type: string
-        default: '6'
+        default: '2'
       cohort:
         description: Label for the uploaded benchmark evidence
         type: string
@@ -76,6 +76,7 @@ jobs:
             .mlf-build/compiler-shapes/producer/receipt.json
             .mlf-build/compiler-shapes/summary.md
             .mlf-build/compiler-shapes/summary.csv
+            .mlf-build/compiler-shapes/growth.json
             .mlf-build/compiler-shapes/setup/setup.json
             .mlf-build/compiler-shapes/setup/preparation.json
             .mlf-build/compiler-shapes/cohorts/**/plan.json

@@ -489,7 +489,10 @@ class TestFrameworkSourceReconciliation(unittest.TestCase):
         self.assertNotIn('Tests.TupleListLegacy', registry)
         self.assertEqual(c.advance_registry(c.registry_to_parent(registry, c.added_source_bytes(ROOT))),
                          registry)
+        graph = 'libraries/mlf-inference/Bootstrap/Graph.hs'
+        prior_graph = (c.archived / graph).read_bytes()
         for invalid in ({**current, retired: historical[retired]},
+                        {**current, graph: prior_graph},
                         {**current, 'mlf.lock': (c.archived / 'mlf.lock').read_bytes()}):
             with self.assertRaises(ValueError):
                 c.project_tree_bytes(invalid)

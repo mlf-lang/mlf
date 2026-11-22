@@ -1556,6 +1556,10 @@ module MLF.Tests.SharedFrontend where {
       scope = foldl (\env binding -> M.delete X.compareName (fst binding) env) names bindings
     } in XELetRec (map (\((,) name rhs) -> (,) name (monomorphicAdministrative scope rhs)) bindings)
       (monomorphicAdministrative scope body);
+    XECase subject alternatives -> XECase (monomorphicAdministrative names subject)
+      (map (\(XErasedAlternative pattern body) -> let {
+        scope = foldl (\env name -> M.delete X.compareName name env) names (X.patternNames pattern)
+      } in XErasedAlternative pattern (monomorphicAdministrative scope body)) alternatives);
     _ -> term
   };
   monomorphicErasure names left right = case (,) left right of {
@@ -1572,18 +1576,47 @@ module MLF.Tests.SharedFrontend where {
         scope = foldl (\env ((,) a b) -> M.insert X.compareName (fst a) (fst b) env) names (zip xs ys)
       } in all (\((,) a b) -> monomorphicErasure scope (snd a) (snd b)) (zip xs ys) &&
         monomorphicErasure scope body rest;
+    (,) (XECase subject alternatives) (XECase other branches) ->
+      monomorphicErasure names subject other &&
+      eqList (\(XErasedAlternative pattern body) (XErasedAlternative target result) ->
+        case erasurePatternScope names pattern target of {
+          Just scope -> monomorphicErasure scope body result;
+          Nothing -> False
+        }) alternatives branches;
     _ -> X.equalErased left right
+  };
+  erasurePatternScope names left right = let {
+    binder env pair = case pair of {
+      (,) Nothing Nothing -> Just env;
+      (,) (Just a) (Just b) -> Just (M.insert X.compareName a b env);
+      _ -> Nothing
+    };
+    fields env a b = case (,) a b of {
+      (,) [] [] -> Just env;
+      (,) ((:) x xs) ((:) y ys) -> case binder env ((,) x y) of {
+        Just scope -> fields scope xs ys;
+        Nothing -> Nothing
+      };
+      _ -> Nothing
+    }
+  } in case (,) left right of {
+    (,) (XConstructorPattern a xs) (XConstructorPattern b ys) ->
+      if eqString a b then fields names xs ys else Nothing;
+    (,) (XDefaultPattern a) (XDefaultPattern b) -> binder names ((,) a b);
+    _ -> Nothing
   };
   monomorphicGroupCase = inferenceGroupCase Inference.monomorphicIndexed;
   groundGroupCase = inferenceGroupCase Inference.groundIndexed;
-  inferenceGroupCase route label expectedFast parameters members = do {
-    prepared <- recursiveRight label (Inference.prepareIndexedGroup parameters [] members);
+  inferenceGroupCase route label expectedFast parameters members =
+    inferenceGroupCaseWithData route label expectedFast [] parameters members;
+  inferenceGroupCaseWithData route label expectedFast datatypes parameters members = do {
+    prepared <- recursiveRight label (Inference.prepareIndexedGroup parameters datatypes members);
     let { candidate = route parameters members (snd prepared) };
     check (label ++ " route") (isRight candidate == expectedFast);
     ordinary <- recursiveRight (label ++ " ordinary")
       (Inference.finishOpenGroup (fst prepared) (map snd members) (snd prepared));
     actual <- recursiveRight (label ++ " indexed")
-      (Inference.compileOpenGroupIndexed "control" parameters [] members);
+      (Inference.compileOpenGroupIndexed "control" parameters datatypes members);
     let { a = Open.closedTerm actual; b = Open.closedTerm ordinary };
     check (label ++ " erasure") (monomorphicErasure M.empty (monomorphicAdministrative M.empty (X.erase a))
       (monomorphicAdministrative M.empty (X.erase b)));
@@ -1679,6 +1712,7 @@ module MLF.Tests.SharedFrontend where {
     checkedGroundUses;
     groundAliasChecks;
     groundRecursiveChecks;
+    groundCaseEvidenceCheck;
     let { a = XTyVar 100; b = XTyVar 101; c = XTyVar 102;
       xa = XVar a; xb = XVar b; xc = XVar c;
       int = SCon "Int" []; arrow = SArrow int int;
@@ -1747,6 +1781,19 @@ module MLF.Tests.SharedFrontend where {
         (isLeft (Inference.compileOpenGroupIndexed "control" (parameter identity) [] members))
     }) bad
   };
+  groundCaseEvidenceCheck = let {
+    datatypes = [DataDecl "CaseDictionary" ["a"]
+      [ConstructorDecl "CaseDictionary" [Function (Parameter "a") (Parameter "a")]]];
+    variable = STVar "a";
+    annotation = SAnnotation [] (SForall Flexible "a" SBottom
+      (SArrow (SCon "CaseDictionary" [variable]) (SArrow variable variable)));
+    wanted = SWantedScope "CaseDictionary" (CandidateEnvironment 0 []);
+    rhs = SLam "dictionary" Nothing (SLam "input" Nothing (SGivenScope ["dictionary"]
+      (SCase wanted [SAlternative (SConstructorPattern "CaseDictionary" [Just "method"])
+        (SApp (SVar "method") (SVar "input"))])));
+    members = [(,) (Index.fromInt 10) ((,,) "applyDictionary" (Just annotation) rhs)]
+  } in inferenceGroupCaseWithData Inference.groundIndexed
+    "signed polymorphic case with lexical evidence" True datatypes [] members;
   groundRecursiveChecks = do {
     let { int = SCon "Int" []; bool = SCon "Bool" [];
       sig = \ty -> Just (SAnnotation [] (SArrow int ty));

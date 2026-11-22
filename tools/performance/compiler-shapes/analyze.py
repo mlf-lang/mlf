@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Offline descriptive analysis. Reject incomplete/duplicate/nonfinite/incompatible cohorts."""
+"""Analyze timing and memory from qualified compiler-shape cohorts."""
 from pathlib import Path
+import fit_growth
 import worker
 import argparse
 import collections
@@ -10,6 +11,9 @@ import json
 import math
 import statistics as S
 import query_cache as Q
+
+
+RSS_SAMPLE = 'sampled_process_tree_peak_rss_bytes'
 
 
 def require(condition,message):
@@ -59,6 +63,9 @@ def analyze(folder):
         require(run['command'].get('exit_code')==0 and run['command'].get('reason') is None,'clean exit without guard')
         for k in ['wall_seconds','child_user_seconds','child_system_seconds']:
             require(math.isfinite(run['command'][k]) and run['command'][k]>=0,'finite nonnegative timings')
+        peak = run['command'].get(RSS_SAMPLE)
+        require(peak is None or (type(peak) is int and peak >= 0),
+                f"invalid sampled peak RSS for {run['case']} {run['lane']} at position {run['position']}")
         if run['lane']=='mlf':require(type(run['fresh']) is int and run['fresh']>0 and
             type(run['reused']) is int and run['reused']==0,'fresh MLF target')
         groups[run['case'],run['lane']].append(run)
@@ -66,6 +73,7 @@ def analyze(folder):
             'position':run['position'],'wall_seconds':run['command']['wall_seconds'],
             'child_user_seconds':run['command']['child_user_seconds'],
             'child_system_seconds':run['command']['child_system_seconds'],
+            RSS_SAMPLE:peak,
             'exit_code':run['command'].get('exit_code'),'fresh':run.get('fresh'),'reused':run.get('reused'),
             'output_correct':run['output_correct'],'started_utc':run['command'].get('started_utc'),
             'executable_sha256':run.get('executable_sha256')})
@@ -83,6 +91,8 @@ def analyze(folder):
             row[lane+'_user_median']=S.median(r['command']['child_user_seconds'] for r in rs)
             row[lane+'_system_median']=S.median(r['command']['child_system_seconds'] for r in rs)
             row[lane+'_samples']=times
+            peaks=[r['command'].get(RSS_SAMPLE) for r in rs]
+            row[lane+'_peak_rss_bytes']=fit_growth.median_peak_rss(peaks)
             if lane=='mlf':
                 row['fresh']=rs[0]['fresh'];row['reused']=0;row['max_group_members']=rs[0]['max_group_members']
                 require(all(r['fresh']==row['fresh'] for r in rs),'stable query group count')
@@ -115,6 +125,8 @@ def analyze(folder):
                     require(all(n==row['fresh'] for n in counts),'one persisted query object per fresh group')
                     row['query_files']=counts[0]
                     row['query_bytes_median']=S.median(sum(v['bytes'] for k,v in inv.items() if k.endswith('.mlfq')) for inv in inventories)
+        mlf_rss, ghc_rss = (row[field] for field in fit_growth.PEAK_RSS_MEDIANS)
+        row[fit_growth.PEAK_RSS_RATIO] = fit_growth.peak_rss_ratio(mlf_rss, ghc_rss)
         row['mlf_over_ghc']=row['mlf_wall_median']/row['ghc_wall_median'];rows.append(row)
     return rows,plan,receipt,samples
 
@@ -152,12 +164,42 @@ def markdown(report,rows,samples):
     if report['duplicate_cells_across_cohorts']:
         lines+=['','Cells present in more than one cohort (listed, never combined): '
                 +', '.join('`'+c['family']+'-'+str(c['size'])+'`' for c in report['duplicate_cells_across_cohorts'])+'.']
+    lines+=['', '## Build performance checks', '']
+    for cohort in report['cohorts']:
+        label = cohort['benchmark']['cohort']
+        if len(report['cohorts']) > 1:
+            lines += ['### ' + label, '']
+        lines += fit_growth.markdown(cohort['growth']) + ['']
+        lines += fit_growth.peak_rss_markdown(row for row in rows if row['cohort'] == label) + ['']
     lines+=['','## Reading this table','']
     lines+=['- '+limit for limit in report['claim_limits']]
     lines+=['- Spread is (max - min) / median over the recorded repetitions; it is a description of this window, not an error bar.',
             '- A ratio above 1.00 means MLF took longer for that cell in this cohort. It is not a universal speed claim.',
             '- Cohorts are separate windows and are never pooled into one median.','']
     return '\n'.join(lines)
+
+
+def save_recorded_growth(folder):
+    """Publish a standalone growth report beside a recorder receipt."""
+    receipt_path = folder / 'receipt.json'
+    receipt = load(receipt_path)
+    if receipt['complete'] and receipt['all_cases_passed'] and not receipt['failures']:
+        rows, plan, _, samples = analyze(folder)
+    else:
+        plan_path = folder / 'plan.json'
+        require(sha(plan_path) == receipt['plan_sha256'], 'frozen plan digest')
+        plan = load(plan_path)
+        rows = [dict(case=case['id'], family=case['family'], size=case['size'], status='unqualified')
+                for case in plan['cases']]
+        samples = []
+    reports = fit_growth.family_reports(rows, samples, plan['benchmark']['repeats'])
+    result = {'endpoint': plan['benchmark']['endpoint']['id'], 'receipt_sha256': sha(receipt_path),
+              'growth': reports}
+    (folder / 'growth.json').write_text(json.dumps(result, indent=2) + '\n')
+    path = folder / 'growth.md'
+    path.write_text('\n'.join(['# Build performance checks', '', *fit_growth.markdown(reports), '',
+                              *fit_growth.peak_rss_markdown(rows), '']))
+    return path
 
 
 def main():
@@ -172,13 +214,13 @@ def main():
             'plan_sha256':sha(cohort/'plan.json'),'compile_runs':len(receipt['runs']),
             'executable_oracle_runs':sum(len(r['oracle_inputs']) for r in receipt['runs']),
             'cell_count':len(plan['cases']),'host':plan['host'],'compatibility':compatibility(plan),
-            'source':plan['source']})
+            'source':plan['source'],'growth':fit_growth.family_reports(data,points,plan['benchmark']['repeats'])})
     reference=cohorts[0]['compatibility']
     for cohort in cohorts[1:]:
         difference=sorted(k for k in reference if cohort['compatibility'][k]!=reference[k])
         require(not difference,'incompatible cohorts differ in: '+', '.join(difference))
     seen=collections.Counter((r['family'],r['size']) for r in rows)
-    report={'scope':'descriptive measured medians, ratio of medians; no confidence intervals; cohorts are never pooled',
+    report={'scope':'timing and peak RSS medians with paired growth estimates per cohort',
         'endpoint':reference['endpoint'],
         'endpoint_summary':cohorts[0]['benchmark']['endpoint'],
         'native_installed_emlf_measured':False,

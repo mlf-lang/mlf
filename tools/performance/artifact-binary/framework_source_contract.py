@@ -12,6 +12,10 @@ import tempfile
 BASELINE = '720dd649627fbf8b19c7447493a4fdf6fd05eb39'
 BASELINE_TREE = '65a02f636c716d4f58a9997d87ec89677e41a609'
 MANIFEST = 'test-framework-source-migration.json'
+FOUNDATION_MANIFEST = 'foundation-source-migration.json'
+FOUNDATION = 'd607907bda1ce5ac053dae10497dc1888b08f0fc'
+FOUNDATION_TREE = '937e4b687ce8af86ffd4aa6fa239dfbe860ec1ef'
+FOUNDATION_MERGE_PATHS = {'mlf.lock', 'tests/shared/MLF/Tests/SharedFrontend.hs'}
 ARCHIVE_PATHS = (
     'bootstrap', 'host', 'libraries', 'package', 'runtime', 'testing', 'tests',
     'tools/performance', 'tools/shared', 'shared-sources.json', 'mlf.lock',
@@ -56,17 +60,45 @@ def baseline_root(history_root):
     return Path(archived_baseline(source_repository(history_root)).name)
 
 
-def successor_type(predecessor_type, predecessor_manifest, manifest_pin, read_implementation):
+def foundation_changes(spec, repository, files, framework_changes, framework_pin):
+    require(set(spec) == {'commit', 'tree', 'framework_manifest_sha256', 'changes'} and
+            spec['commit'] == FOUNDATION and spec['tree'] == FOUNDATION_TREE and
+            spec['framework_manifest_sha256'] == framework_pin, 'exact Foundation transition identity')
+    git = ['git', '--no-replace-objects', '-C', repository]
+    tree = subprocess.check_output([*git, 'rev-parse', FOUNDATION + '^{tree}'], text=True).strip()
+    require(tree == FOUNDATION_TREE, 'pinned Foundation tree')
+    changed = subprocess.check_output([*git, 'diff-tree', '--no-commit-id', '--name-only',
+                                       '--no-renames', '-r', FOUNDATION], text=True).splitlines()
+    changes = spec['changes']
+    require(changes.keys() == files.keys() & set(changed), 'complete Foundation source transition')
+    require(changes.keys() & framework_changes.keys() == FOUNDATION_MERGE_PATHS,
+            'exact Foundation overlap with the test-framework transition')
+    for path, row in changes.items():
+        prior = subprocess.check_output([*git, 'show', FOUNDATION + '^:' + path])
+        branch = subprocess.check_output([*git, 'show', FOUNDATION + ':' + path])
+        baseline_digest = framework_changes[path][0] if path in framework_changes else files[path]
+        require(set(row) == {'framework', 'branch', 'merged'} and row['framework'] == files[path] and
+                sha(prior) == baseline_digest and
+                row['branch'] == sha(branch) and row['framework'] != row['merged'] and
+                (path in FOUNDATION_MERGE_PATHS or row['merged'] == row['branch']),
+                'Foundation source endpoint: ' + path)
+    return {path: row['merged'] for path, row in changes.items()}
+
+
+def successor_type(predecessor_type, predecessor_manifest, framework_pin, manifest_pin, read_implementation):
     """Reuse exact projection operations, adding a locally reviewed inventory edge."""
 
     class Contract(predecessor_type):
         def __init__(self, directory, manifest_sha256, history_root, source_root=None):
             self.directory = Path(directory).resolve(strict=True)
             raw = read_implementation(self.directory / MANIFEST)
-            require(sha(raw) == manifest_pin == manifest_sha256, 'pinned manifest SHA')
+            require(sha(raw) == framework_pin, 'pinned framework manifest SHA')
+            foundation_raw = read_implementation(self.directory / FOUNDATION_MANIFEST)
+            require(sha(foundation_raw) == manifest_pin == manifest_sha256, 'pinned Foundation manifest SHA')
             self.manifest_sha256 = manifest_sha256
             self.source_root = Path(source_root or Path(history_root).parents[1]).resolve(strict=True)
-            self.archived = baseline_root(history_root)
+            repository = source_repository(history_root)
+            self.archived = Path(archived_baseline(repository).name)
             archived_history = self.archived / 'tools/performance'
             self.previous = predecessor_type(self.directory, predecessor_manifest,
                                             archived_history, self.archived)
@@ -77,7 +109,7 @@ def successor_type(predecessor_type, predecessor_manifest, manifest_pin, read_im
                     spec['baseline'] == BASELINE and spec['baseline_tree'] == BASELINE_TREE and
                     spec['predecessor_manifest_sha256'] == predecessor_manifest,
                     'exact predecessor identity and transition schema')
-            self.changes = spec['changes']
+            self.changes = dict(spec['changes'])
             self.maintenance = spec['maintenance']
             old_files = self.previous.value['current_files']
             old_paths = self.previous.value['module_paths']
@@ -90,6 +122,10 @@ def successor_type(predecessor_type, predecessor_manifest, manifest_pin, read_im
             for path, (old, new) in self.changes.items():
                 require(old == old_files[path] and old != new, 'source transition: ' + path)
                 files[path] = new
+            foundation = foundation_changes(self.core.strict_json(foundation_raw), repository,
+                                            files, self.changes, framework_pin)
+            self.changes.update({path: [old_files[path], new] for path, new in foundation.items()})
+            files.update(foundation)
             self.core.hash_map(files, 'current framework sources')
             paths = {n: p for n, p in old_paths.items() if n not in retired}
             self.value = {'current_files': files, 'module_paths': paths,
@@ -107,7 +143,7 @@ def successor_type(predecessor_type, predecessor_manifest, manifest_pin, read_im
             self.added_paths = self.previous.added_paths
             require(not self.removed_paths.intersection(self.added_paths),
                     'retirement leaves historical addition evidence intact')
-            self.metadata_paths = (*self.previous.metadata_paths, MANIFEST, Path(__file__).name)
+            self.metadata_paths = (*self.previous.metadata_paths, MANIFEST, FOUNDATION_MANIFEST, Path(__file__).name)
             history_names = set(self.parent['frozen_history']) | set(self.maintenance_parent['files'])
             require(self.maintenance.keys() <= history_names, 'unknown maintenance owner')
             for name in history_names:

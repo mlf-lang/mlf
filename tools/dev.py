@@ -73,7 +73,7 @@ def check_tools(args):
     if sys.platform in ('linux', 'darwin'):
         suites.extend(('compiler-shapes-contract', 'compiler-shapes-sweep',
                        'compiler-shapes-cancellation', 'compiler-shapes-data-shapes',
-                       'compiler-shapes-rank-shapes'))
+                       'compiler-shapes-rank-shapes', 'compiler-shapes-fit-growth'))
     elif not args.suite:
         print('The compiler-shape harness is tested on macOS and Linux.', flush=True)
     if args.suite:
