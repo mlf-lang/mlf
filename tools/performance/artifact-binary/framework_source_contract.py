@@ -19,11 +19,11 @@ FOUNDATION_MERGE_PATHS = {'mlf.lock', 'tests/shared/MLF/Tests/SharedFrontend.hs'
 HOSTED_PARITY_CHANGES = {
     'mlf.lock': (
         '7f98e4a7552ef58cafd5b200f3dd722d127c23227e7d6bd5f53280fc84128d97',
-        '88b174d70a31399b189fa0ab864ebe753bcf492ad30d400cdf9bff962b347663',
+        'e7caa82b98dcfa22d52c9cda775f6ae95b255b8941bb31c7677d4f4056a0d6c1',
     ),
     'tests/Tests/CompilerTests.hs': (
         'ff14edf8bf979c34979117b2c1aff5c31b7c508d8f321474a3b40a548836d961',
-        '57c8284be73681306fbcaa08a24bf54421628f4340fba403ff801c93b918e56b',
+        '65ef8e082ef3fdd551514ec97912011d058792a29f00b2b1423c522377437068',
     ),
 }
 ARCHIVE_PATHS = (

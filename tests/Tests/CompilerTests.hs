@@ -1619,8 +1619,9 @@ module Tests.CompilerTests where {
       return ((,) exporter checker)
     }
     else do {
+      attempt <- O.temporaryDirectory (output c) (output c ++ "/hosted-parity-helpers-");
       let {
-        directory = output c ++ "/hosted-parity-helpers";
+        directory = attempt ++ "/build";
         program = root c ++ "/tools/shared/prepare_parity.py";
         receiptPath = directory ++ "/receipt.json"
       };
