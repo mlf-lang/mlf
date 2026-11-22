@@ -38,7 +38,7 @@ def tag_selector(lo, hi):
 
 
 def program(family, n):
-    """No generated declaration is intentionally unreachable from the IO entry."""
+    """Generate one shared module with a runtime input at its IO entry."""
     if family == 'baseline':
         declarations, expression = '', 'x'
     elif family == 'captured_parameter_uses':
@@ -483,6 +483,19 @@ tick = Parser (\s -> if ltInt s 1 then Stop else Next s (subInt s 1));
                 + 'else ioBind (printInt (selectedScore i)) (\\_ -> printAll (addInt i 1));\n'
                 + 'main :: IO ();\nmain = ioBind (getArg 0) (\\text -> if eqString text "--all" '
                 + 'then printAll 0 else printInt (entry (readInt text)))\n}\n')
+    elif family == 'visible_instance_inventory':
+        rows = ['class Score a where { score :: a -> Int };',
+                'instance Score Int where { score x = x };']
+        for i in range(n):
+            rows.extend((f'data Box{i} a = B{i} a;',
+                         f'instance Score a => Score (Box{i} a) where '
+                         f'{{ score (B{i} v) = addInt (score v) {7*(i+1)} }};'))
+        declarations = '\n'.join(rows) + '\n'
+        # All instances are in scope at the two calls, including the unused middle ones.
+        first = '(B0 y)' if n else 'y'
+        last = f'(B{n-1} y)' if n else 'y'
+        expression = ('let { ident a = a; b = ident (ltInt x 0); y = ident x } '
+                      f'in if b then score {first} else score {last}')
     elif family == 'class_instances':
         declarations = ('class Score a where { score :: a -> Int };\n'
                         'measure :: forall a. Score a => a -> Int;\nmeasure value = score value;\n')
@@ -696,6 +709,9 @@ def expected(family, n, x):
         return cycles * n * (n + 1) // 2 + remainder * (remainder + 1) // 2 + remainder
     if family == 'wide_case':
         return x + 2 * max(0, min(x, n-1)) + 1
+    if family == 'visible_instance_inventory':
+        selected = min(1, n) if x < 0 else n
+        return (x + 7*selected + 2**63) % 2**64 - 2**63
     if family == 'class_instances':
         return x*n*(n+1)//2 + n*(n-1)*(n+1)//3
     if family == 'dependency_diamonds':
@@ -747,6 +763,8 @@ def generate(out, sizes=None, families=None):
         inputs = [-1,0,n+3] if family == 'recursive_ring' else [-1,0,7]
         if family == 'wide_case':
             inputs = [-1, n//2, n, '--all']
+        elif family == 'visible_instance_inventory':
+            inputs = [-2**63, -1, 0, 7, 2**63-1]
         elif family == 'recursive_lookup_workers':
             inputs = [3 - n, 5 - n//2, 8, 9]
         elif family == 'decoder_pipeline':

@@ -450,6 +450,35 @@ class ScheduleTests(unittest.TestCase):
             for x in (-7, 0, 11):
                 self.assertEqual(generate.expected(family, bindings, x), sum([x] * (bindings + 1)))
 
+    def test_visible_instance_inventory_keeps_two_calls_in_one_polymorphic_let(self):
+        family = 'visible_instance_inventory'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        self.assertNotIn(family, generate.REGISTRY['matrices']['default']['families'])
+        with tempfile.TemporaryDirectory() as root:
+            cases = generate.generate(Path(root)/'cases', [0, 1, 2, 4, 16, 32], [family])
+            for case in cases:
+                n = case['size']
+                source = Path(case['source']).read_text()
+                self.assertEqual(source.count('instance Score Int where { score x = x };'), 1)
+                self.assertEqual(re.findall(r'^data Box(\d+) a = B\1 a;$', source, re.M),
+                                 list(map(str, range(n))))
+                methods = re.findall(
+                    r'^instance Score a => Score \(Box(\d+) a\) where '
+                    r'\{ score \(B\1 v\) = addInt \(score v\) (\d+) \};$', source, re.M)
+                self.assertEqual(methods, [(str(i), str(7*(i+1))) for i in range(n)])
+                calls = f'score (B0 y) else score (B{n-1} y)' if n else 'score y else score y'
+                self.assertIn('entry :: Int -> Int;\n'
+                              'entry x = let { ident a = a; b = ident (ltInt x 0); y = ident x } '
+                              f'in if b then {calls};\n', source)
+                offsets = [int(offset) for _, offset in methods]
+                inputs = [-2**63, -1, 0, 7, 2**63-1]
+                self.assertEqual(case['inputs'], inputs)
+                outputs = []
+                for x in inputs:
+                    chosen = offsets[:1] if x < 0 else offsets[-1:]
+                    outputs.append(f'{self.signed_int(x + sum(chosen))}\n')
+                self.assertEqual(case['expected_stdout'], outputs)
+
     def test_class_declaration_reservations_keep_all_instance_calls_reachable(self):
         family = 'class_declaration_reservations'
         self.assertFalse(generate.REGISTRY['families'][family]['default'])
