@@ -30,6 +30,7 @@
     "nested_poly_types": {"label": "Nested polymorphic types", "default": true, "work": "n nested polymorphic Box constructors followed by n projections"},
     "rank2_callbacks": {"label": "Many rank-2 callback consumers", "default": true, "work": "n distinct consumers use their polymorphic callback at both Int and Bool"},
     "decoder_pipeline": {"label": "Dependent decoder stages", "default": true, "work": "n field reads with state-dependent checks and an early malformed-input exit"},
+    "stable_recursive_workers": {"label": "Stable recursive workers", "default": false, "work": "n reachable recursive functions beside a fully applied 24-argument lambda reduced over successive optimizer passes"},
     "escaping_curried_jobs": {"label": "Stored curried functions", "default": false, "work": "n distinct twelve-argument functions stored in a job list and partially applied and reused with two suffixes"},
     "captured_application_spines": {"label": "Applications of a captured function", "default": false, "work": "n calls through a function field with twelve ordered lazy arguments"},
     "curried_environment_prefix": {"label": "Curried environment prefix", "default": false, "work": "n distinct boxed arguments forwarded through a reusable partial closure"},

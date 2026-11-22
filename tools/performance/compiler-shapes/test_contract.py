@@ -335,6 +335,26 @@ class ScheduleTests(unittest.TestCase):
                     fields.append(fields.pop(0))
                 self.assertEqual(generate.expected(family, count, x), self.signed_int(result))
 
+    def test_stable_recursive_workers_keep_the_worker_table_and_beta_steps(self):
+        family = 'stable_recursive_workers'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        for n in (1, 8, 19, 32):
+            source = generate.program(family, n)
+            self.assertEqual(re.findall(r'\(Job worker(\d+) ', source), list(map(str, range(n))))
+            self.assertEqual(re.findall(r'\\a(\d+) -> ', source), list(map(str, range(24))))
+            for x in (-2**63, -35, -1, 0, 7, 29, 2**63-1):
+                def rem(a, b):
+                    q = abs(a) // b
+                    return a - (q if a >= 0 else -q)*b
+
+                offsets = [rem(self.signed_int(x+i), 31) for i in range(3, 27)]
+                result = offsets[0]
+                for offset in offsets[1:]:
+                    result = rem(3*result + offset, 97)
+                for i in range(1, n+1):
+                    result += i + sum(rem(i+k, 19) for k in range(1, rem(x, 11)+1))
+                self.assertEqual(generate.expected(family, n, x), self.signed_int(result))
+
     def test_escaping_curried_jobs_store_distinct_order_sensitive_functions(self):
         family = 'escaping_curried_jobs'
         self.assertFalse(generate.REGISTRY['families'][family]['default'])

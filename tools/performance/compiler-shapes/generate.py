@@ -169,6 +169,24 @@ producer x = if ltInt x 0 then next (subInt 0 x) else addInt x ({total});
             integer_call = call(integer, boolean)
             terms.append(f'if {call(boolean, integer)} then {integer_call} else subInt 0 ({integer_call})')
         expression = balanced(terms, lambda a,b:f'addInt ({a}) ({b})')
+    elif family == 'stable_recursive_workers':
+        rows = [HEADER, 'data Job = End | Job (Int -> Int) Job;',
+                'total :: Int -> Job -> Int;',
+                'total q list = case list of { End -> 0; Job f rest -> addInt (f q) (total q rest) };']
+        for i in range(n):
+            rows.extend([f'worker{i} :: Int -> Int;',
+                         f'worker{i} x = if ltInt x 1 then {i+1} else addInt '
+                         f'(worker{i} (subInt x 1)) (remInt (addInt x {i+1}) 19);'])
+        params = [f'a{i}' for i in range(24)]
+        state = params[0]
+        for param in params[1:]:
+            state = f'(remInt (addInt (mulInt {state} 3) {param}) 97)'
+        function = '(' + ''.join('\\' + param + ' -> ' for param in params) + state + ')'
+        args = ' '.join(f'(remInt (addInt x {i+3}) 31)' for i in range(len(params)))
+        jobs = ''.join(f'(Job worker{i} ' for i in range(n)) + 'End' + ')' * n
+        rows.extend(['entry :: Int -> Int;', f'entry x = addInt ({function} {args}) '
+                     f'(total (remInt x 11) {jobs});', MAIN])
+        return '\n'.join(rows)
     elif family == 'escaping_curried_jobs':
         arity = 12
         params = [f'a{j}' for j in range(arity)]
@@ -578,6 +596,23 @@ def expected(family, n, x):
     if family == 'inferred_poly_functions':
         negative = max(0, min(n, x + 1))
         return n*x + n*(n-1)//2 - 2*(negative*x + negative*(negative-1)//2)
+    if family == 'stable_recursive_workers':
+        def remainder(number, divisor):
+            return number % divisor if number >= 0 else -((-number) % divisor)
+
+        # readInt and addInt operate on signed 64-bit words. Truncating
+        # remainder keeps the sign of each input to the 24-argument function.
+        score = 0
+        for offset in range(3, 27):
+            value = (x + offset + 2**63) % 2**64 - 2**63
+            score = remainder(3*score + remainder(value, 31), 97)
+        # Sum each recursion level across the table. Every 19 workers use
+        # every residue exactly once, regardless of the starting position.
+        cycles, rest = divmod(n, 19)
+        total = n*(n+1)//2 + score
+        for level in range(1, remainder(x, 11)+1):
+            total += cycles*(18*19//2) + sum((level+i) % 19 for i in range(1, rest+1))
+        return (total + 2**63) % 2**64 - 2**63
     if family == 'escaping_curried_jobs':
         # The suffix offsets cancel in their original positions. Each endpoint
         # rotates the coefficients of the independently computed positional sum.
