@@ -2,7 +2,7 @@ module Tests.Backends
  (Backends, Entry(..), Event(..), Input(..), Observation(..), RuntimeError(..),
   withBackends, inventoryContext, withExecutionTimeout, withInterpreterTimeout, inCase, inRegisteredCase,
   auditBackends, auditSelectedBackends, auditNativeBackends, execute,
-  executeWithArguments, executeSerialized, executeNativeSerialized, serializeTerm, capture, outcome, events, remaining,
+  executeWithArguments, executeSerialized, executeNativeSerialized, executeGeneratedLLVM, serializeTerm, capture, outcome, events, remaining,
   output, outputBytes, stderrOutput, assertCase, failCase, rightCase, rejectCase, recoverCase, reportArgs) where
 import Bootstrap.Types
 import MLF.Primitive (IOError, catchIOError, ioError, ioeGetErrorString, textFromChars, textToChars, userError)
@@ -240,17 +240,30 @@ native context stem sourceHash arguments entry input = do
       let receipt = J.set "llvm" (J.str first) (J.set "sha256" (J.str digest) J.empty)
       writeFile prepared (J.render receipt ++ "\n")
       ioReturn ((,) first digest)
-    let program = directory context ++ "/program-" ++ hash
-    cached <- fileExists program
-    if cached then ioReturn () else do
-      flagsFile <- getEnv "MLF_TEST_LINK_FLAGS_FILE"
-      flags <- readFile flagsFile
-      root <- getEnv "MLF_TEST_ROOT"
-      let runtime = directory context ++ "/runtime.o"
-      let argv = S.append ((:) "clang" ((:) "-O2" ((:) "-Wno-override-module" ((:) llvm ((:) runtime ((:) (root ++ "/trace.o") [])))))) (S.append (O.unpack flags) ((:) "-lm" ((:) "-o" ((:) program []))))
-      code <- O.exec "" argv "" (stem ++ ".link.out") (stem ++ ".link.err") 1800
-      assertCase (code == 0) ("LLVM link failed (" ++ showInt code ++ "); see " ++ stem ++ ".link.err")
-    observe context (stem ++ "-llvm") ((:) program arguments) input
+    runLinkedLLVM context stem llvm hash arguments input
+
+-- Raw erased terms have no checked xMLF serialization. Run their emitted
+-- module with the same runtime, native observation and link cache as the matrix.
+executeGeneratedLLVM : Backends -> String -> String -> IO Observation
+executeGeneratedLLVM context name llvm = do
+  let path = directory context ++ "/case-" ++ name
+  let modulePath = path ++ ".ll"
+  writeFile modulePath llvm
+  hash <- fileDigest modulePath
+  runLinkedLLVM context path modulePath hash [] (Input "" false)
+
+runLinkedLLVM context stem llvm hash arguments input = do
+  let program = directory context ++ "/program-" ++ hash
+  cached <- fileExists program
+  if cached then ioReturn () else do
+    flagsFile <- getEnv "MLF_TEST_LINK_FLAGS_FILE"
+    flags <- readFile flagsFile
+    root <- getEnv "MLF_TEST_ROOT"
+    let runtime = directory context ++ "/runtime.o"
+    let argv = S.append ((:) "clang" ((:) "-O2" ((:) "-Wno-override-module" ((:) llvm ((:) runtime ((:) (root ++ "/trace.o") [])))))) (S.append (O.unpack flags) ((:) "-lm" ((:) "-o" ((:) program []))))
+    code <- O.exec "" argv "" (stem ++ ".link.out") (stem ++ ".link.err") 1800
+    assertCase (code == 0) ("LLVM link failed (" ++ showInt code ++ "); see " ++ stem ++ ".link.err")
+  observe context (stem ++ "-llvm") ((:) program arguments) input
 observe : Backends -> String -> [] String -> Input -> IO Observation
 observe context stem argv input = do
   Bytes.writeFile (stem ++ ".stdin") (encodedInput input)
