@@ -53,6 +53,17 @@ HOSTED_PARITY_CHANGES = {
         '65ef8e082ef3fdd551514ec97912011d058792a29f00b2b1423c522377437068',
     ),
 }
+# Local prepared-solver repair: only survivor demand and its lock digest change.
+C4_SURVIVOR_DEMAND_CHANGES = {
+    'libraries/mlf-inference/Bootstrap/Graph/Solver.hs': (
+        'df197571d58c89faef47b23a645cba89585093e5d6387fc9cc18bc6123ae022f',
+        'c5e9145114e6d7714d89010d4d78f61dac879a25dd3d6f37fdec047a30a31499',
+    ),
+    'mlf.lock': (
+        '85971352d3b7a012b388322969ff9d858e532e828482d5f04f63164d18ebf3ea',
+        'e714b87ec9a2aa4f92eec720e5436c9810015764bda13835c44426007041fcf9',
+    ),
+}
 COMPACT_SCOPE_MAINTENANCE = {
     'patricia/run_integrated.py': (
         '4fd2ad1497834d43189800dc720457fbe62c02511911d8c89317534336115744',
@@ -246,6 +257,10 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, founda
                                       branch, tree, framework, framework_tree, parents)
                 self.changes.update({path: [old_files[path], new] for path, new in edge.items()})
                 files.update(edge)
+            for path, (previous, current) in C4_SURVIVOR_DEMAND_CHANGES.items():
+                require(files[path] == previous, 'C4 survivor demand source transition: ' + path)
+                self.changes[path] = [old_files[path], current]
+                files[path] = current
             self.core.hash_map(files, 'current framework sources')
             paths = {n: p for n, p in old_paths.items() if n not in retired}
             self.value = {'current_files': files, 'module_paths': paths,

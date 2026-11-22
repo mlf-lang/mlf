@@ -2335,10 +2335,27 @@ module Bootstrap.Graph.Solver where {
         then Right (LocalRejected (diagnostic message)) else Left message;
       Right skeleton -> case closeLocalQuotientUsing scopeLift solver current before skeleton fresh of {
         Left message -> Right (LocalNeedsComponent message skeleton);
-        Right result -> Right result
+        Right result -> if L.not projectedErrors then Right result else case result of {
+          LocalSolved solved -> G.bindE projection
+            (\((,,,) _ _ originals _) -> G.bindE
+              (compareExpandedSurvivors (graph solved) originals)
+              (\_ -> Right result));
+          _ -> Right result
+        }
       }
     }
   };
+  -- The projected restoration compares nodes that survive, in ascending
+  -- original identity order. Keep that demand on constructor names and kinds
+  -- when returning the local fast result, without a second unification or
+  -- constructing the compact graph. Deleted nodes and unrelated components
+  -- must not acquire new demand.
+  compareExpandedSurvivors :: Graph -> [] ((,) Int Node) -> Either String ();
+  compareExpandedSurvivors solved = G.mapE_ (\((,) identity previous) ->
+    case IM.lookup identity (G.nodes solved) of {
+      Nothing -> Right ();
+      Just current -> seq (G.equalNode previous current) (Right ())
+    });
   closeLocalQuotient :: Solver -> Graph -> Graph -> Graph -> [] ((,) Int Node) -> Either String LocalUnification;
   closeLocalQuotient = closeLocalQuotientUsing noScopeLift;
   closeLocalQuotientUsing :: (Int -> Int -> Bool) -> Solver -> Graph -> Graph -> Graph -> [] ((,) Int Node) -> Either String LocalUnification;
