@@ -403,6 +403,21 @@ class ScheduleTests(unittest.TestCase):
                             for i in range(count))
                 self.assertEqual(generate.expected(family, count, value), total)
 
+    def test_captured_thunk_fanout_selects_fields_at_runtime(self):
+        family = 'captured_thunk_fanout'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        for count in (1, 8, 32, 128):
+            source = generate.program(family, count)
+            self.assertEqual(len(re.findall(r'^make\d+ a b c d = Row', source, re.M)), count)
+            self.assertIn('if ltInt selector 0 then addInt one three else addInt two four', source)
+            for value in (-7, -1, 0, 7, 11):
+                a, b, c, d = value, value + 3, 9 - value, 2 * value
+                rows = [(a * i, a * b, (a + b) * c, (a + b) * (c + d))
+                        for i in range(1, count + 1)]
+                selected = (0, 2) if value < 0 else (1, 3)
+                total = sum(row[field] for row in rows for field in selected)
+                self.assertEqual(generate.expected(family, count, value), total)
+
     def test_repeated_ground_dictionary_demands_preserve_call_paths(self):
         family = 'repeated_ground_dictionary_demands'
         self.assertFalse(generate.REGISTRY['families'][family]['default'])

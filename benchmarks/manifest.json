@@ -106,7 +106,7 @@
     "benchmarks/k-nucleotide/mlf/main.emlf": "f5be5957e29a02603b9b632d5169111a035002364e1464c79a055456055d4884",
     "benchmarks/regex-redux/mlf/main.emlf": "f8ade352362ffce016e22e9df99834777eaf2f731996d39e73ae7e89cfedefc4",
     "libraries/mlf-foundation/Bootstrap/Regex.hs": "016cda4d5a9cd2ed0161976ab4150d74c1b2843cb6a5a046aef72eccc1945b0d",
-    "libraries/mlf-foundation/Bootstrap/Types.hs": "9c6790a0469b6e6de6ac44bc39535f15fbed27cc283e4840cc3df4a34bc54964",
+    "libraries/mlf-foundation/Bootstrap/Types.hs": "c87f0e9e1dc675f324ecbcf5667a4f5761a30c9e16281ff19b38e925fd08d502",
     "libraries/mlf-foundation/Bootstrap/Std.hs": "fb5ff1d8eb96d8948f598fa3e6cb4e551457bb97cb1619a5ce31937c4a2332b8",
     "libraries/mlf-foundation/Bootstrap/IntMap.hs": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e",
     "libraries/mlf-foundation/Bootstrap/IntSet.hs": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe",

@@ -30,6 +30,8 @@ CLASSES_SUCCESSORS = (
     '5f813fb61a3982644a528e7fb481210e6da56b95',
     # Cold frontend work keeps the authenticated selector fixture byte-identical.
     '7f3649c519a3426cb14c035921175f510bc749ca',
+    # Ground dictionary reuse (ca21a467) leaves the extracted selector bytes unchanged.
+    '9825bb775624b6cdbc27b79b18c224ee2d978706',
 )
 PINS = {
  'test_direct.py':'a46bd66949e81c5761dff3446201640837ec8f68',

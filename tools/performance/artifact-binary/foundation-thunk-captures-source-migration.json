@@ -1,0 +1,27 @@
+{
+  "changes": {
+    "libraries/mlf-llvm/Bootstrap/LLVM/Build.hs": {
+      "branch": "fc51a6519b44e3d56a5c164b1a689f2850ef3b03e3335c2ccebf5fe6bfadcd58",
+      "branch_parent": "e56eac4bcc93e4400717aabf85ffd1c4fe552b78dfaf3f9861a2a5723502da9c",
+      "framework": "e56eac4bcc93e4400717aabf85ffd1c4fe552b78dfaf3f9861a2a5723502da9c",
+      "merged": "fc51a6519b44e3d56a5c164b1a689f2850ef3b03e3335c2ccebf5fe6bfadcd58"
+    },
+    "libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs": {
+      "branch": "04bc397b544ca852405a571833df20fb6f12e52127c96f353fa9b11df21e98e5",
+      "branch_parent": "233c3dbbcd101f8416cfa49cf65a96c2df8b0991a41c57ab8799dfc521733acc",
+      "framework": "233c3dbbcd101f8416cfa49cf65a96c2df8b0991a41c57ab8799dfc521733acc",
+      "merged": "04bc397b544ca852405a571833df20fb6f12e52127c96f353fa9b11df21e98e5"
+    },
+    "mlf.lock": {
+      "branch": "646466fc59fe592c1f5dd2b2eaae0c8983a1d679122424323c8e99ca45087c51",
+      "branch_parent": "b01960b20d0eb3f6f8592d73314a4abf79377456633a603c251a0e94098274a7",
+      "framework": "dc9f5974e845e8f48fbdaaace5efb70b51645b01af3df7cfcb68a90ce0220b27",
+      "merged": "daa47d82f95839314de150a98a958c971d2a7c9e56dd8d70a2cf0ddf238341a6"
+    }
+  },
+  "commit": "48d498a6696031323a2b3eac8bad10e4c3155d9b",
+  "dictionary_demand_manifest_sha256": "96064dcd3d09e3e7e3be19a3a1cc701a2ce9660af7702f99f0e07801a30cd737",
+  "framework_parent": "6805162d120b6fda66b82cc6a48e8f0490a446ef",
+  "framework_parent_tree": "d4a2027dc925c9c8139fe90f28a965a4f3b5e712",
+  "tree": "b1460a6a9277cda0747ce1a120dd01ec9f92890a"
+}
