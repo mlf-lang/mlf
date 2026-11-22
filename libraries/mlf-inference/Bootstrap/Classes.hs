@@ -869,7 +869,8 @@ module Bootstrap.Classes where {
   lowerUnsignedSourceRootProtectedOwned = lowerUnsignedSourceRootUsingNames sourceOwnedEnvironmentNames;
   lowerUnsignedSourceRootUsingNames environmentNames = lowerUnsignedRootAt environmentNames Nothing;
   lowerUnsignedRootAt = lowerUnsignedRootReading (Dependency.valueOccurrences True False);
-  lowerUnsignedRootReading references environmentNames owner
+  lowerUnsignedRootReading = lowerUnsignedRootWithDuplicates (\_ -> Nothing);
+  lowerUnsignedRootWithDuplicates duplicates references environmentNames owner
     inventory@(ClassInventory _ ds infos valueScopes _ baseMethodEnv _ _ _) overloads protected name original =
     do {
       body <- freshLift (Surface.lowerExpressionWithData ds original);
@@ -885,7 +886,9 @@ module Bootstrap.Classes where {
       let { wanted = inventoryWantedScopes inventory;
             available = case owner of { Nothing -> Dependency.lookupScope name wanted; Just i -> Dependency.scopeAt wanted i }
       };
-      lowered <- lowerExprIn (Dependency.nestedScopes wanted) ds infos environment
+      let { groups = if not usesManaged && ordinaryRecursiveSource ((,,) name Nothing body)
+              then duplicates else (\_ -> Nothing) };
+      lowered <- lowerExprInAtWith groups Nothing (Dependency.nestedScopes wanted) ds infos environment
         (fromMaybe (wantedScope valueScopes candidates) available) body;
       case lowered of {
         (,) rhs wanted -> do {
@@ -1714,6 +1717,7 @@ module Bootstrap.Classes where {
   -- Planning fixes dictionary arity/provenance, never predicate argument types.
   -- Those remain ordinary dictionary-arrow constraints in the existing solver.
   data QualifiedBinding = QualifiedKnown TermRef ([] String)
+                        | QualifiedRepeats TermRef ([] String) Bool ([] Int)
                         | QualifiedTemplate TermRef Int Int
                         | QualifiedRecursive TermRef Int;
   -- Per-expression extensions are lexical or explicitly owned by a slot.
@@ -1781,7 +1785,7 @@ module Bootstrap.Classes where {
   data QualifiedForm = QualifiedPlain SExpr
                      | QualifiedVariable TermRef Int (Maybe Int)
                      | QualifiedApply QualifiedExpr QualifiedExpr
-                     | QualifiedContext QualifiedExpr ([] QualifiedArgument)
+                     | QualifiedContext (Maybe TermRef) QualifiedExpr ([] QualifiedArgument)
                      | QualifiedLambda TermRef (Maybe SAnnotation) QualifiedExpr
                      | QualifiedLet TermRef (Maybe Int) QualifiedExpr QualifiedExpr
                      | QualifiedAnnotation QualifiedExpr SAnnotation
@@ -1866,8 +1870,9 @@ module Bootstrap.Classes where {
   };
   qualifiedEvidence :: Maybe ((,) String SourceSpan) -> Int -> QualifiedEnv ->
                        String -> QualifiedResult -> [] String -> Fresh QualifiedResult;
-  qualifiedEvidence site owner env hint source classes = do {
-    arguments <- mapM (\classId ->
+  qualifiedEvidence = qualifiedEvidenceWith Nothing;
+  qualifiedEvidenceWith grouped site owner env hint source classes = do {
+    original <- mapM (\classId ->
       if eqString classId callStackPredicate then do {
         evidence <- callSiteEvidence site hint (qualifiedManagedScope env);
         freshPure ((,) (ManagedArgument evidence) qualifiedEmpty)
@@ -1878,9 +1883,19 @@ module Bootstrap.Classes where {
           (QualifiedBuild [] ((:) (Q.Seed seed classId owner) []) []
             ((:) ((,) node (Q.SeedNode seed)) [])))
       }) classes;
-    let { build = qualifiedBuilds (map snd arguments) };
+    let { select position previous ordinals values = case (,) ordinals values of {
+      (,) ((:) parent more) ((:) entry rest) -> if parent == position then
+          (:) entry (select (position + 1) (IM.insert position (fst entry) previous) more rest)
+        else case IM.lookup parent previous of {
+          Nothing -> values; Just old -> (:) ((,) old qualifiedEmpty) (select (position + 1) previous more rest)
+        };
+      _ -> values
+    }; arguments = case grouped of { Nothing -> original; Just ((,) _ ordinals) -> select 0 IM.empty ordinals original };
+    build = qualifiedBuilds (map snd arguments) };
     case build of { QualifiedBuild _ _ _ nodes ->
-      qualifiedMake (QualifiedContext (qualifiedExpression source) (map fst arguments))
+      qualifiedMake (QualifiedContext (case grouped of {
+        Nothing -> Nothing; Just ((,) callee _) -> callee
+      }) (qualifiedExpression source) (map fst arguments))
         (Q.UnionNodes (map fst nodes)) (qualifiedMerge (qualifiedBuild source) build)
     }
   };
@@ -2111,6 +2126,11 @@ module Bootstrap.Classes where {
   planReference site owner env ref = case lookupQualified ref env of {
     Nothing -> qualifiedPlain (referenceExpr ref);
     Just (QualifiedKnown name classes) -> qualifiedKnown site owner env (termRefName ref) name classes;
+    Just (QualifiedRepeats name classes ground grouping) -> do {
+      source <- qualifiedPlain (referenceExpr name);
+      let { checked = if ground then Just name else Nothing };
+      qualifiedEvidenceWith (Just ((,) checked grouping)) site owner env (termRefName ref) source classes
+    };
     Just (QualifiedRecursive name source) ->
       qualifiedMake (QualifiedVariable name source Nothing) (Q.RefNode source) qualifiedEmpty;
     Just (QualifiedTemplate name frame source) -> do {
@@ -2389,7 +2409,7 @@ module Bootstrap.Classes where {
         LexicalRef _ -> node /= source
       };
       QualifiedApply f x -> visit f && visit x;
-      QualifiedContext f arguments -> all ordinary arguments && visit f;
+      QualifiedContext _ f arguments -> all ordinary arguments && visit f;
       QualifiedLambda (LexicalRef _) _ body -> visit body;
       QualifiedLambda _ _ _ -> False;
       QualifiedLet (LexicalRef _) _ rhs body -> visit rhs && visit body;
@@ -2439,7 +2459,7 @@ module Bootstrap.Classes where {
             right <- render bindings b;
             freshPure (SApp left right)
           };
-          QualifiedContext source arguments -> do {
+          QualifiedContext checkedCallee source arguments -> do {
             result <- render bindings source;
             values <- mapM (\argument -> case argument of {
               ManagedArgument value -> freshPure value;
@@ -2452,7 +2472,18 @@ module Bootstrap.Classes where {
                 freshPure (SVar name)
               }
             }) arguments;
-            freshPure (foldl SApp result values)
+            -- The predecessor contract proved the entire dictionary prefix.
+            -- Keep every source operand and give inference one checked arrow.
+            let { ordinary = foldl SApp result values;
+              dictionary value = case value of { SVar name -> Just name; _ -> Nothing }
+            };
+            freshPure (case checkedCallee of {
+              Nothing -> ordinary;
+              Just callee -> case mapM dictionary values of {
+                Just names -> if length names >= 8 then SApplyDictionaries callee names else ordinary;
+                Nothing -> ordinary
+              }
+            })
           };
           QualifiedLambda name annotation body -> do {
             result <- render bindings body;
@@ -2562,8 +2593,9 @@ module Bootstrap.Classes where {
     [] ((,) EvidenceRole String) -> SExpr -> Fresh ((,) SExpr ([] ((,) String String)));
   lowerExprAt site valueScopes ds infos env candidates = lowerExprInAt site
     (Dependency.mapScopes (wantedScope valueScopes) valueScopes) ds infos env (wantedScope valueScopes candidates);
-  lowerExprInAt site valueScopes ds infos env candidates expression = do {
-    result <- prepareQualified site valueScopes ds infos env candidates expression;
+  lowerExprInAt = lowerExprInAtWith (\_ -> Nothing);
+  lowerExprInAtWith duplicates site valueScopes ds infos env candidates expression = do {
+    result <- prepareQualifiedWith duplicates site valueScopes ds infos env candidates expression;
     case result of { (,,) planned plan frames -> do {
       parameters <- qualifiedParameters plan planned;
       lowered <- renderQualified plan frames infos (qualifiedParameterMap parameters) planned;
@@ -2573,10 +2605,11 @@ module Bootstrap.Classes where {
   prepareQualified :: Maybe ((,) String SourceSpan) -> Dependency.ValueScopes WantedScope ->
     DataEnv -> Map String Info -> Map String ((,) String ([] String)) ->
     WantedScope -> SExpr -> Fresh ((,,) QualifiedExpr Q.Plan (IntMap Q.Frame));
-  prepareQualified site valueScopes ds infos env candidates expression = do {
+  prepareQualified = prepareQualifiedWith (\_ -> Nothing);
+  prepareQualifiedWith duplicates site valueScopes ds infos env candidates expression = do {
     owner <- qualifiedId;
     result <- planQualified site valueScopes ds infos owner
-      (qualifiedEnvironment valueScopes env) candidates expression;
+      (qualifiedEnvironmentWith duplicates valueScopes env) candidates expression;
     build <- qualifiedFinish owner Nothing (qualifiedBuild result);
     case build of {
       QualifiedBuild frames seeds uses nodes -> do {
@@ -2586,7 +2619,8 @@ module Bootstrap.Classes where {
       }
     }
   };
-  qualifiedEnvironment scopes entries = QualifiedEnv M.empty (\ref -> case ref of {
+  qualifiedEnvironment = qualifiedEnvironmentWith (\_ -> Nothing);
+  qualifiedEnvironmentWith duplicates scopes entries = QualifiedEnv M.empty (\ref -> case ref of {
     LexicalRef n -> mapOptional (\((,) name classes) -> QualifiedKnown (LexicalRef name) classes)
       (M.lookup compareString n entries);
     DeclRef i _ -> case Dependency.scopeGeneration scopes of {
@@ -2594,7 +2628,10 @@ module Bootstrap.Classes where {
       Just table -> case Dependency.selectorEntry table i of {
         Just ((,) target classes) -> Just (QualifiedKnown
           (DeclRef target (Dependency.symbolName (Dependency.generatedSymbols table) target)) classes);
-        Nothing -> mapOptional (\((,) classes _) -> QualifiedKnown ref classes) (Dependency.scopeContract scopes i)
+        Nothing -> mapOptional (\((,) classes _) -> case duplicates i of {
+          Just ((,) ground ordinals) -> QualifiedRepeats ref classes ground ordinals;
+          Nothing -> QualifiedKnown ref classes
+        }) (Dependency.scopeContract scopes i)
       }
     }
   });

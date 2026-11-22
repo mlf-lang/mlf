@@ -408,6 +408,13 @@ module Bootstrap.ClassDemand where {
     }) IS.empty nodes
   } in IS.foldr (\binding rest ->
     all (\owner -> owner /= binding && beneath frames binding owner) owners && rest) True bindings;
+  -- Only seeds can change on empty inputs. Each productive visit schedules
+  -- every dependent, so the omitted initial visits cannot affect the update
+  -- order or count, even when requirements flow through a cycle.
+  seedWork :: IntMap Demand -> IntSet;
+  seedWork nodes = IS.fromDistinctAscList (IM.foldrWithKey (\n d rest -> case d of {
+    SeedNode _ -> (:) n rest; _ -> rest
+  }) [] nodes);
   solveInherited :: IntMap Seed -> IntMap Demand -> IntMap IntSet -> Either String Plan;
   solveInherited seeds nodes dependents = do {
     let { universe = allocateSeeds seeds };
@@ -416,7 +423,7 @@ module Bootstrap.ClassDemand where {
       _ -> demand
     }) nodes };
     (,) values updates <- saturate universe (IM.keysSet (universeSlots universe))
-      equations dependents (IM.keysSet nodes) (IM.map (\_ -> IS.empty) nodes) 0;
+      equations dependents (seedWork nodes) (IM.map (\_ -> IS.empty) nodes) 0;
     -- Every reachable input set is final. Share it across the uses of the
     -- node. A use may occur at several nodes in the general planner API, so
     -- keep the union of its inputs, omitting uses with no reachable slot.
@@ -451,7 +458,7 @@ module Bootstrap.ClassDemand where {
         if IS.eqIntSet next (IM.get output values) then fixed rest values
         else fixed (IS.union rest (IM.get output dependents)) (IM.insert output next values)
     };
-    owners = fixed (IM.keysSet nodes) (IM.map (\_ -> IS.empty) nodes)
+    owners = fixed (seedWork nodes) (IM.map (\_ -> IS.empty) nodes)
   } in if IM.foldr (\owners found -> IS.member bad owners || found) False owners then Nothing
     else Just (IM.foldrWithKey (\n demand rest -> case demand of {
       InstantiateNode use input -> if IS.foldr (\owner exists ->
@@ -509,7 +516,7 @@ module Bootstrap.ClassDemand where {
           }
         };
         (,) values updates <- saturateWith evaluateNode (IM.keysSet (universeSlots universe))
-          equations dependents (IM.keysSet nodes) (IM.map (\_ -> IS.empty) nodes) 0;
+          equations dependents (seedWork nodes) (IM.map (\_ -> IS.empty) nodes) 0;
         let {
           copyInputs = IM.keysSet mapping;
           inherited = IM.foldl (\seen demand -> case demand of {
@@ -559,7 +566,7 @@ module Bootstrap.ClassDemand where {
           _ -> do {
             Discovery universe reached _ <- discoverUniverse frames seeds uses nodes dependents;
             (,) values updates <- saturate universe (IM.keysSet (universeSlots universe))
-              nodes dependents (IM.keysSet nodes) (IM.map (\_ -> IS.empty) nodes) 0;
+              nodes dependents (seedWork nodes) (IM.map (\_ -> IS.empty) nodes) 0;
             ensure (IM.eqIntMap IS.eqIntSet reached values)
               "class demand: preallocation and immutable saturation disagree";
             Right (Plan universe values updates)

@@ -461,8 +461,8 @@ module Bootstrap.Elaborate where {
   evidenceRequests context outer locals typed rest = let {
     gen = C.generalization typed;
     env = extendEnvironment outer (boundsAtIn context gen);
-    visit givens form = let { child = evidenceRequests context env givens } in case form of {
-      FWithGivens bindings body -> visit (map (candidateTypeIn context) bindings) body;
+    visit givens form rest = let { child = evidenceRequests context env givens } in case form of {
+      FWithGivens bindings body -> visit (map (candidateTypeIn context) bindings) body rest;
       FScopedEvidence scope -> (:) ((,,) gen (EvidenceContext env givens) (ScopedEvidence scope)) rest;
       FEvidence candidates -> (:) ((,,) gen (EvidenceContext env givens) (ExplicitEvidence candidates)) rest;
       FLambda _ _ body _ -> child body rest;
@@ -471,7 +471,11 @@ module Bootstrap.Elaborate where {
       FApplyVariable _ _ argument _ -> child argument rest;
       FApplyDictionaries _ _ _ -> rest;
       FApplyGroundDictionaries _ _ arguments -> foldr (\((,) argument _) tail -> child argument tail) rest arguments;
-      FApplyPrimitive _ _ arguments -> foldr (\((,) argument _) tail -> child argument tail) rest arguments;
+      FApplyPrimitive _ _ arguments -> foldr (\operand tail -> case operand of {
+        PrimitiveUse argument _ -> child argument tail;
+        ClosedPrimitiveForm current -> visit givens current tail
+      }) rest arguments;
+      FPrimitiveStringConversion _ _ _ dictionary _ _ -> child dictionary rest;
       FIntStringCalls _ worker value _ _ arms fallback _ ->
         child worker (child value (foldr (\(StringCallArm _ _ argument _ _) tail -> child argument tail)
           (child fallback rest) arms));
@@ -490,7 +494,7 @@ module Bootstrap.Elaborate where {
         givens body rest;
       _ -> rest
     }
-  } in visit locals (C.rawForm typed);
+  } in visit locals (C.rawForm typed) rest;
   elaborate graph typed =
     do {
       evidence <- resolveEvidence graph typed;
@@ -593,8 +597,17 @@ module Bootstrap.Elaborate where {
             Right (foldl XApp function operands)
           };
           FApplyPrimitive primitive types arguments -> do {
-            operands <- mapM (\((,) argument proof) -> childEdge argument proof) arguments;
+            operands <- mapM (\operand -> case operand of {
+              PrimitiveUse argument proof -> childEdge argument proof;
+              ClosedPrimitiveForm current -> elaborateForm current
+            }) arguments;
             Right (foldl XApp (XPrimitive primitive (map (referenceIn context) types)) operands)
+          };
+          FPrimitiveStringConversion primitive selector domain dictionary use text -> do {
+            value <- childEdge dictionary use;
+            let { convert = X.instantiate (XVarTerm selector) (X.typeApplication domain);
+                  chars = XApp (XPrimitive PTextToChars []) (XStringTerm text) };
+            Right (XApp (XPrimitive primitive []) (XApp (XApp convert value) chars))
           };
           FIntStringCalls operator worker value valueProof result arms fallback restProof -> do {
             word <- child worker;

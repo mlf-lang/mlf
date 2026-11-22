@@ -357,7 +357,8 @@ module Bootstrap.Constraint where {
           }
         }
     };
-  data BindingEnv = BindingEnv (Map String Binding) (Map (V.Index Declaration) Binding);
+  data BindingEnv = BindingEnv (Map String Binding) (Map (V.Index Declaration) Binding) |
+    ClosedPrimitiveScope BindingEnv;
   compareRefSlot a b = compareInt (V.toInt a) (V.toInt b);
   compareTermRef a b = case (,) a b of {
     (,) (LexicalRef x) (LexicalRef y) -> compareString x y;
@@ -365,10 +366,12 @@ module Bootstrap.Constraint where {
     (,) (LexicalRef _) _ -> 0 - 1;
     _ -> 1
   };
+  lookupTerm (ClosedPrimitiveScope env) ref = lookupTerm env ref;
   lookupTerm (BindingEnv locals globals) ref = case ref of {
     LexicalRef n -> M.lookup compareString n locals;
     DeclRef i _ -> M.lookup compareRefSlot i globals
   };
+  bindTerm (ClosedPrimitiveScope env) ref value = ClosedPrimitiveScope (bindTerm env ref value);
   bindTerm (BindingEnv locals globals) ref value = case ref of {
     LexicalRef n -> BindingEnv (M.insert compareString n value locals) globals;
     DeclRef i _ -> BindingEnv locals (M.insert compareRefSlot i value globals)
@@ -468,6 +471,16 @@ module Bootstrap.Constraint where {
       DeclRef _ _ -> case lookupTerm env ref of { Just (Poly _ source) -> scheme source; _ -> False };
       _ -> False
     };
+  checkedStringConverterName env graph ref =
+    if not (caseConverter env graph ref) then Nothing else case lookupTerm env ref of {
+      Just (Poly name source) -> case G.tag (G.nodeAt graph (G.genRoot graph source)) of {
+        GArr domain _ -> case G.tag (G.nodeAt graph domain) of {
+          GTyApp head _ -> case G.tag (G.nodeAt graph head) of {
+            GTyCon dictionary _ -> Just ((,) name dictionary); _ -> Nothing
+          }; _ -> Nothing
+        }; _ -> Nothing
+      }; _ -> Nothing
+    };
   caseCoreRef :: Core -> Maybe TermRef;
   caseCoreRef expr = case expr of {
     CVar name -> Just (LexicalRef name); CGlobal i name -> Just (DeclRef i name); _ -> Nothing
@@ -553,6 +566,81 @@ module Bootstrap.Constraint where {
       }
     }
   } in walk root operands && all fixed (IS.toList reached);
+  -- Read a complete, monomorphic checked arrow prefix. A first-order tail
+  -- is embedded under the caller; no node of the saved scheme is mutated.
+  repeatedDictionaryCall graph source operands alreadyGround = let {
+    root = G.genRoot graph source;
+    atom n = case G.tag (G.nodeAt graph n) of {
+      GTyApp f a -> case (,) (G.tag (G.nodeAt graph f)) (G.tag (G.nodeAt graph a)) of {
+        (,) (GTyCon c (KArrow Star Star)) (GCon t []) -> Just ((,) c t); _ -> Nothing
+      }; _ -> Nothing
+    };
+    nominal n = case G.tag (G.nodeAt graph n) of { GCon c [] -> Just (SCon c []); _ -> Nothing };
+    tail n = case G.tag (G.nodeAt graph n) of {
+      GArr a b -> do { x <- nominal a; y <- nominal b; Just (SArrow x y) };
+      _ -> nominal n
+    };
+    walk c t first n remaining = case remaining of {
+      [] -> tail n;
+      (:) _ more -> case G.tag (G.nodeAt graph n) of {
+        GArr domain result -> if domain == first then walk c t first result more else do {
+          (,) other actual <- atom domain;
+          if eqString c other && eqString t actual then walk c t first result more else Nothing
+        };
+        _ -> Nothing
+      }
+    }
+  } in case (,) operands (G.tag (G.nodeAt graph root)) of {
+    (,) ((:) _ ((:) _ _)) (GArr first _) -> do {
+      (,) c t <- atom first;
+      result <- walk c t first root operands;
+      if alreadyGround || groundDictionaryDomains graph source (map (\_ -> (,) c ()) operands)
+      then Just ((,,) c t result) else Nothing
+    };
+    _ -> Nothing
+  };
+  fileApplication specialized ordinary = WithCandidates (\memo state ->
+    runWithCandidates memo (case memo of {
+      SeparateEnvironments -> ordinary;
+      _ -> specialized
+    }) state);
+  -- A complete first-order producer can prove that all of these distinct
+  -- binders have one closed nominal predicate. Only their type is shared.
+  buildDictionaryPrefix common scopeRoot datatypes typeScope env gen root names body = let {
+    bottom = newNode GBot (Just gen) Flexible;
+    setTag tag = setNode root (Node tag (Just gen) Flexible);
+    child = buildUnder scopeRoot datatypes typeScope gen
+  } in do {
+        shared <- case common of {
+          Nothing -> return Nothing;
+          Just ((,) constructor argument) -> do {
+            known <- embed datatypes M.empty (SCon constructor [SCon argument []]);
+            attach gen Rigid known;
+            return (Just known)
+          }
+        };
+        parameters <- mapM (\n -> do {
+          name <- freshName n;
+          domain <- case shared of { Nothing -> bottom; Just known -> return known };
+          return ((,,) (LexicalRef n) name domain)
+        }) names;
+        result <- bottom;
+        case parameters of {
+          (:) ((,,) _ _ first) rest -> do {
+            tail <- foldM (\to ((,,) _ _ from) -> newNode (GArr from to) (Just gen) Flexible)
+              result (reverse rest);
+            setTag (GArr first tail)
+          };
+          _ -> failGenerate "missing inferred dictionary binders"
+        };
+        let {
+          bindings = map (\((,,) ref name domain) -> (,) ref (Mono name domain)) parameters
+        };
+        let { scope = bindTerms env bindings };
+        value <- child (case common of { Just _ -> ClosedPrimitiveScope scope; _ -> scope }) body;
+        proof <- edge (generalization value) result;
+        return (FBindDictionaries (map (\((,,) _ name domain) -> (,) name domain) parameters) value proof)
+      };
   buildCoreUnder :: Int -> DataEnv -> Map String Int -> BindingEnv -> Int -> Int -> Core -> Generate Form;
   buildCoreUnder scopeRoot datatypes typeScope env gen root core =
     let {
@@ -623,11 +711,6 @@ module Bootstrap.Constraint where {
         eb <- edge (generalization b') domain;
         return (FApply a' b' ea eb)
       };
-      fileApplication saturated ordinary = WithCandidates (\memo state ->
-        runWithCandidates memo (case memo of {
-          SeparateEnvironments -> ordinary;
-          _ -> saturated
-        }) state);
       -- These operands cannot flush the graph or issue a pattern projection.
       -- Bound the lookahead so nested calls take linear time to classify.
       simpleOperand depth operand = case operand of {
@@ -657,18 +740,102 @@ module Bootstrap.Constraint where {
         };
         _ -> ordinary
       }) ordinary;
-      primitiveApplication primitive types operands = do {
-        -- Generating the next operand may flush the solver.
-        arguments <- mapM (\((,) expression target) -> do {
+      verifiedCall source ref count alreadyGround = WithCandidates (\memo state -> runWithCandidates memo (case (,) memo ref of {
+        (,) (BatchedEnvironments _) (DeclRef _ _) -> do {
+          graph <- getGraph;
+          case repeatedDictionaryCall graph source count alreadyGround of {
+            Just ((,,) dictionary argument tail) -> do {
+              wanted <- embed datatypes M.empty (SCon dictionary [SCon argument []]);
+              attach gen Rigid wanted;
+              result <- embed datatypes M.empty tail;
+              attach gen Flexible result;
+              equality root result;
+              return (Just ((,) wanted (Edge source (G.genRoot graph source))))
+            };
+            _ -> return Nothing
+          }
+        };
+        _ -> return Nothing
+      }) state);
+      primitiveApplication primitive types operands = let {
+        ordinary expression target = do {
           argument <- child env expression;
           proof <- edge (generalization argument) target;
-          return ((,) argument proof)
-        }) operands;
+          return (PrimitiveUse argument proof)
+        };
+        result arity p = let {
+          fixed n ty = case (,) n ty of {
+            (,) 0 (Applied name []) -> Just name;
+            (,) count (Function (Applied _ []) tail) -> if count > 0 then fixed (count - 1) tail else Nothing;
+            _ -> Nothing
+          }
+        } in case P.primitiveSignature p of { (,) [] ty -> fixed arity ty; _ -> Nothing };
+        targetResult expression = case expression of {
+          CApp (CPrimitive p) _ -> result 1 p;
+          CApp (CApp (CPrimitive p) _) _ -> result 2 p;
+          CApp (CApp (CApp (CPrimitive p) _) _) _ -> result 3 p;
+          _ -> Nothing
+        };
+        operand ((,) expression target) = case env of {
+          ClosedPrimitiveScope _ -> case targetResult expression of {
+            Just output -> do {
+              graph <- getGraph;
+              case G.nodeAt graph target of {
+                Node (GCon required []) (Just owner) Flexible ->
+                  if owner == gen && G.resolve graph target == target && eqString output required then
+                    fmap ClosedPrimitiveForm (buildCoreUnder scopeRoot datatypes typeScope env gen target expression)
+                  else ordinary expression target;
+                _ -> ordinary expression target
+              }
+            };
+            _ -> ordinary expression target
+          };
+          _ -> ordinary expression target
+        }
+      } in do {
+        arguments <- mapM operand operands;
         return (FApplyPrimitive primitive types arguments)
       };
       -- A complete primitive call with closed nominal operands and result
       -- has no intermediate scheme to instantiate. Keep one proof for each
       -- operand, with types taken from the primitive's declared signature.
+      convertedPrimitive primitive operand ordinary = case operand of {
+        CApp (CApp converter (CVar dictionary)) (CApp (CPrimitive PTextToChars) (CString text)) ->
+          case (,,) (P.primitiveSignature primitive) (caseCoreRef converter) (lookupTerm env (LexicalRef dictionary)) of {
+            (,,) ((,) [] (Function (Applied input []) (Applied output []))) (Just ref) (Just (Mono _ supplied)) ->
+              fileApplication (do {
+                graph <- getGraph;
+                case checkedStringConverterName env graph ref of {
+                  Just ((,) name constructor) -> do {
+                    -- The selector has precisely forall a. D a -> [Char] -> a.
+                    -- This saturated primitive fixes a. The actual dictionary
+                    -- retains its own ordinary instantiation at D a.
+                    setTag (GCon output []);
+                    let { closed = case G.nodeAt graph supplied of {
+                            Node (GTyApp h a) _ Rigid -> case (,) (G.nodeAt graph h) (G.nodeAt graph a) of {
+                              (,) (Node (GTyCon c (KArrow Star Star)) (Just p) Rigid)
+                                  (Node (GCon t []) (Just q) Rigid) ->
+                                p == supplied && q == supplied && eqString c constructor && eqString t input;
+                              _ -> False
+                            };
+                            _ -> False
+                          } };
+                    expected <- if closed then return supplied else do {
+                      known <- embed datatypes M.empty (SCon constructor [SCon input []]);
+                      attach gen Flexible known;
+                      return known
+                    };
+                    value <- child env (CVar dictionary);
+                    use <- edge (generalization value) expected;
+                    return (FPrimitiveStringConversion primitive name (XCon input []) value use text)
+                  };
+                  Nothing -> ordinary
+                }
+              }) ordinary;
+            _ -> ordinary
+          };
+        _ -> ordinary
+      };
       closedPrimitive primitive operands ordinary = fileApplication (let {
         nominal field = case field of {
           Applied _ fields -> all nominal fields;
@@ -690,14 +857,31 @@ module Bootstrap.Constraint where {
         }
       } in case P.primitiveSignature primitive of {
         (,) [] fields -> case signature operands fields of {
-          Just ((,) arguments result) -> do {
-            targets <- mapM (\((,) term field) -> do {
-              identity <- owned field;
-              return ((,) term identity)
-            }) arguments;
-            resultType <- owned result;
-            equality root resultType;
-            primitiveApplication primitive [] targets
+          Just ((,) arguments result) -> let {
+            normal = do {
+              targets <- mapM (\((,) term field) -> do {
+                identity <- owned field;
+                return ((,) term identity)
+              }) arguments;
+              resultType <- owned result;
+              equality root resultType;
+              primitiveApplication primitive [] targets
+            }
+          } in case (,) env result of {
+            (,) (ClosedPrimitiveScope _) (Applied output []) -> do {
+              -- These primitives have a concrete result. Repeated operands of
+              -- that same nominal type keep separate use proofs against it.
+              setTag (GCon output []);
+              targets <- mapM (\((,) term field) -> do {
+                identity <- case field of {
+                  Applied input [] -> if eqString input output then return root else owned field;
+                  _ -> owned field
+                };
+                return ((,) term identity)
+              }) arguments;
+              primitiveApplication primitive [] targets
+            };
+            _ -> normal
           };
           Nothing -> ordinary
         };
@@ -756,28 +940,7 @@ module Bootstrap.Constraint where {
       };
       CGlobal i hint -> variable (DeclRef i hint);
       CLam x body -> lambda (LexicalRef x) body;
-      CBindDictionaries names body -> do {
-        parameters <- mapM (\n -> do {
-          name <- freshName n;
-          domain <- bottom;
-          return ((,,) (LexicalRef n) name domain)
-        }) names;
-        result <- bottom;
-        case parameters of {
-          (:) ((,,) _ _ first) rest -> do {
-            tail <- foldM (\to ((,,) _ _ from) -> newNode (GArr from to) (Just gen) Flexible)
-              result (reverse rest);
-            setTag (GArr first tail)
-          };
-          _ -> failGenerate "missing inferred dictionary binders"
-        };
-        let {
-          bindings = map (\((,,) ref name domain) -> (,) ref (Mono name domain)) parameters
-        };
-        value <- child (bindTerms env bindings) body;
-        proof <- edge (generalization value) result;
-        return (FBindDictionaries (map (\((,,) _ name domain) -> (,) name domain) parameters) value proof)
-      };
+      CBindDictionaries names body -> buildDictionaryPrefix Nothing scopeRoot datatypes typeScope env gen root names body;
       CDeclScope ids enclosed -> case (,) ids enclosed of {
         (,) [i] (CLam x body) -> lambda (DeclRef i x) body;
         (,) [i] (CLet x a b) -> binding (DeclRef i x) a b;
@@ -820,7 +983,7 @@ module Bootstrap.Constraint where {
           integer <- newNode (GCon "Int" []) (Just gen) Flexible;
           primitiveApplication PEqInt [] [(,) left integer,(,) b integer]
         }) ordinary;
-        CPrimitive primitive -> closedPrimitive primitive [b] ordinary;
+        CPrimitive primitive -> convertedPrimitive primitive b (closedPrimitive primitive [b] ordinary);
         CApp (CPrimitive primitive) x -> closedPrimitive primitive [x,b] ordinary;
         CApp (CApp (CPrimitive primitive) x) y -> closedPrimitive primitive [x,y,b] ordinary;
         CVar name -> variableApplication (LexicalRef name) b ordinary;
@@ -829,23 +992,70 @@ module Bootstrap.Constraint where {
       };
       CApplyScopedDictionaries function arguments -> let {
         ordinary = buildCoreUnder scopeRoot datatypes typeScope env gen root
-          (ordinaryScopedDictionaries (caseRefTerm function) arguments)
+          (ordinaryScopedDictionaries (caseRefTerm function) arguments);
+        -- The whole source scheme was checked by groundDictionaryDomains.
+        -- Adjacent wants for the same fully ground nominal argument in the
+        -- same lexical frame and immutable module scope have the same proof.
+        -- Distinct application positions keep separate instantiation edges.
+        atom graph n = case G.tag (G.nodeAt graph n) of {
+          GTyApp h a -> case (,) (G.tag (G.nodeAt graph h)) (G.tag (G.nodeAt graph a)) of {
+            (,) (GTyCon c (KArrow Star Star)) (GCon t []) -> Just ((,) c t); _ -> Nothing
+          }; _ -> Nothing
+        };
+        values graph n remaining previous = case remaining of {
+          [] -> return [];
+          (:) ((,) ((,) dictionary candidates@(CandidateEnvironment owner _)) domain) tail ->
+            case G.tag (G.nodeAt graph n) of {
+              GArr arg rest -> do {
+                let { key = atom graph arg;
+                      fresh = child env (CWantedScope dictionary candidates) };
+                value <- case (,) key previous of {
+                  (,) (Just ((,) c t)) (Just ((,,,) pc pt po old)) ->
+                    if owner /= po || not (eqString c pc && eqString t pt) then fresh else do {
+                      resolved <- resolveCandidateEnvironment env gen candidates;
+                      case (,) old resolved of {
+                        (,) (Typed _ (FScopedEvidence (ResolvedCandidateEnvironment previous _)))
+                            (ResolvedCandidateEnvironment actual _) ->
+                          if previous == actual then return old else fresh;
+                        _ -> fresh
+                      }
+                    };
+                  _ -> fresh
+                };
+                use <- edge (generalization value) domain;
+                let { next = mapOptional (\((,) c t) -> (,,,) c t owner value) key };
+                more <- values graph rest tail next;
+                return ((:) ((,) value use) more)
+              };
+              _ -> failGenerate "checked dictionary arrow inventory mismatch"
+            }
+        }
       } in fileApplication (case lookupTerm env function of {
         Just (Poly name source) -> do {
           graph <- getGraph;
           if not (groundDictionaryDomains graph source arguments) then ordinary else do {
             -- Each wanted keeps its lexical environment, source order and
             -- independent instantiation edge, as in the ordinary application.
-            domains <- mapM (\_ -> bottom) arguments;
-            arrow <- foldM (\result domain -> newNode (GArr domain result) (Just gen) Flexible)
-              root (reverse domains);
-            proof <- edge source arrow;
-            values <- mapM (\((,) ((,) dictionary candidates) domain) -> do {
+            known <- verifiedCall source function arguments True;
+            (,) proof domains <- case known of {
+              Just ((,) target use) -> return ((,) use (map (\_ -> target) arguments));
+              Nothing -> do {
+                pending <- mapM (\_ -> bottom) arguments;
+                arrow <- foldM (\result domain -> newNode (GArr domain result) (Just gen) Flexible)
+                  root (reverse pending);
+                use <- edge source arrow;
+                return ((,) use pending)
+              }
+            };
+            operands <- WithCandidates (\memo state -> runWithCandidates memo (case memo of {
+              BatchedEnvironments _ -> values graph (G.genRoot graph source) (zip arguments domains) Nothing;
+              _ -> mapM (\((,) ((,) dictionary candidates) domain) -> do {
               value <- child env (CWantedScope dictionary candidates);
               use <- edge (generalization value) domain;
               return ((,) value use)
-            }) (zip arguments domains);
-            return (FApplyGroundDictionaries name proof values)
+            }) (zip arguments domains)
+            }) state);
+            return (FApplyGroundDictionaries name proof operands)
           }
         };
         _ -> ordinary
@@ -864,8 +1074,15 @@ module Bootstrap.Constraint where {
         (,) (Just (Poly name source)) (Right parameters) -> do {
           -- The callee's binding already owns its scheme. Instantiate it
           -- at the complete arrow using the caller's monomorphic domains.
-          arrow <- prefixType parameters;
-          proof <- edge source arrow;
+          known <- verifiedCall source function parameters False;
+          proof <- case known of {
+            Just ((,) target use) -> do {
+              mapM (\((,) _ actual) -> equality target actual) parameters;
+              return use
+            };
+            Nothing -> do { arrow <- prefixType parameters; use <- edge source arrow;
+              return use }
+          };
           return (FApplyDictionaries name proof (map fst parameters))
         };
         (,) (Just (RecursiveDictionaryMono name shared export arity)) (Right parameters) ->
@@ -1246,6 +1463,133 @@ module Bootstrap.Constraint where {
     Left _ -> False;
     Right sources -> all closed (IS.toList sources)
   });
+  hasLambdaPrefix :: Int -> Core -> Bool;
+  hasLambdaPrefix count term = if count == 0 then True else case term of {
+    CLam _ body -> hasLambdaPrefix (count - 1) body; _ -> False
+  };
+  -- Each admitted parameter has a use at a closed nominal type. Every call
+  -- in the body is saturated, and its result is closed. Only the contiguous
+  -- leading parameters used exclusively as an authenticated selector's
+  -- dictionary operand can share a binder group. Their actual values and
+  -- operand order remain distinct, and ordinary user lambdas keep their
+  -- own generation scopes.
+  closedDictionaryLambdas :: Graph -> BindingEnv -> Core -> Maybe Core;
+  closedDictionaryLambdas graph env original =
+    mapOptional (\((,,) names body _) -> CBindDictionaries names body)
+      (closedDictionaryLambdasWithDomain graph env original);
+  closedDictionaryLambdasWithDomain graph env original = let {
+    nominal ty = case ty of { XCon _ xs -> all nominal xs; XApply f x -> nominal f && nominal x; _ -> False };
+    field f = case f of {
+      Applied c xs -> mapOptional (XCon c) (mapM field xs);
+      Function a b -> do { x <- field a; y <- field b; Just (XArrow x y) };
+      _ -> Nothing
+    };
+    checked ref = case (,) ref (lookupTerm env ref) of {
+      (,) (DeclRef _ _) (Just (Poly _ source)) -> let {
+        domain parent id = case G.nodeAt graph id of {
+          Node (GCon c []) (Just owner) Rigid -> if owner == parent then Just (XCon c []) else Nothing;
+          _ -> Nothing
+        };
+        read parent root id = case G.nodeAt graph id of {
+          Node tag (Just owner) flag -> if owner /= parent || not (root || G.equalFlag flag Rigid) then Nothing else
+            case tag of {
+              GArr a b -> do { x <- domain id a; y <- read id False b; Just (XArrow x y) };
+              GCon c [] -> Just (XCon c []);
+              _ -> Nothing
+            };
+          _ -> Nothing
+        }
+      } in read source True (G.genRoot graph source);
+      _ -> Nothing
+    };
+    headType expr = case expr of {
+      CPrimitive primitive -> case P.primitiveSignature primitive of {
+        (,) [] signature -> field signature; _ -> Nothing
+      };
+      _ -> case caseCoreRef expr of { Just ref -> checked ref; _ -> Nothing }
+    };
+    spine expression args = case expression of {
+      CApp f a -> spine f ((:) a args); _ -> (,) expression args
+    };
+    result ty args = case (,) ty args of {
+      (,) (XArrow domain tail) ((:) _ more) -> if nominal domain then result tail more else Nothing;
+      (,) end [] -> if nominal end then Just end else Nothing;
+      _ -> Nothing
+    };
+    known expr = case expr of {
+      CInt _ -> Just (XCon "Int" []); CBool _ -> Just (XCon "Bool" []); CString _ -> Just (XCon "String" []);
+      CApp (CApp (CApp (CPrimitive PIfThenElse) _) y) n -> case known y of { Just t -> Just t; _ -> known n };
+      _ -> case spine expr [] of { (,) f args -> do { t <- headType f; result t args } }
+    };
+    converter ref = if not (caseConverter env graph ref) then Nothing else case lookupTerm env ref of {
+      Just (Poly _ source) -> case G.tag (G.nodeAt graph (G.genRoot graph source)) of {
+        GArr domain _ -> case G.tag (G.nodeAt graph domain) of {
+          GTyApp constructor _ -> case G.tag (G.nodeAt graph constructor) of { GTyCon name _ -> Just name; _ -> Nothing };
+          _ -> Nothing
+        }; _ -> Nothing
+      }; _ -> Nothing
+    };
+    check binders expect expr used = let {
+      bind evidence n ty = if not (M.member compareString n binders) then Nothing else case M.lookup compareString n used of {
+        Nothing -> Just (M.insert compareString n ((,) ty evidence) used);
+        Just ((,) previous onlyEvidence) -> if not (T.alphaEq previous ty) then Nothing
+          else if onlyEvidence && not evidence then Just (M.insert compareString n ((,) ty False) used)
+          else Just used
+      };
+      args signature values previous = case (,) signature values of {
+        (,) (XArrow domain tail) ((:) v rest) -> if not (nominal domain) then Nothing else do {
+          now <- check binders domain v previous; args tail rest now
+        };
+        (,) end [] -> if nominal end && T.alphaEq expect end then Just previous else Nothing;
+        _ -> Nothing
+      };
+      application = case spine expr [] of { (,) f values -> do { ty <- headType f; args ty values used } };
+      literal typ = if T.alphaEq expect (XCon typ []) then Just used else Nothing
+    } in case expr of {
+      CVar n -> bind False n expect;
+      CInt _ -> literal "Int"; CBool _ -> literal "Bool"; CString _ -> literal "String";
+      CApp (CApp (CApp (CPrimitive PIfThenElse) condition) yes) no -> do {
+        a <- check binders (XCon "Bool" []) condition used;
+        b <- check binders expect yes a; check binders expect no b
+      };
+      CApp (CApp callee (CVar d)) (CApp (CPrimitive PTextToChars) (CString _)) -> case caseCoreRef callee of {
+        Just ref -> case converter ref of { Just c -> bind True d (XCon c [expect]); Nothing -> application };
+        _ -> application
+      };
+      CApp _ _ -> application;
+      _ -> Nothing
+    };
+    lambdas expression names = case expression of {
+      CLam name body -> lambdas body ((:) name names);
+      _ -> (,) (reverse names) expression
+    }
+  } in case original of {
+    CLam _ (CLam _ _) -> case lambdas original [] of { (,) names body -> do {
+      let { binders = M.fromList compareString (map (\n -> (,) n ()) names) };
+      if M.size binders /= length names then Nothing else do {
+        end <- known body;
+        used <- check binders end body M.empty;
+        let { isEvidence n = case M.lookup compareString n used of {
+                Just ((,) _ True) -> True; _ -> False
+              } };
+        if M.size used /= length names then Nothing else case span isEvidence names of {
+          (,) leading@((:) first ((:) _ _)) trailing -> let {
+            common = case M.lookup compareString first used of {
+              Just ((,) (XCon constructor [XCon argument []]) True) ->
+                if all (\n -> case M.lookup compareString n used of {
+                  Just ((,) (XCon other [XCon actual []]) True) ->
+                    eqString constructor other && eqString argument actual;
+                  _ -> False
+                }) leading then Just ((,) constructor argument) else Nothing;
+              _ -> Nothing
+            }
+          } in Just ((,,) leading (foldr CLam body trailing) common);
+          _ -> Nothing
+        }
+      }
+    } };
+    _ -> Nothing
+  };
   buildRecursiveGroup :: DataEnv -> Map String Int -> BindingEnv -> Int ->
                          [] ((,,) TermRef RecursiveMode Core) ->
                          Generate ((,) BindingEnv ([] ((,) TermRef RecursiveDefinition)));
@@ -1279,8 +1623,25 @@ module Bootstrap.Constraint where {
         scope = bindTerms env (zipWith assumption declarations definitions)
       };
       bodies <- mapM
-        (\((,) ((,,,) _ _ shared _) ((,,) _ _ rhs)) -> do {
-           value <- buildUnder scopeRoot datatypes typeScope group scope rhs;
+        (\((,) ((,,,) declaration _ shared _) ((,,) _ _ rhs)) -> do {
+           let { buildBody = buildUnder scopeRoot datatypes typeScope group scope; ordinary = buildBody rhs };
+           value <- case declaration of {
+             DeclRef _ _ -> if not (hasLambdaPrefix 8 rhs) then ordinary else fileApplication (do {
+               graph <- getGraph;
+               case closedDictionaryLambdasWithDomain graph scope rhs of {
+                 Nothing -> ordinary;
+                 Just ((,,) names body common) -> let { compact = CBindDictionaries names body } in case common of {
+                   Nothing -> buildBody compact;
+                   Just _ -> WithCandidates (\memo state -> runWithCandidates memo (case memo of {
+                     BatchedEnvironments _ -> generalize (Just group) (\gen root ->
+                       buildDictionaryPrefix common scopeRoot datatypes typeScope scope gen root names body);
+                     _ -> buildBody compact
+                   }) state)
+                 }
+               }
+             }) ordinary;
+             _ -> ordinary
+           };
            proof <- edge (generalization value) shared;
            return ((,) value proof)
          }) (zip declarations definitions);
@@ -1799,8 +2160,13 @@ module Bootstrap.Constraint where {
         (XEVar f) arguments;
       FApplyGroundDictionaries f _ arguments -> foldl (\function ((,) argument _) ->
         XEApp function (eraseSourceWith evidence argument)) (XEVar f) arguments;
-      FApplyPrimitive primitive _ arguments -> foldl (\function ((,) argument _) ->
-        XEApp function (eraseSourceWith evidence argument)) (XEPrimitive primitive) arguments;
+      FApplyPrimitive primitive _ arguments -> foldl (\function operand -> XEApp function (case operand of {
+        PrimitiveUse argument _ -> eraseSourceWith evidence argument;
+        ClosedPrimitiveForm current -> erase current
+      })) (XEPrimitive primitive) arguments;
+      FPrimitiveStringConversion primitive selector _ dictionary _ text ->
+        XEApp (XEPrimitive primitive) (XEApp (XEApp (XEVar selector) (eraseSourceWith evidence dictionary))
+          (XEApp (XEPrimitive PTextToChars) (XEString text)));
       FIntStringCalls operator worker value _ _ arms fallback _ -> let {
         use = eraseSourceWith evidence value;
         arm (StringCallArm key text argument _ _) rest = XEApp (XEApp (XEApp (XEPrimitive PIfThenElse)

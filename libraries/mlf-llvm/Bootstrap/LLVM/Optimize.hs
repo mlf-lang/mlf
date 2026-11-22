@@ -2065,9 +2065,145 @@ module Bootstrap.LLVM.Optimize where {
           } else freshPure normalized;
         _ -> freshPure normalized
       };
+      XELetRec bindings _ -> if textWorkerGroup bindings then foldStaticConversions normalized else freshPure normalized;
       _ -> freshPure normalized
     }
   };
+  -- A direct primitive argument from a sibling starts a bounded local analysis.
+  -- Check every use of each private function, including references in argument
+  -- position. A partial call or escape makes all its formals unknown.
+  textWorkerGroup bindings = case bindings of {
+    (:) _ ((:) _ _) -> L.null (L.drop 4 bindings) && L.any (\((,) self fn) ->
+      case applications (L.snd (lambdas fn)) of {
+        (,) (XEVar target) args -> L.not (eqName target self) &&
+          L.any (\entry -> eqName target (L.fst entry)) bindings &&
+          L.any textConverter args;
+        _ -> False
+      }) bindings;
+    _ -> False
+  };
+  textConverter term = case term of { XEPrimitive PTextFromChars -> True; _ -> False };
+  privateFunctions term rest = let {
+    put ((,) name fn) tail = case lambdas fn of {
+      (,) [] _ -> tail; (,) parameters _ -> (:) ((,) name parameters) tail
+    };
+    below = L.foldr privateFunctions rest (subterms term)
+  } in case term of {
+    XELet name rhs _ -> put ((,) name rhs) below;
+    XELetRec defs _ -> L.foldr put below defs;
+    _ -> below
+  };
+  regionBinders term rest = let { below = L.foldr regionBinders rest (subterms term) } in case term of {
+    XEAbs n _ -> (:) n below;
+    XELet n _ _ -> (:) n below;
+    XELetRec defs _ -> L.foldr (\entry tail -> (:) (L.fst entry) tail) below defs;
+    XECase _ branches -> L.foldr (\(XErasedAlternative pattern _) tail ->
+      L.append (X.patternNames pattern) tail) below branches;
+    _ -> below
+  };
+  privateCalls functions known term = case applications term of {
+    (,) head args -> let {
+      here = case head of {
+        XEVar target -> if M.member compareName target functions
+          then M.insertWith compareName L.append target [args] known else known;
+        _ -> L.foldlStrict (privateCalls functions) known (subterms head)
+      }
+    } in L.foldlStrict (privateCalls functions) here args
+  };
+  -- Nothing rules out a slot. Otherwise it records the supplying formals and
+  -- whether any call supplies the converter directly.
+  conversionInputs functions calls = L.concatMap (\((,) target parameters) ->
+    let { uses = M.findWithDefault compareName [] target calls;
+          arity = L.length parameters;
+          add observed value = case observed of {
+            Nothing -> Nothing;
+            Just ((,) concrete names) -> case value of {
+              XEPrimitive PTextFromChars -> Just ((,) True names);
+              XEVar name -> Just ((,) concrete ((:) name names));
+              _ -> Nothing
+            }
+          };
+          inputs = L.foldlStrict (L.zipWith add) (L.map (\_ -> Just ((,) False [])) parameters) uses
+    } in if L.null uses || L.any (\args -> L.length args /= arity) uses then []
+      else L.mapMaybe (\((,) name value) -> case value of {
+        Nothing -> Nothing; Just supplied -> Just ((,) name supplied)
+      }) (L.zip parameters inputs)) (M.toList functions);
+  -- Each newly certified formal has a concrete supplier. A self-forwarding
+  -- call preserves it. Unseeded or mutually dependent unknowns remain opaque.
+  certifiedConversions limit inputs known =
+    if limit == 0 then known else let {
+      next = L.foldlStrict (\found ((,) slot ((,) concrete names)) ->
+        if (concrete || L.any (\name -> S.member compareName name known) names) &&
+           L.all (\name -> eqName name slot || S.member compareName name known) names
+        then S.insert compareName slot found else found) known inputs
+    } in if S.size next == S.size known then known else certifiedConversions (limit - 1) inputs next;
+  -- Only a known positive-arity primitive can erase this seq. Preserve every
+  -- other binding and demand, including a converter supplied as a computation.
+  foldConversionText known expression = do {
+    value <- children (foldConversionText known) expression;
+    let { isConverter item = case item of {
+          XEVar name -> S.member compareName name known; _ -> textConverter item
+        } };
+    freshPure (case value of {
+      XELet bound rhs (XEApp (XEApp (XEPrimitive PSeq) (XEVar forced)) (XEVar returned)) ->
+        if eqName bound forced && eqName bound returned && isConverter rhs
+        then XEPrimitive PTextFromChars else value;
+      XEApp fn (XEApp (XEPrimitive PTextToChars) literal@(XEString _)) ->
+        if isConverter fn then literal else value;
+      XEApp (XEPrimitive PStringLength) (XEString text) -> XEInt (stringLength text);
+      XEApp (XEApp (XEPrimitive PAddInt) (XEInt left)) (XEInt right) -> XEInt (left + right);
+      _ -> value
+    })
+  };
+  foldStaticConversions expression =
+    if remainingSize 16384 expression < 0 then freshPure expression else let {
+      definitions = privateFunctions expression [];
+      binders = regionBinders expression [];
+      bound = S.fromList compareName binders;
+      -- The checked optimizer normally gives binders unique identities. Keep
+      -- ambiguous hand-built terms on the ordinary path as well.
+      scoped = S.size bound == L.length binders &&
+        S.null (S.intersection compareName bound (free expression))
+    } in if L.not (L.null (L.drop 16 definitions)) || L.not scoped then freshPure expression else let {
+      functions = M.fromList compareName definitions;
+      inputs = conversionInputs functions (privateCalls functions M.empty expression);
+      certified = certifiedConversions 12 inputs S.empty
+    } in if S.null certified then freshPure expression else do {
+      folded <- foldConversionText certified expression;
+      contractConversionFormals functions certified folded
+    };
+  -- Certified private functions can omit a converter from both binders and
+  -- saturated calls. Keep all-static functions as functions to preserve WHNF.
+  contractConversionFormals :: Map XName ([] XName) -> Set XName -> XErased -> Fresh XErased;
+  contractConversionFormals functions certified expression = let {
+    known name = S.member compareName name certified;
+    select parameters = if L.all known parameters then [] else L.filter known parameters;
+    removed = S.fromList compareName (L.concatMap select (M.elems functions));
+    drops name = S.member compareName name removed;
+    plan parameters = if L.any drops parameters
+      then Just (L.map (\name -> if drops name then Just PTextFromChars else Nothing) parameters)
+      else Nothing;
+    plans = M.mapMaybe plan functions;
+    visit term = case term of {
+      XEVar name -> freshPure (if drops name then XEPrimitive PTextFromChars else term);
+      XEAbs name body -> if drops name then visit body else children visit term;
+      XEApp _ _ -> case applications term of {
+        (,) head arguments -> let {
+          retained = case head of {
+            XEVar target -> case M.lookup compareName target plans of {
+              Just slots -> dynamicArguments slots arguments; Nothing -> arguments
+            };
+            _ -> arguments
+          }
+        } in do {
+          callee <- visit head;
+          operands <- traverseFresh visit retained;
+          freshPure (L.foldl XEApp callee operands)
+        }
+      };
+      _ -> children visit term
+    }
+  } in if S.null removed then freshPure expression else visit expression;
   staticPrimitive :: XErased -> Maybe Primitive;
   staticPrimitive expression = case expression of {
     XEPrimitive primitive -> if P.primitiveArity primitive > 0 then Just primitive else Nothing;

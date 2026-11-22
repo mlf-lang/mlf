@@ -342,6 +342,7 @@ module Bootstrap.Types where {
   -- Case projection barriers precede every use of their sealed field schemes.
   data SolveStep = Instantiate Edge | ProjectCase ([] ((,) Int Int));
   data Typed = Typed Int Form;
+  data PrimitiveOperand = PrimitiveUse Typed Edge | ClosedPrimitiveForm Form;
   data Form =
     FVariable XName (Maybe Edge) |
     FDeclaredVariable XName XType Edge |
@@ -351,7 +352,8 @@ module Bootstrap.Types where {
     FApplyVariable XName Edge Typed Edge |
     FApplyDictionaries XName Edge ([] XName) |
     FApplyGroundDictionaries XName Edge ([] ((,) Typed Edge)) |
-    FApplyPrimitive Primitive ([] Int) ([] ((,) Typed Edge)) |
+    FApplyPrimitive Primitive ([] Int) ([] PrimitiveOperand) |
+    FPrimitiveStringConversion Primitive XName XType Typed Edge String |
     FIntStringCalls XName Typed Typed Edge Int ([] StringCallArm) Typed Edge |
     FBinding XName Typed Typed Edge |
     FCoercion XName Int Int |
