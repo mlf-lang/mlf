@@ -109,9 +109,15 @@ def main():
                    output / 'runtime.o', *native['link_args'], '-lpthread', '-ldl',
                    '-o', output / 'native-controls'], timeout=120)
         artifact(output / 'native-controls')
+        # Prepare one checked interpreter target. The CRC and demand cases
+        # still execute in fresh processes without repeating source compilation.
+        interpreted = runner.run('emit-interpreter', [build / 'bin/emlf', '-i',
+                                 ROOT / 'libraries/mlf-foundation', NATIVE], timeout=240)
+        xmlf = output / 'program.xmlf'
+        xmlf.write_bytes(interpreted.stdout)
+        artifact(xmlf)
         lanes = {'host': [output / 'host-controls'], 'native': [output / 'native-controls'],
-                 'interpreter': [build / 'bin/emlf', '-i', ROOT / 'libraries/mlf-foundation',
-                                 '--run', NATIVE, '--']}
+                 'interpreter': [build / 'bin/emlf', '--run-xmlf', xmlf, '--']}
         rng = random.Random(88513)
         record['vector_counts'] = {lane: 0 for lane in lanes}
         for size in SIZES:
@@ -121,8 +127,7 @@ def main():
                              (min(76, size), min(4, max(0, size - 76)))})
             for index, (start, count) in enumerate(ranges):
                 for lane, argv in lanes.items():
-                    # The interpreted fixture includes front-end checking on each
-                    # invocation; keep its finite subset explicit and bounded.
+                    # Preserve the reviewed finite interpreter vector subset.
                     if lane == 'interpreter' and (size not in [0, 1, 80, 1024, 16384] or index not in [0, len(ranges)-1]):
                         continue
                     runner.run(f'{lane}-{size}-{index}', [*argv, 'crc', path, start, count],

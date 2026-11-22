@@ -12,7 +12,7 @@ import types
 
 HERE = Path(__file__).resolve().parent
 ORIGINALS = {'test_direct.py': 'a46bd66949e81c5761dff3446201640837ec8f68',
-             'test_crc32.py': 'f906dde582c2aef13d56ec608accedec7f746dae'}
+             'test_crc32.py': 'df12730b51b5e5f99b3482b2fbf8e51a2034bf4e'}
 WORK = 1800
 CLEANUP = 10
 MARGIN = 15
@@ -80,8 +80,8 @@ def main():
                          started=time.time(), state='running', original_timeout_seconds=600,
                          timeout_seconds=WORK + CLEANUP + MARGIN, work_seconds=WORK,
                          cleanup_seconds=CLEANUP, input_pins=pins,
-                         budget_basis='Finite 1800s policy informed by observed ~72s x 17 interpreter invocations + ~74s setup; not a sum-of-maxima bound or performance root-cause fix',
-                         scope='original CRC cases and inner limits unchanged; Linux subreaper successor')
+                         budget_basis='Finite 1800s policy covers independent host and LLVM builds, one checked xMLF emission, and 17 fresh interpreter executions',
+                         scope='original CRC vectors and demand checks with a shared immutable interpreter target; Linux subreaper successor')
             self.receipt['commands'].append(entry)
             self.save()
             process = None

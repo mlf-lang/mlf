@@ -16,7 +16,7 @@ HERE = Path(__file__).resolve().parent
 PINS = {
  'test_direct.py': 'a46bd66949e81c5761dff3446201640837ec8f68',
  'test_utf8_length.py': '73fe9e2c4dc4201a03d342ad146b7227a9b57330',
- 'test_direct_crc_successor.py': '789dc7e641fdbd8aace2f9395914d786c18eadb1',
+ 'test_direct_crc_successor.py': '541ab23d1d94736af9a928ba2a1c19e0ce63db97',
  'crc_process_supervisor.py': '620e88b557139a6b19ca63097decaa9148bdd819',
  'default_stdlib.py': '33f84ec682f78c064322de8e9d303b76b6040871',
  'fixtures/utf8-length/Main.hs': '5dc5eddae94e609328404febc90db226a82167cd',
