@@ -148,7 +148,8 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
          Right (PreparedEntry (ioType ty) constructors (entryFamilies declarations) lowered);
   emitPreparedChunks :: PreparedEntry -> Either String ([] String);
   emitPreparedChunks (PreparedEntry executeIO constructors families lowered) =
-    case Codegen.generateCheckedFamilies constructors families lowered of {
+    let { plans = Codegen.familyPlans constructors families } in
+    case Codegen.generateWithWorkerAliases Codegen.recursiveWorkerAliases True Set.empty constructors plans lowered of {
       Left error -> Left error;
       Right ((,) entry code) ->
         let {

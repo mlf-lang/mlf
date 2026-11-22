@@ -38,9 +38,14 @@ def tag_selector(lo, hi):
 
 
 def program(family, n):
-    """No generated declaration is intentionally unreachable from the IO entry."""
+    """Generate one shared module with a runtime input at its IO entry."""
     if family == 'baseline':
         declarations, expression = '', 'x'
+    elif family == 'captured_parameter_uses':
+        declarations = ''.join(
+            f'f{i} x = let {{ y = x }} in addInt y {i+1};\n' for i in range(n))
+        calls = [f'(f{i} x)' for i in range(n)]
+        expression = balanced(calls, lambda a, b: f'(addInt {a} {b})') if calls else '0'
     elif family in ('flat_functions', 'inferred_functions', 'local_functions', 'dependency_chain', 'inferred_chain'):
         declarations = ''
         for i in range(n):
@@ -169,6 +174,49 @@ producer x = if ltInt x 0 then next (subInt 0 x) else addInt x ({total});
             integer_call = call(integer, boolean)
             terms.append(f'if {call(boolean, integer)} then {integer_call} else subInt 0 ({integer_call})')
         expression = balanced(terms, lambda a,b:f'addInt ({a}) ({b})')
+    elif family == 'nested_worker_applications':
+        if n == 0:
+            return HEADER + 'entry :: Int -> Int;\nentry x = 0;\n' + MAIN
+        rows = [
+            'data Tokens = Stop | Token Bool Tokens;',
+            'data Jobs = Done | Direct Int Jobs | Saved Int (Int -> Int) Jobs;',
+            'makeTokens :: Int -> Bool -> Tokens;',
+            'makeTokens n flag = if ltInt n 1 then Stop else Token flag (makeTokens (subInt n 1) (if flag then False else True));',
+            'sumJobs :: Int -> Jobs -> Int;',
+            'sumJobs q jobs = case jobs of { Done -> 0; Direct value rest -> addInt value (sumJobs q rest);',
+            '  Saved value function rest -> addInt (addInt value (mulInt 2 (function q))) (sumJobs q rest) };',
+            'score :: Tokens -> Int -> Int;',
+            'score input key =',
+        ]
+        for i in range(1, n + 1):
+            subject = 'input' if i == 1 else f'rest{i-1}'
+            rows.append(f'case {subject} of {{ Stop -> 0; Token flag{i} rest{i} ->')
+        for i in range(1, n + 1):
+            rows.append(f'let {{ work{i} again v = if again then work{i} False 3 else if ltInt v 0 then {i} else v }} in')
+        jobs = 'Done'
+        for i in reversed(range(1, n + 1)):
+            direct = f'(work{i} flag{i} key)'
+            if i % 2:
+                jobs = f'Saved {direct} (work{i} flag{i}) ({jobs})'
+            else:
+                jobs = f'Direct {direct} ({jobs})'
+        rows.append(f'sumJobs (if ltInt key 0 then 4 else (subInt 0 1)) ({jobs})' + ' }' * n + ';')
+        rows.extend(['entry :: Int -> Int;',
+                     f'entry x = let {{ key = remInt x 11 }} in score (makeTokens (if eqInt key 6 then {n-1} else {n}) (ltInt key 0)) key;'])
+        return HEADER + '\n'.join(rows) + '\n' + MAIN
+    elif family == 'recursive_lookup_workers':
+        declarations = (
+            'data Tree = Empty | Branch Tree Int Int Tree;\n'
+            'tree :: Tree;\n'
+            'tree = Branch (Branch Empty 2 17 Empty) 5 41 (Branch Empty 8 73 Empty);\n')
+        calls = []
+        for i in range(n):
+            declarations += (
+                f'walk{i} :: Int -> Tree -> Int;\n'
+                f'walk{i} q t = case t of {{ Empty -> 0; Branch l key value r -> '
+                f'if ltInt q key then walk{i} q l else if ltInt key q then walk{i} q r else value }};\n')
+            calls.append(f'(walk{i} (addInt x {i}) tree)')
+        expression = balanced(calls, lambda a, b: f'(addInt {a} {b})') if calls else '0'
     elif family == 'stable_recursive_workers':
         rows = [HEADER, 'data Job = End | Job (Int -> Int) Job;',
                 'total :: Int -> Job -> Int;',
@@ -465,6 +513,19 @@ tick = Parser (\s -> if ltInt s 1 then Stop else Next s (subInt s 1));
                 + 'else ioBind (printInt (selectedScore i)) (\\_ -> printAll (addInt i 1));\n'
                 + 'main :: IO ();\nmain = ioBind (getArg 0) (\\text -> if eqString text "--all" '
                 + 'then printAll 0 else printInt (entry (readInt text)))\n}\n')
+    elif family == 'visible_instance_inventory':
+        rows = ['class Score a where { score :: a -> Int };',
+                'instance Score Int where { score x = x };']
+        for i in range(n):
+            rows.extend((f'data Box{i} a = B{i} a;',
+                         f'instance Score a => Score (Box{i} a) where '
+                         f'{{ score (B{i} v) = addInt (score v) {7*(i+1)} }};'))
+        declarations = '\n'.join(rows) + '\n'
+        # All instances are in scope at the two calls, including the unused middle ones.
+        first = '(B0 y)' if n else 'y'
+        last = f'(B{n-1} y)' if n else 'y'
+        expression = ('let { ident a = a; b = ident (ltInt x 0); y = ident x } '
+                      f'in if b then score {first} else score {last}')
     elif family == 'class_instances':
         declarations = ('class Score a where { score :: a -> Int };\n'
                         'measure :: forall a. Score a => a -> Int;\nmeasure value = score value;\n')
@@ -500,6 +561,32 @@ tick = Parser (\s -> if ltInt s 1 then Stop else Next s (subInt s 1));
         )
         expression = 'applyClosures (makeClosures x)'
 
+    elif family == 'closed_field_projection':
+        declarations = '''data Graph = Graph Int Int Int;
+project :: Graph -> Int;
+project graph = case graph of { Graph first second field -> field };
+makeGraph :: Int -> Graph;
+makeGraph x = if ltInt x 0 then Graph x (subInt x 1) (addInt (mulInt x 2) 1)
+              else Graph (addInt x 1) x (addInt (mulInt x 3) 2);
+'''
+        if n == 0:
+            entry = 'let { small = remInt value 11; graph = makeGraph small } in small'
+        else:
+            indices = range(1, n + 1)
+            fields = [f'field{i}' for i in indices]
+            types = ' '.join(['Int'] * n)
+            pattern = ' '.join(fields)
+            added = ' '.join(f'(addInt x {i})' for i in indices)
+            subtracted = ' '.join(f'(subInt x {i})' for i in indices)
+            terms = [f'addInt (project graph) {field}' for field in fields]
+            total = balanced(terms, lambda a, b: f'addInt ({a}) ({b})')
+            declarations += (f'data Inputs = Inputs {types};\n'
+                             'makeInputs :: Int -> Inputs;\n'
+                             f'makeInputs x = if ltInt x 0 then Inputs {added} else Inputs {subtracted};\n'
+                             'score :: Graph -> Inputs -> Int;\n'
+                             f'score graph inputs = case inputs of {{ Inputs {pattern} -> {total} }};\n')
+            entry = 'let { small = remInt value 11 } in score (makeGraph small) (makeInputs small)'
+        return HEADER + declarations + f'entry :: Int -> Int;\nentry value = {entry};\n' + MAIN
     elif family == 'wide_product':
         indices = range(1, n + 1)
         types = ' '.join(['Int'] * n)
@@ -558,6 +645,9 @@ def expected(family, n, x):
     """Closed-form specifications; no compiled results or generated helpers used."""
     if family == 'baseline':
         return x
+    if family == 'captured_parameter_uses':
+        total = n*x + n*(n+1)//2
+        return (total + 2**63) % 2**64 - 2**63
     if family in ('flat_functions', 'inferred_functions', 'local_functions', 'mono_calls', 'poly_calls',
                   'class_declaration_reservations',
                   'tree_chain', 'balanced_tree', 'polymorphic_import_fanout'):
@@ -596,6 +686,19 @@ def expected(family, n, x):
     if family == 'inferred_poly_functions':
         negative = max(0, min(n, x + 1))
         return n*x + n*(n-1)//2 - 2*(negative*x + negative*(negative-1)//2)
+    if family == 'nested_worker_applications':
+        key = x % 11 if x >= 0 else -((-x) % 11)
+        if key == 6:
+            return 0
+        odd, even = (n + 1) // 2, n // 2
+        # Alternating flags make odd rows return 3 twice for a negative key.
+        # For a nonnegative key their saved calls contribute the sum of odd indices.
+        result = 9*odd + even*(even+1) if key < 0 else odd*key + 2*odd*odd + 3*even
+        return (result + 2**63) % 2**64 - 2**63
+    if family == 'recursive_lookup_workers':
+        # Each stored key contributes once if its signed Int64 offset is visited.
+        modulus = 2**64
+        return sum(value for key, value in ((2, 17), (5, 41), (8, 73)) if (key - x) % modulus < n)
     if family == 'stable_recursive_workers':
         def remainder(number, divisor):
             return number % divisor if number >= 0 else -((-number) % divisor)
@@ -671,6 +774,9 @@ def expected(family, n, x):
         return cycles * n * (n + 1) // 2 + remainder * (remainder + 1) // 2 + remainder
     if family == 'wide_case':
         return x + 2 * max(0, min(x, n-1)) + 1
+    if family == 'visible_instance_inventory':
+        selected = min(1, n) if x < 0 else n
+        return (x + 7*selected + 2**63) % 2**64 - 2**63
     if family == 'class_instances':
         return x*n*(n+1)//2 + n*(n-1)*(n+1)//3
     if family == 'dependency_diamonds':
@@ -678,6 +784,12 @@ def expected(family, n, x):
         return x + change if x < 0 else x - change
     if family == 'captured_closures':
         return x * n * (n + 1) // 2 - n * (n + 1) * (2 * n + 1) // 6
+    if family == 'closed_field_projection':
+        small = -(abs(x) % 11) if x < 0 else x % 11
+        if n == 0:
+            return small
+        offsets = n * (n + 1) // 2
+        return n * (3 * small + 1) + offsets if small < 0 else n * (4 * small + 2) - offsets
     if family == 'wide_product':
         return x * n * (n + 1) // 2 + n * (n + 1) * (n + 2) // 6
     if family == 'rank2_arguments':
@@ -722,6 +834,14 @@ def generate(out, sizes=None, families=None):
         inputs = [-1,0,n+3] if family == 'recursive_ring' else [-1,0,7]
         if family == 'wide_case':
             inputs = [-1, n//2, n, '--all']
+        elif family == 'visible_instance_inventory':
+            inputs = [-2**63, -1, 0, 7, 2**63-1]
+        elif family == 'closed_field_projection':
+            inputs = [-2**63, -57, -1, 0, 1, 7, 12, 2**63-1]
+        elif family == 'nested_worker_applications':
+            inputs = [-2**63, -7, -1, 0, 6, 7, 17, 2**63-1]
+        elif family == 'recursive_lookup_workers':
+            inputs = [3 - n, 5 - n//2, 8, 9]
         elif family == 'decoder_pipeline':
             inputs = data_shapes.inputs(family, n)
         elif family == 'rank2_callbacks':

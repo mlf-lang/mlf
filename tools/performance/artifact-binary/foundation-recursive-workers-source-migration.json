@@ -1,0 +1,39 @@
+{
+  "changes": {
+    "libraries/mlf-llvm/Bootstrap/LLVM.hs": {
+      "branch": "069bfda2ad440e4895f5b14cb9b8d9b4378cb5ce1e9efe5c869aba79147019c9",
+      "branch_parent": "73e82119e7870eb59aecd11d94c06e0b9cad2aabb5d73c38ecf5a6ea1bc7b2c8",
+      "framework": "73e82119e7870eb59aecd11d94c06e0b9cad2aabb5d73c38ecf5a6ea1bc7b2c8",
+      "merged": "069bfda2ad440e4895f5b14cb9b8d9b4378cb5ce1e9efe5c869aba79147019c9"
+    },
+    "libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs": {
+      "branch": "4c3c016bdadaa34690b2e57e2e4fa0c3508ee18de1b6f17554e06fbc138c0739",
+      "branch_parent": "964c4dbb499adf009b25a239a86aec92c6ef73850ff717260e9e696db5b0591d",
+      "framework": "964c4dbb499adf009b25a239a86aec92c6ef73850ff717260e9e696db5b0591d",
+      "merged": "4c3c016bdadaa34690b2e57e2e4fa0c3508ee18de1b6f17554e06fbc138c0739"
+    },
+    "libraries/mlf-llvm/Bootstrap/LLVM/Library.hs": {
+      "branch": "0ab830446ae86fb37f19c2987638026f87724aadfb5f8210e25105b9ff96ab76",
+      "branch_parent": "04fa9fcf759a86995458c1ae765b67e74cb54a064eb581862f08aaf1502e4796",
+      "framework": "04fa9fcf759a86995458c1ae765b67e74cb54a064eb581862f08aaf1502e4796",
+      "merged": "0ab830446ae86fb37f19c2987638026f87724aadfb5f8210e25105b9ff96ab76"
+    },
+    "libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs": {
+      "branch": "88d6b5fd5f04259e1f23567da7849056f50153d082fa0bae929d673d8bab5ae7",
+      "branch_parent": "aa3d136a41d76139ede1d9eda7dbef4452993c93255163224637df54f86778f1",
+      "framework": "aa3d136a41d76139ede1d9eda7dbef4452993c93255163224637df54f86778f1",
+      "merged": "88d6b5fd5f04259e1f23567da7849056f50153d082fa0bae929d673d8bab5ae7"
+    },
+    "mlf.lock": {
+      "branch": "6b349d40d904e6393db28f99b5eab6e058fce92a010005dd06aab9d95d24f3e7",
+      "branch_parent": "98d9c5c3359d9078ec5dcd2a51ef671f343a1c964c28dbde7a9d0e3770cc0047",
+      "framework": "58be558b0894ec523f3dde29a02c83025ade1858a514417e18f017fc4e63f263",
+      "merged": "ee3290f2de4e549cc9f7f6e329cb99e6827640d40592f05979d5f79239ce6632"
+    }
+  },
+  "checked_dispatch_manifest_sha256": "9b4f8a525e657c253c9b7986100ce7e2ab8e93ad6d88c3c7f41342c2f43d883e",
+  "commit": "a69bb9d7b528092ecd54fbb3057f24c6e713c2b1",
+  "framework_parent": "456c2cda46012554f92f174b8dda57e8eebffa65",
+  "framework_parent_tree": "e9ba0b557dbecac05ac535db5cb17cdc80925fde",
+  "tree": "e7e17222e2d2d413f21d075319575f697c0274b7"
+}

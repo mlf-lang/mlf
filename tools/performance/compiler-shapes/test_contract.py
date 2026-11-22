@@ -263,6 +263,23 @@ class ScheduleTests(unittest.TestCase):
                                  sum(value + i if value < i else -(value + i) for i in range(size)))
         self.assertEqual([generate.expected('inferred_poly_functions', 4, x) for x in [-1, 0, 7]], [2, 6, -34])
 
+    def test_captured_parameter_uses_checks_each_binding_and_signed_sum(self):
+        family = 'captured_parameter_uses'
+        for size in (0, 1, 2, 8, 32, 128):
+            source = generate.program(family, size)
+            declarations = re.findall(
+                r'^f(\d+) x = let \{ y = x \} in addInt y (\d+);$', source, re.MULTILINE)
+            self.assertEqual(declarations, [(str(i), str(i+1)) for i in range(size)])
+            entry = next(line for line in source.splitlines() if line.startswith('entry x ='))
+            self.assertEqual(re.findall(r'\(f(\d+) x\)', entry), list(map(str, range(size))))
+            if size == 0:
+                self.assertEqual(entry, 'entry x = 0;')
+            for x in (-2**63, -1, 0, 7, 2**63-1):
+                total = 0
+                for i in range(size):
+                    total = self.signed_int(total + self.signed_int(x+i+1))
+                self.assertEqual(generate.expected_output(family, size, x), f'{total}\n')
+
     def test_inferred_functions_only_remove_generated_signatures(self):
         for size in [1, 32, 512]:
             annotated = generate.program('flat_functions', size)
@@ -334,6 +351,64 @@ class ScheduleTests(unittest.TestCase):
                     result += fields[0] + site if x < 0 else fields[-1] - site
                     fields.append(fields.pop(0))
                 self.assertEqual(generate.expected(family, count, x), self.signed_int(result))
+
+    def test_nested_worker_applications_preserves_direct_calls_and_saved_prefixes(self):
+        family = 'nested_worker_applications'
+        inputs = [-2**63, -7, -1, 0, 6, 7, 17, 2**63-1]
+        with tempfile.TemporaryDirectory() as temporary:
+            cases = generate.generate(Path(temporary)/'cases', [0, 1, 2, 5], [family])
+            for case in cases:
+                n = case['size']
+                source = Path(case['source']).read_text()
+                self.assertEqual(case['inputs'], inputs)
+                self.assertEqual(source.count('let { work'), n)
+                for i in range(1, n+1):
+                    self.assertIn(f'Token flag{i} rest{i} ->', source)
+                    self.assertIn(f'then work{i} False 3', source)
+                    call = f'(work{i} flag{i} key)'
+                    if i % 2:
+                        self.assertIn(f'Saved {call} (work{i} flag{i})', source)
+                    else:
+                        self.assertIn(f'Direct {call}', source)
+                        self.assertNotIn(f'(work{i} flag{i})', source)
+                expected = []
+                for x in inputs:
+                    key = abs(x) % 11 * (-1 if x < 0 else 1)
+                    flag = key < 0
+                    total = 0
+                    if key != 6:
+                        for i in range(1, n+1):
+                            direct = 3 if flag else i if key < 0 else key
+                            total += direct
+                            if i % 2:
+                                suffix = 4 if key < 0 else -1
+                                saved = 3 if flag else i if suffix < 0 else suffix
+                                total += 2*saved
+                            flag = not flag
+                    expected.append(f'{total}\n')
+                self.assertEqual(case['expected_stdout'], expected)
+
+    def test_recursive_lookup_workers_visit_every_binding_and_report_lookup_hits(self):
+        family = 'recursive_lookup_workers'
+        table = {2: 17, 5: 41, 8: 73}
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)/'cases'
+            generate.generate(output, [8, 32, 64], [family])
+            for case in json.loads((output/'cases.json').read_text()):
+                n = case['size']
+                self.assertEqual(case['inputs'], [3 - n, 5 - n//2, 8, 9])
+                self.assertEqual(case['expected_stdout'][0], '17\n')
+                self.assertEqual(case['expected_stdout'][-2:], ['73\n', '0\n'])
+        for n in (1, 3, 8, 16, 64):
+            source = generate.program(family, n)
+            for i in range(n):
+                self.assertEqual(source.count(f'walk{i} ::'), 1)
+                self.assertIn(f'walk{i} q l else if ltInt key q then walk{i} q r', source)
+                self.assertEqual(source.count(f'(walk{i} (addInt x {i}) tree)'), 1)
+            for x in (-2**63, -n, -1, 0, 2, 5, 8, 9, 2**63 - 1):
+                keys = [((x+i+2**63) % 2**64) - 2**63 for i in range(n)]
+                self.assertEqual(generate.expected_output(family, n, x),
+                                 f'{sum(table.get(key, 0) for key in keys)}\n')
 
     def test_stable_recursive_workers_keep_the_worker_table_and_beta_steps(self):
         family = 'stable_recursive_workers'
@@ -410,6 +485,62 @@ class ScheduleTests(unittest.TestCase):
             self.assertEqual(source.count('<- pure (addInt'), bindings)
             for x in (-7, 0, 11):
                 self.assertEqual(generate.expected(family, bindings, x), sum([x] * (bindings + 1)))
+
+    def test_closed_field_projection_sums_every_field(self):
+        family = 'closed_field_projection'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        self.assertNotIn(family, generate.REGISTRY['matrices']['default']['families'])
+        inputs = [-2**63, -57, -1, 0, 1, 7, 12, 2**63-1]
+        with tempfile.TemporaryDirectory() as root:
+            for case in generate.generate(Path(root)/'cases', [0, 1, 3, 8, 16, 32, 64, 128], [family]):
+                n = case['size']
+                source = Path(case['source']).read_text()
+                self.assertIn('project graph = case graph of { Graph first second field -> field };', source)
+                self.assertEqual(re.findall(r'addInt \(project graph\) field(\d+)', source),
+                                 [str(i) for i in range(1, n + 1)])
+                self.assertEqual(case['inputs'], inputs)
+                outputs = []
+                for x in inputs:
+                    quotient = abs(x) // 11
+                    small = x - 11 * (-quotient if x < 0 else quotient)
+                    if small < 0:
+                        graph = (small, small - 1, 2 * small + 1)
+                        fields = [small + i for i in range(1, n + 1)]
+                    else:
+                        graph = (small + 1, small, 3 * small + 2)
+                        fields = [small - i for i in range(1, n + 1)]
+                    answer = sum(graph[2] + field for field in fields) if n else small
+                    outputs.append(f'{answer}\n')
+                self.assertEqual(case['expected_stdout'], outputs)
+
+    def test_visible_instance_inventory_keeps_two_calls_in_one_polymorphic_let(self):
+        family = 'visible_instance_inventory'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        self.assertNotIn(family, generate.REGISTRY['matrices']['default']['families'])
+        with tempfile.TemporaryDirectory() as root:
+            cases = generate.generate(Path(root)/'cases', [0, 1, 2, 4, 16, 32], [family])
+            for case in cases:
+                n = case['size']
+                source = Path(case['source']).read_text()
+                self.assertEqual(source.count('instance Score Int where { score x = x };'), 1)
+                self.assertEqual(re.findall(r'^data Box(\d+) a = B\1 a;$', source, re.M),
+                                 list(map(str, range(n))))
+                methods = re.findall(
+                    r'^instance Score a => Score \(Box(\d+) a\) where '
+                    r'\{ score \(B\1 v\) = addInt \(score v\) (\d+) \};$', source, re.M)
+                self.assertEqual(methods, [(str(i), str(7*(i+1))) for i in range(n)])
+                calls = f'score (B0 y) else score (B{n-1} y)' if n else 'score y else score y'
+                self.assertIn('entry :: Int -> Int;\n'
+                              'entry x = let { ident a = a; b = ident (ltInt x 0); y = ident x } '
+                              f'in if b then {calls};\n', source)
+                offsets = [int(offset) for _, offset in methods]
+                inputs = [-2**63, -1, 0, 7, 2**63-1]
+                self.assertEqual(case['inputs'], inputs)
+                outputs = []
+                for x in inputs:
+                    chosen = offsets[:1] if x < 0 else offsets[-1:]
+                    outputs.append(f'{self.signed_int(x + sum(chosen))}\n')
+                self.assertEqual(case['expected_stdout'], outputs)
 
     def test_class_declaration_reservations_keep_all_instance_calls_reachable(self):
         family = 'class_declaration_reservations'
