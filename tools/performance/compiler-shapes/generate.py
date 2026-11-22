@@ -41,6 +41,11 @@ def program(family, n):
     """No generated declaration is intentionally unreachable from the IO entry."""
     if family == 'baseline':
         declarations, expression = '', 'x'
+    elif family == 'captured_parameter_uses':
+        declarations = ''.join(
+            f'f{i} x = let {{ y = x }} in addInt y {i+1};\n' for i in range(n))
+        calls = [f'(f{i} x)' for i in range(n)]
+        expression = balanced(calls, lambda a, b: f'(addInt {a} {b})') if calls else '0'
     elif family in ('flat_functions', 'inferred_functions', 'local_functions', 'dependency_chain', 'inferred_chain'):
         declarations = ''
         for i in range(n):
@@ -571,6 +576,9 @@ def expected(family, n, x):
     """Closed-form specifications; no compiled results or generated helpers used."""
     if family == 'baseline':
         return x
+    if family == 'captured_parameter_uses':
+        total = n*x + n*(n+1)//2
+        return (total + 2**63) % 2**64 - 2**63
     if family in ('flat_functions', 'inferred_functions', 'local_functions', 'mono_calls', 'poly_calls',
                   'class_declaration_reservations',
                   'tree_chain', 'balanced_tree', 'polymorphic_import_fanout'):

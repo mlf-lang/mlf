@@ -263,6 +263,23 @@ class ScheduleTests(unittest.TestCase):
                                  sum(value + i if value < i else -(value + i) for i in range(size)))
         self.assertEqual([generate.expected('inferred_poly_functions', 4, x) for x in [-1, 0, 7]], [2, 6, -34])
 
+    def test_captured_parameter_uses_checks_each_binding_and_signed_sum(self):
+        family = 'captured_parameter_uses'
+        for size in (0, 1, 2, 8, 32, 128):
+            source = generate.program(family, size)
+            declarations = re.findall(
+                r'^f(\d+) x = let \{ y = x \} in addInt y (\d+);$', source, re.MULTILINE)
+            self.assertEqual(declarations, [(str(i), str(i+1)) for i in range(size)])
+            entry = next(line for line in source.splitlines() if line.startswith('entry x ='))
+            self.assertEqual(re.findall(r'\(f(\d+) x\)', entry), list(map(str, range(size))))
+            if size == 0:
+                self.assertEqual(entry, 'entry x = 0;')
+            for x in (-2**63, -1, 0, 7, 2**63-1):
+                total = 0
+                for i in range(size):
+                    total = self.signed_int(total + self.signed_int(x+i+1))
+                self.assertEqual(generate.expected_output(family, size, x), f'{total}\n')
+
     def test_inferred_functions_only_remove_generated_signatures(self):
         for size in [1, 32, 512]:
             annotated = generate.program('flat_functions', size)
