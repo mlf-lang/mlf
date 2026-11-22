@@ -59,14 +59,17 @@ module Bootstrap.LLVM.Codegen where {
     } in
     case runBuild (callback [] Nothing term) output of {
       Left error -> Left error;
-      Right ((,) entry out) ->
+      Right ((,) entry out) -> let {
+        needs symbol = S.member compareString symbol (workers out);
+        support = L.concat [constructorDefinitions needs, thunkAllocationDefinition,
+          thunkCaptureDefinitions needs, forceDefinition]
+      } in
         Right
           ((,) entry
              (L.concat
                 ((:) ((:) "declare ptr @mlf_thunk_new(ptr, i64)" runtimeDeclarations)
                    (args4
-                      (L.append (constructorDefinitions (\symbol -> S.member compareString symbol (workers out)))
-                         (L.append thunkAllocationDefinition forceDefinition))
+                      support
                       aliasMetadata
                       (L.reverse (constants out))
                       (L.reverse (definitions out))))))
@@ -974,24 +977,32 @@ module Bootstrap.LLVM.Codegen where {
              env <- environment scope captures;
              call "@mlf_thunk" (args2 (pointer code) (pointer env))
            }
-      else do {
-             value <-
-               call (if (L.length captures <= 28) then "@mlf.allocate.thunk" else "@mlf_thunk_new")
-                 (args2 (pointer code) (number (L.length captures)));
-             env <- loadAt "ptr" value 16;
-             L.mapM_
-               (\entry ->
-                  case entry of {
-                    (,) index name ->
-                      do {
-                        binding <- lookupName scope name;
-                        captured <- bindingOperand binding;
-                        storeEnvironment env index captured
-                      }
-                  })
-               (L.zip (L.range 0 (L.length captures - 1)) captures);
-             cgPure value
-           }
+      else let {
+        width = L.length captures;
+        local name = case M.lookup O.compareName name scope of {
+          Just (CGSlot _ _) -> Nothing;
+          ready -> ready
+        };
+        compact = if width <= 4 then L.mapM local captures else Nothing
+      } in case compact of {
+        -- Existing operands can be passed without emitting a load, closure
+        -- or force. Their references stay live until the helper fills its slots.
+        Just bindings -> do {
+          values <- L.mapM bindingOperand bindings;
+          callCompactAllocation (thunkCaptureHelper width) ((:) (pointer code) (L.map pointer values))
+        };
+        Nothing -> do {
+          value <- call (if width <= 28 then "@mlf.allocate.thunk" else "@mlf_thunk_new")
+            (args2 (pointer code) (number width));
+          env <- loadAt "ptr" value 16;
+          L.mapM_ (\((,) index name) -> do {
+            binding <- lookupName scope name;
+            captured <- bindingOperand binding;
+            storeEnvironment env index captured
+          }) (L.zip (L.range 0 (width - 1)) captures);
+          cgPure value
+        }
+      }
     };
   -- Computing these operations cannot fail on checked, already evaluated
   -- operands. In particular, neither indexing nor division is admitted here.
@@ -2761,5 +2772,30 @@ module Bootstrap.LLVM.Codegen where {
                                                                      "  %allocated = call ptr @mlf_thunk_new(ptr %code, i64 %count)"
                                                                      ((:) "  ret ptr %allocated"
                                                                         ((:) "}"
-                                                                           [])))))))))))))))))))))))
+                                                                           [])))))))))))))))))))))));
+  thunkCaptureHelper :: Int -> String;
+  thunkCaptureHelper width = "@mlf.allocate.thunk.fill." ++ showInt width;
+  thunkCaptureDefinitions :: (String -> Bool) -> [] String;
+  thunkCaptureDefinitions needs = L.concatMap (\width ->
+    if needs (thunkCaptureHelper width) then thunkCaptureDefinition width else []) [1,2,3,4];
+  -- The compact and runtime allocation paths both install the environment
+  -- pointer. Load that pointer before writing capture slots in source order.
+  thunkCaptureDefinition :: Int -> [] String;
+  thunkCaptureDefinition width = let {
+    indices = L.range 1 width;
+    name prefix i = prefix ++ showInt i;
+    formals = L.intercalate ", " ((:) "ptr %code" (L.map (\i -> pointer (name "%capture" i)) indices));
+    store i = let { slot = name "%slot" i; value = name "%capture" i } in [
+      "  " ++ slot ++ " = getelementptr i8, ptr %env, i64 " ++ showInt (8 * i),
+      "  store ptr " ++ value ++ ", ptr " ++ slot ++ ", align 8, !tbaa !3"
+    ]
+  } in L.concat [
+    ["define private ptr " ++ thunkCaptureHelper width ++ "(" ++ formals ++ ") noinline {",
+     "entry:",
+     "  %thunk = call ptr @mlf.allocate.thunk(ptr %code, i64 " ++ showInt width ++ ")",
+     "  %env.slot = getelementptr i8, ptr %thunk, i64 16",
+     "  %env = load ptr, ptr %env.slot, align 8, !tbaa !3"],
+    L.concatMap store indices,
+    ["  ret ptr %thunk", "}"]
+  ]
 }

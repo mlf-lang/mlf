@@ -686,16 +686,15 @@ module Bootstrap.LLVM.Build where {
            literal <- stringConstant (showInt value);
            call "@mlf_integer" (args1 (pointer (L.fst literal)))
          };
-  -- Compact constructor initialization uses shared allocation helpers. Refill,
-  -- allocator debugging and constructor audits remain runtime responsibilities.
-  -- Constructor allocation functions are private to each LLVM module.
-  -- Record their symbols with the other module-wide worker definitions.
-  callConstructor :: String -> [] String -> Build String;
-  callConstructor symbol arguments = do {
+  -- Record private allocation helpers alongside the module's worker definitions.
+  callCompactAllocation :: String -> [] String -> Build String;
+  callCompactAllocation symbol arguments = do {
     modify (\state -> let { known = workers state } in if S.member compareString symbol known
       then state else withWorkers (S.insert compareString symbol known) state);
     call symbol arguments
   };
+  callConstructor :: String -> [] String -> Build String;
+  callConstructor = callCompactAllocation;
   compactConstructor :: Int -> [] String -> Build String;
   compactConstructor tag fields =
     case fields of {

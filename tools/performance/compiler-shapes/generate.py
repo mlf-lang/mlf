@@ -109,6 +109,23 @@ packet x = if eqInt x 0 then Missing else Payload (addInt x 3) (subInt 3 x);
         terms = [f'(probe{i} payload)' for i in range(n)]
         total = balanced(terms, lambda a, b: f'(addInt {a} {b})')
         return HEADER + declarations + f'entry x = let {{ payload = packet x }} in {total};\n' + MAIN
+    elif family == 'captured_thunk_fanout':
+        declarations = '''data Row = Row Int Int Int Int;
+data Batch = End | More Row Batch;
+readRow selector row = case row of {
+  Row one two three four -> if ltInt selector 0 then addInt one three else addInt two four
+};
+readBatch selector batch = case batch of {
+  End -> 0;
+  More row rest -> addInt (readRow selector row) (readBatch selector rest)
+};
+'''
+        for i in range(1, n + 1):
+            declarations += (f'make{i} a b c d = Row (mulInt a {i}) (mulInt a b) '
+                             '(mulInt c (addInt a b)) (mulInt (addInt a b) (addInt c d));\n')
+        rows = ''.join(f'More (make{i} x b c d) (' for i in range(1, n + 1)) + 'End' + ')' * n
+        return (HEADER + declarations + 'entry x = let { b = addInt x 3; c = subInt 9 x; d = mulInt 2 x } '
+                f'in readBatch x ({rows});\n' + MAIN)
     elif family == 'repeated_ground_dictionary_demands':
         terms = [f'stringLength "{"s" * (i % 4 + 1)}"' for i in range(n)]
         total = balanced(terms, lambda a, b: f'addInt ({a}) ({b})')
@@ -462,6 +479,10 @@ def expected(family, n, x):
         right_count = min(n, max(0, x + 4))
         right_offsets = right_count*(right_count-1)//2
         return right_count*(3-x) + (n-right_count)*(x+3) + offsets - 2*right_offsets
+    if family == 'captured_thunk_fanout':
+        if x < 0:
+            return x*n*(n+1)//2 + n*(9-x)*(2*x+3)
+        return n*(x*(x+3) + (2*x+3)*(9+x))
     if family == 'repeated_ground_dictionary_demands':
         turns, rest = divmod(n, 4)
         lengths = 10 * turns + rest * (rest + 1) // 2
