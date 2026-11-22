@@ -16,6 +16,16 @@ FOUNDATION_MANIFEST = 'foundation-source-migration.json'
 FOUNDATION = 'd607907bda1ce5ac053dae10497dc1888b08f0fc'
 FOUNDATION_TREE = '937e4b687ce8af86ffd4aa6fa239dfbe860ec1ef'
 FOUNDATION_MERGE_PATHS = {'mlf.lock', 'tests/shared/MLF/Tests/SharedFrontend.hs'}
+HOSTED_PARITY_CHANGES = {
+    'mlf.lock': (
+        '7f98e4a7552ef58cafd5b200f3dd722d127c23227e7d6bd5f53280fc84128d97',
+        '88b174d70a31399b189fa0ab864ebe753bcf492ad30d400cdf9bff962b347663',
+    ),
+    'tests/Tests/CompilerTests.hs': (
+        'ff14edf8bf979c34979117b2c1aff5c31b7c508d8f321474a3b40a548836d961',
+        '57c8284be73681306fbcaa08a24bf54421628f4340fba403ff801c93b918e56b',
+    ),
+}
 ARCHIVE_PATHS = (
     'bootstrap', 'host', 'libraries', 'package', 'runtime', 'testing', 'tests',
     'tools/performance', 'tools/shared', 'shared-sources.json', 'mlf.lock',
@@ -126,6 +136,10 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, manife
                                             files, self.changes, framework_pin)
             self.changes.update({path: [old_files[path], new] for path, new in foundation.items()})
             files.update(foundation)
+            for path, (previous, current) in HOSTED_PARITY_CHANGES.items():
+                require(files[path] == previous, 'hosted parity source transition: ' + path)
+                self.changes[path] = [old_files[path], current]
+                files[path] = current
             self.core.hash_map(files, 'current framework sources')
             paths = {n: p for n, p in old_paths.items() if n not in retired}
             self.value = {'current_files': files, 'module_paths': paths,

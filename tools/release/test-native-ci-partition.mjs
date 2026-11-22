@@ -258,12 +258,30 @@ const validate = text => {
   assert.equal(headerShell, "set -euo pipefail\nmkdir .mlf-build/header-adapter-controls\ngit --no-replace-objects cat-file blob dd5b4630a80803c19afdb219dba2dc4bffc3ea1b > .mlf-build/header-adapter-controls/history.hs\nexport HEADER_FIXTURE=\"$PWD/tools/shared/fixtures/native/HeaderValidationTests.hs\"\nexport HEADER_ORACLE=\"$PWD/tools/shared/fixtures/native/HeaderNamingOracle.hs\"\nexport HEADER_HISTORY_SOURCE=\"$PWD/.mlf-build/header-adapter-controls/history.hs\"\npython3 -B tools/shared/test_header_validation_adapter.py\npython3 -O -B tools/shared/test_header_validation_adapter.py\npython3 tools/shared/test_native_library.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/native-library --clang clang --gc-prefix .mlf-build/io-action-gc", 'Exact fixed-history Header environment, controls and native-library call');
   assert.doesNotMatch(native, /^\s*python3(?:\s+-B)?\s+tools\/shared\/test_direct_bounded\.py\b/m,
     'The old bounded entry must not bypass candidate batching');
-  const hostedMatrix = commandStep('for suite in backends parity; do');
-  assert.match(hostedMatrix, /options=\(--compiler-receipt "\$PWD\/\.mlf-build\/shared-ghc\/receipt.json"\)/);
-  assert.match(hostedMatrix, /"\$toolset\/compiler-tests" "\$suite" --manager "\$toolset\/mlfpkg" --compiler "\$toolset\/emlf"/);
+  const hostedParity = commandStep('"$toolset/compiler-tests" parity --manager');
+  const hostedBackends = commandStep('"$toolset/compiler-tests" backends --manager');
+  assert.ok(hostedParity.includes('--compiler-receipt "$PWD/.mlf-build/shared-ghc/receipt.json"'));
+  for (const [step, group] of [[hostedParity, 'parity'], [hostedBackends, 'backends']]) {
+    assert.ok(step.includes('--manager "$toolset/mlfpkg" --compiler "$toolset/emlf"'));
+    assert.ok(step.includes('--build-dir "$PWD/.mlf-build/compiler-tests/' + group + '" --cache-dir "$PWD/.mlf-build/cache"'));
+  }
   const hostedTuple = commandStep('tools/release/test-tuple-list.sh');
   assert.match(hostedTuple, /\.mlf-build\/shared-ghc/);
   const lifecycle = commandStep('--locked test --target lifecycle');
+  const campaignTools = commandStep('clang -O2 -std=c11 -Wall -Wextra -Werror runtime/mlf_build_runner.c');
+  assert.match(campaignTools, /^        id: hosted_campaign_tools$/m);
+  assert.match(lifecycle, /^        id: native_lifecycle$/m);
+  assert.equal(campaignTools.match(/^        if: (.+)$/m)?.[1],
+    "${{ !cancelled() && steps.shared_build.outcome == 'success' && matrix.suite == 'routine' }}");
+  assert.equal(hostedParity.match(/^        if: (.+)$/m)?.[1],
+    "${{ !cancelled() && steps.hosted_campaign_tools.outcome == 'success' && matrix.suite == 'routine' }}");
+  assert.equal(lifecycle.match(/^        if: (.+)$/m)?.[1],
+    "${{ !cancelled() && steps.shared_build.outcome == 'success' && steps.hosted_campaign_tools.outcome == 'success' && matrix.suite == 'routine' }}");
+  assert.equal(hostedBackends.match(/^        if: (.+)$/m)?.[1],
+    "${{ !cancelled() && steps.native_lifecycle.outcome == 'success' && matrix.suite == 'routine' }}");
+  assert.ok(steps.indexOf(campaignTools) < steps.indexOf(hostedParity) &&
+    steps.indexOf(hostedParity) < steps.indexOf(lifecycle) && steps.indexOf(lifecycle) < steps.indexOf(hostedBackends),
+    'Hosted parity runs before the native prerequisites used by Backends');
   const figure12 = commandStep('tools/shared/test_figure12_direct.py');
   assert.ok(steps.indexOf(figure12) < steps.indexOf(lifecycle),
     'Hosted Figure12 runs before the native fixture build');
@@ -282,7 +300,6 @@ const validate = text => {
         'Coverage selected only with its intended hosted producer: ' + command);
     }
     const routine = leg.suite === 'routine';
-    assert.equal(selected(hostedMatrix, leg), routine);
     assert.equal(selected(hostedTuple, leg), routine);
     assert.equal(selected(framework, leg), routine);
     assert.equal(selected(optimizedFramework, leg), !routine);

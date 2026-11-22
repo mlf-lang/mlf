@@ -274,7 +274,8 @@ jobs:
         run: |
           python3 -B tools/testing/run.py framework-direct -- --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/framework-direct --suite all --suite-timeout 5400
       - name: Build shared hosted campaign tools
-        if: matrix.suite == 'routine'
+        id: hosted_campaign_tools
+        if: ${{ !cancelled() && steps.shared_build.outcome == 'success' && matrix.suite == 'routine' }}
         run: |
           clang -O2 -std=c11 -Wall -Wextra -Werror runtime/mlf_build_runner.c -o .mlf-build/shared-ghc/bin/mlf-build-runner
       - name: Qualify hosted tuple and list interpreter and LLVM parity
@@ -284,28 +285,32 @@ jobs:
         if: matrix.suite == 'routine'
         run: |
           python3 -B tools/testing/run.py figure12-direct -- --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/figure12-direct
+      - name: Exercise hosted frozen parity corpus
+        if: ${{ !cancelled() && steps.hosted_campaign_tools.outcome == 'success' && matrix.suite == 'routine' }}
+        run: |
+          set -euo pipefail
+          toolset="$PWD/.mlf-build/shared-ghc/bin"
+          export MLF_BUILD_RUNNER="$toolset/mlf-build-runner"
+          "$toolset/compiler-tests" parity --manager "$toolset/mlfpkg" --compiler "$toolset/emlf" \
+            --build-dir "$PWD/.mlf-build/compiler-tests/parity" --cache-dir "$PWD/.mlf-build/cache" \
+            --compiler-receipt "$PWD/.mlf-build/shared-ghc/receipt.json"
       - name: Run native lifecycle contracts with hosted tools
-        if: matrix.suite == 'routine'
+        id: native_lifecycle
+        if: ${{ !cancelled() && steps.shared_build.outcome == 'success' && steps.hosted_campaign_tools.outcome == 'success' && matrix.suite == 'routine' }}
         run: |
           set -euo pipefail
           toolset="$PWD/.mlf-build/shared-ghc/bin"
           MLF_PACKAGE_MANAGER="$toolset/mlfpkg" MLF_BUILD_RUNNER="$toolset/mlf-build-runner" "$toolset/mlfpkg" \
             --manifest testing/tools/mlf-package.json --compiler "$toolset/emlf" --runtime "$PWD/runtime/mlf_runtime.c" \
             --build-dir "$PWD/.mlf-build/compiler-tests/lifecycle" --cache-dir "$PWD/.mlf-build/cache" --locked test --target lifecycle
-      - name: Exercise hosted backend matrix and frozen parity corpus
-        if: matrix.suite == 'routine'
+      - name: Exercise hosted backend matrix
+        if: ${{ !cancelled() && steps.native_lifecycle.outcome == 'success' && matrix.suite == 'routine' }}
         run: |
           set -euo pipefail
           toolset="$PWD/.mlf-build/shared-ghc/bin"
           export MLF_BUILD_RUNNER="$toolset/mlf-build-runner"
-          for suite in backends parity; do
-            options=()
-            if test "$suite" = parity; then
-              options=(--compiler-receipt "$PWD/.mlf-build/shared-ghc/receipt.json")
-            fi
-            "$toolset/compiler-tests" "$suite" --manager "$toolset/mlfpkg" --compiler "$toolset/emlf" \
-              --build-dir "$PWD/.mlf-build/compiler-tests/$suite" --cache-dir "$PWD/.mlf-build/cache" "${options[@]}"
-          done
+          "$toolset/compiler-tests" backends --manager "$toolset/mlfpkg" --compiler "$toolset/emlf" \
+            --build-dir "$PWD/.mlf-build/compiler-tests/backends" --cache-dir "$PWD/.mlf-build/cache"
       - name: Check batched inlining against frozen optimizer
         if: matrix.optimization == '2'
         run: |

@@ -1569,14 +1569,17 @@ module Tests.CompilerTests where {
   -- The exported corpus prescribes acceptance, rejection phase/diagnostic,
   -- checked target type and (where applicable) exact output for both backends.
   parity :: TestContext -> IO ();
-  parity c = parityWith c [];
-  parityWith :: TestContext -> [] String -> IO ();
-  parityWith c args =
+  parity c = parityWith c "" [];
+  parityWith :: TestContext -> String -> [] String -> IO ();
+  parityWith c buildReceipt args =
     case TestRunner.parse args of {
       Left message -> O.fatal message;
       Right options -> if TestRunner.listing options
         then parityList c args
-        else parityCampaign c args
+        else do {
+          if S.null (TestRunner.selectors options) then return () else record c "scope" (J.str "partial");
+          parityCampaign c buildReceipt args
+        }
     };
   parityRows path =
     do {
@@ -1606,12 +1609,60 @@ module Tests.CompilerTests where {
       code <- TestRunner.run args (S.map (\row -> parityEntry row (TestAssert.succeed ())) rows);
       if code == 0 then return () else exitWith code
     };
-  parityCampaign c args =
-    do {
+  parityHelpers :: TestContext -> String -> IO ((,) String String);
+  parityHelpers c buildReceipt =
+    if eqString buildReceipt ""
+    then do {
       nativeTests c (O.words "corpus check-target");
       exporter <- nativeTest c "corpus";
+      checker <- nativeTest c "check-target";
+      return ((,) exporter checker)
+    }
+    else do {
       let {
-        corpus = output c ++ "/corpus"
+        directory = output c ++ "/hosted-parity-helpers";
+        program = root c ++ "/tools/shared/prepare_parity.py";
+        receiptPath = directory ++ "/receipt.json"
+      };
+      buildHash <- fileDigest buildReceipt;
+      programHash <- fileDigest program;
+      run c ["python3", "-B", program, "--build-receipt", buildReceipt, "--output", directory];
+      receipt <- J.read receiptPath;
+      currentBuildHash <- fileDigest buildReceipt;
+      currentProgramHash <- fileDigest program;
+      O.require (J.getBool "complete" False receipt &&
+        eqString buildHash (J.getText "build_receipt_sha256" "" receipt) &&
+        eqString buildHash currentBuildHash && eqString programHash currentProgramHash)
+        "hosted parity helper build receipt changed or is incomplete";
+      exporter <- parityHelper directory receipt "corpus";
+      checker <- parityHelper directory receipt "check-target";
+      receiptHash <- fileDigest receiptPath;
+      record c "parity_helpers" (B.info
+        [(,) "host" (J.str "GHC"), (,) "receipt" (J.str receiptPath),
+         (,) "receipt_sha256" (J.str receiptHash), (,) "preparer_sha256" (J.str programHash),
+         (,) "outputs" (J.getObject "outputs" receipt)]);
+      return ((,) exporter checker)
+    };
+  parityHelper :: String -> J.Json -> String -> IO String;
+  parityHelper directory receipt name = do {
+    let {
+      path = directory ++ "/bin/" ++ name;
+      product = J.getObject name (J.getObject "outputs" receipt)
+    };
+    executable <- O.executable path;
+    hash <- fileDigest executable;
+    O.require (eqString path executable && eqString executable (J.getText "path" "" product) &&
+      eqString hash (J.getText "sha256" "" product))
+      ("hosted parity helper changed: " ++ name);
+    return executable
+  };
+  parityCampaign c buildReceipt args =
+    do {
+      helpers <- parityHelpers c buildReceipt;
+      let {
+        corpus = output c ++ "/corpus";
+        exporter = S.fst helpers;
+        checker = S.snd helpers
       };
       run c [exporter, corpus];
       rows <- parityRows (corpus ++ "/manifest.jsonl");
@@ -1700,7 +1751,6 @@ module Tests.CompilerTests where {
                S.length (S.filter (\row -> O.starts "figure12-" (J.getText "id" "" row)) aliases) == 2)
               "parity execution sharing changed"
             else return ();
-            checker <- nativeTest c "check-target";
             checkCrateCycleOracles c corpus checker rows selectedIds;
             sourceResults <- parityBatch c "compile" (compiler c) "--test-parity-batch" targets;
             checks <- S.mapM
@@ -2575,7 +2625,7 @@ module Tests.CompilerTests where {
                                                      else if eqString group "parity"
                                                           then do {
                                                             parityProducer c hash settings;
-                                                            parityWith c (S.snd split)
+                                                            parityWith c (J.getText "compiler-receipt" "" settings) (S.snd split)
                                                           }
                                                           else if O.starts "port-prepare-" group
                                                                then do {
