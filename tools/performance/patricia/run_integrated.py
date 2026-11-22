@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Retained finite regressions across the explicitly reviewed Int64/Patricia ABI."""
 from pathlib import Path
-import argparse, hashlib, json, shutil, sys, types, struct, zlib
+import argparse, difflib, hashlib, json, shutil, sys, types, struct, zlib
 from legacy_controls import prepare
 ROOT=Path(__file__).resolve().parents[3]
 HERE=Path(__file__).resolve().parent
@@ -22,6 +22,113 @@ SUITES = {
 LIMITS={'address_space_per_process_bytes':6*1024**3,'disk_free_floor_bytes':5*1024**3,
         'host_available_floor_bytes':3*1024**3,'max_work_bytes':3*1024**3,
         'process_tree_rss_bytes':5*1024**3,'wall_seconds':1200}
+
+SCOPE_BRIDGE = '''
+auditLiveScopeState :: String -> T.Solver -> IO ()
+auditLiveScopeState label value@(T.Solver graph _ _ _) = do
+  checked <- right (label ++ " raw live index audit") (S.finish value)
+  assert (label ++ " live finish preserves physical graph") (sameGraphPhysical graph checked)
+
+-- Live indexes retain only the levels required by the scope depth.
+-- Audit the raw state and use the frozen solver solely for the omitted tail.
+withFrozenScopeTail :: String -> T.Solver -> IO T.Solver
+withFrozenScopeTail label value@(T.Solver graph parents bindings (T.ScopeIndex intervals jumps)) =
+  case FS.finish value of
+    T.Right _ -> pure value
+    T.Left _ -> do
+      auditLiveScopeState label value
+      frozen <- right (label ++ " independent frozen scope reconstruction") (FS.prepare graph)
+      case frozen of
+        T.Solver _ _ _ (T.ScopeIndex frozenIntervals frozenJumps) -> do
+          assert (label ++ " exact frozen intervals") (sameMapPhysical (==) intervals frozenIntervals)
+          assert (label ++ " exact retained frozen jump prefix")
+            (length jumps < length frozenJumps && and (zipWith (sameMapPhysical (==)) jumps frozenJumps))
+          pure (T.Solver graph parents bindings (T.ScopeIndex intervals (jumps ++ drop (length jumps) frozenJumps)))
+
+frozenScopeComparison :: String -> T.Solver -> T.Solver -> IO (T.Solver, T.Solver)
+frozenScopeComparison label old@(T.Solver _ _ _ a) new@(T.Solver _ _ _ b)
+  | sameScopesPhysical a b = pure (old,new)
+  | otherwise = do
+      old' <- withFrozenScopeTail (label ++ " reference") old
+      new' <- withFrozenScopeTail (label ++ " actual") new
+      pure (old',new')
+
+'''
+
+
+def adapt_compact_scope_checks(H, directory):
+    """Extend test projections while retaining the prior staged and original bytes."""
+    ledger_path = directory / 'adaptations.json'
+    ledger = H.load(ledger_path)
+    session_header = 'checkSolver :: String -> Bool -> T.Solver -> T.Solver -> IO ()\n'
+    transaction_edits = {
+        'checkTransactional label old new = do\n':
+            'checkTransactional label rawOld rawNew = do\n'
+            '  O.auditLiveScopeState label rawNew\n'
+            '  old <- O.withFrozenScopeTail (label ++ " reference") rawOld\n'
+            '  new <- O.withFrozenScopeTail (label ++ " actual") rawNew\n'
+            '  checkHistoricalInputTransaction label old new\n\n'
+            '-- Low-level operations on an explicitly frozen input preserve that scope index.\n'
+            'checkHistoricalInputTransaction :: String -> T.Solver -> T.Solver -> IO ()\n'
+            'checkHistoricalInputTransaction label old new = do\n',
+        'checkTransactionalOutcome label expected actual = case (expected,actual) of\n':
+            'checkTransactionalOutcome = checkOutcomeWith checkTransactional\n\n'
+            'checkHistoricalInputOutcome :: String -> T.Either B.String T.Solver -> T.Either B.String T.Solver -> IO ()\n'
+            'checkHistoricalInputOutcome = checkOutcomeWith checkHistoricalInputTransaction\n\n'
+            'checkOutcomeWith :: (String -> T.Solver -> T.Solver -> IO ()) -> String -> T.Either B.String T.Solver -> T.Either B.String T.Solver -> IO ()\n'
+            'checkOutcomeWith compareSolvers label expected actual = case (expected,actual) of\n',
+        '(T.Right a,T.Right b) -> checkTransactional label a b':
+            '(T.Right a,T.Right b) -> compareSolvers label a b',
+    }
+    edits = {
+        'SessionOracle.hs': {
+            session_header: SCOPE_BRIDGE + session_header,
+            'checkSolver label physical old new=do\n':
+                'checkSolver label physical rawOld rawNew=do\n'
+                '  if physical then pure () else auditLiveScopeState label rawNew\n'
+                '  (old,new)<-frozenScopeComparison label rawOld rawNew\n',
+            '    _<-right (label++" frozen final index audit") (FS.finish new)\n':
+                '    forAudit<-withFrozenScopeTail label new\n'
+                '    _<-right (label++" frozen final index audit") (FS.finish forAudit)\n',
+        },
+        'TransactionOracle.hs': transaction_edits,
+        'C4TransactionOracle.hs': transaction_edits,
+        'C4TransactionControls.hs': {
+            'checkTransactionalOutcome "canonical/filter/missing equation first error"':
+                'checkHistoricalInputOutcome "canonical/filter/missing equation first error"',
+            'checkTransactionalOutcome "direct complete Graph history restoration"':
+                'checkHistoricalInputOutcome "direct complete Graph history restoration"',
+            'checkTransactionalOutcome "restore inverse escaped alias exact rejection"':
+                'checkHistoricalInputOutcome "restore inverse escaped alias exact rejection"',
+        },
+    }
+    adapted = set()
+    for entry in ledger['changes']:
+        path = Path(entry['adapted'])
+        if path.name not in edits:
+            continue
+        H.require(path == directory / path.name and path.name not in adapted, 'unique scope projection ' + path.name)
+        H.require(H.sha(path) == entry['adapted_sha256'], 'exact prior scope projection ' + path.name)
+        original = Path(entry['source'])
+        H.require(H.sha(original) == entry['source_sha256'], 'unchanged frozen scope control ' + path.name)
+        before = path.read_text()
+        after = before
+        for old, new in edits[path.name].items():
+            H.require(after.count(old) == 1, 'exact scope bridge anchor ' + path.name)
+            after = after.replace(old, new, 1)
+        raw = original.read_text()
+        for basis, suffix in ((raw, '.ndiff'), (before, '.scope.ndiff')):
+            delta = list(difflib.ndiff(basis.splitlines(keepends=True), after.splitlines(keepends=True)))
+            H.require(''.join(difflib.restore(delta, 1)) == basis and
+                      ''.join(difflib.restore(delta, 2)) == after, 'reversible scope projection ' + path.name)
+            (directory / (path.name + suffix)).write_text(''.join(delta))
+        entry['scope_bridge_preimage_sha256'] = entry['adapted_sha256']
+        path.write_text(after)
+        entry['adapted_sha256'] = H.sha(path)
+        adapted.add(path.name)
+    H.require(adapted == set(edits), 'complete scope projection inventory')
+    H.save(ledger_path, ledger)
+
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
@@ -79,7 +186,11 @@ def main():
                 a1=H.load(old/'manifest.json')
                 for name,digest in a1['files'].items():H.require(H.sha(old/name)==digest,'frozen A1 control '+name)
                 A.prepare(source,out/'source')
-                for name in ['OracleTypes.hs','PatriciaOracleControls.hs']:shutil.copy2(HERE/name,out/'source'/name)
+                adapt_compact_scope_checks(H, out/'source')
+                for name in ['OracleTypes.hs','PatriciaOracleControls.hs']:
+                    current_control = HERE / name
+                    record['driver_inputs'][str(current_control)] = H.sha(current_control)
+                    shutil.copy2(current_control, out/'source'/name)
                 modules=GRAPH_MODULES
                 if a.suite=='validation':
                     V=H.module(ROOT/'tools/performance/validation-reuse/source_contract.py','validation_contract')

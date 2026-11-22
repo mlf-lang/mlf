@@ -26,6 +26,12 @@ HOSTED_PARITY_CHANGES = {
         '65ef8e082ef3fdd551514ec97912011d058792a29f00b2b1423c522377437068',
     ),
 }
+COMPACT_SCOPE_MAINTENANCE = {
+    'patricia/run_integrated.py': (
+        '4fd2ad1497834d43189800dc720457fbe62c02511911d8c89317534336115744',
+        '73885e37b41a19fbfb1307386ba073e44ea43dd313a8ec49216656164ae36db1',
+    ),
+}
 ARCHIVE_PATHS = (
     'bootstrap', 'host', 'libraries', 'package', 'runtime', 'testing', 'tests',
     'tools/performance', 'tools/shared', 'shared-sources.json', 'mlf.lock',
@@ -120,7 +126,11 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, manife
                     spec['predecessor_manifest_sha256'] == predecessor_manifest,
                     'exact predecessor identity and transition schema')
             self.changes = dict(spec['changes'])
-            self.maintenance = spec['maintenance']
+            self.maintenance = dict(spec['maintenance'])
+            for name, (previous, current) in COMPACT_SCOPE_MAINTENANCE.items():
+                original, migrated = self.maintenance[name]
+                require(migrated == previous, 'compact scope maintenance transition: ' + name)
+                self.maintenance[name] = [original, current]
             old_files = self.previous.value['current_files']
             old_paths = self.previous.value['module_paths']
             retired = spec['removed_modules']
