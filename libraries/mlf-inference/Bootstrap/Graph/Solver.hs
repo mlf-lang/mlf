@@ -1886,7 +1886,7 @@ module Bootstrap.Graph.Solver where {
         } in
         if ((a == b) || pairSeen a b seen)
         then equalGround current seen rest
-        else case sameGroundShape (G.tag (G.nodeAt current a)) (G.tag (G.nodeAt current b)) of {
+        else case sameGroundShape (G.tag (G.nodeAtRepresentative current a a)) (G.tag (G.nodeAtRepresentative current b b)) of {
                Nothing -> False;
                Just pairs -> equalGround current (insertPair a b seen) (L.append pairs rest)
              }
@@ -2768,7 +2768,7 @@ module Bootstrap.Graph.Solver where {
           indexed = L.foldlStrict addNode (withGraph current solver) fresh;
           equations = L.append frontier ((:) ((,) root target) []);
           oldTarget = G.resolve current target;
-          targetIsScope = G.isGen (G.tag (G.nodeAt current oldTarget));
+          targetIsScope = G.isGen (G.tag (G.nodeAtRepresentative current oldTarget oldTarget));
           scope = G.binder (G.nodeAt current root);
           -- A certified copy under an old type binder fails the original
           -- graph validation: that binder has no structural path to fresh IDs.

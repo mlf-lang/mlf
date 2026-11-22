@@ -380,6 +380,17 @@ class ScheduleTests(unittest.TestCase):
                 offset = 0 if value < 0 else value
                 self.assertEqual(generate.expected(family, count, value), sum(range(offset, offset + count)))
 
+    def test_boxed_closure_factory_preserves_both_captures(self):
+        family = 'boxed_closure_factory'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        for count in (1, 4, 16, 32):
+            source = generate.program(family, count)
+            self.assertEqual(re.findall(r'\(make x (\d+)\)', source), [str(i) for i in range(1, count + 1)])
+            for value in (-2, 0, 5):
+                total = sum(value*i + value if value < 0 else value-i + value*value
+                            for i in range(1, count + 1))
+                self.assertEqual(generate.expected(family, count, value), total)
+
     def test_local_dictionary_branch_fanout_keeps_literal_sites_fixed(self):
         family = 'local_dictionary_branch_fanout'
         self.assertFalse(generate.REGISTRY['families'][family]['default'])

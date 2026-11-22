@@ -310,8 +310,12 @@ module Bootstrap.Graph where {
       Just representative -> resolve graph representative
     };
   nodeAt :: Graph -> Int -> Node;
-  nodeAt graph identity =
-    case IM.lookup (resolve graph identity) (nodes graph) of {
+  nodeAt graph identity = nodeAtRepresentative graph identity (resolve graph identity);
+  -- A caller that already has the representative can reuse it. Keep the
+  -- requested identity in the error, including when it was an alias.
+  nodeAtRepresentative :: Graph -> Int -> Int -> Node;
+  nodeAtRepresentative graph identity representative =
+    case IM.lookup representative (nodes graph) of {
       Nothing -> panic ("missing graph node " ++ showInt identity);
       Just node -> node
     };
@@ -478,7 +482,7 @@ module Bootstrap.Graph where {
         if IS.member identity seen
         then reachableVisit graph seen rest
         else reachableVisit graph (IS.insert identity seen)
-               (L.append (children (tag (nodeAt graph identity))) rest)
+               (L.append (children (tag (nodeAtRepresentative graph identity identity))) rest)
     };
   reachable :: Graph -> Int -> IntSet;
   reachable graph start = reachableVisit graph IS.empty ((:) start []);
@@ -497,7 +501,7 @@ module Bootstrap.Graph where {
         else if IS.member identity seen
              then containsVisit graph wanted seen rest
              else containsVisit graph wanted (IS.insert identity seen)
-                    (L.append (children (tag (nodeAt graph identity))) rest)
+                    (L.append (children (tag (nodeAtRepresentative graph identity identity))) rest)
     };
   structurallyContains :: Graph -> Int -> Int -> Bool;
   structurallyContains graph parent target =
@@ -931,15 +935,12 @@ module Bootstrap.Graph where {
               })
            entries of {
       (:) ((,) root value) [] ->
-        ST.bindE (denseCheckBinders state entries)
-          (\binders ->
-             stBind (denseAddDescendants state entries)
-               (\loaded ->
-                  stBind (denseBindingVisit state root 0)
-                    (\count ->
-                       if (count == L.length entries)
-                       then denseKindEntries state entries
-                       else ST.failE "cyclic binding tree")));
+        ST.bindE (denseValidateDescendants state entries)
+          (\size -> stBind (denseBindingVisit state root 0)
+            (\count ->
+               if (count == size)
+               then denseKindEntries state entries
+               else ST.failE "cyclic binding tree"));
       _ -> ST.failE "graph must have one binding root"
     };
   -- Each structural edge is checked even if the child's kind is already cached.
@@ -1134,7 +1135,7 @@ module Bootstrap.Graph where {
                  then Left
                         ("kind mismatch during unification: " ++
                          (kindDescription ka ++ (" versus " ++ kindDescription kb)))
-                 else bindE (tagEquationsWith mismatch (tag (nodeAt graph a)) (tag (nodeAt graph b)))
+                 else bindE (tagEquationsWith mismatch (tag (nodeAtRepresentative graph a a)) (tag (nodeAtRepresentative graph b b)))
                         (\answer ->
                            case answer of {
                              (,) newTag equations ->
@@ -1145,7 +1146,7 @@ module Bootstrap.Graph where {
                                  loser = if (a < b) then b else a
                                } in
                                let {
-                                 old = nodeAt graph a
+                                 old = nodeAtRepresentative graph a a
                                } in
                                let {
                                  next =
@@ -1251,7 +1252,7 @@ module Bootstrap.Graph where {
                    then Left
                           ("kind mismatch during unification: " ++
                            (kindDescription ka ++ (" versus " ++ kindDescription kb)))
-                   else bindE (tagEquationsWith mismatch (tag (nodeAt graph a)) (tag (nodeAt graph b)))
+                   else bindE (tagEquationsWith mismatch (tag (nodeAtRepresentative graph a a)) (tag (nodeAtRepresentative graph b b)))
                           (\answer ->
                              case answer of {
                                (,) newTag equations ->
@@ -1262,7 +1263,7 @@ module Bootstrap.Graph where {
                                    loser = if (a < b) then b else a
                                  } in
                                  let {
-                                   old = nodeAt graph a
+                                   old = nodeAtRepresentative graph a a
                                  } in
                                  let {
                                    next =
@@ -3027,6 +3028,24 @@ module Bootstrap.Graph where {
       (:) entry rest ->
         stBind (denseAddDescendant state entry) (\ignored -> denseAddDescendants state rest)
     };
+  -- Populate the local reverse index while checking binders in the same order.
+  -- An error still leaves only private scratch state, and may not reach DFS.
+  denseValidateDescendants :: forall s. DenseValidation s -> [] ((,) Int Node) -> ST s (Either String Int);
+  denseValidateDescendants state rows = case state of {
+    DenseValidation _ low _ _ descendants _ _ _ _ _ -> let {
+      visit entries size = case entries of {
+        [] -> ST.pureE size;
+        (:) ((,) n node) rest -> let { next = size + 1 } in seq next (case binder node of {
+          Nothing -> visit rest next;
+          Just parent -> stBind (denseGetNode state parent) (\found -> case found of {
+            Nothing -> ST.failE "missing binder";
+            Just _ -> stBind (readDense low descendants parent) (\previous ->
+              stBind (writeDense low descendants parent ((:) n previous)) (\updated -> visit rest next))
+          })
+        })
+      }
+    } in visit rows 0
+  };
   denseKindEntries :: forall s. DenseValidation s ->
                                 [] ((,) Int Node) -> ST s (Either String ());
   denseKindEntries state values =

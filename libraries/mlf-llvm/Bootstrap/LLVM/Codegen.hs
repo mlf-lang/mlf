@@ -430,14 +430,28 @@ module Bootstrap.LLVM.Codegen where {
                       registers)
              };
              state <- get;
-             let { keepWorker = M.size (functions state) > 128 &&
-                     hasBranchTailTransfer state name (L.length names) (A.functionBody f) };
+             let { keepWorker = wrapsCapturedFunction state names (A.functionBody f) ||
+                     (M.size (functions state) > 128 &&
+                       hasBranchTailTransfer state name (L.length names) (A.functionBody f)) };
              definitionBodyWithPolicy keepWorker "ptr" symbol (L.map pointer registers)
                (finishWorker (L.length names) scope (A.functionBody f));
              modify (withInlinePrimitives inline)
            };
       cgPure symbol
     };
+  -- Keep the environment, closure and unary constructor allocations together.
+  -- The exact factory takes every capture directly from its boxed worker ABI.
+  wrapsCapturedFunction :: Output -> [] XName -> XErased -> Bool;
+  wrapsCapturedFunction state arguments expression = case expression of {
+    XEApp (XEConstructor constructor) (XEAbs binder body) ->
+      case M.lookup compareString constructor (constructors state) of {
+        Just ((,) _ 1) -> let { captures = callbackNames state binder body } in
+          L.not (L.null captures) && L.null (L.drop 4 captures) &&
+          L.all (\name -> L.elem O.eqName name arguments) captures;
+        _ -> False
+      };
+    _ -> False
+  };
   finishWorker :: Int -> Map XName CGBinding -> XErased -> Build ();
   finishWorker arity scope expression = do {
     state <- get;

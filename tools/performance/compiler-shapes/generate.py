@@ -84,6 +84,20 @@ instance Score Token where { score (Token value) = value };
         rows.append('entry :: Int -> Int;\n'
                     f'entry x = let {{ shared = if ltInt x 0 then Alternate0 else Primary x }} in {total};')
         return HEADER + '\n'.join(rows) + '\n' + MAIN
+    elif family == 'boxed_closure_factory':
+        declarations = r'''data Box = Absent | Box (Int -> Int);
+make :: Int -> Int -> Box;
+make left right = Box (\x -> if ltInt x 0 then addInt (mulInt left right) x else addInt (subInt left right) (mulInt x x));
+readBox :: Box -> Int -> Int;
+readBox box input = case box of { Absent -> subInt 0 input; Box f -> f input };
+data Chain = End | More Box Chain;
+sumChain :: Int -> Chain -> Int;
+sumChain x chain = case chain of { End -> 0; More box rest -> addInt (readBox box x) (sumChain x rest) };
+'''
+        chain = 'End'
+        for i in range(n, 0, -1):
+            chain = f'More (make x {i}) ({chain})'
+        expression = f'sumChain x ({chain})'
     elif family == 'local_dictionary_branch_fanout':
         definitions = ['level0 z = if ltInt z 0 then stringLength "a" else stringLength "bb"']
         for i in range(1, n + 1):
@@ -415,6 +429,9 @@ def expected(family, n, x):
         return x if n == 1 else n*max(0, x) + n*(n-1)//2
     if family == 'shared_datatype_fragments':
         return n*max(0, x) + n*(n-1)//2
+    if family == 'boxed_closure_factory':
+        offsets = n*(n+1)//2
+        return x*(offsets + n) if x < 0 else n*(x + x*x) - offsets
     if family == 'local_dictionary_branch_fanout':
         for threshold in range(n, 0, -1):
             x += threshold if x < threshold else -threshold

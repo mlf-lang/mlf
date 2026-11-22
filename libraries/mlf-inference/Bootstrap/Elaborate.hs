@@ -70,7 +70,7 @@ module Bootstrap.Elaborate where {
   typeAtRaw context identity = let {
     graph = contextGraph context;
     resolved = G.resolve graph identity
-  } in typeAtNode context resolved (G.nodeAt graph resolved);
+  } in typeAtNode context resolved (G.nodeAtRepresentative graph resolved resolved);
   typeAtNode :: TypeContext -> Int -> Node -> XType;
   typeAtNode context@(TypeContext _ _ bounds _) identity node =
     let {
@@ -89,13 +89,11 @@ module Bootstrap.Elaborate where {
     foldr (\bound body -> XForall (fst bound) (snd bound) body) structure
       (IM.get identity bounds);
   childTypeIn :: TypeContext -> Int -> XType;
-  childTypeIn context identity =
-    let {
-      graph = contextGraph context
-    } in
-    if isFlexible (G.flag (G.nodeAt graph identity))
-    then XVar (XTyVar (G.resolve graph identity))
-    else typeAtIn context identity;
+  childTypeIn (TypeContext graph types _ _) identity = let {
+    representative = G.resolve graph identity
+  } in if isFlexible (G.flag (G.nodeAtRepresentative graph identity representative))
+    then XVar (XTyVar representative)
+    else IM.get representative types;
   referenceIn :: TypeContext -> Int -> XType;
   referenceIn context identity =
     let {
@@ -351,7 +349,7 @@ module Bootstrap.Elaborate where {
     if IS.member a seen
     then correspondence graph seen images rest
     else let {
-           pairs = structuralPairs (G.tag (G.nodeAt graph a)) (G.tag (G.nodeAt graph b))
+           pairs = structuralPairs (G.tag (G.nodeAtRepresentative graph a a)) (G.tag (G.nodeAtRepresentative graph b b))
          } in
          correspondence graph (IS.insert a seen) (IM.insert a b images) (append pairs rest);
   -- Every fast correspondence is checked. Failed candidates use the final
@@ -811,13 +809,13 @@ module Bootstrap.Elaborate where {
          } in
          let {
            withSkolem =
-             case G.tag (G.nodeAt graph a) of {
+             case G.tag (G.nodeAtRepresentative graph a a) of {
                GSkolem identity _ -> IM.insert identity b inserted;
                _ -> inserted
              }
          } in
          let {
-           pairs = structuralPairs (G.tag (G.nodeAt graph a)) (G.tag (G.nodeAt graph b))
+           pairs = structuralPairs (G.tag (G.nodeAtRepresentative graph a a)) (G.tag (G.nodeAtRepresentative graph b b))
          } in
          checkedPositions graph (IS.insert a seen) withSkolem (append pairs rest);
   -- Public compatibility entry points used by graph-level callers.

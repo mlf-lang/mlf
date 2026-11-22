@@ -199,6 +199,24 @@ denseTypeBinderAncestorChecks = do
   check "the structural witness preserves missing child diagnostics" (Left "missing graph node 4")
     (inspect (IntMap.delete 4 nodes))
 
+denseBindingValidationOrderChecks :: IO ()
+denseBindingValidationOrderChecks = forM_ [1,100003] $ \stride -> do
+  let at n = n * stride
+      root = T.Node (T.GGen (at 1)) T.Nothing T.Flexible
+      bound parent = T.Node T.GBot (T.Just (at parent)) T.Flexible
+      inspect entries = case Graph.validateGraph (Graph.mkGraph (IntMap.fromList entries) IntMap.empty (at 8)) of
+        T.Left reason -> Left (H.unpack reason)
+        T.Right () -> Right ()
+      valid = [(at 0,root), (at 1,bound 0)]
+      missing = [(at 0,root), (at 1,bound 7)]
+  check "binding traversal accepts a complete tree" (Right ()) (inspect valid)
+  check "binding traversal diagnoses an absent parent before checking edges" (Left "missing binder")
+    (inspect missing)
+  check "duplicate roots precede the absent parent diagnostic" (Left "graph must have one binding root")
+    (inspect (missing ++ [(at 2,root)]))
+  check "binding traversal still rejects a disconnected cycle" (Left "cyclic binding tree")
+    (inspect (valid ++ [(at 2,bound 3), (at 3,bound 2)]))
+
 solvedTypeBoundsChecks :: IO ()
 solvedTypeBoundsChecks = do
   let node tag parent = T.Node tag parent T.Flexible
@@ -692,6 +710,23 @@ localExpansionChecks = do
       restored <- right "finish closed-arrow unification" (Solver.finish cached)
       check "closed-arrow unification preserves external parents and hidden scope roots" True
         (same rawArrow restored)
+    forM_ [(side,tag,flag) | side <- [False,True], tag <- [T.GBot,T.GBotK T.Star],
+            flag <- [T.Flexible,T.Rigid]] $ \(swap,tag,flag) -> do
+      let shape = if swap then T.GArr 5 4 else T.GArr 4 5
+          arrow = Graph.setNode (at 3) (node shape (Just 2) T.Flexible)
+            (Graph.setNode (at 4) (node tag (Just 3) flag) scopedArrow)
+          target = at 12
+          endpoint = if swap then at 14 else at 13
+      initial <- right "prepare arrow with a direct bottom" (Solver.prepare arrow)
+      (copy,_,frontier,expanded) <- right "expand direct bottom" (Solver.expandedGraphPrepared source target initial)
+      expected <- right "unify direct bottom" (Graph.unify (frontier ++ [(copy,target)]) expanded)
+      solved <- right "solve generated arrow with a direct bottom"
+        (Solver.solveGenerated arrow [] [T.Instantiate (T.Edge source target)])
+      actual <- right "validate the direct bottom quotient" (Solver.finish solved)
+      let retained = Graph.nodeAt actual endpoint
+      check "direct bottom keeps the older GBot tag and merged flag" True
+        (Graph.equalTag T.GBot (Graph.tag retained) && Graph.equalFlag flag (Graph.flag retained))
+      check "direct bottom preserves the complete reference quotient" True (same expected actual)
   forM_ [0,-55] $ \base -> do
     let root = base + 82
         entries = [(base, T.Node (T.GGen root) T.Nothing T.Flexible),
@@ -3940,6 +3975,7 @@ main = do
   wantedBindingRoots
   denseRaisedAncestors
   denseTypeBinderAncestorChecks
+  denseBindingValidationOrderChecks
   solvedTypeBoundsChecks
   scopeProjectionChecks
   localExpansionChecks
