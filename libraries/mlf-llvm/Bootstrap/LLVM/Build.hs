@@ -18,8 +18,10 @@ module Bootstrap.LLVM.Build where {
   data Scalar = Boxed String | Floating String;
   data NativeMode = General | UnboxedDouble | NonnegativeInt | SmallIndex;
   data FunctionScope = FunctionScope (Map XName A.WorkerFunction) (Map XName (Maybe (Set XName)));
+  data CaseDispatch = SingleCase | HeapCases | ImmediateCases | BinaryCase Int Int;
+  data ConstructorLayout = ConstructorLayout (Map String ((,) Int Int)) (Map Int ((,,) Int Int CaseDispatch));
   data Output =
-    Output Int ([] String) String ([] String) ([] String) (Map String ((,) Int Int)) FunctionScope (Set
+    Output Int ([] String) String ([] String) ([] String) ConstructorLayout FunctionScope (Set
                                                                                                                 String) (Map
                                                                                                                         XName
                                                                                                                         String) (Set
@@ -82,10 +84,14 @@ module Bootstrap.LLVM.Build where {
   withConstants value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) =
     Output f0 f1 f2 f3 value f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22;
   constructors :: Output -> Map String ((,) Int Int);
-  constructors (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) = f5;
+  constructors state = case constructorLayout state of { ConstructorLayout tags _ -> tags };
+  caseDispatches :: Output -> Map Int ((,,) Int Int CaseDispatch);
+  caseDispatches state = case constructorLayout state of { ConstructorLayout _ plans -> plans };
+  constructorLayout :: Output -> ConstructorLayout;
+  constructorLayout (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) = f5;
   withConstructors :: Map String ((,) Int Int) -> Output -> Output;
   withConstructors value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) =
-    Output f0 f1 f2 f3 f4 value f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22;
+    Output f0 f1 f2 f3 f4 (ConstructorLayout value M.empty) f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22;
   functions :: Output -> Map XName A.WorkerFunction;
   functions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) = case f6 of { FunctionScope fs _ -> fs };
   withFunctions :: Map XName A.WorkerFunction -> Output -> Output;

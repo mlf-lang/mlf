@@ -32,7 +32,33 @@ module Bootstrap.LLVM.Codegen where {
   generateWithPrivate :: Set String -> Map String ((,) Int Int) -> XErased -> Either String ((,) String ([] String));
   generateWithPrivate names = generateWithConstructorPolicy False names;
   generateWithConstructorPolicy :: Bool -> Set String -> Map String ((,) Int Int) -> XErased -> Either String ((,) String ([] String));
-  generateWithConstructorPolicy closed names cs term =
+  generateWithConstructorPolicy closed names cs = generateProgram closed names cs M.empty;
+  generateCheckedFamilies :: Map String ((,) Int Int) -> [] ([] String) -> XErased ->
+                             Either String ((,) String ([] String));
+  generateCheckedFamilies cs groups = generateProgram True S.empty cs
+    (M.fromList L.compareInt (L.concatMap (familyDispatch cs) groups));
+  -- All names in each group come from one complete, checked declaration.
+  -- The runtime encodes a nullary constructor below 2^60 as (tag * 8 + 4).
+  familyDispatch :: Map String ((,) Int Int) -> [] String -> [] ((,) Int ((,,) Int Int CaseDispatch));
+  familyDispatch cs names = case L.mapM (\name -> M.lookup compareString name cs) names of {
+    Just ((:) first rest) -> let {
+      members = (:) first rest;
+      valid entry = L.fst entry >= 0 && L.fst entry < 1152921504606846976 && L.snd entry >= 0;
+      select plan = L.map (\entry -> (,) (L.fst entry) ((,,) (L.fst first) (L.length members) plan)) members
+    } in if L.not (L.all valid members) then [] else case rest of {
+      [] -> select SingleCase;
+      _ -> case L.partition (\entry -> L.snd entry == 0) members of {
+        (,) [] _ -> select HeapCases;
+        (,) _ [] -> select ImmediateCases;
+        (,) ((:) immediate []) ((:) boxed []) -> select (BinaryCase (L.fst immediate) (L.fst boxed));
+        _ -> []
+      }
+    };
+    _ -> []
+  };
+  generateProgram :: Bool -> Set String -> Map String ((,) Int Int) -> Map Int ((,,) Int Int CaseDispatch) ->
+                     XErased -> Either String ((,) String ([] String));
+  generateProgram closed names cs plans term =
     let {
       fs = A.analyze term
     } in
@@ -44,7 +70,7 @@ module Bootstrap.LLVM.Codegen where {
     } in
     let {
       output =
-        Output 0 [] "entry" [] [] cs (FunctionScope fs (A.lambdaFreeTable term)) S.empty M.empty ks S.empty (K.collecting fs ks) M.empty
+        Output 0 [] "entry" [] [] (ConstructorLayout cs plans) (FunctionScope fs (A.lambdaFreeTable term)) S.empty M.empty ks S.empty (K.collecting fs ks) M.empty
           True
           M.empty
           M.empty
@@ -1352,7 +1378,6 @@ module Bootstrap.LLVM.Codegen where {
       _ ->
         do {
           value <- evaluate scope scrutinee;
-          tag <- constructorTag value;
           labelled <-
             L.mapM
               (\alternative ->
@@ -1366,10 +1391,7 @@ module Bootstrap.LLVM.Codegen where {
           let {
             fallback = L.fromMaybe missing (caseFallback labelled)
           };
-          entries <- L.mapM caseSwitchEntry labelled;
-          emit ("  switch i64 " ++ (tag ++ (", label %" ++ (fallback ++ " ["))));
-          L.mapM_ emit (L.concat entries);
-          emit "  ]";
+          dispatchCase value fallback labelled;
           forcedBefore <- gets forcedValues;
           incoming <-
             L.mapM
@@ -1407,6 +1429,55 @@ module Bootstrap.LLVM.Codegen where {
           _ -> caseFallback rest
         }
     };
+  -- Only a complete set from one checked constructor family can use its
+  -- representation directly. The caller still evaluates the scrutinee.
+  dispatchCase :: String -> String -> [] ((,) String XErasedAlternative) -> Build ();
+  dispatchCase value fallback labelled = do {
+    entries <- L.mapM (\((,) dest (XErasedAlternative pat _)) -> case pat of {
+      XDefaultPattern _ -> cgPure [];
+      XConstructorPattern name _ -> do {
+        descriptor <- lookupConstructor name;
+        cgPure [(,) (L.fst descriptor) dest]
+      }
+    }) labelled;
+    layouts <- gets caseDispatches;
+    let {
+      arms = L.concat entries;
+      generic = do { tag <- constructorTag value; emitCaseSwitch tag fallback arms };
+      target tag = L.fromMaybe fallback (L.lookup eqInt tag arms)
+    };
+    case arms of {
+      [] -> generic;
+      (:) ((,) tag _) rest -> case M.lookup L.compareInt tag layouts of {
+        Nothing -> generic;
+        Just ((,,) owner width plan) -> let {
+          member entry = case M.lookup L.compareInt (L.fst entry) layouts of {
+            Just ((,,) other _ _) -> owner == other;
+            Nothing -> False
+          };
+          distinct = S.size (S.fromList L.compareInt (L.map L.fst arms))
+        } in if width /= L.length arms || distinct /= width || L.not (L.all member rest) ||
+          L.isJust (caseFallback labelled) then generic else case plan of {
+          SingleCase -> emit ("  br label %" ++ target tag);
+          HeapCases -> do { key <- loadAt "i64" value 8; emitCaseSwitch key fallback arms };
+          ImmediateCases -> do {
+            bits <- result ("ptrtoint ptr " ++ value ++ " to i64");
+            emitCaseSwitch bits fallback (L.map (\((,) n dest) -> (,) (n * 8 + 4) dest) arms)
+          };
+          BinaryCase zero boxed -> do {
+            empty <- result ("icmp eq ptr " ++ value ++ ", " ++ immediate (8 * zero + 4));
+            emit ("  br i1 " ++ empty ++ ", label %" ++ target zero ++ ", label %" ++ target boxed)
+          }
+        }
+      }
+    }
+  };
+  emitCaseSwitch :: String -> String -> [] ((,) Int String) -> Build ();
+  emitCaseSwitch tag fallback arms = do {
+    emit ("  switch i64 " ++ tag ++ ", label %" ++ fallback ++ " [");
+    L.mapM_ (\((,) n dest) -> emit ("    i64 " ++ showInt n ++ ", label %" ++ dest)) arms;
+    emit "  ]"
+  };
   caseSwitchEntry :: (,) String XErasedAlternative -> Build ([] String);
   caseSwitchEntry ((,) label (XErasedAlternative pattern body)) =
     case pattern of {
@@ -2022,7 +2093,6 @@ module Bootstrap.LLVM.Codegen where {
       _ ->
         do {
           value <- evaluate scope scrutinee;
-          tag <- constructorTag value;
           labelled <-
             L.mapM
               (\a ->
@@ -2035,10 +2105,7 @@ module Bootstrap.LLVM.Codegen where {
           let {
             fallback = L.fromMaybe missing (caseFallback labelled)
           };
-          entries <- L.mapM caseSwitchEntry labelled;
-          emit ("  switch i64 " ++ (tag ++ (", label %" ++ (fallback ++ " ["))));
-          L.mapM_ emit (L.concat entries);
-          emit "  ]";
+          dispatchCase value fallback labelled;
           saved <- get;
           L.mapM_
             (\entry ->

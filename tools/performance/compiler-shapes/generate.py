@@ -304,6 +304,22 @@ inspect :: Chain -> Int;
 inspect value = case value of {{ {pattern} -> here; _ -> 0 }};
 '''
         expression = f'inspect (make (if ltInt x 0 then {n - 1} else {n}) x)'
+    elif family == 'checked_constructor_dispatch':
+        declarations = (
+            'data Wrapped = Wrapped Int (Int -> Step);\n'
+            'data Step = Leaf Int | More Wrapped;\n'
+            'make :: Int -> Wrapped;\n'
+            'make value = Wrapped value (\\key -> if ltInt key 1 then Leaf key else More (make (subInt key 1)));\n'
+            'walk0 :: Wrapped -> Int;\n'
+            'walk0 wrapped = case wrapped of { Wrapped value advance -> value };\n'
+        )
+        for i in range(1, n + 1):
+            declarations += (
+                f'walk{i} :: Wrapped -> Int;\n'
+                f'walk{i} wrapped = case wrapped of {{ Wrapped value advance -> case advance value of '
+                f'{{ Leaf key -> key; More next -> addInt value (walk{i-1} next) }} }};\n'
+            )
+        expression = f'walk{n} (make x)'
     elif family == 'signed_constructor_cases':
         declarations = '''data Path a = End | Step a (Path a);
 build :: Int -> Int -> Path Int;
@@ -523,6 +539,9 @@ def expected(family, n, x):
         return -(abs(value) % 251) if value < 0 else value % 251
     if family == 'deferred_constructor_spine':
         return 0 if x < 0 else x+n-1
+    if family == 'checked_constructor_dispatch':
+        steps = min(max(x, 0), n)
+        return (steps + 1) * (2*x - steps) // 2
     if family == 'signed_constructor_cases':
         return x + int(x >= 0 or n >= 2)
     if family == 'recursive_ring':
@@ -590,6 +609,8 @@ def generate(out, sizes=None, families=None):
             inputs = [-1, n//2, n]
         elif family == 'inferred_dictionary_prefix':
             inputs = [-n-1, -n, n-1]
+        elif family == 'checked_constructor_dispatch':
+            inputs = [-1, 0, n//2, 2*n+3]
         elif family == 'mixed_parser_recursion':
             inputs = [-1, 0, n-1, n, 2*n+1]
         elif family == 'local_dictionary_branch_fanout':
