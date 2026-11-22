@@ -391,6 +391,18 @@ class ScheduleTests(unittest.TestCase):
                             for i in range(1, count + 1))
                 self.assertEqual(generate.expected(family, count, value), total)
 
+    def test_delayed_packet_fanout_demands_the_selected_branch(self):
+        family = 'delayed_packet_fanout'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        for count in (1, 8, 32, 128):
+            source = generate.program(family, count)
+            self.assertEqual(len(re.findall(r'^probe\d+ :: Packet -> Int;', source, re.M)), count)
+            for value in (-7, -4, -3, 0, 11, 129):
+                total = sum(i if value == 0 else
+                            value + 3 + i if value + 3 < i else 3 - value - i
+                            for i in range(count))
+                self.assertEqual(generate.expected(family, count, value), total)
+
     def test_local_dictionary_branch_fanout_keeps_literal_sites_fixed(self):
         family = 'local_dictionary_branch_fanout'
         self.assertFalse(generate.REGISTRY['families'][family]['default'])

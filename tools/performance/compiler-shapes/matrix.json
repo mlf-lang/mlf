@@ -45,6 +45,7 @@
     "datatype_validation_fanout": {"label": "Shared datatype validation", "default": false, "work": "n independent signed functions match distinct constructors of one shared datatype"},
     "shared_datatype_fragments": {"label": "Datatype references across fragments", "default": false, "work": "n independently checked functions each use the same n-constructor datatype and their own unary datatype"},
     "boxed_closure_factory": {"label": "Boxed closure factory", "default": false, "work": "n calls allocate closures with two captures through the same constructor worker"},
+    "delayed_packet_fanout": {"label": "Delayed packet fan-out", "default": false, "work": "n consumers inspect a shared packet, force its left field and conditionally force its right field"},
     "local_dictionary_branch_fanout": {"label": "Local dictionary branch fan-out", "default": false, "work": "n inferred local helpers each use the previous helper in two branches, with two overloaded string literals at the base"},
     "signed_constructor_cases": {"label": "Signed polymorphic constructor cases", "default": false, "work": "n explicitly quantified declarations inspect a recursive datatype and pass the selected field to their predecessor"},
     "baseline": {"label": "Minimal IO baseline", "default": false, "work": "a program that only reads argv and prints it"}

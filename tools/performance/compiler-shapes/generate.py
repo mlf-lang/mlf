@@ -98,6 +98,17 @@ sumChain x chain = case chain of { End -> 0; More box rest -> addInt (readBox bo
         for i in range(n, 0, -1):
             chain = f'More (make x {i}) ({chain})'
         expression = f'sumChain x ({chain})'
+    elif family == 'delayed_packet_fanout':
+        declarations = '''data Packet = Missing | Payload Int Int;
+packet x = if eqInt x 0 then Missing else Payload (addInt x 3) (subInt 3 x);
+'''
+        for i in range(n):
+            declarations += (f'probe{i} :: Packet -> Int;\n'
+                             f'probe{i} packet = case packet of {{ Missing -> {i}; Payload left right -> '
+                             f'if ltInt left {i} then addInt left {i} else subInt right {i} }};\n')
+        terms = [f'(probe{i} payload)' for i in range(n)]
+        total = balanced(terms, lambda a, b: f'(addInt {a} {b})')
+        return HEADER + declarations + f'entry x = let {{ payload = packet x }} in {total};\n' + MAIN
     elif family == 'local_dictionary_branch_fanout':
         definitions = ['level0 z = if ltInt z 0 then stringLength "a" else stringLength "bb"']
         for i in range(1, n + 1):
@@ -432,6 +443,13 @@ def expected(family, n, x):
     if family == 'boxed_closure_factory':
         offsets = n*(n+1)//2
         return x*(offsets + n) if x < 0 else n*(x + x*x) - offsets
+    if family == 'delayed_packet_fanout':
+        offsets = n*(n-1)//2
+        if x == 0:
+            return offsets
+        right_count = min(n, max(0, x + 4))
+        right_offsets = right_count*(right_count-1)//2
+        return right_count*(3-x) + (n-right_count)*(x+3) + offsets - 2*right_offsets
     if family == 'local_dictionary_branch_fanout':
         for threshold in range(n, 0, -1):
             x += threshold if x < threshold else -threshold
