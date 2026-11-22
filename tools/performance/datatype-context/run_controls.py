@@ -38,7 +38,8 @@ def main():
     adapted_dir=out/'historical-oracle'
     adapted_dir.mkdir()
     adapted=H.module(adapter,'frozen_query').prepare_frozen_query(HERE/'FrozenCrateQuery.hs',adapted_dir,
-        expected_sha256=oracle['frozen_sha256'])
+        expected_sha256=oracle['frozen_sha256'],
+        types_source=ROOT/'libraries/mlf-foundation/Bootstrap/Types.hs')
     pins={str(f):H.sha(f) for f in [*files,bridge,adapter,adapted]}
     limits=dict(address_space_per_process_bytes=6*1024**3,disk_free_floor_bytes=5*1024**3,
         host_available_floor_bytes=3*1024**3,process_tree_rss_bytes=5*1024**3,max_work_bytes=2*1024**3,wall_seconds=600)

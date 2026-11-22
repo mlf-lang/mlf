@@ -470,6 +470,11 @@ jobs:
             .mlf-build/compiler-shapes-smoke/cohorts/**/stdout
             .mlf-build/compiler-shapes-smoke/cohorts/**/stderr
             .mlf-build/compiler-shapes-smoke/results/
+            .mlf-build/datatype-context/receipt.json
+            .mlf-build/datatype-context/*-build/stdout
+            .mlf-build/datatype-context/*-build/stderr
+            .mlf-build/datatype-context-guard/bounded-receipt.json
+            .mlf-build/datatype-context-guard/build.log
             .mlf-build/crate-optimization-guard/
             .mlf-build/crate-optimization-controls/**/*.json
             .mlf-build/crate-optimization-controls/**/*.stdout

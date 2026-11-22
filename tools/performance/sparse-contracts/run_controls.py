@@ -72,7 +72,8 @@ def main():
     sys.path.insert(0,str(adapter_dir))
     from frozen_query import prepare_frozen_query
     adapted_query=prepare_frozen_query(HERE/'FrozenCrateQuery.hs',generated,
-                                       expected_sha256=oracle['sources']['CrateQuery']['frozen_sha256'])
+                                       expected_sha256=oracle['sources']['CrateQuery']['frozen_sha256'],
+                                       types_source=ROOT/'libraries/mlf-foundation/Bootstrap/Types.hs')
     (generated/'FullyFrozenSourceInference.hs').write_bytes(adapted)
     (generated/'Main.hs').write_bytes(mainAdapted)
     adaptations={'source_original_sha256':hashlib.sha256(rawSource).hexdigest(),

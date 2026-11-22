@@ -8,10 +8,11 @@ import sys
 
 FINAL_MANIFEST_SHA256 = '4d8ada0eae02aee9e3f93cea6670a59f51e1f8b5d49d2c5a7d8e2ecbe66432cb'
 CONTRACT_SOURCE_SHA256 = '52067d6ba346927ea257ddc45bb52b37d4b66520500d1013f242018e67d240b7'
-FRAMEWORK_SOURCE_SHA256 = '8b3e4f4866bfbaf8d7ef02d46cfaeb408d24f2fe2ae42faa5320230bb9f6a305'
+FRAMEWORK_SOURCE_SHA256 = '26a8b1aa54cdb6bbae8f18f2b9b48399003aa94141018608d4bbc6eaed41a658'
 FRAMEWORK_MANIFEST_SHA256 = '7dadb5521dec305170eca4169fe9a1195a9a35d5e1eface09bc6edcae1ee05cd'
 FOUNDATION_MANIFEST_SHA256 = '4c51f5a1c1825d04ffae830e5b260366c3239d810d9a85809c386f1860128ca3'
 PHASE2_MANIFEST_SHA256 = 'd30e6f73bcf1da12258c347668c86097aedbc818e79490fd54a72591322cf8f7'
+HEAP_FORCE_MANIFEST_SHA256 = '256e98b459c8b6f279fee380645aeb8b583e8eebd93ea486b2b7573a48ad5f45'
 
 
 def read_implementation(path):
@@ -68,5 +69,6 @@ def live_contract(history_root, source_root=None):
     directory, previous, current = contracts()
     contract = current.successor_type(previous, FINAL_MANIFEST_SHA256,
                                       FRAMEWORK_MANIFEST_SHA256, FOUNDATION_MANIFEST_SHA256,
-                                      PHASE2_MANIFEST_SHA256, read_implementation)
-    return contract(directory, PHASE2_MANIFEST_SHA256, history_root, source_root=source_root)
+                                      PHASE2_MANIFEST_SHA256, HEAP_FORCE_MANIFEST_SHA256,
+                                      read_implementation)
+    return contract(directory, HEAP_FORCE_MANIFEST_SHA256, history_root, source_root=source_root)

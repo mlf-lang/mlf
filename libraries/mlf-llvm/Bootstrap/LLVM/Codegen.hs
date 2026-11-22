@@ -2388,13 +2388,29 @@ module Bootstrap.LLVM.Codegen where {
   -- A single thunk can use its own update root directly. Mark it busy before
   -- calling, clear captures through its callback, then force and memoize its
   -- result. Runtime fallback preserves null/cycle errors and longer spines.
-  -- Every site returns immediate and already evaluated values inline. Boxed
-  -- worker arguments also follow a single ready indirection inline. Other
-  -- sites share that dispatch to keep generated function bodies smaller.
+  -- Immediate values keep a short inline test. Share the ordinary heap
+  -- dispatch across call sites. Boxed worker arguments still inline the
+  -- ready-value and forwarding checks.
   forceDefinition :: [] String;
   forceDefinition = L.concat
-    [["define private ptr @mlf.force(ptr %value) alwaysinline {"],
-     forceReadyBlocks,
+    [["define private ptr @mlf.force(ptr %value) alwaysinline {",
+      "entry:",
+      "  %bits = ptrtoint ptr %value to i64",
+      "  %kind = and i64 %bits, 7",
+      "  %immediate = icmp ne i64 %kind, 0",
+      "  br i1 %immediate, label %done, label %heap",
+      "done:",
+      "  ret ptr %value",
+      "heap:",
+      "  %result = tail call ptr @mlf.force.heap(ptr %value)",
+      "  ret ptr %result",
+      "}",
+      "define private ptr @mlf.force.heap(ptr %value) noinline {",
+      "entry:",
+      "  %null = icmp eq ptr %value, null",
+      "  br i1 %null, label %slow, label %tagged",
+      "tagged:"],
+     forceTagBlocks,
      ["  %result.deferred = tail call ptr @mlf.force.deferred(ptr %value, i32 %tag)",
       "  ret ptr %result.deferred",
       "done:",
@@ -2430,7 +2446,7 @@ module Bootstrap.LLVM.Codegen where {
       "}"]];
   forceReadyBlocks :: [] String;
   forceReadyBlocks =
-    ["entry:",
+    L.append ["entry:",
      "  %null = icmp eq ptr %value, null",
      "  br i1 %null, label %slow, label %test",
      "test:",
@@ -2438,8 +2454,10 @@ module Bootstrap.LLVM.Codegen where {
      "  %kind = and i64 %bits, 7",
      "  %immediate = icmp ne i64 %kind, 0",
      "  br i1 %immediate, label %done, label %tagged",
-     "tagged:",
-     "  %tag = load i32, ptr %value, align 4",
+     "tagged:"] forceTagBlocks;
+  forceTagBlocks :: [] String;
+  forceTagBlocks =
+    ["  %tag = load i32, ptr %value, align 4",
      "  %ready = icmp uge i32 %tag, 5",
      "  br i1 %ready, label %done, label %deferred",
      "deferred:"];

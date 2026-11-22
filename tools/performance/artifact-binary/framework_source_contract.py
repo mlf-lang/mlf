@@ -22,6 +22,11 @@ PHASE2_INTERMEDIATE = '80b305b2580e3d941785072098493a3471a9dced'
 PHASE2_BRANCH_PARENT = 'c253676070d4b094b6b1d4441cf4829f5ea4d8dd'
 PHASE2_FRAMEWORK_PARENT = 'd09dfdd00141bc932b2d38b95f8343893abfed82'
 PHASE2_FRAMEWORK_PARENT_TREE = 'b242d36eb97c4c76433851564f69e9d8c548f5c3'
+HEAP_FORCE_MANIFEST = 'foundation-heap-force-source-migration.json'
+HEAP_FORCE = '8558f0ff37425a3b432a87b0c9cb82ac7e77e1e8'
+HEAP_FORCE_TREE = '67932b8d16df683bd53e6715923fe49b51d488ec'
+HEAP_FORCE_FRAMEWORK_PARENT = 'e3ea95192453cb49965d6c9bedd0a45effe5bae9'
+HEAP_FORCE_FRAMEWORK_PARENT_TREE = '577aef9b8bf17e127dc245614d70d56eb5c6a5fb'
 FOUNDATION_MERGE_PATHS = {'mlf.lock', 'tests/shared/MLF/Tests/SharedFrontend.hs'}
 HOSTED_PARITY_CHANGES = {
     'mlf.lock': (
@@ -108,26 +113,27 @@ def foundation_changes(spec, repository, files, framework_changes, framework_pin
     return {path: row['merged'] for path, row in changes.items()}
 
 
-def phase2_changes(spec, repository, files, foundation_pin):
+def phase2_changes(spec, repository, files, predecessor_pin, pin_key, branch, tree,
+                   framework, framework_tree, parents):
     require(set(spec) == {'commit', 'tree', 'framework_parent', 'framework_parent_tree',
-                          'foundation_manifest_sha256', 'changes'} and
-            spec['commit'] == PHASE2 and spec['tree'] == PHASE2_TREE and
-            spec['framework_parent'] == PHASE2_FRAMEWORK_PARENT and
-            spec['framework_parent_tree'] == PHASE2_FRAMEWORK_PARENT_TREE and
-            spec['foundation_manifest_sha256'] == foundation_pin,
+                          pin_key, 'changes'} and
+            spec['commit'] == branch and spec['tree'] == tree and
+            spec['framework_parent'] == framework and
+            spec['framework_parent_tree'] == framework_tree and
+            spec[pin_key] == predecessor_pin,
             'exact Phase 2 transition identity')
     git = ['git', '--no-replace-objects', '-C', repository]
 
     def revision(expr):
         return subprocess.check_output([*git, 'rev-parse', '--verify', expr], text=True).strip()
 
-    require(revision(PHASE2 + '^{tree}') == PHASE2_TREE and
-            revision(PHASE2_FRAMEWORK_PARENT + '^{tree}') == PHASE2_FRAMEWORK_PARENT_TREE and
-            revision(PHASE2 + '^') == PHASE2_INTERMEDIATE and
-            revision(PHASE2_INTERMEDIATE + '^') == PHASE2_BRANCH_PARENT,
+    require(revision(branch + '^{tree}') == tree and
+            revision(framework + '^{tree}') == framework_tree and
+            all(revision(child + '^') == parent
+                for child, parent in zip((branch, *parents[:-1]), parents)),
             'pinned Phase 2 trees and ancestry')
     changed = subprocess.check_output([*git, 'diff-tree', '--no-commit-id', '--name-only',
-                                      '--no-renames', '-r', PHASE2_BRANCH_PARENT, PHASE2],
+                                      '--no-renames', '-r', parents[-1], branch],
                                      text=True).splitlines()
     changes = spec['changes']
     require(changes.keys() == files.keys() & set(changed), 'complete Phase 2 source transition')
@@ -135,16 +141,16 @@ def phase2_changes(spec, repository, files, foundation_pin):
         def at(commit):
             return sha(subprocess.check_output([*git, 'show', commit + ':' + path]))
         require(set(row) == {'branch_parent', 'framework', 'branch', 'merged'} and
-                row['branch_parent'] == at(PHASE2_BRANCH_PARENT) and
-                row['framework'] == files[path] == at(PHASE2_FRAMEWORK_PARENT) and
-                row['branch'] == at(PHASE2) and row['framework'] != row['merged'] and
+                row['branch_parent'] == at(parents[-1]) and
+                row['framework'] == files[path] == at(framework) and
+                row['branch'] == at(branch) and row['framework'] != row['merged'] and
                 (path == 'mlf.lock' or row['merged'] == row['branch']),
                 'Phase 2 source endpoint: ' + path)
     return {path: row['merged'] for path, row in changes.items()}
 
 
 def successor_type(predecessor_type, predecessor_manifest, framework_pin, foundation_pin,
-                   phase2_pin, read_implementation):
+                   phase2_pin, heap_force_pin, read_implementation):
     """Reuse exact projection operations, adding a locally reviewed inventory edge."""
 
     class Contract(predecessor_type):
@@ -155,7 +161,10 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, founda
             foundation_raw = read_implementation(self.directory / FOUNDATION_MANIFEST)
             require(sha(foundation_raw) == foundation_pin, 'pinned Foundation manifest SHA')
             phase2_raw = read_implementation(self.directory / PHASE2_MANIFEST)
-            require(sha(phase2_raw) == phase2_pin == manifest_sha256, 'pinned Phase 2 manifest SHA')
+            require(sha(phase2_raw) == phase2_pin, 'pinned Phase 2 manifest SHA')
+            heap_force_raw = read_implementation(self.directory / HEAP_FORCE_MANIFEST)
+            require(sha(heap_force_raw) == heap_force_pin == manifest_sha256,
+                    'pinned heap-force manifest SHA')
             self.manifest_sha256 = manifest_sha256
             self.source_root = Path(source_root or Path(history_root).parents[1]).resolve(strict=True)
             repository = source_repository(history_root)
@@ -195,9 +204,16 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, founda
                 require(files[path] == previous, 'hosted parity source transition: ' + path)
                 self.changes[path] = [old_files[path], current]
                 files[path] = current
-            phase2 = phase2_changes(self.core.strict_json(phase2_raw), repository, files, foundation_pin)
-            self.changes.update({path: [old_files[path], new] for path, new in phase2.items()})
-            files.update(phase2)
+            for data, pin, key, branch, tree, framework, framework_tree, parents in (
+                    (phase2_raw, foundation_pin, 'foundation_manifest_sha256', PHASE2, PHASE2_TREE,
+                     PHASE2_FRAMEWORK_PARENT, PHASE2_FRAMEWORK_PARENT_TREE,
+                     (PHASE2_INTERMEDIATE, PHASE2_BRANCH_PARENT)),
+                    (heap_force_raw, phase2_pin, 'phase2_manifest_sha256', HEAP_FORCE, HEAP_FORCE_TREE,
+                     HEAP_FORCE_FRAMEWORK_PARENT, HEAP_FORCE_FRAMEWORK_PARENT_TREE, (PHASE2,))):
+                edge = phase2_changes(self.core.strict_json(data), repository, files, pin, key,
+                                      branch, tree, framework, framework_tree, parents)
+                self.changes.update({path: [old_files[path], new] for path, new in edge.items()})
+                files.update(edge)
             self.core.hash_map(files, 'current framework sources')
             paths = {n: p for n, p in old_paths.items() if n not in retired}
             self.value = {'current_files': files, 'module_paths': paths,
@@ -216,7 +232,7 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, founda
             require(not self.removed_paths.intersection(self.added_paths),
                     'retirement leaves historical addition evidence intact')
             self.metadata_paths = (*self.previous.metadata_paths, MANIFEST, FOUNDATION_MANIFEST,
-                                   PHASE2_MANIFEST, Path(__file__).name)
+                                   PHASE2_MANIFEST, HEAP_FORCE_MANIFEST, Path(__file__).name)
             history_names = set(self.parent['frozen_history']) | set(self.maintenance_parent['files'])
             require(self.maintenance.keys() <= history_names, 'unknown maintenance owner')
             for name in history_names:

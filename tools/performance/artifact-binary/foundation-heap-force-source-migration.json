@@ -1,0 +1,21 @@
+{
+  "changes": {
+    "libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs": {
+      "branch": "233c3dbbcd101f8416cfa49cf65a96c2df8b0991a41c57ab8799dfc521733acc",
+      "branch_parent": "0cbdf0f3842ee45c05b0216e4b38db97194dc9d363d1e18deadea1e2cce03224",
+      "framework": "0cbdf0f3842ee45c05b0216e4b38db97194dc9d363d1e18deadea1e2cce03224",
+      "merged": "233c3dbbcd101f8416cfa49cf65a96c2df8b0991a41c57ab8799dfc521733acc"
+    },
+    "mlf.lock": {
+      "branch": "f9b9fedfae7a4e4c6a35d178e4860ebb839cc86452ac43242bdeb52a0f0d6a2e",
+      "branch_parent": "2bd9027025017b5720d83cc256895ec417969c1b535739e9d21ed7c6cd280737",
+      "framework": "ba9313ffaa2e97414ff83085110699d4fa51f5ff02d78003aec3c786e7373d79",
+      "merged": "f8e761d04c695c9d72be1d8df314b660ed7ce06062578c2758ee4bc00cb67411"
+    }
+  },
+  "commit": "8558f0ff37425a3b432a87b0c9cb82ac7e77e1e8",
+  "framework_parent": "e3ea95192453cb49965d6c9bedd0a45effe5bae9",
+  "framework_parent_tree": "577aef9b8bf17e127dc245614d70d56eb5c6a5fb",
+  "phase2_manifest_sha256": "d30e6f73bcf1da12258c347668c86097aedbc818e79490fd54a72591322cf8f7",
+  "tree": "67932b8d16df683bd53e6715923fe49b51d488ec"
+}
