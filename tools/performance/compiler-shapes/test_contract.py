@@ -335,6 +335,28 @@ class ScheduleTests(unittest.TestCase):
                     fields.append(fields.pop(0))
                 self.assertEqual(generate.expected(family, count, x), self.signed_int(result))
 
+    def test_recursive_lookup_workers_visit_every_binding_and_report_lookup_hits(self):
+        family = 'recursive_lookup_workers'
+        table = {2: 17, 5: 41, 8: 73}
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)/'cases'
+            generate.generate(output, [8, 32, 64], [family])
+            for case in json.loads((output/'cases.json').read_text()):
+                n = case['size']
+                self.assertEqual(case['inputs'], [3 - n, 5 - n//2, 8, 9])
+                self.assertEqual(case['expected_stdout'][0], '17\n')
+                self.assertEqual(case['expected_stdout'][-2:], ['73\n', '0\n'])
+        for n in (1, 3, 8, 16, 64):
+            source = generate.program(family, n)
+            for i in range(n):
+                self.assertEqual(source.count(f'walk{i} ::'), 1)
+                self.assertIn(f'walk{i} q l else if ltInt key q then walk{i} q r', source)
+                self.assertEqual(source.count(f'(walk{i} (addInt x {i}) tree)'), 1)
+            for x in (-2**63, -n, -1, 0, 2, 5, 8, 9, 2**63 - 1):
+                keys = [((x+i+2**63) % 2**64) - 2**63 for i in range(n)]
+                self.assertEqual(generate.expected_output(family, n, x),
+                                 f'{sum(table.get(key, 0) for key in keys)}\n')
+
     def test_stable_recursive_workers_keep_the_worker_table_and_beta_steps(self):
         family = 'stable_recursive_workers'
         self.assertFalse(generate.REGISTRY['families'][family]['default'])

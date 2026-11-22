@@ -169,6 +169,19 @@ producer x = if ltInt x 0 then next (subInt 0 x) else addInt x ({total});
             integer_call = call(integer, boolean)
             terms.append(f'if {call(boolean, integer)} then {integer_call} else subInt 0 ({integer_call})')
         expression = balanced(terms, lambda a,b:f'addInt ({a}) ({b})')
+    elif family == 'recursive_lookup_workers':
+        declarations = (
+            'data Tree = Empty | Branch Tree Int Int Tree;\n'
+            'tree :: Tree;\n'
+            'tree = Branch (Branch Empty 2 17 Empty) 5 41 (Branch Empty 8 73 Empty);\n')
+        calls = []
+        for i in range(n):
+            declarations += (
+                f'walk{i} :: Int -> Tree -> Int;\n'
+                f'walk{i} q t = case t of {{ Empty -> 0; Branch l key value r -> '
+                f'if ltInt q key then walk{i} q l else if ltInt key q then walk{i} q r else value }};\n')
+            calls.append(f'(walk{i} (addInt x {i}) tree)')
+        expression = balanced(calls, lambda a, b: f'(addInt {a} {b})') if calls else '0'
     elif family == 'stable_recursive_workers':
         rows = [HEADER, 'data Job = End | Job (Int -> Int) Job;',
                 'total :: Int -> Job -> Int;',
@@ -596,6 +609,10 @@ def expected(family, n, x):
     if family == 'inferred_poly_functions':
         negative = max(0, min(n, x + 1))
         return n*x + n*(n-1)//2 - 2*(negative*x + negative*(negative-1)//2)
+    if family == 'recursive_lookup_workers':
+        # Each stored key contributes once if its signed Int64 offset is visited.
+        modulus = 2**64
+        return sum(value for key, value in ((2, 17), (5, 41), (8, 73)) if (key - x) % modulus < n)
     if family == 'stable_recursive_workers':
         def remainder(number, divisor):
             return number % divisor if number >= 0 else -((-number) % divisor)
@@ -722,6 +739,8 @@ def generate(out, sizes=None, families=None):
         inputs = [-1,0,n+3] if family == 'recursive_ring' else [-1,0,7]
         if family == 'wide_case':
             inputs = [-1, n//2, n, '--all']
+        elif family == 'recursive_lookup_workers':
+            inputs = [3 - n, 5 - n//2, 8, 9]
         elif family == 'decoder_pipeline':
             inputs = data_shapes.inputs(family, n)
         elif family == 'rank2_callbacks':
