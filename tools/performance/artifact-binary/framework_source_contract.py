@@ -88,6 +88,12 @@ SESSION_SCOPE_INPUT_MAINTENANCE = {
         '2318263bec07392b32a3652d8bb0dafc0f5f9edd39828c7e20b0ce082ac89354',
     ),
 }
+ADMISSION_SCOPE_PREFIX_MAINTENANCE = {
+    'patricia/run_integrated.py': (
+        '2318263bec07392b32a3652d8bb0dafc0f5f9edd39828c7e20b0ce082ac89354',
+        '5c4edb54e2ae1429e37795ca3bc9adf5e89cc69b8a32d852aed136e31688c920',
+    ),
+}
 ARCHIVE_PATHS = (
     'bootstrap', 'host', 'libraries', 'package', 'runtime', 'testing', 'tests',
     'tools/performance', 'tools/shared', 'shared-sources.json', 'mlf.lock',
@@ -233,7 +239,8 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, founda
                     'exact predecessor identity and transition schema')
             self.changes = dict(spec['changes'])
             self.maintenance = dict(spec['maintenance'])
-            for edge in (COMPACT_SCOPE_MAINTENANCE, SESSION_SCOPE_INPUT_MAINTENANCE):
+            for edge in (COMPACT_SCOPE_MAINTENANCE, SESSION_SCOPE_INPUT_MAINTENANCE,
+                         ADMISSION_SCOPE_PREFIX_MAINTENANCE):
                 for name, (previous, current) in edge.items():
                     original, migrated = self.maintenance[name]
                     require(migrated == previous, 'compact scope maintenance transition: ' + name)

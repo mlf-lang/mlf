@@ -141,6 +141,23 @@ def adapt_compact_scope_checks(H, directory):
                 '\n'
                 'literalControls :: IO ()\n',
         },
+        'AdmissionTests.hs': {
+            '    O.assert (label ++ "/hand scope jumps") (map O.mapEntries actualJumps == jumps)\n':
+                '    let T.ScopeIndex frozenIntervals frozenJumps = S.scopeIndex old\n'
+                '    O.assert (label ++ "/hand full frozen scope intervals") (O.mapEntries frozenIntervals == intervals)\n'
+                '    O.assert (label ++ "/hand scope jumps") (map O.mapEntries frozenJumps == jumps)\n'
+                '    -- The authored scope forests all have depth at most one. Their\n'
+                '    -- first authored map is the complete live prefix, independently\n'
+                '    -- of how many maps either run returns; actual was raw-audited above.\n'
+                '    O.assert (label ++ "/hand live compact scope jumps") (map O.mapEntries actualJumps == take 1 jumps)\n'
+                '    if length jumps > 1 then do\n'
+                '      let wider = T.Solver actualGraph actualParents actualBinders (T.ScopeIndex actualIntervals frozenJumps)\n'
+                '      O.assert (label ++ "/raw live audit rejects a redundant scope tail")\n'
+                '        (case S.finish wider of\n'
+                '          T.Left message -> B.unpack message == "incremental graph index disagrees with the graph"\n'
+                '          T.Right _ -> False)\n'
+                '    else pure ()\n',
+        },
         'TransactionOracle.hs': transaction_edits,
         'C4TransactionOracle.hs': transaction_edits,
         'C4TransactionControls.hs': {
