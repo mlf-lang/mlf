@@ -64,6 +64,18 @@ C4_SURVIVOR_DEMAND_CHANGES = {
         'e714b87ec9a2aa4f92eec720e5436c9810015764bda13835c44426007041fcf9',
     ),
 }
+# The repaired Solver is in the builtin generator's source closure. GHC O0
+# and O2 independently generated the same literal with only its identity changed.
+C4_BUILTIN_REGENERATION_CHANGES = {
+    'bootstrap/MLF/BuiltinPreludeData.hs': (
+        '0a2c09d3698b26c8ac48e9388b0fecefd1e4469fe088192662a7849010cd51de',
+        'b6dfd0eba758cba48b893d0d25d83e8254d0f25d95274559cb4c4e05467ccb5f',
+    ),
+    'mlf.lock': (
+        'e714b87ec9a2aa4f92eec720e5436c9810015764bda13835c44426007041fcf9',
+        '58be558b0894ec523f3dde29a02c83025ade1858a514417e18f017fc4e63f263',
+    ),
+}
 COMPACT_SCOPE_MAINTENANCE = {
     'patricia/run_integrated.py': (
         '4fd2ad1497834d43189800dc720457fbe62c02511911d8c89317534336115744',
@@ -257,10 +269,12 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, founda
                                       branch, tree, framework, framework_tree, parents)
                 self.changes.update({path: [old_files[path], new] for path, new in edge.items()})
                 files.update(edge)
-            for path, (previous, current) in C4_SURVIVOR_DEMAND_CHANGES.items():
-                require(files[path] == previous, 'C4 survivor demand source transition: ' + path)
-                self.changes[path] = [old_files[path], current]
-                files[path] = current
+            for label, edge in (('C4 survivor demand', C4_SURVIVOR_DEMAND_CHANGES),
+                                ('C4 builtin regeneration', C4_BUILTIN_REGENERATION_CHANGES)):
+                for path, (previous, current) in edge.items():
+                    require(files[path] == previous, label + ' source transition: ' + path)
+                    self.changes[path] = [old_files[path], current]
+                    files[path] = current
             self.core.hash_map(files, 'current framework sources')
             paths = {n: p for n, p in old_paths.items() if n not in retired}
             self.value = {'current_files': files, 'module_paths': paths,
