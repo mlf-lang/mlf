@@ -1138,8 +1138,8 @@ def main():
     parser.add_argument('--case', help='one control plus its required setup and paired processes')
     args = parser.parse_args()
     plan = run_path(str(Path(__file__).with_name('context_control_plan.py')))
-    expected = plan['commands_for'](args.legacy_query_only, args.case)
-    active = set(expected)
+    expected_commands = plan['commands_for'](args.legacy_query_only, args.case)
+    active = set(expected_commands)
     drivers = [kind for kind in ('query', 'session') if kind + '-cold' in active]
     memo_drivers = [kind for kind in ('query', 'session') if 'memo-' + kind in active]
     left_modes = [kind for kind in ('legacy', 'source', 'session') if 'left-' + kind in active]
@@ -1150,7 +1150,7 @@ def main():
     out.mkdir()
     record = {"complete": False, "fixture_sha256": digest(fixture.read_bytes()), "commands": [], "drivers": {},
               "legacy_query_only": args.legacy_query_only,
-              "selected_case": args.case, "planned_commands": expected,
+              "selected_case": args.case, "planned_commands": expected_commands,
               "binary_inspector_inputs": inspector_inputs,
               "format_migration": {
                   "default_query_context_schemas": [2, 1], "formal_interface_object_schemas": [3, 4],
@@ -1896,7 +1896,7 @@ def main():
         record["all_cache_totals"] = {"logical": logical, "allocated": allocated, "cache_roots": len(cache_roots),
                                       "scope": "all selected private cache trees; includes every retained raw/backup/lock/rejected directory; build/capture evidence remains in outer root accounting"}
         require(logical <= 16 * 1024**2 and allocated <= 16 * 1024**2, "16 MiB complete cache budget")
-        require([row['name'] for row in record['commands']] == expected, "fixed selected command inventory")
+        require([row['name'] for row in record['commands']] == expected_commands, "fixed selected command inventory")
         require(all(digest(Path(path).read_bytes()) == expected for path, expected in inspector_inputs.items()),
                 'independent binary inspector input changed during controls')
         if "left-session" in active:
