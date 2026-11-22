@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cheap transport regressions with a Darwin zombie-only group check.
+"""Cheap transport regressions, including bounded POSIX session cleanup.
 
 These mocks check dispatch, units, limits and historical reproduction pins.
 They do not qualify a real Mach-O closure, measure peak RSS, run the nine-leg
@@ -10,8 +10,10 @@ from __future__ import annotations
 from contextlib import ExitStack
 import hashlib
 import json
+import os
 from pathlib import Path
 import resource
+import select
 import signal
 import subprocess
 import sys
@@ -344,8 +346,10 @@ class GroupTermination(unittest.TestCase):
     def test_darwin_accepts_eperm_only_for_disappeared_or_zombie_only_group(self):
         for members in ([], [{'pid': 31, 'state': 'Z+'}]):
             with self.subTest(members=members), mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
-                 mock.patch.object(HELPER.os, 'killpg', side_effect=PermissionError):
+                 mock.patch.object(HELPER.os, 'getsid', return_value=31), \
+                 mock.patch.object(HELPER.os, 'killpg', side_effect=PermissionError) as killpg:
                 HELPER.kill_group(31, members=lambda group: members)
+                killpg.assert_called_once_with(31, signal.SIGKILL)
 
     def test_darwin_eperm_rechecks_exiting_members(self):
         exiting = [{'pid': 31, 'state': '?E', 'rss': 0}]
@@ -353,6 +357,7 @@ class GroupTermination(unittest.TestCase):
         for final in ([], zombie):
             inventory = mock.Mock(side_effect=[exiting, final])
             with self.subTest(final=final), mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
+                 mock.patch.object(HELPER.os, 'getsid', return_value=31), \
                  mock.patch.object(HELPER.os, 'killpg', side_effect=PermissionError), \
                  mock.patch.object(HELPER.time, 'sleep'), mock.patch.object(HELPER.os, 'kill') as kill:
                 HELPER.kill_group(31, members=inventory)
@@ -369,6 +374,7 @@ class GroupTermination(unittest.TestCase):
             with self.subTest(label=label), mock.patch.object(HELPER.sys, 'platform', platform), \
                  mock.patch.object(HELPER.os, 'killpg', side_effect=PermissionError), \
                  mock.patch.object(HELPER.os, 'getpgid', return_value=31), \
+                 mock.patch.object(HELPER.os, 'getsid', return_value=31), \
                  mock.patch.object(HELPER.os, 'kill') as kill, mock.patch.object(HELPER.time, 'sleep'):
                 inventory = mock.Mock(return_value=rows)
                 with self.assertRaises(PermissionError):
@@ -387,7 +393,7 @@ class GroupTermination(unittest.TestCase):
             inventory = mock.Mock(side_effect=[exiting, result])
             with self.subTest(result=result), mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
                  mock.patch.object(HELPER.os, 'killpg', side_effect=PermissionError), \
-                 mock.patch.object(HELPER.os, 'getpgid', return_value=31), \
+                 mock.patch.object(HELPER.os, 'getsid', return_value=31), \
                  mock.patch.object(HELPER.os, 'kill'), mock.patch.object(HELPER.time, 'sleep'):
                 with self.assertRaises(error):
                     HELPER.kill_group(31, members=inventory)
@@ -396,19 +402,69 @@ class GroupTermination(unittest.TestCase):
         rows = [{'pid': 31, 'state': 'S'}, {'pid': 32, 'state': 'R'}, {'pid': 35, 'state': 'Z'}]
         with mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
              mock.patch.object(HELPER.os, 'killpg', side_effect=PermissionError), \
-             mock.patch.object(HELPER.os, 'getpgid', side_effect=[31,40]), \
-             mock.patch.object(HELPER.os, 'getsid', return_value=40), \
+             mock.patch.object(HELPER.os, 'getsid', side_effect=[31, 31, 40]), \
              mock.patch.object(HELPER.os, 'kill') as kill, self.assertRaises(PermissionError):
             HELPER.kill_group(31, members=lambda group: rows)
         kill.assert_called_once_with(31, signal.SIGKILL)
 
     def test_unknown_membership_and_linux_zombie_denial_remain_errors(self):
         with mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
+             mock.patch.object(HELPER.os, 'getsid', return_value=31), \
              mock.patch.object(HELPER.os, 'killpg', side_effect=PermissionError), self.assertRaisesRegex(RuntimeError, 'cannot inspect'):
             HELPER.kill_group(31, members=mock.Mock(side_effect=RuntimeError('cannot inspect')))
         with mock.patch.object(HELPER.sys, 'platform', 'linux'), \
              mock.patch.object(HELPER.os, 'killpg', side_effect=PermissionError), self.assertRaises(PermissionError):
             HELPER.kill_group(31, members=lambda group: [])
+
+    def test_darwin_sweeps_only_revalidated_members_after_killpg_success_or_esrch(self):
+        rows = [{'pid': pid, 'state': state} for pid, state in [(32, 'S'), (33, 'R'), (34, 'S'), (35, 'Z+')]]
+        for outcome in (None, ProcessLookupError):
+            with self.subTest(killpg=outcome), mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
+                 mock.patch.object(HELPER.os, 'killpg', side_effect=outcome) as killpg, \
+                 mock.patch.object(HELPER.os, 'getsid', side_effect=[31, 31, 40, ProcessLookupError]) as sid, \
+                 mock.patch.object(HELPER.os, 'kill') as kill:
+                HELPER.kill_group(31, members=lambda group: rows)
+            killpg.assert_called_once_with(31, signal.SIGKILL)
+            self.assertEqual(sid.call_args_list, [mock.call(pid) for pid in (31, 32, 33, 34)])
+            kill.assert_called_once_with(32, signal.SIGKILL)
+
+    def test_darwin_never_signals_a_reassigned_leader_or_group(self):
+        with mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
+             mock.patch.object(HELPER.os, 'getsid', return_value=40), \
+             mock.patch.object(HELPER.os, 'killpg') as killpg, mock.patch.object(HELPER.os, 'kill') as kill:
+            HELPER.kill_group(31, members=lambda group: [{'pid': 31, 'state': 'S'}])
+        killpg.assert_not_called()
+        kill.assert_not_called()
+
+    def test_darwin_unverified_leader_remains_an_error_even_without_live_rows(self):
+        with mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
+             mock.patch.object(HELPER.os, 'getsid', side_effect=PermissionError('leader identity')), \
+             mock.patch.object(HELPER.os, 'killpg') as killpg:
+            with self.assertRaisesRegex(PermissionError, 'leader identity'):
+                HELPER.kill_group(31, members=lambda group: [])
+        killpg.assert_not_called()
+
+    def test_darwin_reports_worker_denial_after_trying_every_enrolled_worker(self):
+        rows = [{'pid': pid, 'state': 'S'} for pid in (32, 33, 34)]
+        with mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
+             mock.patch.object(HELPER.os, 'killpg'), \
+             mock.patch.object(HELPER.os, 'getsid', side_effect=[31, PermissionError('worker identity'), 31, 31]), \
+             mock.patch.object(HELPER.os, 'kill', side_effect=[PermissionError('worker signal'), None]) as kill:
+            with self.assertRaisesRegex(PermissionError, 'worker identity'):
+                HELPER.kill_group(31, members=lambda group: rows)
+        self.assertEqual(kill.call_args_list, [mock.call(pid, signal.SIGKILL) for pid in (33, 34)])
+
+    def test_linux_still_returns_without_inventory_after_killpg_success_or_esrch(self):
+        for outcome in (None, ProcessLookupError):
+            inventory = mock.Mock()
+            with self.subTest(killpg=outcome), mock.patch.object(HELPER.sys, 'platform', 'linux'), \
+                 mock.patch.object(HELPER.os, 'killpg', side_effect=outcome) as killpg, \
+                 mock.patch.object(HELPER.os, 'getsid') as session, mock.patch.object(HELPER.os, 'kill') as kill:
+                HELPER.kill_group(31, members=inventory)
+            killpg.assert_called_once_with(31, signal.SIGKILL)
+            session.assert_not_called()
+            kill.assert_not_called()
+            inventory.assert_not_called()
 
     @unittest.skipUnless(sys.platform == 'darwin', 'Darwin killpg exit race')
     def test_owned_unreaped_zombie_is_handled_on_darwin(self):
@@ -423,8 +479,108 @@ class GroupTermination(unittest.TestCase):
             self.assertEqual(child.wait(timeout=2), 0)
 
 
+@unittest.skipUnless(sys.platform in ('linux', 'darwin') and Path('/bin/ps').is_file(),
+                     'requires POSIX sessions and ps')
+class EnrolledSessionTermination(unittest.TestCase):
+    SCRIPT = '''import os, sys, time
+r, w = os.pipe()
+worker = os.fork()
+if worker == 0:
+    os.close(r)
+    os.setpgid(0, 0)
+    os.write(w, b'R')
+    os.close(w)
+    time.sleep(15)
+    os._exit(0)
+os.close(w)
+if os.read(r, 1) != b'R':
+    raise RuntimeError('worker startup failed')
+os.close(r)
+print(worker, flush=True)
+if sys.argv[1] == 'False':
+    os.waitpid(worker, 0)
+'''
+
+    def run_session(self, exit_early):
+        # Use real processes, process groups, ps, and signals. Exercise the
+        # Darwin cleanup branch on Linux too without claiming a real Mac run.
+        linux = sys.platform == 'linux'
+        if linux:
+            import ctypes
+            prctl = ctypes.CDLL(None).prctl
+            previous = ctypes.c_int()
+            self.assertEqual(prctl(37, ctypes.byref(previous), 0, 0, 0), 0)  # PR_GET_CHILD_SUBREAPER
+            self.assertEqual(prctl(36, 1, 0, 0, 0), 0)  # PR_SET_CHILD_SUBREAPER
+            self.addCleanup(prctl, 36, previous.value, 0, 0, 0)
+        def stop(child):
+            if child.poll() is None:
+                child.kill()
+                child.wait(timeout=3)
+
+        def reap(pid):
+            deadline = time.monotonic() + 3
+            while True:
+                reaped, status = os.waitpid(pid, os.WNOHANG)
+                if reaped:
+                    return os.waitstatus_to_exitcode(status)
+                self.assertLess(time.monotonic(), deadline, 'session worker did not exit')
+                time.sleep(0.01)
+
+        unrelated = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(15)'], start_new_session=True)
+        self.addCleanup(stop, unrelated)
+        leader = subprocess.Popen([sys.executable, '-c', self.SCRIPT, str(exit_early)],
+                                  start_new_session=True, stdout=subprocess.PIPE, text=True)
+        self.addCleanup(stop, leader)
+        with leader.stdout as ready:
+            self.assertTrue(select.select([ready], [], [], 4)[0], 'session fixture did not become ready')
+            worker = int(ready.readline())
+        try:
+            self.assertEqual(os.getpgid(worker), worker)
+            self.assertEqual(os.getsid(worker), leader.pid)
+            self.assertNotEqual(os.getsid(unrelated.pid), leader.pid)
+            if exit_early:
+                self.assertEqual(leader.wait(timeout=3), 0)
+                with self.assertRaises(ProcessLookupError):
+                    os.killpg(leader.pid, 0)
+            with mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
+                 mock.patch.object(HELPER.os, 'killpg', wraps=os.killpg) as killpg, \
+                 mock.patch.object(HELPER.os, 'kill', wraps=os.kill) as kill:
+                HELPER.kill_group(leader.pid)
+            self.assertEqual(killpg.call_args_list, [] if exit_early else [mock.call(leader.pid, signal.SIGKILL)])
+            self.assertIn(mock.call(worker, signal.SIGKILL), kill.call_args_list)
+            self.assertFalse(any(call.args[0] == unrelated.pid for call in kill.call_args_list))
+            self.assertIsNone(unrelated.poll())
+            self.assertEqual(leader.wait(timeout=3), 0 if exit_early else -signal.SIGKILL)
+            if linux:
+                status = reap(worker)
+                worker = None
+                self.assertEqual(status, -signal.SIGKILL)
+            else:
+                deadline = time.monotonic() + 3
+                while HELPER.live_group_members(leader.pid, HELPER.process_group):
+                    self.assertLess(time.monotonic(), deadline, 'session worker did not exit')
+                    time.sleep(0.01)
+        finally:
+            stop(leader)
+            if worker is not None:
+                try:
+                    if os.getsid(worker) == leader.pid:
+                        os.kill(worker, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                if linux:
+                    reap(worker)
+
+    def test_split_worker_does_not_survive_successful_original_group_signal(self):
+        self.run_session(exit_early=False)
+
+    def test_split_worker_does_not_survive_vanished_original_group(self):
+        self.run_session(exit_early=True)
+
+
 class RunnerAccounting(unittest.TestCase):
-    def run_mock(self, platform, terminal=None, sampled_overflow=False, wait_status=0, group_replies=None, kill_error=None, refuse_wait=False):
+    def run_mock(self, platform, terminal=None, sampled_overflow=False, wait_status=0,
+                 group_replies=None, kill_error=None, kill_member=None, refuse_wait=False):
         """Exercise the actual Runner without launching a child or setting limits."""
         pending = []
         class Event:
@@ -469,9 +625,9 @@ class RunnerAccounting(unittest.TestCase):
             stack.enter_context(mock.patch.object(HELPER, 'memory_available', return_value=1024**3))
             process_groups = stack.enter_context(mock.patch.object(HELPER, 'process_group', return_value=rows))
             if sampled_overflow:
-                process_groups.side_effect = [[{'pid': 321, 'state': 'R', 'rss': 5121}], []]
+                process_groups.side_effect = [[{'pid': 321, 'state': 'R', 'rss': 5121}], [], []]
             elif terminal:
-                process_groups.side_effect = [terminal, []]
+                process_groups.side_effect = [terminal, [], []]
             if group_replies is not None:
                 process_groups.side_effect = group_replies
             stack.enter_context(mock.patch.object(HELPER.threading, 'Event', Event))
@@ -479,6 +635,8 @@ class RunnerAccounting(unittest.TestCase):
             stack.enter_context(mock.patch.object(HELPER.subprocess, 'Popen', side_effect=popen))
             stack.enter_context(mock.patch.object(HELPER.os, 'wait4', return_value=(321, wait_status, usage)))
             setrlimit = stack.enter_context(mock.patch.object(HELPER.resource, 'setrlimit'))
+            stack.enter_context(mock.patch.object(HELPER.os, 'getsid', return_value=321))
+            stack.enter_context(mock.patch.object(HELPER.os, 'kill', new=kill_member or mock.Mock()))
             killpg = stack.enter_context(mock.patch.object(HELPER.os, 'killpg'))
             killpg.side_effect = kill_error
             failure = None
@@ -524,6 +682,31 @@ class RunnerAccounting(unittest.TestCase):
         self.assertEqual(receipt['reason'], 'live descendants after leader completion')
         self.assertEqual(kills, [mock.call(321, signal.SIGKILL)])
 
+    def test_darwin_rechecks_survivors_after_individual_kill_and_fails_closed(self):
+        live = [{'pid': 322, 'state': 'R', 'rss': 8}]
+        for remains, denial in [([], None), (live, None), (live, PermissionError('worker signal denied'))]:
+            with self.subTest(remains=remains, denial=denial), \
+                 mock.patch.object(HELPER.time, 'monotonic', side_effect=[0, 1, 2, 7]), \
+                 mock.patch.object(HELPER.time, 'sleep'):
+                kill = mock.Mock(side_effect=denial)
+                receipt, _, _, failure = self.run_mock('darwin', group_replies=[live, live, remains],
+                                                       kill_member=kill)
+            kill.assert_called_once_with(322, signal.SIGKILL)
+            self.assertFalse(receipt['complete'])
+            self.assertTrue(receipt['child_reaped'])
+            self.assertEqual(receipt['exit_code'], 0)
+            self.assertEqual(receipt['terminal_live_descendants'], live)
+            self.assertEqual(receipt['remaining_live_after_cleanup'], remains)
+            self.assertEqual(receipt['reason'], 'live descendants after leader completion')
+            if remains:
+                self.assertIn('live group members remain', ' '.join(receipt['supervision_errors']))
+            else:
+                self.assertNotIn('supervision_errors', receipt)
+            if denial:
+                self.assertIs(failure, denial)
+            else:
+                self.assertIsInstance(failure, RuntimeError)
+
     def test_sampled_overflow_kills_but_does_not_claim_hard_address_cap(self):
         receipt, limits, kills, failure = self.run_mock('darwin', sampled_overflow=True, wait_status=9)
         self.assertIsNotNone(failure)
@@ -557,10 +740,9 @@ class RunnerAccounting(unittest.TestCase):
     def test_guarded_darwin_exiting_descendant_vanishes_after_wait4(self):
         busy = [{'pid': 321, 'state': 'R', 'rss': 5121}]
         exiting = [{'pid': 322, 'state': '?E', 'rss': 0}]
-        with mock.patch.object(HELPER.time, 'sleep'), mock.patch.object(HELPER.os, 'getpgid', return_value=321), \
-             mock.patch.object(HELPER.os, 'kill'):
+        with mock.patch.object(HELPER.time, 'sleep'):
             receipt, _, kills, failure = self.run_mock('darwin', sampled_overflow=True, wait_status=9,
-                group_replies=[busy, exiting, exiting, []], kill_error=[None, PermissionError('exiting')])
+                group_replies=[busy, exiting, exiting, [], []])
         self.assertIsInstance(failure, RuntimeError)
         self.assertEqual(kills, [mock.call(321, signal.SIGKILL)])
         self.assertFalse(receipt['complete'])
@@ -574,7 +756,7 @@ class RunnerAccounting(unittest.TestCase):
     def test_terminal_inspection_error_keeps_wait4_and_guard(self):
         busy = [{'pid': 321, 'state': 'R', 'rss': 5121}]
         receipt, _, _, failure = self.run_mock('darwin', sampled_overflow=True, wait_status=9,
-            group_replies=[busy, PermissionError('cannot inspect')])
+            group_replies=[busy, [], PermissionError('cannot inspect'), []])
         self.assertIsInstance(failure, PermissionError)
         self.assertFalse(receipt['complete'])
         self.assertTrue(receipt['child_reaped'])
@@ -585,7 +767,7 @@ class RunnerAccounting(unittest.TestCase):
     def test_no_unbounded_wait_when_child_cannot_be_reaped(self):
         busy = [{'pid': 321, 'state': 'R', 'rss': 5121}]
         receipt, _, _, failure = self.run_mock('darwin', sampled_overflow=True, refuse_wait=True,
-                                               group_replies=[busy, []])
+                                               group_replies=[busy, [], []])
         self.assertIsInstance(failure, RuntimeError)
         self.assertFalse(receipt['complete'])
         self.assertFalse(receipt['child_reaped'])

@@ -184,17 +184,57 @@ def live_group_members(group, members, *, settle_exit=False):
     return live
 
 
+def kill_darwin_session(session, members):
+    group_denial, member_denial = None, None
+    # Popen creates a session whose leader also leads the original group.
+    # If that leader is gone, clean up by verified session membership instead.
+    try:
+        leader_enrolled = os.getsid(session) == session
+    except ProcessLookupError:
+        leader_enrolled = False
+    except PermissionError as error:
+        leader_enrolled, member_denial = False, error
+    if leader_enrolled:
+        try:
+            os.killpg(session, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        except PermissionError as error:
+            group_denial = error
+
+    # A successful killpg (or a vanished PGID) says nothing about other groups
+    # in the same session. Revalidate every PID rather than signaling a stale
+    # ps row, and attempt all enrolled workers before reporting any denial.
+    live = live_group_members(session, members, settle_exit=True)
+    for row in live:
+        pid = row['pid']
+        try:
+            if os.getsid(pid) == session:
+                os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            continue
+        except PermissionError as error:
+            if member_denial is None:
+                member_denial = error
+    # Darwin can report EPERM as its last members exit. Only a fresh empty
+    # (or zombie-only) live inventory permits ignoring that group denial.
+    if group_denial is not None and live:
+        raise group_denial
+    if member_denial is not None:
+        raise member_denial
+
+
 def kill_group(group, *, members=None):
-    """Stop this group. Darwin can report EPERM as its last members exit."""
+    """Stop this group and, on Darwin, the rest of its enrolled session."""
     members = process_group if members is None else members
+    if sys.platform == 'darwin':
+        return kill_darwin_session(group, members)
     try:
         os.killpg(group, signal.SIGKILL)
     except ProcessLookupError:
         return
     except PermissionError:
         live = live_group_members(group, members, settle_exit=True)
-        if sys.platform == 'darwin' and not live:
-            return
         # A real denial is a supervision failure, even if individual signals are
         # permitted. Stop the remaining members where possible before reporting it.
         for row in live:
