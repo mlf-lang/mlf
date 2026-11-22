@@ -207,6 +207,13 @@ def main():
         observe(f"world/{backend}/success", run, [exe, "success"], expected=WORLD_EXPECTED)
         for mode in WORLD_FAILURES:
             observe(f"world/{backend}/{mode}", run, [exe, mode], failure=b"IndexVec index out of bounds")
+    # Record these independent rejections before the codec fixture builds.
+    # The invalid declarations are still exported and checked even though main is harmless.
+    for name, ghc_diagnostic, mlf_diagnostic in COMPILE_NEGATIVES:
+        source = HERE / (name + ".hs")
+        observe(f"rejected/{name}/ghc", run, [*ghc, "-fno-code", source], failure=ghc_diagnostic)
+        observe(f"rejected/{name}/mlf", run, [*mlf, "--type", source], failure=mlf_diagnostic)
+
     # The separate Python reader decides which default-limit wire files are valid.
     codec = HERE / "CodecProbe.hs"
     codec_mlf = [*mlf, "-i", ROOT / "libraries/mlf-crates"]
@@ -259,11 +266,6 @@ def main():
               "root-postorder", "children-postorder", "node-padding-bits", "root-padding-bits"]
     observe("codec/interpreter/selected-corpus", run, [*codec_mlf, "--run", codec, "--", "check", *[corpus_files[name] for name in chosen]],
         expected=b"".join(native_output[name] for name in chosen))
-    # The invalid declarations are still exported and checked even though main is harmless.
-    for name, ghc_diagnostic, mlf_diagnostic in COMPILE_NEGATIVES:
-        source = HERE / (name + ".hs")
-        observe(f"rejected/{name}/ghc", run, [*ghc, "-fno-code", source], failure=ghc_diagnostic)
-        observe(f"rejected/{name}/mlf", run, [*mlf, "--type", source], failure=mlf_diagnostic)
     print("Passed ordered graph, package scheduling, typed index, IO-world, wire corpus, region, interpreter and LLVM controls.")
 
 

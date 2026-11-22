@@ -11,7 +11,8 @@ def prepare_frozen_query(source: Path, out_dir: Path, *, expected_sha256: str) -
     # FrozenCrateQuery sources. Keep every historical branch verbatim, even
     # the wildcard in canonicalPattern; typed syntax has no historical key.
     cases = [(b'case pattern of {', 2, [b'SIndexedStringPattern _ _ _']),
-             (b'case expression of {', 3, [b'SGlobal _ _', b'SDeclScope _ _', b'SWantedRefs _ _'])]
+             (b'case expression of {', 3, [b'SGlobal _ _', b'SDeclScope _ _', b'SWantedRefs _ _',
+                                          b'SWantedScope _ _', b'SGivenScope _ _'])]
     adapted = original
     for anchor, count, constructors in cases:
         inserted = b''.join(b'\n      ' + ctor + b' -> panic "indexed syntax in historical named query oracle";'
