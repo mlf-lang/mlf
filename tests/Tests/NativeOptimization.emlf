@@ -72,9 +72,9 @@ captureWorkersAt offset = (let { fn = (XArrow int int) } in (let { local i = (na
 disjointIdentities : XTerm
 disjointIdentities = (printInt (XApp (XLet (name 0) (XIntTerm 19) (XAbs (name 1) int (binary PAddInt (XVarTerm (name 0)) (XVarTerm (name 1))))) (XLet (name 0) (XIntTerm 23) (XVarTerm (name 0)))))
 
--- Both recursive functions rebind their Boolean parameter to 11. The
--- selected function returns the subsequent local 22, whereas the first
--- returns the shadowing binding. Raw erased callers supply these identities.
+-- The first worker returns its shadowing binding (11); the second returns
+-- its subsequent local (22). Demand both: calling only the second can hide
+-- wrongful sharing when it is the first body emitted at their common symbol.
 rawShadowedWorkers : XErased
 rawShadowedWorkers =
  let worker self flag local useShadow =
@@ -84,9 +84,12 @@ rawShadowedWorkers =
         [XEVar flag, XEApp (XEVar self) (XEBool false), base]) in
  let first = name 1 in
  let second = name 4 in
+ let call target = XEApp (XEVar target) (XEBool false) in
+ let binary primitive left right = XEApp (XEApp (XEPrimitive primitive) left) right in
  XELetRec [(first, worker first (name 2) (name 3) true),
            (second, worker second (name 5) (name 6) false)]
-   (XEApp (XEPrimitive PPrintInt) (XEApp (XEVar second) (XEBool false)))
+   (XEApp (XEPrimitive PPrintInt)
+     (binary PSubInt (binary PAddInt (call first) (call second)) (XEInt 11)))
 
 observeRawFamilyShadow : B.Backends -> IO ()
 observeRawFamilyShadow backends = do
