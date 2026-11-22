@@ -117,7 +117,9 @@ normalizeExpr expression = case expression of
   T.SVar name -> T.SVar name
   T.SConstructor name -> T.SConstructor name
   T.SLam name annotation body -> T.SLam name annotation (normalizeExpr body)
+  T.SBindDictionaries names body -> T.SBindDictionaries names (normalizeExpr body)
   T.SApp function argument -> T.SApp (normalizeExpr function) (normalizeExpr argument)
+  T.SApplyDictionaries function names -> T.SApplyDictionaries function names
   T.SLet name value body -> T.SLet name (normalizeExpr value) (normalizeExpr body)
   T.SAnn body annotation -> T.SAnn (normalizeExpr body) annotation
   T.SSignature body annotation -> T.SSignature (normalizeExpr body) annotation

@@ -94,7 +94,9 @@ module Bootstrap.Surface where {
       SWantedScope n env -> freeNamesRaw (SWantedRefs n (wantedScopeRefs [] env));
       SWantedRefs _ candidates -> map (compose termRefName snd) candidates;
       SLam n _ b -> without (freeNamesRaw b) ((:) n []);
+      SBindDictionaries names body -> without (freeNamesRaw body) names;
       SApp a b -> append (freeNamesRaw a) (freeNamesRaw b);
+      SApplyDictionaries f names -> append (freeNamesRaw (referenceExpr f)) names;
       SLet n a b -> append (freeNamesRaw a) (without (freeNamesRaw b) ((:) n []));
       SAnn a _ -> freeNamesRaw a;
       SSignature a _ -> freeNamesRaw a;
@@ -277,6 +279,9 @@ module Bootstrap.Surface where {
   lowerSurface :: SProgram -> Either String SProgram;
   lowerSurface program = do {
     env <- D.validateDeclarations (case program of { SProgram ds _ -> ds; SClassProgram ds _ _ _ -> ds });
+    lowerSurfaceIn env program
+  };
+  lowerSurfaceIn env program =
     case program of {
       SProgram ds e -> mapEither (SProgram ds) (lowerExpressionWithData env e);
       SClassProgram ds cs instances e ->
@@ -294,7 +299,6 @@ module Bootstrap.Surface where {
           body <- lowerExpressionWithData env e;
           Right (SClassProgram ds cs lowered body)
         }
-    }
     };
   lowerExpression :: SExpr -> Either String SExpr;
   lowerExpression = lowerExpressionWithData D.emptyDataEnv;
@@ -315,7 +319,9 @@ module Bootstrap.Surface where {
     SSourceDefinition body -> surfaceCore body;
     SCallSite _ _ body -> surfaceCore body;
     SLam _ _ body -> surfaceCore body;
+    SBindDictionaries _ body -> surfaceCore body;
     SApp f x -> surfaceCore f && surfaceCore x;
+    SApplyDictionaries _ _ -> True;
     SLet _ rhs body -> surfaceCore rhs && surfaceCore body;
     SAnn body _ -> surfaceCore body;
     SSignature body _ -> surfaceCore body;
@@ -351,6 +357,7 @@ module Bootstrap.Surface where {
     case expression of {
       SDeclScope ids body -> do { b <- lower env body; freshPure (SDeclScope ids b) };
       SGivenScope names body -> do { b <- lower env body; freshPure (SGivenScope names b) };
+      SBindDictionaries names body -> do { b <- lower env body; freshPure (SBindDictionaries names b) };
       SSourceDefinition body -> do { b <- lower env body; freshPure (SSourceDefinition b) };
       SCallSite name location body -> do { b <- lower env body; freshPure (SCallSite name location b) };
       SSharedBind _ _ _ _ _ -> freshFail "internal error: shared do escaped metadata lowering";
@@ -499,9 +506,23 @@ module Bootstrap.Surface where {
   rowPatterns :: MatchRow -> [] SPattern;
   rowPatterns (MatchRow ps _ _) = ps;
   matrix :: DataEnv -> [] SExpr -> [] MatchRow -> Fresh ((,) SExpr ([] Int));
-  matrix env values rows = do {
-    normalized <- mapM (normalizeRow env values) rows;
-    matrixReady env values normalized
+  matrix env values rows = let {
+    ordinary = do {
+      normalized <- mapM (normalizeRow env values) rows;
+      matrixReady env values normalized
+    };
+    bareTail (MatchRow patterns body index) = case patterns of {
+      (:) (SDefaultPattern Nothing) rest -> Just (MatchRow rest body index);
+      _ -> Nothing
+    }
+  } in case (,) values rows of {
+    (,) ((:) _ rest) ((:) _ _) -> case mapM bareTail rows of {
+      -- Every row ignores this column. Source binders, generated constructor
+      -- fields, row order and fresh names remain owned by their original arms.
+      Just shorter -> matrix env rest shorter;
+      Nothing -> ordinary
+    };
+    _ -> ordinary
   };
   normalizeRow :: DataEnv -> [] SExpr -> MatchRow -> Fresh MatchRow;
   normalizeRow env values (MatchRow patterns body rowIndex) = do {

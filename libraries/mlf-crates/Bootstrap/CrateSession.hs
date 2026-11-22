@@ -665,7 +665,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
             graph = S.solverGraph solved
           };
           let {
-            types = E.prepareTypes graph
+            types = E.prepareSolvedTypes solved
           };
           evidence <- Compiler.atPhase Resolution (E.resolveEvidenceIn types (C.skeleton constraints));
           body <-

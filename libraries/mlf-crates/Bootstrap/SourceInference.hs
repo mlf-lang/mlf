@@ -1095,16 +1095,21 @@ module Bootstrap.SourceInference where {
 
   candidateParameters :: [] ((,) XName XType) ->
     XTerm -> [] ((,,) EvidenceRole String XType) -> Either String ([] Boundary.Candidate);
-  candidateParameters parameters term candidates =
-    let {
-      first = 1 + Separate.maximumTermIdentity 0 term
-    } in
+  candidateParameters parameters term candidates = let {
+    -- An unused ambient parameter can still be present in the checked scope.
+    latest = foldlStrict (\n ((,) ref _) -> max n (X.nameId ref))
+      (Separate.maximumTermIdentity 0 term) parameters
+  } in
     traverseEither
       (\((,) ordinal ((,,) role name ty)) -> do {
-        let { binder = case find (\((,) n _) -> eqString (X.nameHint n) name) parameters of {
-          Just ((,) n _) -> n;
-          Nothing -> XName (first + ordinal) name
-        } };
+        binder <- case find (\((,) n _) -> eqString (X.nameHint n) name) parameters of {
+          Just ((,) n _) -> Right n;
+          Nothing -> do {
+            let { offset = ordinal + 1 };
+            ensure (latest <= 9223372036854775807 - offset) "evidence identity supply exhausted";
+            Right (XName (latest + offset) name)
+          }
+        };
         Right (Boundary.Candidate role binder ty)
       })
       (zip (range 0 (length candidates - 1)) candidates);
@@ -1402,23 +1407,34 @@ module Bootstrap.SourceInference where {
   };
   -- Persistent slot-keyed updates publish a completed SCC atomically. Named
   -- contracts are a compatibility view for class lowering and public callers.
+  -- An owned source plan also carries its initial Fresh reservation plus the
+  -- keys of all current contracts. Local binders and method targets stay in
+  -- the reservation of the individual group that uses them.
   data CheckedContracts = CheckedContracts DeclScope
-    (Map (V.Index Declaration) SourceContract) (Map String SourceContract);
-  checkedScope (CheckedContracts scope _ _) = scope;
-  checkedNamed (CheckedContracts _ _ contracts) = contracts;
+    (Map (V.Index Declaration) SourceContract) (Map String SourceContract) (Maybe (Set String));
+  checkedScope (CheckedContracts scope _ _ _) = scope;
+  checkedNamed (CheckedContracts _ _ contracts _) = contracts;
+  checkedIndexed (CheckedContracts _ contracts _ _) = contracts;
+  checkedReservation (CheckedContracts _ _ _ reserved) = reserved;
   contractSymbols = compose declSymbols checkedScope;
-  checkedBinding (CheckedContracts scope byId _) i = case M.lookup compareDecl i byId of {
+  checkedBinding (CheckedContracts scope byId _ _) i = case M.lookup compareDecl i byId of {
     Just value -> Right value;
     Nothing -> Left ("query dependency is not available: " ++ Dependency.symbolDisplay (declSymbols scope) i)
   };
-  installContracts scope named = do {
+  installContracts = installContractsReserving Nothing;
+  installContractsReserving reserved scope named = do {
     entries <- traverseEither (\((,) name contract) ->
       mapEither (\i -> (,) i contract) (requireDecl scope name)) (M.toList named);
-    Right (CheckedContracts scope (M.fromList compareDecl entries) named)
+    Right (CheckedContracts scope (M.fromList compareDecl entries) named
+      (mapOptional (reserveContractKeys named) reserved))
   };
-  publishContracts (CheckedContracts scope byId named) entries =
-    CheckedContracts scope (foldlStrict (\m ((,) i c) -> M.insert compareDecl i c m) byId entries)
-      (foldlStrict (\m ((,) i c) -> M.insert compareString (declName scope i) c m) named entries);
+  publishContracts (CheckedContracts scope byId named reserved) entries = let {
+    decoded = map (\((,) i c) -> (,) (declName scope i) c) entries;
+    reserve = \initial -> foldlStrict
+      (\used ((,) name _) -> Set.insert compareString name used) initial decoded
+  } in CheckedContracts scope (foldlStrict (\m ((,) i c) -> M.insert compareDecl i c m) byId entries)
+    (foldlStrict (\m ((,) name c) -> M.insert compareString name c m) named decoded)
+    (mapOptional reserve reserved);
   data GroupSlots = GroupSlots DeclScope ([] (V.Index Declaration))
     ([] (V.Index Declaration)) ([] (V.Index Declaration));
   slotScope (GroupSlots scope _ _ _) = scope;
@@ -1464,7 +1480,7 @@ module Bootstrap.SourceInference where {
     ordered = snd (foldlStrict selectMember ((,) IS.empty M.empty) members)
   } in filter (\i -> not (elem (\a b -> compareDecl a b == 0) i owners)) (M.elems ordered);
   slotPrepared = slotPreparedWith (Dependency.valueOccurrences True False);
-  slotPreparedWith references checked owners (SlotPrepared _ named) = slotPreparedWith references checked owners named;
+  slotPreparedWith references checked owners (SlotPrepared _ named _) = slotPreparedWith references checked owners named;
   slotPreparedWith references checked owners (PreparedGroup original members _ registry specs authority _) = do {
     let { scope = checkedScope checked; parameters = selectedContractIdsWith references scope owners members;
       materialize i = mapEither ((,) (declName scope i)) (checkedBinding checked i) };
@@ -1497,10 +1513,25 @@ module Bootstrap.SourceInference where {
           (mapMaybe (\x -> x) flags))))
       }
     };
-    let { slots = GroupSlots scope owners parameters ids };
+    (,) mutualIds mutual <- case activeAuthority of {
+      Just _ -> Right ((,) [] Nothing);
+      Nothing -> case (,) (mutualEvidenceLabels registry members specs) (commonMutualCandidates scope owners) of {
+        (,) (Just labels) (Just entries@((:) _ _)) -> do {
+          typed <- traverseEither (\((,) role i) -> do {
+            c <- checkedBinding checked i;
+            Right ((,,) role (declName scope i) c)
+          }) entries;
+          let { candidates = map (\((,,) role name c) -> (,,) role name (contractType c)) typed;
+                protected = mapMaybe (\((,,) _ name c) -> if contractProtected c then Just name else Nothing) typed };
+          Right ((,) (map snd entries) (Just (MutualEvidence labels candidates protected)))
+        };
+        _ -> Right ((,) [] Nothing)
+      }
+    };
+    let { slots = GroupSlots scope owners parameters (append ids mutualIds) };
     Right ((,) slots (SlotPrepared slots (PreparedGroup original members
       (map (\((,) n c) -> (,) n (contractType c)) values) registry specs activeAuthority
-      (map (\((,) n c) -> (,) n (contractProtected c)) values))))
+      (map (\((,) n c) -> (,) n (contractProtected c)) values)) mutual))
   };
 
   -- A sealed prepared query contains raw input and all finalization authority.
@@ -1510,29 +1541,58 @@ module Bootstrap.SourceInference where {
     ([] ((,,) String (Maybe SAnnotation) SExpr))
     ([] ((,) String XType)) (Map String String)
     ([] ((,,) String ([] String) Bool)) (Maybe RootAuthority) ([] ((,) String Bool)) |
-    SlotPrepared GroupSlots PreparedGroup;
-  preparedSlots (SlotPrepared slots _) = Just slots;
+    SlotPrepared GroupSlots PreparedGroup (Maybe MutualEvidence);
+  preparedSlots (SlotPrepared slots _ _) = Just slots;
   preparedSlots _ = Nothing;
   data RootAuthority = RootAuthority String ([] ((,,) String String String)) Bool
     ([] ((,,) EvidenceRole String XType)) ([] String);
-  groupOriginal (SlotPrepared _ named) = groupOriginal named;
+  data MutualEvidence = MutualEvidence ([] ((,) String ([] ((,,) String String String))))
+    ([] ((,,) EvidenceRole String XType)) ([] String);
+  groupMutualEvidence group = case group of {
+    SlotPrepared _ _ authority -> authority;
+    _ -> Nothing
+  };
+  groupOriginal (SlotPrepared _ named _) = groupOriginal named;
   groupOriginal (PreparedGroup original _ _ _ _ _ _) = original;
-  groupMembers (SlotPrepared _ named) = groupMembers named;
+  groupMembers (SlotPrepared _ named _) = groupMembers named;
   groupMembers (PreparedGroup _ members _ _ _ _ _) = members;
-  groupBindings (SlotPrepared _ named) = groupBindings named;
+  groupBindings (SlotPrepared _ named _) = groupBindings named;
   groupBindings (PreparedGroup _ _ bindings _ _ _ _) = bindings;
-  groupRegistry (SlotPrepared _ named) = groupRegistry named;
+  groupRegistry (SlotPrepared _ named _) = groupRegistry named;
   groupRegistry (PreparedGroup _ _ _ registry _ _ _) = registry;
-  groupContracts (SlotPrepared _ named) = groupContracts named;
+  groupContracts (SlotPrepared _ named _) = groupContracts named;
   groupContracts (PreparedGroup _ _ _ _ contracts _ _) = contracts;
-  groupAuthority (SlotPrepared _ named) = groupAuthority named;
+  groupAuthority (SlotPrepared _ named _) = groupAuthority named;
   groupAuthority (PreparedGroup _ _ _ _ _ authority _) = authority;
-  groupParameterProtection (SlotPrepared _ named) = groupParameterProtection named;
+  groupParameterProtection (SlotPrepared _ named _) = groupParameterProtection named;
   groupParameterProtection (PreparedGroup _ _ _ _ _ _ flags) = flags;
-  groupCandidateBindings group = case groupAuthority group of {
-    Nothing -> [];
-    Just (RootAuthority _ _ _ candidates _) ->
-      map (\((,,) _ name ty) -> (,) name ty) candidates
+  groupEvidenceCandidates group = case groupAuthority group of {
+    Just (RootAuthority _ _ _ candidates protected) -> (,) candidates protected;
+    Nothing -> case groupMutualEvidence group of {
+      Just (MutualEvidence _ candidates protected) -> (,) candidates protected;
+      Nothing -> (,) [] []
+    }
+  };
+  groupCandidateBindings group = map (\((,,) _ name ty) -> (,) name ty) (fst (groupEvidenceCandidates group));
+  -- Only the indexed source planner can issue this marker on multiple
+  -- outer members. The contract supplies the corresponding class identities.
+  mutualEvidenceLabels registry members specs = if length members < 2 then Nothing else
+    mapM (\((,,) owner annotation body) -> case (,) annotation body of {
+      (,) Nothing (SBindDictionaries names _) -> case find (\((,,) name _ _) -> eqString name owner) specs of {
+        Just ((,,) _ classes False) -> if length names /= length classes || null names then Nothing
+          else mapOptional ((,) owner) (mapM (\((,) spelling cls) ->
+            mapOptional ((,,) spelling cls) (M.lookup compareString cls registry)) (zip names classes));
+        _ -> Nothing
+      };
+      _ -> Nothing
+    }) members;
+  commonMutualCandidates scope owners = case (,) scope owners of {
+    (,) (DeclScope _ _ _ _ (ResolvedOrigin inventory)) ((:) first rest) -> let {
+      entries = Classes.inventoryCandidateIds inventory first;
+      same ((,) role i) ((,) other j) = Evidence.sameRole role other && compareDecl i j == 0
+    } in if all (\i -> eqList same entries (Classes.inventoryCandidateIds inventory i)) rest
+      then Just entries else Nothing;
+    _ -> Nothing
   };
   -- The sparse selector is reserved for finite parsed-file groups. The public
   -- selector retains its full-map traversal and partial-value demand behavior.
@@ -1599,7 +1659,9 @@ module Bootstrap.SourceInference where {
           };
           [] -> False
         };
-        prepare checked contracts = prepareCheckedReading references checked (Just memberOrder) selectBindings Nothing (case ids of { [i] -> Just i; _ -> Nothing })
+        prepare checked contracts = prepareCheckedReading references checked (Just memberOrder) selectBindings
+          (case checked of { Just current -> checkedReservation current; Nothing -> Nothing })
+          (case ids of { [i] -> Just i; _ -> Nothing })
           (eligibleIndexedSourceWith (any snd group)) plan contracts names
           (if support then [] else members) (if support then members else [])
           (contractOverloads contracts) (M.map contractProtected contracts)
@@ -1622,8 +1684,8 @@ module Bootstrap.SourceInference where {
   -- every source and pattern projects identically in both consumers.
   protectedQueryPlan = protectedQueryPlanReading (Dependency.valueOccurrences True False);
   protectedQueryPlanReading references original imported = let {
-    open contracts plan cached = let { scope = planScope plan (M.keys contracts) } in do {
-      checked <- installContracts scope contracts;
+    open contracts plan@(SourcePlan _ _ _ used _ _ _ _) cached = let { scope = planScope plan (M.keys contracts) } in do {
+      checked <- installContractsReserving (mapOptional (\_ -> used) cached) scope contracts;
       steps <- case (,) cached scope of {
         (,) (Just rows) (DeclScope _ _ _ ambiguous _) -> if Set.size ambiguous == 0
           then queryStepsFrom plan scope (planStepsReading references (\_ _ -> []) (\_ -> declName scope)
@@ -1736,8 +1798,8 @@ module Bootstrap.SourceInference where {
   prepareGroupWithViews selectBindings = prepareGroupWithReservation selectBindings Nothing Nothing eligibleSource;
   prepareGroupWithReservation = prepareWithChecked Nothing Nothing;
   checkedFacts current = let {
-    read = case current of { CheckedContracts _ contracts _ -> M.lookupProjectedId V.toInt
-      (\_ c -> (,) (contractClasses c) (contractProtected c)) contracts }
+    read = M.lookupProjectedId V.toInt
+      (\_ c -> (,) (contractClasses c) (contractProtected c)) (checkedIndexed current)
   } in \i -> read i;
   prepareWithChecked = prepareCheckedReading (Dependency.valueOccurrences True False);
   prepareCheckedReading references checked memberOrder selectBindings reserved knownOwner eligible (SourcePlan base graph count used _ _ _ supportProtection)
@@ -1748,7 +1810,7 @@ module Bootstrap.SourceInference where {
     } };
     ensure (length original + length support == length names) "source SCC ownership mismatch";
     traverseEither (\name -> case checked of {
-      Just (CheckedContracts scope byId _) -> do {
+      Just (CheckedContracts scope byId _ _) -> do {
         i <- requireDecl scope name;
         ensure (not (M.member compareDecl i byId)) "source SCC imports its own checked predecessor"
       };
@@ -1956,10 +2018,27 @@ module Bootstrap.SourceInference where {
       (sortBy compareDecl (memberIds slots))) "lowered group ownership changed";
     Right entries
   };
+  openMutualMembers labels object = case Open.body object of {
+    XLetRec definitions (XConstructor "()" []) -> do {
+      ensure (length labels == length definitions) "raw recursive evidence group changed size";
+      traverseEither (\((,,) binder ty rhs) -> do {
+        exact <- case lookup eqString (X.nameHint binder) labels of {
+          Nothing -> Left "raw recursive evidence member changed identity";
+          Just exact -> Right exact
+        };
+        validateRawSlots exact (X.erase rhs);
+        Right (Boundary.GroundRecursiveMember binder exact ty rhs)
+      }) definitions
+    };
+    _ -> Left "raw recursive evidence group changed shape"
+  };
   validatePreparedOpen slots prepared object = do {
     _ <- ownedFragmentBindings slots object;
     case groupAuthority prepared of {
-      Nothing -> Right ();
+      Nothing -> case groupMutualEvidence prepared of {
+        Nothing -> Right ();
+        Just (MutualEvidence labels _ _) -> mapEither (\_ -> ()) (openMutualMembers labels object)
+      };
       Just (RootAuthority name labels _ _ _) -> do {
         parts <- openRootParts object;
         case parts of { (,,) binder _ rhs -> do {
@@ -1970,8 +2049,8 @@ module Bootstrap.SourceInference where {
     }
   };
   -- Checked open fragments can normalize complete ground arguments after the
-  -- geometry scan certifies the expanded tree. Other proof edits use the
-  -- graph finalizer. Standalone source objects keep their shallow editor.
+  -- geometry scan certifies the expanded tree. The bounded proof editor also
+  -- handles mixed arguments before the complete graph finalizer is needed.
   -- In the finalizer's height-ordered forest, Inner (Bottom (Con n []))
   -- has height four and Elim has height one. Before the next Inner, padding
   -- joins the preceding Inner and Elim. Each complete argument is therefore
@@ -2219,9 +2298,22 @@ module Bootstrap.SourceInference where {
       Just True -> if not spines then planned else case editGroundTerm 1 (Open.body object) of {
         Just (Just result) -> Open.normalize object result;
         Just Nothing -> Right object;
-        Nothing -> planned
+        Nothing -> local
       };
       Nothing -> planned
+    };
+    -- A bounded checked tree needs canonicalization only at nested XThen
+    -- proofs. Retain all unmodified nodes and validate replacement geometry.
+    local = case finalCheckedTreeGeometry 256 (Open.body object) of {
+      Just True -> case editProofs (Open.body object) of {
+        Right Nothing -> Right object;
+        Right (Just result) -> case finalCheckedTreeGeometry (Wire.maxDepth Wire.defaultLimits) result of {
+          Just _ -> Open.normalize object result;
+          Nothing -> planned
+        };
+        Left _ -> planned
+      };
+      _ -> planned
     }
   } in case storage object of {
     Nothing -> ordinary;
@@ -2235,6 +2327,36 @@ module Bootstrap.SourceInference where {
       (FinalSyntaxState M.empty M.empty 0 0 0);
     result <- finalSyntaxTerm normalized;
     if finalSyntaxUnchanged identity normalized then Right object else Open.normalize object result
+  };
+  compactWorkerPrefix prepared object = case (,) (groupMembers prepared) (groupContracts prepared) of {
+    (,) [(,,) owner Nothing lowered] [(,,) name classes False] ->
+      if not (eqString owner name) then Right Nothing else
+      case Classes.recursiveWorkerEvidenceLabels lowered of {
+        Nothing -> Right Nothing;
+        Just names -> do {
+          ensure (length names == length classes) "recursive evidence labels changed calling convention";
+          labels <- traverseEither (\((,) spelling className) -> case M.lookup compareString className (groupRegistry prepared) of {
+            Nothing -> Left "recursive evidence has no ordinary class";
+            Just dict -> Right ((,,) spelling className dict)
+          }) (zip names classes);
+          (,,) binder ty rhs <- openRootParts object;
+          compact <- Boundary.compactInferredPrefix (groupRegistry prepared) labels ty rhs;
+          case compact of {
+            Nothing -> Right Nothing;
+            Just ((,,) result body retained) -> do {
+              checked <- Open.check (Open.context object) (Open.parameters object)
+                (XLet binder body (XConstructor "()" []));
+              ensure (case Open.bindings checked of {
+                [(,) n scheme] -> X.equalName n binder && Type.alphaEq scheme result;
+                _ -> False
+              }) "compact recursive evidence changed exported binding";
+              final <- canonicalCheckedOpen checked;
+              Right (Just ((,,) final result retained))
+            }
+          }
+        }
+      };
+    _ -> Right Nothing
   };
   prepareOpenFinish group checked prepared object = do {
     owners <- ownedFragmentBindings group object;
@@ -2261,7 +2383,33 @@ module Bootstrap.SourceInference where {
             Nothing -> Left "final source group lacks calling-convention metadata";
             Just ((,) classes protected) -> Right ((,) i (SourceContract ty classes (protected || usedProtected)))
           }) owners;
-        Right (ReadyOpenFinish (OpenFinalGroup KeepRawBody contracts))
+        case owners of {
+          [(,) owner _] -> if usedProtected then Right (ReadyOpenFinish (OpenFinalGroup KeepRawBody contracts)) else do {
+            compact <- compactWorkerPrefix prepared object;
+            case compact of {
+              Nothing -> Right (ReadyOpenFinish (OpenFinalGroup KeepRawBody contracts));
+              Just ((,,) final result retained) -> Right (ReadyOpenFinish (OpenFinalGroup (AdaptedBody final)
+                [(,) owner (SourceContract result retained False)]))
+            }
+          };
+          _ -> let { unchanged = OpenFinalGroup KeepRawBody contracts } in
+            case groupMutualEvidence prepared of {
+              Just (MutualEvidence labels candidates _) -> if usedProtected then Right (ReadyOpenFinish unchanged) else do {
+                members <- openMutualMembers labels object;
+                authorized <- candidateParameters parameters (Open.body object) candidates;
+                plan <- Boundary.checkedGroundRecursivePlan (groupRegistry prepared) authorized members;
+                case plan of {
+                  Nothing -> Right (ReadyOpenFinish unchanged);
+                  Just accepted -> do {
+                    ensure (length authorized == length (candidateIds group)) "recursive candidate inventory changed";
+                    let { authority = M.fromList X.compareName (zip (map Boundary.candidateName authorized) (candidateIds group)) };
+                    Right (PendingGroundRecursiveFinish group object unchanged authority accepted)
+                  }
+                }
+              };
+              Nothing -> Right (ReadyOpenFinish unchanged)
+            }
+        }
       };
       Just (RootAuthority name labels protected candidates _) -> do {
         owner <- case owners of { [(,) i _] -> Right i; _ -> Left "raw source identity mismatch" };
@@ -2296,14 +2444,44 @@ module Bootstrap.SourceInference where {
     }
   };
 
-  data OpenFinish = ReadyOpenFinish OpenFinalGroup | PendingOpenFinish Open.Fragment (V.Index Declaration) XName XType
-    ([] ((,,) String String String)) Bool (Map XName (V.Index Declaration)) Boundary.CheckedPlan;
+  data OpenFinish = ReadyOpenFinish OpenFinalGroup |
+    PendingOpenFinish Open.Fragment (V.Index Declaration) XName XType
+      ([] ((,,) String String String)) Bool (Map XName (V.Index Declaration)) Boundary.CheckedPlan |
+    PendingGroundRecursiveFinish GroupSlots Open.Fragment OpenFinalGroup (Map XName (V.Index Declaration))
+      Boundary.GroundRecursivePlan;
   openFinishRequests finish = case finish of {
     ReadyOpenFinish _ -> [];
-    PendingOpenFinish _ _ _ _ _ _ _ plan -> Boundary.checkedRequests plan
+    PendingOpenFinish _ _ _ _ _ _ _ plan -> Boundary.checkedRequests plan;
+    PendingGroundRecursiveFinish _ _ _ _ plan -> Boundary.groundRecursiveRequests plan
   };
   completeOpenFinish checked finish answers = case finish of {
     ReadyOpenFinish group -> Right group;
+    PendingGroundRecursiveFinish group object unchanged authority plan -> do {
+      compact <- Boundary.finishGroundRecursivePlan plan answers;
+      case compact of {
+        Nothing -> Right unchanged;
+        Just ((,) definitions supports) -> do {
+          bindings <- traverseEither (\name -> case M.lookup X.compareName name authority of {
+            Nothing -> Left "recursive proof support lacks a declaration";
+            Just i -> mapEither ((,) name) (checkedBinding checked i)
+          }) supports;
+          if any (compose contractProtected snd) bindings then Right unchanged else do {
+            let { parameters = map (\((,) name c) -> (,) name (contractType c)) bindings };
+            required <- Boundary.mergeTypes (append (Open.parameters object) parameters);
+            rewritten <- Open.check (Open.context object) required (XLetRec definitions (XConstructor "()" []));
+            let { types = M.fromList X.compareName (map (\((,,) name ty _) -> (,) name ty) definitions) };
+            ensure (length definitions == length (Open.bindings rewritten) &&
+              all (\((,) name ty) -> case M.lookup X.compareName name types of {
+                Just expected -> Type.alphaEq expected ty;
+                Nothing -> False
+              }) (Open.bindings rewritten)) "checked recursive evidence adapter type mismatch";
+            exports <- ownedFragmentBindings group rewritten;
+            final <- canonicalCheckedOpen rewritten;
+            Right (OpenFinalGroup (AdaptedBody final) (map (\((,) i ty) -> (,) i (SourceContract ty [] False)) exports))
+          }
+        }
+      }
+    };
     PendingOpenFinish object owner binder ty labels protected candidates plan -> do {
       recipe <- Boundary.finishCheckedPlan plan answers;
       let { unchanged = \flag -> Right (OpenFinalGroup KeepRawBody

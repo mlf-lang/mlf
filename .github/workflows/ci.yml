@@ -418,6 +418,10 @@ jobs:
             .mlf-build/tuple-list-runtime/
             .mlf-build/compiler-tests/**/*.json*
             .mlf-build/compiler-tests/**/*.stderr
+            .mlf-build/compiler-tests/parity/parity/*.interpreter.out
+            .mlf-build/compiler-tests/parity/parity/*.interpreter.err
+            .mlf-build/compiler-tests/parity/parity/*.llvm.out
+            .mlf-build/compiler-tests/parity/parity/*.llvm.err
             .mlf-build/shared-ghc/receipt.json
             .mlf-build/shared-ghc/*.log
             .mlf-build/shared-ghc/packages.txt

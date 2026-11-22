@@ -15,6 +15,13 @@ MANIFEST = 'test-framework-source-migration.json'
 FOUNDATION_MANIFEST = 'foundation-source-migration.json'
 FOUNDATION = 'd607907bda1ce5ac053dae10497dc1888b08f0fc'
 FOUNDATION_TREE = '937e4b687ce8af86ffd4aa6fa239dfbe860ec1ef'
+PHASE2_MANIFEST = 'foundation-phase2-source-migration.json'
+PHASE2 = '2df930ce6fdd74af11c68d1cd3ecdec70d19119f'
+PHASE2_TREE = '1079544662dce9f2596fa434fd00acba9e2b50ae'
+PHASE2_INTERMEDIATE = '80b305b2580e3d941785072098493a3471a9dced'
+PHASE2_BRANCH_PARENT = 'c253676070d4b094b6b1d4441cf4829f5ea4d8dd'
+PHASE2_FRAMEWORK_PARENT = 'd09dfdd00141bc932b2d38b95f8343893abfed82'
+PHASE2_FRAMEWORK_PARENT_TREE = 'b242d36eb97c4c76433851564f69e9d8c548f5c3'
 FOUNDATION_MERGE_PATHS = {'mlf.lock', 'tests/shared/MLF/Tests/SharedFrontend.hs'}
 HOSTED_PARITY_CHANGES = {
     'mlf.lock': (
@@ -101,7 +108,43 @@ def foundation_changes(spec, repository, files, framework_changes, framework_pin
     return {path: row['merged'] for path, row in changes.items()}
 
 
-def successor_type(predecessor_type, predecessor_manifest, framework_pin, manifest_pin, read_implementation):
+def phase2_changes(spec, repository, files, foundation_pin):
+    require(set(spec) == {'commit', 'tree', 'framework_parent', 'framework_parent_tree',
+                          'foundation_manifest_sha256', 'changes'} and
+            spec['commit'] == PHASE2 and spec['tree'] == PHASE2_TREE and
+            spec['framework_parent'] == PHASE2_FRAMEWORK_PARENT and
+            spec['framework_parent_tree'] == PHASE2_FRAMEWORK_PARENT_TREE and
+            spec['foundation_manifest_sha256'] == foundation_pin,
+            'exact Phase 2 transition identity')
+    git = ['git', '--no-replace-objects', '-C', repository]
+
+    def revision(expr):
+        return subprocess.check_output([*git, 'rev-parse', '--verify', expr], text=True).strip()
+
+    require(revision(PHASE2 + '^{tree}') == PHASE2_TREE and
+            revision(PHASE2_FRAMEWORK_PARENT + '^{tree}') == PHASE2_FRAMEWORK_PARENT_TREE and
+            revision(PHASE2 + '^') == PHASE2_INTERMEDIATE and
+            revision(PHASE2_INTERMEDIATE + '^') == PHASE2_BRANCH_PARENT,
+            'pinned Phase 2 trees and ancestry')
+    changed = subprocess.check_output([*git, 'diff-tree', '--no-commit-id', '--name-only',
+                                      '--no-renames', '-r', PHASE2_BRANCH_PARENT, PHASE2],
+                                     text=True).splitlines()
+    changes = spec['changes']
+    require(changes.keys() == files.keys() & set(changed), 'complete Phase 2 source transition')
+    for path, row in changes.items():
+        def at(commit):
+            return sha(subprocess.check_output([*git, 'show', commit + ':' + path]))
+        require(set(row) == {'branch_parent', 'framework', 'branch', 'merged'} and
+                row['branch_parent'] == at(PHASE2_BRANCH_PARENT) and
+                row['framework'] == files[path] == at(PHASE2_FRAMEWORK_PARENT) and
+                row['branch'] == at(PHASE2) and row['framework'] != row['merged'] and
+                (path == 'mlf.lock' or row['merged'] == row['branch']),
+                'Phase 2 source endpoint: ' + path)
+    return {path: row['merged'] for path, row in changes.items()}
+
+
+def successor_type(predecessor_type, predecessor_manifest, framework_pin, foundation_pin,
+                   phase2_pin, read_implementation):
     """Reuse exact projection operations, adding a locally reviewed inventory edge."""
 
     class Contract(predecessor_type):
@@ -110,7 +153,9 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, manife
             raw = read_implementation(self.directory / MANIFEST)
             require(sha(raw) == framework_pin, 'pinned framework manifest SHA')
             foundation_raw = read_implementation(self.directory / FOUNDATION_MANIFEST)
-            require(sha(foundation_raw) == manifest_pin == manifest_sha256, 'pinned Foundation manifest SHA')
+            require(sha(foundation_raw) == foundation_pin, 'pinned Foundation manifest SHA')
+            phase2_raw = read_implementation(self.directory / PHASE2_MANIFEST)
+            require(sha(phase2_raw) == phase2_pin == manifest_sha256, 'pinned Phase 2 manifest SHA')
             self.manifest_sha256 = manifest_sha256
             self.source_root = Path(source_root or Path(history_root).parents[1]).resolve(strict=True)
             repository = source_repository(history_root)
@@ -150,6 +195,9 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, manife
                 require(files[path] == previous, 'hosted parity source transition: ' + path)
                 self.changes[path] = [old_files[path], current]
                 files[path] = current
+            phase2 = phase2_changes(self.core.strict_json(phase2_raw), repository, files, foundation_pin)
+            self.changes.update({path: [old_files[path], new] for path, new in phase2.items()})
+            files.update(phase2)
             self.core.hash_map(files, 'current framework sources')
             paths = {n: p for n, p in old_paths.items() if n not in retired}
             self.value = {'current_files': files, 'module_paths': paths,
@@ -167,7 +215,8 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, manife
             self.added_paths = self.previous.added_paths
             require(not self.removed_paths.intersection(self.added_paths),
                     'retirement leaves historical addition evidence intact')
-            self.metadata_paths = (*self.previous.metadata_paths, MANIFEST, FOUNDATION_MANIFEST, Path(__file__).name)
+            self.metadata_paths = (*self.previous.metadata_paths, MANIFEST, FOUNDATION_MANIFEST,
+                                   PHASE2_MANIFEST, Path(__file__).name)
             history_names = set(self.parent['frozen_history']) | set(self.maintenance_parent['files'])
             require(self.maintenance.keys() <= history_names, 'unknown maintenance owner')
             for name in history_names:

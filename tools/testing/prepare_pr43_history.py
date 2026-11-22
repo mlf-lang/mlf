@@ -43,11 +43,18 @@ def prepare():
     if not history._is_ancestor(TRANSPORT.integration, 'HEAD'):
         raise ValueError('PR43 integration ancestry differs')
     needed = (TRANSPORT.source, *(identity for identity, _ in PREDECESSORS))
-    candidate = TRANSPORT.source
-    if any(history._object_tree(history.ROOT, identity, 'commit') is None for identity in needed):
+
+    def missing_reviewed_objects():
+        return any(history._object_tree(history.ROOT, identity, 'commit') is None for identity in needed)
+
+    if missing_reviewed_objects():
         subprocess.run(['git', '--no-replace-objects', 'fetch', '--no-tags', 'origin', SOURCE_REF],
                        cwd=history.ROOT, check=True, timeout=120)
-        candidate = history._git('rev-parse', '--verify', 'FETCH_HEAD').decode('ascii').strip()
+        if missing_reviewed_objects():
+            raise ValueError('PR43 source locator did not supply all reviewed objects')
+    # A moved locator can still deliver the full pinned history. Verify only
+    # the reviewed source, never the tip advertised by the locator.
+    candidate = TRANSPORT.source
     verify(candidate)
     subprocess.run(['git', '--no-replace-objects', 'update-ref',
                     'refs/history/verified-source-' + TRANSPORT.source, candidate],

@@ -133,7 +133,7 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
            optimized = Optimize.optimizeCheckedTerm term
          } in
          let {
-           lowered = Wrappers.optimize declarations constructors optimized
+           lowered = Optimize.compactStaticRecursion (Wrappers.optimize declarations constructors optimized)
          } in
          Right (PreparedEntry (ioType ty) constructors lowered);
   emitPreparedChunks :: PreparedEntry -> Either String ([] String);

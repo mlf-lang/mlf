@@ -8,6 +8,8 @@ import qualified Bootstrap.Resolved as R
 import qualified Bootstrap.IndexVec as V
 import qualified Bootstrap.IntSet as IS
 import qualified Bootstrap.Map as M
+import qualified Bootstrap.Set as Set
+import qualified Bootstrap.Fresh as Fresh
 import qualified Bootstrap.Types as T
 import qualified Bootstrap.CrateQuery as Q
 import qualified MLF.Primitive as P
@@ -41,11 +43,9 @@ new annotation body =
    externals [] [] [] [] scopes []) $ \(route,_) -> case route of
     T.Nothing -> T.Right []
     T.Just raw ->
-     bind (S.initializeProtection raw protected) $ \plan ->
+     bind (S.protectedQueryPlan raw protected) $ \(plan,open) ->
      bind (S.initialContracts plan types protected) $ \contracts ->
-     let scope=S.planScope plan (M.keys contracts) in
-     bind (S.installContracts scope contracts) $ \checked ->
-     bind (S.querySteps plan scope) $ \steps ->
+     bind (open contracts) $ \(checked,steps) ->
      traverseT (\(ids,prepare)->bind (prepare checked) $ \p ->
        bind (S.slotPrepared checked ids p) $ \(_,ready)->T.Right (vw ready)) steps
 old annotation body =
@@ -85,7 +85,26 @@ annotations=[T.Nothing,T.Just (ann int),T.Just (ann bool),T.Just (ann fn),
  T.Just (T.SAnnotation ["e"] (T.STVar "e"))]
 brief (Left e)="Left "++e
 brief (Right xs)="Right "++show [(map B.unpack a,map B.unpack b,map B.unpack c) | (a,b,c,_,_,_,_)<-xs]
+reservationControls = do
+ let imported = "wantedDictionary1"
+     predecessor = "wantedDictionary2"
+     declarations = D.symbols [(imported,False),(predecessor,False)]
+     scope = S.declarationScope declarations [owner] [] [imported]
+     contract = S.SourceContract intX [] False
+     seed = Set.singleton "wantedDictionary0"
+     firstName current = case S.checkedReservation current of
+       T.Nothing -> Left "missing plan reservation"
+       T.Just names -> norm (Fresh.runFreshFrom names (Fresh.freshName "wantedDictionary"))
+ case norm (S.installContractsReserving (T.Just seed) scope (M.singleton imported contract)) of
+   Left message -> error message
+   Right initial -> do
+     need "both the plan and imported contract reserve generated names"
+       (firstName initial == Right predecessor)
+     let published = S.publishContracts initial [(owner,contract)]
+     need "only the successor reserves the published declaration name"
+       (firstName published == Right "wantedDictionary3" && firstName initial == Right predecessor)
 main=do
+ reservationControls
  let cases=[(a,b)|a<-annotations,b<-bodies]
      plainBody=R.Lam "x" T.Nothing (app2 T.PAddInt (R.Local "x") (R.IntLit 1))
      importedBody=R.Lam "x" T.Nothing (R.App (R.Global prev) (R.Local "x"))
@@ -98,4 +117,4 @@ main=do
  let eligible=[("f",T.Just (ann fn),T.SLam "x" T.Nothing (T.SVar "x"))]
  need "new indexed signed seam exercised" (S.eligibleIndexedSourceWith False eligible && not (S.eligibleSourceWith False eligible))
  need "self recursive signature stays grouped" (not (S.eligibleIndexedSourceWith True eligible))
- putStrLn ("PASS signed source roots: "++show (length cases)++" complete prepared/query-slot comparisons and nonvacuous eligibility/fallback controls")
+ putStrLn ("PASS signed source roots: "++show (length cases)++" complete prepared/query-slot comparisons, Fresh reservation and eligibility/fallback controls")

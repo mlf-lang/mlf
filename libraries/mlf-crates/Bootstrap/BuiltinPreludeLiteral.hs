@@ -269,7 +269,9 @@ module Bootstrap.BuiltinPreludeLiteral where {
     SVar n -> application "SVar" [string n];
     SConstructor n -> application "SConstructor" [string n];
     SLam n signature body -> application "SLam" [string n, maybe annotation signature, sourceExpression body];
+    SBindDictionaries names body -> sourceExpression (L.dictionaryAbstraction names body);
     SApp a b -> application "SApp" [sourceExpression a, sourceExpression b];
+    SApplyDictionaries function names -> sourceExpression (L.dictionaryApplication function names);
     SLet n a b -> application "SLet" [string n, sourceExpression a, sourceExpression b];
     SAnn body signature -> application "SAnn" [sourceExpression body, annotation signature];
     SSignature body signature -> application "SSignature" [sourceExpression body, annotation signature];

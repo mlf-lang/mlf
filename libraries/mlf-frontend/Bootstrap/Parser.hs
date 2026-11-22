@@ -1776,6 +1776,7 @@ module Bootstrap.Parser where {
         mapM_ validateSharedExpression ((:) action ((:) continuation ((:) bind ((:) failure []))))
       };
       SVar _ -> Right ();
+      SBindDictionaries _ _ -> Left "dictionary binders are reserved for class translation";
       SLam name annotation body ->
         do {
           validateSharedBinding name;

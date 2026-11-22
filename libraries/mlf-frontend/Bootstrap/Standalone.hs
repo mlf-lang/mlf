@@ -341,6 +341,10 @@ module Bootstrap.Standalone where {
       body' <- rewriteExpr scope (Set.insert compareString name bound) body;
       unchanged (SLam name annotation' body')
     };
+    SBindDictionaries names body -> do {
+      rewritten <- rewriteExpr scope (addBound bound names) body;
+      unchanged (SBindDictionaries names rewritten)
+    };
     SApp f a -> do { f' <- rewriteExpr scope bound f; a' <- rewriteExpr scope bound a; unchanged (SApp f' a') };
     SLet name value body -> do {
       value' <- rewriteExpr scope bound value;
@@ -506,6 +510,7 @@ module Bootstrap.Standalone where {
     SWantedRefs n candidates -> (:) n (map (compose termRefName snd) candidates);
     SConstructor name -> (:) name [];
     SLam name annotation body -> (:) name (append (maybe [] annotationNames annotation) (expressionNames body));
+    SBindDictionaries names body -> append names (expressionNames body);
     SApp f a -> append (expressionNames f) (expressionNames a);
     SLet name value body -> (:) name (append (expressionNames value) (expressionNames body));
     SAnn value annotation -> append (expressionNames value) (annotationNames annotation);

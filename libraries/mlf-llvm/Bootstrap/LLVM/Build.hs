@@ -13,7 +13,8 @@ module Bootstrap.LLVM.Build where {
   import qualified Bootstrap.LLVM.Optimize as O;
   import qualified Bootstrap.LLVM.Result as R;
   import qualified Bootstrap.LLVM.LazyProducer as V;
-  data CGBinding = CGBinding String Bool | CGSlot String Bool;
+  -- A boxed worker parameter can carry an evaluated indirection between calls.
+  data CGBinding = CGBinding String Bool | CGWorkerArgument String Bool | CGSlot String Bool;
   data Scalar = Boxed String | Floating String;
   data NativeMode = General | UnboxedDouble | NonnegativeInt | SmallIndex;
   data FunctionScope = FunctionScope (Map XName A.WorkerFunction) (Map XName (Maybe (Set XName)));
@@ -225,9 +226,9 @@ module Bootstrap.LLVM.Build where {
   compareKernel :: (,) XName ([] NativeMode) -> (,) XName ([] NativeMode) -> Int;
   compareKernel = L.comparePair O.compareName (L.compareList compareMode);
   operand :: CGBinding -> String;
-  operand binding = case binding of { CGBinding value _ -> value; CGSlot _ _ -> panic "LLVM slot operand must be loaded" };
+  operand binding = case binding of { CGBinding value _ -> value; CGWorkerArgument value _ -> value; CGSlot _ _ -> panic "LLVM slot operand must be loaded" };
   evaluated :: CGBinding -> Bool;
-  evaluated binding = case binding of { CGBinding _ forced -> forced; CGSlot _ forced -> forced };
+  evaluated binding = case binding of { CGBinding _ forced -> forced; CGWorkerArgument _ forced -> forced; CGSlot _ forced -> forced };
   fresh :: String -> Build String;
   fresh prefix =
     do {
@@ -306,8 +307,9 @@ module Bootstrap.LLVM.Build where {
   -- Definition and branch boundaries below restrict facts to dominated uses.
   forceBinding :: CGBinding -> Build String;
   forceBinding (CGSlot slot forced) = do { value <- result ("load volatile ptr, ptr " ++ slot ++ ", align 8"); forceBinding (CGBinding value forced) };
-  forceBinding (CGBinding value forced) =
-    if forced
+  forceBinding binding =
+    let { value = operand binding } in
+    if evaluated binding
     then cgPure value
     else do {
            previous <- gets (\state -> M.lookup compareString value (forcedValues state));
@@ -315,7 +317,10 @@ module Bootstrap.LLVM.Build where {
              Just result -> cgPure result;
              Nothing ->
                do {
-                 result <- forceValue value;
+                 result <- case binding of {
+                   CGWorkerArgument _ _ -> call "@mlf.force.worker" (args1 (pointer value));
+                   _ -> forceValue value
+                 };
                  modify
                    (\state ->
                       withForcedValues
@@ -333,8 +338,8 @@ module Bootstrap.LLVM.Build where {
     };
   bindingOperand :: CGBinding -> Build String;
   bindingOperand (CGSlot slot _) = result ("load volatile ptr, ptr " ++ slot ++ ", align 8");
-  bindingOperand (CGBinding value forced) =
-    gets (\state -> L.fromMaybe value (M.lookup compareString value (forcedValues state)));
+  bindingOperand binding =
+    let { value = operand binding } in gets (\state -> L.fromMaybe value (M.lookup compareString value (forcedValues state)));
   definition :: String -> [] String -> Build String -> Build ();
   definition name args body = definitionTyped "ptr" name args body;
   definitionTyped :: String -> String -> [] String -> Build String -> Build ();

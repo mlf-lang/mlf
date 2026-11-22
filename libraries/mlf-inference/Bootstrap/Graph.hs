@@ -310,8 +310,12 @@ module Bootstrap.Graph where {
       Just representative -> resolve graph representative
     };
   nodeAt :: Graph -> Int -> Node;
-  nodeAt graph identity =
-    case IM.lookup (resolve graph identity) (nodes graph) of {
+  nodeAt graph identity = nodeAtRepresentative graph identity (resolve graph identity);
+  -- A caller that already has the representative can reuse it. Keep the
+  -- requested identity in the error, including when it was an alias.
+  nodeAtRepresentative :: Graph -> Int -> Int -> Node;
+  nodeAtRepresentative graph identity representative =
+    case IM.lookup representative (nodes graph) of {
       Nothing -> panic ("missing graph node " ++ showInt identity);
       Just node -> node
     };
@@ -478,7 +482,7 @@ module Bootstrap.Graph where {
         if IS.member identity seen
         then reachableVisit graph seen rest
         else reachableVisit graph (IS.insert identity seen)
-               (L.append (children (tag (nodeAt graph identity))) rest)
+               (L.append (children (tag (nodeAtRepresentative graph identity identity))) rest)
     };
   reachable :: Graph -> Int -> IntSet;
   reachable graph start = reachableVisit graph IS.empty ((:) start []);
@@ -497,7 +501,7 @@ module Bootstrap.Graph where {
         else if IS.member identity seen
              then containsVisit graph wanted seen rest
              else containsVisit graph wanted (IS.insert identity seen)
-                    (L.append (children (tag (nodeAt graph identity))) rest)
+                    (L.append (children (tag (nodeAtRepresentative graph identity identity))) rest)
     };
   structurallyContains :: Graph -> Int -> Int -> Bool;
   structurallyContains graph parent target =
@@ -533,9 +537,11 @@ module Bootstrap.Graph where {
       IM.empty
       (IM.toList (nodes graph));
   inertVisit :: Graph -> IntMap ([] Int) -> IntMap Bool -> Int -> (,) Bool (IntMap Bool);
+  inertVisit graph descendants = inertVisitWith graph (\n -> IM.findWithDefault [] n descendants);
+  inertVisitWith :: Graph -> (Int -> [] Int) -> IntMap Bool -> Int -> (,) Bool (IntMap Bool);
   -- A bottom is never inert. Match the seed's short-circuiting conjunction:
   -- even constructing the binding index is unnecessary for this query.
-  inertVisit graph descendants known identity =
+  inertVisitWith graph childrenOf known identity =
     case IM.lookup identity known of {
       Just answer -> (,) answer known;
       Nothing ->
@@ -544,7 +550,7 @@ module Bootstrap.Graph where {
         else let {
                flexibleChildren =
                  L.filter (\child -> equalFlag (flag (nodeAt graph child)) Flexible)
-                   (IM.findWithDefault [] identity descendants)
+                   (childrenOf identity)
              } in
              case L.foldlStrict
                     (\state ->
@@ -552,7 +558,7 @@ module Bootstrap.Graph where {
                          case state of {
                            (,) answer cache ->
                              if answer
-                             then case inertVisit graph descendants cache child of {
+                             then case inertVisitWith graph childrenOf cache child of {
                                     (,) childAnswer next -> strictPair childAnswer next
                                   }
                              else state
@@ -630,20 +636,33 @@ module Bootstrap.Graph where {
     } in
     IM.mapWithKey
       (\n ->
-         \v ->
-           if IM.findWithDefault False n inertness
-           then Inert
-           else if equalFlag (flag v) Rigid
-                then Orange
-                else if IM.findWithDefault False n paths then Green else Red)
+         \v -> permissionClass (IM.findWithDefault False n inertness) (flag v)
+           (IM.findWithDefault False n paths))
       (nodes graph);
+  permissionClass :: Bool -> Flag -> Bool -> Permission;
+  permissionClass isInert rigidity flexible =
+    if isInert then Inert
+    else if equalFlag rigidity Rigid then Orange
+    else if flexible then Green else Red;
+  -- Memoize the paths and binding subtrees reached from the requested nodes.
+  permissionsAt :: Graph -> (Int -> [] Int) -> [] Int -> IntMap Permission;
+  permissionsAt graph childrenOf identities =
+    let {
+      visit ((,,) inertness paths selected) n =
+        case inertVisitWith graph childrenOf inertness n of {
+          (,) isInert nextInertness -> case flexiblePathVisit graph paths n of {
+            (,) isFlexible nextPaths -> let {
+              value = permissionClass isInert (flag (nodeAt graph n)) isFlexible;
+              nextSelected = seq value (IM.insert n value selected)
+            } in seq nextSelected ((,,) nextInertness nextPaths nextSelected)
+          }
+        }
+    } in case L.foldlStrict visit ((,,) IM.empty IM.empty IM.empty) identities of {
+      (,,) _ _ result -> result
+    };
   permission :: Graph -> Int -> Permission;
   permission graph identity =
-    if inert graph identity
-    then Inert
-    else if equalFlag (flag (nodeAt graph identity)) Rigid
-         then Orange
-         else if flexiblePath graph identity then Green else Red;
+    permissionClass (inert graph identity) (flag (nodeAt graph identity)) (flexiblePath graph identity);
   -- Validating the binding tree before using ancestry makes sparse identities
   -- and disconnected cycles as safe as dense source-generated graphs.
   bindingVisitIndexed :: IntMap ([] Int) ->
@@ -704,6 +723,8 @@ module Bootstrap.Graph where {
           Just ((,) position ignored) -> ((start <= position) && (position < end))
         }
     };
+  typeBinderContainmentError :: String;
+  typeBinderContainmentError = "a type binder must structurally contain its node";
   validateNodeBinder :: Graph -> (,) Int Node -> Either String ();
   validateNodeBinder graph ((,) identity node) =
     case binder node of {
@@ -715,7 +736,7 @@ module Bootstrap.Graph where {
                  L.any (\child -> (resolve graph child == identity)) (children (tag p)))
              then Right ()
              else check (structurallyContains graph parent identity)
-                    "a type binder must structurally contain its node")
+                    typeBinderContainmentError)
     };
   validateChild :: Graph -> IntMap ((,) Int Int) -> Int -> Int -> Either String ();
   validateChild graph intervals parent child =
@@ -914,15 +935,12 @@ module Bootstrap.Graph where {
               })
            entries of {
       (:) ((,) root value) [] ->
-        ST.bindE (denseCheckBinders state entries)
-          (\binders ->
-             stBind (denseAddDescendants state entries)
-               (\loaded ->
-                  stBind (denseBindingVisit state root 0)
-                    (\count ->
-                       if (count == L.length entries)
-                       then denseKindEntries state entries
-                       else ST.failE "cyclic binding tree")));
+        ST.bindE (denseValidateDescendants state entries)
+          (\size -> stBind (denseBindingVisit state root 0)
+            (\count ->
+               if (count == size)
+               then denseKindEntries state entries
+               else ST.failE "cyclic binding tree"));
       _ -> ST.failE "graph must have one binding root"
     };
   -- Each structural edge is checked even if the child's kind is already cached.
@@ -958,14 +976,15 @@ module Bootstrap.Graph where {
              then ST.pureE ()
              else case state of {
                     DenseValidation graph low high table descendants colours kinds starts ends visited ->
-                      if L.any (\child -> (resolve graph child == n)) (children (tag parent))
-                      then ST.pureE ()
-                      else stBind (readDense low starts n)
-                             (\stamp ->
-                                ST.bindE (denseStructurally state n stamp ((:) b []))
-                                  (\found ->
-                                     ST.check found
-                                       "a type binder must structurally contain its node"))
+                      -- An open colour denotes a structural ancestor on this
+                      -- DFS stack. That path already witnesses containment.
+                      stBind (readDense low colours b)
+                        (\colour ->
+                           if colour == 1 || L.any (\child -> resolve graph child == n) (children (tag parent))
+                           then ST.pureE ()
+                           else stBind (readDense low starts n)
+                                  (\stamp -> ST.bindE (denseStructurally state n stamp ((:) b []))
+                                     (\found -> ST.check found typeBinderContainmentError)))
                   })
     };
   denseKind :: forall s. DenseValidation s -> Int -> Node -> ST s (Either String Kind);
@@ -1046,7 +1065,10 @@ module Bootstrap.Graph where {
   typeMismatch a b =
     Left ("type constructor mismatch: " ++ (tagDescription a ++ (" versus " ++ tagDescription b)));
   tagEquations :: GTag -> GTag -> Either String ((,) GTag ([] ((,) Int Int)));
-  tagEquations a b =
+  tagEquations = tagEquationsWith typeMismatch;
+  tagEquationsWith :: (GTag -> GTag -> Either String ((,) GTag ([] ((,) Int Int)))) ->
+    GTag -> GTag -> Either String ((,) GTag ([] ((,) Int Int)));
+  tagEquationsWith mismatch a b =
     if (isGen a || isGen b)
     then Left "cannot unify generalization nodes"
     else if isBottom a
@@ -1057,41 +1079,44 @@ module Bootstrap.Graph where {
                      GArr x y ->
                        case b of {
                          GArr z w -> Right ((,) a ((:) ((,) x z) ((:) ((,) y w) [])));
-                         _ -> typeMismatch a b
+                         _ -> mismatch a b
                        };
                      GCon c xs ->
                        case b of {
                          GCon d ys ->
                            if (eqString c d && (L.length xs == L.length ys))
                            then Right ((,) a (L.zip xs ys))
-                           else typeMismatch a b;
-                         _ -> typeMismatch a b
+                           else mismatch a b;
+                         _ -> mismatch a b
                        };
                      GTyCon c k ->
                        case b of {
                          GTyCon d l ->
                            if (eqString c d && equalKind k l)
                            then Right ((,) a [])
-                           else typeMismatch a b;
-                         _ -> typeMismatch a b
+                           else mismatch a b;
+                         _ -> mismatch a b
                        };
                      GSkolem c k ->
                        case b of {
                          GSkolem d l ->
                            if ((c == d) && equalKind k l)
                            then Right ((,) a [])
-                           else typeMismatch a b;
-                         _ -> typeMismatch a b
+                           else mismatch a b;
+                         _ -> mismatch a b
                        };
                      GTyApp f x ->
                        case b of {
                          GTyApp h y -> Right ((,) a ((:) ((,) f h) ((:) ((,) x y) [])));
-                         _ -> typeMismatch a b
+                         _ -> mismatch a b
                        };
-                     _ -> typeMismatch a b
+                     _ -> mismatch a b
                    };
   firstOrder :: IntMap Kind -> Graph -> (,) Int Int -> Either String Graph;
-  firstOrder kinds graph ((,) left right) =
+  firstOrder = firstOrderWith typeMismatch;
+  firstOrderWith :: (GTag -> GTag -> Either String ((,) GTag ([] ((,) Int Int)))) ->
+    IntMap Kind -> Graph -> (,) Int Int -> Either String Graph;
+  firstOrderWith mismatch kinds graph ((,) left right) =
     let {
       a = resolve graph left
     } in
@@ -1110,7 +1135,7 @@ module Bootstrap.Graph where {
                  then Left
                         ("kind mismatch during unification: " ++
                          (kindDescription ka ++ (" versus " ++ kindDescription kb)))
-                 else bindE (tagEquations (tag (nodeAt graph a)) (tag (nodeAt graph b)))
+                 else bindE (tagEquationsWith mismatch (tag (nodeAtRepresentative graph a a)) (tag (nodeAtRepresentative graph b b)))
                         (\answer ->
                            case answer of {
                              (,) newTag equations ->
@@ -1121,7 +1146,7 @@ module Bootstrap.Graph where {
                                  loser = if (a < b) then b else a
                                } in
                                let {
-                                 old = nodeAt graph a
+                                 old = nodeAtRepresentative graph a a
                                } in
                                let {
                                  next =
@@ -1131,7 +1156,7 @@ module Bootstrap.Graph where {
                                      (IM.insert loser winner (links graph))
                                      (nextId graph)
                                } in
-                               foldE (firstOrder kinds) next equations
+                               foldE (firstOrderWith mismatch kinds) next equations
                            })
              }
          };
@@ -1151,19 +1176,26 @@ module Bootstrap.Graph where {
   -- explicit kinds. Type-application graphs keep the existing shared kind cache,
   -- avoiding repeated traversal of shared higher-kinded subgraphs.
   validatedKind :: Graph -> Int -> Either String Kind;
-  validatedKind graph identity =
+  validatedKind = validatedKindUsing False;
+  -- Each edge of the fully validated old graph and the new expansion already
+  -- satisfies its kind premises. Its result follows only the function spine.
+  -- Public callers can still request full validation of a type application.
+  validatedKindUsing :: Bool -> Graph -> Int -> Either String Kind;
+  validatedKindUsing prepared graph identity =
     bindE (require graph identity)
-      (\node ->
-         case tag node of {
-           GBot -> Right Star;
-           GBotK kind -> Right kind;
-           GTyCon name kind -> Right kind;
-           GSkolem identity kind -> Right kind;
-           GArr a b -> Right Star;
-           GCon name arguments -> Right Star;
-           GGen root -> validatedKind graph root;
-           GTyApp function argument -> kindAt graph identity
-         });
+      (\node -> case tag node of {
+        GBot -> Right Star;
+        GBotK kind -> Right kind;
+        GTyCon _ kind -> Right kind;
+        GSkolem _ kind -> Right kind;
+        GArr _ _ -> Right Star;
+        GCon _ _ -> Right Star;
+        GGen root -> validatedKindUsing prepared graph root;
+        GTyApp function _ -> if prepared then
+          bindE (validatedKindUsing True graph function)
+            (\kind -> case kind of { KArrow _ result -> Right result; _ -> kindAt graph identity })
+          else kindAt graph identity
+      });
   simpleKindTag :: Node -> Bool;
   simpleKindTag node =
     case tag node of {
@@ -1200,7 +1232,10 @@ module Bootstrap.Graph where {
   simpleKinds :: IntMap Node -> Bool;
   simpleKinds (IntMap tree) = simpleKindTree tree;
   firstOrderValidated :: Graph -> Graph -> (,) Int Int -> Either String Graph;
-  firstOrderValidated original graph ((,) left right) =
+  firstOrderValidated = firstOrderKindsUsing typeMismatch validatedKind;
+  firstOrderKindsUsing :: (GTag -> GTag -> Either String ((,) GTag ([] ((,) Int Int)))) ->
+    (Graph -> Int -> Either String Kind) -> Graph -> Graph -> (,) Int Int -> Either String Graph;
+  firstOrderKindsUsing mismatch lookupKind original graph ((,) left right) =
     let {
       a = resolve graph left
     } in
@@ -1209,15 +1244,15 @@ module Bootstrap.Graph where {
     } in
     if (a == b)
     then Right graph
-    else bindE (validatedKind original a)
+    else bindE (lookupKind original a)
            (\ka ->
-              bindE (validatedKind original b)
+              bindE (lookupKind original b)
                 (\kb ->
                    if L.not (equalKind ka kb)
                    then Left
                           ("kind mismatch during unification: " ++
                            (kindDescription ka ++ (" versus " ++ kindDescription kb)))
-                   else bindE (tagEquations (tag (nodeAt graph a)) (tag (nodeAt graph b)))
+                   else bindE (tagEquationsWith mismatch (tag (nodeAtRepresentative graph a a)) (tag (nodeAtRepresentative graph b b)))
                           (\answer ->
                              case answer of {
                                (,) newTag equations ->
@@ -1228,7 +1263,7 @@ module Bootstrap.Graph where {
                                    loser = if (a < b) then b else a
                                  } in
                                  let {
-                                   old = nodeAt graph a
+                                   old = nodeAtRepresentative graph a a
                                  } in
                                  let {
                                    next =
@@ -1238,7 +1273,7 @@ module Bootstrap.Graph where {
                                        (IM.insert loser winner (links graph))
                                        (nextId graph)
                                  } in
-                                 foldE (firstOrderValidated original) next equations
+                                 foldE (firstOrderKindsUsing mismatch lookupKind original) next equations
                              })));
   checkedFirstOrder :: [] ((,) Int Int) -> Graph -> Either String Graph;
   -- The preceding eager kind traversal checks every input identity before
@@ -1255,11 +1290,11 @@ module Bootstrap.Graph where {
   unify :: [] ((,) Int Int) -> Graph -> Either String Graph;
   unify equations before =
     bindE (validateGraph before)
-      (\ignored ->
-         bindE (checkedFirstOrder equations before)
-           (\skeleton ->
-              bindE (rebind before (canonicalize skeleton))
-                (\rebuilt -> bindE (validateGraph rebuilt) (\verified -> Right rebuilt))));
+      (\ignored -> bindE (checkedFirstOrder equations before) (finishUnification before));
+  finishUnification :: Graph -> Graph -> Either String Graph;
+  finishUnification before skeleton =
+    bindE (rebind before (canonicalize skeleton))
+      (\rebuilt -> bindE (validateGraph rebuilt) (\verified -> Right rebuilt));
   graftedNodes :: Graph -> Graph -> IntSet;
   graftedNodes old skeleton =
     L.foldlStrict
@@ -2395,7 +2430,13 @@ module Bootstrap.Graph where {
   -- their kinds, so only the frontier proxies need a kind calculation.
   -- Their fresh identities are contiguous and disjoint from the old graph.
   expandPreparedWithScopes :: IntMap ((,) Int Int) -> Int -> Int -> Graph -> Either String PreparedExpansion;
-  expandPreparedWithScopes intervals generalization destination graph =
+  expandPreparedWithScopes = expandPreparedUsing kindsAt;
+  preparedFrontierKinds :: Graph -> [] Int -> Either String (IntMap Kind);
+  preparedFrontierKinds graph ids = L.mapEither IM.fromDistinctAscList
+    (mapE (\n -> L.mapEither (\kind -> (,) n kind) (validatedKindUsing True graph n)) ids);
+  expandPreparedUsing :: (Graph -> [] Int -> Either String (IntMap Kind)) -> IntMap ((,) Int Int) ->
+    Int -> Int -> Graph -> Either String PreparedExpansion;
+  expandPreparedUsing calculateKinds intervals generalization destination graph =
     let { source = genRoot graph generalization; first = nextId graph } in
     case expansionVisitCached graph generalization intervals ((,) IS.empty IM.empty) ((:) source []) of {
       (,) visited scopes ->
@@ -2403,7 +2444,7 @@ module Bootstrap.Graph where {
           originals = IS.toList visited;
           external = L.filter (\n -> L.not (IM.findWithDefault False n scopes)) originals
         } in do {
-          kinds <- kindsAt graph external;
+          kinds <- calculateKinds graph external;
           let {
             copies = IM.fromDistinctAscList (freshCopyEntries first originals);
             stop = L.advanceIdentity first (L.length originals);
@@ -2430,44 +2471,80 @@ module Bootstrap.Graph where {
                        Graph -> Either String ((,) ((,) Int (IntMap Int)) Graph);
   materializeExport generalization selected destination parent graph =
     bindE (validateGraph graph)
-      (\valid ->
-         bindE (require graph generalization)
-           (\groupNode ->
-              bindE (require graph parent)
-                (\parentNode ->
-                   bindE (require graph selected)
-                     (\sourceNode ->
-                        let {
-                          group = resolve graph generalization;
-                          source = resolve graph selected;
-                          outer = resolve graph parent
-                        } in
-                        bindE
-                          (check
-                             (isGen (tag groupNode) && isGen (tag parentNode) &&
-                              equalMaybeInt (mapMaybeInt (resolve graph) (binder groupNode)) (Just outer))
-                             "recursive export requires a group under its parent gen")
-                          (\scopeChecked ->
-                             bindE
-                               (check
-                                  (IM.notMember destination (nodes graph) &&
-                                   IM.notMember destination (links graph) &&
-                                   (destination < nextId graph) &&
-                                   L.all (\n -> (n < nextId graph))
-                                     (L.append (IM.keys (nodes graph)) (IM.keys (links graph))))
-                                  "recursive export requires a reserved destination and valid fresh counter")
-                               (\destinationChecked ->
-                                  bindE
-                                    (check (L.not (isGen (tag sourceNode)))
-                                       "recursive export root must be a type node")
-                                    (\sourceChecked ->
-                                       materializeExportIn graph group source destination outer)))))));
+      (\valid -> materializeCheckedExport generalization selected destination parent graph);
+  -- The caller owns an already validated graph. Materializing the export
+  -- still checks the new graph before returning it for the next member.
+  materializeCheckedExport :: Int -> Int -> Int -> Int -> Graph -> Either String ((,) ((,) Int (IntMap Int)) Graph);
+  materializeCheckedExport = materializeCheckedExportUsing True;
+
+  -- The group has been solved and checked before any export is added.
+  -- Every export follows only original edges. Earlier exports introduce no
+  -- alias or edge from the original graph to new identities. The complete
+  -- audit can therefore validate the append-only exports together. Replay a
+  -- rejected batch with the original audit points to preserve diagnostics.
+  materializeCheckedExports :: Int -> [] ((,) Int Int) -> Int -> Graph ->
+    Either String ((,) ([] ((,) Int (IntMap Int))) Graph);
+  materializeCheckedExports generalization members parent =
+    materializeCheckedExportBatch parent (L.map (\((,) source destination) -> (,,) generalization source destination) members);
+  materializeCheckedExportBatch :: Int -> [] ((,,) Int Int Int) -> Graph ->
+    Either String ((,) ([] ((,) Int (IntMap Int))) Graph);
+  materializeCheckedExportBatch parent members graph = let {
+    copyAll audit rows current = case rows of {
+      [] -> Right ((,) [] current);
+      (:) ((,,) generalization source destination) rest -> do {
+        (,) item next <- materializeCheckedExportUsing audit generalization source destination parent current;
+        (,) items result <- copyAll audit rest next;
+        Right ((,) ((:) item items) result)
+      }
+    };
+    ordinary = copyAll True members graph;
+    frozen ((,,) generalization source destination) =
+      IM.member (resolve graph generalization) (nodes graph) &&
+      IM.member (resolve graph source) (nodes graph) && destination < nextId graph &&
+      IM.notMember destination (nodes graph) && IM.notMember destination (links graph);
+    batched = do {
+      check (exportCounterValid graph && L.all frozen members)
+        "recursive export requires a reserved destination and valid fresh counter";
+      answer <- copyAll False members graph;
+      validateGraph (L.snd answer);
+      Right answer
+    }
+  } in case members of {
+    (:) _ ((:) _ _) -> case batched of {
+      Right result -> Right result;
+      Left _ -> ordinary
+    };
+    _ -> ordinary
+  };
+  exportCounterValid graph =
+    L.all (\n -> n < nextId graph) (IM.keys (nodes graph)) &&
+    L.all (\n -> n < nextId graph) (IM.keys (links graph));
+  materializeCheckedExportUsing audit generalization selected destination parent graph = do {
+    groupNode <- require graph generalization;
+    parentNode <- require graph parent;
+    sourceNode <- require graph selected;
+    let {
+      group = resolve graph generalization;
+      source = resolve graph selected;
+      outer = resolve graph parent
+    };
+    check (isGen (tag groupNode) && isGen (tag parentNode) &&
+      equalMaybeInt (mapMaybeInt (resolve graph) (binder groupNode)) (Just outer))
+      "recursive export requires a group under its parent gen";
+    check (IM.notMember destination (nodes graph) && IM.notMember destination (links graph) &&
+      destination < nextId graph &&
+      (L.not audit || exportCounterValid graph))
+      "recursive export requires a reserved destination and valid fresh counter";
+    check (L.not (isGen (tag sourceNode))) "recursive export root must be a type node";
+    materializeExportInUsing audit graph group source destination outer
+  };
   materializeExportIn :: Graph ->
                          Int ->
                          Int ->
                          Int ->
                          Int -> Either String ((,) ((,) Int (IntMap Int)) Graph);
-  materializeExportIn graph generalization source destination parent =
+  materializeExportIn = materializeExportInUsing True;
+  materializeExportInUsing audit graph generalization source destination parent =
     case expansionVisitCached graph generalization IM.empty ((,) IS.empty IM.empty)
            ((:) source []) of {
       (,) visited scopes ->
@@ -2502,7 +2579,7 @@ module Bootstrap.Graph where {
                           setNode destination (mkNode (GGen (copy source)) (Just parent) Flexible)
                             result
                       } in
-                      bindE (validateGraph exported)
+                      bindE (if audit then validateGraph exported else Right ())
                         (\verified -> Right ((,) ((,) (copy source) copies) exported)))
              })
     };
@@ -2951,6 +3028,24 @@ module Bootstrap.Graph where {
       (:) entry rest ->
         stBind (denseAddDescendant state entry) (\ignored -> denseAddDescendants state rest)
     };
+  -- Populate the local reverse index while checking binders in the same order.
+  -- An error still leaves only private scratch state, and may not reach DFS.
+  denseValidateDescendants :: forall s. DenseValidation s -> [] ((,) Int Node) -> ST s (Either String Int);
+  denseValidateDescendants state rows = case state of {
+    DenseValidation _ low _ _ descendants _ _ _ _ _ -> let {
+      visit entries size = case entries of {
+        [] -> ST.pureE size;
+        (:) ((,) n node) rest -> let { next = size + 1 } in seq next (case binder node of {
+          Nothing -> visit rest next;
+          Just parent -> stBind (denseGetNode state parent) (\found -> case found of {
+            Nothing -> ST.failE "missing binder";
+            Just _ -> stBind (readDense low descendants parent) (\previous ->
+              stBind (writeDense low descendants parent ((:) n previous)) (\updated -> visit rest next))
+          })
+        })
+      }
+    } in visit rows 0
+  };
   denseKindEntries :: forall s. DenseValidation s ->
                                 [] ((,) Int Node) -> ST s (Either String ());
   denseKindEntries state values =

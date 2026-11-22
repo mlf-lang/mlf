@@ -14,6 +14,10 @@ module Bootstrap.Std where {
   namedCandidates xs = map (\((,) role ref) -> (,) role (termRefName ref)) xs;
   termRefName ref = case ref of { LexicalRef n -> n; DeclRef _ n -> n };
   referenceExpr ref = case ref of { LexicalRef n -> SVar n; DeclRef i n -> SGlobal i n };
+  dictionaryAbstraction :: [] String -> SExpr -> SExpr;
+  dictionaryAbstraction names body = foldr (\name rest -> SLam name Nothing rest) body names;
+  dictionaryApplication :: TermRef -> [] String -> SExpr;
+  dictionaryApplication function arguments = foldl SApp (referenceExpr function) (map SVar arguments);
   id :: forall a. a -> a;
   id x = x;
   const :: forall a b. a -> b -> a;
@@ -662,6 +666,7 @@ module Bootstrap.Std where {
     SWantedScope dictionary env -> SWantedRefs dictionary (wantedScopeRefs givens env);
     SDeclScope ids body -> SDeclScope ids (visit body);
     SLam n ann body -> SLam n ann (visit body);
+    SBindDictionaries names body -> SBindDictionaries names (visit body);
     SApp f a -> SApp (visit f) (visit a); SLet n a b -> SLet n (visit a) (visit b);
     SAnn e ann -> SAnn (visit e) ann; SSignature e ann -> SSignature (visit e) ann;
     SCase e alternatives -> SCase (visit e)

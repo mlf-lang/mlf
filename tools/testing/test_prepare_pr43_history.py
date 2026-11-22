@@ -61,9 +61,17 @@ class PR43HistoryControls(unittest.TestCase):
         self.git(self.origin, 'update-ref', '-d', prep.SOURCE_REF)
         prep.prepare()
 
+    def test_advanced_locator_supplies_reviewed_objects_in_one_call(self):
+        descendant = self.commit(self.transport.tree, [self.transport.source], 'later work')
+        self.git(self.origin, 'update-ref', prep.SOURCE_REF, descendant)
+        prep.prepare()
+        self.assertEqual(self.git(self.checkout, 'rev-parse', 'FETCH_HEAD'), descendant)
+        self.assertEqual(self.git(self.checkout, 'rev-parse', 'refs/history/verified-source-'+self.transport.source),
+                         self.transport.source)
+
     def test_changed_locator_is_not_retained(self):
         self.git(self.origin, 'update-ref', prep.SOURCE_REF, self.transport.parent)
-        with self.assertRaisesRegex(ValueError, 'locator differs'):
+        with self.assertRaisesRegex(ValueError, 'locator did not supply all reviewed objects'):
             prep.prepare()
         with self.assertRaises(subprocess.CalledProcessError):
             self.git(self.checkout, 'rev-parse', '--verify', 'refs/history/verified-source-'+self.transport.source)

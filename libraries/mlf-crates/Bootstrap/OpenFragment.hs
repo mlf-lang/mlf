@@ -3,7 +3,7 @@
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
 module Bootstrap.OpenFragment
-  (Environment, environment, declarations, dataEnvironment, Fragment, check, fromChecked,
+  (Environment, environment, environmentUsing, checkClosedIn, declarations, dataEnvironment, Fragment, check, fromChecked,
    parameters, body, bodyValue, storageValue, checkedStorageValue, bindings, usedParameters, context, fingerprint,
    normalize, withNameHints, encodeBody, encodeRaw, encodeCheckedRaw, decodeTrusted, decodeTrustedIds, audit, closedTerm, fresh, linkBody,
    Package, makePackage, makeCheckedPackage, readPackage, readPackageProfiled, packageFragments, packageBytes,
@@ -19,6 +19,7 @@ module Bootstrap.OpenFragment
   import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.Data as D;
+  import qualified Bootstrap.SourceEquality as E;
   import qualified Bootstrap.X.Check as Check;
   import qualified Bootstrap.X.Checked as Checked;
   import qualified Bootstrap.X.Syntax as X;
@@ -33,8 +34,20 @@ module Bootstrap.OpenFragment
 
   -- Environments and receipts are immutable. The constructor is private;
   -- decoding below is the only trusted-disk admission, after a byte SHA match.
-  data Environment = Environment ([] DataDecl) DataEnv;
-  environment ds = mapEither (Environment ds) (D.validateDeclarations ds);
+  data Environment = Environment ([] DataDecl) DataEnv Checked.ContextPool Separate.FingerprintEncoding;
+  -- The checker retains its proof for this exact ordered environment. Its
+  -- lazy fingerprint summarizes the same declaration list independently.
+  environmentWithEncoding ds encoded = mapEither (\((,) env proof) ->
+    Environment ds env proof encoded) (Checked.singleContext ds);
+  environment ds = environmentWithEncoding ds (Separate.encodingText
+    (Separate.pack (map (compose D.prettyDeclaration canonicalDeclaration) ds)));
+  -- Cached datatype identities admit equivalent source layouts. Only exact
+  -- syntax may reuse this validation, including constructor order and kinds.
+  environmentUsing current ds = case current of {
+    Just recorded -> if eqList E.eqDataDecl ds (declarations recorded) then Right recorded else environment ds;
+    Nothing -> environment ds
+  };
+  checkClosedIn (Environment _ _ proof _) = Checked.checkWithContexts proof;
   -- DataDecl and an all-Star DataDeclK denote the same declaration. Bound
   -- parameter spellings and saturated application syntax are not identities.
   canonicalField scope depth field = case field of {
@@ -54,8 +67,8 @@ module Bootstrap.OpenFragment
   } in DataDeclK (D.datatypeName declaration) normalized (map (\(ConstructorDecl name fields) ->
     ConstructorDecl name (map (canonicalField scope (length binders)) fields)) (D.datatypeConstructors declaration));
   declarationValue declaration = Structure.toDataDecl (canonicalDeclaration declaration);
-  declarations (Environment ds _) = ds;
-  dataEnvironment (Environment _ ds) = ds;
+  declarations (Environment ds _ _ _) = ds;
+  dataEnvironment (Environment _ ds _ _) = ds;
   -- Derive the wire tree once from the exact immutable checked term. The
   -- bytes for each envelope still go through their own ordinary writer.
   -- The flag selects schema 10 only when a ground instantiation is present.
@@ -536,8 +549,15 @@ module Bootstrap.OpenFragment
     saved = stampEncoding env ps (prettyStamp views) bs
   } in Fragment env ps term bs used saved (Structure.toXTerm term) (ordinaryRows views) (spineRows views) Nothing;
   stamp env ps term bs = stampEncoding env ps (termEncoding term) bs;
-  stampEncoding env ps summary bs = Separate.encodingFingerprint (Separate.encodingPack
-    [Separate.encodingText (Separate.pack (map (compose D.prettyDeclaration canonicalDeclaration) (declarations env))),
+  declarationEncoding (Environment _ _ _ encoded) = encoded;
+  -- A row is a scalar-length-framed canonical declaration, exactly one field
+  -- of Separate.pack. Different inventories can share this field only when
+  -- they actually select the same admitted declaration from this package.
+  framedDeclaration declaration = Separate.encodingPack
+    [Separate.encodingText (D.prettyDeclaration (canonicalDeclaration declaration))];
+  stampEncoding env ps summary bs = stampWithDeclarations (declarationEncoding env) ps summary bs;
+  stampWithDeclarations declared ps summary bs = Separate.encodingFingerprint (Separate.encodingPack
+    [declared,
      Separate.encodingText (Separate.pack (map (\((,) n ty) -> Separate.pack [showInt (X.nameId n), X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) ps)),
      summary,
      Separate.encodingText (Separate.pack (map (\((,) n ty) -> Separate.pack [X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) bs))]);
@@ -558,7 +578,7 @@ module Bootstrap.OpenFragment
     env = context fragment
   } in checkedFragment env ps term bs (map rename (usedParameters fragment));
   check :: Environment -> [] ((,) XName XType) -> XTerm -> Either String Fragment;
-  check env@(Environment _ ds) ps term = do {
+  check env@(Environment _ ds _ _) ps term = do {
     let { names = map fst ps };
     ensure (length names == length (nubBy X.equalName names)) "duplicate open-fragment parameter";
     let { scope = XEnv M.empty (M.fromList X.compareName ps) };
@@ -1089,7 +1109,9 @@ module Bootstrap.OpenFragment
                   let { rows = M.toList checkedBindings; types = V.fromList (map snd rows);
                     table = M.fromDistinctAscList (zip (map fst rows) (V.indices types)) };
                   headers <- Host.phaseValue profile "validate_ms" (Host.phaseEither length)
-                    (prepareFinals8 graph ((,) table types) checkedDeclarations M.empty S.empty entries);
+                    (prepareFinals8 graph ((,) table types)
+                      (M.map (\declaration -> (,) declaration (framedDeclaration declaration)) checkedDeclarations)
+                      M.empty S.empty entries);
                   case headers of {
                     Left message -> ioReturn (Left message);
                     Right prepared -> do {
@@ -1104,7 +1126,9 @@ module Bootstrap.OpenFragment
                   });
                   Host.phaseIO profile "fragment_validate_ms" (ioReturn (do {
                   bodies <- decoded;
-                  fragments <- restoreFinals8 prepared bodies;
+                  let { fields = M.fromDistinctAscList (map (\((,) name ty) ->
+                    (,) name (namedBindingEncoding name ty)) rows) };
+                  fragments <- restoreFinals8 fields prepared bodies;
                   let { usedKeys = S.fromList compareString (concatMap (\((,) _ fragment) ->
                     map (compose X.nameHint fst) (append (parameters fragment) (bindings fragment))) fragments) };
                   ensure (S.size usedKeys == length rows) "open crate binding reference inventory mismatch";
@@ -1128,7 +1152,9 @@ module Bootstrap.OpenFragment
     }
   };
 
-  data PackageFinalFields8 = PackageFinalFields8 String String Environment
+  -- A decoded declaration inventory selects its checked environment. Its
+  -- canonical fingerprint field is identical in every fragment using it.
+  data PackageFinalFields8 = PackageFinalFields8 String String ((,) Environment Separate.FingerprintEncoding)
     ([] ((,) XName XType)) Int ([] ((,) XName XType)) ([] XName);
   finalBodyIndex8 (PackageFinalFields8 _ _ _ _ index _ _) = index;
 
@@ -1146,15 +1172,17 @@ module Bootstrap.OpenFragment
             rawData <- decodedList Structure.ShapeText graph ds;
             names <- traverseEither Structure.expectText rawData;
             let { identity = Separate.pack names };
-            env <- case M.lookup compareString identity contexts of {
-              Just env -> Right env;
+            admitted <- case M.lookup compareString identity contexts of {
+              Just current -> Right current;
               Nothing -> do {
                 values <- traverseEither
                   (\key -> case M.lookup compareString key declarations of {
                     Just declaration -> Right declaration;
                     Nothing -> Left "open crate datatype reference out of scope"
                   }) names;
-                environment values
+                let { encoded = Separate.encodingConcat (map snd values) };
+                env <- environmentWithEncoding (map fst values) encoded;
+                Right ((,) env encoded)
               }
             };
             params <- finalBindings graph types ps;
@@ -1163,10 +1191,10 @@ module Bootstrap.OpenFragment
             used <- traverseEither Structure.expectXName usedValues;
             validateBinders params owned used;
             next <- prepareFinals8 graph types declarations
-              (M.insert compareString identity env contexts)
+              (M.insert compareString identity admitted contexts)
               (S.insert compareString name seen) rest;
             Right ((:)
-              (PackageFinalFields8 name savedStamp env params t owned used)
+              (PackageFinalFields8 name savedStamp admitted params t owned used)
               next)
           };
           _ -> Left "invalid final open crate fragment"
@@ -1174,20 +1202,33 @@ module Bootstrap.OpenFragment
       }
     };
 
-  restoreFinals8 :: [] PackageFinalFields8 -> [] XTerm ->
+  -- finalBindings selected each actual type from the package's checked table
+  -- by the exact binder hint. Its two framed fields can be shared by all
+  -- fragments using that name. The local parameter identity is still framed
+  -- at every occurrence, and the complete ordered inventories are rehashed.
+  namedBindingEncoding name ty = Separate.encodingPack [Separate.encodingText name,
+    Separate.encodingText (Pretty.prettyType (Separate.normalType ty))];
+  restoredStamp fields declared ps term bs = let {
+    named ((,) name ty) = M.findWithDefault compareString
+      (namedBindingEncoding (X.nameHint name) ty) (X.nameHint name) fields;
+    param row = Separate.encodingAppend
+      (Separate.encodingPack [Separate.encodingText (showInt (X.nameId (fst row)))]) (named row)
+  } in Separate.encodingFingerprint (Separate.encodingPack
+    [declared, Separate.encodingPack (map param ps), term, Separate.encodingPack (map named bs)]);
+  restoreFinals8 :: Map String Separate.FingerprintEncoding -> [] PackageFinalFields8 -> [] XTerm ->
     Either String ([] ((,) String Fragment));
-  restoreFinals8 prepared bodies = case prepared of {
+  restoreFinals8 fields prepared bodies = case prepared of {
     [] -> case bodies of {
       [] -> Right [];
       _ -> Left "open crate decoded body count mismatch"
     };
-    (:) (PackageFinalFields8 name savedStamp env params _ owned used) rest ->
+    (:) (PackageFinalFields8 name savedStamp ((,) env declared) params _ owned used) rest ->
       case bodies of {
         [] -> Left "open crate decoded body count mismatch";
         (:) source more -> do {
-          ensure (eqString savedStamp (stamp env params source owned))
+          ensure (eqString savedStamp (restoredStamp fields declared params (termEncoding source) owned))
             "open crate fragment fingerprint mismatch";
-          next <- restoreFinals8 rest more;
+          next <- restoreFinals8 fields rest more;
           Right ((:) ((,) name
             (fragmentWith env params source owned used savedStamp)) next)
         }

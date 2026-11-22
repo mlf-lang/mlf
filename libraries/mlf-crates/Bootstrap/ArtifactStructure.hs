@@ -311,7 +311,9 @@ module Bootstrap.ArtifactStructure where {
     SVar x0 -> W.VNode 120 [toText x0];
     SConstructor x0 -> W.VNode 121 [toText x0];
     SLam x0 x1 x2 -> W.VNode 122 [toText x0, (toMaybe toSAnnotation) x1, toSExpr x2];
+    SBindDictionaries names body -> toSExpr (S.dictionaryAbstraction names body);
     SApp x0 x1 -> W.VNode 123 [toSExpr x0, toSExpr x1];
+    SApplyDictionaries f names -> toSExpr (S.dictionaryApplication f names);
     SLet x0 x1 x2 -> W.VNode 124 [toText x0, toSExpr x1, toSExpr x2];
     SAnn x0 x1 -> W.VNode 125 [toSExpr x0, toSAnnotation x1];
     SSignature x0 x1 -> W.VNode 126 [toSExpr x0, toSAnnotation x1];

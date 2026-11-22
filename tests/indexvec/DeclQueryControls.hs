@@ -3,12 +3,15 @@ module Main where
 
 import Control.Monad (unless)
 import System.Environment (getArgs)
-import System.Directory (createDirectoryIfMissing)
+import System.Directory (createDirectoryIfMissing, makeAbsolute)
+import Data.List (isInfixOf)
 import Data.String (fromString)
+import qualified MLF.Host.Base as HostText
 import qualified MLF.Host.IO as Host
 import qualified MLF.Primitive as P
 import qualified Bootstrap.Crate as Crate
 import qualified Bootstrap.CrateArtifact as Artifact
+import qualified Bootstrap.CrateSession as Session
 import qualified Bootstrap.BuiltinPreludeContext as Builtin
 import qualified MLF.BuiltinPreludeData as Literal
 import qualified Bootstrap.Parser as Parser
@@ -16,10 +19,13 @@ import qualified Bootstrap.CrateQuery as Q
 import qualified Bootstrap.QueryGraph as G
 import qualified Bootstrap.Resolved as R
 import qualified Bootstrap.OpenFragment as Open
+import qualified Bootstrap.Module as Modules
 import qualified Bootstrap.Separate as Separate
 import qualified Bootstrap.IntSet as IS
 import qualified Bootstrap.X.Pretty as Pretty
 import qualified Bootstrap.X.Syntax as X
+import qualified Bootstrap.X.Type as XT
+import qualified Bootstrap.Runtime as Runtime
 import qualified Bootstrap.CrateGraph as CG
 import qualified Bootstrap.Dependency as D
 import qualified Bootstrap.InferenceUnit as Inference
@@ -77,7 +83,17 @@ main = do
   putStrLn "PASS typed SCC query kinds, ordered members and split identities"
   args <- getArgs
   case args of
-    [directory] -> queryDefinitions directory >> mixedLowered (directory ++ "/mixed") >> legacyCrate (directory ++ "/crate") >> mutualOrder (directory ++ "/mutual") >> typedInputs >> scopeTransitions (directory ++ "/scope") >> expectedReads >> directFinishReads
+    [directory] -> do
+      queryDefinitions directory
+      mixedLowered (directory ++ "/mixed")
+      legacyCrate (directory ++ "/crate")
+      mutualOrder (directory ++ "/mutual")
+      typedInputs
+      scopeTransitions (directory ++ "/scope")
+      expectedReads
+      directFinishReads
+      groundRecursiveScope (directory ++ "/ground-scc")
+      recursiveStringArms (directory ++ "/string-arms")
     _ -> fail "expected a fresh cache directory"
   putStrLn "PASS declaration readers, sparse publication, local shadowing, ABI order and contract fields"
 
@@ -195,6 +211,101 @@ legacyCrate directory = do
   check "both public encoding modes retain checked lowered declarations"
     (cold == warm && Q.inferredCount c == 2 && Q.reusedCount w == 2)
   putStrLn "PASS public crate compatibility API, indexed lowering and named cache reuse"
+
+groundRecursiveScope directory = do
+  root <- makeAbsolute directory
+  createDirectoryIfMissing True root
+  let path name = root ++ "/" ++ name
+      header = ["-- mlf:syntax shared-haskell-v1"
+        , "{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,"
+        , "             KindSignatures, FlexibleContexts, FlexibleInstances,"
+        , "             MultiParamTypeClasses, OverloadedStrings #-}"
+        ]
+      writeModule name exports declarations = writeFile (path (name ++ ".hs")) (unlines
+        (header ++ ["module " ++ name ++ " (" ++ exports ++ ") where {", "import MLF.Primitive;"]
+          ++ declarations ++ ["}"]))
+      writeScanner imports = writeModule "Scanner" "reader" (imports ++
+        [ "import Ground;"
+        , "collect n = if eqInt n 0 then shade (Mark 10) else resume (subInt n 1);"
+        , "resume n = if eqInt n 0 then shade (Mark 20) else collect (subInt n 1);"
+        , "reader :: Int -> Int;"
+        , "reader n = collect n;"
+        ])
+      moduleSpec name = Separate.pack [fromString name, fromString (path (name ++ ".hs"))]
+      identity = "ground-scc-fixture"
+      spec = fromString (path "spec")
+      output = fromString (path "checked")
+      metadata = fromString (path "checked.mlfci")
+      compile = Session.compileSpecFileWithVerification True T.Nothing spec output
+  writeModule "Ground" "Shade(..), Mark(..)"
+    ["class Shade a where { shade :: a -> Int };", "data Mark = Mark Int;"]
+  writeModule "Instance" ""
+    ["import Ground;", "instance Shade Mark where { shade (Mark n) = addInt n 11 };"]
+  writeModule "Main" "main"
+    ["import Scanner;", "import Instance ();", "main = addInt (reader 2) (reader 3);"]
+  Host.v_writeFile spec (Separate.pack ["MLF-CRATE-1", identity, "Main", "true",
+    Separate.pack (map moduleSpec ["Ground", "Instance", "Main", "Scanner"]), Separate.pack [],
+    fromString (path "cache"), fromString (path "builtin")])
+  writeScanner ["import Instance ();"]
+  _ <- compile >>= expect
+  iface <- Artifact.readInterface metadata >>= expect
+  let int = T.XCon "Int" []
+      plainFunction name = case lookup (Artifact.definitionName identity (Modules.Entity "Scanner" name Modules.Value))
+          (Artifact.crateBindings iface) of
+        Just ty -> XT.alphaEq ty (T.XArrow int int)
+        Nothing -> False
+  check "the ground dictionary prefix is removed from both recursive members"
+    (all plainFunction ["collect", "resume"])
+  term <- Artifact.linkFile metadata >>= expect
+  (datatypes, _) <- expect (Runtime.prepare False term)
+  value <- expect (Runtime.integer (Runtime.evaluate datatypes (Runtime.REnv M.empty) (X.erase term)))
+  check "both recursive members use the expected ground dictionary" (value == 52)
+  -- Keep the importer and the previous cache entries while removing the
+  -- defining module's access to the instance.
+  writeScanner []
+  hidden <- compile
+  case hidden of
+    T.Left message -> check "the hidden instance must fail at evidence resolution"
+      ("no instance or given constraint for Ground.Shade Ground.Mark" `isInfixOf` HostText.unpack message)
+    T.Right _ -> fail "the importer supplied a dictionary outside the recursive group's defining scope"
+  putStrLn "PASS ground recursive dictionary prefix and definition-site scope"
+
+recursiveStringArms directory = do
+  root <- makeAbsolute directory
+  createDirectoryIfMissing True root
+  let path name = root ++ "/" ++ name
+      source = path "Main.hs"
+      spec = fromString (path "spec")
+      output = fromString (path "checked")
+      arms = [show key ++ " -> consume \"" ++ replicate (key + 1) 'x' ++ "\";" | key <- [0..7]]
+  writeFile source (unlines
+    [ "-- mlf:syntax shared-haskell-v1"
+    , "{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,"
+    , "             KindSignatures, FlexibleContexts, FlexibleInstances,"
+    , "             MultiParamTypeClasses, OverloadedStrings #-}"
+    , "module Main (main) where {"
+    , "import MLF.Primitive;"
+    , "data Stamp = Stamp Int;"
+    , "stampLength [] = 0;"
+    , "stampLength (_ : tail) = addInt 1 (stampLength tail);"
+    , "instance IsString Stamp where { fromString xs = Stamp (stampLength xs) };"
+    , "selectRank consume key fuel = if ltInt fuel 1 then case key of {"
+    , unlines arms
+    , "  _ -> (\\_ -> 99) } else selectRank consume key (subInt fuel 1);"
+    , "useStamp :: Stamp -> (forall t. t -> t) -> Int;"
+    , "useStamp (Stamp n) callback = if callback True then callback (addInt n 10) else 98;"
+    , "main = addInt (selectRank useStamp 7 1 (\\x -> x)) (selectRank useStamp 20 1 (panic \"unused callback\"));"
+    , "}"
+    ])
+  Host.v_writeFile spec (Separate.pack ["MLF-CRATE-1", "recursive-string-arms", "Main", "true",
+    Separate.pack [Separate.pack ["Main", fromString source]], Separate.pack [],
+    fromString (path "cache"), fromString (path "builtin")])
+  _ <- Session.compileSpecFileWithVerification True T.Nothing spec output >>= expect
+  term <- Artifact.linkFile (fromString (path "checked.mlfci")) >>= expect
+  (datatypes, _) <- expect (Runtime.prepare False term)
+  value <- expect (Runtime.integer (Runtime.evaluate datatypes (Runtime.REnv M.empty) (X.erase term)))
+  check "string arms retain their conversion, rank-two result and lazy fallback" (value == 117)
+  putStrLn "PASS recursive string arms with higher-rank result and lazy fallback"
 
 typedInputs = do
   let symbols = D.symbolsWithKeys [("n","firstN",False),("n","secondN",False),("f","f",False)]
