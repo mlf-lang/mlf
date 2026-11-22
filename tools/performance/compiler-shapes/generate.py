@@ -174,6 +174,36 @@ producer x = if ltInt x 0 then next (subInt 0 x) else addInt x ({total});
             integer_call = call(integer, boolean)
             terms.append(f'if {call(boolean, integer)} then {integer_call} else subInt 0 ({integer_call})')
         expression = balanced(terms, lambda a,b:f'addInt ({a}) ({b})')
+    elif family == 'nested_worker_applications':
+        if n == 0:
+            return HEADER + 'entry :: Int -> Int;\nentry x = 0;\n' + MAIN
+        rows = [
+            'data Tokens = Stop | Token Bool Tokens;',
+            'data Jobs = Done | Direct Int Jobs | Saved Int (Int -> Int) Jobs;',
+            'makeTokens :: Int -> Bool -> Tokens;',
+            'makeTokens n flag = if ltInt n 1 then Stop else Token flag (makeTokens (subInt n 1) (if flag then False else True));',
+            'sumJobs :: Int -> Jobs -> Int;',
+            'sumJobs q jobs = case jobs of { Done -> 0; Direct value rest -> addInt value (sumJobs q rest);',
+            '  Saved value function rest -> addInt (addInt value (mulInt 2 (function q))) (sumJobs q rest) };',
+            'score :: Tokens -> Int -> Int;',
+            'score input key =',
+        ]
+        for i in range(1, n + 1):
+            subject = 'input' if i == 1 else f'rest{i-1}'
+            rows.append(f'case {subject} of {{ Stop -> 0; Token flag{i} rest{i} ->')
+        for i in range(1, n + 1):
+            rows.append(f'let {{ work{i} again v = if again then work{i} False 3 else if ltInt v 0 then {i} else v }} in')
+        jobs = 'Done'
+        for i in reversed(range(1, n + 1)):
+            direct = f'(work{i} flag{i} key)'
+            if i % 2:
+                jobs = f'Saved {direct} (work{i} flag{i}) ({jobs})'
+            else:
+                jobs = f'Direct {direct} ({jobs})'
+        rows.append(f'sumJobs (if ltInt key 0 then 4 else (subInt 0 1)) ({jobs})' + ' }' * n + ';')
+        rows.extend(['entry :: Int -> Int;',
+                     f'entry x = let {{ key = remInt x 11 }} in score (makeTokens (if eqInt key 6 then {n-1} else {n}) (ltInt key 0)) key;'])
+        return HEADER + '\n'.join(rows) + '\n' + MAIN
     elif family == 'recursive_lookup_workers':
         declarations = (
             'data Tree = Empty | Branch Tree Int Int Tree;\n'
@@ -656,6 +686,15 @@ def expected(family, n, x):
     if family == 'inferred_poly_functions':
         negative = max(0, min(n, x + 1))
         return n*x + n*(n-1)//2 - 2*(negative*x + negative*(negative-1)//2)
+    if family == 'nested_worker_applications':
+        key = x % 11 if x >= 0 else -((-x) % 11)
+        if key == 6:
+            return 0
+        odd, even = (n + 1) // 2, n // 2
+        # Alternating flags make odd rows return 3 twice for a negative key.
+        # For a nonnegative key their saved calls contribute the sum of odd indices.
+        result = 9*odd + even*(even+1) if key < 0 else odd*key + 2*odd*odd + 3*even
+        return (result + 2**63) % 2**64 - 2**63
     if family == 'recursive_lookup_workers':
         # Each stored key contributes once if its signed Int64 offset is visited.
         modulus = 2**64
@@ -799,6 +838,8 @@ def generate(out, sizes=None, families=None):
             inputs = [-2**63, -1, 0, 7, 2**63-1]
         elif family == 'closed_field_projection':
             inputs = [-2**63, -57, -1, 0, 1, 7, 12, 2**63-1]
+        elif family == 'nested_worker_applications':
+            inputs = [-2**63, -7, -1, 0, 6, 7, 17, 2**63-1]
         elif family == 'recursive_lookup_workers':
             inputs = [3 - n, 5 - n//2, 8, 9]
         elif family == 'decoder_pipeline':

@@ -352,6 +352,42 @@ class ScheduleTests(unittest.TestCase):
                     fields.append(fields.pop(0))
                 self.assertEqual(generate.expected(family, count, x), self.signed_int(result))
 
+    def test_nested_worker_applications_preserves_direct_calls_and_saved_prefixes(self):
+        family = 'nested_worker_applications'
+        inputs = [-2**63, -7, -1, 0, 6, 7, 17, 2**63-1]
+        with tempfile.TemporaryDirectory() as temporary:
+            cases = generate.generate(Path(temporary)/'cases', [0, 1, 2, 5], [family])
+            for case in cases:
+                n = case['size']
+                source = Path(case['source']).read_text()
+                self.assertEqual(case['inputs'], inputs)
+                self.assertEqual(source.count('let { work'), n)
+                for i in range(1, n+1):
+                    self.assertIn(f'Token flag{i} rest{i} ->', source)
+                    self.assertIn(f'then work{i} False 3', source)
+                    call = f'(work{i} flag{i} key)'
+                    if i % 2:
+                        self.assertIn(f'Saved {call} (work{i} flag{i})', source)
+                    else:
+                        self.assertIn(f'Direct {call}', source)
+                        self.assertNotIn(f'(work{i} flag{i})', source)
+                expected = []
+                for x in inputs:
+                    key = abs(x) % 11 * (-1 if x < 0 else 1)
+                    flag = key < 0
+                    total = 0
+                    if key != 6:
+                        for i in range(1, n+1):
+                            direct = 3 if flag else i if key < 0 else key
+                            total += direct
+                            if i % 2:
+                                suffix = 4 if key < 0 else -1
+                                saved = 3 if flag else i if suffix < 0 else suffix
+                                total += 2*saved
+                            flag = not flag
+                    expected.append(f'{total}\n')
+                self.assertEqual(case['expected_stdout'], expected)
+
     def test_recursive_lookup_workers_visit_every_binding_and_report_lookup_hits(self):
         family = 'recursive_lookup_workers'
         table = {2: 17, 5: 41, 8: 73}
