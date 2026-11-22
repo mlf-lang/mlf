@@ -450,6 +450,33 @@ class ScheduleTests(unittest.TestCase):
             for x in (-7, 0, 11):
                 self.assertEqual(generate.expected(family, bindings, x), sum([x] * (bindings + 1)))
 
+    def test_closed_field_projection_sums_every_field(self):
+        family = 'closed_field_projection'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        self.assertNotIn(family, generate.REGISTRY['matrices']['default']['families'])
+        inputs = [-2**63, -57, -1, 0, 1, 7, 12, 2**63-1]
+        with tempfile.TemporaryDirectory() as root:
+            for case in generate.generate(Path(root)/'cases', [0, 1, 3, 8, 16, 32, 64, 128], [family]):
+                n = case['size']
+                source = Path(case['source']).read_text()
+                self.assertIn('project graph = case graph of { Graph first second field -> field };', source)
+                self.assertEqual(re.findall(r'addInt \(project graph\) field(\d+)', source),
+                                 [str(i) for i in range(1, n + 1)])
+                self.assertEqual(case['inputs'], inputs)
+                outputs = []
+                for x in inputs:
+                    quotient = abs(x) // 11
+                    small = x - 11 * (-quotient if x < 0 else quotient)
+                    if small < 0:
+                        graph = (small, small - 1, 2 * small + 1)
+                        fields = [small + i for i in range(1, n + 1)]
+                    else:
+                        graph = (small + 1, small, 3 * small + 2)
+                        fields = [small - i for i in range(1, n + 1)]
+                    answer = sum(graph[2] + field for field in fields) if n else small
+                    outputs.append(f'{answer}\n')
+                self.assertEqual(case['expected_stdout'], outputs)
+
     def test_visible_instance_inventory_keeps_two_calls_in_one_polymorphic_let(self):
         family = 'visible_instance_inventory'
         self.assertFalse(generate.REGISTRY['families'][family]['default'])

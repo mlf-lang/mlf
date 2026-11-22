@@ -531,6 +531,32 @@ tick = Parser (\s -> if ltInt s 1 then Stop else Next s (subInt s 1));
         )
         expression = 'applyClosures (makeClosures x)'
 
+    elif family == 'closed_field_projection':
+        declarations = '''data Graph = Graph Int Int Int;
+project :: Graph -> Int;
+project graph = case graph of { Graph first second field -> field };
+makeGraph :: Int -> Graph;
+makeGraph x = if ltInt x 0 then Graph x (subInt x 1) (addInt (mulInt x 2) 1)
+              else Graph (addInt x 1) x (addInt (mulInt x 3) 2);
+'''
+        if n == 0:
+            entry = 'let { small = remInt value 11; graph = makeGraph small } in small'
+        else:
+            indices = range(1, n + 1)
+            fields = [f'field{i}' for i in indices]
+            types = ' '.join(['Int'] * n)
+            pattern = ' '.join(fields)
+            added = ' '.join(f'(addInt x {i})' for i in indices)
+            subtracted = ' '.join(f'(subInt x {i})' for i in indices)
+            terms = [f'addInt (project graph) {field}' for field in fields]
+            total = balanced(terms, lambda a, b: f'addInt ({a}) ({b})')
+            declarations += (f'data Inputs = Inputs {types};\n'
+                             'makeInputs :: Int -> Inputs;\n'
+                             f'makeInputs x = if ltInt x 0 then Inputs {added} else Inputs {subtracted};\n'
+                             'score :: Graph -> Inputs -> Int;\n'
+                             f'score graph inputs = case inputs of {{ Inputs {pattern} -> {total} }};\n')
+            entry = 'let { small = remInt value 11 } in score (makeGraph small) (makeInputs small)'
+        return HEADER + declarations + f'entry :: Int -> Int;\nentry value = {entry};\n' + MAIN
     elif family == 'wide_product':
         indices = range(1, n + 1)
         types = ' '.join(['Int'] * n)
@@ -719,6 +745,12 @@ def expected(family, n, x):
         return x + change if x < 0 else x - change
     if family == 'captured_closures':
         return x * n * (n + 1) // 2 - n * (n + 1) * (2 * n + 1) // 6
+    if family == 'closed_field_projection':
+        small = -(abs(x) % 11) if x < 0 else x % 11
+        if n == 0:
+            return small
+        offsets = n * (n + 1) // 2
+        return n * (3 * small + 1) + offsets if small < 0 else n * (4 * small + 2) - offsets
     if family == 'wide_product':
         return x * n * (n + 1) // 2 + n * (n + 1) * (n + 2) // 6
     if family == 'rank2_arguments':
@@ -765,6 +797,8 @@ def generate(out, sizes=None, families=None):
             inputs = [-1, n//2, n, '--all']
         elif family == 'visible_instance_inventory':
             inputs = [-2**63, -1, 0, 7, 2**63-1]
+        elif family == 'closed_field_projection':
+            inputs = [-2**63, -57, -1, 0, 1, 7, 12, 2**63-1]
         elif family == 'recursive_lookup_workers':
             inputs = [3 - n, 5 - n//2, 8, 9]
         elif family == 'decoder_pipeline':

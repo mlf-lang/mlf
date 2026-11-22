@@ -27,6 +27,7 @@
     "state_updates": {"label": "Ordered IO updates", "default": true, "work": "n unrolled pairs of reads and writes to a runtime-initialized integer array"},
     "captured_closures": {"label": "Escaping closures", "default": true, "work": "n escaping functions with captured runtime values"},
     "wide_product": {"label": "Wide product", "default": true, "work": "one constructor with n integer fields and a pattern that consumes every field"},
+    "closed_field_projection": {"label": "Closed field projection", "default": false, "work": "n live integer fields are each added to the third field projected from a separate runtime graph"},
     "rank2_arguments": {"label": "Rank-2 function arguments", "default": true, "work": "n rank-2 call sites passing a polymorphic argument that the consumer uses at Bool and Int"},
     "irregular_literal_table": {"label": "Irregular literal table", "default": true, "work": "n two-field rows with irregular payloads consumed by an order-sensitive checksum"},
     "nested_poly_types": {"label": "Nested polymorphic types", "default": true, "work": "n nested polymorphic Box constructors followed by n projections"},
