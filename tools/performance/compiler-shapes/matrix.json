@@ -49,6 +49,7 @@
     "captured_thunk_fanout": {"label": "Captured thunk fan-out", "default": false, "work": "n rows each contain four suspended fields that capture one through four operands"},
     "repeated_ground_dictionary_demands": {"label": "Repeated ground dictionary demands", "default": false, "work": "a recursive predecessor exports n string literal demands at the same concrete type and two local branches use it"},
     "local_dictionary_branch_fanout": {"label": "Local dictionary branch fan-out", "default": false, "work": "n inferred local helpers each use the previous helper in two branches, with two overloaded string literals at the base"},
+    "checked_constructor_dispatch": {"label": "Checked constructor dispatch", "default": false, "work": "n functions each inspect a product and the always-boxed two-constructor result of a runtime callback"},
     "signed_constructor_cases": {"label": "Signed polymorphic constructor cases", "default": false, "work": "n explicitly quantified declarations inspect a recursive datatype and pass the selected field to their predecessor"},
     "baseline": {"label": "Minimal IO baseline", "default": false, "work": "a program that only reads argv and prints it"}
   },

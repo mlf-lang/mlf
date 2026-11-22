@@ -37,6 +37,11 @@ THUNK_CAPTURES = '48d498a6696031323a2b3eac8bad10e4c3155d9b'
 THUNK_CAPTURES_TREE = 'b1460a6a9277cda0747ce1a120dd01ec9f92890a'
 THUNK_CAPTURES_FRAMEWORK_PARENT = '6805162d120b6fda66b82cc6a48e8f0490a446ef'
 THUNK_CAPTURES_FRAMEWORK_PARENT_TREE = 'd4a2027dc925c9c8139fe90f28a965a4f3b5e712'
+CHECKED_DISPATCH_MANIFEST = 'foundation-checked-dispatch-source-migration.json'
+CHECKED_DISPATCH = '945689c219723e3bc8b1f3327ced109a13363bee'
+CHECKED_DISPATCH_TREE = 'b8a4cab72284b9ad928ff73cb5462a62c2d9cada'
+CHECKED_DISPATCH_FRAMEWORK_PARENT = '719fd4e4fc04a5c3f9c48621eee0d43b905454c2'
+CHECKED_DISPATCH_FRAMEWORK_PARENT_TREE = '656eeb86fbbcc9fac5a78503624305646f75b2e0'
 FOUNDATION_MERGE_PATHS = {'mlf.lock', 'tests/shared/MLF/Tests/SharedFrontend.hs'}
 HOSTED_PARITY_CHANGES = {
     'mlf.lock': (
@@ -160,7 +165,7 @@ def phase2_changes(spec, repository, files, predecessor_pin, pin_key, branch, tr
 
 
 def successor_type(predecessor_type, predecessor_manifest, framework_pin, foundation_pin,
-                   phase2_pin, heap_force_pin, dictionary_demand_pin, thunk_captures_pin, read_implementation):
+                   phase2_pin, heap_force_pin, dictionary_demand_pin, thunk_captures_pin, checked_dispatch_pin, read_implementation):
     """Reuse exact projection operations, adding a locally reviewed inventory edge."""
 
     class Contract(predecessor_type):
@@ -178,8 +183,11 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, founda
             require(sha(dictionary_demand_raw) == dictionary_demand_pin,
                     'pinned dictionary-demand manifest SHA')
             thunk_captures_raw = read_implementation(self.directory / THUNK_CAPTURES_MANIFEST)
-            require(sha(thunk_captures_raw) == thunk_captures_pin == manifest_sha256,
+            require(sha(thunk_captures_raw) == thunk_captures_pin,
                     'pinned thunk-captures manifest SHA')
+            checked_dispatch_raw = read_implementation(self.directory / CHECKED_DISPATCH_MANIFEST)
+            require(sha(checked_dispatch_raw) == checked_dispatch_pin == manifest_sha256,
+                    'pinned checked-dispatch manifest SHA')
             self.manifest_sha256 = manifest_sha256
             self.source_root = Path(source_root or Path(history_root).parents[1]).resolve(strict=True)
             repository = source_repository(history_root)
@@ -230,7 +238,10 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, founda
                      DICTIONARY_DEMAND_FRAMEWORK_PARENT_TREE, (HEAP_FORCE,)),
                     (thunk_captures_raw, dictionary_demand_pin, 'dictionary_demand_manifest_sha256',
                      THUNK_CAPTURES, THUNK_CAPTURES_TREE, THUNK_CAPTURES_FRAMEWORK_PARENT,
-                     THUNK_CAPTURES_FRAMEWORK_PARENT_TREE, (DICTIONARY_DEMAND,))):
+                     THUNK_CAPTURES_FRAMEWORK_PARENT_TREE, (DICTIONARY_DEMAND,)),
+                    (checked_dispatch_raw, thunk_captures_pin, 'thunk_captures_manifest_sha256',
+                     CHECKED_DISPATCH, CHECKED_DISPATCH_TREE, CHECKED_DISPATCH_FRAMEWORK_PARENT,
+                     CHECKED_DISPATCH_FRAMEWORK_PARENT_TREE, (THUNK_CAPTURES,))):
                 edge = phase2_changes(self.core.strict_json(data), repository, files, pin, key,
                                       branch, tree, framework, framework_tree, parents)
                 self.changes.update({path: [old_files[path], new] for path, new in edge.items()})
@@ -254,7 +265,7 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, founda
                     'retirement leaves historical addition evidence intact')
             self.metadata_paths = (*self.previous.metadata_paths, MANIFEST, FOUNDATION_MANIFEST,
                                    PHASE2_MANIFEST, HEAP_FORCE_MANIFEST, DICTIONARY_DEMAND_MANIFEST,
-                                   THUNK_CAPTURES_MANIFEST, Path(__file__).name)
+                                   THUNK_CAPTURES_MANIFEST, CHECKED_DISPATCH_MANIFEST, Path(__file__).name)
             history_names = set(self.parent['frozen_history']) | set(self.maintenance_parent['files'])
             require(self.maintenance.keys() <= history_names, 'unknown maintenance owner')
             for name in history_names:

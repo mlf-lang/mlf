@@ -1,0 +1,33 @@
+{
+  "changes": {
+    "libraries/mlf-llvm/Bootstrap/LLVM.hs": {
+      "branch": "73e82119e7870eb59aecd11d94c06e0b9cad2aabb5d73c38ecf5a6ea1bc7b2c8",
+      "branch_parent": "a584c4cbdf868a2766a09670160949ba2b5d00c276101f30d8d2dfb094280c2e",
+      "framework": "a584c4cbdf868a2766a09670160949ba2b5d00c276101f30d8d2dfb094280c2e",
+      "merged": "73e82119e7870eb59aecd11d94c06e0b9cad2aabb5d73c38ecf5a6ea1bc7b2c8"
+    },
+    "libraries/mlf-llvm/Bootstrap/LLVM/Build.hs": {
+      "branch": "881a0c601723124759ee2c87bb3d66a15b3b846c0837d41fa362b9691cdc8793",
+      "branch_parent": "fc51a6519b44e3d56a5c164b1a689f2850ef3b03e3335c2ccebf5fe6bfadcd58",
+      "framework": "fc51a6519b44e3d56a5c164b1a689f2850ef3b03e3335c2ccebf5fe6bfadcd58",
+      "merged": "881a0c601723124759ee2c87bb3d66a15b3b846c0837d41fa362b9691cdc8793"
+    },
+    "libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs": {
+      "branch": "964c4dbb499adf009b25a239a86aec92c6ef73850ff717260e9e696db5b0591d",
+      "branch_parent": "04bc397b544ca852405a571833df20fb6f12e52127c96f353fa9b11df21e98e5",
+      "framework": "04bc397b544ca852405a571833df20fb6f12e52127c96f353fa9b11df21e98e5",
+      "merged": "964c4dbb499adf009b25a239a86aec92c6ef73850ff717260e9e696db5b0591d"
+    },
+    "mlf.lock": {
+      "branch": "98d9c5c3359d9078ec5dcd2a51ef671f343a1c964c28dbde7a9d0e3770cc0047",
+      "branch_parent": "646466fc59fe592c1f5dd2b2eaae0c8983a1d679122424323c8e99ca45087c51",
+      "framework": "daa47d82f95839314de150a98a958c971d2a7c9e56dd8d70a2cf0ddf238341a6",
+      "merged": "85971352d3b7a012b388322969ff9d858e532e828482d5f04f63164d18ebf3ea"
+    }
+  },
+  "commit": "945689c219723e3bc8b1f3327ced109a13363bee",
+  "framework_parent": "719fd4e4fc04a5c3f9c48621eee0d43b905454c2",
+  "framework_parent_tree": "656eeb86fbbcc9fac5a78503624305646f75b2e0",
+  "thunk_captures_manifest_sha256": "eb6062eda5c90fb8f4c4dd16f3dbc3be89b506da58c1446cf47908eed295f53b",
+  "tree": "b8a4cab72284b9ad928ff73cb5462a62c2d9cada"
+}

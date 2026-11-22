@@ -303,17 +303,19 @@ class MemoryAndProcessUnits(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'vm_stat memory fields missing'):
                 HELPER.memory_available()
 
-    def test_darwin_process_rss_is_kib_and_group_filter_is_explicit(self):
-        output = '101 1 41 0 R+ 12\n102 101 41 0 Z+ 3\n103 1 42 0 S 9\n'
+    def test_darwin_process_rss_includes_workers_in_separate_groups(self):
+        output = '101 41 R+ 12\n102 41 Z+ 3\n103 103 S 9\n104 104 R 6\n105 105 R 5\n'
         with mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
-             mock.patch.object(HELPER.subprocess, 'check_output', return_value=output) as command:
+             mock.patch.object(HELPER.subprocess, 'check_output', return_value=output) as command, \
+             mock.patch.object(HELPER.os, 'getsid', side_effect=[41, 44, ProcessLookupError]) as session:
             self.assertEqual(HELPER.process_group(41), [
                 {'pid': 101, 'state': 'R+', 'rss': 12 * 1024},
-                {'pid': 102, 'state': 'Z+', 'rss': 3 * 1024}])
-        command.assert_called_once_with(['/bin/ps', '-axo', 'pid=,ppid=,pgid=,sess=,state=,rss='], text=True)
+                {'pid': 102, 'state': 'Z+', 'rss': 3 * 1024},
+                {'pid': 103, 'state': 'S', 'rss': 9 * 1024}])
+        command.assert_called_once_with(['/bin/ps', '-axo', 'pid=,pgid=,state=,rss='], text=True)
+        self.assertEqual(session.call_args_list, [mock.call(103), mock.call(104), mock.call(105)])
 
-    def test_unknown_ps_layout_or_nondecimal_session_fails_closed(self):
-        # sess is not promised to be a Linux numeric SID on all Darwin releases.
+    def test_unknown_ps_layout_fails_closed(self):
         for output in ['1 2 3\n', '1 2 3 0x123 S 9\n']:
             with self.subTest(output=output), mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
                  mock.patch.object(HELPER.subprocess, 'check_output', return_value=output):

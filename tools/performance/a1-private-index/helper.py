@@ -136,13 +136,20 @@ def memory_available():
 def process_group(group):
     rows = []
     if sys.platform == 'darwin':
-        output = subprocess.check_output(['/bin/ps', '-axo', 'pid=,ppid=,pgid=,sess=,state=,rss='], text=True)
+        output = subprocess.check_output(['/bin/ps', '-axo', 'pid=,pgid=,state=,rss='], text=True)
         for line in output.splitlines():
             parts = line.split()
-            require(len(parts) == 6, 'invalid ps process row')
-            pid, ppid, pgid, session = map(int, parts[:4])
-            if pgid == group or session == group:
-                rows.append({'pid': pid, 'state': parts[4], 'rss': int(parts[5]) * 1024})
+            require(len(parts) == 4, 'invalid ps process row')
+            pid, pgid = map(int, parts[:2])
+            if pgid != group:
+                # Darwin ps reports a kernel pointer in sess, often as zero.
+                # getsid also finds workers that created their own process group.
+                try:
+                    if os.getsid(pid) != group:
+                        continue
+                except (ProcessLookupError, PermissionError):
+                    continue
+            rows.append({'pid': pid, 'state': parts[2], 'rss': int(parts[3]) * 1024})
         return rows
     for entry in Path('/proc').iterdir():
         if not entry.name.isdigit():
