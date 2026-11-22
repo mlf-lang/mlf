@@ -35,8 +35,11 @@ module Bootstrap.LLVM.Codegen where {
   generateWithConstructorPolicy closed names cs = generateProgram closed names cs M.empty;
   generateCheckedFamilies :: Map String ((,) Int Int) -> [] ([] String) -> XErased ->
                              Either String ((,) String ([] String));
-  generateCheckedFamilies cs groups = generateProgram True S.empty cs
-    (M.fromList L.compareInt (L.concatMap (familyDispatch cs) groups));
+  -- The family proof covers constructor dispatch. Raw erased terms may
+  -- still shadow an outer binder identity.
+  generateCheckedFamilies cs groups = generateProgram True S.empty cs (familyPlans cs groups);
+  familyPlans :: Map String ((,) Int Int) -> [] ([] String) -> Map Int ((,,) Int Int CaseDispatch);
+  familyPlans cs groups = M.fromList L.compareInt (L.concatMap (familyDispatch cs) groups);
   -- All names in each group come from one complete, checked declaration.
   -- The runtime encodes a nullary constructor below 2^60 as (tag * 8 + 4).
   familyDispatch :: Map String ((,) Int Int) -> [] String -> [] ((,) Int ((,,) Int Int CaseDispatch));
@@ -58,7 +61,10 @@ module Bootstrap.LLVM.Codegen where {
   };
   generateProgram :: Bool -> Set String -> Map String ((,) Int Int) -> Map Int ((,,) Int Int CaseDispatch) ->
                      XErased -> Either String ((,) String ([] String));
-  generateProgram closed names cs plans term =
+  generateProgram = generateWithWorkerAliases (\_ -> M.empty);
+  generateWithWorkerAliases :: (Output -> Map XName XName) -> Bool -> Set String -> Map String ((,) Int Int) ->
+    Map Int ((,,) Int Int CaseDispatch) -> XErased -> Either String ((,) String ([] String));
+  generateWithWorkerAliases aliases closed names cs plans term =
     let {
       fs = A.analyze term
     } in
@@ -70,7 +76,9 @@ module Bootstrap.LLVM.Codegen where {
     } in
     let {
       output =
-        Output 0 [] "entry" [] [] (ConstructorLayout cs plans) (FunctionScope fs (A.lambdaFreeTable term)) S.empty M.empty ks S.empty (K.collecting fs ks) M.empty
+        Output 0 [] "entry" [] [] (ConstructorLayout cs plans)
+          (FunctionScope fs (A.lambdaFreeTable term))
+          S.empty M.empty ks S.empty (K.collecting fs ks) M.empty
           True
           M.empty
           M.empty
@@ -83,7 +91,8 @@ module Bootstrap.LLVM.Codegen where {
           rs
           (V.plan cs fs (S.union O.compareName ks (M.keysSet rs)) term) M.empty
     } in
-    case runBuild (callback [] Nothing term) output of {
+    let { initial = withCallbacks (workerSymbols (aliases output)) output } in
+    case runBuild (callback [] Nothing term) initial of {
       Left error -> Left error;
       Right ((,) entry out) -> let {
         needs symbol = S.member compareString symbol (workers out);
@@ -430,11 +439,59 @@ module Bootstrap.LLVM.Codegen where {
     _ -> failure "LLVM invalid admitted result pattern"
   };
   worker :: XName -> A.WorkerFunction -> Build String;
-  worker name f =
+  worker name f = do {
+    state <- get;
+    let { own = workerSymbol name;
+      symbol = M.findWithDefault (L.compareList compareString) own [own] (callbacks state) } in
+      emitWorkerAt symbol name f
+  };
+  workerSymbol name = "@mlf.worker." ++ showInt (O.nameId name);
+  -- A singleton worker symbol and a callback's structured body key are
+  -- disjoint. Seed the canonical symbols before their first demand so recursive
+  -- and forward calls use the same private entry regardless of emission order.
+  workerSymbols :: Map XName XName -> Map ([] String) String;
+  workerSymbols = M.foldlWithKeyStrict
+    (\table name target -> M.insert (L.compareList compareString) [workerSymbol name] (workerSymbol target) table) M.empty;
+  -- The checked optimizer gives each binder a fresh identity before this
+  -- classifier runs. Only its private boxed entry is shared. Each function keeps its
+  -- own captures, wrapper and argument preparation. A self reference occupies
+  -- its own lexical slot. Other workers retain their exact identity and their
+  -- implicit capture mapping through the callback key.
+  recursiveWorkerAliases :: Output -> Map XName XName;
+  recursiveWorkerAliases state = let {
+    add ((,) known aliases) name f = case recursiveWorkerKey state name f of {
+      Nothing -> (,) known aliases;
+      Just key -> case M.lookup (L.compareList compareString) key known of {
+        Nothing -> (,) (M.insert (L.compareList compareString) key name known) aliases;
+        Just representative -> (,) known (M.insert O.compareName name representative aliases)
+      }
+    }
+  } in L.snd (M.foldlWithKeyStrict add ((,) M.empty M.empty) (functions state));
+  recursiveWorkerKey :: Output -> XName -> A.WorkerFunction -> Maybe ([] String);
+  recursiveWorkerKey state name f = let {
+    body = A.functionBody f;
+    captured = A.captures f;
+    parameters = A.parameters f;
+    names = (:) name (L.append captured parameters);
+    scope = M.fromList O.compareName (L.zip names (L.range 0 (L.length names - 1)));
+    order = A.entryOrder f
+  } in if S.member O.compareName name (numericKernels state) ||
+    M.member O.compareName name (resultPlans state) || M.member O.compareName name (producerPlans state) ||
+    O.remainingSize 128 body < 0 || O.occurrences 1 name body == 0 ||
+    L.not (O.uniformStaticRecursion name (L.map (\n -> (,) n Nothing) parameters) body) ||
+    L.any (\n -> M.member O.compareName n (functions state)) (L.append captured parameters)
+  then Nothing else do {
+    fields <- callbackTerm (withFunctions (M.delete O.compareName name (functions state)) state) scope body;
+    slots <- L.mapM (\n -> M.lookup O.compareName n scope) order;
+    Just (L.concat [[showInt (L.length captured), showInt (L.length parameters),
+      if A.demandComplete (A.entrySummary f) then "total" else "barrier", showInt (L.length slots)],
+      L.map showInt slots, fields])
+  };
+  emitWorker :: XName -> A.WorkerFunction -> Build String;
+  emitWorker name = emitWorkerAt (workerSymbol name) name;
+  emitWorkerAt :: String -> XName -> A.WorkerFunction -> Build String;
+  emitWorkerAt symbol name f =
     do {
-      let {
-        symbol = ("@mlf.worker." ++ showInt (O.nameId name))
-      };
       let {
         names = L.append (A.captures f) (A.parameters f)
       };

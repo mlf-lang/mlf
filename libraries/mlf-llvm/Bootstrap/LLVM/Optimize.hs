@@ -706,10 +706,13 @@ module Bootstrap.LLVM.Optimize where {
          };
   liftConstructorValue :: Map String (Maybe Int) ->
                           XErased -> Fresh ((,) ([] ((,) XName XErased)) XErased);
-  liftConstructorValue arities value =
+  liftConstructorValue = liftConstructorValueFor False;
+  liftConstructorValueFor :: Bool -> Map String (Maybe Int) ->
+                                XErased -> Fresh ((,) ([] ((,) XName XErased)) XErased);
+  liftConstructorValueFor checked arities value =
     case constructorValue arities value of {
       Just ((,) c args) ->
-        do {
+        if checked && closedNestedFields arities args then freshPure ((,) [] value) else do {
           fields <- traverseFresh liftField args;
           freshPure
             ((,) (L.concatMap L.fst fields) (L.foldl XEApp (XEConstructor c) (L.map L.snd fields)))
@@ -727,13 +730,29 @@ module Bootstrap.LLVM.Optimize where {
       }
     };
   liftConstructorFields :: Map String (Maybe Int) -> XErased -> Fresh XErased;
-  liftConstructorFields arities expression =
+  liftConstructorFields = liftConstructorFieldsFor False;
+  -- A closed, nested constructor tree already has one lazy binding. Lifting
+  -- its children makes the parent a constructor with atomic fields, which
+  -- the ordinary inliner can then duplicate at each use.
+  closedNestedFields :: Map String (Maybe Int) -> [] XErased -> Bool;
+  closedNestedFields arities fields = let {
+    closed term = case term of {
+      XEInt _ -> True; XEDouble _ -> True; XEBool _ -> True; XEString _ -> True;
+      _ -> case constructorValue arities term of {
+        Just ((,) _ children) -> L.all closed children;
+        Nothing -> False
+      }
+    };
+    applied field = case field of { XEApp _ _ -> True; _ -> False }
+  } in L.any applied fields && L.all closed fields;
+  liftConstructorFieldsFor :: Bool -> Map String (Maybe Int) -> XErased -> Fresh XErased;
+  liftConstructorFieldsFor checked arities expression =
     do {
-      normalized <- children (liftConstructorFields arities) expression;
+      normalized <- children (liftConstructorFieldsFor checked arities) expression;
       case normalized of {
         XELet name rhs body ->
           do {
-            lifted <- liftConstructorValue arities rhs;
+            lifted <- liftConstructorValueFor checked arities rhs;
             case lifted of {
               (,) fields value ->
                 freshPure
@@ -2022,7 +2041,7 @@ module Bootstrap.LLVM.Optimize where {
       let {
         arities = constructorArities recursive
       };
-      lifted <- liftConstructorFields arities recursive;
+      lifted <- liftConstructorFieldsFor checked arities recursive;
       simple <- iterationsOwnedFor checked arities 16 lifted;
       specialized <- specializeHigherOrder simple;
       iterationsOwnedFor checked arities 16 specialized

@@ -211,7 +211,7 @@ module Bootstrap.LLVM.Library
     -- of these fresh root types. Their local sites still undergo the ordinary
     -- all-site/escaping-constructor proof; shared constructors remain open.
     names = S.fromList compareString (concatMap (\d -> map D.constructorName (D.datatypeConstructors d)) private)
-  } in Codegen.generateWithPrivate names cs optimized;
+  } in Codegen.generateWithWorkerAliases Codegen.recursiveWorkerAliases False names cs M.empty optimized;
   header :: [] String;
   header = ["; Generated from checked xMLF and an authenticated fixed native library boundary.",
     "source_filename = \"emlf-fixed-native\"", ""];
