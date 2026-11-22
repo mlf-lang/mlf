@@ -169,6 +169,87 @@ producer x = if ltInt x 0 then next (subInt 0 x) else addInt x ({total});
             integer_call = call(integer, boolean)
             terms.append(f'if {call(boolean, integer)} then {integer_call} else subInt 0 ({integer_call})')
         expression = balanced(terms, lambda a,b:f'addInt ({a}) ({b})')
+    elif family == 'stable_recursive_workers':
+        rows = [HEADER, 'data Job = End | Job (Int -> Int) Job;',
+                'total :: Int -> Job -> Int;',
+                'total q list = case list of { End -> 0; Job f rest -> addInt (f q) (total q rest) };']
+        for i in range(n):
+            rows.extend([f'worker{i} :: Int -> Int;',
+                         f'worker{i} x = if ltInt x 1 then {i+1} else addInt '
+                         f'(worker{i} (subInt x 1)) (remInt (addInt x {i+1}) 19);'])
+        params = [f'a{i}' for i in range(24)]
+        state = params[0]
+        for param in params[1:]:
+            state = f'(remInt (addInt (mulInt {state} 3) {param}) 97)'
+        function = '(' + ''.join('\\' + param + ' -> ' for param in params) + state + ')'
+        args = ' '.join(f'(remInt (addInt x {i+3}) 31)' for i in range(len(params)))
+        jobs = ''.join(f'(Job worker{i} ' for i in range(n)) + 'End' + ')' * n
+        rows.extend(['entry :: Int -> Int;', f'entry x = addInt ({function} {args}) '
+                     f'(total (remInt x 11) {jobs});', MAIN])
+        return '\n'.join(rows)
+    elif family == 'escaping_curried_jobs':
+        arity = 12
+        params = [f'a{j}' for j in range(arity)]
+        signature = ' -> '.join(['Int']*(arity+1))
+        names = ' '.join(params)
+        value = params[0]
+        for name in params[1:]:
+            value = f'addInt (mulInt 2 ({value})) {name}'
+        rows = [f'data Job = Job ({signature});', 'data Jobs = End | More Job Jobs;',
+                f'score :: {signature};', f'score {names} = {value};']
+        for i in range(n):
+            # Each endpoint keeps its own identity, every position is observable.
+            args = params[i % arity:] + params[:i % arity]
+            rows.extend([f'job{i} :: {signature};',
+                         f'job{i} {names} = addInt {i} (score {" ".join(args)});'])
+        jobs = ''.join(f'More (Job job{i}) (' for i in reversed(range(n))) + 'End' + ')'*n
+        prefix = ' '.join(f'(addInt x {j})' for j in range(1,9))
+        positive = ' '.join(f'(addInt x {j})' for j in range(9,13))
+        negative = ' '.join(f'(subInt x {j})' for j in range(9,13))
+        rows.extend(['run :: Int -> Jobs -> Int;', 'run x End = 0;',
+                     f'run x (More (Job f) rest) = let {{ saved = f {prefix} }} in',
+                     f'  addInt (addInt (saved {positive}) (saved {negative})) (run x rest);',
+                     f'entry x = run x ({jobs});'])
+        return HEADER + '\n'.join(rows) + '\n' + MAIN
+    elif family == 'captured_application_spines':
+        width = 12
+        args = [f'v{i}' for i in range(width)]
+        arrow = ' -> '.join(['Box']*(width+1))
+        rows = ['data Box = Box Int;', f'data Op = Op ({arrow});',
+                'data Inputs = Inputs ' + ' '.join(['Box']*width) + ';',
+                'unbox (Box v) = v;',
+                f'first :: {arrow};', 'first ' + ' '.join(args) + ' = v0;',
+                f'last :: {arrow};', 'last ' + ' '.join(args) + f' = v{width-1};',
+                'choose :: Int -> Op;',
+                'choose x = if ltInt x 0 then Op first else Op last;']
+        for i in range(n):
+            ordered = [args[(i+j) % width] for j in range(width)]
+            # Each call keeps its own result observable with either operator.
+            ordered[0] = f'(Box (addInt (unbox {ordered[0]}) {i}))'
+            ordered[-1] = f'(Box (subInt (unbox {ordered[-1]}) {i}))'
+            rows.extend([f'site{i} :: Op -> Inputs -> Int;',
+                         f'site{i} (Op f) (Inputs {" ".join(args)}) = unbox (f {" ".join(ordered)});'])
+        seed = ' '.join(f'(Box (addInt x {j}))' for j in range(width))
+        uses = [f'site{i} op inputs' for i in range(n)]
+        result = balanced(uses, lambda a,b: f'addInt ({a}) ({b})')
+        rows.append(f'entry x = let {{ op = choose x; inputs = Inputs {seed} }} in {result};')
+        return HEADER + '\n'.join(rows) + '\n' + MAIN
+    elif family == 'curried_environment_prefix':
+        variables = [f'arg{i}' for i in range(1, n+1)]
+        fields = [f'mulInt (unbox {name}) {i}' for i, name in enumerate(variables, 1)]
+        weighted = balanced(fields, lambda left, right: f'addInt ({left}) ({right})')
+        signature = ' -> '.join(['Box Int'] * n + ['Int', 'Int', 'Int'])
+        actual = ' '.join(f'(Box (addInt start {i}))' for i in range(1, n+1))
+        declarations = f"""data Box a = Box a;
+unbox :: forall a. Box a -> a;
+unbox (Box item) = item;
+wide :: {signature};
+wide {' '.join(variables)} extra ignored = addInt ({weighted}) extra;
+partial start = wide {actual};
+entry x = let {{ apply = partial x }} in
+  addInt (apply x (panic "unused argument")) (apply (subInt 0 x) (panic "unused argument"));
+"""
+        return HEADER + declarations + MAIN
     elif family == 'polymorphic_fanout':
         terms = [f'apply (apply measure value) (addInt base {i})' for i in range(n)]
         total = balanced(terms, lambda left, right: f'addInt ({left}) ({right})')
@@ -515,6 +596,44 @@ def expected(family, n, x):
     if family == 'inferred_poly_functions':
         negative = max(0, min(n, x + 1))
         return n*x + n*(n-1)//2 - 2*(negative*x + negative*(negative-1)//2)
+    if family == 'stable_recursive_workers':
+        def remainder(number, divisor):
+            return number % divisor if number >= 0 else -((-number) % divisor)
+
+        # readInt and addInt operate on signed 64-bit words. Truncating
+        # remainder keeps the sign of each input to the 24-argument function.
+        score = 0
+        for offset in range(3, 27):
+            value = (x + offset + 2**63) % 2**64 - 2**63
+            score = remainder(3*score + remainder(value, 31), 97)
+        # Sum each recursion level across the table. Every 19 workers use
+        # every residue exactly once, regardless of the starting position.
+        cycles, rest = divmod(n, 19)
+        total = n*(n+1)//2 + score
+        for level in range(1, remainder(x, 11)+1):
+            total += cycles*(18*19//2) + sum((level+i) % 19 for i in range(1, rest+1))
+        return (total + 2**63) % 2**64 - 2**63
+    if family == 'escaping_curried_jobs':
+        # The suffix offsets cancel in their original positions. Each endpoint
+        # rotates the coefficients of the independently computed positional sum.
+        total = n*(n-1)
+        for endpoint in range(n):
+            for position in range(12):
+                field = (endpoint+position) % 12
+                pair = 2*(x + field+1) if field < 8 else 2*x
+                total += (1 << (11-position))*pair
+        return (total + 2**63) % 2**64 - 2**63
+    if family == 'captured_application_spines':
+        if x < 0:
+            total = n*x + sum(i % 12 for i in range(n)) + n*(n-1)//2
+        else:
+            total = n*x + sum((i-1) % 12 for i in range(n)) - n*(n-1)//2
+        return (total + 2**63) % 2**64 - 2**63
+    if family == 'curried_environment_prefix':
+        linear = n*(n+1)//2
+        quadratic = n*(n+1)*(2*n+1)//6
+        total = 2*(x*linear + quadratic)
+        return (total + 2**63) % 2**64 - 2**63
     if family == 'polymorphic_fanout':
         offsets = n*x + n*(n-1)//2
         return n*x + offsets + (offsets if x < 0 else -offsets)
