@@ -198,7 +198,6 @@ iterationChecks = do
  let lazy = p T.PIfThenElse [T.XEBool False,poison,T.XEInt 42]
  result <- integer (C.optimizeChecked lazy)
  ensure "iteration retains undemanded branch laziness" (result == 42)
- putStrLn "PASS checked-iteration-algebra-and-scopes"
 
 checkPending :: B.Int -> T.XErased -> IO ()
 checkPending expected term = do
