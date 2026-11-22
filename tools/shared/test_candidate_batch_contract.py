@@ -5,26 +5,16 @@ import unittest
 import candidate_batch_contract as C
 
 HERE=Path(__file__).resolve().parent
-class ContractControls(unittest.TestCase):
+
+class SelectorSourceChecks:
     @classmethod
     def setUpClass(cls):
         cls.script=(HERE/'test_candidate_selection.py').read_bytes()
-        cls.classes=(HERE/'../../libraries/mlf-inference/Bootstrap/Classes.hs').read_bytes()
+        cls.classes=cls.classes_path.read_bytes()
+        actual=C.blob(cls.classes)
+        if actual not in cls.accepted_blobs:
+            raise ValueError(f'{cls.classes_path.name}: unexpected Classes blob {actual} for {cls.__name__}')
         cls.original=C.original_fixture(cls.script,cls.classes)
-    def capture(self,direction):
-        # Test fixture only, never represented as actual workload evidence.
-        return b''.join(('%d\n%d\n'%(C.BEGIN,i)).encode()+C.cases()[i]['expected']+
-                        ('%d\n'%C.END).encode() for i in C.order_for(direction))
-    def fixture(self):
-        physical=[];projections=[]
-        for direction in ('forward','reverse'):
-            raw=self.capture(direction)
-            for lane in ('host','interpreter'):
-                row=C.physical_record(lane+'-'+direction,lane,direction,['synthetic'],raw,b'',0)
-                physical.append(row)
-                for i in range(24):
-                    projections.append(C.project(row,raw,i,['original',*C.cases()[i]['arguments']],C.cases()[i]['expected']))
-        return physical,projections
     def test_fixed_full_sources_and_selector_body(self):
         self.assertEqual(C.blob(self.script),C.SCRIPT_BLOB)
         self.assertIn(C.blob(self.classes), C.CLASSES_BLOBS)
@@ -33,21 +23,6 @@ class ContractControls(unittest.TestCase):
         self.assertEqual(self.original.count(body),1)
         for a,b in ((self.script+b'\n',self.classes),(self.script,self.classes+b'\n')):
             with self.assertRaises(ValueError):C.original_fixture(a,b)
-    def test_independent_literal_inventory(self):
-        small=[
-            (0,[]),(0,[-1,0]),(0,[0,0,1,-1]),
-            (1,[]),(1,[-1,1]),(1,[0,0,1,0]),
-            (2,[]),(2,[-1,2]),(2,[0,0,1,1]),
-            (7,[]),(7,[-1,7]),(7,[0,0,1,6])]
-        outputs=['','','','','','i:n0;','','','i:n0;i:n1;','','','i:n0;i:n1;i:n6;']
-        expected_tail='s:super;g:given;i:n0;i:n0;\n'
-        got=C.cases()
-        self.assertEqual(list(got),list(range(24)))
-        for selector,offset in [('named',0),('ids',12)]:
-            for i,((n,ids),prefix) in enumerate(zip(small,outputs)):
-                self.assertEqual(got[offset+i],dict(selector=selector,index=i,
-                    arguments=[selector,str(n),'0',str(len(ids)),*map(str,ids)],
-                    expected=(prefix+expected_tail).encode()))
     def test_complete_inverse_both_directions_and_single_call(self):
         body=self.classes[self.classes.index(b'  selectCandidates ::'):self.classes.index(b'  methodBindings ::')]
         for direction in ('forward','reverse'):
@@ -79,6 +54,48 @@ class ContractControls(unittest.TestCase):
         with self.assertRaises(ValueError):C.restore(raw,'reverse',self.script,self.classes)
         with self.assertRaises(ValueError):C.generate(self.original+b'\n','forward',self.script,self.classes)
         with self.assertRaises(ValueError):C.generate(self.original,'other',self.script,self.classes)
+
+# Keep both inputs: the synthetic oracle has a fixed basis, while the live
+# selector must still pass every original source, inverse and tamper check.
+class HistoricalSourceControls(SelectorSourceChecks, unittest.TestCase):
+    # Exact Classes.hs bytes from candidate_batch_contract.SOURCE_BASIS.
+    classes_path=HERE/'fixtures/candidate-selection/Classes.hs.txt'
+    accepted_blobs=('bbcc794dc1ce447ccfc1450378e951df1b427819',)
+
+class LiveSourceControls(SelectorSourceChecks, unittest.TestCase):
+    classes_path=HERE/'../../libraries/mlf-inference/Bootstrap/Classes.hs'
+    accepted_blobs=C.CLASSES_BLOBS
+
+class ContractControls(unittest.TestCase):
+    def capture(self,direction):
+        # Test fixture only, never represented as actual workload evidence.
+        return b''.join(('%d\n%d\n'%(C.BEGIN,i)).encode()+C.cases()[i]['expected']+
+                        ('%d\n'%C.END).encode() for i in C.order_for(direction))
+    def fixture(self):
+        physical=[];projections=[]
+        for direction in ('forward','reverse'):
+            raw=self.capture(direction)
+            for lane in ('host','interpreter'):
+                row=C.physical_record(lane+'-'+direction,lane,direction,['synthetic'],raw,b'',0)
+                physical.append(row)
+                for i in range(24):
+                    projections.append(C.project(row,raw,i,['original',*C.cases()[i]['arguments']],C.cases()[i]['expected']))
+        return physical,projections
+    def test_independent_literal_inventory(self):
+        small=[
+            (0,[]),(0,[-1,0]),(0,[0,0,1,-1]),
+            (1,[]),(1,[-1,1]),(1,[0,0,1,0]),
+            (2,[]),(2,[-1,2]),(2,[0,0,1,1]),
+            (7,[]),(7,[-1,7]),(7,[0,0,1,6])]
+        outputs=['','','','','','i:n0;','','','i:n0;i:n1;','','','i:n0;i:n1;i:n6;']
+        expected_tail='s:super;g:given;i:n0;i:n0;\n'
+        got=C.cases()
+        self.assertEqual(list(got),list(range(24)))
+        for selector,offset in [('named',0),('ids',12)]:
+            for i,((n,ids),prefix) in enumerate(zip(small,outputs)):
+                self.assertEqual(got[offset+i],dict(selector=selector,index=i,
+                    arguments=[selector,str(n),'0',str(len(ids)),*map(str,ids)],
+                    expected=(prefix+expected_tail).encode()))
     def test_actual_byte_ranges_have_no_virtual_process_fields(self):
         for d in ('forward','reverse'):
             raw=self.capture(d);rows=C.parse(raw,d)
