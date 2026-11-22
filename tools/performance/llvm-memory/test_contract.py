@@ -110,10 +110,10 @@ class HostContract(unittest.TestCase):
     def test_later_host_delta_corruption_is_rejected(self):
         # The complete physical source was admitted above. Relocate only the
         # subsequently read host proof to exercise its independent byte gate.
-        # Reconciliation -> DeclId -> authenticated builtin-regeneration stage.
-        # Corrupt the exact historical owner while exercising the complete live
-        # forward/reverse bridge, rather than discarding the mutation oracle.
-        historical = self.binary.previous.previous
+        # The live framework stage retains Reconciliation, then DeclId, then
+        # the authenticated builtin-regeneration stage. Corrupt that stage's
+        # exact historical owner through the complete live forward/reverse bridge.
+        historical = self.binary.previous.previous.previous
         self.assertEqual(historical.manifest_sha256,
                          'fb8335e198e463d3a25b336f124d56dac141c6ad2063df531c09ade8e7411559')
         row = historical.frozen_value['deltas'][OWNER]
@@ -138,7 +138,8 @@ class HostContract(unittest.TestCase):
         # A current host alone must never authenticate an obsolete or mixed tree.
         sources = {path: (ROOT / path).read_bytes()
                    for path in self.binary.value['current_files']}
-        self.assertEqual(len(sources), 198)
+        self.assertEqual(len(sources), 197)
+        self.assertNotIn('tests/Tests/TupleListLegacy.hs', sources)
         self.assertIn('libraries/mlf-foundation/Bootstrap/IndexVec.hs', sources)
         self.assertIn('libraries/mlf-frontend/Bootstrap/Resolved.hs', sources)
         self.assertLessEqual(sum(map(len, sources.values())), 16 * 1024**2)
