@@ -169,6 +169,7 @@ module Bootstrap.CrateGraph where {
       SApp f a -> templateNodesLeft (templateNodesLeft next f) a;
       SDeclScope _ body -> templateNodesLeft next body;
       SLam _ _ body -> templateNodesLeft next body;
+      SBindDictionaries names body -> templateNodesLeft (remaining - length names) body;
       SChecked _ body -> templateNodesLeft next body;
       _ -> next
     };
@@ -358,6 +359,7 @@ module Bootstrap.CrateGraph where {
   preparedLocation fuel body = if fuel <= 0 then Nothing else case body of {
     SCallSite _ span _ -> Just span;
     SLam _ _ e -> preparedLocation (fuel - 1) e;
+    SBindDictionaries names e -> preparedLocation (fuel - length names) e;
     SApp f _ -> preparedLocation (fuel - 1) f;
     -- A constructor can head a large tree without a recorded call site.
     -- An empty origin still preserves each foreign span in full.
@@ -937,10 +939,8 @@ module Bootstrap.CrateGraph where {
       ioReturn (mapEither (\digest -> (,) (G.recordDigest (G.inputKey (groupKey PreparedQuery slots))
         [] Nothing digest Nothing session) cached) answer)
     } };
-  scopeInventory prepared = case Source.groupAuthority prepared of {
-    Nothing -> W.VNode 422 [];
-    Just (Source.RootAuthority _ _ _ candidates protected) -> W.VNode 422
-      (map (\candidate -> W.VText (candidateMetadata protected candidate)) candidates)
+  scopeInventory prepared = case Source.groupEvidenceCandidates prepared of {
+    (,) candidates protected -> W.VNode 422 (map (\candidate -> W.VText (candidateMetadata protected candidate)) candidates)
   };
   scopeValue prepared dependencies = W.VNode 423
     [scopeInventory prepared,A.toList (A.toPair A.toText A.toText) (map G.edge dependencies)];
@@ -1023,7 +1023,7 @@ module Bootstrap.CrateGraph where {
         started <- G.begin (cacheDir ++ "/query-graph-v3")
           (Separate.pack [crateId,compilerHash,Q.sourceQueryFormat,"open-fragment-checker-1/finish-receipt-1",flavor]);
         case started of { Left e -> ioReturn (Left e); Right session -> do {
-          let { initial = case contracts of { Source.CheckedContracts _ indexed _ -> indexed } };
+          let { initial = Source.checkedIndexed contracts };
           G.elapsed statistics 0 graphStarted;
           runCheckedGroups owned occurrences declarationReads selectData verify (eqString auditSetting "1") (Separate.compactOpenGroupName crateId) inventory initial ((,) Nothing Nothing) groups
             (State session contracts (InferenceCaches M.empty M.empty M.empty Nothing Nothing) [] 0 0 [] statistics)
@@ -1116,7 +1116,7 @@ module Bootstrap.CrateGraph where {
                         inferStarted <- G.clock statistics;
                         let { hit = case cached of { Right _ -> True; Left _ -> False };
                           bind reads = Surface.bindIndexedMembersWith (Dependency.occurrenceGlobalIds reads);
-                          compiler = if owned then Inference.compileFileGroupIndexedWith (bind Dependency.fileLastDeclarationOccurrences)
+                          compiler = if owned then Inference.compileFileGroupIn env (bind Dependency.fileLastDeclarationOccurrences)
                             else Inference.compileOpenGroupIndexedWith (bind declarationReads);
                           compile = compileIndexedMemoUsing compiler;
                           raw = case cached of {

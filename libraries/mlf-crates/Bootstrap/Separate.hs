@@ -270,9 +270,16 @@ module Bootstrap.Separate where {
           body <- walk scope b;
           freshPure (SLam (hygieneName scope n) a body)
         };
+      SBindDictionaries names body -> do {
+        scope <- hygieneBind env names;
+        inner <- walk scope body;
+        freshPure (SBindDictionaries (map (hygieneName scope) names) inner)
+      };
       SApp _ _ -> if plainHygiene expression
         then freshPure (if M.null env then expression else rename env expression)
         else hygieneApplicationWith walk env expression;
+      SApplyDictionaries f names -> freshPure
+        (SApplyDictionaries (hygieneRef env f) (map (hygieneName env) names));
       SLet n a b ->
         do {
           scope <- hygieneBind env ((:) n []);

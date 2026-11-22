@@ -29,6 +29,7 @@ module Bootstrap.InferenceUnit where {
   import qualified Bootstrap.Kinding as Kinding;
   import qualified Bootstrap.SourceEquality as SourceEquality;
   import qualified Bootstrap.OpenFragment as Open;
+  import qualified Bootstrap.ImportedRoot as Imported;
   import qualified Bootstrap.X.Pretty as Pretty;
   -- Class translation is a crate query, before the value dependency graph is
   -- built. Its generated selectors/dictionaries become ordinary signed graph
@@ -328,29 +329,51 @@ module Bootstrap.InferenceUnit where {
       Right ((,) externalTypes lowered)
   };
   compileOpenGroupIndexed = compileOpenGroupIndexedWith Surface.bindIndexedMembers;
-  compileOpenGroupIndexedWith = compileIndexedUsing Compiler.finishCompilation;
+  compileOpenGroupIndexedWith = compileIndexedUsing (\_ -> finishOpenGroupWith Compiler.finishCompilation);
   -- The file pass supplies members lowered against one resolver snapshot.
-  compileFileGroupIndexedWith = compileIndexedUsing (Compiler.finishCompilationWith Constraint.generateFileProgram);
-  compileIndexedUsing finish bindMembers name parameters datatypes members =
-    case signedApplicationGroup parameters datatypes members of {
+  compileFileGroupIndexedWith = compileIndexedUsing finishFileGroup;
+  finishFileGroup = finishFileGroupIn Nothing;
+  finishFileGroupIn known parameters externalTypes members lowered = let {
+    ordinary = do {
+      compiled <- compileGroupBodyWith Compiler.finishFileCompilation externalTypes lowered;
+      checkGroupBodyIn known members compiled
+    };
+    imported authenticated = do {
+      compiled <- Imported.finishFileImportsIn known authenticated lowered;
+      checkGroupBodyIn known members compiled
+    }
+  } in case Imported.fileImports parameters lowered of {
+    Left _ -> ordinary;
+    Right authenticated -> case imported authenticated of {
+      Right checked -> Right checked;
+      -- Preserve the source diagnostic, including graph identities, if any
+      -- declaration or target fails to check on the direct route.
+      Left _ -> ordinary
+    }
+  };
+  compileIndexedUsing = compileIndexedIn Nothing;
+  compileFileGroupIn env = compileIndexedIn (Just env) (finishFileGroupIn (Just env));
+  compileIndexedIn known finish bindMembers name parameters datatypes members =
+    case signedApplicationGroupIn known parameters datatypes members of {
       Right fragment -> Right fragment;
-      Left _ -> compileElaboratedUsing finish bindMembers parameters datatypes members
+      Left _ -> compileElaboratedIn known finish bindMembers parameters datatypes members
     };
   compileElaboratedGroup = compileElaboratedGroupWith Surface.bindIndexedMembers;
-  compileElaboratedGroupWith = compileElaboratedUsing Compiler.finishCompilation;
-  compileElaboratedUsing finish bindMembers parameters datatypes members = do {
-    (,) externalTypes lowered <- prepareIndexedGroupWith bindMembers parameters datatypes members;
-    case monomorphicIndexed parameters members lowered of {
+  compileElaboratedGroupWith = compileElaboratedUsing (\_ -> finishOpenGroupWith Compiler.finishCompilation);
+  compileElaboratedUsing = compileElaboratedIn Nothing;
+  compileElaboratedIn known finish bindMembers parameters datatypes members = do {
+    (,) externalTypes lowered <- prepareIndexedGroupIn known bindMembers parameters datatypes members;
+    case monomorphicIndexedIn known parameters members lowered of {
       Right fragment -> Right fragment;
-      Left _ -> case signedDataGroup parameters members lowered of {
+      Left _ -> case signedDataGroupIn known parameters members lowered of {
         Right fragment -> Right fragment;
-        Left _ -> case signedLocalGroup parameters members lowered of {
+        Left _ -> case signedLocalGroupIn known parameters members lowered of {
           Right fragment -> Right fragment;
-          Left _ -> case groundIndexed parameters members lowered of {
+          Left _ -> case groundIndexedIn known parameters members lowered of {
             Right fragment -> Right fragment;
-            Left _ -> case groundRecursiveIndexed parameters members lowered of {
+            Left _ -> case groundRecursiveIndexedIn known parameters members lowered of {
               Right fragment -> Right fragment;
-              Left _ -> finishOpenGroupWith finish externalTypes (map snd members) lowered
+              Left _ -> finish parameters externalTypes (map snd members) lowered
             }
           }
         }
@@ -360,7 +383,8 @@ module Bootstrap.InferenceUnit where {
   -- A closed simply typed lambda spine checks against its declared arrows.
   -- Obtain the export's forall order from the signature graph itself: flexible
   -- bottom leaves occur in graph traversal order, regardless of their spelling.
-  signedLocalGroup parameters members lowered = case (,,) parameters members lowered of {
+  signedLocalGroup = signedLocalGroupIn Nothing;
+  signedLocalGroupIn known parameters members lowered = case (,,) parameters members lowered of {
     (,,) [] [(,) owner ((,,) exported (Just declared) _)]
       ((,) (SProgram datatypes (SDeclScope [slot] (SLet name (SSignature source written)
         (SConstructor "()")))) _) -> do {
@@ -395,7 +419,7 @@ module Bootstrap.InferenceUnit where {
         }
       };
       prefix S.empty signature;
-      env <- Open.environment datatypes;
+      env <- Open.environmentUsing known datatypes;
       Kinding.annotationType (Open.dataEnvironment env) M.empty signature;
       (,) root (Constraint.Generation graph _ _) <- Constraint.runGenerate
         (Constraint.embed (Open.dataEnvironment env) M.empty signature)
@@ -433,7 +457,8 @@ module Bootstrap.InferenceUnit where {
   -- A closed, explicitly quantified constructor or case projection has its
   -- type arguments in the declaration. The ordinary xMLF checker verifies
   -- constructor arity, coverage, branch types and the complete exported type.
-  signedDataGroup parameters members lowered = case (,,) parameters members lowered of {
+  signedDataGroup = signedDataGroupIn Nothing;
+  signedDataGroupIn known parameters members lowered = case (,,) parameters members lowered of {
     (,,) [] [(,) owner ((,,) exported (Just declared) _)]
       ((,) (SProgram datatypes (SDeclScope [slot] (SLet name (SSignature source written)
         (SConstructor "()")))) _) -> do {
@@ -450,7 +475,7 @@ module Bootstrap.InferenceUnit where {
         };
         _ -> Right source
       };
-      env <- Open.environment datatypes;
+      env <- Open.environmentUsing known datatypes;
       Kinding.annotationType (Open.dataEnvironment env) M.empty signature;
       field <- Classes.fieldType signature;
       expected <- T.instantiateField M.empty field;
@@ -522,7 +547,8 @@ module Bootstrap.InferenceUnit where {
   -- In a signed first-order body, applications introduce neither a type
   -- annotation nor a binder. Build the resolved term once and let the
   -- independent checker establish every intermediate type in its environment.
-  signedApplicationGroup parameters declarations members = case members of {
+  signedApplicationGroup = signedApplicationGroupIn Nothing;
+  signedApplicationGroupIn known parameters declarations members = case members of {
     [(,) owner ((,,) exported (Just annotation) expression)] -> do {
       expected <- monomorphicAnnotation annotation;
       let { numbered = zip parameters (range 0 (length parameters - 1));
@@ -543,7 +569,7 @@ module Bootstrap.InferenceUnit where {
           signedApplicationSpineUsing (\n ty -> SignedValue (XVarTerm n) ty) signedInstanceTerm
             identity (M.map scoped globals) (M.map scoped names) serial expected expression
         };
-      env <- Open.environment declarations;
+      env <- Open.environmentUsing known declarations;
       fragment <- Open.check env bindings (XLet (XName count exported) result (XConstructor "()" []));
       ensure (case Open.bindings fragment of {
         [(,) actual ty] -> eqString (X.nameHint actual) exported && T.alphaEq ty expected; _ -> False
@@ -1430,7 +1456,8 @@ module Bootstrap.InferenceUnit where {
     _ -> Right expression
   };
   groundAbstract prefix term = foldr (\((,) v bound) -> XTypeAbs v bound) term prefix;
-  groundIndexed parameters members lowered = case (,) members lowered of {
+  groundIndexed = groundIndexedIn Nothing;
+  groundIndexedIn known parameters members lowered = case (,) members lowered of {
     (,) [(,) identity ((,,) name (Just annotation) _)] ((,) (SProgram declarations expression) _) -> do {
       let { entries = zip parameters (range 0 (length parameters - 1));
         binding = \((,,) _ hint ty) serial -> prepareGroundApplication (XName serial hint) ty;
@@ -1447,7 +1474,7 @@ module Bootstrap.InferenceUnit where {
         };
         _ -> Left "not a single signed nonrecursive monotype"
       };
-      env <- Open.environment declarations;
+      env <- Open.environmentUsing known declarations;
       let { datatypes = Open.dataEnvironment env };
       (,,) expected wanted prefix <- groundDeclarationType datatypes annotation;
       source <- groundDeclaredBody annotation rhs;
@@ -1466,11 +1493,13 @@ module Bootstrap.InferenceUnit where {
   -- common declared environment. Its local unification variables cannot occur
   -- in a peer's closed signature. Only the term identity supply crosses RHSs.
   data GroundMember = GroundMember Int XName XType GroundType ([] ((,) XTyVar XType)) SExpr;
-  groundRecursiveIndexed parameters members lowered = case lowered of {
-    (,) (SProgram declarations expression) _ -> groundRecursiveGroup parameters members declarations expression;
+  groundRecursiveIndexed = groundRecursiveIndexedIn Nothing;
+  groundRecursiveIndexedIn known parameters members lowered = case lowered of {
+    (,) (SProgram declarations expression) _ -> groundRecursiveGroupIn known parameters members declarations expression;
     _ -> Left "ground recursive group requires lowered declarations"
   };
-  groundRecursiveGroup parameters members declarations expression = do {
+  groundRecursiveGroup = groundRecursiveGroupIn Nothing;
+  groundRecursiveGroupIn known parameters members declarations expression = do {
     let { sorted = sortBy (\((,,) _ n _) ((,,) _ m _) -> compareString n m) parameters;
       imported = mapIndexed (\serial ((,,) i name ty) -> (,,) (V.toInt i) (XName serial name) ty) sorted;
       count = length imported;
@@ -1485,7 +1514,7 @@ module Bootstrap.InferenceUnit where {
       };
       _ -> Left "ground recursive import boundary"
     };
-    env <- Open.environment declarations;
+    env <- Open.environmentUsing known declarations;
     let { datatypes = Open.dataEnvironment env };
     rows <- case core of {
       SDeclScope ids (SLetRec definitions (SConstructor "()")) -> do {
@@ -1545,7 +1574,8 @@ module Bootstrap.InferenceUnit where {
     XApply f a -> monomorphicTarget f && monomorphicTarget a;
     _ -> False
   };
-  monomorphicIndexed parameters members lowered = case (,) members lowered of {
+  monomorphicIndexed = monomorphicIndexedIn Nothing;
+  monomorphicIndexedIn known parameters members lowered = case (,) members lowered of {
     (,) [(,) identity ((,,) name annotation _)] ((,) (SProgram declarations expression) _) -> do {
       ensure (all (\((,,) _ _ ty) -> monomorphicTarget ty) parameters)
         "polymorphic import requires ordinary adaptation";
@@ -1574,7 +1604,7 @@ module Bootstrap.InferenceUnit where {
           (M.map (\binding -> MonoType (snd binding)) names) (MonoState 0 M.empty) rhs)
       };
       result <- monomorphicCheck globals names (length parameters + 1) expected rhs;
-      env <- Open.environment declarations;
+      env <- Open.environmentUsing known declarations;
       fragment <- Open.check env ps
         (XLet (XName (length parameters) name) (fst result) (XConstructor "()" []));
       ensure (case Open.bindings fragment of {
@@ -1754,7 +1784,8 @@ module Bootstrap.InferenceUnit where {
     Right ((,,) (fst result) ty (snd result))
   };
   prepareIndexedGroup = prepareIndexedGroupWith Surface.bindIndexedMembers;
-  prepareIndexedGroupWith bindMembers parameters datatypes members = do {
+  prepareIndexedGroupWith = prepareIndexedGroupIn Nothing;
+  prepareIndexedGroupIn known bindMembers parameters datatypes members = do {
     ensure (not (null members)) "cannot infer an empty declaration group";
     let { parameterIds = M.fromList compareString (map (\((,,) i n _) -> (,) n i) parameters) };
     externalTypes <- foldM mergeExternal M.empty (map (\((,,) _ n ty) -> (,) n ty) parameters);
@@ -1765,7 +1796,14 @@ module Bootstrap.InferenceUnit where {
       "inference group also imports its own binding";
     body <- bindMembers members (SConstructor "()");
     let { externals = M.map (Separate.sourceSchemeIn M.empty False) externalTypes };
-    lowered <- Classes.lowerSeparateClasses externals [] (SProgram datatypes body);
+    let { lower program = case known of {
+      Nothing -> Surface.lowerSurface program;
+      Just _ -> do {
+        env <- Open.environmentUsing known datatypes;
+        Surface.lowerSurfaceIn (Open.dataEnvironment env) program
+      }
+    } };
+    lowered <- Classes.lowerSeparateClassesUsing lower M.empty externals [] (SProgram datatypes body);
     let { attached = case lowered of {
       (,) (SProgram ds (SLetRec defs rest)) registry -> if M.null externalTypes then lowered else
         (,) (SProgram ds (SDeclScope (map (\((,,) n _ _) -> M.get compareString n parameterIds) defs) (SLetRec defs rest))) registry;
@@ -1816,8 +1854,12 @@ module Bootstrap.InferenceUnit where {
   };
   finishOpenGroup = finishOpenGroupWith Compiler.finishCompilation;
   finishOpenGroupWith finish externalTypes members lowered = do {
-    (,,) declarations parameters implementation <- compileGroupBodyWith finish externalTypes lowered;
-    env <- Open.environment declarations;
+    compiled <- compileGroupBodyWith finish externalTypes lowered;
+    checkGroupBody members compiled
+  };
+  checkGroupBody = checkGroupBodyIn Nothing;
+  checkGroupBodyIn known members ((,,) declarations parameters implementation) = do {
+    env <- Open.environmentUsing known declarations;
     checked <- Open.check env parameters implementation;
     ensure
       (eqList eqString (sortBy compareString (map (\((,) n _) -> X.nameHint n) (Open.bindings checked)))

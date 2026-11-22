@@ -379,10 +379,11 @@ module Bootstrap.Classes where {
   managedImports conventions externals = any managedType (M.elems externals) ||
     any (elem eqString callStackPredicate) (M.elems conventions);
   lowerSeparateClasses = lowerSeparateClassesWithImports M.empty;
-  lowerSeparateClassesWithImports conventions externals instanceNames original =
+  lowerSeparateClassesWithImports = lowerSeparateClassesUsing Surface.lowerSurface;
+  lowerSeparateClassesUsing lower conventions externals instanceNames original =
     do {
       program <-
-        Surface.lowerSurface
+        lower
           (case original of {
              SProgram ds b -> SClassProgram ds [] [] b;
              _ -> original
@@ -958,7 +959,7 @@ module Bootstrap.Classes where {
           (environmentNames overloads methods environment (map snd candidates)));
         planned <- prepareQualified Nothing (inventoryWantedScopes inventory) ds infos environment
           (wantedIn (Dependency.scopeGeneration valueScopes) (Just (0 - 1)) candidates) surface;
-        case planned of { (,) expression plan -> do {
+        case planned of { (,,) expression plan frames -> do {
           wants <- freshLift (Q.slotsAt plan (qualifiedNode expression));
           freshLift (ensure (null wants) "source group leaked ordinary obligations");
           let { bindings = qualifiedTopBindings expression };
@@ -974,8 +975,20 @@ module Bootstrap.Classes where {
             } else freshPure explicit;
             freshPure ((,,) name classes groupProtected)
           }) (zip owners members);
-          body <- renderQualified plan infos IM.empty expression;
-          freshPure ((,) body contracts)
+          let { eligible = case (,) declaredSlots members of {
+            (,) (Just [slot]) [(,,) _ Nothing rhs] -> if groupProtected || copiedBinding rhs then Nothing else Just slot;
+            _ -> Nothing
+          }; ordinaryOwners = case declaredSlots of {
+            Just _ -> not groupProtected && all ordinaryRecursiveSource members;
+            Nothing -> False
+          } };
+          body <- renderFileQualifiedWith ordinaryOwners plan frames infos eligible expression;
+          marked <- case declaredSlots of {
+            Just slots -> if length slots < 2 || not ordinaryOwners
+              then freshPure body else freshLift (markFileRecursiveEvidence plan slots expression body);
+            Nothing -> freshPure body
+          };
+          freshPure ((,) marked contracts)
         } }
       }
     };
@@ -999,11 +1012,11 @@ module Bootstrap.Classes where {
   };
   qualifiedTopBindings :: QualifiedExpr -> Map TermRef QualifiedExpr;
   qualifiedTopBindings (QualifiedExpr _ form) = case form of {
-    QualifiedLet owner rhs body -> M.insert compareRef owner rhs (qualifiedTopBindings body);
+    QualifiedLet owner _ rhs body -> M.insert compareRef owner rhs (qualifiedTopBindings body);
     QualifiedRec slots definitions body -> let {
-      entry ref ((,,) _ _ rhs) = (,) ref rhs;
-      owners = if null slots then map (\((,,) n _ _) -> LexicalRef n) definitions
-        else zipWith (\i ((,,) n _ _) -> DeclRef i n) slots definitions
+      entry ref (QualifiedDefinition _ _ _ rhs) = (,) ref rhs;
+      owners = if null slots then map (\(QualifiedDefinition n _ _ _) -> LexicalRef n) definitions
+        else zipWith (\i (QualifiedDefinition n _ _ _) -> DeclRef i n) slots definitions
     } in M.union compareRef (M.fromList compareRef (zipWith entry owners definitions)) (qualifiedTopBindings body);
     _ -> M.empty
   };
@@ -1764,17 +1777,18 @@ module Bootstrap.Classes where {
   };
   data QualifiedArgument = OrdinaryArgument Int | ManagedArgument SExpr;
   data QualifiedExpr = QualifiedExpr Int QualifiedForm;
+  data QualifiedDefinition = QualifiedDefinition String RecursiveMode (Maybe ((,) Int Int)) QualifiedExpr;
   data QualifiedForm = QualifiedPlain SExpr
-                     | QualifiedVariable TermRef (Maybe ((,) Int Int))
+                     | QualifiedVariable TermRef Int (Maybe Int)
                      | QualifiedApply QualifiedExpr QualifiedExpr
                      | QualifiedContext QualifiedExpr ([] QualifiedArgument)
                      | QualifiedLambda TermRef (Maybe SAnnotation) QualifiedExpr
-                     | QualifiedLet TermRef QualifiedExpr QualifiedExpr
+                     | QualifiedLet TermRef (Maybe Int) QualifiedExpr QualifiedExpr
                      | QualifiedAnnotation QualifiedExpr SAnnotation
                      | QualifiedSignature QualifiedExpr SAnnotation
                      | QualifiedCase QualifiedExpr ([] ((,) SPattern QualifiedExpr))
                      | QualifiedChecked SType ([] String) WantedScope QualifiedExpr
-                     | QualifiedRec ([] (V.Index Declaration)) ([] ((,,) String RecursiveMode QualifiedExpr)) QualifiedExpr;
+                     | QualifiedRec ([] (V.Index Declaration)) ([] QualifiedDefinition) QualifiedExpr;
   data QualifiedBuild = QualifiedBuild ([] Q.Frame) ([] Q.Seed) ([] Q.Use)
                                       ([] ((,) Int Q.Demand));
   data QualifiedResult = QualifiedResult QualifiedExpr QualifiedBuild | PlainResult Int SExpr;
@@ -2022,7 +2036,7 @@ module Bootstrap.Classes where {
             (SSignature rhs (SAnnotation [] ty));
           right <- planQualified site valueScopes ds infos owner
             (putQualified (scopedBinder slots x) (QualifiedKnown (scopedBinder slots x) (qualifiedClasses ty)) env) candidates body;
-          qualifiedMake (QualifiedLet (scopedBinder slots x) (qualifiedExpression left) (qualifiedExpression right))
+          qualifiedMake (QualifiedLet (scopedBinder slots x) Nothing (qualifiedExpression left) (qualifiedExpression right))
             (Q.RefNode (qualifiedNode (qualifiedExpression right)))
             (qualifiedMerge (qualifiedBuild left) (qualifiedBuild right))
         };
@@ -2041,7 +2055,8 @@ module Bootstrap.Classes where {
           };
           right <- planQualified site valueScopes ds infos owner
             (putQualified (scopedBinder slots x) binding env) candidates body;
-          qualifiedMake (QualifiedLet (scopedBinder slots x) (qualifiedExpression left) (qualifiedExpression right))
+          qualifiedMake (QualifiedLet (scopedBinder slots x) (if null explicit then Just frame else Nothing)
+              (qualifiedExpression left) (qualifiedExpression right))
             (Q.RefNode (qualifiedNode (qualifiedExpression right)))
             (qualifiedMerge build (qualifiedBuild right))
         };
@@ -2097,10 +2112,10 @@ module Bootstrap.Classes where {
     Nothing -> qualifiedPlain (referenceExpr ref);
     Just (QualifiedKnown name classes) -> qualifiedKnown site owner env (termRefName ref) name classes;
     Just (QualifiedRecursive name source) ->
-      qualifiedMake (QualifiedVariable name Nothing) (Q.RefNode source) qualifiedEmpty;
+      qualifiedMake (QualifiedVariable name source Nothing) (Q.RefNode source) qualifiedEmpty;
     Just (QualifiedTemplate name frame source) -> do {
       use <- qualifiedId;
-      qualifiedMake (QualifiedVariable name (Just ((,) use source))) (Q.InstantiateNode use source)
+      qualifiedMake (QualifiedVariable name source (Just use)) (Q.InstantiateNode use source)
         (QualifiedBuild [] [] [(Q.Use use frame owner)] [])
     }
   };
@@ -2182,7 +2197,7 @@ module Bootstrap.Classes where {
             link = QualifiedBuild [] [] []
               ((:) ((,) node (Q.RefNode (qualifiedNode (qualifiedExpression result)))) [])
           };
-          freshPure ((,) ((,,) n InferRecursive (qualifiedExpression result))
+          freshPure ((,) (QualifiedDefinition n InferRecursive (Just ((,) frame node)) (qualifiedExpression result))
             (qualifiedMerge (qualifiedBuild result) link))
         }) entries;
         completed <- qualifiedFinish frame (Just owner) (qualifiedBuilds (map snd planned));
@@ -2199,14 +2214,14 @@ module Bootstrap.Classes where {
               translated <- freshLift (translateLocalScheme ds infos ty);
               result <- planQualifiedSigned site (Dependency.nestedScopes valueScopes) ds infos owner scope
                 (Dependency.scopeForBinder valueScopes (ref n) (copiedBinding rhs) candidates) rhs ty;
-              freshPure ((,) ((,,) n (CheckRecursive (SAnnotation [] translated))
-                (qualifiedExpression result)) (qualifiedBuild result))
+              freshPure ((,) (QualifiedDefinition n (CheckRecursive (SAnnotation [] translated))
+                Nothing (qualifiedExpression result)) (qualifiedBuild result))
             };
             _ -> freshFail "invalid signed recursive plan"
           }) signed;
           let { allDefinitions = append inferred (map fst checked) };
           ordered <- freshLift (traverseEither (\((,,) n _ _) ->
-            case find (\((,,) name _ _) -> eqString name n) allDefinitions of {
+            case find (\(QualifiedDefinition name _ _ _) -> eqString name n) allDefinitions of {
               Nothing -> Left "qualified recursive plan lost a declaration";
               Just definition -> Right definition
             }) definitions);
@@ -2231,20 +2246,201 @@ module Bootstrap.Classes where {
   qualifiedParameterMap parameters = IM.fromList (map (\((,,) slot name _) -> (,) slot name) parameters);
   qualifiedWants :: [] ((,,) Int String String) -> [] ((,) String String);
   qualifiedWants parameters = map (\((,,) _ name classId) -> (,) name classId) parameters;
-  renderQualified :: Q.Plan -> Map String Info -> IntMap String -> QualifiedExpr -> Fresh SExpr;
-  renderQualified plan infos bindings expression =
+  -- A demand from a strict ancestor keeps its slot identity at every use of
+  -- this binding. If the enclosing body supplies it, use that lexical given.
+  captureQualified :: Q.Plan -> IntMap Q.Frame -> IntMap String -> Maybe Int -> QualifiedExpr -> Fresh (IntMap String);
+  captureQualified plan frames bindings frame expression = case frame of {
+    Nothing -> freshPure IM.empty;
+    Just owner -> if IM.null bindings then freshPure IM.empty else freshLift (do {
+      slots <- Q.slotsAt plan (qualifiedNode expression);
+      foldM (\captured slot -> case IM.lookup slot bindings of {
+        Nothing -> Right captured;
+        Just name -> do {
+          enclosing <- Q.slotOwner plan slot;
+          Right (if enclosing /= owner && Q.beneath frames owner enclosing
+            then IM.insert slot name captured else captured)
+        }
+      }) IM.empty slots
+    })
+  };
+  -- A file query gives a singleton recursive definition its own checked
+  -- boundary. Keep that public binding's evidence and move its ordinary
+  -- recursion under the outer evidence lambdas. A private worker keeps the
+  -- same evidence references for every recursive call.
+  renderFileQualifiedWorker = renderFileQualifiedWith False;
+  renderFileQualifiedWith ordinaryOwners plan frames infos selected expression = let {
+    render = renderQualifiedFileEvidence ordinaryOwners plan frames infos;
+    ordinary = render IM.empty IM.empty IM.empty expression
+  } in case (,) selected expression of {
+    (,) (Just expected) (QualifiedExpr _ (QualifiedRec [slot]
+        [(QualifiedDefinition name InferRecursive (Just ((,) owner source)) rhs)]
+        (QualifiedExpr _ (QualifiedPlain (SConstructor unit))))) ->
+      if V.toInt expected /= V.toInt slot || not (eqString unit "()") ||
+         not (qualifiedWorkerLambda rhs && qualifiedWorkerUses slot source rhs)
+      then ordinary else do {
+        slots <- freshLift (Q.slotsAt plan source);
+        rhsSlots <- freshLift (Q.slotsAt plan (qualifiedNode rhs));
+        owners <- freshLift (traverseEither (Q.slotOwner plan) slots);
+        if null slots || not (eqList eqInt slots rhsSlots && all (eqInt owner) owners)
+        then ordinary else do {
+          parameters <- qualifiedParameters plan rhs;
+          worker <- freshName "deferredEvidenceWorker";
+          let { given = qualifiedParameterMap parameters;
+                redirect = IM.insert source ((,) worker given) IM.empty };
+          body <- render redirect IM.empty given rhs;
+          let { local = SLetRec [(,,) worker InferRecursive body] (SVar worker);
+                wrapper = SBindDictionaries (map (\((,,) _ name _) -> name) parameters) local };
+          freshPure (SDeclScope [slot] (SLet name wrapper (SConstructor unit)))
+        }
+      };
+    _ -> ordinary
+  };
+  -- Only source-owned unsigned definitions may put a ground ordinary
+  -- dictionary in their definition scope. Copies and explicit scopes keep
+  -- their own givens and definition boundaries.
+  ordinaryRecursiveSource ((,,) _ annotation rhs) = let {
+    visit expression = case expression of {
+      SSourceDefinition _ -> False;
+      SDeclScope _ _ -> False;
+      SSignature _ _ -> False;
+      SChecked _ _ -> False;
+      SGivenScope _ _ -> False;
+      SCallSite _ _ body -> visit body;
+      SAnn body (SAnnotation _ ty) -> null (qualifiedClasses ty) && visit body;
+      SLam _ annotation body -> case annotation of {
+        Nothing -> visit body;
+        Just (SAnnotation _ ty) -> null (qualifiedClasses ty) && visit body
+      };
+      SApp f x -> visit f && visit x;
+      SLet _ value body -> visit value && visit body;
+      SLetRec definitions body -> all unsigned definitions && visit body;
+      SCase value clauses -> visit value && all (\(SAlternative _ body) -> visit body) clauses;
+      SEquations clauses -> all (\((,) _ body) -> visit body) clauses;
+      SDo _ _ -> visit (Desugar.desugarDo expression);
+      SSharedBind _ value success failure body -> all visit [value,success,failure,body];
+      _ -> True
+    };
+    unsigned ((,,) _ mode body) = case mode of {
+      InferRecursive -> visit body;
+      CheckRecursive _ -> False
+    }
+  } in case annotation of {
+    Nothing -> visit rhs;
+    Just _ -> False
+  };
+  -- Mark exactly the outer evidence binders issued by the planner, without
+  -- changing their order or allocating new names. A common planner frame
+  -- identifies peers in one recursive component, not neighboring groups.
+  markFileRecursiveEvidence plan expected (QualifiedExpr _ expression) lowered = let {
+    sameId a b = V.toInt a == V.toInt b;
+    ownerSet = I.fromList (map V.toInt expected);
+    describe definition = case definition of {
+      QualifiedDefinition _ InferRecursive (Just ((,) frame source)) rhs ->
+        if not (qualifiedWorkerLambda rhs) then Right Nothing else do {
+          slots <- Q.slotsAt plan source;
+          bound <- Q.slotsAt plan (qualifiedNode rhs);
+          ownership <- traverseEither (Q.slotOwner plan) slots;
+          Right (if null slots || not (eqList eqInt slots bound && all (eqInt frame) ownership)
+            then Nothing else Just ((,) frame (length slots)))
+        };
+      _ -> Right Nothing
+    };
+    mark ((,) ((,) _ count) ((,,) name mode rhs)) = mapEither (\value -> (,,) name mode value) (prefix count [] rhs);
+    prefix count binders body = if count == 0 then Right (SBindDictionaries (reverse binders) body) else case body of {
+      SLam name Nothing inner -> prefix (count - 1) ((:) name binders) inner;
+      _ -> Left "qualified recursive dictionary prefix is incomplete"
+    }
+  } in case (,) expression lowered of {
+    (,) (QualifiedRec owners definitions _) (SDeclScope slots (SLetRec values unit@(SConstructor "()"))) ->
+      if length expected /= length owners || not (I.eqIntSet ownerSet (I.fromList (map V.toInt owners)) &&
+        eqList sameId owners slots) || length owners /= length definitions || length definitions /= length values
+      then Right lowered else do {
+        rows <- traverseEither describe definitions;
+        case mapM (\entry -> entry) rows of {
+          Just rows@((:) ((,) first _) _) -> if not (all (\entry -> fst entry == first) rows)
+            then Right lowered else do {
+              marked <- traverseEither mark (zip rows values);
+              Right (SDeclScope slots (SLetRec marked unit))
+            };
+          _ -> Right lowered
+        }
+      };
+    _ -> Right lowered
+  };
+  qualifiedWorkerLambda (QualifiedExpr _ form) = case form of {
+    QualifiedLambda (LexicalRef _) _ _ -> True;
+    _ -> False
+  };
+  recursiveWorkerEvidenceLabels :: SExpr -> Maybe ([] String);
+  recursiveWorkerEvidenceLabels expression = case expression of {
+    SBindDictionaries labels (SLetRec [(,,) worker InferRecursive _] (SVar returned)) ->
+      if eqString worker returned then Just labels else Nothing;
+    _ -> Nothing
+  };
+  -- An explicit checked body installs its own evidence frame. Keep it out
+  -- of this route, together with any unplanned occurrence of the public ID.
+  qualifiedWorkerUses owner source = let {
+    plain expr = not (any (\i -> V.toInt i == V.toInt owner) (Dependency.expressionGlobalIds expr));
+    ordinary argument = case argument of { OrdinaryArgument _ -> True; _ -> False };
+    visit (QualifiedExpr _ form) = case form of {
+      QualifiedPlain expr -> plain expr;
+      QualifiedVariable ref node use -> case ref of {
+        DeclRef i _ -> if V.toInt i == V.toInt owner then node == source && not (isJust use) else node /= source;
+        LexicalRef _ -> node /= source
+      };
+      QualifiedApply f x -> visit f && visit x;
+      QualifiedContext f arguments -> all ordinary arguments && visit f;
+      QualifiedLambda (LexicalRef _) _ body -> visit body;
+      QualifiedLambda _ _ _ -> False;
+      QualifiedLet (LexicalRef _) _ rhs body -> visit rhs && visit body;
+      QualifiedLet _ _ _ _ -> False;
+      QualifiedAnnotation expr _ -> visit expr;
+      QualifiedSignature _ _ -> False;
+      QualifiedCase expr branches -> visit expr && all (\((,) _ body) -> visit body) branches;
+      QualifiedChecked _ _ _ _ -> False;
+      QualifiedRec slots definitions body -> null slots && visit body && all (\definition -> case definition of {
+        QualifiedDefinition _ InferRecursive _ value -> visit value;
+        _ -> False
+      }) definitions
+    }
+  } in visit;
+  renderQualified :: Q.Plan -> IntMap Q.Frame -> Map String Info -> IntMap String -> QualifiedExpr -> Fresh SExpr;
+  renderQualified plan frames infos = renderQualifiedUsing plan frames infos IM.empty;
+  renderQualifiedUsing :: Q.Plan -> IntMap Q.Frame -> Map String Info -> IntMap IntSet ->
+                          IntMap String -> QualifiedExpr -> Fresh SExpr;
+  renderQualifiedUsing plan frames infos = renderQualifiedRedirecting plan frames infos IM.empty;
+  renderQualifiedRedirecting :: Q.Plan -> IntMap Q.Frame -> Map String Info ->
+    IntMap ((,) String (IntMap String)) -> IntMap IntSet -> IntMap String -> QualifiedExpr -> Fresh SExpr;
+  renderQualifiedRedirecting = renderQualifiedFileEvidence False;
+  renderQualifiedFileEvidence :: Bool -> Q.Plan -> IntMap Q.Frame -> Map String Info ->
+    IntMap ((,) String (IntMap String)) -> IntMap IntSet -> IntMap String -> QualifiedExpr -> Fresh SExpr;
+  renderQualifiedFileEvidence ordinaryOwners plan frames infos redirects captures bindings expression = let {
+    renderWith = renderQualifiedFileEvidence ordinaryOwners plan frames infos redirects;
+    render = renderWith captures;
+    supplied source inherited scope = if IM.null inherited then scope
+      else IM.insert source (IM.keysSet inherited) scope;
+    retainedParameters inherited = filter (\((,,) slot _ _) -> IM.notMember slot inherited)
+  } in
     case expression of {
-      QualifiedExpr node form ->
+      QualifiedExpr _ form ->
         case form of {
           QualifiedPlain source -> freshPure source;
-          QualifiedVariable name mapping -> renderQualifiedArguments plan bindings node mapping (referenceExpr name);
+          QualifiedVariable name source use -> case (,) use (IM.lookup source redirects) of {
+            (,) Nothing (Just ((,) worker given)) -> do {
+              freshLift (ensure (all (\((,) slot formal) -> case IM.lookup slot bindings of {
+                Nothing -> False; Just current -> eqString current formal
+              }) (IM.toList given)) "recursive worker escaped its evidence frame");
+              freshPure (SVar worker)
+            };
+            _ -> renderQualifiedArguments plan bindings (IM.findWithDefault I.empty source captures) source use name
+          };
           QualifiedApply a b -> do {
-            left <- renderQualified plan infos bindings a;
-            right <- renderQualified plan infos bindings b;
+            left <- render bindings a;
+            right <- render bindings b;
             freshPure (SApp left right)
           };
           QualifiedContext source arguments -> do {
-            result <- renderQualified plan infos bindings source;
+            result <- render bindings source;
             values <- mapM (\argument -> case argument of {
               ManagedArgument value -> freshPure value;
               OrdinaryArgument seed -> do {
@@ -2259,66 +2455,102 @@ module Bootstrap.Classes where {
             freshPure (foldl SApp result values)
           };
           QualifiedLambda name annotation body -> do {
-            result <- renderQualified plan infos bindings body;
+            result <- render bindings body;
             freshPure (scopeBinding name (SLam (termRefName name) annotation result))
           };
-          QualifiedLet name rhs body -> do {
+          QualifiedLet name frame rhs body -> do {
+            inherited <- captureQualified plan frames bindings
+              (case name of { LexicalRef _ -> frame; DeclRef _ _ -> Nothing }) rhs;
             parameters <- qualifiedParameters plan rhs;
-            left <- renderQualified plan infos (qualifiedParameterMap parameters) rhs;
-            right <- renderQualified plan infos bindings body;
-            freshPure (scopeBinding name (SLet (termRefName name) (foldr (\((,,) _ n _) b -> SLam n Nothing b) left parameters) right))
+            let { retained = retainedParameters inherited parameters };
+            left <- render (IM.union inherited (qualifiedParameterMap retained)) rhs;
+            right <- renderWith
+              (supplied (qualifiedNode rhs) inherited captures) bindings body;
+            freshPure (scopeBinding name (SLet (termRefName name)
+              (foldr (\((,,) _ n _) b -> SLam n Nothing b) left retained) right))
           };
           QualifiedAnnotation source annotation -> do {
-            result <- renderQualified plan infos bindings source;
+            result <- render bindings source;
             freshPure (SAnn result annotation)
           };
           QualifiedSignature source annotation -> do {
-            result <- renderQualified plan infos bindings source;
+            result <- render bindings source;
             freshPure (SSignature result annotation)
           };
           QualifiedCase source branches -> do {
-            result <- renderQualified plan infos bindings source;
+            result <- render bindings source;
             alternatives <- mapM (\((,) pattern body) -> do {
-              branch <- renderQualified plan infos bindings body;
+              branch <- render bindings body;
               freshPure (SAlternative pattern branch)
             }) branches;
             freshPure (SCase result alternatives)
           };
           QualifiedChecked ty names candidates source -> do {
             parameters <- qualifiedParameters plan source;
-            result <- renderQualified plan infos (qualifiedParameterMap parameters) source;
+            result <- render (qualifiedParameterMap parameters) source;
             freshPure (SChecked ty (foldr (\n b -> SLam n Nothing b)
               (closePlannedWants infos candidates (qualifiedWants parameters) result) names))
           };
           QualifiedRec slots definitions body -> do {
-            lowered <- mapM (\((,,) name mode rhs) -> do {
-              parameters <- qualifiedParameters plan rhs;
-              result <- renderQualified plan infos (qualifiedParameterMap parameters) rhs;
-              freshPure ((,,) name mode
-                (foldr (\((,,) _ n _) b -> SLam n Nothing b) result parameters))
+            planned <- mapM (\definition@(QualifiedDefinition _ _ template rhs) -> do {
+              inherited <- captureQualified plan frames bindings
+                (if null slots then mapOptional fst template else Nothing) rhs;
+              freshPure ((,) definition inherited)
             }) definitions;
-            result <- renderQualified plan infos bindings body;
+            let {
+              scope = foldlStrict (\current ((,) (QualifiedDefinition _ _ template _) inherited) -> case template of {
+                Nothing -> current;
+                Just ((,) _ source) -> supplied source inherited current
+              }) captures planned;
+              renderGroup = renderWith scope
+            };
+            lowered <- mapM (\((,) (QualifiedDefinition name mode template rhs) inherited) -> do {
+              parameters <- qualifiedParameters plan rhs;
+              let { retained = retainedParameters inherited parameters };
+              result <- renderGroup (IM.union inherited (qualifiedParameterMap retained)) rhs;
+              let { labels = map (\((,,) _ n _) -> n) retained;
+                    ordinary = foldr (\n b -> SLam n Nothing b) result labels };
+              -- Only a file-owned lexical worker may combine the ordinary
+              -- dictionary binders supplied by its own recursive demand frame.
+              -- The retained names keep their slot order and the inherited
+              -- names stay in the enclosing lexical environment.
+              abstracted <- case (,) mode template of {
+                (,) InferRecursive (Just ((,) frame source)) ->
+                  if not (null slots && qualifiedWorkerLambda rhs && not (null retained) && ordinaryOwners) then freshPure ordinary else do {
+                    demanded <- freshLift (Q.slotsAt plan source);
+                    let { proofSlots = map (\((,,) slot _ _) -> slot) retained };
+                    owners <- freshLift (traverseEither (Q.slotOwner plan) proofSlots);
+                    freshPure (if eqList eqInt demanded (map (\((,,) slot _ _) -> slot) parameters) && all (eqInt frame) owners
+                      then SBindDictionaries labels result else ordinary)
+                  };
+                _ -> freshPure ordinary
+              };
+              freshPure ((,,) name mode abstracted)
+            }) planned;
+            result <- renderGroup bindings body;
             freshPure (if null slots then SLetRec lowered result else SDeclScope slots (SLetRec lowered result))
           }
         }
     };
-  renderQualifiedArguments :: Q.Plan -> IntMap String -> Int -> Maybe ((,) Int Int) -> SExpr -> Fresh SExpr;
-  renderQualifiedArguments plan bindings node mapping source =
+  renderQualifiedArguments :: Q.Plan -> IntMap String -> IntSet -> Int -> Maybe Int -> TermRef -> Fresh SExpr;
+  renderQualifiedArguments plan bindings captured source use function =
     do {
-      -- Preserve formal order and multiplicity. Two callee slots can map to
-      -- one inherited caller slot; the call still passes both arguments.
-      slots <- freshLift (case mapping of {
-        Nothing -> Q.slotsAt plan node;
-        Just ((,) use input) -> do {
-          original <- Q.slotsAt plan input;
-          traverseEither (Q.instantiateSlot plan use) original
-        }
+      original <- freshLift (Q.slotsAt plan source);
+      -- Captured slots are invariant under instantiation. Preserve order and
+      -- multiplicity among the parameters the binding still declares.
+      let { remaining = filter (\slot -> I.notMember slot captured) original };
+      slots <- freshLift (case use of {
+        Nothing -> Right remaining;
+        Just site -> traverseEither (Q.instantiateSlot plan site) remaining
       });
       names <- freshLift (traverseEither (\slot -> case IM.lookup slot bindings of {
         Nothing -> Left "qualified dictionary slot escaped its lexical abstraction";
         Just name -> Right name
       }) slots);
-      freshPure (foldl SApp source (map SVar names))
+      -- Ordinary template and recursive uses both supply a generated
+      -- prefix. Inference checks the callee and lexical arguments again.
+      freshPure (if length names >= 8 then SApplyDictionaries function names
+        else dictionaryApplication function names)
     };
   lowerExpr :: Dependency.ValueScopes ([] ((,) EvidenceRole String)) -> DataEnv -> Map String Info ->
                Map String ((,) String ([] String)) -> [] ((,) EvidenceRole String) ->
@@ -2332,24 +2564,27 @@ module Bootstrap.Classes where {
     (Dependency.mapScopes (wantedScope valueScopes) valueScopes) ds infos env (wantedScope valueScopes candidates);
   lowerExprInAt site valueScopes ds infos env candidates expression = do {
     result <- prepareQualified site valueScopes ds infos env candidates expression;
-    case result of { (,) planned plan -> do {
+    case result of { (,,) planned plan frames -> do {
       parameters <- qualifiedParameters plan planned;
-      lowered <- renderQualified plan infos (qualifiedParameterMap parameters) planned;
+      lowered <- renderQualified plan frames infos (qualifiedParameterMap parameters) planned;
       freshPure ((,) lowered (qualifiedWants parameters))
     } }
   };
   prepareQualified :: Maybe ((,) String SourceSpan) -> Dependency.ValueScopes WantedScope ->
     DataEnv -> Map String Info -> Map String ((,) String ([] String)) ->
-    WantedScope -> SExpr -> Fresh ((,) QualifiedExpr Q.Plan);
+    WantedScope -> SExpr -> Fresh ((,,) QualifiedExpr Q.Plan (IntMap Q.Frame));
   prepareQualified site valueScopes ds infos env candidates expression = do {
     owner <- qualifiedId;
     result <- planQualified site valueScopes ds infos owner
       (qualifiedEnvironment valueScopes env) candidates expression;
     build <- qualifiedFinish owner Nothing (qualifiedBuild result);
-    plan <- freshLift (case build of {
-      QualifiedBuild frames seeds uses nodes -> Q.solve frames seeds uses (IM.fromList nodes)
-    });
-    freshPure ((,) (qualifiedExpression result) plan)
+    case build of {
+      QualifiedBuild frames seeds uses nodes -> do {
+        plan <- freshLift (Q.solve frames seeds uses (IM.fromList nodes));
+        freshPure ((,,) (qualifiedExpression result) plan
+          (IM.fromList (map (\frame -> (,) (Q.frameId frame) frame) frames)))
+      }
+    }
   };
   qualifiedEnvironment scopes entries = QualifiedEnv M.empty (\ref -> case ref of {
     LexicalRef n -> mapOptional (\((,) name classes) -> QualifiedKnown (LexicalRef name) classes)
@@ -2549,8 +2784,19 @@ module Bootstrap.Classes where {
             in if nested then withGivenScope candidates hole else hole
         };
       SLam n a b -> SLam n a (closeWantedReading nested replacements candidates b);
+      SBindDictionaries names body ->
+        SBindDictionaries names (closeWantedReading nested replacements candidates body);
       SApp a b ->
         SApp (closeWantedReading nested replacements candidates a) (closeWantedReading nested replacements candidates b);
+      SApplyDictionaries function names -> let {
+        receivesEvidence n = M.member compareString n replacements;
+        functionReceivesEvidence = case function of {
+          LexicalRef n -> receivesEvidence n;
+          DeclRef _ _ -> False
+        }
+      } in if functionReceivesEvidence || any receivesEvidence names
+        then closeWantedReading nested replacements candidates (dictionaryApplication function names)
+        else expression;
       SLet n a b ->
         SLet n (closeWantedReading nested replacements candidates a) (closeWantedReading nested replacements candidates b);
       SAnn a ty -> SAnn (closeWantedReading nested replacements candidates a) ty;

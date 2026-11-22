@@ -190,6 +190,15 @@ module MLF.Tests.SharedFrontend where {
   };
   failsWith :: String -> String -> Bool;
   failsWith body expected = case evaluated body of { Left actual -> eqString actual expected; Right _ -> False };
+  saturatedPrimitiveRouting = let {
+    predicate = SApp (SApp (SPrimitive PEqInt) (SIntLit 1)) (SIntLit 1);
+    program = SProgram [] (SApp (SApp (SApp (SPrimitive PIfThenElse) predicate) (SIntLit 7)) (SIntLit 9));
+    form = mapEither (compose Constraint.form Constraint.skeleton)
+  } in case (,) (form (Constraint.generateFileProgram program)) (form (Constraint.generateProgram program)) of {
+    (,) (Right (FApplyPrimitive PIfThenElse [_]
+      [((,) (Typed _ (FApplyPrimitive PEqInt [] [_,_])) _),_,_])) (Right (FApply _ _ _ _)) -> True;
+    _ -> False
+  };
   boxFunctor :: String;
   boxFunctor = "data Box a = Box a\ninstance Functor Box where { fmap f (Box x) = Box (f x) }\nunBox (Box x) = x\n";
   boxApplicative :: String;
@@ -2467,6 +2476,20 @@ module MLF.Tests.SharedFrontend where {
   nativeFirst :: IO ();
   nativeFirst = do {
     listExpressionChecks;
+    check "file-owned constraints specialize saturated primitives" saturatedPrimitiveRouting;
+    check "wildcard columns stay lazy and a binder in a later row shadows the outer name"
+      (evaluatesInt
+        ("outer = 40\npick _ _ _ True = outer\npick _ _ outer False = outer\n" ++
+         "unused :: Int\nunused = panic \"unused pattern column\"\n" ++
+         "main = addInt (pick unused unused unused True) (pick unused unused 2 False)")
+        42);
+    check "saturated conditional preserves rank and lazy integer alternatives"
+      (evaluatesInt
+        ("choose :: Bool -> (forall a. a -> a) -> (forall a. a -> a) -> Int\n" ++
+         "choose test f g = (if test then f else g) 13\n" ++
+         "pick n = case n of { 1 -> choose True (\\x -> x) (\\x -> panic \"unselected function\"); 0 -> panic \"unselected alternative\"; _ -> 16 }\n" ++
+         "main = addInt (pick 1) (pick 8)")
+        29);
     check "default and generated-name capture execution" (evaluatesInt captureDefaults 40);
     check "native standard hierarchy inference" (evaluatesInt (boxMonad ++ "main = unBox (do { x <- pure 40; return (x + 2) })") 42);
     check "native Applicative defaults" (evaluatesInt (boxApplicative ++ "main = unBox (liftA2 addInt (Box 30) (Box 12))") 42);

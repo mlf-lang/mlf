@@ -46,7 +46,9 @@ module Bootstrap.Desugar where {
     SWantedRefs n candidates -> (:) n (foldr (\candidate more -> (:) (termRefName (snd candidate)) more) rest candidates);
     SConstructor n -> (:) n rest;
     SLam n _ body -> (:) n (namesBefore body rest);
+    SBindDictionaries names body -> append names (namesBefore body rest);
     SApp f a -> namesBefore f (namesBefore a rest);
+    SApplyDictionaries f names -> (:) (termRefName f) (append names rest);
     SLet n rhs body -> (:) n (namesBefore rhs (namesBefore body rest));
     SAnn body _ -> namesBefore body rest;
     SSignature body _ -> namesBefore body rest;
@@ -75,6 +77,8 @@ module Bootstrap.Desugar where {
       SPrimitive _ -> state; SIntLit _ -> state; SBoolLit _ -> state;
       SStringLit _ -> state; SDoubleLit _ -> state;
       SLam name _ value -> let { next = reserveName state name } in seq next (visit next value);
+      SBindDictionaries names body -> let { next = foldlStrict reserveName state names }
+        in seq next (visit next body);
       SLet name value body -> let {
         named = reserveName state name; next = seq named (visit named value)
       } in seq next (visit next body);
@@ -142,6 +146,7 @@ module Bootstrap.Desugar where {
     };
     SDeclScope ids body -> do { b <- sharedGo env body; freshPure (SDeclScope ids b) };
     SGivenScope names body -> do { b <- sharedGo env body; freshPure (SGivenScope names b) };
+    SBindDictionaries names body -> do { b <- sharedGo env body; freshPure (SBindDictionaries names b) };
     SSourceDefinition body -> do { b <- sharedGo env body; freshPure (SSourceDefinition b) };
     SCallSite n location body -> do { b <- sharedGo env body; freshPure (SCallSite n location b) };
     SLam n annotation body -> do { b <- sharedGo env body; freshPure (SLam n annotation b) };
@@ -177,6 +182,7 @@ module Bootstrap.Desugar where {
     case expression of {
       SDeclScope ids body -> do { b <- go body; freshPure (SDeclScope ids b) };
       SGivenScope names body -> do { b <- go body; freshPure (SGivenScope names b) };
+      SBindDictionaries names body -> do { b <- go body; freshPure (SBindDictionaries names b) };
       SSourceDefinition body -> do { b <- go body; freshPure (SSourceDefinition b) };
       SCallSite name location body -> do {
         result <- go body; freshPure (SCallSite name location result)

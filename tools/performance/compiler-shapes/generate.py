@@ -53,6 +53,49 @@ def program(family, n):
         if family == 'local_functions':
             expression = 'let {\n'+declarations+'} in '+expression
             declarations = ''
+    elif family == 'class_declaration_reservations':
+        declarations = '''data Token = Token Int;
+class Score a where { score :: a -> Int };
+instance Score Token where { score (Token value) = value };
+'''
+        names = [f'compilerShapeReservationForIndependentTopLevelPredecessor{i}' for i in range(n)]
+        for i, name in enumerate(names):
+            declarations += (f'{name} :: Int -> Int;\n'
+                             f'{name} x = score (Token (addInt x {i}));\n')
+        expression = balanced([f'{name} x' for name in names],
+                              lambda a, b: f'addInt ({a}) ({b})')
+    elif family == 'datatype_validation_fanout':
+        declarations = 'data Token = ' + ' | '.join(f'Tag{i} Int' for i in range(n)) + ';\n'
+        declarations += ''.join(
+            f'probe{i} :: Token -> Int;\n'
+            f'probe{i} t = case t of {{ Tag{i} x -> addInt x {i}; _ -> {i} }};\n'
+            for i in range(n))
+        calls = [f'probe{i} (if ltInt x 0 then Tag{(i+1)%n} x else Tag{i} x)' for i in range(n)]
+        expression = balanced(calls, lambda a, b: f'addInt ({a}) ({b})')
+    elif family == 'shared_datatype_fragments':
+        alternatives = ' | '.join(f'Alternate{i}' for i in range(n))
+        rows = [f'data Shared = Primary Int | {alternatives};']
+        for i in range(n):
+            rows.extend((f'data Local{i} = Local{i} Int;',
+                         f'project{i} :: Shared -> Local{i} -> Int;',
+                         f'project{i} shared (Local{i} y) = case shared of {{ Primary z -> addInt z y; _ -> y }};'))
+        terms = [f'(project{i} shared (Local{i} {i}))' for i in range(n)]
+        total = balanced(terms, lambda a, b: f'(addInt {a} {b})')
+        rows.append('entry :: Int -> Int;\n'
+                    f'entry x = let {{ shared = if ltInt x 0 then Alternate0 else Primary x }} in {total};')
+        return HEADER + '\n'.join(rows) + '\n' + MAIN
+    elif family == 'local_dictionary_branch_fanout':
+        definitions = ['level0 z = if ltInt z 0 then stringLength "a" else stringLength "bb"']
+        for i in range(1, n + 1):
+            definitions.append(f'level{i} z = if ltInt z {i} '
+                               f'then level{i-1} (addInt z {i}) else level{i-1} (subInt z {i})')
+        return (HEADER + 'hotTransaction start = let {\n' + ';\n'.join(definitions)
+                + f'\n}} in level{n} start;\nentry x = hotTransaction x;\n' + MAIN)
+    elif family == 'polymorphic_import_fanout':
+        declarations = ''.join(f'helper{i} x = x;\n' for i in range(n))
+        terms = [f'helper{i} (addInt x {i})' for i in range(n)]
+        expression = balanced(terms, lambda left, right: f'addInt ({left}) ({right})')
+        return HEADER + declarations + f'entry x = {expression};\n' + MAIN
     elif family == 'inferred_poly_chain':
         declarations = 'f0 step y = step y;\n'
         declarations += ''.join(f'f{i} step y = step (f{i-1} step y);\n' for i in range(1, n))
@@ -78,6 +121,84 @@ def program(family, n):
         declarations = f'apply f value = f value;\nfanout measure value base = {total};\n'
         expression = ('addInt (fanout addInt x x) '
                       '(fanout (\\flag offset -> if flag then offset else subInt 0 offset) (ltInt x 0) x)')
+    elif family == 'polymorphic_box_fanout':
+        declarations = '''data Box a = Box a;
+step :: forall a. Box a -> (a -> Int) -> Int;
+step (Box item) next = next item;
+'''
+        terms = [f'step box (\\item -> measure item {i})' for i in range(n)]
+        total = balanced(terms, lambda left, right: f'addInt ({left}) ({right})')
+        expression = ('addInt (fanout addInt (Box x)) '
+                      '(fanout (\\flag offset -> if flag then offset else subInt 0 offset) (Box (ltInt x 0)))')
+        return HEADER + declarations + f'fanout measure box = {total};\nentry x = {expression};\n' + MAIN
+    elif family == 'inferred_dictionary_prefix':
+        cases = '\n'.join(f'    {i} -> punct "mark{i}";' for i in range(n))
+        declarations = f'''loop consume fuel code state = if ltInt fuel 1 then state else let {{
+  punct text = loop consume (subInt fuel 1) code (consume state text)
+}} in case code of {{
+{cases}
+    _ -> punct "default"
+  }};
+'''
+        expression = rf'loop (\state text -> addInt state (stringLength text)) 2 (remInt x {n}) x'
+        return HEADER + declarations + f'entry x = {expression};\n' + MAIN
+    elif family == 'polymorphic_scanner_cases':
+        cases = '\n'.join(f'      {200 + i} -> punct "mark{i}";' for i in range(n))
+        declarations = r'''data Token = Token String Int Int Int Int;
+data Cursor = Cursor Int Int Int;
+data Checked a b = Failed a | Succeeded b;
+data Spelling = Spelling String NameTable;
+data Scanned = Scanned Int Token;
+data NameTable = Names Int;
+data TokenOutput h = TokenOutput (Int -> Token -> h -> h) (Int -> Token -> h -> h)
+  (Token -> h -> h) (Token -> h -> h) (h -> Token -> Checked String Scanned);
+spellingAt :: String -> Int -> NameTable -> Spelling;
+spellingAt source i names = Spelling (stringSlice source i 1) names;
+skip :: String -> String -> Int -> Cursor -> Checked String Cursor;
+skip file source size cursor = Succeeded cursor;
+collect output@(TokenOutput word number punctuation _ finish) skipQuoted file source size known seen (Cursor start row column) = let {
+  loop i line col names history =
+    if i >= size then finish history (Token "" line col line col) else let {
+      c = stringCodeAt source i;
+      next = i + 1;
+      slow = resume output skipQuoted file source size names history (Cursor i line col);
+      emit save scalar end table spelling = let {
+        lastColumn = col + (end - i);
+        token = Token spelling line col line lastColumn;
+        more = save scalar token history
+      } in seq lastColumn (seq more (loop end line lastColumn table more));
+      punctuationAt _ token prefix = punctuation token prefix;
+      punct spelling = emit punctuationAt c next names spelling
+    } in case c of {
+      32 -> loop next line (col + 1) names history;
+      40 -> punct "(";
+      41 -> punct ")";
+      65 -> emit word c next names "A";
+      57 -> emit number c next names "9";
+''' + cases + r'''
+      _ -> slow
+    }
+} in loop start row column known seen;
+resume output@(TokenOutput _ _ _ save finish) skipQuoted file source size names seen cursor =
+  case skipQuoted file source size cursor of {
+    Failed reason -> Failed reason;
+    Succeeded (Cursor i row col) -> if i >= size then finish seen (Token "" row col row col)
+      else case spellingAt source i names of {
+        Spelling spelling nextNames -> let {
+          token = Token spelling row col row (col + 1);
+          more = save token seen
+        } in seq more (collect output skipQuoted file source size nextNames more (Cursor (i + 1) row (col + 1)))
+      }
+  };
+result value = case value of { Failed _ -> subInt 0 1; Succeeded (Scanned count _) -> count };
+'''
+        expression = rf'''let {{
+  measure (Token text _ _ _ _) count = addInt count (stringLength text);
+  step _ token count = measure token count;
+  finish count token = Succeeded (Scanned count token);
+  input = concatString "A(9)" (if ltInt x 0 then "#" else stringFromCode (addInt 200 (remInt x {n})))
+}} in result (collect (TokenOutput step step measure measure finish) skip "" input
+  (stringLength input) (Names 0) x (Cursor 0 1 1))'''
     elif family == 'polymorphic_tree_fold':
         declarations = '''data Tree a = Leaf a | Branch (Tree a) (Tree a);
 foldTree :: forall a b. (a -> b -> b) -> b -> Tree a -> b;
@@ -90,6 +211,45 @@ foldPair step seed left right = foldTree step seed (Branch (Leaf left) (Leaf rig
         calls = [f'foldPair addInt x (addInt x {i}) x' for i in range(n)]
         total = balanced(calls, lambda left, right: f'addInt ({left}) ({right})')
         return HEADER + declarations + f'entry x = {total};\n' + MAIN
+    elif family == 'inferred_monadic_recursion':
+        steps = '\n'.join(f'    a{i+1} <- pure (addInt a{i} x);' for i in range(n))
+        declarations = f'''data Work a = Done a;
+instance Functor Work where {{ fmap f (Done x) = Done (f x) }};
+instance Applicative Work where {{ pure x = Done x; (<*>) (Done f) (Done x) = Done (f x) }};
+instance Monad Work where {{ (>>=) (Done x) next = next x }};
+data Tree = Leaf Int | Branch Tree Int;
+core :: Tree -> Work Int;
+core tree = work tree;
+work tree = case tree of {{
+  Leaf y -> return y;
+  Branch body x -> do {{
+    a0 <- core body;
+{steps}
+    return a{n}
+  }}
+}};
+'''
+        expression = 'case core (Branch (Leaf x) x) of { Done a -> a }'
+    elif family in ('shared_callback_let_chain', 'queued_callback_let_chain'):
+        bindings = []
+        previous = 'x'
+        for i in range(n):
+            rule, state = f'rule{i}', f'state{i}'
+            operand = f'(mulInt {previous} y)' if family == 'shared_callback_let_chain' else 'y'
+            bindings.append(f'{rule} y = remInt (addInt {previous} {operand}) 251')
+            bindings.append(f'{state} = if ltInt x {i} then {rule} x else {rule} (addInt x 1)')
+            previous = state
+        return HEADER + 'entry :: Int -> Int;\nentry x = let {\n' + ';\n'.join(bindings) + f'\n}} in {previous};\n' + MAIN
+    elif family == 'deferred_constructor_spine':
+        pattern = '(Link _ ' * (n - 1) + '(Link here _)' + ')' * (n - 1)
+        declarations = f'''data Chain = End | Link Int Chain;
+make :: Int -> Int -> Chain;
+make remaining value = if ltInt remaining 1 then End
+  else Link value (make (subInt remaining 1) (addInt value 1));
+inspect :: Chain -> Int;
+inspect value = case value of {{ {pattern} -> here; _ -> 0 }};
+'''
+        expression = f'inspect (make (if ltInt x 0 then {n - 1} else {n}) x)'
     elif family == 'signed_constructor_cases':
         declarations = '''data Path a = End | Step a (Path a);
 build :: Int -> Int -> Path Int;
@@ -104,6 +264,28 @@ build count base = if ltInt count 1 then End else
     elif family == 'recursive_ring':
         declarations = ''.join(f'f{i} :: Int -> Int;\nf{i} x = if ltInt x 1 then {i} else f{(i+1)%n} (subInt x 1);\n' for i in range(n))
         expression = 'f0 x'
+    elif family == 'mixed_parser_recursion':
+        declarations = r'''data Reply a = Stop | Next a Int;
+data Parser a = Parser (Int -> Reply a);
+run :: forall a. Parser a -> Int -> Reply a;
+run (Parser f) state = f state;
+pureP :: forall a. a -> Parser a;
+pureP x = Parser (\state -> Next x state);
+mapP :: forall a b. (a -> b) -> Parser a -> Parser b;
+mapP f p = Parser (\state -> case run p state of { Stop -> Stop; Next x s -> Next (f x) s });
+bindP :: forall a b. Parser a -> (a -> Parser b) -> Parser b;
+bindP p f = Parser (\state -> case run p state of { Stop -> Stop; Next x s -> run (f x) s });
+choice :: forall a. Parser a -> Parser a -> Parser a;
+choice p q = Parser (\s -> case run p s of { Stop -> run q s; hit -> hit });
+tick :: Parser Int;
+tick = Parser (\s -> if ltInt s 1 then Stop else Next s (subInt s 1));
+'''
+        declarations += ''.join(
+            f'rule{i} :: Parser Int;\n'
+            f'rule{i} = choice (bindP tick (\\_ -> tail{i} {i})) (pureP {i});\n'
+            f'tail{i} first = mapP (addInt (addInt first 1)) rule{(i+1)%n};\n'
+            for i in range(n))
+        expression = 'case run rule0 x of { Next value _ -> value; Stop -> (-1) }'
     elif family in ('mono_calls', 'poly_calls'):
         ty = 'Int' if family == 'mono_calls' else 'a'
         quantified = 'forall a. ' if family == 'poly_calls' else ''
@@ -225,8 +407,18 @@ def expected(family, n, x):
     """Closed-form specifications; no compiled results or generated helpers used."""
     if family == 'baseline':
         return x
-    if family in ('flat_functions', 'inferred_functions', 'local_functions', 'mono_calls', 'poly_calls', 'tree_chain', 'balanced_tree'):
+    if family in ('flat_functions', 'inferred_functions', 'local_functions', 'mono_calls', 'poly_calls',
+                  'class_declaration_reservations',
+                  'tree_chain', 'balanced_tree', 'polymorphic_import_fanout'):
         return n*x + n*(n-1)//2
+    if family == 'datatype_validation_fanout':
+        return x if n == 1 else n*max(0, x) + n*(n-1)//2
+    if family == 'shared_datatype_fragments':
+        return n*max(0, x) + n*(n-1)//2
+    if family == 'local_dictionary_branch_fanout':
+        for threshold in range(n, 0, -1):
+            x += threshold if x < threshold else -threshold
+        return 1 if x < 0 else 2
     if family in ('dependency_chain', 'inferred_chain', 'higher_order_chain'):
         return x+n
     if family == 'inferred_poly_chain':
@@ -238,13 +430,35 @@ def expected(family, n, x):
     if family == 'polymorphic_fanout':
         offsets = n*x + n*(n-1)//2
         return n*x + offsets + (offsets if x < 0 else -offsets)
+    if family == 'polymorphic_box_fanout':
+        return n*x + (n*(n-1) if x < 0 else 0)
+    if family == 'inferred_dictionary_prefix':
+        label_length = len(str(x % n)) + 4 if x >= 0 else (7 if x % n else 5)
+        return x + 2 * label_length
+    if family == 'polymorphic_scanner_cases':
+        return x + 4 + (1 if x < 0 else len(f'mark{x % n}'))
     if family == 'polymorphic_tree_fold':
         total = 3*n*x + n*(n-1)//2
         return (total + 2**63) % 2**64 - 2**63
+    if family == 'inferred_monadic_recursion':
+        return ((n + 1)*x + 2**63) % 2**64 - 2**63
+    if family == 'shared_callback_let_chain':
+        computed = max(0, min(n, x+1))
+        magnitude = abs(x) * pow(abs(x+2), computed, 251) * pow(abs(x+1), n-computed, 251) % 251
+        return -magnitude if x < 0 and n % 2 == 0 else magnitude
+    if family == 'queued_callback_let_chain':
+        value = (n+1)*x + max(0, min(n, x+1))
+        return -(abs(value) % 251) if value < 0 else value % 251
+    if family == 'deferred_constructor_spine':
+        return 0 if x < 0 else x+n-1
     if family == 'signed_constructor_cases':
         return x + int(x >= 0 or n >= 2)
     if family == 'recursive_ring':
         return max(0,x) % n
+    if family == 'mixed_parser_recursion':
+        cycles, remainder = divmod(max(0, x), n)
+        # Each full circuit adds 1 through n. The stopping rule returns its index.
+        return cycles * n * (n + 1) // 2 + remainder * (remainder + 1) // 2 + remainder
     if family == 'wide_case':
         return x + 2 * max(0, min(x, n-1)) + 1
     if family == 'class_instances':
@@ -302,6 +516,15 @@ def generate(out, sizes=None, families=None):
             inputs = data_shapes.inputs(family, n)
         elif family == 'rank2_callbacks':
             inputs = [-1, n//2, n]
+        elif family == 'inferred_dictionary_prefix':
+            inputs = [-n-1, -n, n-1]
+        elif family == 'mixed_parser_recursion':
+            inputs = [-1, 0, n-1, n, 2*n+1]
+        elif family == 'local_dictionary_branch_fanout':
+            limit = n*(n+1)//2 + 1
+            inputs = [-limit, 0, limit]
+        elif family in ('shared_callback_let_chain', 'queued_callback_let_chain'):
+            inputs = [1, 7, 19]
         elif family in ('captured_closures', 'wide_product'):
             inputs = [-n-1, 0, n+1]
         cases.append({'id':identity,'family':family,'size':n,'source':str(source.resolve()),

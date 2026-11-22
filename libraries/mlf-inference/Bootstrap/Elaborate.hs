@@ -35,7 +35,11 @@ module Bootstrap.Elaborate where {
   contextGraph :: TypeContext -> Graph;
   contextGraph (TypeContext graph types bounds parents) = graph;
   prepareTypes :: Graph -> TypeContext;
-  prepareTypes graph =
+  prepareTypes = prepareTypesWith Nothing;
+  prepareSolvedTypes :: Solver -> TypeContext;
+  prepareSolvedTypes solver = prepareTypesWith (Just (Solver.bindingChildren solver)) (Solver.solverGraph solver);
+  prepareTypesWith :: Maybe (IntMap IntSet) -> Graph -> TypeContext;
+  prepareTypesWith bindings graph =
     let {
       context :: TypeContext;
       context =
@@ -48,8 +52,11 @@ module Bootstrap.Elaborate where {
       -- alias keys, so those use the resolving queries.
       renderType n node = if IM.notMember n (G.links graph)
         then typeAtNode context n node else typeAtRaw context n;
-      renderBounds n node = if IM.notMember n (G.links graph)
-        then boundsAtNode context n node else boundsAtRaw context n
+      renderBounds n node = case bindings of {
+        Nothing -> if IM.notMember n (G.links graph)
+          then boundsAtNode context n node else boundsAtRaw context n;
+        Just children -> boundsAtIndexed context children n node
+      }
     } in
     context;
   typeAtIn :: TypeContext -> Int -> XType;
@@ -113,26 +120,37 @@ module Bootstrap.Elaborate where {
     else typeAtIn context identity;
   boundsAtRaw :: TypeContext -> Int -> [] ((,) XTyVar XType);
   boundsAtRaw context parent = boundsAtNode context parent (G.nodeAt (contextGraph context) parent);
+  boundRoot :: Int -> Node -> Int;
+  boundRoot parent node = case G.tag node of { GGen root -> root; _ -> parent };
+  -- A solved, normalized graph certifies that a type binder reaches its
+  -- children, and normalization makes unreachable Gen children rigid. Use
+  -- the checked reverse index to answer empty and singleton bounds directly.
+  -- Several bounds still follow the structural postorder used by elaboration.
+  boundsAtIndexed :: TypeContext -> IntMap IntSet -> Int -> Node -> [] ((,) XTyVar XType);
+  boundsAtIndexed context children parent node = let {
+    graph = contextGraph context;
+    eligible identity = let { child = IM.get identity (G.nodes graph) } in
+      isFlexible (G.flag child) && not (G.isGen (G.tag child));
+    candidates = IS.filter eligible (IM.findWithDefault IS.empty parent children);
+    ordered = case IS.toList candidates of {
+      [] -> [];
+      (:) one [] -> (:) one [];
+      _ -> filter (\identity -> IS.member identity candidates) (G.orderedBelow graph (boundRoot parent node))
+    }
+  } in map (\identity -> (,) (XTyVar identity) (typeAtIn context identity)) ordered;
   boundsAtNode :: TypeContext -> Int -> Node -> [] ((,) XTyVar XType);
   boundsAtNode context parent node =
     case context of {
       TypeContext graph types bounds parents ->
         if IS.notMember parent parents
         then []
-        else let {
-               resolvedParent = G.resolve graph parent;
-               root =
-                 case G.tag node of {
-                   GGen identity -> identity;
-                   _ -> parent
-                 }
-             } in
+        else let { resolvedParent = G.resolve graph parent } in
              map (\identity -> (,) (XTyVar identity) (typeAtIn context identity))
                (filter
                   (\identity ->
                      (sameParent resolvedParent (G.binder (G.nodeAt graph identity)) &&
                       isFlexible (G.flag (G.nodeAt graph identity))))
-                  (G.orderedBelow graph root))
+                  (G.orderedBelow graph (boundRoot parent node)))
     };
   schemeTypeIn context gen =
     let {
@@ -450,7 +468,15 @@ module Bootstrap.Elaborate where {
       FScopedEvidence scope -> (:) ((,,) gen (EvidenceContext env givens) (ScopedEvidence scope)) rest;
       FEvidence candidates -> (:) ((,,) gen (EvidenceContext env givens) (ExplicitEvidence candidates)) rest;
       FLambda _ _ body _ -> child body rest;
+      FBindDictionaries _ body _ -> child body rest;
       FApply a b _ _ -> child a (child b rest);
+      FApplyVariable _ _ argument _ -> child argument rest;
+      FApplyDictionaries _ _ _ -> rest;
+      FApplyGroundDictionaries _ _ arguments -> foldr (\((,) argument _) tail -> child argument tail) rest arguments;
+      FApplyPrimitive _ _ arguments -> foldr (\((,) argument _) tail -> child argument tail) rest arguments;
+      FIntStringCalls _ worker value _ _ arms fallback _ ->
+        child worker (child value (foldr (\(StringCallArm _ _ argument _ _) tail -> child argument tail)
+          (child fallback rest) arms));
       FBinding _ a b _ -> child a (child b rest);
       FMatch scrutinee _ branches -> child scrutinee
         (foldr (\(Branch _ body _) more -> child body more) rest branches);
@@ -544,12 +570,48 @@ module Bootstrap.Elaborate where {
               body' <- childEdge body edge;
               Right (XAbs name (referenceIn context domain) body')
             };
+          FBindDictionaries args body edge -> do {
+            term <- childEdge body edge;
+            Right (foldr (\((,) name domain) b -> XAbs name (referenceIn context domain) b) term args)
+          };
           FApply a b ea eb ->
             do {
               a' <- childEdge a ea;
               b' <- childEdge b eb;
               Right (XApp a' b')
             };
+          FApplyVariable name use argument proof -> do {
+            function <- instantiateEdgeIn context datatypes solver env (XVarTerm name) use;
+            operand <- childEdge argument proof;
+            Right (XApp function operand)
+          };
+          FApplyDictionaries f proof arguments -> do {
+            function <- instantiateEdgeIn context datatypes solver env (XVarTerm f) proof;
+            Right (foldl (\value name -> XApp value (XVarTerm name)) function arguments)
+          };
+          FApplyGroundDictionaries f proof arguments -> do {
+            function <- instantiateEdgeIn context datatypes solver env (XVarTerm f) proof;
+            operands <- mapM (\((,) argument edge) -> childEdge argument edge) arguments;
+            Right (foldl XApp function operands)
+          };
+          FApplyPrimitive primitive types arguments -> do {
+            operands <- mapM (\((,) argument proof) -> childEdge argument proof) arguments;
+            Right (foldl XApp (XPrimitive primitive (map (referenceIn context) types)) operands)
+          };
+          FIntStringCalls operator worker value valueProof result arms fallback restProof -> do {
+            word <- child worker;
+            subject <- childEdge value valueProof;
+            let { arm (StringCallArm key text argument operand proof) = do {
+              function <- instantiateEdgeIn context datatypes solver env (XVarTerm operator) proof;
+              selected <- childEdge argument operand;
+              let { test = XApp (XApp (XPrimitive PEqInt []) subject) (XIntTerm key);
+                    branch = XApp (XApp function selected) (XStringTerm text) };
+              Right (XApp (XApp (XPrimitive PIfThenElse [referenceIn context result]) test) branch)
+            } };
+            branches <- mapM arm arms;
+            fallback' <- childEdge fallback restProof;
+            Right (XLet operator word (foldr XApp fallback' branches))
+          };
           FBinding name a b edge ->
             do {
               a' <- child a;

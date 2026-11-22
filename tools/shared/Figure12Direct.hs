@@ -63,6 +63,8 @@ freeNames expression = case expression of
   T.SGlobal _ _ -> error "Figure12 signature oracle received a resolved global"
   T.SDeclScope _ _ -> error "Figure12 signature oracle received a declaration scope"
   T.SGivenScope _ _ -> error "Figure12 signature oracle received a given scope"
+  T.SApplyDictionaries _ _ -> error "Figure12 signature oracle received a dictionary application"
+  T.SBindDictionaries _ _ -> error "Figure12 signature oracle received dictionary binders"
   T.SWantedScope _ _ -> error "Figure12 signature oracle received resolved evidence"
   T.SWantedRefs _ _ -> error "Figure12 signature oracle received resolved evidence"
   T.SConstructor _ -> Set.empty

@@ -17,6 +17,7 @@ module Bootstrap.LLVM.Codegen where {
   import qualified Bootstrap.LLVM.Native as N;
   import qualified Bootstrap.LLVM.Result as R;
   import qualified Bootstrap.LLVM.LazyProducer as V;
+  import qualified Bootstrap.X.Syntax as X;
   generate :: Map String ((,) Int Int) -> XErased -> Either String ((,) String ([] String));
   generate = generateWithClosedConstructors True;
   -- Separately compiled units can receive constructor fields allocated by
@@ -239,7 +240,8 @@ module Bootstrap.LLVM.Codegen where {
       (L.map (\optional -> case optional of { Nothing -> "ignored"; Just _ -> "bound" }) names) fields))
   };
   callbackFresh :: Bool -> [] XName -> Maybe XName -> XErased -> Build String;
-  callbackFresh private captures argument body =
+  callbackFresh = callbackFreshWith evaluate;
+  callbackFreshWith finish private captures argument body =
     do {
       name <- fresh "@mlf.code.";
       definition name (args2 "ptr %env" "ptr %arg")
@@ -256,7 +258,7 @@ module Bootstrap.LLVM.Codegen where {
                  Just n -> M.insert O.compareName n (CGBinding "%arg" False) scope
                }
            };
-           evaluate local body
+           finish local body
          });
       cgPure name
     };
@@ -275,7 +277,7 @@ module Bootstrap.LLVM.Codegen where {
       let { names = L.append (A.captures f) (A.parameters f) };
       let { registers = L.map (\i -> "%a" ++ showInt i) (L.range 0 (L.length names - 1)) };
       let { scope = M.fromList O.compareName
-              (L.zipWith (\n register -> (,) n (CGBinding register (S.member O.compareName n (A.strict f)))) names registers) };
+              (L.zipWith (\n register -> (,) n (CGWorkerArgument register (S.member O.compareName n (A.strict f)))) names registers) };
       definitionTyped resultType symbol (L.map pointer registers) (evaluateResult scope (A.functionBody f))
     };
     cgPure symbol
@@ -423,7 +425,7 @@ module Bootstrap.LLVM.Codegen where {
                  M.fromList O.compareName
                    (L.zipWith
                       (\n register ->
-                         (,) n (CGBinding register (S.member O.compareName n (A.strict f))))
+                         (,) n (CGWorkerArgument register (S.member O.compareName n (A.strict f))))
                       names
                       registers)
              };
@@ -479,6 +481,9 @@ module Bootstrap.LLVM.Codegen where {
     XEPrimitive _ -> intact;
     XEApp f a -> matchPair XEApp f a;
     XELet n a b -> if O.eqName n reductionLiteral then Nothing else matchPair (XELet n) a b;
+    XECase subject [XErasedAlternative pattern body] ->
+      if L.any (O.eqName reductionLiteral) (X.patternNames pattern) then Nothing
+      else matchPair (\value branch -> XECase value [XErasedAlternative pattern branch]) subject body;
     _ -> Nothing
   };
   matchReductionLeaf :: Output -> XErased -> Maybe ((,,) XErased ([] String) Int);
@@ -621,11 +626,15 @@ module Bootstrap.LLVM.Codegen where {
       else finishCase (finishOrdinary arity) scope scrutinee alternatives
     };
     _ -> case O.applications expression of {
-      (,) (XEPrimitive PIfThenElse) [condition,yes,no] -> do {
-        value <- evaluate scope condition;
-        test <- result ("icmp eq ptr " ++ value ++ ", " ++ immediate 6);
-        finishChoice test (finishOrdinary arity scope yes) (finishOrdinary arity scope no)
-      };
+      (,) (XEPrimitive PIfThenElse) [condition,yes,no] ->
+        case integerCases condition yes no of {
+          Just ((,,) name arms fallback) -> finishIntegerCases (finishOrdinary arity) scope name arms fallback;
+          Nothing -> do {
+            value <- evaluate scope condition;
+            test <- result ("icmp eq ptr " ++ value ++ ", " ++ immediate 6);
+            finishChoice test (finishOrdinary arity scope yes) (finishOrdinary arity scope no)
+          }
+        };
       (,) (XEPrimitive PSeq) [first,next] -> do {
         evaluate scope first;
         finishOrdinary arity scope next
@@ -779,7 +788,7 @@ module Bootstrap.LLVM.Codegen where {
           else (:) (pointer (producerRegister selected index)) []) entries };
       let { scope = M.fromList O.compareName (L.map
         (\((,) index parameter) -> (,) parameter
-          (CGBinding (producerRegister selected index) (S.member O.compareName parameter (A.strict f))))
+          (CGWorkerArgument (producerRegister selected index) (S.member O.compareName parameter (A.strict f))))
         (L.filter (\((,) index ignored) -> index /= selected) entries)) };
       definition symbol parameters
         (evaluateProducerPrefix info mode first second scope (V.prefixExpression name (V.prefix info)))
@@ -834,7 +843,7 @@ module Bootstrap.LLVM.Codegen where {
       (,) (XEPrimitive PIfThenElse) ((:) condition ((:) yes ((:) no []))) -> do {
         boxed <- result ("icmp eq i64 " ++ mode ++ ", 0");
         value <- choose "ptr" boxed
-          (forceBinding (CGBinding first False))
+          (forceBinding (CGWorkerArgument first False))
           (evaluate (producerScope info (args2 first second)) (V.recipe info));
         evaluate (M.insert O.compareName (V.parameter info) (CGBinding value True) scope) expression
       };
@@ -1003,7 +1012,7 @@ module Bootstrap.LLVM.Codegen where {
   readyName scope known name = case M.lookup O.compareName name scope of {
     Nothing -> False;
     Just (CGSlot _ forced) -> forced;
-    Just (CGBinding value forced) -> forced || M.member compareString value known
+    Just binding -> evaluated binding || M.member compareString (operand binding) known
   };
   nextDemandIs :: Map XName CGBinding -> Map String String -> XName -> [] XName -> Bool;
   nextDemandIs scope known binder names = case names of {
@@ -1062,7 +1071,8 @@ module Bootstrap.LLVM.Codegen where {
   -- function. Outline only at an existing evaluation point, immediately call
   -- the helper, and capture values so demand order and escaping closures stay
   -- unchanged. Both the expression and instruction scans are bounded.
-  evaluate scope expression = do {
+  evaluate = evaluateSkippingCases 0;
+  evaluateSkippingCases skipped scope expression = do {
     prior <- gets instructions;
     if O.remainingSize 128 expression < 0 && workerBodyLimit 4097 prior then do {
       fs <- gets functions;
@@ -1070,15 +1080,18 @@ module Bootstrap.LLVM.Codegen where {
       -- Loading an oversized environment could itself cross the instruction
       -- budget and re-outline the same expression indefinitely. Descend in the
       -- current function until the required capture set is small enough.
-      if L.length names > 1024 then evaluateBody scope expression else do {
-        code <- callback names Nothing expression;
+      if L.length names > 1024 then evaluateBodySkippingCases skipped scope expression else do {
+        -- The size guard also rules out callback interning. Keep the declined
+        -- prefix when the ordinary instruction budget outlines this branch.
+        code <- callbackFreshWith (evaluateSkippingCases skipped) False names Nothing expression;
         env <- environment scope names;
         call code (args2 (pointer env) "ptr null")
       }
-    } else evaluateBody scope expression
+    } else evaluateBodySkippingCases skipped scope expression
   };
   evaluateBody :: Map XName CGBinding -> XErased -> Build String;
-  evaluateBody scope expression =
+  evaluateBody = evaluateBodySkippingCases 0;
+  evaluateBodySkippingCases skipped scope expression =
     case expression of {
       XEVar n ->
         do {
@@ -1144,7 +1157,18 @@ module Bootstrap.LLVM.Codegen where {
           recursive <- recursiveBindings scope bindings body;
           evaluate recursive body
         };
-      XECase scrutinee alternatives -> evaluateCase evaluate scope scrutinee alternatives;
+      XECase scrutinee alternatives -> let {
+        ordinary remaining = evaluateCase (evaluateSkippingCases remaining) scope scrutinee alternatives
+      } in if skipped > 0 then ordinary (skipped - 1) else case constructorSpine alternatives of {
+        Right ((,,,,) constructor depth next found fallback) -> do {
+          available <- gets constructors;
+          case M.lookup compareString constructor available of {
+            Just ((,) tag 2) -> evaluateConstructorSpine scope scrutinee constructor tag depth next found fallback;
+            _ -> ordinary (depth - 1)
+          }
+        };
+        Left remaining -> ordinary remaining
+      };
       XEApp f a -> application scope expression;
       XEEvidenceHole hole -> failure "LLVM unresolved dictionary evidence"
     };
@@ -1200,6 +1224,78 @@ module Bootstrap.LLVM.Codegen where {
       emit ("  call void @mlf_fill(ptr " ++ operand hole ++ ", ptr " ++ value ++ ")")
     }) values;
     cgPure recursive
+  };
+  -- A successful arm may only demand one of this constructor's fields as the
+  -- next subject. At the last constructor it returns a single field. Every
+  -- default has the same closed literal and binds nothing.
+  constructorSpine :: [] XErasedAlternative -> Either Int ((,,,,) String Int Int Int Int);
+  constructorSpine alternatives = let {
+    matches n field = case field of { Just other -> X.equalName n other; _ -> False };
+    selected n a b = case (,) (matches n a) (matches n b) of {
+      (,) True False -> Just 0; (,) False True -> Just 1; _ -> Nothing
+    };
+    -- All prior levels matched this tag, field and literal. Their suffixes
+    -- reach the same mismatch. The mismatching case can start another spine.
+    scan constructor fallback step depth arms = let { stop = Left (depth - 2) } in case arms of {
+      [XErasedAlternative (XConstructorPattern name [a,b]) body,
+       XErasedAlternative (XDefaultPattern Nothing) (XEInt miss)] ->
+        if L.not (eqString name constructor) || miss /= fallback then stop else case body of {
+          XECase (XEVar n) next -> case selected n a b of {
+            Just field -> if field == step then scan constructor fallback step (depth + 1) next else stop;
+            Nothing -> stop
+          };
+          XEVar n -> if depth < 4 then stop else case selected n a b of {
+            Just field -> Right ((,,,,) constructor depth step field fallback); Nothing -> stop
+          };
+          _ -> stop
+        };
+      _ -> stop
+    }
+  } in case alternatives of {
+    [XErasedAlternative (XConstructorPattern constructor [a,b]) (XECase (XEVar n) next),
+     XErasedAlternative (XDefaultPattern Nothing) (XEInt fallback)] -> case selected n a b of {
+       Just step -> scan constructor fallback step 2 next; Nothing -> Left 0
+    };
+    _ -> Left 0
+  };
+  evaluateConstructorSpine scope subject constructor tag depth step found fallback = do {
+    first <- evaluate scope subject;
+    flags <- gets (\state -> M.findWithDefault compareString [] constructor (constructorFacts state));
+    let { strict field = L.fromMaybe False (L.at field flags);
+          offset field = 16 + 8 * field };
+    entry <- gets block;
+    loop <- fresh "spine.loop."; matched <- fresh "spine.match.";
+    advance <- fresh "spine.tail."; success <- fresh "spine.field.";
+    short <- fresh "spine.short."; join <- fresh "spine.join.";
+    next <- fresh "%spine.next."; decremented <- fresh "%spine.count.";
+    emit ("  br label %" ++ loop);
+    label loop;
+    value <- phi "ptr" [(,) first entry,(,) next advance];
+    remaining <- phi "i64" [(,) (showInt depth) entry,(,) decremented advance];
+    actual <- constructorTag value;
+    same <- result ("icmp eq i64 " ++ actual ++ ", " ++ showInt tag);
+    emit ("  br i1 " ++ same ++ ", label %" ++ matched ++ ", label %" ++ short);
+    label matched;
+    last <- result ("icmp eq i64 " ++ remaining ++ ", 1");
+    emit ("  br i1 " ++ last ++ ", label %" ++ success ++ ", label %" ++ advance);
+    label advance;
+    address <- result ("getelementptr i8, ptr " ++ value ++ ", i64 " ++ showInt (offset step));
+    let { load = "load ptr, ptr " ++ address ++ ", align 8, !tbaa !3" };
+    if strict step then emit ("  " ++ next ++ " = " ++ load) else do {
+      raw <- result load;
+      emit ("  " ++ next ++ " = call ptr @mlf.force(ptr " ++ raw ++ ")")
+    };
+    emit ("  " ++ decremented ++ " = sub i64 " ++ remaining ++ ", 1");
+    emit ("  br label %" ++ loop);
+    label success;
+    field <- loadAt "ptr" value (offset found);
+    answer <- if strict found then cgPure field else forceValue field;
+    emit ("  br label %" ++ join);
+    label short;
+    missed <- literalInteger fallback;
+    emit ("  br label %" ++ join);
+    label join;
+    phi "ptr" [(,) answer success,(,) missed short]
   };
   evaluateCase :: (Map XName CGBinding -> XErased -> Build String) ->
                   Map XName CGBinding -> XErased -> [] XErasedAlternative -> Build String;
@@ -1660,6 +1756,222 @@ module Bootstrap.LLVM.Codegen where {
     withScalarRanges (scalarRanges saved)
       (withArrayViews (arrayViews saved)
          (withUnboxedDoubles (unboxedDoubles saved) (withForcedValues (forcedValues saved) state)));
+  -- Source literal cases are lowered to nested equalities. An Int in the
+  -- compact range has a canonical immediate representation, whose low bit
+  -- distinguishes it from heap-boxed Ints.
+  integerCaseKey :: XErased -> Maybe ((,) XName Int);
+  integerCaseKey condition = case condition of {
+    XEApp (XEApp (XEPrimitive PEqInt) (XEVar name)) (XEInt value) ->
+      if N.smallBounds ((,) value value)
+      then Just ((,) name (2 * value + 1)) else Nothing;
+    _ -> Nothing
+  };
+  integerCases :: XErased -> XErased -> XErased -> Maybe ((,,) XName ([] ((,) Int XErased)) XErased);
+  integerCases condition yes no = do {
+    (,) name key <- integerCaseKey condition;
+    let {
+      collect seen reversed next = case next of {
+        XEApp (XEApp (XEApp (XEPrimitive PIfThenElse) test) branch) rest ->
+          case integerCaseKey test of {
+            Just ((,) use bits) ->
+              if O.eqName name use && L.not (S.member L.compareInt bits seen)
+              then collect (S.insert L.compareInt bits seen) ((:) ((,) bits branch) reversed) rest
+              else ((,) reversed next);
+            Nothing -> ((,) reversed next)
+          };
+        _ -> ((,) reversed next)
+      }
+    };
+    case collect (S.singleton key) [((,) key yes)] no of {
+      (,) arms fallback ->
+        if L.null (L.drop 2 arms) then Nothing else Just ((,,) name (L.reverse arms) fallback)
+    }
+  };
+  finishIntegerCases :: (Map XName CGBinding -> XErased -> Build ()) ->
+    Map XName CGBinding -> XName -> [] ((,) Int XErased) -> XErased -> Build ();
+  finishIntegerCases finish scope name arms fallback =
+    let { ordinary = finishIntegerSwitch finish scope name arms fallback } in
+    if M.member O.compareName caseString scope then ordinary else do {
+      state <- get;
+      case largestStringCaseRun state arms of {
+        Just run@(DenseStringRun offset start count body expected texts) ->
+          let { partial = finishPartialStringCase finish scope name arms fallback run } in
+          if offset /= 0 || L.not (L.null (L.drop count arms)) then partial else
+            case stringCaseKey state fallback of {
+              Just ((,,) _ fields defaultText) ->
+                if L.eqList eqString expected fields
+                then emitDenseStringCases finish scope name start body texts defaultText
+                else partial;
+              Nothing -> partial
+            };
+        Nothing -> ordinary
+      }
+    };
+  -- Replace one static string in each arm with a common operand. The exact
+  -- callback key checks the remaining expression, including worker captures.
+  -- Choosing the operand does not evaluate any part of the continuation.
+  caseString :: XName;
+  caseString = XName (0 - 9223372036854775807) "case string";
+  stringCaseTemplate :: XErased -> Maybe ((,) XErased (Maybe String));
+  stringCaseTemplate expression = let {
+    intact = Just ((,) expression Nothing);
+    matchPair combine function argument = do {
+      (,) f first <- stringCaseTemplate function;
+      (,) a second <- stringCaseTemplate argument;
+      literal <- case first of {
+        Nothing -> Just second;
+        Just _ -> case second of { Nothing -> Just first; Just _ -> Nothing }
+      };
+      Just ((,) (combine f a) literal)
+    }
+  } in case expression of {
+    XEString value -> Just ((,) (XEVar caseString) (Just value));
+    XEVar name -> if O.eqName name caseString then Nothing else intact;
+    XEApp function argument -> matchPair XEApp function argument;
+    XELet name rhs body ->
+      if O.eqName name caseString then Nothing else matchPair (XELet name) rhs body;
+    XECase subject [XErasedAlternative pattern body] ->
+      if L.any (O.eqName caseString) (X.patternNames pattern) then Nothing
+      else matchPair (\value branch -> XECase value [XErasedAlternative pattern branch]) subject body;
+    XEPrimitive _ -> intact;
+    XEConstructor _ -> intact;
+    XEInt _ -> intact;
+    _ -> Nothing
+  };
+  stringCaseKey :: Output -> XErased -> Maybe ((,,) XErased ([] String) String);
+  stringCaseKey state branch = if O.remainingSize 128 branch < 0 then Nothing else
+    case stringCaseTemplate branch of {
+      Just ((,) template (Just literal)) -> do {
+        key <- callbackTerm state M.empty template;
+        Just ((,,) template key literal)
+      };
+      _ -> Nothing
+    };
+  data DenseStringRun = DenseStringRun Int Int Int XErased ([] String) ([] String);
+  -- Completed runs do not overlap. Consume each arm once except for the first
+  -- arm after a run, whose key also starts the next candidate.
+  largestStringCaseRun :: Output -> [] ((,) Int XErased) -> Maybe DenseStringRun;
+  largestStringCaseRun state arms = let {
+    consume expected key count reversed remaining = let {
+      done = (,,) count reversed remaining
+    } in case remaining of {
+      (:) ((,) actual arm) rest -> if key /= actual then done else
+        case stringCaseKey state arm of {
+          Just ((,,) _ fields literal) ->
+            if L.eqList eqString expected fields then
+              let { next = key + 2; size = count + 1 } in seq next (seq size
+                (consume expected next size ((:) literal reversed) rest))
+            else done;
+          Nothing -> done
+        };
+      [] -> done
+    };
+    scan offset largest best remaining = case remaining of {
+      [] -> best;
+      (:) ((,) start arm) rest -> case stringCaseKey state arm of {
+        Nothing -> scan (offset + 1) largest best rest;
+        Just ((,,) template expected literal) ->
+          case consume expected (start + 2) 1 [literal] rest of {
+            (,,) count reversed trailing ->
+              let { next = offset + count } in seq next
+                (if count > largest
+                then scan next count (Just (DenseStringRun offset start count template expected (L.reverse reversed))) trailing
+                else scan next largest best trailing)
+          }
+      }
+    }
+  } in
+    if L.null (L.drop 7 arms) || M.member O.compareName caseString (functions state)
+    then Nothing
+    else scan 0 7 Nothing arms;
+  finishPartialStringCase :: (Map XName CGBinding -> XErased -> Build ()) ->
+    Map XName CGBinding -> XName -> [] ((,) Int XErased) -> XErased -> DenseStringRun -> Build ();
+  finishPartialStringCase finish scope name arms fallback (DenseStringRun offset start count body _ entries) = do {
+    value <- evaluate scope (XEVar name);
+    let { strict = M.insert O.compareName name (CGBinding value True) scope };
+    bits <- result ("ptrtoint ptr " ++ value ++ " to i64");
+    (,) index inside <- denseStringIndex bits start count;
+    finishChoice inside
+      (do {
+        (,) tableType table <- denseStringTable strict count entries;
+        selected <- loadStringCase tableType table index;
+        finish (M.insert O.compareName caseString (CGBinding selected True) strict) body
+      })
+      (emitIntegerSwitch finish strict bits
+        (L.append (L.take offset arms) (L.drop (offset + count) arms)) fallback)
+  };
+  emitDenseStringCases :: (Map XName CGBinding -> XErased -> Build ()) ->
+    Map XName CGBinding -> XName -> Int -> XErased -> [] String -> String -> Build ();
+  emitDenseStringCases finish scope name start body entries defaultText = do {
+    value <- evaluate scope (XEVar name);
+    let {
+      strict = M.insert O.compareName name (CGBinding value True) scope;
+      count = L.length entries
+    };
+    (,) tableType table <- denseStringTable strict count entries;
+    fallback <- evaluateBody strict (XEString defaultText);
+    bits <- result ("ptrtoint ptr " ++ value ++ " to i64");
+    (,) index inside <- denseStringIndex bits start count;
+    selected <- choose "ptr" inside (loadStringCase tableType table index) (cgPure fallback);
+    finish (M.insert O.compareName caseString (CGBinding selected True) strict) body
+  };
+  denseStringTable :: Map XName CGBinding -> Int -> [] String -> Build ((,) String String);
+  denseStringTable scope count entries = do {
+    literals <- L.mapM (\text -> evaluateBody scope (XEString text)) entries;
+    table <- fresh "@mlf.case.strings.";
+    let {
+      tableType = "[" ++ showInt count ++ " x ptr]";
+      declaration = table ++ " = private unnamed_addr constant " ++ tableType ++ " [" ++
+        L.intercalate ", " (L.map pointer literals) ++ "], align 8"
+    };
+    modify (\state -> withConstants ((:) declaration (constants state)) state);
+    cgPure ((,) tableType table)
+  };
+  denseStringIndex :: String -> Int -> Int -> Build ((,) String String);
+  denseStringIndex bits start count = do {
+    -- Successive keys differ by two. Check the tag as well as the unsigned
+    -- index before touching the table, so boxed Ints take the default.
+    adjusted <- result ("sub i64 " ++ bits ++ ", " ++ showInt start);
+    index <- result ("lshr i64 " ++ adjusted ++ ", 1");
+    tagged <- result ("trunc i64 " ++ bits ++ " to i1");
+    bounded <- result ("icmp ult i64 " ++ index ++ ", " ++ showInt count);
+    inside <- result ("and i1 " ++ tagged ++ ", " ++ bounded);
+    cgPure ((,) index inside)
+  };
+  loadStringCase :: String -> String -> String -> Build String;
+  loadStringCase tableType table index = do {
+    slot <- result ("getelementptr inbounds " ++ tableType ++ ", ptr " ++ table ++ ", i64 0, i64 " ++ index);
+    result ("load ptr, ptr " ++ slot ++ ", align 8")
+  };
+  finishIntegerSwitch :: (Map XName CGBinding -> XErased -> Build ()) ->
+    Map XName CGBinding -> XName -> [] ((,) Int XErased) -> XErased -> Build ();
+  finishIntegerSwitch finish scope name arms fallback = do {
+    value <- evaluate scope (XEVar name);
+    bits <- result ("ptrtoint ptr " ++ value ++ " to i64");
+    let { strict = M.insert O.compareName name (CGBinding value True) scope };
+    emitIntegerSwitch finish strict bits arms fallback
+  };
+  emitIntegerSwitch :: (Map XName CGBinding -> XErased -> Build ()) ->
+    Map XName CGBinding -> String -> [] ((,) Int XErased) -> XErased -> Build ();
+  emitIntegerSwitch finish strict bits arms fallback = do {
+    saved <- get;
+    defaultLabel <- fresh "int.default.";
+    labelled <- L.mapM (\((,) key body) -> do {
+      entry <- fresh "int.case.";
+      cgPure ((,,) key body entry)
+    }) arms;
+    emit ("  switch i64 " ++ bits ++ ", label %" ++ defaultLabel ++ " [");
+    L.mapM_ (\((,,) key _ entry) -> emit ("    i64 " ++ showInt key ++ ", label %" ++ entry)) labelled;
+    emit "  ]";
+    L.mapM_ (\((,,) _ body entry) -> do {
+      modify (restoreBranchCaches saved);
+      label entry;
+      finish strict body
+    }) labelled;
+    modify (restoreBranchCaches saved);
+    label defaultLabel;
+    finish strict fallback
+  };
   finishChoice :: String -> Build () -> Build () -> Build ();
   finishChoice condition yes no =
     do {
@@ -1749,7 +2061,7 @@ module Bootstrap.LLVM.Codegen where {
                  M.fromList O.compareName
                    (L.zipWith
                       (\n register ->
-                         (,) n (CGBinding register (S.member O.compareName n (A.strict f))))
+                         (,) n (CGWorkerArgument register (S.member O.compareName n (A.strict f))))
                       names
                       registers)
              };
@@ -2062,13 +2374,49 @@ module Bootstrap.LLVM.Codegen where {
   -- A single thunk can use its own update root directly. Mark it busy before
   -- calling, clear captures through its callback, then force and memoize its
   -- result. Runtime fallback preserves null/cycle errors and longer spines.
-  -- Keep the immediate, WHNF and one-forwarding tests inline. Thunk entry
-  -- performs the same busy marking, callback, forcing and memoization once
-  -- out of line, instead of duplicating that sequence at every force site.
+  -- Every site returns immediate and already evaluated values inline. Boxed
+  -- worker arguments also follow a single ready indirection inline. Other
+  -- sites share that dispatch to keep generated function bodies smaller.
   forceDefinition :: [] String;
-  forceDefinition =
-    ["define private ptr @mlf.force(ptr %value) alwaysinline {",
-     "entry:",
+  forceDefinition = L.concat
+    [["define private ptr @mlf.force(ptr %value) alwaysinline {"],
+     forceReadyBlocks,
+     ["  %result.deferred = tail call ptr @mlf.force.deferred(ptr %value, i32 %tag)",
+      "  ret ptr %result.deferred",
+      "done:",
+      "  ret ptr %value",
+      "slow:",
+      "  %result = tail call ptr @mlf_force(ptr %value)",
+      "  ret ptr %result",
+      "}"],
+     ["define private ptr @mlf.force.deferred(ptr %value, i32 %tag) noinline {",
+      "entry:"],
+     forceForwardingBlocks,
+     forceEnterOrFallback,
+     ["define private ptr @mlf.force.worker(ptr %value) alwaysinline {"],
+     forceReadyBlocks,
+     forceForwardingBlocks,
+     ["done:",
+      "  ret ptr %value"],
+     forceEnterOrFallback,
+     ["define private ptr @mlf.force.enter(ptr %value) noinline {",
+      "entry:",
+      "  %code.slot = getelementptr i8, ptr %value, i64 8",
+      "  %env.slot = getelementptr i8, ptr %value, i64 16",
+      "  %code = load ptr, ptr %code.slot, align 8",
+      "  %env = load ptr, ptr %env.slot, align 8",
+      "  store i32 1, ptr %value, align 4",
+      "  store ptr null, ptr %code.slot, align 8",
+      "  store ptr null, ptr %env.slot, align 8",
+      "  %returned = call ptr %code(ptr %env, ptr null)",
+      "  %canonical = call ptr @mlf_force(ptr %returned)",
+      "  store i32 2, ptr %value, align 4",
+      "  store ptr %canonical, ptr %code.slot, align 8",
+      "  ret ptr %canonical",
+      "}"]];
+  forceReadyBlocks :: [] String;
+  forceReadyBlocks =
+    ["entry:",
      "  %null = icmp eq ptr %value, null",
      "  br i1 %null, label %slow, label %test",
      "test:",
@@ -2080,8 +2428,10 @@ module Bootstrap.LLVM.Codegen where {
      "  %tag = load i32, ptr %value, align 4",
      "  %ready = icmp uge i32 %tag, 5",
      "  br i1 %ready, label %done, label %deferred",
-     "deferred:",
-     "  %isthunk = icmp eq i32 %tag, 3",
+     "deferred:"];
+  forceForwardingBlocks :: [] String;
+  forceForwardingBlocks =
+    ["  %isthunk = icmp eq i32 %tag, 3",
      "  br i1 %isthunk, label %enter, label %indirect",
      "indirect:",
      "  %forwarded = icmp eq i32 %tag, 2",
@@ -2101,30 +2451,15 @@ module Bootstrap.LLVM.Codegen where {
      "  %pready = icmp uge i32 %ptag, 5",
      "  br i1 %pready, label %forward, label %slow",
      "forward:",
-     "  ret ptr %p",
-     "done:",
-     "  ret ptr %value",
-     "enter:",
+     "  ret ptr %p"];
+  forceEnterOrFallback :: [] String;
+  forceEnterOrFallback =
+    ["enter:",
      "  %entered = tail call ptr @mlf.force.enter(ptr %value)",
      "  ret ptr %entered",
      "slow:",
      "  %result = tail call ptr @mlf_force(ptr %value)",
      "  ret ptr %result",
-     "}",
-     "define private ptr @mlf.force.enter(ptr %value) noinline {",
-     "entry:",
-     "  %code.slot = getelementptr i8, ptr %value, i64 8",
-     "  %env.slot = getelementptr i8, ptr %value, i64 16",
-     "  %code = load ptr, ptr %code.slot, align 8",
-     "  %env = load ptr, ptr %env.slot, align 8",
-     "  store i32 1, ptr %value, align 4",
-     "  store ptr null, ptr %code.slot, align 8",
-     "  store ptr null, ptr %env.slot, align 8",
-     "  %returned = call ptr %code(ptr %env, ptr null)",
-     "  %canonical = call ptr @mlf_force(ptr %returned)",
-     "  store i32 2, ptr %value, align 4",
-     "  store ptr %canonical, ptr %code.slot, align 8",
-     "  ret ptr %canonical",
      "}"];
   aliasMetadata :: [] String;
   aliasMetadata =

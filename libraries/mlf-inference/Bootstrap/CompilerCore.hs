@@ -41,19 +41,25 @@ module Bootstrap.CompilerCore where {
     };
   finishCompilation :: (,) SProgram (Map String String) -> Either CompileError Compilation;
   finishCompilation = finishCompilationWith C.generateProgram;
-  finishCompilationWith generate ((,) program names) =
+  finishCompilationWith generate = finishCompilationUsing (\program -> do {
+    constraints <- generate program;
+    solved <- C.solvePrepared constraints;
+    Right ((,) constraints solved)
+  });
+  finishFileCompilation :: (,) SProgram (Map String String) -> Either CompileError Compilation;
+  finishFileCompilation = finishCompilationUsing C.generateAndSolveFileProgram;
+  finishCompilationUsing infer ((,) program names) =
     case program of {
       SClassProgram _ _ _ _ ->
         Left (CompileError Inference "class translation did not produce a core program");
       SProgram declarations expression ->
         do {
-          constraints <- atPhase Inference (generate program);
-          solved <- atPhase Inference (C.solvePrepared constraints);
+          (,) constraints solved <- atPhase Inference (infer program);
           let {
             graph = Solver.solverGraph solved
           };
           let {
-            types = E.prepareTypes graph
+            types = E.prepareSolvedTypes solved
           };
           evidence <- atPhase Resolution (E.resolveEvidenceIn types (C.skeleton constraints));
           body <-

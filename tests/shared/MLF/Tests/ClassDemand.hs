@@ -42,8 +42,9 @@ module MLF.Tests.ClassDemand where {
         "a seedless cycle invented a dictionary"
     };
   assertEmptyPlan :: IntSet -> Q.Plan -> Either String ();
-  assertEmptyPlan expected (Q.Plan (Q.Universe next slots seeds transitions) values updates) =
-    ensure (next == 0 && IM.null slots && IM.null seeds && IM.null transitions &&
+  assertEmptyPlan expected (Q.Plan universe values updates) =
+    ensure (Q.nextSlot universe == 0 && IM.null (Q.universeSlots universe) &&
+      IM.null (Q.universeSeeds universe) && IM.null (Q.universeTransitions universe) &&
       IS.eqIntSet expected (IM.keysSet values) &&
       IM.foldl (\empty value -> empty && IS.null value) True values && updates == 0)
       "seedless plan changed its exact universe, node sets, or update count";
@@ -165,6 +166,68 @@ module MLF.Tests.ClassDemand where {
       ensure (inherited == local && Q.universeSize plan == 1)
         "captured outer dictionary was independently instantiated"
     };
+  inheritedExact :: Either String ();
+  inheritedExact = do {
+    let { seeds = [Q.Seed 10 "Inspect" 1,Q.Seed 11 "Inspect" 1,Q.Seed 12 "Unused" 0] };
+    let { uses = [Q.Use 100 2 1,Q.Use 101 2 1,Q.Use 102 2 1,Q.Use 103 1 0] };
+    let { nodes = IM.fromList [(,) 0 (Q.SeedNode 10),(,) 1 (Q.SeedNode 11),
+      (,) 2 (Q.UnionNodes [0,8]),(,) 8 (Q.InstantiateNode 100 2),
+      (,) 9 (Q.InstantiateNode 100 1),(,) 10 (Q.RefNode 11),
+      (,) 11 (Q.InstantiateNode 101 10),(,) 12 (Q.InstantiateNode 102 2)] };
+    let { frameMap = IM.fromList (map (\frame -> (,) (Q.frameId frame) frame) frames) };
+    let { seedMap = IM.fromList (map (\seed -> (,) (Q.seedId seed) seed) seeds) };
+    let { useMap = IM.fromList (map (\use -> (,) (Q.useId use) use) uses) };
+    let { dependents = Q.dependentNodes nodes };
+    plan <- Q.solve frames seeds uses nodes;
+    Q.Discovery original reached _ <- Q.discoverUniverse frameMap seedMap useMap nodes dependents;
+    (,) values updates <- Q.saturate original (IM.keysSet (Q.universeSlots original))
+      nodes dependents (IM.keysSet nodes) (IM.map (\_ -> IS.empty) nodes) 0;
+    let { universe = Q.planUniverse plan };
+    case universe of {
+      Q.InheritedUniverse next _ _ _ -> ensure (next == Q.nextSlot original)
+        "inherited transports allocated a new origin";
+      _ -> Left "inherited transports did not use shared input sets"
+    };
+    ensure (IM.eqIntMap IS.eqIntSet values reached && IM.eqIntMap IS.eqIntSet values (Q.nodeSets plan) &&
+      updates == Q.saturationUpdates plan && Q.universeSize plan == 3 && Q.transitionCount plan == 3 &&
+      IM.eqIntMap (IM.eqIntMap eqInt) (Q.universeTransitions original) (Q.universeTransitions universe))
+      "inherited sets changed reachability, worklist order or transition inventory";
+    first <- Q.instantiateSlot plan 100 0;
+    second <- Q.instantiateSlot plan 100 1;
+    ensure (first == 0 && second == 1) "an inherited use changed its input slot";
+    let { missing use slot expected = case Q.instantiateSlot plan use slot of {
+      Left actual -> ensure (eqString actual expected) "inherited lookup changed the diagnostic";
+      Right _ -> Left "inherited lookup accepted an unreachable transition"
+    } };
+    missing 101 0 "class demand: unknown reachable instantiation 101";
+    missing 103 0 "class demand: unknown reachable instantiation 103";
+    missing 100 2 "class demand: unknown instantiation input slot 2"
+  };
+  singleCopyOrder :: Either String ();
+  singleCopyOrder = do {
+    let { children = (:) (Q.Frame 4 (Just 2) 5) frames };
+    let { seeds = [Q.Seed 10 "Inspect" 2,Q.Seed 11 "Inspect" 2,Q.Seed 12 "Convert" 1] };
+    let { uses = [Q.Use 100 2 1,Q.Use 101 4 2,Q.Use 102 4 2] };
+    let { nodes = IM.fromList [(,) 0 (Q.SeedNode 10),(,) 1 (Q.SeedNode 11),
+      (,) 2 (Q.SeedNode 12),(,) 3 (Q.RefNode 0),(,) 4 (Q.RefNode 3),
+      (,) 5 (Q.InstantiateNode 101 8),(,) 6 (Q.UnionNodes [1,2,4,5]),
+      (,) 7 (Q.InstantiateNode 102 6),(,) 8 (Q.InstantiateNode 100 6),
+      (,) 9 (Q.InstantiateNode 100 2)] };
+    plan <- Q.solve children seeds uses nodes;
+    case Q.planUniverse plan of {
+      Q.SingleCopyUniverse next _ _ use _ _ -> ensure (next == 5 && use == 100)
+        "single-copy plan changed the origin supply";
+      _ -> Left "the mixed plan did not use its sole copying instantiation"
+    };
+    first <- Q.instantiateSlot plan 100 1;
+    second <- Q.instantiateSlot plan 100 0;
+    ensure (first == 3 && second == 4) "copy order did not follow discovery distance";
+    inherited <- mapM (Q.instantiateSlot plan 100) [2,3,4];
+    ensure (eqList eqInt inherited [2,3,4] && Q.transitionCount plan == 13)
+      "an inherited input created another origin or duplicate transition";
+    assertSlots plan 8 [2,3,4];
+    assertSlots plan 9 [2]
+  };
   unreachableUses :: Either String ();
   unreachableUses =
     do {
@@ -191,7 +254,8 @@ module MLF.Tests.ClassDemand where {
       rejects (Q.solve frames ((:) (Q.Seed 10 "A" 2) ((:) (Q.Seed 10 "B" 2) [])) [] IM.empty);
       rejects (Q.solve frames [] [] (IM.singleton 0 (Q.RefNode 1)));
       rejects (Q.solve frames [] [] (IM.singleton 0 (Q.InstantiateNode 99 0)));
-      rejects (Q.solve frames ((:) (Q.Seed 10 "Inspect" 3) [])
+      rejectsExactly "class demand: unrelated owner escaped into a binding interface"
+        (Q.solve frames ((:) (Q.Seed 10 "Inspect" 3) [])
         ((:) (Q.Use 100 2 1) [])
         (IM.fromList ((:) ((,) 0 (Q.SeedNode 10))
           ((:) ((,) 1 (Q.InstantiateNode 100 0)) []))));
@@ -205,7 +269,7 @@ module MLF.Tests.ClassDemand where {
       fx <- C.qualifiedApplication f x;
       y <- C.qualifiedPlain (SIntLit 5);
       plain <- C.qualifiedApplication fx y;
-      needed <- C.qualifiedMake (C.QualifiedVariable (LexicalRef "method") Nothing)
+      needed <- C.qualifiedMake (C.QualifiedVariable (LexicalRef "method") 5 Nothing)
         (Q.SeedNode 10) (C.QualifiedBuild [] oneSeed [] []);
       left <- C.qualifiedApplication needed plain;
       right <- C.qualifiedApplication plain needed;
@@ -250,7 +314,9 @@ module MLF.Tests.ClassDemand where {
   };
   checks :: [] ((,) String (Either String ()));
   checks = append [(,) "ordered seed equations share final slot sets" orderedSeedEquations,
-    (,) "plain applications and evidence boundaries" plainApplication] (append
+    (,) "plain applications and evidence boundaries" plainApplication,
+    (,) "inherited uses share fixed-point input sets" inheritedExact,
+    (,) "one copying instantiation preserves breadth-first origin order" singleCopyOrder] (append
     ((:) ((,) "slot supply independent of cardinality" independentSupply)
       ((:) ((,) "seedless exact plan across all demand forms" emptyDemandKinds)
         ((:) ((,) "seedless exact validation and error order" emptyValidation) [])))

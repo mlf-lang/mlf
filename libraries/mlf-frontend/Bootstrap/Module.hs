@@ -1343,6 +1343,8 @@ module Bootstrap.Module where {
       mapEither (R.Lam n ty) (walk (Set.insert compareString n bound) b)
     };
     SApp a b -> application child a b;
+    SApplyDictionaries _ _ -> Left "dictionary applications are reserved for class translation";
+    SBindDictionaries _ _ -> Left "dictionary binders are reserved for class translation";
     SLet n a b -> do { v <- child a; mapEither (R.Let n v) (walk (Set.insert compareString n bound) b) };
     SAnn a t -> do { v <- child a; mapEither (R.Ann v) (resolveAnnotation bindings env t) };
     SSignature a t -> do { v <- child a; mapEither (R.Signature v) (resolveAnnotation bindings env t) };

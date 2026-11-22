@@ -2,7 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
-module Bootstrap.X.Checked (CheckedTerm, check, term, typeOf, declarationBindings, ContextPool, contextPool, checkWithContexts, validateContext, LinkedSpine, emptySpine, appendSpine, finishSpine, materializeSpine, FreshFragment, freshFragment, freshSerial, freshTerm, freshBindings, appendFreshSpine, latestSpineBody) where {
+module Bootstrap.X.Checked (CheckedTerm, check, term, typeOf, declarationBindings, ContextPool, contextPool, singleContext, checkWithContexts, validateContext, LinkedSpine, emptySpine, appendSpine, finishSpine, materializeSpine, FreshFragment, freshFragment, freshSerial, freshTerm, freshBindings, appendFreshSpine, latestSpineBody) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import qualified Bootstrap.X.Check as Check;
@@ -31,6 +31,10 @@ module Bootstrap.X.Checked (CheckedTerm, check, term, typeOf, declarationBinding
   -- caller-supplied environment or equality predicate can manufacture a proof.
   data ContextPool = ContextPool ([] ((,) ([] DataDecl) (Either String DataEnv)));
   contextPool declarations = ContextPool (L.map (\ds -> (,) ds (D.validateDeclarations ds)) declarations);
+  singleContext declarations = do {
+    env <- D.validateDeclarations declarations;
+    Right ((,) env (ContextPool [(,) declarations (Right env)]))
+  };
   contextIn (ContextPool entries) declarations = contextLookup entries declarations;
   contextLookup entries declarations = case entries of {
     [] -> D.validateDeclarations declarations;

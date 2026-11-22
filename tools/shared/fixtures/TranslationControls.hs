@@ -95,6 +95,16 @@ checkUnaryConstructors = do
  need "demanded field keeps its error" (agree demanded && result demanded==Left "field demanded")
  need "unselected field stays lazy" (agree unused && result unused==Right 42)
  need "shadowed selector with the same numeric id is handled after freshening" (agree shadowed && result shadowed==Right 8)
+ let select condition = C.indexUses (prim T.PIfThenElse [condition,
+       T.XEApp (T.XEConstructor "A") (T.XEInt 9), T.XEApp (T.XEConstructor "B") poison])
+     wildcard = (T.XDefaultPattern T.Nothing,C.indexUses (T.XEInt 17))
+     matching = (T.XConstructorPattern "A" [T.Just (n 30)],C.indexUses (v 30))
+ need "case distribution keeps a wildcard-only match lazy"
+   (case C.selectConditionalConstructors (select poison) [wildcard] of T.Nothing -> True; _ -> False)
+ forM_ [(T.XEBool True,Right 9),(T.XEBool False,Right 17),(poison,Left "field demanded")] $ \(condition,wanted) ->
+   case C.selectConditionalConstructors (select condition) [matching,wildcard] of
+    T.Nothing -> fail "exhaustive conditional constructor match was not reduced"
+    T.Just chosen -> need "conditional constructor match preserves demand and selected fields" (result (C.useTerm chosen)==wanted)
  let identity term = T.XEApp (T.XEAbs (n 40) (v 40)) term
      aliased parameter alias body = identity (T.XEAbs (n parameter)
        (T.XELet (n alias) (identity (v parameter)) body))
@@ -158,9 +168,41 @@ checkComposition env = do
    (scope compose 1 (prim T.PSeq [pair (poison "outer") (poison "inner"),T.XEInt 41]))
 
 
+checkConditionalCalls env = do
+ let app = T.XEApp
+     lit = T.XEInt
+     call f = app (v f)
+     choose c yes no = prim T.PIfThenElse [c,yes,no]
+     local body = T.XELet (n 1) (T.XEAbs (n 3) body)
+     selected right = choose (v 4) (call 1 (v 5)) (call right (prim T.PAddInt [v 5,lit 1]))
+     bound value = T.XELet (n 6) value (v 6)
+     shape checked term = C.useTerm (fst (C.runFresh (C.passOwnedFor checked term) 100))
+     hasDecision term = case term of
+       T.XEPrimitive T.PSeq -> True
+       _ -> any hasDecision (C.subterms term)
+     rhs = prim T.PRemInt [prim T.PAddInt [v 5,v 3],lit 97]
+ forM_ [local rhs (selected 1),local rhs (bound (selected 1))] $ \term -> do
+   need "checked adjacent callback shares one condition-ordered call" (hasDecision (shape True term))
+   need "unchecked callback retains its original demand path" (not (hasDecision (shape False term)))
+ forM_ [local rhs (selected 2),selected 1,T.XELet (n 1) (v 2) (selected 1)] $ \term ->
+   need "other callee identities and nonlocal calls stay ordinary" (not (hasDecision (shape True term)))
+ let poison text = prim T.PPanic [T.XEString text]
+     apply body c yes no = local body (choose c (call 1 yes) (call 1 no))
+     observe term = case R.integer (R.evaluate env (R.REnv M.empty) term) of
+       T.Right value -> Right value
+       T.Left message -> Left (B.unpack message)
+     check expected term = forM_ [term,C.optimizeChecked term] $ \version ->
+       need "conditional callback preserves first demand and selection" (observe version == expected)
+ check (Left "condition") (apply (poison "callee") (poison "condition") (poison "left") (poison "right"))
+ check (Right 41) (apply (lit 41) (T.XEBool True) (poison "ignored") (poison "unselected"))
+ check (Right 42) (apply (v 3) (T.XEBool False) (poison "unselected") (lit 42))
+ check (Left "selected") (apply (v 3) (T.XEBool True) (poison "selected") (poison "unselected"))
+ check (Left "capture") (apply (prim T.PAddInt [poison "capture",v 3]) (T.XEBool False) (lit 0) (poison "operand"))
+
 main = do
  env <- case D.validateDeclarations [] of T.Right e -> pure e; T.Left e -> fail (B.unpack e)
  checkIntSums env
+ checkConditionalCalls env
  checkUnaryConstructors
  checkComposition env
  let eval = R.evaluate env (R.REnv M.empty)

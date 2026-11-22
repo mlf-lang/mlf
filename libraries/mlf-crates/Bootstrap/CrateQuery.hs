@@ -129,7 +129,9 @@ module Bootstrap.CrateQuery where {
       SLam n annotation body ->
         node "lambda"
           ((:) n ((:) (optional encodeAnnotation annotation) ((:) (encodeExpression body) [])));
+      SBindDictionaries names body -> node "bind-dictionaries" [list id names,encodeExpression body];
       SApp a b -> node "apply" ((:) (encodeExpression a) ((:) (encodeExpression b) []));
+      SApplyDictionaries f names -> node "apply-dictionaries" [encodeTermRef f,list id names];
       SLet n a b -> node "let" ((:) n ((:) (encodeExpression a) ((:) (encodeExpression b) [])));
       SAnn a annotation ->
         node "annotate" ((:) (encodeExpression a) ((:) (encodeAnnotation annotation) []));
@@ -219,7 +221,9 @@ module Bootstrap.CrateQuery where {
     SConstructor n -> keyNode "constructor" [KeyText n];
     SLam n annotation body -> keyNode "lambda"
       [KeyText n, KeyText (optional encodeAnnotation annotation), child body];
+    SBindDictionaries names body -> keyNode "bind-dictionaries" [keyList KeyText names,child body];
     SApp a b -> keyNode "apply" [child a, child b];
+    SApplyDictionaries f names -> keyNode "apply-dictionaries" [KeyText (encodeTermRef f),keyList KeyText names];
     SLet n a b -> keyNode "let" [KeyText n, child a, child b];
     SAnn a annotation -> keyNode "annotate" [child a, KeyText (encodeAnnotation annotation)];
     SSignature a annotation -> keyNode "signature" [child a, KeyText (encodeAnnotation annotation)];
@@ -639,7 +643,15 @@ module Bootstrap.CrateQuery where {
              types
              typeDepth
              body);
+      SBindDictionaries names body -> let {
+        nextDepth = depth + length names;
+        binders = map (\i -> "local:" ++ showInt i) (range depth (nextDepth - 1));
+        scope = canonicalScope "local:" env depth names
+      } in SBindDictionaries binders
+        (canonicalExpressionReading projected givens rank scope nextDepth types typeDepth body);
       SApp a b -> SApp (child a) (child b);
+      SApplyDictionaries f names -> SApplyDictionaries (LexicalRef (canonicalTermRef rank env f))
+        (map (canonicalReference env) names);
       SLet n a b ->
         SLet ("local:" ++ showInt depth) (child a)
           (canonicalExpressionReading projected givens rank (M.insert compareString n ("local:" ++ showInt depth) env)
@@ -827,10 +839,12 @@ module Bootstrap.CrateQuery where {
           seq ts (visit inner pending ts constructors)
       } in case expression of {
         SApp f a -> visit f ((:) a pending) types constructors;
+        SApplyDictionaries _ _ -> next types constructors;
         SCallSite _ _ inner -> visit inner pending types constructors;
         SSourceDefinition inner -> visit inner pending types constructors;
         SDeclScope _ inner -> visit inner pending types constructors;
         SLam _ a inner -> annotated (Dependency.observeOptional a) inner;
+        SBindDictionaries _ inner -> visit inner pending types constructors;
         SAnn inner a -> annotated (Dependency.observeAnnotation a) inner;
         SSignature inner a -> annotated (Dependency.observeAnnotation a) inner;
         SChecked ty inner -> annotated (Dependency.observeType ty) inner;

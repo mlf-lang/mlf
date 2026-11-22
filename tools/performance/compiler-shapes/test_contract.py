@@ -274,6 +274,24 @@ class ScheduleTests(unittest.TestCase):
                 self.assertEqual(generate.expected('inferred_functions', size, value),
                                  size * value + size * (size - 1) // 2)
 
+    def test_polymorphic_import_fanout_retains_each_predecessor(self):
+        family = 'polymorphic_import_fanout'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        with tempfile.TemporaryDirectory() as root:
+            cases = generate.generate(Path(root)/'cases', [8, 16, 32, 64, 128], [family])
+            for case in cases:
+                size = case['size']
+                source = Path(case['source']).read_text()
+                self.assertNotRegex(source, r'(?m)^(helper\d+|entry) ::')
+                self.assertEqual(re.findall(r'^helper(\d+) x = x;$', source, re.M),
+                                 [str(i) for i in range(size)])
+                entry, = re.findall(r'^entry x = (.*);$', source, re.M)
+                self.assertEqual(re.findall(r'helper(\d+) \(addInt x (\d+)\)', entry),
+                                 [(str(i), str(i)) for i in range(size)])
+                self.assertEqual(case['inputs'], [-1, 0, 7])
+                self.assertEqual(case['expected_stdout'],
+                                 [f'{sum(x + i for i in range(size))}\n' for x in case['inputs']])
+
     def test_polymorphic_fanout_uses_one_inferred_group_and_both_argument_types(self):
         family = 'polymorphic_fanout'
         self.assertEqual(bench.resolve('default', [family], [32])[1], [family])
@@ -290,6 +308,148 @@ class ScheduleTests(unittest.TestCase):
                 contributions = [value + offset + (offset if value < 0 else -offset)
                                  for offset in range(value, value + size)]
                 self.assertEqual(generate.expected(family, size, value), sum(contributions))
+
+    def test_mixed_parser_recursion_keeps_one_alternating_cycle(self):
+        family = 'mixed_parser_recursion'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        with tempfile.TemporaryDirectory() as root:
+            cases = generate.generate(Path(root)/'cases', [1, 3, 8], [family])
+            for case in cases:
+                n = case['size']
+                source = Path(case['source']).read_text()
+                self.assertEqual(len(re.findall(r'^rule\d+ :: Parser Int;', source, re.M)), n)
+                self.assertNotRegex(source, r'(?m)^tail\d+ ::')
+                for i in range(n):
+                    self.assertIn(f'rule{i} = choice (bindP tick (\\_ -> tail{i} {i}))', source)
+                    self.assertIn(f'tail{i} first = mapP (addInt (addInt first 1)) rule{(i+1)%n};', source)
+                self.assertIn(n, case['inputs'])
+                self.assertGreater(max(case['inputs']), n)
+                for x in [-3, *range(3*n+2)]:
+                    steps = max(0, x)
+                    score = steps % n + sum(i % n + 1 for i in range(steps))
+                    self.assertEqual(generate.expected_output(family, n, x), f'{score}\n')
+
+    def test_inferred_monadic_recursion_leaves_the_helper_unsigned(self):
+        family = 'inferred_monadic_recursion'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        for bindings in (1, 8, 32):
+            source = generate.program(family, bindings)
+            self.assertIn('core :: Tree -> Work Int;', source)
+            self.assertNotIn('work ::', source)
+            self.assertIn('core tree = work tree;', source)
+            self.assertIn('a0 <- core body;', source)
+            self.assertEqual(source.count('<- pure (addInt'), bindings)
+            for x in (-7, 0, 11):
+                self.assertEqual(generate.expected(family, bindings, x), sum([x] * (bindings + 1)))
+
+    def test_class_declaration_reservations_keep_all_instance_calls_reachable(self):
+        family = 'class_declaration_reservations'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        for count in (1, 16, 128):
+            source = generate.program(family, count)
+            self.assertEqual(source.count('instance Score Token where'), 1)
+            self.assertEqual(source.count(' x = score (Token (addInt'), count)
+            entry = next(line for line in source.splitlines() if line.startswith('entry x ='))
+            self.assertEqual(entry.count('compilerShapeReservationForIndependentTopLevelPredecessor'), count)
+            for value in (-7, 0, 11):
+                self.assertEqual(generate.expected(family, count, value), sum(range(value, value + count)))
+
+    def test_datatype_validation_fanout_checks_each_constructor_and_fallback(self):
+        family = 'datatype_validation_fanout'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        for count in (1, 2, 16, 64):
+            source = generate.program(family, count)
+            self.assertEqual(len(re.findall(r'^probe\d+ :: Token -> Int;', source, re.M)), count)
+            entry = next(line for line in source.splitlines() if line.startswith('entry x ='))
+            for i in range(count):
+                self.assertIn(f'Tag{(i+1)%count} x else Tag{i} x', entry)
+            for value in (-7, 0, 11):
+                tags = range(count) if value >= 0 else [*range(1, count), 0]
+                total = sum(i + (value if i == tag else 0) for i, tag in enumerate(tags))
+                self.assertEqual(generate.expected(family, count, value), total)
+
+    def test_shared_datatype_fragments_checks_shared_and_local_fields(self):
+        family = 'shared_datatype_fragments'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        for count in (1, 3, 32, 128):
+            source = generate.program(family, count)
+            self.assertEqual(len(re.findall(r'^project\d+ :: Shared -> Local\d+ -> Int;', source, re.M)), count)
+            shared = next(line for line in source.splitlines() if line.startswith('data Shared ='))
+            self.assertEqual(len(re.findall(r'\bAlternate\d+\b', shared)), count)
+            for value in (-7, 0, 11):
+                offset = 0 if value < 0 else value
+                self.assertEqual(generate.expected(family, count, value), sum(range(offset, offset + count)))
+
+    def test_local_dictionary_branch_fanout_keeps_literal_sites_fixed(self):
+        family = 'local_dictionary_branch_fanout'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        with tempfile.TemporaryDirectory() as root:
+            for case in generate.generate(Path(root)/'cases', [2, 4, 6], [family]):
+                n = case['size']
+                source = Path(case['source']).read_text()
+                self.assertEqual(source.count('stringLength'), 2)
+                self.assertNotRegex(source, r'level\d+ ::')
+                for i in range(1, n + 1):
+                    self.assertIn(f'then level{i-1} (addInt z {i}) else level{i-1} (subInt z {i})', source)
+                self.assertEqual(case['expected_stdout'], ['1\n', '2\n', '2\n'])
+
+    def test_shared_callback_let_chain_retains_both_call_forms(self):
+        family = 'shared_callback_let_chain'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        for depth in (1, 2, 8, 32):
+            source = generate.program(family, depth)
+            for i in range(depth):
+                previous = 'x' if i == 0 else f'state{i - 1}'
+                self.assertIn(f'rule{i} y = remInt (addInt {previous} (mulInt {previous} y)) 251', source)
+                self.assertIn(f'then rule{i} x else rule{i} (addInt x 1)', source)
+            for x in (-3, -1, 0, 1, 7, 19):
+                state = x
+                for i in range(depth):
+                    product = state * (1 + (x if x < i else x + 1))
+                    state = (1 if product >= 0 else -1) * (abs(product) % 251)
+                self.assertEqual(generate.expected_output(family, depth, x), f'{state}\n')
+
+    def test_deferred_constructor_spine_demands_exactly_the_generated_depth(self):
+        family = 'deferred_constructor_spine'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        for depth in (1, 8, 32):
+            with self.subTest(depth=depth):
+                source = generate.program(family, depth)
+                match = next(line for line in source.splitlines() if line.startswith('inspect value'))
+                self.assertEqual(match.count('(Link '), depth)
+                self.assertEqual(match.count('(Link here _)'), 1)
+                self.assertIn(f'if ltInt x 0 then {depth - 1} else {depth}', source)
+                for value in (-3, -1, 0, 7):
+                    length = depth - int(value < 0)
+                    chain = list(range(value, value + length))
+                    result = chain[depth - 1] if len(chain) >= depth else 0
+                    self.assertEqual(generate.expected_output(family, depth, value), f'{result}\n')
+
+    def test_queued_callback_let_chain_adds_each_selected_operand(self):
+        family = 'queued_callback_let_chain'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        for depth in (1, 8, 32):
+            source = generate.program(family, depth)
+            self.assertNotIn('mulInt', source)
+            self.assertEqual(source.count(' y = remInt (addInt'), depth)
+            for x in (-7, 0, 1, 19):
+                state = x
+                for i in range(depth):
+                    state += x if x < i else x+1
+                    state = -(abs(state) % 251) if state < 0 else state % 251
+                self.assertEqual(generate.expected_output(family, depth, x), f'{state}\n')
+
+    def test_inferred_dictionary_prefix_scales_literals_and_checks_signed_dispatch(self):
+        family = 'inferred_dictionary_prefix'
+        for size in (8, 16, 32):
+            source = generate.program(family, size)
+            self.assertNotRegex(source, r'(loop|punct) ::')
+            self.assertIn('punct text = loop consume', source)
+            self.assertEqual(re.findall(r'-> punct "mark(\d+)"', source), list(map(str, range(size))))
+            self.assertEqual(generate.expected(family, size, -size - 1), 13 - size)
+            self.assertEqual(generate.expected(family, size, -size), 10 - size)
+        self.assertEqual(generate.expected(family, 8, 7), 17)
+        self.assertEqual(generate.expected(family, 16, 15), 27)
 
     def test_polymorphic_tree_fold_sites_and_oracle(self):
         family = 'polymorphic_tree_fold'

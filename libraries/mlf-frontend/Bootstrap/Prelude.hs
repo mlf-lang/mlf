@@ -96,6 +96,8 @@ module Bootstrap.Prelude where {
       SSharedBind _ _ _ _ _ -> Set.fromList compareString (Surface.freeNames expression);
       SVar name -> Set.fromList compareString (Surface.freeNames expression);
       SLam name annotation body -> Set.delete compareString name (freeNames body);
+      SBindDictionaries names body ->
+        Set.difference compareString (freeNames body) (Set.fromList compareString names);
       SApp f a -> Set.union compareString (freeNames f) (freeNames a);
       SLet name value body ->
         Set.union compareString (freeNames value) (Set.delete compareString name (freeNames body));
@@ -168,6 +170,7 @@ module Bootstrap.Prelude where {
       SSharedBind _ _ _ _ _ -> True;
       SLam name annotation body ->
         (L.maybe False annotationMentionsMonad annotation || exprMentionsMonad body);
+      SBindDictionaries _ body -> exprMentionsMonad body;
       SApp f a -> (exprMentionsMonad f || exprMentionsMonad a);
       SLet name value body -> (exprMentionsMonad value || exprMentionsMonad body);
       SAnn value annotation -> (exprMentionsMonad value || annotationMentionsMonad annotation);
