@@ -291,6 +291,64 @@ class ScheduleTests(unittest.TestCase):
                 self.assertEqual(generate.expected('inferred_functions', size, value),
                                  size * value + size * (size - 1) // 2)
 
+    def test_repeated_dictionary_arguments(self):
+        family = 'repeated_dictionary_arguments'
+        for size in (1, 4, 16):
+            source = generate.program(family, size)
+            self.assertEqual(source.count('(pass '), size)
+            self.assertIn('case worker (Box x)', source)
+            self.assertEqual(generate.expected_output(family, size, -10), f'{size - 10}\n')
+            self.assertEqual(generate.expected(family, size, 2**63 - 1), -2**63 + size - 1)
+
+    def test_recursive_dictionary_forwarding(self):
+        family = 'recursive_dictionary_forwarding'
+        for n in (0, 1, 2, 17, 32):
+            source = generate.program(family, n)
+            self.assertEqual(source.count('(step (Box') + source.count('(step (Tag'), n)
+            self.assertIn('else second (subInt fuel 1) x', source)
+            self.assertIn('else first (subInt fuel 1) x', source)
+            alias = generate.program('recursive_dictionary_alias', n)
+            self.assertIn('bridge = first True;', alias)
+            self.assertIn('else bridge (subInt fuel 1) x', alias)
+            for x in (-2**63, -3, 0, 7, 2**63 - 1):
+                seed = self.signed_int(x + 1)
+                value = seed
+                for i in range(n):
+                    item = self.signed_int(seed + i)
+                    value = self.signed_int(value + (item if i % 2 == 0 else -item))
+                self.assertEqual(generate.expected(family, n, x), value)
+                self.assertEqual(generate.expected('recursive_dictionary_alias', n, x), value)
+
+    def test_closed_dictionary_result(self):
+        family = 'closed_dictionary_result'
+        for n in (0, 1, 2, 17, 32):
+            source = generate.program(family, n)
+            self.assertEqual(source.count('(step (Box') + source.count('(step (Tag'), n)
+            self.assertIn('entry x = addInt x (worker x);', source)
+            for x in (-2**63, -3, 0, 7, 2**63 - 1):
+                terms = [self.signed_int(x + i) for i in range(n)]
+                total = x + sum(terms[::2]) - sum(terms[1::2])
+                self.assertEqual(generate.expected(family, n, x), self.signed_int(total))
+
+    def test_bounded_dictionary_arguments(self):
+        family = 'bounded_dictionary_arguments'
+        for size in (1, 8, 32):
+            source = generate.program(family, size)
+            self.assertEqual(source.count('case pass (Box x'), size)
+            self.assertIn(f'callback x{size}', source)
+            self.assertEqual(generate.expected_output(family, size, -7), f'{size - 7}\n')
+            self.assertEqual(generate.expected(family, size, 2**63 - 1), -2**63 + size - 1)
+
+    def test_duplicated_type_arguments_preserves_input(self):
+        family = 'duplicated_type_arguments'
+        for depth in (1, 4, 19):
+            source = generate.program(family, depth)
+            self.assertIn('a -> Fork a a;', source)
+            self.assertEqual(source.count('(duplicate '), depth)
+            self.assertEqual(source.count('(left '), depth)
+            for value in (-2**63, -1, 7, 2**63 - 1):
+                self.assertEqual(generate.expected_output(family, depth, value), f'{value}\n')
+
     def test_polymorphic_import_spine_grows_one_inferred_application(self):
         family = 'polymorphic_import_spine'
         self.assertFalse(generate.REGISTRY['families'][family]['default'])

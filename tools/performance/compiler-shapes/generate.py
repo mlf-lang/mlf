@@ -156,6 +156,56 @@ producer x = if ltInt x 0 then next (subInt 0 x) else addInt x ({total});
                                f'then level{i-1} (addInt z {i}) else level{i-1} (subInt z {i})')
         return (HEADER + 'hotTransaction start = let {\n' + ';\n'.join(definitions)
                 + f'\n}} in level{n} start;\nentry x = hotTransaction x;\n' + MAIN)
+    elif family in ('recursive_dictionary_forwarding', 'recursive_dictionary_alias',
+                    'closed_dictionary_result'):
+        declarations = """data Box a = Box Int a;
+data Tag a = Tag Int a;
+class Step a where { step :: a -> Int };
+instance Step (Box a) where { step (Box value ignored) = value };
+instance Step (Tag a) where { step (Tag value ignored) = subInt 0 value };
+"""
+        terms = [f'(step ({"Box" if i % 2 == 0 else "Tag"} (addInt x {i}) x))' for i in range(n)]
+        subtotal = balanced(terms, lambda a, b: f'(addInt {a} {b})') if terms else '0'
+        if family == 'closed_dictionary_result':
+            return HEADER + declarations + f'worker x = {subtotal};\nentry x = addInt x (worker x);\n' + MAIN
+        if family == 'recursive_dictionary_alias':
+            return (HEADER + declarations
+                    + 'first direction fuel x = if ltInt fuel 1 then '
+                    + f'addInt (if direction then x else subInt 0 x) {subtotal} else second (subInt fuel 1) x;\n'
+                    + 'bridge = first True;\n'
+                    + 'second fuel x = if ltInt fuel 1 then bridge 0 (addInt x 1) else bridge (subInt fuel 1) x;\n'
+                    + 'entry x = second 2 x;\n' + MAIN)
+        return (HEADER + declarations
+                + f'first fuel x = if ltInt fuel 1 then addInt x {subtotal} else second (subInt fuel 1) x;\n'
+                + 'second fuel x = if ltInt fuel 1 then first 0 (addInt x 1) else first (subInt fuel 1) x;\n'
+                + 'entry x = second 2 x;\n' + MAIN)
+    elif family in ('repeated_dictionary_arguments', 'bounded_dictionary_arguments'):
+        declarations = """data Box = Box Int;
+class Pass a where { pass :: a -> a };
+instance Pass Box where { pass (Box x) = Box (addInt x 1) };
+"""
+        if family == 'bounded_dictionary_arguments':
+            body = f'callback x{n}'
+            for i in reversed(range(n)):
+                body = f'case pass (Box x{i}) of {{ Box x{i+1} -> {body} }}'
+            return (HEADER + declarations + f'worker callback x0 = {body};\n'
+                    + 'entry x = worker (\\y -> y) x;\n' + MAIN)
+        calls = '(pass ' * n + 'x' + ')' * n
+        return (HEADER + declarations + f'worker x = {calls};\n'
+                + 'entry x = case worker (Box x) of { Box y -> y };\n' + MAIN)
+    elif family == 'duplicated_type_arguments':
+        # Each call shares its value but uses its type in both result slots.
+        expression = 'x'
+        for _ in range(n):
+            expression = f'(duplicate {expression})'
+        for _ in range(n):
+            expression = f'(left {expression})'
+        declarations = ('data Fork a b = ForkValue a b;\n'
+                        'duplicate :: forall a. a -> Fork a a;\n'
+                        'duplicate x = ForkValue x x;\n'
+                        'left :: forall a b. Fork a b -> a;\n'
+                        'left (ForkValue x _) = x;\n')
+        return HEADER + declarations + f'entry x = {expression};\n' + MAIN
     elif family == 'polymorphic_import_spine':
         parameters = ''.join(f' unused{i}' for i in range(n))
         operands = ''.join(
@@ -823,8 +873,18 @@ def expected(family, n, x):
     """Closed-form specifications; no compiled results or generated helpers used."""
     if family == 'baseline':
         return x
-    if family == 'polymorphic_import_spine':
+    if family in ('polymorphic_import_spine', 'duplicated_type_arguments'):
         return x
+    if family == 'closed_dictionary_result':
+        total = x - n // 2 + (x + n - 1 if n % 2 else 0)
+        return (total + 2**63) % 2**64 - 2**63
+    if family in ('recursive_dictionary_forwarding', 'recursive_dictionary_alias'):
+        # Each Box/Tag pair contributes -1. An unpaired Box contributes seed + n - 1.
+        seed = x + 1
+        total = seed - n // 2 + (seed + n - 1 if n % 2 else 0)
+        return (total + 2**63) % 2**64 - 2**63
+    if family in ('repeated_dictionary_arguments', 'bounded_dictionary_arguments'):
+        return (x + n + 2**63) % 2**64 - 2**63
     if family == 'captured_parameter_uses':
         total = n*x + n*(n+1)//2
         return (total + 2**63) % 2**64 - 2**63
