@@ -50,6 +50,8 @@ class PR43SourceReconciliation(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.contract = historical_contract(HISTORY)
+        # Git objects come from ROOT; the historical adapter must read the matching archive.
+        cls.history_root = cls.contract.source_root / 'tools/performance'
 
     def test_macos_repair_is_exactly_the_declared_main_follow_on(self):
         c = self.contract
@@ -83,7 +85,7 @@ class PR43SourceReconciliation(unittest.TestCase):
         c = self.contract
         module = sys.modules[type(c).__module__]
         spec = json.loads((c.directory / 'pr43-reconciliation-migration.json').read_bytes())
-        module.validate_live_transition(spec, ROOT, c.core)
+        module.validate_live_transition(spec, ROOT, c.core, history_root=self.history_root)
         mutations = []
         def changed(label, mutate):
             value = copy.deepcopy(spec)
@@ -102,7 +104,7 @@ class PR43SourceReconciliation(unittest.TestCase):
         changed('unchanged endpoint', lambda s: s['changes'][MACOS_PATH].__setitem__(1, MACOS_BASE_SOURCE))
         for label, value in mutations:
             with self.subTest(label=label), self.assertRaises(ValueError):
-                module.validate_live_transition(value, ROOT, c.core)
+                module.validate_live_transition(value, ROOT, c.core, history_root=self.history_root)
 
     def test_macos_source_rejects_prior_mutated_and_wrong_layer_bytes(self):
         c = self.contract
@@ -212,7 +214,7 @@ class PR43SourceReconciliation(unittest.TestCase):
             elif mutation == 'tree': transition['predecessor_tree'] = '0' * 40
             else: transition['predecessor_manifest_sha256'] = '0' * 64
             with self.subTest(mutation=mutation), self.assertRaises(ValueError):
-                module.validate_live_transition(bad, ROOT, c.core)
+                module.validate_live_transition(bad, ROOT, c.core, history_root=self.history_root)
 
     def test_performance_maintenance_preserves_both_historical_endpoints(self):
         c = self.contract
@@ -274,7 +276,7 @@ class PR43SourceReconciliation(unittest.TestCase):
             elif mutation == 'other-maintenance': bad['maintenance']['other'] = ['0' * 64, '1' * 64]
             else: bad['performance_transition']['extra'] = True
             with self.subTest(mutation=mutation), self.assertRaises(ValueError):
-                module.validate_live_transition(bad, ROOT, c.core)
+                module.validate_live_transition(bad, ROOT, c.core, history_root=self.history_root)
 
     def test_complete_tree_projections_recover_exact_predecessor_and_live_inputs(self):
         c = self.contract
@@ -335,7 +337,7 @@ class PR43SourceReconciliation(unittest.TestCase):
             bad = copy.deepcopy(spec)
             bad['compiler_source_transitions'][-1][key] = {} if key == 'changes' else '0' * 40
             with self.subTest(key=key), self.assertRaises(ValueError):
-                module.validate_live_transition(bad, ROOT, c.core)
+                module.validate_live_transition(bad, ROOT, c.core, history_root=self.history_root)
 
     def test_direct_runner_extends_the_frozen_controls_only_with_metadata(self):
         path = 'tools/shared/test_direct.py'
