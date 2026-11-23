@@ -26,8 +26,8 @@ The CI timing helper rejects a command peak above 5.5 GB before exposing a
 candidate to later steps; the paired driver also checks sampled aggregate RSS.
 All six native groups passed, including a fresh LLVM/binary self-host fixed
 point and both backend layouts. All nine workloads emit identical LLVM in both
-layouts. All checks remain enabled. See the [complete report](results/2026-10-19-bootstrap-memory/README.md)
-for samples, variation, exact identities, verification, and reproduction.
+layouts. All checks remain enabled. The original report and raw records are not
+available in this repository.
 
 ## Published release seed bootstrap — 2026-10-19
 
@@ -36,9 +36,8 @@ Three alternating cold build pairs on identical v0.1.1 sources measured a
 than v0.1.0: **362.97s → 303.71s**. Both compiler and package manager are built;
 MLF emission, fresh runtime C, Clang O2 LLVM compilation and linking are included.
 MLF phase medians are 338.40s → 266.36s; Clang LLVM/link medians are
-17.89s → 30.64s. All samples, variation, source/tool hashes, fixed-point checks,
-reproduction commands and the hosted-memory limitation are in the
-[seed comparison report](results/2026-10-19-seed/README.md).
+17.89s → 30.64s. The original report and raw records are not available in
+this repository.
 
 This establishes a local improvement for the stock release seeds. It does not
 attribute the historical hour-long CI build or measure a hosted speedup. The
