@@ -4,7 +4,7 @@
              MultiParamTypeClasses, OverloadedStrings #-}
 module MLF.PreparedCompiler
   (Compilation, compileFileWithPrelude, compileSourceWithImports, compileProgramWithPrelude,
-   checkedTerm, compiledTerm, sourceType, reused, dictionaryIdentities, verifyBuiltin, verifyBuiltinImages, installCompilerPrelude, cratePrelude, linkCrateFile, linkCrateFileProfiled, linkCompiledCrate,
+   checkedTerm, compiledTerm, sourceType, reused, dictionaryIdentities, verifyBuiltin, verifyBuiltinImages, installCompilerPrelude, cratePrelude, linkCrateFile, linkCrateFileProfiled, linkCompiledCrate, linkCompiledCrateRetaining,
    emitNativeFileChunks, emitNativeSourceChunks, nativeInstallInfo,
    NativeCompilation, compileNativeFile, compileNativeSource,
    nativeChunks, nativeManifest, nativeExportCount, nativeInlineCount, nativeFallback, nativeInputs,
@@ -400,17 +400,35 @@ module MLF.PreparedCompiler
       }
     }
   };
-  -- A retained root is already checked and published by this invocation.
-  -- Dependencies still acquire ordinary object snapshots and check them against
-  -- the metadata used for inference. No disk cache supplies the retained root.
-  linkCompiledCrate compiled = do {
+  -- The ordinary entry retains the root checked by this invocation. A plan
+  -- also owns the dependency objects it published earlier in this process.
+  linkCompiledCrate = linkCompiledCrateRetaining M.empty;
+  linkCompiledCrateRetaining :: Map String Artifact.CrateObject -> Session.CompiledCrate ->
+    IO (Either String Checked.CheckedTerm);
+  linkCompiledCrateRetaining retained compiled = do {
     let { root = Session.compiledObject compiled;
           iface = Artifact.objectInterface root;
           dependencies = Session.compiledInterfaces compiled;
           available = (:) iface (map snd dependencies);
+          readDependency ((,) file expected) = let {
+            ordinary = Artifact.readObjectWithInterfaces available (Artifact.objectPath file) expected
+          } in case M.lookup compareString file retained of {
+            Just object@(Artifact.OpenCrateObject saved _) ->
+              if not (Artifact.sameAdmittedInterface expected saved) then ordinary else do {
+                input <- Storage.readRaw (Artifact.objectPath file);
+                case input of {
+                  Left _ -> ordinary;
+                  Right bytes -> do {
+                    digest <- byteArrayDigest bytes;
+                    if eqString digest (Artifact.crateObjectFingerprint saved)
+                    then ioReturn (Right object) else ordinary
+                  }
+                }
+              };
+            _ -> ordinary
+          };
           ordinary = \ignored -> do {
-            admitted <- mapM (\((,) file expected) ->
-              Artifact.readObjectWithInterfaces available (Artifact.objectPath file) expected) dependencies;
+            admitted <- mapM readDependency dependencies;
             ioReturn (do { objects <- sequenceEither admitted;
               Artifact.linkCheckedObjects (snoc objects root) (Artifact.crateId iface) })
           } };
@@ -428,8 +446,7 @@ module MLF.PreparedCompiler
             }
           };
           if not exact then ordinary () else do {
-            admitted <- mapM (\((,) file expected) ->
-              Artifact.readObjectWithInterfaces available (Artifact.objectPath file) expected) rest;
+            admitted <- mapM readDependency rest;
             case sequenceEither admitted of {
               Left message -> ioReturn (Left message);
               Right objects -> if any Artifact.envelopeMarked ((:) root objects) then ordinary ()

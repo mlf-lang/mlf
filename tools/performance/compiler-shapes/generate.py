@@ -37,6 +37,17 @@ def tag_selector(lo, hi):
     return f'if ltInt x {mid} then ({tag_selector(lo, mid-1)}) else ({tag_selector(mid, hi)})'
 
 
+def packet_declarations(n):
+    declarations = '''data Packet = Missing | Payload Int Int;
+packet x = if eqInt x 0 then Missing else Payload (addInt x 3) (subInt 3 x);
+'''
+    for i in range(n):
+        declarations += (f'probe{i} :: Packet -> Int;\n'
+                         f'probe{i} packet = case packet of {{ Missing -> {i}; Payload left right -> '
+                         f'if ltInt left {i} then addInt left {i} else subInt right {i} }};\n')
+    return declarations
+
+
 def program(family, n):
     """Generate one shared module with a runtime input at its IO entry."""
     if family == 'baseline':
@@ -103,14 +114,9 @@ sumChain x chain = case chain of { End -> 0; More box rest -> addInt (readBox bo
         for i in range(n, 0, -1):
             chain = f'More (make x {i}) ({chain})'
         expression = f'sumChain x ({chain})'
-    elif family == 'delayed_packet_fanout':
-        declarations = '''data Packet = Missing | Payload Int Int;
-packet x = if eqInt x 0 then Missing else Payload (addInt x 3) (subInt 3 x);
-'''
-        for i in range(n):
-            declarations += (f'probe{i} :: Packet -> Int;\n'
-                             f'probe{i} packet = case packet of {{ Missing -> {i}; Payload left right -> '
-                             f'if ltInt left {i} then addInt left {i} else subInt right {i} }};\n')
+    elif family in ('delayed_packet_fanout', 'retained_packet_dependency'):
+        declarations = (packet_declarations(n) if family == 'delayed_packet_fanout'
+                        else 'import PacketLibrary;\n')
         terms = [f'(probe{i} payload)' for i in range(n)]
         total = balanced(terms, lambda a, b: f'(addInt {a} {b})')
         return HEADER + declarations + f'entry x = let {{ payload = packet x }} in {total};\n' + MAIN
@@ -235,6 +241,136 @@ producer x = if ltInt x 0 then next (subInt 0 x) else addInt x ({total});
         rows.extend(['entry :: Int -> Int;', f'entry x = addInt ({function} {args}) '
                      f'(total (remInt x 11) {jobs});', MAIN])
         return '\n'.join(rows)
+    elif family == 'retained_curried_job_list':
+        return (HEADER + 'import CurryLibrary;\nimport CurryFacade;\n' +
+                'entry :: Int -> Int;\nentry x = run x allJobs;\n' + MAIN)
+    elif family == 'retained_curried_dependencies':
+        jobs = ''.join(f'More job{i} (' for i in range(n)) + 'End' + ')'*n
+        return (HEADER + 'import CurryLibrary;\nimport CurryFacade;\n' +
+                f'entry x = run x ({jobs});\n' + MAIN)
+    elif family == 'bounded_optional_writers':
+        declarations = '''data Optional a = Omit | Include a;
+data Writers = End | More (Int -> Int) Writers;
+writeAll :: Int -> Writers -> Int;
+writeAll x writers = case writers of {
+  End -> 0;
+  More writer rest -> addInt (writer x) (writeAll x rest)
+};
+'''
+        omitted = '"none"'
+        included = '(encode value)'
+        for word in ('a', 'b', 'c', 'd', 'e', 'f'):
+            omitted = f'(concatString "{word}" {omitted})'
+        for word in ('u', 'v', 'w', 'x', 'y', 'z'):
+            included = f'(concatString "{word}" {included})'
+        declarations += f'''formatOptional encode item = case item of {{
+  Omit -> {omitted};
+  Include value -> {included}
+}};
+'''
+        for index in range(n):
+            declarations += f'''write{index} x =
+  addInt {index} (stringLength (formatOptional showInt
+    (if ltInt x 0 then Omit else Include (addInt x {index}))));
+'''
+        writers = ''.join(f'(More write{i} ' for i in range(n)) + 'End' + ')' * n
+        declarations += f'''entry :: Int -> Int;
+entry x = writeAll x {writers};
+'''
+        return HEADER + declarations + MAIN
+    elif family == 'inferred_constructor_writers':
+        declarations = '''data Query = Read Int | Reject Int | Stop;
+data Decision = Accepted Int | Failed Int;
+data Writers = None | More (Query -> Decision) Writers;
+writeAll :: Query -> Writers -> Int;
+writeAll query writers = case writers of {
+  None -> 0;
+  More writer rest -> case writer query of {
+    Accepted value -> addInt value (writeAll query rest);
+    Failed code -> subInt (writeAll query rest) code
+  }
+};
+'''
+        for index in range(n):
+            declarations += f'''write{index} query = case query of {{
+  Read v -> Accepted (addInt (mulInt v {index+1}) {index});
+  Reject c -> Failed (addInt c {index});
+  Stop -> Accepted (subInt 0 {index+1})
+}};
+'''
+        writers = ''.join(f'(More write{index} ' for index in range(n)) + 'None' + ')' * n
+        declarations += f'''entry :: Int -> Int;
+entry x = writeAll (if ltInt x 0 then Reject x else if eqInt x 0 then Stop else Read x)
+  {writers};
+'''
+        return HEADER + declarations + MAIN
+    elif family == 'mixed_recursive_decoder':
+        variants = ''.join(f' | Variant{i} Int' for i in range(n))
+        arms = ''.join(f'  Variant{i} payload -> schedule (addInt (mulInt payload {i+2}) 3) rest;\n'
+                       for i in range(n))
+        choices = ''.join(f'  if eqInt x {i} then Variant{i} (addInt x 2) else\n' for i in range(n))
+        return HEADER + f'''data Node = Flush | Invalid{variants};
+data Task = End | Open Node Task | AddValue Int Task;
+data Outcome = Rejected Int | Value Int;
+dispatch :: Node -> Task -> Outcome;
+dispatch node rest = case node of {{
+  Flush -> schedule 0 rest;
+  Invalid -> Rejected 37;
+{arms}  }};
+schedule value rest = scan (AddValue value rest);
+scan :: Task -> Outcome;
+scan tasks = case tasks of {{
+  End -> Value 0;
+  Open node rest -> dispatch node rest;
+  AddValue amount rest -> case scan rest of {{
+    Rejected code -> Rejected code;
+    Value total -> Value (addInt amount total)
+  }}
+}};
+makeNode :: Int -> Node;
+makeNode x =
+{choices}  if ltInt x 0 then Flush else Invalid;
+entry :: Int -> Int;
+entry x = case scan (Open (makeNode x) (Open Flush (AddValue 7 End))) of {{
+  Rejected code -> subInt 0 code;
+  Value total -> total
+}};
+''' + MAIN
+    elif family == 'signed_decoder_selectors':
+        declarations = '''data Piece = Missing | Present Int;
+data Result e a = Failure e | Success a;
+instance forall e. Functor (Result e) where {
+  fmap _ (Failure e) = Failure e;
+  fmap f (Success a) = Success (f a)
+};
+instance forall e. Applicative (Result e) where {
+  pure a = Success a;
+  (<*>) (Failure e) _ = Failure e;
+  (<*>) (Success _) (Failure e) = Failure e;
+  (<*>) (Success f) (Success a) = Success (f a)
+};
+instance forall e. Monad (Result e) where {
+  (>>=) (Failure e) _ = Failure e;
+  (>>=) (Success a) next = next a
+};
+readPiece :: Piece -> Result Int Int;
+readPiece x = case x of { Missing -> Failure 11; Present a -> Success a };
+assemble :: Int -> Piece -> Piece -> Result Int Int;
+assemble tag left right =
+'''
+        declarations += ''.join(f'''  if eqInt tag {i} then do {{
+    a <- readPiece left; b <- readPiece right;
+    pure (addInt (mulInt a {i+1}) (subInt b {i}))
+  }} else
+''' for i in range(n))
+        declarations += '''  Failure 99;
+entry :: Int -> Int;
+entry x = case assemble x (Present (addInt x 2))
+  (if eqInt x 0 then Missing else Present (subInt (mulInt 3 x) 1)) of {
+  Failure code -> subInt 0 code; Success value -> value
+};
+'''
+        return HEADER + declarations + MAIN
     elif family == 'escaping_curried_jobs':
         arity = 12
         params = [f'a{j}' for j in range(arity)]
@@ -641,6 +777,40 @@ makeGraph x = if ltInt x 0 then Graph x (subInt x 1) (addInt (mulInt x 2) 1)
     return HEADER + declarations + f'entry :: Int -> Int;\nentry x = {expression};\n' + MAIN
 
 
+def cold_curried_library(n):
+    header = HEADER.replace('module Main (main)', 'module CurryLibrary')
+    rows = ['data Payload = Payload Int Int Int Int Int Int Int;',
+            'data Job = Job (Int -> Int -> Int -> Int -> Int -> Int -> Payload);',
+            'data Jobs = End | More Job Jobs;']
+    for i in range(n):
+        rows += [f'job{i} :: Job;', f'job{i} = Job (\\a -> \\b -> \\c -> \\d -> \\e -> \\f -> Payload {i+1} a b c d e f);']
+    return header + '\n'.join(rows) + '\n}\n'
+
+
+def cold_curried_job_list(n):
+    prefix = cold_curried_library(0).removesuffix('\n}\n') + '\n'
+    jobs = ''.join(f'More (Job (\\a -> \\b -> \\c -> \\d -> \\e -> \\f -> Payload {i+1} a b c d e f)) ('
+                   for i in range(n)) + 'rest' + ')'*n
+    return (prefix + f'jobs :: Jobs -> Jobs; jobs rest = {jobs};\n' +
+            'allJobs :: Jobs; allJobs = jobs End\n}\n')
+
+
+def cold_curried_facade():
+    header = HEADER.replace('module Main (main)', 'module CurryFacade')
+    return header + '''import CurryLibrary;
+value :: Payload -> Int;
+value (Payload tag a b c d e f) =
+  addInt tag (addInt a (addInt (mulInt 2 b) (addInt (mulInt 3 c)
+    (addInt (mulInt 4 d) (addInt (mulInt 5 e) (mulInt 6 f))))));
+run :: Int -> Jobs -> Int;
+run x End = 0;
+run x (More (Job worker) rest) = let { saved = worker x (addInt x 1) } in
+  addInt (value (saved (addInt x 2) (addInt x 3) (addInt x 4) (addInt x 5)))
+    (addInt (value (saved (subInt x 4) (subInt x 9) (subInt x 16) (subInt x 25))) (run x rest))
+}
+'''
+
+
 def expected(family, n, x):
     """Closed-form specifications; no compiled results or generated helpers used."""
     if family == 'baseline':
@@ -659,7 +829,7 @@ def expected(family, n, x):
     if family == 'boxed_closure_factory':
         offsets = n*(n+1)//2
         return x*(offsets + n) if x < 0 else n*(x + x*x) - offsets
-    if family == 'delayed_packet_fanout':
+    if family in ('delayed_packet_fanout', 'retained_packet_dependency'):
         offsets = n*(n-1)//2
         if x == 0:
             return offsets
@@ -716,6 +886,11 @@ def expected(family, n, x):
         for level in range(1, remainder(x, 11)+1):
             total += cycles*(18*19//2) + sum((level+i) % 19 for i in range(1, rest+1))
         return (total + 2**63) % 2**64 - 2**63
+    if family in ('retained_curried_dependencies','retained_curried_job_list'):
+        # Each tag is observed twice. The two weighted suffixes contribute
+        # offsets 0, 4, -6, -24, -60 and -120 to each job.
+        total = n * (42 * x - 206) + n * (n + 1)
+        return (total + 2**63) % 2**64 - 2**63
     if family == 'escaping_curried_jobs':
         # The suffix offsets cancel in their original positions. Each endpoint
         # rotates the coefficients of the independently computed positional sum.
@@ -752,6 +927,28 @@ def expected(family, n, x):
         return (total + 2**63) % 2**64 - 2**63
     if family == 'inferred_monadic_recursion':
         return ((n + 1)*x + 2**63) % 2**64 - 2**63
+    if family == 'bounded_optional_writers':
+        offsets = n * (n - 1) // 2
+        if x < 0:
+            return 10 * n + offsets
+        def wrap(i):
+            return (i + 2**63) % 2**64 - 2**63
+        return offsets + 6*n + sum(len(str(wrap(x+i))) for i in range(n))
+    if family == 'inferred_constructor_writers':
+        count = n * (n + 1) // 2
+        offsets = count - n
+        value = (x * count + offsets) if x > 0 else (-n * x - offsets) if x < 0 else -count
+        return (value + 2**63) % 2**64 - 2**63
+    if family == 'mixed_recursive_decoder':
+        if x < 0:
+            return 7
+        if x >= n:
+            return -37
+        return (x + 2) ** 2 + 10
+    if family == 'signed_decoder_selectors':
+        if x < 0 or x >= n:
+            return -99
+        return -11 if x == 0 else (x + 2) * (x + 1) + 2 * x - 1
     if family == 'shared_callback_let_chain':
         computed = max(0, min(n, x+1))
         magnitude = abs(x) * pow(abs(x+2), computed, 251) * pow(abs(x+1), n-computed, 251) % 251
@@ -824,13 +1021,20 @@ def coordinates(sizes=None, families=None):
     return [(family, n) for family in selected for n in ((0,) if family == 'baseline' else sizes)]
 
 
-def generate(out, sizes=None, families=None):
+def generate(out, sizes=None, families=None, baseline_family=None):
     out = Path(out); out.mkdir(parents=True, exist_ok=False)
+    cells = coordinates(sizes, families)
+    if baseline_family is not None and (
+        not REGISTRY['families'].get(baseline_family, {}).get('matched_zero') or
+        {family for family, _ in cells} != {'baseline', baseline_family}
+    ):
+        raise ValueError('a matched baseline requires the zero cell and exactly its growing family')
     cases = []
-    for family, n in coordinates(sizes, families):
+    for family, n in cells:
+        source_family = baseline_family if family == 'baseline' and baseline_family else family
         identity = f'{family}-{n}'
         directory = out/identity; directory.mkdir()
-        source = directory/'Main.hs'; source.write_text(program(family,n))
+        source = directory/'Main.hs'; source.write_text(program(source_family,n))
         inputs = [-1,0,n+3] if family == 'recursive_ring' else [-1,0,7]
         if family == 'wide_case':
             inputs = [-1, n//2, n, '--all']
@@ -850,6 +1054,14 @@ def generate(out, sizes=None, families=None):
             inputs = [-n-1, -n, n-1]
         elif family == 'checked_constructor_dispatch':
             inputs = [-1, 0, n//2, 2*n+3]
+        elif source_family == 'bounded_optional_writers':
+            inputs = [-9, 0, 9, 99, 2**63-1]
+        elif source_family == 'inferred_constructor_writers':
+            inputs = [-9, -1, 0, 3, 17]
+        elif source_family == 'mixed_recursive_decoder':
+            inputs = [-5, 0, n//2, n-1, n+2] if n >= 3 else [-5, -1, 0, 1, 2]
+        elif source_family == 'signed_decoder_selectors':
+            inputs = [-1, 0, n//2, n-1, n+1] if n >= 3 else [-2, -1, 0, 1, 7]
         elif family == 'mixed_parser_recursion':
             inputs = [-1, 0, n-1, n, 2*n+1]
         elif family == 'local_dictionary_branch_fanout':
@@ -859,10 +1071,32 @@ def generate(out, sizes=None, families=None):
             inputs = [1, 7, 19]
         elif family in ('captured_closures', 'wide_product'):
             inputs = [-n-1, 0, n+1]
-        cases.append({'id':identity,'family':family,'size':n,'source':str(source.resolve()),
+        case = {'id':identity,'family':family,'size':n,'source':str(source.resolve()),
             'source_sha256':hashlib.sha256(source.read_bytes()).hexdigest(),'source_bytes':source.stat().st_size,
-            'inputs':inputs, 'expected_stdout':[expected_output(family,n,x) for x in inputs],
+            'inputs':inputs, 'expected_stdout':[expected_output(source_family,n,x) for x in inputs],
             'syntax':'shared-haskell-v1; identical source bytes for GHC and MLF',
-            'route':'one Main module, imports fixed MLF.Primitive; main reads runtime argv'})
+            'route':'one Main module, imports fixed MLF.Primitive; main reads runtime argv'}
+        if family == 'retained_packet_dependency':
+            library=directory/'PacketLibrary.hs'
+            library.write_text(HEADER.replace('module Main (main)', 'module PacketLibrary') +
+                               packet_declarations(n) + '}\n')
+            case.update(dependency={'source':str(library.resolve()),
+                         'module':'PacketLibrary','sha256':hashlib.sha256(library.read_bytes()).hexdigest()},
+                        route='PacketLibrary and Main both start from source')
+        if source_family in ('retained_curried_dependencies','retained_curried_job_list'):
+            library = (cold_curried_job_list(n) if source_family == 'retained_curried_job_list'
+                       else cold_curried_library(n))
+            sources = [('CurryLibrary', library), ('CurryFacade', cold_curried_facade())]
+            dependencies = []
+            for module, contents in sources:
+                dep = directory/(module+'.hs')
+                dep.write_text(contents)
+                dependencies.append({'source':str(dep.resolve()),'module':module,
+                                     'sha256':hashlib.sha256(dep.read_bytes()).hexdigest()})
+            case.update(dependencies=dependencies,
+                        route='CurryLibrary, CurryFacade and Main all start from source')
+        if source_family != family:
+            case['matched_baseline_for'] = source_family
+        cases.append(case)
     (out/'cases.json').write_text(json.dumps(cases,indent=2)+'\n')
     return cases

@@ -1321,9 +1321,48 @@ module Bootstrap.LLVM.Native where {
   smallBounds :: (,) Int Int -> Bool;
   smallBounds ((,) lo hi) = ((lo >= (0 - 4611686018427387904)) && (hi < 4611686018427387904));
   numericProduct :: Primitive -> String -> String -> Build String;
-  numericProduct p a b =
+  numericProduct p a b = do {
+    facts <- gets scalarRanges;
+    case M.lookup compareString b facts of {
+      Just bounds@((,) low high) ->
+        if P.primitiveCode p /= 14 && low > 0 && smallBounds bounds
+        then positiveDivision p a b (M.lookup compareString a facts) high
+        else numericProductGeneral facts p a b;
+      Nothing -> numericProductGeneral facts p a b
+    }
+  };
+  -- A positive, compact divisor removes the zero and signed-overflow cases.
+  -- The fallback still handles a boxed dividend. Both paths bound a signed
+  -- remainder by the divisor, so its compact range survives their join.
+  positiveDivision :: Primitive -> String -> String -> Maybe ((,) Int Int) -> Int -> Build String;
+  positiveDivision p a b dividend maximum = do {
+    let {
+      remainder = P.primitiveCode p /= 15;
+      divisor = if remainder then "srem" else "sdiv";
+      compact = case dividend of { Just bounds -> smallBounds bounds; Nothing -> False }
+    };
+    x <- result ("ptrtoint ptr " ++ a ++ " to i64");
+    y <- result ("ptrtoint ptr " ++ b ++ " to i64");
+    let { fast = do {
+      left <- result ("ashr i64 " ++ x ++ ", 1");
+      right <- result ("ashr i64 " ++ y ++ ", 1");
+      n <- result (divisor ++ " i64 " ++ left ++ ", " ++ right);
+      tagInteger n
+    } };
+    value <- if compact then fast else do {
+      low <- result ("and i64 " ++ x ++ ", 1");
+      immediate <- result ("icmp ne i64 " ++ low ++ ", 0");
+      choose "ptr" immediate fast (numericPrimitiveCall p (args2 a b))
+    };
+    if remainder then recordRange value ((,) (1 - maximum) (maximum - 1)) else case dividend of {
+      Just ((,) low high) -> if compact then recordRange value ((,) (L.min 0 low) (L.max 0 high)) else cgPure ();
+      Nothing -> cgPure ()
+    };
+    cgPure value
+  };
+  numericProductGeneral :: Map String ((,) Int Int) -> Primitive -> String -> String -> Build String;
+  numericProductGeneral facts p a b =
     do {
-      facts <- gets scalarRanges;
       x <- result ("ptrtoint ptr " ++ (a ++ " to i64"));
       y <- result ("ptrtoint ptr " ++ (b ++ " to i64"));
       let {

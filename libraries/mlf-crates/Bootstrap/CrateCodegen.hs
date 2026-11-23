@@ -232,12 +232,14 @@ module Bootstrap.CrateCodegen where {
   emitChecked directory requireIO checked =
     emitWithKey directory requireIO checked (LLVM.checkedInputKey requireIO checked);
   emitCrateChecked :: String -> Bool -> Checked.CheckedTerm -> IO (Either String CodegenResult);
-  emitCrateChecked directory requireIO checked =
-    emitWithKey directory requireIO checked (LLVM.crateInputKey requireIO checked);
+  emitCrateChecked = emitCrateCheckedUsing (ioBind getExecutablePath fileDigest);
+  emitCrateCheckedUsing compiler directory requireIO checked =
+    emitWithKeyUsing compiler directory requireIO checked (LLVM.crateInputKey requireIO checked);
   emitWithKey :: String ->
                  Bool ->
                  Checked.CheckedTerm -> Either String String -> IO (Either String CodegenResult);
-  emitWithKey directory requireIO checked key =
+  emitWithKey = emitWithKeyUsing (ioBind getExecutablePath fileDigest);
+  emitWithKeyUsing readCompiler directory requireIO checked key =
     case key of {
       Left error -> ioReturn (Left error);
       Right inputKey ->
@@ -254,8 +256,7 @@ module Bootstrap.CrateCodegen where {
                if any isLeft made
                then ioReturn (Left "cannot create code generation query cache")
                else do {
-                      executable <- getExecutablePath;
-                      compiler <- fileDigest executable;
+                      compiler <- readCompiler;
                       lock <- acquireFileLock (cache ++ "/.lock");
                       result <- emitLocked cache compiler requireIO checked inputKey;
                       releaseFileLock lock;

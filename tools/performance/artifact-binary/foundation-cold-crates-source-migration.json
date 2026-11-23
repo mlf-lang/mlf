@@ -1,0 +1,159 @@
+{
+  "changes": {
+    "bootstrap/MLF/BuiltinPreludeData.hs": {
+      "branch": "a2eb19781171fe212bea005466abdc7bcff79dfeccccfe843f14c55e54feb01b",
+      "branch_parent": "0a2c09d3698b26c8ac48e9388b0fecefd1e4469fe088192662a7849010cd51de",
+      "framework": "b6dfd0eba758cba48b893d0d25d83e8254d0f25d95274559cb4c4e05467ccb5f",
+      "merged": "912284252eee6ba26d26a4af528eb9f71db81775e3675ac88c5d0e1cd29cb1f9"
+    },
+    "bootstrap/MLF/Entry/Emlf.hs": {
+      "branch": "14d45109e670a8acbccc069da03555d0302161245db8c04137cb1e67644717b2",
+      "branch_parent": "8f7fbcf43631c4106d2459ed20f822af8059f09be15a4219b9776260b04e8176",
+      "framework": "8f7fbcf43631c4106d2459ed20f822af8059f09be15a4219b9776260b04e8176",
+      "merged": "14d45109e670a8acbccc069da03555d0302161245db8c04137cb1e67644717b2"
+    },
+    "bootstrap/MLF/PreparedCompiler.hs": {
+      "branch": "d3dcd16a6543cac6ff2b6de89e04ed8d090edba50e7ab0c6b643fa07e61b65d7",
+      "branch_parent": "cc4ef5041b7820e1cbc56dae248ce2958dc941d276384ffe2b8bcef7e677bca6",
+      "framework": "cc4ef5041b7820e1cbc56dae248ce2958dc941d276384ffe2b8bcef7e677bca6",
+      "merged": "d3dcd16a6543cac6ff2b6de89e04ed8d090edba50e7ab0c6b643fa07e61b65d7"
+    },
+    "libraries/mlf-crates/Bootstrap/CrateArtifact.hs": {
+      "branch": "19f119b7ace3f9eeae57e7e359b05bd83c7cc0433fd49700270c98a16e7f7744",
+      "branch_parent": "47d32ee2485f82854c6e72c02f0379592963117785fd2f70b8a5673ae0243a69",
+      "framework": "47d32ee2485f82854c6e72c02f0379592963117785fd2f70b8a5673ae0243a69",
+      "merged": "19f119b7ace3f9eeae57e7e359b05bd83c7cc0433fd49700270c98a16e7f7744"
+    },
+    "libraries/mlf-crates/Bootstrap/CrateCodegen.hs": {
+      "branch": "32c26d42bf36b2264d1e00052cf01366ab60bd151b9b111d1e29a90d045a8899",
+      "branch_parent": "3b965481dec681849dbc2fb5172a31fc2b703609a7d379195a2c3338e92011ad",
+      "framework": "3b965481dec681849dbc2fb5172a31fc2b703609a7d379195a2c3338e92011ad",
+      "merged": "32c26d42bf36b2264d1e00052cf01366ab60bd151b9b111d1e29a90d045a8899"
+    },
+    "libraries/mlf-crates/Bootstrap/CrateGraph.hs": {
+      "branch": "69fc71026fa7401a63d30822b236303f3380f117eae3227624a2a1013ee2ccb5",
+      "branch_parent": "5a0ab4e17d11261fadf96815282949c23385e2c0d9c824efe8c828abb623fffe",
+      "framework": "5a0ab4e17d11261fadf96815282949c23385e2c0d9c824efe8c828abb623fffe",
+      "merged": "69fc71026fa7401a63d30822b236303f3380f117eae3227624a2a1013ee2ccb5"
+    },
+    "libraries/mlf-crates/Bootstrap/CrateSession.hs": {
+      "branch": "95bb0e6234d473c87a5224049268761b10fda3ccafe2474050b86645c6b00420",
+      "branch_parent": "e9984ba234bfa40d9ca0a131e13bdd91cdb43b96724d9f0278672bf4cbbbdc9e",
+      "framework": "e9984ba234bfa40d9ca0a131e13bdd91cdb43b96724d9f0278672bf4cbbbdc9e",
+      "merged": "95bb0e6234d473c87a5224049268761b10fda3ccafe2474050b86645c6b00420"
+    },
+    "libraries/mlf-crates/Bootstrap/ImportedRoot.hs": {
+      "branch": "5ccd4d328ef5f5eddbd4771e18172591d105655ef638c0544fdc5f0e901d526a",
+      "branch_parent": "407cc047235d19e52f0c377aa82aa0ae7fd8cdae064940bf2b582a196feb86ff",
+      "framework": "407cc047235d19e52f0c377aa82aa0ae7fd8cdae064940bf2b582a196feb86ff",
+      "merged": "5ccd4d328ef5f5eddbd4771e18172591d105655ef638c0544fdc5f0e901d526a"
+    },
+    "libraries/mlf-crates/Bootstrap/InferenceUnit.hs": {
+      "branch": "ff1088a88690318aa7d4ba89b1329eb45faf1badaaacf71604e341504726dd70",
+      "branch_parent": "c33f8b8eb2a3c0bad433f7099e11bab3978744d0762f450fa2e9afd4eb1c80af",
+      "framework": "c33f8b8eb2a3c0bad433f7099e11bab3978744d0762f450fa2e9afd4eb1c80af",
+      "merged": "ff1088a88690318aa7d4ba89b1329eb45faf1badaaacf71604e341504726dd70"
+    },
+    "libraries/mlf-crates/Bootstrap/SourceInference.hs": {
+      "branch": "364c303b03c8d468f6652affda8923bd122752d9f2fb8c491f4eea39fca758f6",
+      "branch_parent": "88d96225adfe760e04780bc1502b64e01e72872a558ec05f070f763017edc97e",
+      "framework": "88d96225adfe760e04780bc1502b64e01e72872a558ec05f070f763017edc97e",
+      "merged": "364c303b03c8d468f6652affda8923bd122752d9f2fb8c491f4eea39fca758f6"
+    },
+    "libraries/mlf-inference/Bootstrap/Classes.hs": {
+      "branch": "a41d1b746484d9f7697274b695e364f241cdd75c30e4248dc039821560eab24b",
+      "branch_parent": "d70f94527d8bf13ff9db5b9a2745b5167249b637e0bc623f9b5f1e916ddaa93e",
+      "framework": "d70f94527d8bf13ff9db5b9a2745b5167249b637e0bc623f9b5f1e916ddaa93e",
+      "merged": "a41d1b746484d9f7697274b695e364f241cdd75c30e4248dc039821560eab24b"
+    },
+    "libraries/mlf-inference/Bootstrap/Constraint.hs": {
+      "branch": "33030726faf6bfd22f5f517aaed2e53b7e0baf8b235d5147791dc0802fad43ac",
+      "branch_parent": "9dd02142bea48dc97be21764bea78b25ce8e192975e74dd9e330fff70deb6d60",
+      "framework": "9dd02142bea48dc97be21764bea78b25ce8e192975e74dd9e330fff70deb6d60",
+      "merged": "33030726faf6bfd22f5f517aaed2e53b7e0baf8b235d5147791dc0802fad43ac"
+    },
+    "libraries/mlf-inference/Bootstrap/Elaborate.hs": {
+      "branch": "00b48b528f8896d43472ccdcc6b4e8b5f4ca50474a385c69c5c76ae7aeccf63f",
+      "branch_parent": "574beb1efeaf054770e9dd1cd71a0165006f1fdaca05c26358ea0e18e07629d6",
+      "framework": "574beb1efeaf054770e9dd1cd71a0165006f1fdaca05c26358ea0e18e07629d6",
+      "merged": "00b48b528f8896d43472ccdcc6b4e8b5f4ca50474a385c69c5c76ae7aeccf63f"
+    },
+    "libraries/mlf-inference/Bootstrap/Evidence.hs": {
+      "branch": "a78c73dab1f37f752419548988523770e4f658a912d126198bc2c319efd0a2d1",
+      "branch_parent": "d6f77ce07ef566068c8c1fffa33c45b8a41eeb51e045fa95e955f814d7e7f53a",
+      "framework": "d6f77ce07ef566068c8c1fffa33c45b8a41eeb51e045fa95e955f814d7e7f53a",
+      "merged": "a78c73dab1f37f752419548988523770e4f658a912d126198bc2c319efd0a2d1"
+    },
+    "libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs": {
+      "branch": "074a04012fea1b64f7900b2a036b3c3fc7c8f3bdd270ce593e37f7c82fbb44e5",
+      "branch_parent": "be08075aed05a569f50fb999ac83f8a4ad89cd4eee83ad516a5b8c70db3dc037",
+      "framework": "be08075aed05a569f50fb999ac83f8a4ad89cd4eee83ad516a5b8c70db3dc037",
+      "merged": "074a04012fea1b64f7900b2a036b3c3fc7c8f3bdd270ce593e37f7c82fbb44e5"
+    },
+    "libraries/mlf-inference/Bootstrap/Graph.hs": {
+      "branch": "b9fd7edbb1f5186681320907e1b0e56909e694c968d153bc24a50c8a0be1e4ba",
+      "branch_parent": "9e849098d9e601254925819180f0951fdd55e1079f46e691239d85b9fb5a4f16",
+      "framework": "9e849098d9e601254925819180f0951fdd55e1079f46e691239d85b9fb5a4f16",
+      "merged": "b9fd7edbb1f5186681320907e1b0e56909e694c968d153bc24a50c8a0be1e4ba"
+    },
+    "libraries/mlf-inference/Bootstrap/Graph/Solver.hs": {
+      "branch": "9ff21a3604a9a815c50a02f5b37045039104a954c0adf19502f92bcbbe478932",
+      "branch_parent": "df197571d58c89faef47b23a645cba89585093e5d6387fc9cc18bc6123ae022f",
+      "framework": "c5e9145114e6d7714d89010d4d78f61dac879a25dd3d6f37fdec047a30a31499",
+      "merged": "3f596788575624c35803217f85b79c7a807a157a40773865b71476c1137c6e8a"
+    },
+    "libraries/mlf-llvm/Bootstrap/LLVM.hs": {
+      "branch": "769b46023ed8725af04ecc5f7fe32d4f53a8d47c06f4ff50a81c970c25085696",
+      "branch_parent": "069bfda2ad440e4895f5b14cb9b8d9b4378cb5ce1e9efe5c869aba79147019c9",
+      "framework": "069bfda2ad440e4895f5b14cb9b8d9b4378cb5ce1e9efe5c869aba79147019c9",
+      "merged": "769b46023ed8725af04ecc5f7fe32d4f53a8d47c06f4ff50a81c970c25085696"
+    },
+    "libraries/mlf-llvm/Bootstrap/LLVM/Build.hs": {
+      "branch": "df11e203f7ab7b12a6b099218d35215ddfd12a93d2c75fbd02f7d2e6979b51c1",
+      "branch_parent": "881a0c601723124759ee2c87bb3d66a15b3b846c0837d41fa362b9691cdc8793",
+      "framework": "881a0c601723124759ee2c87bb3d66a15b3b846c0837d41fa362b9691cdc8793",
+      "merged": "df11e203f7ab7b12a6b099218d35215ddfd12a93d2c75fbd02f7d2e6979b51c1"
+    },
+    "libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs": {
+      "branch": "e91d31f6d262a658bbae8d6bee37ad32dec3c75691e7928498b7ebcc9df1f330",
+      "branch_parent": "4c3c016bdadaa34690b2e57e2e4fa0c3508ee18de1b6f17554e06fbc138c0739",
+      "framework": "4c3c016bdadaa34690b2e57e2e4fa0c3508ee18de1b6f17554e06fbc138c0739",
+      "merged": "e91d31f6d262a658bbae8d6bee37ad32dec3c75691e7928498b7ebcc9df1f330"
+    },
+    "libraries/mlf-llvm/Bootstrap/LLVM/Library.hs": {
+      "branch": "b123e295e95c8a9898344672167139ab7d5ca52d3ff11b0edc7f9b8d963f6efa",
+      "branch_parent": "0ab830446ae86fb37f19c2987638026f87724aadfb5f8210e25105b9ff96ab76",
+      "framework": "0ab830446ae86fb37f19c2987638026f87724aadfb5f8210e25105b9ff96ab76",
+      "merged": "b123e295e95c8a9898344672167139ab7d5ca52d3ff11b0edc7f9b8d963f6efa"
+    },
+    "libraries/mlf-llvm/Bootstrap/LLVM/Native.hs": {
+      "branch": "2a7f814400ec5e256237bfa63e686ecf4faa50a67d4af80ef2a3d557a72a531a",
+      "branch_parent": "dd5c283b74aa407a7555ad7c5c1793d5b1e8e72bf7bdc61bb946c96aef0ac242",
+      "framework": "dd5c283b74aa407a7555ad7c5c1793d5b1e8e72bf7bdc61bb946c96aef0ac242",
+      "merged": "2a7f814400ec5e256237bfa63e686ecf4faa50a67d4af80ef2a3d557a72a531a"
+    },
+    "libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs": {
+      "branch": "aa6767796904707bf9f74275b65066eef9e5305b2628244b3288d2565883dc6d",
+      "branch_parent": "88d6b5fd5f04259e1f23567da7849056f50153d082fa0bae929d673d8bab5ae7",
+      "framework": "88d6b5fd5f04259e1f23567da7849056f50153d082fa0bae929d673d8bab5ae7",
+      "merged": "aa6767796904707bf9f74275b65066eef9e5305b2628244b3288d2565883dc6d"
+    },
+    "libraries/mlf-xmlf/Bootstrap/X/Check.hs": {
+      "branch": "6d01ba5b97203af3f0c2c91c8e32641aa5692ad088caba4a6e7569090a083778",
+      "branch_parent": "e0bea8393bb12afe3c355f368e78e764e278f680e9c891f5c4038be4688d497f",
+      "framework": "e0bea8393bb12afe3c355f368e78e764e278f680e9c891f5c4038be4688d497f",
+      "merged": "6d01ba5b97203af3f0c2c91c8e32641aa5692ad088caba4a6e7569090a083778"
+    },
+    "mlf.lock": {
+      "branch": "cd947400680edbd18c5cfa9bbc84992d4efec0584caeb0293a9e2e387e49c724",
+      "branch_parent": "6b349d40d904e6393db28f99b5eab6e058fce92a010005dd06aab9d95d24f3e7",
+      "framework": "ee3290f2de4e549cc9f7f6e329cb99e6827640d40592f05979d5f79239ce6632",
+      "merged": "5735f8a1de3f6c8cc7c9014d611f8df44510700c4aa88384a52213a8de5ff087"
+    }
+  },
+  "commit": "05fccdef6b8c41e00b8753b657ddf2568028e67b",
+  "framework_parent": "e82358f421ac929b53e8c0bd7f58f8869ae1a7cd",
+  "framework_parent_tree": "4f45ba118694f4cddfd5a6e45e55d10df95e669a",
+  "recursive_workers_manifest_sha256": "29eb8ca255fbc467c0451541c2cb855a1ea0605706ed4d514a253a58c79ab308",
+  "tree": "41612f7d403c536f8c08041e818a199d8f71e7e9"
+}

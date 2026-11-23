@@ -753,6 +753,92 @@ class ScheduleTests(unittest.TestCase):
                                       families=['baseline', 'wide_case'])
             self.assertCountEqual([case['id'] for case in cases], ['baseline-0', 'wide_case-8'])
 
+    def test_cold_packet_dependency_uses_two_pinned_sources(self):
+        with tempfile.TemporaryDirectory() as directory:
+            item, = generate.generate(Path(directory) / 'test', [8], ['retained_packet_dependency'])
+            main = Path(item['source']).read_text()
+            library = Path(item['dependency']['source']).read_text()
+            self.assertIn('import PacketLibrary;', main)
+            self.assertIn('module PacketLibrary where', library)
+            self.assertIn('probe7 :: Packet -> Int;', library)
+            self.assertNotIn('probe7 :: Packet -> Int;', main)
+            for x in (-11, 0, 7):
+                self.assertEqual(generate.expected('retained_packet_dependency', 8, x),
+                                 generate.expected('delayed_packet_fanout', 8, x))
+        endpoint=bench.measured_endpoint('crate-plan-v1')
+        self.assertIn('--compile-crate-plan', endpoint['driver'])
+        self.assertEqual(worker.mlf_stage_names('crate-plan-v1'), ['source-to-llvm','llvm-to-executable'])
+
+    def test_three_stage_curried_shape_has_separate_inputs_and_oracle(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case, = generate.generate(Path(directory)/'case', [8], ['retained_curried_dependencies'])
+            libraries = worker.dependencies(case)
+            self.assertEqual([x['module'] for x in libraries], ['CurryLibrary','CurryFacade'])
+            self.assertIn('import CurryLibrary;', Path(libraries[1]['source']).read_text())
+            self.assertIn('import CurryFacade;', Path(case['source']).read_text())
+            self.assertEqual(case['expected_stdout'], ['-1912\n','-1576\n','776\n'])
+
+    def test_curried_job_list_keeps_the_independent_result(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case, = generate.generate(Path(directory)/'case', [8], ['retained_curried_job_list'])
+            lib = Path(worker.dependencies(case)[0]['source']).read_text()
+            self.assertEqual(lib.count('Job (\\a'), 8)
+            self.assertIn('jobs :: Jobs -> Jobs;', lib)
+            self.assertIn('allJobs', Path(case['source']).read_text())
+            self.assertEqual(case['expected_stdout'], ['-1912\n','-1576\n','776\n'])
+
+    def test_cold_curried_zero_has_the_same_dependency_graph(self):
+        with tempfile.TemporaryDirectory() as directory:
+            family = 'retained_curried_job_list'
+            baseline, positive = generate.generate(Path(directory)/'case', [8], ['baseline',family], family)
+            self.assertEqual(baseline['matched_baseline_for'], positive['family'])
+            self.assertEqual(baseline['expected_stdout'], ['0\n']*3)
+            names = lambda case: [lib['module'] for lib in worker.dependencies(case)]
+            self.assertEqual(names(baseline), names(positive))
+            for stage in ('source_sha256', 'expected_stdout'):
+                self.assertEqual(baseline[stage] == positive[stage], stage == 'source_sha256')
+
+    def test_bounded_optional_writer_controls(self):
+        family = 'bounded_optional_writers'
+        with tempfile.TemporaryDirectory() as directory:
+            zero, positive = generate.generate(Path(directory)/'shape', [8], ['baseline', family], family)
+            self.assertEqual(zero['matched_baseline_for'], family)
+            self.assertEqual(zero['expected_stdout'], ['0\n']*5)
+            self.assertEqual(positive['expected_stdout'], ['108\n', '84\n', '91\n', '99\n', '235\n'])
+            for case in (zero, positive):
+                self.assertIn('formatOptional encode item', Path(case['source']).read_text())
+            self.assertEqual(Path(positive['source']).read_text().count('formatOptional showInt'), 8)
+
+    def test_inferred_constructor_writers_controls(self):
+        family = 'inferred_constructor_writers'
+        with tempfile.TemporaryDirectory() as directory:
+            zero, positive = generate.generate(Path(directory)/'shape', [8], ['baseline', family], family)
+            self.assertEqual(zero['matched_baseline_for'], family)
+            self.assertEqual(zero['expected_stdout'], ['0\n']*5)
+            self.assertEqual(positive['expected_stdout'], ['44\n', '-20\n', '-36\n', '136\n', '640\n'])
+            self.assertEqual(Path(positive['source']).read_text().count(' query = case query of'), 8)
+            self.assertIn('writeAll query writers', Path(zero['source']).read_text())
+
+    def test_mixed_recursive_decoder_controls(self):
+        family = 'mixed_recursive_decoder'
+        with tempfile.TemporaryDirectory() as directory:
+            zero, positive = generate.generate(Path(directory)/'shape', [8], ['baseline', family], family)
+            self.assertEqual(zero['matched_baseline_for'], family)
+            self.assertEqual(zero['expected_stdout'], ['7\n', '7\n', '-37\n', '-37\n', '-37\n'])
+            self.assertEqual(positive['expected_stdout'], ['7\n', '14\n', '46\n', '91\n', '-37\n'])
+            self.assertEqual(Path(positive['source']).read_text().count('payload -> schedule '), 8)
+            for case in (positive, zero):
+                self.assertIn('schedule value rest = scan', Path(case['source']).read_text())
+
+    def test_signed_decoder_selector_controls(self):
+        family = 'signed_decoder_selectors'
+        with tempfile.TemporaryDirectory() as directory:
+            zero, positive = generate.generate(Path(directory)/'shape', [8], ['baseline', family], family)
+            self.assertEqual(zero['matched_baseline_for'], family)
+            self.assertEqual(zero['expected_stdout'], ['-99\n'] * 5)
+            self.assertEqual(positive['expected_stdout'], ['-99\n', '-11\n', '37\n', '85\n', '-99\n'])
+            self.assertEqual(Path(positive['source']).read_text().count('a <- readPiece left'), 8)
+
     def test_fused_endpoint_has_its_own_command_and_stages(self):
         endpoint = bench.measured_endpoint('crate-fused-v1')
         self.assertIn('--compile-crate-to-llvm-gc', endpoint['driver'])

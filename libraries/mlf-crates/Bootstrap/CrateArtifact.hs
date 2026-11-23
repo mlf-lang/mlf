@@ -1913,18 +1913,30 @@ module Bootstrap.CrateArtifact where {
     };
     _ -> Left "malformed binary crate object roots"
   };
+  data PublishedMetadata = PublishedMetadata ByteArray (Either String CrateInterface);
+  decodeInterfaceBytes bytes = do {
+    input <- Storage.decode 3 bytes;
+    ioReturn (bindEither input (\decoded -> case decoded of {
+      Storage.LegacyText text -> decodeInterface text;
+      Storage.BinaryInput roots -> decodeBinaryInterface roots
+    }))
+  };
   readInterface = readInterfaceProfiled Nothing;
-  readInterfaceProfiled profile path = Host.phaseIO profile "validate_ms" (do {
+  readInterfaceProfiled profile = readInterfaceRetaining profile M.empty;
+  readInterfaceRetaining profile retained path = Host.phaseIO profile "validate_ms" (do {
     raw <- Host.phaseIO profile "read_ms" (Storage.readRaw path);
-    input <- case raw of {
+    interface <- case raw of {
       Left message -> ioReturn (Left message);
-      Right bytes -> Host.phaseIO profile "decode_ms" (Storage.decode 3 bytes)
+      Right bytes -> let { decode = Host.phaseIO profile "decode_ms" (decodeInterfaceBytes bytes) } in
+        case M.lookup compareString path retained of {
+          Nothing -> decode;
+          Just (PublishedMetadata published admitted) -> do {
+            exact <- Storage.sameBytes bytes published;
+            if exact then ioReturn admitted else decode
+          }
+        }
     };
-    ioReturn (mapLeft (\error -> path ++ ": " ++ error)
-      (bindEither input (\decoded -> case decoded of {
-        Storage.LegacyText text -> decodeInterface text;
-        Storage.BinaryInput roots -> decodeBinaryInterface roots
-      })))
+    ioReturn (mapLeft (\error -> path ++ ": " ++ error) interface)
   });
   readObjectV1 path iface = do {
     input <- Storage.read 4 path;
@@ -1939,7 +1951,9 @@ module Bootstrap.CrateArtifact where {
                [] ((,) String CrateInterface) ->
                [] String -> IO (Either String ([] ((,) String CrateInterface)));
   loadGraph = loadGraphProfiled Nothing;
-  loadGraphProfiled profile trail done paths = Host.phaseIO profile "validate_ms" (
+  loadGraphProfiled profile = loadGraphReading profile (readInterfaceProfiled profile);
+  loadGraphRetaining retained = loadGraphReading Nothing (readInterfaceRetaining Nothing retained);
+  loadGraphReading profile reader trail done paths = Host.phaseIO profile "validate_ms" (
     case paths of {
       [] -> ioReturn (Right done);
       (:) requested rest ->
@@ -1955,9 +1969,9 @@ module Bootstrap.CrateArtifact where {
                            ("cyclic crate metadata paths: " ++
                             intercalate " -> " (snoc trail path)))
                  else if any (\p -> eqString path (fst p)) done
-                      then loadGraphProfiled profile trail done rest
+                      then loadGraphReading profile reader trail done rest
                       else do {
-                             read <- readInterfaceProfiled profile path;
+                             read <- reader path;
                              case read of {
                                Left e -> ioReturn (Left e);
                                Right iface ->
@@ -1968,7 +1982,7 @@ module Bootstrap.CrateArtifact where {
                                             crateId iface))
                                  else do {
                                         children <-
-                                          loadGraphProfiled profile (snoc trail path) done
+                                          loadGraphReading profile reader (snoc trail path) done
                                             (map dependencyPath (crateDependencies iface));
                                         case bindEither children
                                                (\xs ->
@@ -1982,7 +1996,7 @@ module Bootstrap.CrateArtifact where {
                                                   }) of {
                                           Left e -> ioReturn (Left e);
                                           Right xs ->
-                                            loadGraphProfiled profile trail (snoc xs ((,) path iface)) rest
+                                            loadGraphReading profile reader trail (snoc xs ((,) path iface)) rest
                                         }
                                       }
                              }
@@ -3947,7 +3961,29 @@ module Bootstrap.CrateArtifact where {
       })
     } }
   };
-  writeOpenObject prefix iface package = do {
+  writeOpenObject = writeOpenObjectUsing (\path iface ->
+    Storage.writeAtomic 3 path [Structure.toCrateInterfaceFields (binaryInterfaceFields iface)]);
+  writeOpenObjectRetaining prefix object = case object of {
+    OpenCrateObject iface package -> writeOpenObjectUsing publishMetadata prefix iface package;
+    _ -> ioReturn (Left "plan metadata requires an open crate object")
+  };
+  publishMetadata path iface = do {
+    encoded <- Storage.encode 3 [Structure.toCrateInterfaceFields (binaryInterfaceFields iface)];
+    case encoded of {
+      Left message -> ioReturn (Left message);
+      Right bytes -> do {
+        written <- Storage.writeRawAtomic path bytes;
+        case written of {
+          Left message -> ioReturn (Left message);
+          Right _ -> do {
+            admitted <- decodeInterfaceBytes bytes;
+            ioReturn (Right (PublishedMetadata bytes admitted))
+          }
+        }
+      }
+    }
+  };
+  writeOpenObjectUsing publish prefix iface package = do {
     actual <- case Open.cachedMetadata (openMetadataFields iface) package of {
       Just digest -> ioReturn (Right digest);
       Nothing -> openMetadata iface
@@ -3961,8 +3997,7 @@ module Bootstrap.CrateArtifact where {
       Left e -> ioReturn (Left e);
       Right _ -> do {
         written <- Storage.writeRawAtomic (prefix ++ ".mlfco") (Open.packageBytes package);
-        case written of { Left e -> ioReturn (Left e); Right _ ->
-          Storage.writeAtomic 3 (prefix ++ ".mlfci") [Structure.toCrateInterfaceFields (binaryInterfaceFields iface)] }
+        case written of { Left e -> ioReturn (Left e); Right _ -> publish (prefix ++ ".mlfci") iface }
       }
     }
   };

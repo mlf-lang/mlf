@@ -203,6 +203,21 @@ module Bootstrap.X.Check where {
       Right (inferIn ds env)
     }
   };
+  -- A successful check under an empty type scope certifies that all module
+  -- term types are closed. Validate each new type scope and its surviving
+  -- lexical bindings in the same order before checking evidence there.
+  checkerWithModuleBindings ds globals = let {
+    closed = checkerWithEarlierBindings ds (XEnv M.empty globals);
+    certificate = closed M.empty
+  } in \types -> if M.null types then closed else case certificate of {
+    Left _ -> checkerWithEarlierBindings ds (XEnv types globals);
+    Right _ -> let { valid = validateTypeEnv ds types } in \earlier -> do {
+      valid;
+      L.mapM (\((,) n ty) -> if M.member X.compareName n globals then Right () else termType ds types ty)
+        (M.toList earlier);
+      Right (inferIn ds (XEnv types (M.union X.compareName globals earlier)))
+    }
+  };
   -- With no type arguments a primitive's result depends only on its ABI
   -- identity. Share that instantiation across checks in every term scope.
   instantiateClosedPrimitive :: Primitive -> Either String XType;

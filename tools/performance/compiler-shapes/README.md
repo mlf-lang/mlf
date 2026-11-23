@@ -137,6 +137,13 @@ Python's standard library.
 Selecting at least three positive sizes automatically adds one `baseline-0`
 cell for the run or sweep. One- and two-size selections still report the wall
 time and memory comparisons and show which checks need more data.
+The multi-crate `retained_curried_job_list` family can use
+`--baseline-family retained_curried_job_list` on `bench.py run`.
+Its zero cell builds the same two libraries and entry from fresh source with
+an empty job list. This keeps fixed dependency compilation present across the
+slope fit. Use this baseline when running only that family with the crate plan
+endpoint. The seven checks and paired resampling are the same.
+
 Independently recorded runs keep their own checks. A sweep uses its verified
 per-cell pairs under the same setup. `bench.py run` and the direct `run.py`
 recorder write `growth.md` and `growth.json` next to the receipt.

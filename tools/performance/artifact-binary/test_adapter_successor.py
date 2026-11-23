@@ -13,11 +13,27 @@ HERE = Path(__file__).resolve().parent
 OLD = b"LIVE_SESSION_HEADER = 'module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, compileSpecFileWithVerification, compileSpecFileUsingInstaller) where {'"
 NEW = b"LIVE_SESSION_HEADER = 'module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, compileSpecFileWithVerification, compileSpecFileUsingInstaller,\\n    CompiledCrate, compiledObject, compiledInterfaces, compileSpecFileRetainedUsingInstaller) where {'"
 
+COLD_CRATES = NEW.replace(
+    b'compiledInterfaces, compileSpecFileRetainedUsingInstaller)',
+    b'compiledInterfaces, compiledMetadata, PlanInputs(..), compilerImageDigest,\\n'
+    b'    compileSpecFileRetainedUsingInstaller, compileSpecFileRetainedInPlan)')
+BEFORE_COLD = '92871acb93f9c742910b6dfb224bda86e292d2214718be50fdb172b434f65820'
+AFTER_COLD = 'e5ad567b3baecc736190708899cd2579b142a2ec2cd576efcbf5e0f985b52781'
+
+
+def before_cold_crates(raw):
+    if hashlib.sha256(raw).hexdigest() != AFTER_COLD or raw.count(COLD_CRATES) != 1 or NEW in raw:
+        raise ValueError('unexpected cold-crates adapter bytes')
+    previous = raw.replace(COLD_CRATES, NEW)
+    if hashlib.sha256(previous).hexdigest() != BEFORE_COLD or previous.replace(NEW, COLD_CRATES) != raw:
+        raise ValueError('historical adapter inverse')
+    return previous
+
 
 def fixtures():
     live = json.loads((HERE / 'pr43-reconciliation-migration.json').read_bytes())
     spec = C.adapter_endpoint(live)
-    current = (HERE.parent / 'patricia/adapt_oracles.py').read_bytes()
+    current = before_cold_crates((HERE.parent / 'patricia/adapt_oracles.py').read_bytes())
     prior = copy.deepcopy(spec)
     del prior['adapter_successor']
     del prior['maintenance']['patricia/adapt_oracles.py']
@@ -119,6 +135,15 @@ class AdapterSuccessorTests(unittest.TestCase):
         expected = ('module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, '
                     'compileSpecFileWithVerification, compileSpecFileUsingInstaller,\n'
                     '    CompiledCrate, compiledObject, compiledInterfaces, compileSpecFileRetainedUsingInstaller) where {')
+        declaration = ("LIVE_SESSION_HEADER = '" + expected.replace('\n', '\\n') + "'").encode()
+        self.assertEqual(declaration, NEW)
+        live = path.read_bytes()
+        previous = before_cold_crates(live)
+        self.assertEqual(previous.replace(NEW, COLD_CRATES), live)
+        for bad in (previous, live + b' ', live + COLD_CRATES, live.replace(COLD_CRATES, b'')):
+            with self.subTest(sha=hashlib.sha256(bad).hexdigest()), self.assertRaises(ValueError):
+                before_cold_crates(bad)
+        expected = COLD_CRATES.removeprefix(b"LIVE_SESSION_HEADER = '").removesuffix(b"'").decode().replace('\\n', '\n')
         self.assertEqual(adapter.LIVE_SESSION_HEADER, expected)
         owner = (HERE.parents[2] / 'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes()
         self.assertEqual(owner.count(expected.encode()), 1)

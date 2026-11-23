@@ -9,7 +9,7 @@ def sha(raw):return hashlib.sha256(raw).hexdigest()
 
 # Exact public surface of the authenticated live owner. Frozen projected
 # sessions still have the historical compileSpecFile-only module header.
-LIVE_SESSION_HEADER = 'module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, compileSpecFileWithVerification, compileSpecFileUsingInstaller,\n    CompiledCrate, compiledObject, compiledInterfaces, compileSpecFileRetainedUsingInstaller) where {'
+LIVE_SESSION_HEADER = 'module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, compileSpecFileWithVerification, compileSpecFileUsingInstaller,\n    CompiledCrate, compiledObject, compiledInterfaces, compiledMetadata, PlanInputs(..), compilerImageDigest,\n    compileSpecFileRetainedUsingInstaller, compileSpecFileRetainedInPlan) where {'
 RANK_IMPORT = b'  import qualified Bootstrap.IntRank as Rank;\n'
 OLD_INDEX = b'case selected of {\n               IntMap tree -> tree\n             }'
 NEW_INDEX = b'Rank.indexMap selected'

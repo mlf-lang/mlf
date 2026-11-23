@@ -350,12 +350,17 @@ module Bootstrap.EvidenceBoundary where {
       }
     }
   };
-  checkedRequests plan = case plan of {
-    KeepChecked -> [];
-    ResolveChecked _ _ _ candidates _ domains slots -> map
-      (\((,) ordinal ((,) domain _)) -> (,,) ordinal domain candidates)
+  -- Every request of a checked plan uses the same sealed candidate environment.
+  data RequestBatch = RequestBatch ([] Candidate) ([] ((,) Int XType));
+  requestRows (RequestBatch candidates requests) =
+    map (\((,) ordinal goal) -> (,,) ordinal goal candidates) requests;
+  checkedRequests plan = requestRows (checkedRequestBatch plan);
+  checkedRequestBatch plan = case plan of {
+    KeepChecked -> RequestBatch [] [];
+    ResolveChecked _ _ _ candidates _ domains slots -> RequestBatch candidates (map
+      (\((,) ordinal ((,) domain _)) -> (,) ordinal domain)
       (filter (\((,) _ ((,) domain (Slot _ _ _ role _))) -> ordinary role && ground domain)
-        (zip (range 0 (length domains - 1)) (zip domains slots)))
+        (zip (range 0 (length domains - 1)) (zip domains slots))))
   };
   data CheckedRecipe = KeepRecipe | ChangeRecipe XType XTerm ([] ((,) XName XType)) ([] XName);
   finishCheckedPlan plan answers = case plan of {
@@ -486,8 +491,9 @@ module Bootstrap.EvidenceBoundary where {
     })
   };
   groundRecursiveRequests :: GroundRecursivePlan -> [] ((,,) Int XType ([] Candidate));
-  groundRecursiveRequests (GroundRecursivePlan candidates domains _) =
-    zipWith (\ordinal domain -> (,,) ordinal domain candidates) (range 0 (length domains - 1)) domains;
+  groundRecursiveRequests plan = requestRows (groundRecursiveRequestBatch plan);
+  groundRecursiveRequestBatch (GroundRecursivePlan candidates domains _) = RequestBatch candidates
+    (zip (range 0 (length domains - 1)) domains);
 
   -- A context-free declaration supplies the same value at each call. A given,
   -- superclass projection or instance application does not qualify here.

@@ -2774,7 +2774,7 @@ module Bootstrap.Graph.Solver where {
   instantiateExpandedWithKinds :: Bool -> Maybe (Int -> Int -> Bool) -> UnificationCache -> Int -> Int ->
     Solver -> Either String ((,) Solver UnificationCache);
   instantiateExpandedWithKinds checkedKinds certifiedScopes cache source target solver = let {
-    expansion = if checkedKinds then expandUsing (G.expandPreparedUsing G.preparedFrontierKinds)
+    expansion = if checkedKinds then expandUsing (G.expandPreparedRetaining G.preparedFrontierKinds)
       else expandPrepared
   } in G.bindE (expansion source target solver)
       (\(G.PreparedExpansion root _ frontier fresh current) ->

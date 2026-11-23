@@ -48,6 +48,35 @@ RECURSIVE_WORKERS_TREE = 'e7e17222e2d2d413f21d075319575f697c0274b7'
 RECURSIVE_WORKERS_BRANCH_PARENT = '4723a9fe71e53d4556e76e23db1951b81fab7dde'
 RECURSIVE_WORKERS_FRAMEWORK_PARENT = '456c2cda46012554f92f174b8dda57e8eebffa65'
 RECURSIVE_WORKERS_FRAMEWORK_PARENT_TREE = 'e9ba0b557dbecac05ac535db5cb17cdc80925fde'
+COLD_CRATES_MANIFEST = 'foundation-cold-crates-source-migration.json'
+COLD_CRATES = '05fccdef6b8c41e00b8753b657ddf2568028e67b'
+COLD_CRATES_TREE = '41612f7d403c536f8c08041e818a199d8f71e7e9'
+COLD_CRATES_BRANCH_PARENT = '3397a9a8655bee8904f7d077b00f8a5431262e55'
+COLD_CRATES_FRAMEWORK_PARENT = 'e82358f421ac929b53e8c0bd7f58f8869ae1a7cd'
+COLD_CRATES_FRAMEWORK_PARENT_TREE = '4f45ba118694f4cddfd5a6e45e55d10df95e669a'
+# These three merged sources differ from both parents: the combined generator
+# identity, C4 survivor demand plus retaining expansion, and the source lock.
+# The generator identity is not an executable regeneration receipt.
+COLD_CRATES_MERGED = {
+    'bootstrap/MLF/BuiltinPreludeData.hs':
+        '912284252eee6ba26d26a4af528eb9f71db81775e3675ac88c5d0e1cd29cb1f9',
+    'libraries/mlf-inference/Bootstrap/Graph/Solver.hs':
+        '3f596788575624c35803217f85b79c7a807a157a40773865b71476c1137c6e8a',
+    'mlf.lock':
+        '5735f8a1de3f6c8cc7c9014d611f8df44510700c4aa88384a52213a8de5ff087',
+}
+# Local worker-attribute follow-up. Retain the cold branch lowerer and lock as
+# authenticated endpoints; this is a source transition, not a performance receipt.
+LOCAL_WORKER_POLICY = {
+    'libraries/mlf-llvm/Bootstrap/LLVM/Build.hs': (
+        'df11e203f7ab7b12a6b099218d35215ddfd12a93d2c75fbd02f7d2e6979b51c1',
+        '1702e6110830367a5dfeabcc7c4cb3a0172fbfabae26a40c8069fbec9792ec16',
+    ),
+    'mlf.lock': (
+        '5735f8a1de3f6c8cc7c9014d611f8df44510700c4aa88384a52213a8de5ff087',
+        '3ec3bf20b6d1ddcd55d182430ab681d3d63171e0fade2690a9a1d126929377e7',
+    ),
+}
 FOUNDATION_MERGE_PATHS = {'mlf.lock', 'tests/shared/MLF/Tests/SharedFrontend.hs'}
 HOSTED_PARITY_CHANGES = {
     'mlf.lock': (
@@ -170,7 +199,7 @@ def foundation_changes(spec, repository, files, framework_changes, framework_pin
 
 
 def phase2_changes(spec, repository, files, predecessor_pin, pin_key, branch, tree,
-                   framework, framework_tree, parents):
+                   framework, framework_tree, parents, merged_endpoints=None):
     require(set(spec) == {'commit', 'tree', 'framework_parent', 'framework_parent_tree',
                           pin_key, 'changes'} and
             spec['commit'] == branch and spec['tree'] == tree and
@@ -200,14 +229,15 @@ def phase2_changes(spec, repository, files, predecessor_pin, pin_key, branch, tr
                 row['branch_parent'] == at(parents[-1]) and
                 row['framework'] == files[path] == at(framework) and
                 row['branch'] == at(branch) and row['framework'] != row['merged'] and
-                (path == 'mlf.lock' or row['merged'] == row['branch']),
+                ((path == 'mlf.lock' or row['merged'] == row['branch']) if merged_endpoints is None
+                 else row['merged'] == merged_endpoints.get(path, row['branch'])),
                 'Phase 2 source endpoint: ' + path)
     return {path: row['merged'] for path, row in changes.items()}
 
 
 def successor_type(predecessor_type, predecessor_manifest, framework_pin, foundation_pin,
                    phase2_pin, heap_force_pin, dictionary_demand_pin, thunk_captures_pin,
-                   checked_dispatch_pin, recursive_workers_pin, read_implementation):
+                   checked_dispatch_pin, recursive_workers_pin, cold_crates_pin, read_implementation):
     """Reuse exact projection operations, adding a locally reviewed inventory edge."""
 
     class Contract(predecessor_type):
@@ -231,8 +261,11 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, founda
             require(sha(checked_dispatch_raw) == checked_dispatch_pin,
                     'pinned checked-dispatch manifest SHA')
             recursive_workers_raw = read_implementation(self.directory / RECURSIVE_WORKERS_MANIFEST)
-            require(sha(recursive_workers_raw) == recursive_workers_pin == manifest_sha256,
+            require(sha(recursive_workers_raw) == recursive_workers_pin,
                     'pinned recursive-workers manifest SHA')
+            cold_crates_raw = read_implementation(self.directory / COLD_CRATES_MANIFEST)
+            require(sha(cold_crates_raw) == cold_crates_pin == manifest_sha256,
+                    'pinned cold-crates manifest SHA')
             self.manifest_sha256 = manifest_sha256
             self.source_root = Path(source_root or Path(history_root).parents[1]).resolve(strict=True)
             repository = source_repository(history_root)
@@ -249,6 +282,15 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, founda
                     'exact predecessor identity and transition schema')
             self.changes = dict(spec['changes'])
             self.maintenance = dict(spec['maintenance'])
+            # Only the exact public export header in the live private-owner adapter
+            # changed for cold crate plans. The archived baseline still supplies
+            # the previous adapter and the original recursive C4 oracle sources.
+            owner_adapter = 'patricia/adapt_oracles.py'
+            require(owner_adapter not in self.maintenance, 'duplicate private-owner adapter transition')
+            self.maintenance[owner_adapter] = [
+                '92871acb93f9c742910b6dfb224bda86e292d2214718be50fdb172b434f65820',
+                'e5ad567b3baecc736190708899cd2579b142a2ec2cd576efcbf5e0f985b52781',
+            ]
             for edge in (COMPACT_SCOPE_MAINTENANCE, SESSION_SCOPE_INPUT_MAINTENANCE,
                          ADMISSION_SCOPE_PREFIX_MAINTENANCE):
                 for name, (previous, current) in edge.items():
@@ -307,6 +349,17 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, founda
                                   (RECURSIVE_WORKERS_BRANCH_PARENT,))
             self.changes.update({path: [old_files[path], new] for path, new in edge.items()})
             files.update(edge)
+            edge = phase2_changes(self.core.strict_json(cold_crates_raw), repository, files,
+                                  recursive_workers_pin, 'recursive_workers_manifest_sha256',
+                                  COLD_CRATES, COLD_CRATES_TREE,
+                                  COLD_CRATES_FRAMEWORK_PARENT, COLD_CRATES_FRAMEWORK_PARENT_TREE,
+                                  (COLD_CRATES_BRANCH_PARENT,), merged_endpoints=COLD_CRATES_MERGED)
+            self.changes.update({path: [old_files[path], new] for path, new in edge.items()})
+            files.update(edge)
+            for path, (previous, current) in LOCAL_WORKER_POLICY.items():
+                require(files[path] == previous, 'local worker policy source transition: ' + path)
+                self.changes[path] = [old_files[path], current]
+                files[path] = current
             self.core.hash_map(files, 'current framework sources')
             paths = {n: p for n, p in old_paths.items() if n not in retired}
             self.value = {'current_files': files, 'module_paths': paths,
@@ -327,7 +380,7 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, founda
             self.metadata_paths = (*self.previous.metadata_paths, MANIFEST, FOUNDATION_MANIFEST,
                                    PHASE2_MANIFEST, HEAP_FORCE_MANIFEST, DICTIONARY_DEMAND_MANIFEST,
                                    THUNK_CAPTURES_MANIFEST, CHECKED_DISPATCH_MANIFEST,
-                                   RECURSIVE_WORKERS_MANIFEST, Path(__file__).name)
+                                   RECURSIVE_WORKERS_MANIFEST, COLD_CRATES_MANIFEST, Path(__file__).name)
             history_names = set(self.parent['frozen_history']) | set(self.maintenance_parent['files'])
             require(self.maintenance.keys() <= history_names, 'unknown maintenance owner')
             for name in history_names:
