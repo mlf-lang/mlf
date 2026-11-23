@@ -53,6 +53,28 @@ class GrowthTests(unittest.TestCase):
             self.assertAlmostEqual(bound, -.3, places=5)
         self.assertFalse(fit.power_fit(sizes, [1 + (n / 1024) ** 4 for n in sizes])['interior'])
 
+    def test_directional_exponent_boundaries(self):
+        sizes = [0, 4, 8, 14, 19]
+        for mlf, ghc, expected in [(2.25, 4, True), (4, 2.25, False), (.05, 4, True),
+                                   (.05, .05, True), (4, 4, True)]:
+            with self.subTest(mlf=mlf, ghc=ghc), patch.object(fit, 'REPLICATES', 12):
+                pairs = [[(.2 + .1 * (n / 19)**mlf, .8 + (n / 19)**ghc)] * 2 for n in sizes]
+                result = fit.growth(sizes, pairs)
+                self.assertIs(result['checks']['lower_power_point'], expected)
+                self.assertIs(result['checks']['lower_power_95'], expected)
+                self.assertIs(result['accepted'], expected is True)
+
+    def test_lower_point_can_have_interval_touching_zero(self):
+        sizes = [0, 4, 8, 14, 19]
+        pairs = [[(.2 + .1 * (n / 19)**power, .8 + (n / 19)**4) for power in (1.6, 4)]
+                 for n in sizes]
+        with patch.object(fit, 'REPLICATES', 120):
+            result = fit.growth(sizes, pairs)
+        self.assertTrue(result['checks']['lower_power_point'])
+        self.assertEqual(result['paired_bootstrap']['p_delta_95'][1], 0.)
+        self.assertTrue(result['checks']['lower_power_95'])
+        self.assertTrue(result['accepted'])
+
     def test_missing_or_failed_cells_do_not_supply_growth_estimates(self):
         small = [row for row in self.rows if row['family'] == 'chain' and row['size'] == 8]
         result, = fit.family_reports(small, self.samples, 2)
@@ -77,7 +99,8 @@ class GrowthTests(unittest.TestCase):
         for sample in self.samples:
             size = int(sample['case'].rsplit('-', 1)[1])
             startup, scale, exponent = times[sample['lane']]
-            samples.append(dict(sample, wall_seconds=startup + scale * (size / 32)**exponent))
+            samples.append(dict(sample, wall_seconds=startup + scale * (size / 32)**exponent,
+                                sampled_process_tree_peak_rss_bytes=128))
 
         with patch.object(fit, 'REPLICATES', 12):
             tied, = fit.family_reports(rows, samples, 2)
@@ -96,6 +119,43 @@ class GrowthTests(unittest.TestCase):
         self.assertIsNone(missing['checks'][fit.PEAK_RSS_CHECK])
         self.assertEqual(missing['status'], 'incomplete')
         self.assertIn('RSS unavailable at sizes 8', missing['reason'])
+
+    def test_smaller_peaks_can_grow_faster(self):
+        sizes = [0, 8, 16, 32]
+        pairs = [[((10 + n + noise) * 2**20, (100 + noise) * 2**20) for noise in (0, 7)]
+                 for n in sizes]
+        with patch.object(fit, 'REPLICATES', 80):
+            result = fit.peak_rss_growth(sizes, pairs)
+        self.assertEqual(result['mlf_mib_per_unit'], 1.)
+        self.assertEqual(result['ghc_mib_per_unit'], 0.)
+        for bound in result['delta_mib_per_unit_95']:
+            self.assertAlmostEqual(bound, 1.)
+
+    def test_fast_rss_growth_rejects_a_family_with_lower_absolute_peaks(self):
+        rows = [row.copy() for row in self.rows if row['family'] in ('baseline', 'chain')]
+        samples = []
+        for row in rows:
+            n = row['size']
+            peaks = {'mlf': (8 + n) * 2**20, 'ghc': 64 * 2**20}
+            row.update(mlf_peak_rss_bytes=peaks['mlf'], ghc_peak_rss_bytes=peaks['ghc'],
+                       mlf_over_ghc_peak_rss=peaks['mlf'] / peaks['ghc'])
+            for sample in self.samples:
+                if sample['case'] == row['case']:
+                    lane = sample['lane']
+                    seconds = .2 + n / 64 if lane == 'mlf' else 1 + (n / 32)**2
+                    samples.append(dict(sample, wall_seconds=seconds, **{fit.RSS_SAMPLE: peaks[lane]}))
+        with patch.object(fit, 'REPLICATES', 20):
+            result, = fit.family_reports(rows, samples, 2)
+            self.assertTrue(result['checks'][fit.PEAK_RSS_CHECK])
+            self.assertTrue(all(result['checks'][k] for k in fit.TIMING_CHECKS))
+            self.assertFalse(result['checks'][fit.RSS_SLOPE_CHECK])
+            self.assertFalse(result['checks'][fit.RSS_CI_CHECK])
+            self.assertEqual(result['status'], 'unmet')
+            with patch.dict(samples[0], {fit.RSS_SAMPLE: None}):
+                missing, = fit.family_reports(rows, samples, 2)
+            self.assertTrue(missing['checks'][fit.PEAK_RSS_CHECK])
+            self.assertIsNone(missing['checks'][fit.RSS_CI_CHECK])
+            self.assertEqual(missing['status'], 'incomplete')
 
     def test_pair_bootstrap_preserves_perfectly_correlated_lanes(self):
         sizes = [0, 8, 16, 32]
@@ -139,11 +199,17 @@ class MatrixGrowthTests(unittest.TestCase):
             row['mlf_seconds'] = row['ghc_seconds']
         self.assertEqual(('met', 0), (self.fit()['status'], self.fit()['delta_p']))
 
-    def test_bounds_and_zero_amplitude_are_indeterminate(self):
+    def test_boundary_order_and_zero_amplitude(self):
         for row in self.rows:
             row['mlf_seconds'] = 1 + (row['size'] / 8192)**4
         result = self.fit()
-        self.assertEqual(('indeterminate', 'mlf boundary fit'), (result['status'], result['reason']))
+        self.assertEqual('higher', result['status'])
+        for row in self.rows:
+            row['ghc_seconds'] = row['mlf_seconds']
+        self.assertEqual('met', self.fit()['status'])
+        for row in self.rows:
+            row['mlf_seconds'] = 1 + (row['size'] / 8192)**1.2
+        self.assertEqual('met', self.fit()['status'])
         for row in self.rows:
             row['mlf_seconds'] = 1
         result = self.fit()

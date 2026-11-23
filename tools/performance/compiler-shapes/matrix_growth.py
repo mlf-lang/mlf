@@ -4,7 +4,7 @@ import math
 import re
 
 import analyze
-from fit_growth import LANES, MIN_PAIRED_REPEATS, power_fit
+from fit_growth import LANES, MIN_PAIRED_REPEATS, power_fit, power_order_issue
 from sweep import completed_pairs, failure_detail
 
 
@@ -123,19 +123,15 @@ def points(source, matrix):
         if failures:
             row['reason'] = '; '.join(failures)
         else:
-            issues = []
-            for lane, times in zip(LANES, zip(*(cells[n][1] for n in sizes))):
-                fit = power_fit(sizes, times)
-                if fit['scale_seconds'] == 0:
-                    issues.append(lane + ' zero fitted growth')
-                else:
+            fits = [power_fit(sizes, times) for times in zip(*(cells[n][1] for n in sizes))]
+            for lane, fit in zip(LANES, fits):
+                if fit['scale_seconds'] > 0:
                     row[lane + '_p'] = fit['p']
-                    if not fit['interior']:
-                        issues.append(lane + ' boundary fit')
             if row['mlf_p'] is not None and row['ghc_p'] is not None:
                 row['delta_p'] = row['mlf_p'] - row['ghc_p']
-            if issues:
-                row.update(status='indeterminate', reason='; '.join(issues))
+            issue = power_order_issue(*fits)
+            if issue:
+                row.update(status='indeterminate', reason=issue)
             else:
                 row['status'] = 'met' if row['delta_p'] <= 0 else 'higher'
         yield row

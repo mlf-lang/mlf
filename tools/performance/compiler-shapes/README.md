@@ -113,7 +113,7 @@ sources and per-cell measurements remain available.
 
 ### Build performance checks
 
-The sweep, `bench.py run`, `bench.py all` and `bench.py analyze` report seven
+The sweep, `bench.py run`, `bench.py all` and `bench.py analyze` report nine
 checks for each selected family. The time and memory measurements cover the
 same fresh native build, including linking. The executable runs are untimed
 correctness checks.
@@ -121,14 +121,27 @@ correctness checks.
 1. MLF's median wall time is lower at every measured positive size.
 2. MLF's least-squares slope is lower across all measured sizes.
 3. MLF's endpoint slope is lower from zero to the largest measured size.
-4. MLF's exponent `p` is lower in the fitted model `a + b*(n/nmax)^p`.
+4. MLF's exponent `p` is at most GHC's in the fitted model `a + b*(n/nmax)^p`.
 5. The paired 95% interval for the slope difference (MLF minus GHC) lies below zero.
-6. The paired 95% interval for the exponent difference lies below zero.
+6. The upper endpoint of the paired 95% interval for the exponent difference is at most zero.
 7. MLF's median sampled peak build process-group RSS is at most GHC's at every measured positive size.
+8. The OLS slope of median peak build RSS in MiB per size unit is at most GHC’s.
+9. The upper endpoint of the paired 95% interval for the RSS slope difference
+   (MLF minus GHC) is at most zero.
 
-Passing requires all seven checks and both exponent fits in the interior
-[0.101, 2.999]. A boundary fit leaves the exponent checks unresolved and the
-report `indeterminate`. Missing or failed measurements yield `incomplete`.
+The memory slopes include the zero-size build. Resample adjacent MLF/GHC
+build pairs within each size, using the same seed and count as the timing
+checks. A missing peak at any size leaves the growth checks incomplete. A
+failed or OOM build cannot contribute a successful memory observation.
+These metrics measure whole-build RSS. Profiling cumulative allocations and
+live bytes after a major collection requires separate runtime measurements.
+
+Passing requires all nine checks. Compare the unrounded fitted exponents,
+including ties at the search bounds. For example, two fits at the upper bound
+of 3 tie on check 4. Check 6 uses the same non-strict ordering for the upper
+endpoint of the interval. These checks describe the constrained fits over the
+measured sizes. The report labels estimates below 0.101 or above 2.999 as
+boundary fits. A zero fitted growth scale leaves the exponent indeterminate. Missing or failed measurements yield `incomplete`.
 The intervals use 2,000 bootstrap resamples of adjacent MLF/GHC pairs within
 each size. The estimates describe the measured range. Two pairs give quick
 feedback. Use a larger repeat count for confirmation. The analysis uses only
@@ -142,7 +155,7 @@ The multi-crate `retained_curried_job_list` family can use
 Its zero cell builds the same two libraries and entry from fresh source with
 an empty job list. This keeps fixed dependency compilation present across the
 slope fit. Use this baseline when running only that family with the crate plan
-endpoint. The seven checks and paired resampling are the same.
+endpoint. The nine checks and paired resampling are the same.
 
 Independently recorded runs keep their own checks. A sweep uses its verified
 per-cell pairs under the same setup. `bench.py run` and the direct `run.py`
@@ -188,8 +201,8 @@ nonnegative offset and scale in `a + b*(n/nmax)^p` from medians at 8, 32, 128,
 1,024 and 8,192. The published table uses six pairs per size. Sweep analysis
 uses the pair count in the recorded plans. The `met` and `higher` outcomes
 compare the unrounded MLF and GHC point
-exponents. An estimate outside the fitter’s interior [0.101, 2.999] or a
-zero growth scale yields `indeterminate`. Missing or failed standard cells
+exponents. Equal fitted values, including ties at a boundary, yield `met`.
+A zero growth scale yields `indeterminate`. Missing or failed standard cells
 yield `incomplete`. The compiler columns identify the measured binary and
 producer receipt. Published rows also supply its Git revision.
 

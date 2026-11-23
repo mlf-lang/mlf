@@ -13,7 +13,7 @@ import statistics as S
 import query_cache as Q
 
 
-RSS_SAMPLE = 'sampled_process_tree_peak_rss_bytes'
+RSS_SAMPLE = fit_growth.RSS_SAMPLE
 
 
 def require(condition,message):

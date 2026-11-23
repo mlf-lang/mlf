@@ -19,7 +19,10 @@ TIMING_CHECKS = (
     'lower_power_point', 'lower_ols_95', 'lower_power_95',
 )
 PEAK_RSS_CHECK = 'peak_rss_at_most_ghc'
-CHECKS = (*TIMING_CHECKS, PEAK_RSS_CHECK)
+RSS_SAMPLE = 'sampled_process_tree_peak_rss_bytes'
+RSS_SLOPE_CHECK = 'peak_rss_slope_at_most_ghc'
+RSS_CI_CHECK = 'peak_rss_slope_delta_95_at_most_zero'
+CHECKS = (*TIMING_CHECKS, PEAK_RSS_CHECK, RSS_SLOPE_CHECK, RSS_CI_CHECK)
 PEAK_RSS_MEDIANS = ('mlf_peak_rss_bytes', 'ghc_peak_rss_bytes')
 PEAK_RSS_RATIO = 'mlf_over_ghc_peak_rss'
 PEAK_RSS_FIELDS = (*PEAK_RSS_MEDIANS, PEAK_RSS_RATIO)
@@ -50,7 +53,7 @@ def paired_times(rows, samples, family, repeats):
     return sizes, [paired_cell(cell, repeats) for cell in cells.values()]
 
 
-def paired_cell(samples, repeats):
+def paired_cell(samples, repeats, field='wall_seconds'):
     cell = [None] * (2 * repeats)
     for sample in samples:
         position = sample['position']
@@ -63,7 +66,7 @@ def paired_cell(samples, repeats):
             raise ValueError('missing or nonadjacent compiler pair')
         if {first['lane'], second['lane']} != set(LANES):
             raise ValueError('need one MLF and one GHC measurement per pair')
-        observed = {sample['lane']: sample['wall_seconds'] for sample in (first, second)}
+        observed = {sample['lane']: sample[field] for sample in (first, second)}
         if any(not math.isfinite(t) or t < 0 for t in observed.values()):
             raise ValueError('invalid paired timing')
         pairs.append(tuple(observed[lane] for lane in LANES))
@@ -84,6 +87,10 @@ def nonnegative_line(x, y):
         b = max(0., sum(u * v for u, v in zip(x, y)) / sum(u * u for u in x))
     error = sum((observed - (a + b * value)) ** 2 for value, observed in zip(x, y))
     return error, a, b
+
+
+INTERIOR_MIN = 0.101
+INTERIOR_MAX = 2.999
 
 
 def power_fit(sizes, times):
@@ -119,7 +126,14 @@ def power_fit(sizes, times):
     squared_error, floor, amplitude = nonnegative_line([value ** power for value in scale], times)
     return {'p': power, 'offset_seconds': floor, 'scale_seconds': amplitude,
             'rmse_seconds': (squared_error / len(sizes)) ** .5,
-            'interior': .101 <= power <= 2.999}
+            'interior': INTERIOR_MIN <= power <= INTERIOR_MAX}
+
+
+def power_order_issue(mlf, ghc):
+    for lane, fit in zip(LANES, (mlf, ghc)):
+        if fit['scale_seconds'] == 0:
+            return lane + ' zero fitted growth'
+    return ''
 
 
 def median_pair(pairs):
@@ -135,15 +149,34 @@ def peak_rss_ratio(mlf, ghc):
     return mlf / ghc if mlf is not None and ghc is not None else None
 
 
-def growth(sizes, times):
-    medians = [median_pair(cell) for cell in times]
+def slope_estimator(sizes, scale=1.):
     mean_size = statistics.fmean(sizes)
     centered = [size - mean_size for size in sizes]
-    size_variation = sum(value * value for value in centered)
+    variation = sum(dx * dx for dx in centered)
 
-    def slope_ms(observed):
-        mean_time = statistics.fmean(observed)
-        return 1000 * sum(dx * (y - mean_time) for dx, y in zip(centered, observed)) / size_variation
+    def slope(values):
+        mean = statistics.fmean(values)
+        return scale * sum(dx * (y - mean) for dx, y in zip(centered, values)) / variation
+    return slope
+
+
+def peak_rss_growth(sizes, pairs):
+    slope = slope_estimator(sizes)
+    def slopes(medians):
+        return [slope(lane) / 2**20 for lane in zip(*medians)]
+    mlf, ghc = slopes(map(median_pair, pairs))
+    rng = random.Random(SEED)
+    deltas = []
+    for _ in range(REPLICATES):
+        a, b = slopes(median_pair(rng.choices(cell, k=len(cell))) for cell in pairs)
+        deltas.append(a - b)
+    cuts = statistics.quantiles(deltas, n=40, method='inclusive')
+    return dict(mlf_mib_per_unit=mlf, ghc_mib_per_unit=ghc, delta_mib_per_unit_95=[cuts[0], cuts[-1]])
+
+
+def growth(sizes, times):
+    medians = [median_pair(cell) for cell in times]
+    slope_ms = slope_estimator(sizes, 1000.)
 
     estimates = {}
     for lane, observed in zip(LANES, zip(*medians)):
@@ -167,13 +200,16 @@ def growth(sizes, times):
     checks = {'all_positive_medians_lower': all(a < b for a, b in medians[1:]),
               'lower_ols_point': mlf['ols_ms_per_function'] < ghc['ols_ms_per_function'],
               'lower_endpoint_point': mlf['endpoint_ms_per_function'] < ghc['endpoint_ms_per_function'],
-              'lower_power_point': mlf['power']['p'] < ghc['power']['p'],
-              'lower_ols_95': slope_ci[1] < 0, 'lower_power_95': power_ci[1] < 0}
+              'lower_power_point': mlf['power']['p'] <= ghc['power']['p'],
+              'lower_ols_95': slope_ci[1] < 0, 'lower_power_95': power_ci[1] <= 0}
     interior = all(item['power']['interior'] for item in estimates.values())
+    issue = power_order_issue(mlf['power'], ghc['power'])
+    if issue:
+        checks.update(lower_power_point=None, lower_power_95=None)
     return {'sizes': list(sizes), 'pairs_per_size': len(times[0]), 'estimates': estimates,
             'paired_bootstrap': {'seed': SEED, 'iterations': REPLICATES,
                                  'ols_delta_ms_95': slope_ci, 'p_delta_95': power_ci},
-            'checks': checks, 'interior': interior, 'accepted': interior and all(checks.values())}
+            'checks': checks, 'interior': interior, 'power_order_issue': issue, 'accepted': all(checks.values())}
 
 
 def family_reports(rows, samples, repeats):
@@ -206,9 +242,8 @@ def family_reports(rows, samples, repeats):
             sizes, times = paired_times(selected, observations, family, repeats)
             result = growth(sizes, times)
             report.update(result)
-            if not result['interior']:
-                report['checks'].update(lower_power_point=None, lower_power_95=None)
-                report.update(status='indeterminate', reason='at least one exponent fit reached a search boundary')
+            if result['power_order_issue']:
+                report.update(status='indeterminate', reason=result['power_order_issue'])
             else:
                 report['status'] = 'met' if result['accepted'] else 'unmet'
         rss = [{'size': row['size'], **{field: row.get(field) for field in PEAK_RSS_FIELDS}}
@@ -226,6 +261,23 @@ def family_reports(rows, samples, repeats):
             report['checks'][PEAK_RSS_CHECK] = memory_ok
             if report['accepted'] and not memory_ok:
                 report.update(status='unmet', accepted=False)
+        report['checks'].update(dict.fromkeys((RSS_SLOPE_CHECK, RSS_CI_CHECK)))
+        if not reasons:
+            missing = [row['case'] for row in selected
+                       if any(not sample.get(RSS_SAMPLE) for sample in by_case[row['case']])]
+            if missing:
+                reason = 'paired peak RSS unavailable for ' + ', '.join(missing)
+                report.update(status='incomplete', accepted=None,
+                              reason='. '.join(filter(None, (report['reason'], reason))))
+            else:
+                pairs = [paired_cell(by_case[row['case']], repeats, RSS_SAMPLE) for row in selected]
+                memory = peak_rss_growth(report['sizes'], pairs)
+                report['peak_rss_growth'] = memory
+                point = memory['mlf_mib_per_unit'] <= memory['ghc_mib_per_unit']
+                confidence = memory['delta_mib_per_unit_95'][1] <= 0
+                report['checks'].update({RSS_SLOPE_CHECK: point, RSS_CI_CHECK: confidence})
+                if report['accepted'] and not (point and confidence):
+                    report.update(status='unmet', accepted=False)
         reports.append(report)
     return reports
 
@@ -245,6 +297,14 @@ def peak_rss_markdown(rows):
     return lines
 
 
+def format_exponent(fit):
+    value = f"{fit['p']:.6g}"
+    if fit['interior'] or fit['scale_seconds'] == 0:
+        return value
+    bound = 'lower' if fit['p'] < INTERIOR_MIN else 'upper'
+    return f'{value} ({bound} bound)'
+
+
 def markdown(reports):
     lines = ['Lower values favor MLF. Point estimates are MLF / GHC. Intervals are 95% paired '
              'bootstrap intervals for MLF minus GHC over the measured sizes.', '']
@@ -252,8 +312,8 @@ def markdown(reports):
         return lines + ['No growing family selected.']
     lines += ['| Family | Sizes | Lower wall medians at all positive sizes | OLS slope (ms/unit) '
               '| Endpoint slope (ms/unit) | Exponent | OLS slope interval | Exponent interval '
-              '| Peak RSS ≤ GHC at all positive sizes | Verdict |',
-              '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |']
+              '| Peak RSS ≤ GHC at all positive sizes | Peak RSS slope (MiB/unit) | RSS slope difference 95% interval | Verdict |',
+              '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |']
     verdicts = {True: 'pass', False: 'fail', None: '—'}
     for report in reports:
         checks = report['checks']
@@ -263,7 +323,7 @@ def markdown(reports):
             paired = report['paired_bootstrap']
             values = [f"{mlf['ols_ms_per_function']:.6g} / {ghc['ols_ms_per_function']:.6g}",
                       f"{mlf['endpoint_ms_per_function']:.6g} / {ghc['endpoint_ms_per_function']:.6g}",
-                      f"{mlf['power']['p']:.6g} / {ghc['power']['p']:.6g}",
+                      f"{format_exponent(mlf['power'])} / {format_exponent(ghc['power'])}",
                       *[f'[{lo:.6g}, {hi:.6g}]' for lo, hi in
                         (paired['ols_delta_ms_95'], paired['p_delta_95'])]]
             values = [f'{value} ({verdicts[checks[key]]})' for value, key in zip(values, TIMING_CHECKS[1:])]
@@ -271,9 +331,16 @@ def markdown(reports):
         if report['reason']:
             outcome += ' · ' + report['reason']
         memory = checks[PEAK_RSS_CHECK]
+        slope_result = interval_result = '—'
+        if 'peak_rss_growth' in report:
+            rss = report['peak_rss_growth']
+            lo, hi = rss['delta_mib_per_unit_95']
+            slope_result = (f"{rss['mlf_mib_per_unit']:.5g} / {rss['ghc_mib_per_unit']:.5g} "
+                            f"({verdicts[checks[RSS_SLOPE_CHECK]]})")
+            interval_result = f"[{lo:.5g}, {hi:.5g}] ({verdicts[checks[RSS_CI_CHECK]]})"
         fields = [f"`{report['family']}`", ', '.join(map(str, report['sizes'])),
                   verdicts[checks[TIMING_CHECKS[0]]], *values,
-                  'incomplete' if memory is None else verdicts[memory], outcome]
+                  'incomplete' if memory is None else verdicts[memory], slope_result, interval_result, outcome]
         lines.append('| ' + ' | '.join(fields) + ' |')
     return lines
 
