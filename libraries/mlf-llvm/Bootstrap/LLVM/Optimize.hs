@@ -339,7 +339,8 @@ module Bootstrap.LLVM.Optimize where {
   -- remain distinct underneath nested lambdas, patterns and recursive groups.
   data FoldBranch = ReturnField Int | CombineFields Primitive Int Int;
   data UnaryConstructorUse = BuildsField String | SelectsField String |
-    FoldsConstructors (Map String ((,) Int FoldBranch)) | ComposesFunctions | TranslatesBy Int;
+    FoldsConstructors (Map String ((,) Int FoldBranch)) | ComposesFunctions | TranslatesBy Int |
+    ProjectsArgument Int Int;
   unaryConstructorUse term = case term of {
     XEAbs name (XEApp (XEConstructor constructor) (XEVar field)) ->
       if eqName name field then Just (BuildsField constructor) else Nothing;
@@ -2584,6 +2585,32 @@ module Bootstrap.LLVM.Optimize where {
     } in body (S.singleton parameter) value;
     _ -> Nothing
   };
+  -- A saturated call to a lambda that returns its parameter does not
+  -- evaluate the remaining arguments. Keep excess applications in order.
+  scopedProjection expression = case lambdas expression of {
+    (,) ((:) first rest) (XEVar selected) -> let {
+      parameters = (:) first rest;
+      arity = L.length parameters;
+      position i remaining = case remaining of {
+        [] -> Nothing;
+        (:) name tail -> if eqName name selected then Just (ProjectsArgument arity i)
+          else position (i - 1) tail
+      }
+    } in position (arity - 1) (L.reverse parameters);
+    _ -> Nothing
+  };
+  projectApplication facts original = case applications original of {
+    (,) (XEVar name) arguments -> case M.lookup compareName name facts of {
+      Just (ProjectsArgument arity index) -> case L.splitAt arity arguments of {
+        (,) prefix rest -> if L.length prefix == arity then case L.drop index prefix of {
+          (:) argument _ -> Just (L.foldl XEApp argument rest);
+          _ -> Nothing
+        } else Nothing
+      };
+      _ -> Nothing
+    };
+    _ -> Nothing
+  };
   data ScopedInput a = OtherInput | LambdaInput XName a |
     LetInput XName a a | RecursiveInput XName a a | ApplicationInput a a;
   erasedScope term = case term of {
@@ -2595,6 +2622,7 @@ module Bootstrap.LLVM.Optimize where {
   };
   typedScope term = case skipTypeWrappers term of {
     XAbs name _ body -> LambdaInput name body;
+    XInstantiationSpine head rows -> typedScope (X.expandInstantiationSpine head rows);
     XLet name value body -> LetInput name value body;
     XLetRec [(,,) name _ rhs] body -> RecursiveInput name rhs body;
     XApp fn arg -> ApplicationInput fn arg;
@@ -2607,11 +2635,16 @@ module Bootstrap.LLVM.Optimize where {
   foldScopedUsing inspect erase foldArgument = let {
     visit facts expression = let { original = erase expression } in case inspect expression of {
       LetInput name value body -> let {
-        following = case scopedUnaryUse (erase value) of {
-          Just role -> M.insert compareName name role facts;
+        normalized = visit facts value;
+        role = case scopedProjection normalized of {
+          Just projection -> Just projection;
+          Nothing -> scopedUnaryUse (erase value)
+        };
+        following = case role of {
+          Just found -> M.insert compareName name found facts;
           Nothing -> M.delete compareName name facts
         }
-      } in XELet name (visit facts value) (visit following body);
+      } in XELet name normalized (visit following body);
       RecursiveInput name value body -> let { rhs = erase value } in case constructorFold name rhs of {
         Just rules -> XELetRec [(,) name rhs]
           (visit (M.insert compareName name (FoldsConstructors rules) facts) body);
@@ -2622,14 +2655,15 @@ module Bootstrap.LLVM.Optimize where {
         affine = case affineField facts original of {
           Just ((,,) name factor offset) -> affineIntTerm name factor offset;
           Nothing -> original
-        }
-      } in if M.null facts then original else case erase fn of {
-        XEVar name -> case M.lookup compareName name facts of {
-          Just (FoldsConstructors rules) -> L.fromMaybe original (foldArgument rules arg);
-          _ -> affine
         };
-        _ -> affine
-      };
+        ordinary = case erase fn of {
+          XEVar name -> case M.lookup compareName name facts of {
+            Just (FoldsConstructors rules) -> L.fromMaybe original (foldArgument rules arg);
+            _ -> affine
+          };
+          _ -> affine
+        }
+      } in if M.null facts then original else L.fromMaybe ordinary (projectApplication facts original);
       OtherInput -> original
     }
   } in visit;

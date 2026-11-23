@@ -43,7 +43,7 @@ def executable_link_flags(name, optimization):
     # The compiler's larger nursery reduces copying of short-lived syntax trees.
     if name == 'emlf':
         # The Darwin RTS joins its sleeping ticker at process exit.
-        settings = '-F4 -A48m'
+        settings = '-F4 -A128m'
         if sys.platform == 'darwin':
             settings += ' -V0.002'
         flags = [*LINK_FLAGS, '-with-rtsopts=' + settings]

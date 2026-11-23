@@ -52,6 +52,7 @@ module Bootstrap.ImportedRoot
     join = S.unions X.compareName
   } in case source of {
     XVarTerm name -> S.singleton name;
+    XInstantiationSpine n rows -> join ((:) (S.singleton n) (map (\((,,) _ _ val) -> child val) rows));
     XAbs _ _ body -> child body;
     XApp a b -> join [child a, child b];
     XTypeAbs _ _ body -> child body;

@@ -316,6 +316,88 @@ module Bootstrap.X.Check where {
     constructors = case ds of { DataEnv _ cs _ ->
       checkedLookup compareString (constructorApplication ds (typeEnv env)) cs }
   } in inferWithConstructors ds env applications constructors;
+  -- Instantiate the bottom and result binders of a direct application
+  -- together. Keep closed arguments in a substitution table while walking
+  -- the shared suffix. Only domain leaves and the final result are read.
+  checkedApplicationSpine ds env infer expression = let {
+    parts term pending = case term of {
+      XApp (XTypeApp fn proof) arg -> case argument proof of {
+        Just ((,) ty bound) -> parts fn ((:) ((,,) ty bound arg) pending);
+        Nothing -> Nothing
+      };
+      XVarTerm name -> case pending of {
+        [] -> Nothing;
+        _ -> L.mapOptional (\scheme -> (,) scheme pending) (M.lookup X.compareName name (termEnv env))
+      };
+      _ -> Nothing
+    };
+    argument proof = case proof of {
+      XThen (XInner (XBottom ty@(XCon _ []))) XElim -> Just ((,) ty False);
+      XThen (XThen (XInner (XBottom ty@(XCon _ []))) XElim) XElim -> Just ((,) ty True);
+      XThen (XInner (XBottom ty@(XCon _ []))) (XThen XElim XElim) -> Just ((,) ty True);
+      _ -> Nothing
+    }
+  } in case parts expression [] of {
+    Just ((,) scheme pending) -> checkApplicationRows ds env infer scheme pending;
+    Nothing -> Right Nothing
+  };
+  checkApplicationRows ds env infer scheme rows = let {
+    complete count pending = case pending of {
+      [] -> count == 0;
+      (:) ((,,) _ eliminate _) remaining ->
+        count > 0 && eliminate == (count > 1) && complete (count - 1) remaining
+    };
+    -- In a closed projection every argument binds its own type. The
+    -- selected argument is the only substitution needed by the result.
+    project selected index result pending = case pending of {
+      [] -> Right result;
+      (:) ((,,) actual _ value) rest -> do {
+        termType ds (typeEnv env) actual;
+        input <- infer value;
+        ensure (T.alphaEq actual input) "application type mismatch";
+        project selected (index + 1) (if index == selected then Just actual else result) rest
+      }
+    };
+    atom substitutions ty = case ty of {
+      XVar a -> Just (M.findWithDefault T.compareTyVar ty a substitutions);
+      XCon _ [] -> Just ty;
+      _ -> Nothing
+    };
+    arrow binder ty = case (,) binder ty of {
+      (,) False (XArrow domain range) -> Just ((,) domain range);
+      (,) True (XForall r bound (XArrow domain (XVar selected))) -> let {
+        independent = case domain of { XVar input -> L.not (T.equalTyVar r input); _ -> True }
+      } in if T.equalTyVar r selected && independent then Just ((,) domain bound) else Nothing;
+      _ -> Nothing
+    };
+    check substitutions ty pending = case pending of {
+      [] -> Right (atom substitutions ty);
+      (:) ((,,) actual bound value) rest -> case ty of {
+        XForall a XBot body -> case arrow bound body of {
+          Just ((,) domain range) -> let {
+            current = M.insert T.compareTyVar a actual substitutions
+          } in case atom current domain of {
+            Nothing -> Right Nothing;
+            Just expected -> do {
+              termType ds (typeEnv env) actual;
+              input <- infer value;
+              ensure (T.alphaEq expected input) "application type mismatch";
+              check current range rest
+            }
+          };
+          Nothing -> Right Nothing
+        };
+        _ -> Right Nothing
+      }
+    };
+    ordinary = do {
+      wellFormedIn ds (typeEnv env) scheme;
+      check M.empty scheme rows
+    }
+  } in case T.projectionTypeLayout scheme of {
+    Just ((,) width selected) -> if complete width rows then project selected 0 Nothing rows else ordinary;
+    Nothing -> ordinary
+  };
   inferWithConstructors ds env applications constructors term =
     case term of {
       XVarTerm x ->
@@ -330,16 +412,52 @@ module Bootstrap.X.Check where {
           result <- inferIn ds (XEnv (typeEnv env) (M.insert X.compareName x t (termEnv env))) body;
           return (XArrow t result)
         };
-      XApp f a ->
-        do {
-          ft <- inferWithConstructors ds env applications constructors f;
-          at <- inferWithConstructors ds env applications constructors a;
+      XApp f a -> let {
+        infer = inferWithConstructors ds env applications constructors;
+        ordinary = do {
+          ft <- infer f;
+          at <- infer a;
           case ft of {
             XArrow domain result ->
               if T.alphaEq domain at then Right result else Left "application type mismatch";
             _ -> Left "application of a non-function"
           }
+        }
+      } in case f of {
+        XTypeApp _ _ -> do {
+          checked <- checkedApplicationSpine ds env infer term;
+          case checked of { Just result -> Right result; Nothing -> ordinary }
         };
+        _ -> ordinary
+      };
+      XInstantiationSpine name rows -> case M.lookup X.compareName name (termEnv env) of {
+        Nothing -> Left ("unbound term variable " ++ X.nameHint name);
+        Just scheme -> do {
+          ensure (L.all (\((,,) _ _ operand) -> X.plainSpineOperand operand) rows)
+            "instantiation spine operand contains a proof";
+          let { infer = inferWithConstructors ds env applications constructors };
+          checked <- checkApplicationRows ds env infer scheme
+            (L.map (\((,,) tag result operand) -> (,,) (XCon tag []) result operand) rows);
+          case checked of {
+            Just ty -> Right ty;
+            Nothing -> infer (X.expandInstantiationSpine name rows)
+          }
+        }
+      };
+      XProjection rows selected -> do {
+        let { binder ((,) names types) ((,,) n a result) = do {
+          ensure (L.not (M.member X.compareName n names)) "term binder already in scope";
+          fresh types a;
+          let { domain = M.insert T.compareTyVar a XBot types };
+          scope <- case result of {
+            Nothing -> Right domain;
+            Just r -> do { fresh domain r; Right (M.insert T.compareTyVar r XBot domain) }
+          };
+          Right ((,) (M.insert X.compareName n XBot names) scope)
+        } };
+        _ <- L.foldM binder ((,) (termEnv env) (typeEnv env)) rows;
+        fmap L.fst (X.projectionParts rows selected)
+      };
       XTypeAbs a bound body ->
         do {
           fresh (typeEnv env) a;

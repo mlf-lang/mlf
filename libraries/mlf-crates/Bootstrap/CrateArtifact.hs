@@ -685,6 +685,7 @@ module Bootstrap.CrateArtifact where {
     XAbs _ _ body -> child body;
     XApp a b -> Set.union X.compareName (child a) (child b);
     XTypeAbs _ _ body -> child body;
+    XInstantiationSpine n rows -> join ((:) (one n) (map (\((,,) _ _ val) -> child val) rows));
     XTypeApp body _ -> child body;
     XLet _ rhs body -> Set.union X.compareName (child rhs) (child body);
     XLetRec definitions body -> join ((:) (child body)
@@ -3962,13 +3963,13 @@ module Bootstrap.CrateArtifact where {
     } }
   };
   writeOpenObject = writeOpenObjectUsing (\path iface ->
-    Storage.writeAtomic 3 path [Structure.toCrateInterfaceFields (binaryInterfaceFields iface)]);
+    Storage.writeAtomic 3 path [Structure.toStoredCrateInterfaceFields (binaryInterfaceFields iface)]);
   writeOpenObjectRetaining prefix object = case object of {
     OpenCrateObject iface package -> writeOpenObjectUsing publishMetadata prefix iface package;
     _ -> ioReturn (Left "plan metadata requires an open crate object")
   };
   publishMetadata path iface = do {
-    encoded <- Storage.encode 3 [Structure.toCrateInterfaceFields (binaryInterfaceFields iface)];
+    encoded <- Storage.encode 3 [Structure.toStoredCrateInterfaceFields (binaryInterfaceFields iface)];
     case encoded of {
       Left message -> ioReturn (Left message);
       Right bytes -> do {

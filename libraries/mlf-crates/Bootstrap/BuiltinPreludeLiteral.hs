@@ -413,6 +413,10 @@ module Bootstrap.BuiltinPreludeLiteral where {
     XVarTerm n -> application "XVarTerm" [name n];
     XAbs n ty body -> application "XAbs" [name n, typeLiteral ty, term body];
     XApp a b -> application "XApp" [term a, term b];
+    XProjection binders selected -> application "XProjection"
+      [list (triple name variable (maybe variable)) binders,name selected];
+    XInstantiationSpine callee rows -> application "XInstantiationSpine"
+      [name callee,list (triple string boolean term) rows];
     XTypeAbs a bound body -> application "XTypeAbs" [variable a, typeLiteral bound, term body];
     XTypeApp body proof -> application "XTypeApp" [term body, computation proof];
     XLet n a b -> application "XLet" [name n, term a, term b];

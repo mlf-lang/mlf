@@ -446,20 +446,39 @@ module Bootstrap.Separate where {
           y <- normalTypeIn env b;
           freshPure (XApply x y)
         };
-      XForall a bound b ->
-        do {
-          bound2 <- normalTypeIn env bound;
+      XForall a XBot body@(XForall r tail (XArrow (XVar input) (XVar output))) ->
+        if T.equalTyVar a input && T.equalTyVar r output && not (T.equalTyVar a r) then do {
           i <- freshInteger;
-          body <- normalTypeIn (M.insert T.compareTyVar a (XTyVar i) env) b;
-          freshPure (XForall (XTyVar i) bound2 body)
-        };
+          let { variable = XTyVar i };
+          bound <- normalTypeIn (M.insert T.compareTyVar a variable env) tail;
+          j <- freshInteger;
+          let { result = XTyVar j };
+          freshPure (XForall variable XBot (XForall result bound (XArrow (XVar variable) (XVar result))))
+        } else normalForall env a XBot body;
+      XForall a bound b -> normalForall env a bound b;
       _ -> freshPure ty
     };
-  normalType ty =
-    case runFresh [] (normalTypeIn M.empty ty) of {
+  normalForall env a bound body = do {
+    bound2 <- normalTypeIn env bound;
+    i <- freshInteger;
+    let { v = XTyVar i };
+    result <- normalTypeIn (M.insert T.compareTyVar a v env) body;
+    freshPure (XForall v bound2 result)
+  };
+  normalType ty = case T.projectionTypeLayout ty of {
+    Just ((,) width selected) -> let {
+      -- Match normalTypeIn's allocation order. The argument binder comes
+      -- before its suffix and the result binder comes after that suffix.
+      argument index = let { a = XTyVar index; next = index + 1 } in
+        if next == width then XForall a XBot (XArrow (XVar a) (XVar (XTyVar selected)))
+        else let { r = XTyVar (2 * (width - 1) - index) } in
+          XForall a XBot (XForall r (argument next) (XArrow (XVar a) (XVar r)))
+    } in argument 0;
+    Nothing -> case runFresh [] (normalTypeIn M.empty ty) of {
       Right t -> t;
       Left e -> panic e
     };
+  };
   cleanSource source = cleanSourceWith hygiene source;
   cleanParsedSource = cleanParsedReserving True;
   cleanParsedReserving possible = cleanSourceWith (\e ->
@@ -1396,6 +1415,9 @@ module Bootstrap.Separate where {
       XTypeAbs a bound b ->
         XTypeAbs (variable a) (mapType variable bound) (walk b);
       XTypeApp a p -> XTypeApp (walk a) (proof p);
+      XProjection rows selected -> X.mapProjection name variable rows selected;
+      XInstantiationSpine head rows -> XInstantiationSpine (name head)
+        (map (\((,,) spelling eliminate operand) -> (,,) spelling eliminate (walk operand)) rows);
       XLet n a b -> XLet (name n) (walk a) (walk b);
       XLetRec bs b ->
         XLetRec
@@ -1451,6 +1473,9 @@ module Bootstrap.Separate where {
       XTypeAbs (XTyVar a) bound b ->
         foldTermIdentities add b (foldTypeIdentities add bound (add a seen));
       XTypeApp a p -> foldComputationIdentities add p (foldTermIdentities add a seen);
+      XProjection rows selected -> X.foldProjectionIdentities add rows selected seen;
+      XInstantiationSpine n rows -> foldl (\ids ((,,) _ _ operand) -> foldTermIdentities add operand ids)
+        (add (X.nameId n) seen) rows;
       XLet n a b -> foldTermIdentities add b (foldTermIdentities add a (add (X.nameId n) seen));
       XLetRec bs b ->
         foldTermIdentities add b

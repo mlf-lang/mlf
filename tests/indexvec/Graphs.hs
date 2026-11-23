@@ -3900,7 +3900,76 @@ declarationStampInventory = do
   check "restored stamps preserve varied declaration order and individual owned fields" (map snd settled)
     (map (H.unpack . Open.fingerprint . snd) (Open.packageFragments checked))
 
+checkedProjectionSpines = do
+  let first = T.XName 0 "first"
+      chosen = T.XName 1 "chosen"
+      lastArg = T.XName 2 "last"
+      callee = T.XName 3 "choose"
+      rows = [(first,T.XTyVar 0,T.Just (T.XTyVar 3)),
+              (chosen,T.XTyVar 1,T.Just (T.XTyVar 4)),
+              (lastArg,T.XTyVar 2,T.Nothing)]
+      operands = [("Int",True,T.XIntTerm 7),
+                  ("Bool",True,T.XBoolTerm True),
+                  ("Int",False,T.XIntTerm 12)]
+      projection = T.XProjection rows chosen
+      invoke = T.XInstantiationSpine callee operands
+      packed = T.XLet callee projection invoke
+      expanded = T.XLet callee (X.expandProjection rows chosen)
+                   (X.expandInstantiationSpine callee operands)
+      result checkTerm = case checkTerm of
+        T.Right ty -> Right (H.unpack (Pretty.prettyType ty))
+        T.Left message -> Left (H.unpack message)
+      require value = case value of
+        T.Right actual -> pure actual
+        T.Left message -> fail (H.unpack message)
+  check "packed projection call checks as Bool"
+    (Right "Bool") (result (XCheck.checkClosed packed))
+  check "expanded reference checker agrees with packed projection"
+    (result (Independent.infer Independent.emptyEnv expanded)) (result (XCheck.checkClosed packed))
+  check "packed call prints canonical type computations" (H.unpack (Pretty.prettyTerm expanded))
+    (H.unpack (Prim.concatStringList (Pretty.termChunks 0 packed [])))
+  env <- require (Open.environment [])
+  let terminal = T.XConstructor "()" []
+      owner = T.XName 4 "owner"
+  a <- require (Open.check env [] (T.XLet owner packed terminal))
+  b <- require (Open.check env [] (T.XLet owner expanded terminal))
+  check "expanded and packed projections have the same fingerprint"
+    (H.unpack (Open.fingerprint b)) (H.unpack (Open.fingerprint a))
+  decoded <- require (Structure.fromXTerm (Structure.toXTerm packed))
+  check "decoded projection retains its type" (Right "Bool") (result (XCheck.checkClosed decoded))
+  ty <- require (XCheck.checkClosed projection)
+  normal <- require (Fresh.runFresh [] (Separate.normalTypeIn M.empty ty))
+  check "projection normalization retains the canonical binder order" True
+    (Structure.sameEncodedXType normal (Separate.normalType ty))
+  decodedType <- require (Structure.fromXType (Structure.toStoredXType ty))
+  check "packed bounded type retains exact binder identities" True
+    (Structure.sameEncodedXType ty decodedType)
+  let invalid = T.XLet callee projection (T.XInstantiationSpine callee
+        (take 2 operands ++ [("Int",False,T.XBoolTerm False)]))
+  check "discarded operands still require type checking" (Left "application type mismatch")
+    (result (XCheck.checkClosed invalid))
+
+preparedPrefixControls = do
+  let span = T.SourceSpan "source" "Projection" "Projection.hs" 2 1 2 20
+      scope = CrateGraph.SourceOrigin id M.empty 0 M.empty 0
+      encode expression = case CrateGraph.simplePackedOrigin scope span 0 4096 expression "header" of
+        T.Just bytes -> H.unpack bytes
+        T.Nothing -> error "expected a simple prepared source"
+      selector a b chosen = T.SLam a T.Nothing (T.SLam b T.Nothing (T.SVar chosen))
+      left = T.SApp (T.SApp (T.SVar "pick") (T.SIntLit 2)) (T.SIntLit 3)
+      right = T.SApp (T.SVar "pick") (T.SApp (T.SIntLit 2) (T.SIntLit 3))
+  check "prepared projection uses lexical binder positions"
+    (encode (selector "first" "second" "first")) (encode (selector "x" "y" "x"))
+  check "prepared projection retains selected binder" False
+    (encode (selector "x" "y" "x") == encode (selector "x" "y" "y"))
+  check "prepared source retains application association" False (encode left == encode right)
+  check "prepared locations retain start and end coordinates" False
+    (encode (T.SCallSite "arg" span left) ==
+     encode (T.SCallSite "arg" (T.SourceSpan "source" "Projection" "Projection.hs" 2 1 2 21) left))
+
 main = do
+  preparedPrefixControls
+  checkedProjectionSpines
   fileImportPrefixChecks
   declarationStampInventory
   liveDeclarationSpineChecks

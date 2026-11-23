@@ -34,6 +34,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   import qualified Bootstrap.InferenceUnit as Inference;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.SourceInference as Source;
+  import qualified Bootstrap.EvidenceBoundary as Boundary;
   import qualified Bootstrap.SourceUnit as Unit;
   import qualified Bootstrap.CompilerCore as Compiler;
   import qualified Bootstrap.Constraint as C;
@@ -267,11 +268,13 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
       }
       else ioReturn (Left "cannot fingerprint query graph compiler");
     case compiled of { Left e -> ioReturn (Left e); Right state -> case CrateGraph.checkedResult state of {
-      (,,,) fragments report contracts session -> case graphInterface spec interfaces prepared fragments contracts of {
+      (,,,) fragments report contracts session -> let {
+        linked = pruneCheckedProjections prepared (simplifyCheckedProjections fragments)
+      } in case graphInterface spec interfaces prepared linked contracts of {
         Left e -> ioReturn (Left e);
         Right iface -> do {
           outputStarted <- QueryGraph.clock (CrateGraph.statistics state);
-          made <- Artifact.makeOpenObject iface (map snd interfaces) (map (\((,,) n f _) -> (,) n f) fragments);
+          made <- Artifact.makeOpenObject iface (map snd interfaces) (map (\((,,) n f _) -> (,) n f) linked);
           case made of { Left e -> ioReturn (Left e); Right object -> do {
             written <- case planInputs of {
               Nothing -> do {
@@ -298,6 +301,85 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
       }
     } }
   };
+  -- This rewrite runs after query validation. Published code can depend on a
+  -- local projection's implementation while inference uses only its type.
+  simplifyCheckedProjections fragments = let {
+    projection ((,,) _ fragment _) = case (,) (Open.body fragment) (Open.bindings fragment) of {
+      (,) (XLet binder (XProjection rows selected) _) [(,) owner _] ->
+        if X.equalName binder owner then
+          let {
+            position i pending = case pending of {
+              [] -> Nothing;
+              (:) ((,,) name _ _) rest -> if X.equalName name selected then
+                Just ((,) (X.nameHint owner) ((,) (length rows) i))
+                else position (i + 1) rest
+            }
+          } in position 0 rows
+        else Nothing;
+      _ -> Nothing
+    };
+    available = M.fromList compareString (mapMaybe projection fragments);
+    simplify ((,,) key fragment ids) = let {
+      parameters = Open.parameters fragment;
+      local = M.fromList X.compareName (mapMaybe (\((,) name _) ->
+        mapOptional ((,) name) (M.lookup compareString (X.nameHint name) available)) parameters);
+      rewrite term = case term of {
+        XLet n rhs body -> case (,) (rewrite rhs) (rewrite body) of {
+          (,) Nothing Nothing -> Nothing;
+          (,) left right -> Just (XLet n (fromMaybe rhs left) (fromMaybe body right))
+        };
+        XAbs n ty body -> mapOptional (XAbs n ty) (rewrite body);
+        XInstantiationSpine name rows -> case M.lookup X.compareName name local of {
+          Just ((,) arity index) -> if length rows == arity then case drop index rows of {
+            (:) ((,,) _ _ value) _ -> Just value;
+            _ -> Nothing
+          } else Nothing;
+          _ -> Nothing
+        };
+        _ -> Nothing
+      };
+      replacement = if M.null local then Nothing else rewrite (Open.body fragment);
+      agrees ((,) left lt) ((,) right rt) = X.equalName left right && T.alphaEq lt rt;
+      optimize term = let {
+        used = Set.fromList X.compareName (Boundary.freeNames term);
+        remaining = filter (\((,) name _) -> Set.member X.compareName name used) parameters
+      } in case Open.check (Open.context fragment) remaining term of {
+        Right checked -> if eqList agrees (Open.bindings fragment) (Open.bindings checked) then checked else fragment;
+        Left _ -> fragment
+      }
+    } in (,,) key (case replacement of { Just term -> optimize term; Nothing -> fragment }) ids
+  } in if M.null available then fragments else map simplify fragments;
+
+  -- Once an executable's projection calls have been reduced, a private
+  -- projection with no incoming reference contributes no linkable code.
+  pruneCheckedProjections
+    (FileCrate (Crate.CompilationModules terms modules _) _ _ instances _ entry _ _) fragments =
+    case entry of {
+      CrateEntry _ main -> if null instances then let {
+        candidates ((,,) _ fragment ids) = case (,,) ids (Open.bindings fragment) (Open.body fragment) of {
+          (,,) [i] [(,) name ty] (XLet binder (XProjection _ _) _) ->
+            if X.equalName binder name && null (Artifact.entrySignatures "" [(,) (X.nameHint name) ty])
+            then Just ((,) (V.toInt i) (X.nameHint name)) else Nothing;
+          _ -> Nothing
+        };
+        projections = mapMaybe candidates fragments;
+        visible = concatMap (\part -> case Crate.compilationExports part of {
+          Right exports -> Set.toList (Modules.visible exports);
+          Left _ -> []
+        }) modules;
+        root entity = case Modules.termId terms entity of { Right i -> Just (V.toInt i); Left _ -> Nothing };
+        roots = IS.fromList ((:) (V.toInt main) (mapMaybe root visible));
+        references = Set.fromList compareString (concatMap (\((,,) _ f _) ->
+          map (compose X.nameHint fst) (Open.parameters f)) fragments);
+        removable = IS.fromList (map fst (filter (\((,) i name) ->
+          not (IS.member i roots) && not (Set.member compareString name references)) projections))
+      } in if null projections then fragments else filter (\((,,) _ _ ids) -> case ids of {
+        [i] -> not (IS.member (V.toInt i) removable);
+        _ -> True
+      }) fragments else fragments;
+      _ -> fragments
+    };
+
   graphInterface spec interfaces prepared@(FileCrate (Crate.CompilationModules termTable resolved _) ownData ownClasses ownInstances _ ownEntry reachByModule _) fragments contracts = do {
     let { modules = map Crate.compilationName resolved;
       dependencies = map (\path -> case find (\p -> eqString (fst p) path) interfaces of {

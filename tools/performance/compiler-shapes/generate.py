@@ -156,6 +156,14 @@ producer x = if ltInt x 0 then next (subInt 0 x) else addInt x ({total});
                                f'then level{i-1} (addInt z {i}) else level{i-1} (subInt z {i})')
         return (HEADER + 'hotTransaction start = let {\n' + ';\n'.join(definitions)
                 + f'\n}} in level{n} start;\nentry x = hotTransaction x;\n' + MAIN)
+    elif family == 'polymorphic_import_spine':
+        parameters = ''.join(f' unused{i}' for i in range(n))
+        operands = ''.join(
+            f' ({"ltInt" if i % 2 else "addInt"} x {i})' for i in range(n))
+        # Inference gives each ignored argument its own type variable. The
+        # caller imports that scheme and successively applies its wide arrow.
+        declarations = f'keep seed{parameters} = seed;\n'
+        return HEADER + declarations + f'entry x = keep x{operands};\n' + MAIN
     elif family == 'polymorphic_import_fanout':
         declarations = ''.join(f'helper{i} x = x;\n' for i in range(n))
         terms = [f'helper{i} (addInt x {i})' for i in range(n)]
@@ -814,6 +822,8 @@ run x (More (Job worker) rest) = let { saved = worker x (addInt x 1) } in
 def expected(family, n, x):
     """Closed-form specifications; no compiled results or generated helpers used."""
     if family == 'baseline':
+        return x
+    if family == 'polymorphic_import_spine':
         return x
     if family == 'captured_parameter_uses':
         total = n*x + n*(n+1)//2

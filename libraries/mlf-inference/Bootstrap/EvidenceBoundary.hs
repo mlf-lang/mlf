@@ -66,6 +66,8 @@ module Bootstrap.EvidenceBoundary where {
     XAbs n _ b -> (:) n (names b);
     XApp a b -> append (names a) (names b);
     XTypeAbs _ _ b -> names b;
+    XProjection rows selected -> append (map (\((,,) n _ _) -> n) rows) [selected];
+    XInstantiationSpine n rows -> (:) n (concatMap (\((,,) _ _ value) -> names value) rows);
     XTypeApp b _ -> names b;
     XLet n a b -> (:) n (append (names a) (names b));
     XLetRec ds b -> append (concatMap (\((,,) n _ v) -> (:) n (names v)) ds) (names b);
@@ -91,6 +93,10 @@ module Bootstrap.EvidenceBoundary where {
     XAbs n _ body -> freeNamesOnto (bind n) body rest;
     XApp f a -> after f (after a rest);
     XTypeAbs _ _ body -> after body rest;
+    XProjection _ _ -> rest;
+    XInstantiationSpine n rows -> let {
+      arguments = foldr (\((,,) _ _ operand) pending -> after operand pending) rest rows
+    } in if allowed n then (:) n arguments else arguments;
     XTypeApp body _ -> after body rest;
     XLet n expr body -> after expr (freeNamesOnto (bind n) body rest);
     XLetRec defs body -> let {

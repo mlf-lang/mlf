@@ -134,6 +134,24 @@ module Bootstrap.SourceInference where {
       _ -> Left "source finalization expected a constructor node"
     }
   };
+  finalProjectionTag graph identity = do {
+    node <- Wire.lookupGraphNode graph identity;
+    case node of {
+      Wire.GNode tag [_,_] -> if tag == 94 then Right tag else Left "source finalization expected a projection";
+      Wire.GNode tag [_,_,_] -> if tag == 97 || tag == 98 then Right tag
+        else Left "source finalization expected a projection";
+      _ -> Left "source finalization expected a projection"
+    }
+  };
+  finalInstantiationTag :: Wire.Graph -> Int -> Either String Int;
+  finalInstantiationTag graph identity = do {
+    node <- Wire.lookupGraphNode graph identity;
+    case node of {
+      Wire.GNode 93 [_,_,_,_,_] -> Right 93;
+      Wire.GNode 95 [_,_] -> Right 95;
+      _ -> Left "source finalization expected an instantiation"
+    }
+  };
   finalSyntaxEdges :: Wire.Graph -> [] FinalSyntaxEdge -> [] ((,) Int Int) -> Int -> Int -> Either String ((,) ([] ((,) Int Int)) Int);
   finalSyntaxEdges graph edges keys deepest count = case edges of {
     [] -> Right ((,) (reverse keys) deepest);
@@ -315,6 +333,8 @@ module Bootstrap.SourceInference where {
     } } in case original of {
       FinalTerm term -> case term of {
         XVarTerm _ -> schedule 70 [];
+        XProjection _ _ -> do { tag <- finalProjectionTag graph identity; schedule tag [] };
+        XInstantiationSpine _ _ -> do { tag <- finalInstantiationTag graph identity; schedule tag [] };
         XAbs _ _ body -> finalSyntaxTermChild graph identity original 71 2 body rest values state;
         XApp a b -> finalSyntaxTermPair graph identity original 72 0 a 1 b rest values state;
         XTypeAbs _ _ body -> finalSyntaxTermChild graph identity original 73 2 body rest values state;
@@ -446,6 +466,8 @@ module Bootstrap.SourceInference where {
     } in case original of {
       FinalTerm term -> case (,,) term references children of {
         (,,) (XVarTerm _) [_] [] -> untouched 70;
+        (,,) (XProjection _ _) _ [] -> do { tag <- finalProjectionTag graph identity; untouched tag };
+        (,,) (XInstantiationSpine _ _) _ [] -> do { tag <- finalInstantiationTag graph identity; untouched tag };
         (,,) (XAbs name ty _) [n,t,b] [body] -> do {
           value <- finalSyntaxTerm body;
           finish 71 [FinalOriginalEdge n,FinalOriginalEdge t,FinalResultEdge body]
@@ -852,6 +874,8 @@ module Bootstrap.SourceInference where {
       Right (combineEdits (\t alts -> XCase t ty alts) a bs x y)
     };
     XWithData ds b -> one (XWithData ds) b;
+    XProjection _ _ -> Right Nothing;
+    XInstantiationSpine _ _ -> Right Nothing;
     XVarTerm _ -> Right Nothing; XIntTerm _ -> Right Nothing; XDoubleTerm _ -> Right Nothing;
     XBoolTerm _ -> Right Nothing; XStringTerm _ -> Right Nothing; XPrimitive _ _ -> Right Nothing;
     XConstructor _ _ -> Right Nothing
@@ -2275,6 +2299,8 @@ module Bootstrap.SourceInference where {
     XAbs name ty body -> one (XAbs name ty) body;
     XTypeAbs name ty body -> one (XTypeAbs name ty) body;
     XWithData declarations body -> one (XWithData declarations) body;
+    XProjection _ _ -> Just Nothing;
+    XInstantiationSpine _ _ -> Just Nothing;
     XVarTerm _ -> Just Nothing; XIntTerm _ -> Just Nothing; XDoubleTerm _ -> Just Nothing;
     XBoolTerm _ -> Just Nothing; XStringTerm _ -> Just Nothing; XPrimitive _ _ -> Just Nothing;
     XConstructor _ _ -> Just Nothing; XLetRec _ _ -> Nothing; XCase _ _ _ -> Nothing

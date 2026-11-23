@@ -291,6 +291,20 @@ class ScheduleTests(unittest.TestCase):
                 self.assertEqual(generate.expected('inferred_functions', size, value),
                                  size * value + size * (size - 1) // 2)
 
+    def test_polymorphic_import_spine_grows_one_inferred_application(self):
+        family = 'polymorphic_import_spine'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        for size in (1, 8, 64):
+            source = generate.program(family, size)
+            self.assertNotRegex(source, r'(?m)^(keep|entry) ::')
+            predecessor, = re.findall(r'(?m)^keep seed(.*?) = seed;$', source)
+            self.assertEqual(predecessor.split(), [f'unused{i}' for i in range(size)])
+            caller, = re.findall(r'(?m)^entry x = keep x(.*);$', source)
+            self.assertEqual(re.findall(r'\((ltInt|addInt) x (\d+)\)', caller),
+                             [('ltInt' if i % 2 else 'addInt', str(i)) for i in range(size)])
+            for value in (-2**63, -1, 0, 7, 2**63-1):
+                self.assertEqual(generate.expected_output(family, size, value), f'{value}\n')
+
     def test_polymorphic_import_fanout_retains_each_predecessor(self):
         family = 'polymorphic_import_fanout'
         self.assertFalse(generate.REGISTRY['families'][family]['default'])

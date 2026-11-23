@@ -29,13 +29,13 @@ executable emlf
   default-language: Haskell2010
   ghc-options: -fpedantic-bottoms -fno-state-hack -rtsopts=ignoreAll
   if os(osx)
-    ghc-options: "-with-rtsopts=-F4 -A48m -V0.002"
+    ghc-options: "-with-rtsopts=-F4 -A128m -V0.002"
     if flag(retain-host-symbols)
       ghc-options: -g1
     else
       ghc-options: -optl-Wl,-x,-exported_symbol,_main
   else
-    ghc-options: "-with-rtsopts=-F4 -A48m"
+    ghc-options: "-with-rtsopts=-F4 -A128m"
 
 executable mlfpkg
   hs-source-dirs: host/ghc/app/mlfpkg

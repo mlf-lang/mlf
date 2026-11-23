@@ -455,7 +455,7 @@ module Bootstrap.Surface where {
             let {
               names = concatMap patternVariables patterns
             } in
-            (length names /= length (nubBy eqString names)))
+            (length names /= Set.size (Set.fromList compareString names)))
          equations
     then freshFail "duplicate pattern variable"
     else do {

@@ -181,6 +181,8 @@ module Bootstrap.LLVM.Library
     XAbs _ annotation body -> join [typeNames annotation, termNames body];
     XApp a b -> join [termNames a, termNames b];
     XTypeAbs _ bound body -> join [typeNames bound, termNames body];
+    XInstantiationSpine _ rows -> join (concatMap (\((,,) constructor _ value) ->
+      [S.singleton constructor,termNames value]) rows);
     XTypeApp body proof -> join [termNames body, proofNames proof];
     XLet _ rhs body -> join [termNames rhs, termNames body];
     XLetRec definitions body -> join ((:) (termNames body)

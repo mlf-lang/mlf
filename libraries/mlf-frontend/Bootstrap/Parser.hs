@@ -431,7 +431,7 @@ module Bootstrap.Parser where {
           let {
             names = concatMap Surface.patternVariables args
           } in
-          if (length names == length (nubBy eqString names))
+          if (length names == Set.size (Set.fromList compareString names))
           then pPure result
           else pFail "duplicate function parameter"
       }
@@ -970,7 +970,7 @@ module Bootstrap.Parser where {
       let {
         names = concatMap Surface.patternVariables args
       };
-      if (length names == length (nubBy eqString names))
+      if (length names == Set.size (Set.fromList compareString names))
       then pPure (Surface.function ((:) ((,) args body) []))
       else pFail "duplicate pattern variable"
     };
@@ -1039,7 +1039,24 @@ module Bootstrap.Parser where {
   patternAtom :: Parser SPattern;
   patternAtom = sourceOrMetadata sharedPatternAtom legacyPatternAtom;
   sharedPatternAtom :: Parser SPattern;
-  sharedPatternAtom =
+  sharedPatternAtom = Parser (\state -> let {
+    ordinary = pRun generalSharedPatternAtom state
+  } in case state of {
+    ParseState file ((:) (Token name _ _ _ _) rest) end SharedHaskellV1 owner pkg -> let {
+      accept variable = PSuccess (SDefaultPattern variable)
+        (ParseState file rest end SharedHaskellV1 owner pkg) True;
+      first = if stringLength name == 0 then 0 else stringCodeAt name 0;
+      asPattern = case rest of {
+        (:) (Token next _ _ _ _) _ -> eqString next "@";
+        [] -> False
+      }
+    } in if eqString name "_" then accept Nothing
+      else if first >= 97 && first <= 122 && sharedIdentifier name &&
+              not (Set.member compareString name sharedReservedSet || asPattern)
+      then accept (Just name) else ordinary;
+    _ -> ordinary
+  });
+  generalSharedPatternAtom =
     pChoice (pTry (do {
       name <- lowerIdentifier;
       pToken "@";
