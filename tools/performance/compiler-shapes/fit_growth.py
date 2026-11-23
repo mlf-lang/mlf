@@ -35,7 +35,7 @@ def include_baseline(families, sizes, automatic):
     return 'baseline' in families or (automatic and len(sizes) >= MIN_POSITIVE_SIZES)
 
 
-def paired_times(rows, samples, family, repeats):
+def paired_times(rows, samples, family, repeats, reference='ghc'):
     """Rows provide verified sizes. Position identifies the adjacent compiler pair."""
     if family == 'baseline':
         raise ValueError('choose the growing family; baseline-0 is included automatically')
@@ -50,10 +50,29 @@ def paired_times(rows, samples, family, repeats):
     for sample in samples:
         if sample['case'] in cells:
             cells[sample['case']].append(sample)
-    return sizes, [paired_cell(cell, repeats) for cell in cells.values()]
+    return sizes, [paired_cell(cell, repeats, reference=reference) for cell in cells.values()]
 
 
-def paired_cell(samples, repeats, field='wall_seconds'):
+def paired_cell(samples, repeats, field='wall_seconds', reference='ghc'):
+    if any(sample['lane'] == 'reference' for sample in samples):
+        ordered = sorted(samples, key=lambda sample: sample['position'])
+        if [sample['position'] for sample in ordered] != list(range(3 * repeats)):
+            raise ValueError('missing or duplicate compiler position in triple')
+        pairs = []
+        for start in range(0, len(ordered), 3):
+            group = ordered[start:start+3]
+            lanes = [sample['lane'] for sample in group]
+            if lanes not in (['reference', 'mlf', 'ghc'], ['ghc', 'mlf', 'reference']):
+                raise ValueError('candidate must be between both controls')
+            if [sample['order'] for sample in group] != list(range(group[0]['order'], group[0]['order'] + 3)):
+                raise ValueError('nonadjacent compiler triple')
+            observed = {sample['lane']: sample[field] for sample in group if sample['lane'] in ('mlf', reference)}
+            if any(not math.isfinite(t) or t < 0 for t in observed.values()):
+                raise ValueError('invalid paired observation')
+            pairs.append((observed['mlf'], observed[reference]))
+        return pairs
+    if reference != 'ghc':
+        raise ValueError('no committed compiler measurements in this cohort')
     cell = [None] * (2 * repeats)
     for sample in samples:
         position = sample['position']
@@ -174,12 +193,12 @@ def peak_rss_growth(sizes, pairs):
     return dict(mlf_mib_per_unit=mlf, ghc_mib_per_unit=ghc, delta_mib_per_unit_95=[cuts[0], cuts[-1]])
 
 
-def growth(sizes, times):
+def growth(sizes, times, reference='ghc'):
     medians = [median_pair(cell) for cell in times]
     slope_ms = slope_estimator(sizes, 1000.)
 
     estimates = {}
-    for lane, observed in zip(LANES, zip(*medians)):
+    for lane, observed in zip(('mlf', reference), zip(*medians)):
         estimates[lane] = {
             'median_seconds': list(observed), 'ols_ms_per_function': slope_ms(observed),
             'endpoint_ms_per_function': 1000 * (observed[-1] - observed[0]) / (sizes[-1] - sizes[0]),
@@ -196,7 +215,7 @@ def growth(sizes, times):
     intervals = [statistics.quantiles(deltas, n=40, method='inclusive')
                  for deltas in (slope_deltas, power_deltas)]
     slope_ci, power_ci = ([cuts[0], cuts[-1]] for cuts in intervals)
-    mlf, ghc = (estimates[lane] for lane in LANES)
+    mlf, ghc = estimates['mlf'], estimates[reference]
     checks = {'all_positive_medians_lower': all(a < b for a, b in medians[1:]),
               'lower_ols_point': mlf['ols_ms_per_function'] < ghc['ols_ms_per_function'],
               'lower_endpoint_point': mlf['endpoint_ms_per_function'] < ghc['endpoint_ms_per_function'],
@@ -212,8 +231,12 @@ def growth(sizes, times):
             'checks': checks, 'interior': interior, 'power_order_issue': issue, 'accepted': all(checks.values())}
 
 
-def family_reports(rows, samples, repeats):
+def family_reports(rows, samples, repeats, reference='ghc'):
     """Evaluate each selected family using qualified pairs from one measurement window."""
+    memory_check = PEAK_RSS_CHECK.replace('ghc', reference)
+    slope_check = RSS_SLOPE_CHECK.replace('ghc', reference)
+    fields = [key.replace('ghc', reference) for key in PEAK_RSS_FIELDS]
+    ratio_field = PEAK_RSS_RATIO.replace('ghc', reference)
     families, by_case = defaultdict(list), defaultdict(list)
     for row in rows:
         families[row['family']].append(row)
@@ -232,59 +255,60 @@ def family_reports(rows, samples, repeats):
             reasons.append('incomplete cells: ' + ', '.join(incomplete))
         report = {'family': family, 'sizes': [row['size'] for row in selected],
                   'pairs_per_size': repeats, 'status': 'incomplete',
-                  'reason': '. '.join(reasons), 'checks': dict.fromkeys(CHECKS), 'accepted': None}
+                  'reason': '. '.join(reasons), 'checks': dict.fromkeys(k.replace('ghc',reference) for k in CHECKS), 'accepted': None}
         if reasons:
             if not any(row['case'] in incomplete for row in positives) and repeats:
-                medians = [median_pair(paired_cell(by_case[row['case']], repeats)) for row in positives]
+                medians = [median_pair(paired_cell(by_case[row['case']], repeats, reference=reference)) for row in positives]
                 report['checks']['all_positive_medians_lower'] = all(a < b for a, b in medians)
         else:
             observations = (sample for row in selected for sample in by_case[row['case']])
-            sizes, times = paired_times(selected, observations, family, repeats)
-            result = growth(sizes, times)
+            sizes, times = paired_times(selected, observations, family, repeats, reference)
+            result = growth(sizes, times, reference)
             report.update(result)
             if result['power_order_issue']:
                 report.update(status='indeterminate', reason=result['power_order_issue'])
             else:
                 report['status'] = 'met' if result['accepted'] else 'unmet'
-        rss = [{'size': row['size'], **{field: row.get(field) for field in PEAK_RSS_FIELDS}}
+        rss = [{'size': row['size'], **{field: row.get(field) for field in fields}}
                for row in selected]
         report['peak_rss'] = rss
         positive_peaks = [row for row in rss if row['size'] > 0]
-        missing_rss = [str(row['size']) for row in positive_peaks if row[PEAK_RSS_RATIO] is None]
+        missing_rss = [str(row['size']) for row in positive_peaks if row[ratio_field] is None]
         if missing_rss:
             reason = 'peak build RSS unavailable at sizes ' + ', '.join(missing_rss)
             report.update(status='incomplete', accepted=None,
                           reason='. '.join(filter(None, (report['reason'], reason))))
-            report['checks'][PEAK_RSS_CHECK] = None
+            report['checks'][memory_check] = None
         else:
-            memory_ok = all(row[PEAK_RSS_RATIO] <= 1. for row in positive_peaks)
-            report['checks'][PEAK_RSS_CHECK] = memory_ok
+            memory_ok = all(row[ratio_field] <= 1. for row in positive_peaks)
+            report['checks'][memory_check] = memory_ok
             if report['accepted'] and not memory_ok:
                 report.update(status='unmet', accepted=False)
-        report['checks'].update(dict.fromkeys((RSS_SLOPE_CHECK, RSS_CI_CHECK)))
+        report['checks'].update(dict.fromkeys((slope_check, RSS_CI_CHECK)))
         if not reasons:
             missing = [row['case'] for row in selected
-                       if any(not sample.get(RSS_SAMPLE) for sample in by_case[row['case']])]
+                       if any(not sample.get(RSS_SAMPLE) for sample in by_case[row['case']] if sample['lane'] in ('mlf', reference))]
             if missing:
                 reason = 'paired peak RSS unavailable for ' + ', '.join(missing)
                 report.update(status='incomplete', accepted=None,
                               reason='. '.join(filter(None, (report['reason'], reason))))
             else:
-                pairs = [paired_cell(by_case[row['case']], repeats, RSS_SAMPLE) for row in selected]
+                pairs = [paired_cell(by_case[row['case']], repeats, RSS_SAMPLE, reference) for row in selected]
                 memory = peak_rss_growth(report['sizes'], pairs)
-                report['peak_rss_growth'] = memory
+                report['peak_rss_growth'] = {k.replace('ghc', reference):v for k,v in memory.items()}
                 point = memory['mlf_mib_per_unit'] <= memory['ghc_mib_per_unit']
                 confidence = memory['delta_mib_per_unit_95'][1] <= 0
-                report['checks'].update({RSS_SLOPE_CHECK: point, RSS_CI_CHECK: confidence})
+                report['checks'].update({slope_check: point, RSS_CI_CHECK: confidence})
                 if report['accepted'] and not (point and confidence):
                     report.update(status='unmet', accepted=False)
         reports.append(report)
     return reports
 
 
-def format_peak_rss(row):
-    medians = ['—' if row.get(field) is None else f'{row[field] / 2**20:.2f}' for field in PEAK_RSS_MEDIANS]
-    ratio = row.get(PEAK_RSS_RATIO)
+def format_peak_rss(row, reference='ghc'):
+    fields = ('mlf_peak_rss_bytes', reference + '_peak_rss_bytes')
+    medians = ['—' if row.get(field) is None else f'{row[field] / 2**20:.2f}' for field in fields]
+    ratio = row.get('mlf_over_' + reference + '_peak_rss')
     return (*medians, '—' if ratio is None else f'{ratio:.3f}')
 
 
@@ -305,21 +329,22 @@ def format_exponent(fit):
     return f'{value} ({bound} bound)'
 
 
-def markdown(reports):
-    lines = ['Lower values favor MLF. Point estimates are MLF / GHC. Intervals are 95% paired '
-             'bootstrap intervals for MLF minus GHC over the measured sizes.', '']
+def markdown(reports, reference='ghc'):
+    label = 'GHC' if reference == 'ghc' else 'the committed compiler'
+    lines = [f'Lower values favor MLF. Point estimates are MLF / {label}. Intervals are 95% paired '
+             f'bootstrap intervals for MLF minus {label} over the measured sizes.', '']
     if not reports:
         return lines + ['No growing family selected.']
     lines += ['| Family | Sizes | Lower wall medians at all positive sizes | OLS slope (ms/unit) '
               '| Endpoint slope (ms/unit) | Exponent | OLS slope interval | Exponent interval '
-              '| Peak RSS ≤ GHC at all positive sizes | Peak RSS slope (MiB/unit) | RSS slope difference 95% interval | Verdict |',
+              f'| Peak RSS ≤ {label} at all positive sizes | Peak RSS slope (MiB/unit) | RSS slope difference 95% interval | Verdict |',
               '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |']
     verdicts = {True: 'pass', False: 'fail', None: '—'}
     for report in reports:
         checks = report['checks']
         values = ['—'] * 5
         if 'estimates' in report:
-            mlf, ghc = (report['estimates'][lane] for lane in LANES)
+            mlf, ghc = (report['estimates'][lane] for lane in ('mlf', reference))
             paired = report['paired_bootstrap']
             values = [f"{mlf['ols_ms_per_function']:.6g} / {ghc['ols_ms_per_function']:.6g}",
                       f"{mlf['endpoint_ms_per_function']:.6g} / {ghc['endpoint_ms_per_function']:.6g}",
@@ -330,13 +355,13 @@ def markdown(reports):
         outcome = report['status']
         if report['reason']:
             outcome += ' · ' + report['reason']
-        memory = checks[PEAK_RSS_CHECK]
+        memory = checks[PEAK_RSS_CHECK.replace('ghc', reference)]
         slope_result = interval_result = '—'
         if 'peak_rss_growth' in report:
             rss = report['peak_rss_growth']
             lo, hi = rss['delta_mib_per_unit_95']
-            slope_result = (f"{rss['mlf_mib_per_unit']:.5g} / {rss['ghc_mib_per_unit']:.5g} "
-                            f"({verdicts[checks[RSS_SLOPE_CHECK]]})")
+            slope_result = (f"{rss['mlf_mib_per_unit']:.5g} / {rss[reference+'_mib_per_unit']:.5g} "
+                            f"({verdicts[checks[RSS_SLOPE_CHECK.replace('ghc', reference)]]})")
             interval_result = f"[{lo:.5g}, {hi:.5g}] ({verdicts[checks[RSS_CI_CHECK]]})"
         fields = [f"`{report['family']}`", ', '.join(map(str, report['sizes'])),
                   verdicts[checks[TIMING_CHECKS[0]]], *values,
@@ -351,11 +376,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('cohort', type=Path)
     parser.add_argument('--family', required=True)
+    parser.add_argument('--reference', choices=('ghc', 'reference'), default='ghc',
+                        help='compare MLF to GHC or to the recorded Git baseline')
     parser.add_argument('--output', type=Path, help='write the JSON result to this path')
     args = parser.parse_args()
     rows, plan, _, samples = analyze.analyze(args.cohort)
     selected = [row for row in rows if row['family'] in ('baseline', args.family)]
-    reports = family_reports(selected, samples, plan['benchmark']['repeats'])
+    if args.reference == 'reference' and 'compiler_reference' not in plan:
+        parser.error('this cohort has no committed compiler baseline')
+    reports = family_reports(selected, samples, plan['benchmark']['repeats'], args.reference)
     if not reports:
         parser.error('choose a growing family recorded in the cohort')
     result, = reports

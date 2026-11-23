@@ -12,6 +12,7 @@ import command_runner
 import fit_growth
 import framework_results as framework
 import generate as G
+import compiler_reference
 import query_cache as Q
 import provenance
 import worker
@@ -47,6 +48,17 @@ def interleave_pairs(schedule, repeats, rng):
     return interleaved
 
 
+def with_reference(schedule):
+    """Place the candidate between the two controls, reversing all three next round."""
+    result = []
+    for i in range(0, len(schedule), 2):
+        first = schedule[i]
+        lanes = ('reference', 'mlf', 'ghc') if first['lane'] == 'mlf' else ('ghc', 'mlf', 'reference')
+        start = 3 * (first['position'] // 2)
+        result.extend(dict(case=first['case'], position=start+j, lane=lane) for j,lane in enumerate(lanes))
+    return result
+
+
 def main():
     data=registry()
     parser=argparse.ArgumentParser(description=__doc__)
@@ -55,6 +67,7 @@ def main():
     parser.add_argument('--setup',type=Path,required=not listing)
     parser.add_argument('--output',type=Path,required=not listing)
     parser.add_argument('--baseline-family')
+    parser.add_argument('--sweep-reference', help=argparse.SUPPRESS)
     parser.add_argument('--pilot',action='store_true')
     parser.add_argument('--framework-child',action='store_true',help=argparse.SUPPRESS)
     parser.add_argument('--record-only',action='store_true',
@@ -93,8 +106,17 @@ def main():
     setup=H.load(args.setup.resolve()); H.require(setup['complete'],'qualified fixed dependencies')
     H.require(setup.get('endpoint')==args.endpoint,'setup belongs to endpoint profile '+str(setup.get('endpoint'))
               +', not '+args.endpoint)
+    setup.setdefault('source', str(ROOT))
     endpoint=data['endpoints'][args.endpoint]
     auth=H.authenticate(Path(setup['producer']),Path(setup.get('source',ROOT)))
+    generated = [out, args.setup.parent, setup['producer']]
+    if args.sweep_reference:
+        sweep_dir = out.parent.parent
+        generated.extend([out.parent, sweep_dir/'summary.csv', sweep_dir/'summary.md', sweep_dir/'growth.json'])
+    selection = compiler_reference.select_revision(setup['source'], generated) if not args.pilot else None
+    if args.sweep_reference and selection != json.loads(args.sweep_reference):
+        raise ValueError('candidate revision or baseline changed during sweep')
+    reference = compiler_reference.prepare(setup, selection, auth['ghc']['path']) if selection else None
     repeats=1 if args.pilot else args.repeats
     H.require(repeats>=1,'positive repeats')
     sizes = list(dict.fromkeys(size for _, size in cells if size))
@@ -110,14 +132,20 @@ def main():
             schedule.append({'case':case['id'],'position':position,'lane':lane})
     if args.interleave_pairs:
         schedule=interleave_pairs(schedule,repeats,rng)
+    if reference:
+        schedule = with_reference(schedule)
+    lanes_per_round = 3 if reference else 2
     inputs={str(p.resolve()):H.sha(p) for p in [args.setup,Path(H.__file__),HERE/'command_runner.py',HERE/'bench.py',HERE/'run.py',HERE/'worker.py',HERE/'generate.py',
-        HERE/'data_shapes.py',HERE/'rank_shapes.py',HERE/'fit_growth.py',HERE/'analyze.py',
+        HERE/'data_shapes.py',HERE/'rank_shapes.py',HERE/'fit_growth.py',HERE/'analyze.py',HERE/'compiler_reference.py',
         HERE/'framework_results.py',ROOT/'tools/testing/events.py',
         HERE/'matrix.json',HERE/'query_cache.py',HERE/'provenance.py',Q.SHARED/'artifact_binary_reference.py',
         Q.SHARED/'test_query_index.py',Q.SHARED/'artifact_binary_open.py',
         Path(setup['producer'])/'receipt.json',Path(setup['producer'])/'bin/emlf',
         Path(setup['ghc']),Path(setup['clang']),Path(setup['runtime']),Path(setup['builtin']+'.mlfci'),
         Path(setup['builtin']+'.mlfco')]}
+    if reference:
+        inputs.update({str(Path(reference['producer'])/'receipt.json'):reference['receipt_sha256'],
+                       str(Path(reference['producer'])/'bin/emlf'):reference['emlf_sha256']})
     inputs.update(H.file_pins(Path(setup['package_db']).parent))
     inputs.update({c['source']:c['source_sha256'] for c in cases})
     inputs.update({lib['source']:lib['sha256'] for c in cases for lib in worker.dependencies(c)})
@@ -154,17 +182,23 @@ def main():
             '-package','base','-package','mlf-shape-primitives','-i','-odir','<leg>','-hidir','<leg>','<source>','-o','<leg>/program'],
         'mlf_stages':worker.mlf_stage_names(args.endpoint),
         'timing_boundary':'exact-child worker launch through wait4; common Python dispatcher included; preparation and validation excluded'}
+    if selection:
+        plan['baseline_selection'] = selection
+    if reference:
+        plan['compiler_reference'] = reference
+        plan['benchmark']['schema'] = 3
+        plan['benchmark']['order'] = 'candidate between GHC and the committed compiler, reversing each round; ' + ('interleaved cells' if args.interleave_pairs else 'grouped cells')
     plan_path=out/'plan.json';H.save(plan_path,plan);plan_sha=H.sha(plan_path)
     scripts=out/'scripts';scripts.mkdir()
     for name in ['run.py','worker.py','generate.py','data_shapes.py','rank_shapes.py','fit_growth.py','analyze.py',
-                 'matrix.json','query_cache.py','provenance.py','framework_results.py']:
+                 'matrix.json','query_cache.py','provenance.py','framework_results.py','compiler_reference.py']:
         shutil.copy2(HERE/name,scripts/name)
     shutil.copy2(ROOT/'tools/testing/events.py', scripts/'events.py')
     record={'complete':False,'plan_sha256':plan_sha,'runs':[],'failures':[]}; refs={};blocked=set()
     def save():H.save(out/'receipt.json',record)
     save();H.check_pins(inputs)
     by_id = {case['id']: case for case in cases}
-    remaining = {case['id']: repeats * 2 for case in cases}
+    remaining = {case['id']: repeats * lanes_per_round for case in cases}
     with H.SerialLock(ROOT/'.mlf-build'):
         for index,item in enumerate(schedule):
             if item['case'] in blocked:continue
@@ -175,7 +209,7 @@ def main():
                 raise RuntimeError(record['stop_reason'])
             case=by_id[item['case']];lane=item['lane']
             cell = (case['family'], case['size'])
-            if remaining[case['id']] == repeats * 2:
+            if remaining[case['id']] == repeats * lanes_per_round:
                 framework.start(ids, cell, args.pilot, endpoint=args.endpoint,
                                 oracle_inputs=case['inputs'], source_sha256=case['source_sha256'])
             leg=out/'legs'/f'{index:03d}-{case["id"]}-{lane}';leg.mkdir(parents=True)
@@ -191,7 +225,7 @@ def main():
                 r['command']=command;r['stages']=H.load(build/'stages.json')
                 H.require(r['stages']['complete'],'every compilation stage complete')
                 r['executable_sha256']=H.sha(build/'program')
-                if lane=='mlf':
+                if lane in ('mlf','reference'):
                     q=H.load(build/'unit.queries');H.require(q['inferred_groups']==len(q['groups'])>0
                         and q['reused_groups']==0 and all(g['cached'] is False for g in q['groups']),'fresh target groups only')
                     r['fresh']=q['inferred_groups'];r['reused']=0
@@ -226,11 +260,12 @@ def main():
                         if len(libraries)==1:
                             r['dependency_fresh_groups']=r['cold_dependencies'][0]['fresh_groups']
                             r['dependency_checked_sha256']=r['cold_dependencies'][0]['checked_sha256']
-                    if case['id'] in refs:
-                        old=refs[case['id']]
+                    key = (case['id'], lane)
+                    if key in refs:
+                        old=refs[key]
                         H.require(raw==old['raw'] and groups==old['groups'],'checked content and ordered groups stable')
-                    else:refs[case['id']]={'raw':raw,'groups':groups}
-                    r['raw_compared_with_first_mlf_leg']=sum(x['case']==case['id'] and x['lane']=='mlf' for x in record['runs'])>0
+                    else:refs[key]={'raw':raw,'groups':groups}
+                    r['raw_compared_with_first_mlf_leg']=sum(x['case']==case['id'] and x['lane']==lane for x in record['runs'])>0
                 else:
                     H.require((build/'Main.o').is_file() and (build/'Main.hi').is_file(),'fresh GHC target objects')
                     r['ghc_compile_log']=(build/'source-to-executable.stdout').read_text()
@@ -260,7 +295,7 @@ def main():
             if case['id'] in blocked or not remaining[case['id']]:
                 framework.result(ids, cell, 'fail' if case['id'] in blocked else 'pass',
                                  args.pilot, receipt=str(out/'receipt.json'),
-                                 legs_checked=repeats * 2 - remaining[case['id']],
+                                 legs_checked=repeats * lanes_per_round - remaining[case['id']],
                                  **({'detail': r['error'], 'lane': lane} if 'error' in r else {}))
         H.check_pins(inputs)
         H.require(H.authenticate(Path(setup['producer']),Path(setup.get('source',ROOT)))==auth,'ordinary producer unchanged')

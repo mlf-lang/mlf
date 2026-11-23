@@ -40,7 +40,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--plan',type=Path,required=True)
     parser.add_argument('--case',required=True)
-    parser.add_argument('--lane',choices=['ghc','mlf','module'],required=True)
+    parser.add_argument('--lane',choices=['ghc','mlf','reference','module'],required=True)
     parser.add_argument('--out',type=Path,required=True)
     args=parser.parse_args(); plan=json.loads(args.plan.read_text()); setup=plan['setup']
     case=next(c for c in plan['cases'] if c['id']==args.case)
@@ -70,8 +70,9 @@ def main():
             '-no-user-package-db','-hide-all-packages','-package','base','-package','mlf-shape-primitives',
             '-i',*includes,'-odir',out,'-hidir',out,case['source'],'-o',out/'program'])
     else:
-        emlf=Path(setup['producer'])/'bin/emlf'
-        if args.lane=='mlf':
+        producer = plan['compiler_reference']['producer'] if args.lane == 'reference' else setup['producer']
+        emlf=Path(producer)/'bin/emlf'
+        if args.lane in ('mlf', 'reference'):
             query=out/'queries'; query.mkdir()
             spec=out/'crate.spec'
             endpoint = plan.get('benchmark', {}).get('endpoint', {}).get('id', 'crate-bootstrap-v1')

@@ -142,7 +142,7 @@ jobs:
       - name: Check compiler shape benchmark contract
         if: matrix.suite == 'optimizer'
         run: python3 -B tools/dev.py check-tools
-      - name: Compile thirteen shapes at size 8 (GHC vs MLF, 52 timed builds)
+      - name: Compile thirteen shapes at size 8 against GHC and the Git baseline
         if: matrix.suite == 'optimizer'
         run: |
           python3 -B tools/testing/run.py compiler-shapes --report .mlf-build/test-framework/compiler-shapes-smoke.json -- all \
@@ -152,6 +152,7 @@ jobs:
             --family class_instances --family dependency_diamonds --family state_updates \
             --family captured_closures --family wide_product --family rank2_arguments \
             --family irregular_literal_table --family nested_poly_types --family rank2_callbacks --family decoder_pipeline
+          cat .mlf-build/compiler-shapes-smoke/results/pr-size-8/summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Check Int64 arithmetic and Patricia boundaries
         if: matrix.optimization == '2'
         run: |

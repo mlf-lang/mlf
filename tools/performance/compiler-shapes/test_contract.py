@@ -135,6 +135,87 @@ class BindingShapeTests(unittest.TestCase):
                                      sum(value * weight for value, weight in zip(values, reversed(fields))))
 
 
+class CompilerReferenceTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.repo = Path(directory.name)
+        self.git('init', '-q', '-b', 'main')
+        self.git('config', 'user.name', 'Compiler shape test')
+        self.git('config', 'user.email', 'test@example.invalid')
+        self.source = self.repo / 'source'
+        self.source.write_text('one')
+        self.git('add', 'source')
+        self.git('commit', '-qm', 'first')
+        self.first = self.git('rev-parse', 'HEAD')
+
+    def git(self, *args):
+        return subprocess.check_output(['git', '-C', self.repo, *args], text=True).strip()
+
+    def test_revision_follows_staged_unstaged_untracked_and_clean_states(self):
+        select = runner.compiler_reference.select_revision
+        self.assertIsNone(select(self.repo)['commit'])
+        self.source.write_text('two')
+        self.assertEqual(select(self.repo)['commit'], self.first)
+        self.git('add', 'source')
+        self.assertTrue(select(self.repo)['dirty'])
+        self.git('commit', '-qm', 'second')
+        second = self.git('rev-parse', 'HEAD')
+        self.assertEqual(select(self.repo), dict(candidate_commit=second, dirty=False,
+                                                commit=self.first, basis='HEAD vs first parent'))
+        generated = self.repo / 'benchmark-output'
+        generated.mkdir()
+        (generated / 'sample').touch()
+        self.assertEqual(select(self.repo, [generated])['commit'], self.first)
+        self.assertEqual(select(self.repo)['commit'], second)
+        self.git('add', 'benchmark-output/sample')
+        self.assertEqual(select(self.repo, [generated])['commit'], second)
+
+    def test_clean_merge_uses_first_parent(self):
+        self.git('switch', '-qc', 'feature')
+        (self.repo / 'feature').touch()
+        self.git('add', 'feature')
+        self.git('commit', '-qm', 'feature')
+        self.git('switch', '-q', 'main')
+        self.git('merge', '--no-ff', '-qm', 'merge', 'feature')
+        self.assertEqual(runner.compiler_reference.select_revision(self.repo)['commit'], self.first)
+
+    def test_reference_growth_keeps_both_controls_in_the_recorded_round(self):
+        sizes = [0, 8, 32, 64]
+        rows = []
+        samples = []
+        for size in sizes:
+            family = 'flat_functions' if size else 'baseline'
+            case = f'{family}-{size}'
+            rows.append(dict(family=family, size=size, case=case, mlf_peak_rss_bytes=100,
+                             reference_peak_rss_bytes=150, ghc_peak_rss_bytes=200,
+                             mlf_over_reference_peak_rss=2/3, mlf_over_ghc_peak_rss=.5))
+            paired = [dict(case=case, lane=lane, position=i) for i,lane in enumerate(runner.lanes_for(0,2))]
+            for leg in runner.with_reference(paired):
+                cost = {'mlf': 1, 'reference': 2, 'ghc': 3}[leg['lane']]
+                samples.append(dict(leg,order=len(samples),wall_seconds=cost*(size+1),
+                                    sampled_process_tree_peak_rss_bytes=cost*(size+1)*1024))
+        with mock.patch.object(runner.fit_growth, 'REPLICATES', 50):
+            for control in ('ghc', 'reference'):
+                report, = runner.fit_growth.family_reports(rows, samples, 2, control)
+                self.assertEqual(len(report['checks']), 9)
+                self.assertEqual(set(report['estimates']), {'mlf', control})
+                self.assertTrue(report['checks']['lower_ols_95'])
+                self.assertIn(control+'_mib_per_unit', report['peak_rss_growth'])
+
+    def test_pairs_share_one_candidate_and_keep_both_controls_adjacent(self):
+        original = [dict(case='x', lane=lane, position=i) for i,lane in enumerate(runner.lanes_for(0,2))]
+        triple = runner.with_reference(original)
+        self.assertEqual([r['lane'] for r in triple],
+                         ['ghc','mlf','reference','reference','mlf','ghc'])
+        samples = [dict(r, order=i, wall_seconds=i+1) for i,r in enumerate(triple)]
+        self.assertEqual(runner.fit_growth.paired_cell(samples,2), [(2,1),(5,6)])
+        self.assertEqual(runner.fit_growth.paired_cell(samples,2,reference='reference'), [(2,3),(5,4)])
+        samples[-1]['order'] += 1
+        with self.assertRaisesRegex(ValueError,'nonadjacent'):
+            runner.fit_growth.paired_cell(samples,2)
+
+
 class ScheduleTests(unittest.TestCase):
     def test_interleaving_visits_each_cell_once_per_round_and_keeps_pairs(self):
         cases = ['baseline', 'small', 'medium', 'large']
@@ -806,7 +887,7 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual(matrix['repeats'], 2)
         self.assertTrue(baseline)
         listing = subprocess.check_output([sys.executable, '-B', HERE / 'bench.py', 'list'], text=True)
-        self.assertIn('cells:    126, timed compilations: 504', listing)
+        self.assertIn('cells:    126, timed compilations: 756', listing)
         with tempfile.TemporaryDirectory() as directory:
             # Enumerate the whole public generator schedule without building 8,192-node sources.
             with mock.patch.object(generate, 'program', return_value='module Main where\n'):

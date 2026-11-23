@@ -3,8 +3,8 @@
 This benchmark compiles **the same generated shared-Haskell source bytes** with GHC
 and with GHC-hosted MLF, starting from fresh target outputs and ending at a native
 executable. The standard matrix covers 25 program shapes at sizes 8, 32, 128,
-1,024 and 8,192, plus one shared zero-size baseline. Two pairs per cell schedule
-504 native compilations. Each reported time is the median for one
+1,024 and 8,192, plus one shared zero-size baseline. Two rounds of three compilers per cell schedule
+756 native compilations. Each reported time is the median for one
 compiler, shape and size.
 
 It is **not** the C/MLF Benchmarks Game. The [native benchmark runner](../../bench/README.md)
@@ -105,11 +105,30 @@ python3 tools/dev.py bench shapes --workdir .mlf-build/selected-shapes \
 ```
 
 `--family` and `--size` each accept repeated values and replace their respective
-defaults. Each cell uses two pairs by default, with one MLF and one GHC build
-per pair. Set `--repeats` for a larger cohort. Add
+defaults. Each measured round builds with the candidate MLF, a committed MLF
+baseline and GHC. The candidate runs between the controls, reversing their
+order each round. Set `--repeats` for a larger cohort. Add
 `--prune-build-products` to a sweep to remove verified native executables and
 GHC target objects from successful cells after checking them. The receipts,
 sources and per-cell measurements remain available.
+
+### Committed compiler baseline
+
+The benchmark reads the Git state of the checkout that built the candidate.
+With staged, unstaged, or nonignored untracked changes, it compares the
+working tree to its current HEAD. With a clean checkout it compares HEAD to
+its first parent, including for merge commits. A clean initial commit can
+still run the GHC comparison. Shallow CI checkouts need at least two commits.
+The zero-size workload `baseline-0` supplies the intercept for both comparisons.
+
+Preparation builds the selected commit with the same GHC and optimization
+level and records the baseline compiler's SHA-256. The plan and summary
+record the selection rule and both Git SHAs. Each compiler builds the same
+generated sources, with fresh target and code-generation outputs. The
+`mlf_over_reference` column is below 1 when the candidate is faster than
+the committed compiler. A sweep fixes the baseline across its cells.
+The nine checks are reported against each control when enough sizes are
+available. Previously recorded two-compiler cohorts retain their GHC results.
 
 ### Build performance checks
 
@@ -176,7 +195,7 @@ python3 tools/dev.py bench shapes --workdir .mlf-build/fanout-growth \
 ```
 
 For a single cohort, `--interleave-pairs` spreads sizes across rounds and keeps
-the two compilers adjacent. To read just the checks from an existing cohort,
+the candidate adjacent to both controls. To read just the checks from an existing cohort,
 pass its directory and `--family` to `fit_growth.py`.
 
 ```sh
@@ -387,7 +406,7 @@ the index mapping or closure and must be re-measured, not retroactively filled i
   `recursive_ring`, `wide_case`, `class_instances`, `dependency_diamonds`,
   `state_updates`, `captured_closures`, `wide_product`, `rank2_arguments`,
   `irregular_literal_table`, `nested_poly_types`, `rank2_callbacks` and `decoder_pipeline`.
-  Two pairs per cell give 52 timed compilations in one cohort. CI
+  Two rounds per cell give 78 timed compilations in one cohort. CI
   uploads the available receipts and measurements even if a build fails.
 - The manual `.github/workflows/compiler-shapes.yml` workflow runs the standard
   sweep. Dispatch inputs can filter families and sizes or set the repeat count.
