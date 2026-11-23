@@ -42,7 +42,7 @@ module Bootstrap.Bitstream (
   Tables(..), Layout(..), Cursor(..), Read(..),
   Header(..), Parsed(..), CanonicalTask(..),
   planRootBounded, encodeRootBounded, decodeGraphRootBounded,
-  defaultLimits, maxBytes, maxSymbols, maxSymbolBytes, maxTotalSymbolBytes,
+  defaultLimits, indexedTextLimits, maxBytes, maxSymbols, maxSymbolBytes, maxTotalSymbolBytes,
   maxNodes, maxEdges, maxDepth, maxExpandedWork, validLimits, magic,
   hasMagicPrefix, hasMagic, matchMagic, entryKind, compareIds, compareEntry,
   charge, boundedLength, boundedLengthAt, scalar, scalarBytes, utf8Size,
@@ -60,7 +60,7 @@ module Bootstrap.Bitstream (
   collectRoots, decode, decodeChecked, decodeTables,
   Graph, GraphNode(..), decodeGraph, decodeGraphWithText, decodeGraphWithGate,
   firstShortTextMatches, graphRoots, graphNodeCount, lookupGraphNode,
-  ResourceStats, planMeasured, planGraph, GraphPlan, prepareGraphPlan, prepareGraphPlanWithAtoms, realizeGraphPlan, graphNodeDepth, graphResourceStats, graphExpandedWork,
+  ResourceStats, planMeasured, planGraph, GraphPlan, prepareGraphPlan, prepareGraphPlanWithAtoms, realizeGraphPlan, graphNodeDepth, graphResourceStats, graphExpandedWork, graphAdmittedWork,
   resourceBytes, resourceNodes, resourceEdges, resourceSymbols,
   resourceSymbolBytes, resourceDepth, resourceMaxSymbolBytes,
   resourceExpandedNodes, resourceExpandedTextBytes, resourceExpandedWork) where {
@@ -75,26 +75,51 @@ module Bootstrap.Bitstream (
   -- The schema above this layer owns constructor tags and field types. VBits
   -- is an arbitrary Int64 bit pattern, not a nonnegative numeric quantity.
   data Value = VInt Int | VBits Int | VText String | VNode Int ([] Value);
-  data Limits = Limits Int Int Int Int Int Int Int Int;
+  data Limits = Limits Int Int Int Int Int Int Int Int | IndexedText Limits;
   defaultLimits :: Limits;
   defaultLimits = Limits 268435456 1048576 16777216 134217728
     4194304 16777216 16384 67108864;
+  -- Typed graph readers retain text from the symbol table by index. Charge
+  -- physical UTF-8 bytes in that table and bound expanded node visits
+  -- independently. Generic expansion keeps charging text at each occurrence.
+  indexedTextLimits :: Limits;
+  indexedTextLimits = IndexedText defaultLimits;
+  indexesText :: Limits -> Bool;
+  indexesText (IndexedText _) = True;
+  indexesText _ = False;
+  expandedLimits :: Limits -> Limits;
+  expandedLimits (IndexedText limits) = expandedLimits limits;
+  expandedLimits limits = limits;
+  textOccurrenceWork :: Limits -> Int -> Int;
+  textOccurrenceWork (IndexedText _) _ = 0;
+  textOccurrenceWork _ bytes = bytes;
+  subtreeOccurrenceWork :: Limits -> Int -> Int -> Int;
+  subtreeOccurrenceWork (IndexedText _) nodes _ = nodes;
+  subtreeOccurrenceWork _ _ work = work;
   maxBytes :: Limits -> Int;
   maxBytes (Limits x _ _ _ _ _ _ _) = x;
+  maxBytes (IndexedText limits) = maxBytes limits;
   maxSymbols :: Limits -> Int;
   maxSymbols (Limits _ x _ _ _ _ _ _) = x;
+  maxSymbols (IndexedText limits) = maxSymbols limits;
   maxSymbolBytes :: Limits -> Int;
   maxSymbolBytes (Limits _ _ x _ _ _ _ _) = x;
+  maxSymbolBytes (IndexedText limits) = maxSymbolBytes limits;
   maxTotalSymbolBytes :: Limits -> Int;
   maxTotalSymbolBytes (Limits _ _ _ x _ _ _ _) = x;
+  maxTotalSymbolBytes (IndexedText limits) = maxTotalSymbolBytes limits;
   maxNodes :: Limits -> Int;
   maxNodes (Limits _ _ _ _ x _ _ _) = x;
+  maxNodes (IndexedText limits) = maxNodes limits;
   maxEdges :: Limits -> Int;
   maxEdges (Limits _ _ _ _ _ x _ _) = x;
+  maxEdges (IndexedText limits) = maxEdges limits;
   maxDepth :: Limits -> Int;
   maxDepth (Limits _ _ _ _ _ _ x _) = x;
+  maxDepth (IndexedText limits) = maxDepth limits;
   maxExpandedWork :: Limits -> Int;
   maxExpandedWork (Limits _ _ _ _ _ _ _ x) = x;
+  maxExpandedWork (IndexedText limits) = maxExpandedWork limits;
   validLimits :: Limits -> Bool;
   validLimits (Limits bytes symbols single total nodes edges depth work) =
     bytes >= 80 && bytes <= 2147483647 &&
@@ -103,6 +128,7 @@ module Bootstrap.Bitstream (
     nodes >= 0 && nodes <= 2147483647 &&
     edges >= 0 && edges <= 2147483647 &&
     depth >= 1 && depth <= 65536 && work >= 0 && work <= 2147483647;
+  validLimits (IndexedText limits) = validLimits limits;
   -- Aggregate root work is an explicit caller policy. Keep it in the
   -- same narrow nonnegative range as the existing codec work limit.
   validRootBudget :: Int -> Bool;
@@ -110,6 +136,7 @@ module Bootstrap.Bitstream (
   withExpandedWork :: Limits -> Int -> Limits;
   withExpandedWork (Limits bytes symbols single total nodes edges depth _) work =
     Limits bytes symbols single total nodes edges depth work;
+  withExpandedWork (IndexedText limits) work = IndexedText (withExpandedWork limits work);
   magic :: String;
   magic = "MLFBIN\r\n";
   hasMagicPrefix :: String -> Bool;
@@ -370,7 +397,7 @@ module Bootstrap.Bitstream (
     if stringLength text > maxSymbolBytes limits then Left "binary symbol byte limit exceeded"
     else case intern compareString text names of {
       Found ((,) bytes nodeId) -> do {
-        next <- charge limits bytes (PlanState (Symbols names symbols count total) nodes work);
+        next <- charge limits (textOccurrenceWork limits bytes) (PlanState (Symbols names symbols count total) nodes work);
         planId limits tasks stack nodeId next
       };
       Inserted following -> do {
@@ -383,7 +410,7 @@ module Bootstrap.Bitstream (
           nextSymbols = Symbols (following ((,) size nodeCount))
             ((:) (Symbol text size) symbols) nextCount nextTotal
         };
-        charged <- seq nextCount (seq nextTotal (charge limits size (PlanState nextSymbols nodes work)));
+        charged <- seq nextCount (seq nextTotal (charge limits (textOccurrenceWork limits size) (PlanState nextSymbols nodes work)));
         ensure (nodeCount < maxNodes limits) "binary node count limit exceeded";
         let { nextNodeCount = nodeCount + 1;
           nextNodes = pushNode keys (EText count) entries nextNodeCount edges saved pages };
@@ -634,8 +661,9 @@ module Bootstrap.Bitstream (
           Nothing -> remember;
           Just ((,) binding text) -> case IM.lookup binding names of {
             Nothing -> remember;
-            Just ((,,) expected bytes index) -> if bytes > available - 3 then ordinary rest else case text of {
-              VText hint -> if eqString expected hint then reuse (3 + bytes) index else remember;
+            Just ((,,) expected bytes index) -> let { textWork = textOccurrenceWork limits bytes } in
+              if textWork > available - 3 then ordinary rest else case text of {
+              VText hint -> if eqString expected hint then reuse (3 + textWork) index else remember;
               _ -> remember
             }
           }
@@ -644,8 +672,9 @@ module Bootstrap.Bitstream (
           VText text -> case named of {
             NamedAtoms _ table -> case M.lookup compareString text table of {
               Nothing -> remember;
-              Just ((,) bytes index) -> if bytes > available - 2 then ordinary rest
-                else if atomEmpty emptyTag second then reuse (2 + bytes) index else remember
+              Just ((,) bytes index) -> let { textWork = textOccurrenceWork limits bytes } in
+                if textWork > available - 2 then ordinary rest
+                else if atomEmpty emptyTag second then reuse (2 + textWork) index else remember
             };
             NoNamedAtoms -> ordinary rest
           };
@@ -659,14 +688,14 @@ module Bootstrap.Bitstream (
             VNode firstTag _ -> if firstTag /= tag then ordinary rest else let {
               record = ordinary ((:) (EncodeComposition children) rest)
             } in case cache of {
-              LastProof key height size cost identity last ->
+              LastProof key height size cost identity last -> let { proofWork = subtreeOccurrenceWork limits size cost } in
                 if height > maxDepth limits - depth + 1 || size > maxNodes limits - count ||
-                    size - 1 > maxEdges limits - edges || cost - 1 > available then ordinary rest
+                    size - 1 > maxEdges limits - edges || proofWork - 1 > available then ordinary rest
                 else if matchesProof tag inner bottom ctor emptyTag elim key children then let {
                   atoms = AtomIds nameTag namePair primitiveTag opcodeTag emptyTag primitive names named
                     (ProofAtoms tag inner bottom ctor elim (Just last) cache)
                 } in do {
-                  next <- charge limits (cost - 1) (PlanState symbols (Nodes keys entries count edges atoms pages) work);
+                  next <- charge limits (proofWork - 1) (PlanState symbols (Nodes keys entries count edges atoms pages) work);
                   planId limits rest stack identity next
                 } else record;
               _ -> record
@@ -679,9 +708,10 @@ module Bootstrap.Bitstream (
             Nothing -> compound inner bottom ctor elim cache first;
             Just ((,) name args) -> case previous of {
               Nothing -> remember;
-              Just ((,,) expected bytes index) -> if bytes > available - 6 then ordinary rest
+              Just ((,,) expected bytes index) -> let { textWork = textOccurrenceWork limits bytes } in
+                if textWork > available - 6 then ordinary rest
                 else if not (eqString expected name) then remember
-                else if atomEmpty emptyTag args && atomEmpty elim end then reuse (6 + bytes) index
+                else if atomEmpty emptyTag args && atomEmpty elim end then reuse (6 + textWork) index
                 else ordinary rest
             }
           };
@@ -783,10 +813,10 @@ module Bootstrap.Bitstream (
                     };
                     _ -> False
                   }
-                } in if bytes > 8192 then Nothing else Just (WireHead 3 4 (4 + bytes) (root nameTag check))
+                } in if bytes > 8192 then Nothing else Just (WireHead 3 4 (4 + textOccurrenceWork limits bytes) (root nameTag check))
               }) Nothing names;
               build level ordinal = if level == 0 then Nothing else if ordinal == proofId then
-                (if cost > 8192 then Nothing else Just (WireHead height size cost
+                (if cost > 8192 then Nothing else Just (WireHead height size (subtreeOccurrenceWork limits size cost)
                   (root t (matchesProof t i b c empty e key))))
                 else case plannedEntry ordinal count entries pages of {
                   ENode tag fields -> if tag == nameTag then lookupName ordinal else
@@ -1673,11 +1703,11 @@ module Bootstrap.Bitstream (
   realizeGraphPlan (GraphPlan limits tables) = graphFromPlan limits tables;
   graphNodeDepth :: Graph -> Int -> Either String Int;
   graphNodeDepth graph index = case graph of {
-    Graph nodes _ -> case IM.lookup index nodes of {
+    Graph _ nodes _ -> case IM.lookup index nodes of {
       Nothing -> Left "binary graph node index out of range";
       Just parsed -> Right (parsedDepth parsed)
     };
-    DenseGraph nodes _ _ -> case denseLookup nodes index of {
+    DenseGraph _ nodes _ _ -> case denseLookup nodes index of {
       Nothing -> Left "binary graph node index out of range";
       Just (DenseInput _ depth _ _) -> Right depth
     }
@@ -1691,7 +1721,7 @@ module Bootstrap.Bitstream (
     let { table = IM.fromDistinctAscList (zip (range 0 (symbolCount - 1)) symbols) };
     nodes <- materializeEntries limits table entries 0 IM.empty;
     graphPlanRoots limits nodes rootCount roots 0 0;
-    Right (Graph nodes roots)
+    Right (Graph (indexesText limits) nodes roots)
   };
   materializeEntries limits symbols entries index nodes = case entries of {
     [] -> Right nodes;
@@ -1774,8 +1804,8 @@ module Bootstrap.Bitstream (
       }
     }
   };
-  measureGraphNodes :: IntMap Parsed -> Int -> Int -> Int -> ResourceState -> Either String ResourceState;
-  measureGraphNodes nodes count nodeWidth index state =
+  measureGraphNodes :: Bool -> IntMap Parsed -> Int -> Int -> Int -> ResourceState -> Either String ResourceState;
+  measureGraphNodes indexed nodes count nodeWidth index state =
     if index == count then Right state else case state of {
       ResourceState memo edges symbols symbolBytes largest symbolLength nodeBits depth ->
         case IM.lookup index nodes of {
@@ -1785,7 +1815,8 @@ module Bootstrap.Bitstream (
             case measurement of {
               NodeMeasurement expandedNodes expandedText arity texts bytes wireBytes bits -> do {
                 work <- measuredAdd expandedNodes expandedText;
-                ensure (work == parsedWork parsed) "binary resource expanded-work mismatch";
+                ensure ((if indexed then expandedNodes else work) == parsedWork parsed)
+                  "binary resource expanded-work mismatch";
                 nextEdges <- measuredAdd edges arity;
                 nextSymbols <- measuredAdd symbols texts;
                 nextSymbolBytes <- measuredAdd symbolBytes bytes;
@@ -1796,7 +1827,7 @@ module Bootstrap.Bitstream (
                       nextDepth = max depth (parsedDepth parsed);
                       nextMemo = IM.insert index (NodeResources expandedNodes expandedText) memo };
                 seq nextLargest (seq nextDepth (seq nextMemo
-                  (measureGraphNodes nodes count nodeWidth nextIndex
+                  (measureGraphNodes indexed nodes count nodeWidth nextIndex
                     (ResourceState nextMemo nextEdges nextSymbols nextSymbolBytes nextLargest
                       nextSymbolLength nextNodeBits nextDepth))))
               }
@@ -1804,21 +1835,22 @@ module Bootstrap.Bitstream (
           }
         }
     };
-  -- Both graph constructors are private and contain summaries checked by
-  -- the planner or wire decoder. A consumer needing only total expanded work
-  -- can sum root summaries without rebuilding the complete resource report.
-  -- Repeated roots are charged repeatedly, including shared descendants.
+  -- The accepted graph's budget can be read from its root summaries.
+  -- A full resource report still measures text for every occurrence.
+  graphAdmittedWork :: Graph -> Either String Int;
+  graphAdmittedWork graph = graphRootWork graph (graphRoots graph) 0;
   graphExpandedWork :: Graph -> Either String Int;
-  graphExpandedWork graph = graphRootWork graph (graphRoots graph) 0;
+  graphExpandedWork graph = if graphIndexesText graph
+    then mapEither resourceExpandedWork (graphResourceStats graph) else graphAdmittedWork graph;
   graphRootWork graph roots total = case roots of {
     [] -> Right total;
     (:) index rest -> do {
       work <- case graph of {
-        Graph nodes _ -> case IM.lookup index nodes of {
+        Graph _ nodes _ -> case IM.lookup index nodes of {
           Nothing -> Left "binary resource root has no node";
           Just parsed -> Right (parsedWork parsed)
         };
-        DenseGraph nodes _ _ -> case denseLookup nodes index of {
+        DenseGraph _ nodes _ _ -> case denseLookup nodes index of {
           Nothing -> Left "binary resource root has no node";
           Just (DenseInput _ _ used _) -> Right used
         }
@@ -1828,11 +1860,11 @@ module Bootstrap.Bitstream (
     }
   };
   graphResourceStats :: Graph -> Either String ResourceStats;
-  graphResourceStats graph = graphResourceStatsFrom (graphMap graph) (graphRoots graph);
-  graphResourceStatsFrom :: IntMap Parsed -> [] Int -> Either String ResourceStats;
-  graphResourceStatsFrom nodes roots = do {
+  graphResourceStats graph = graphResourceStatsFrom (graphIndexesText graph) (graphMap graph) (graphRoots graph);
+  graphResourceStatsFrom :: Bool -> IntMap Parsed -> [] Int -> Either String ResourceStats;
+  graphResourceStatsFrom indexed nodes roots = do {
     let { count = IM.size nodes; nodeWidth = referenceWidth count };
-    measured <- measureGraphNodes nodes count nodeWidth 0
+    measured <- measureGraphNodes indexed nodes count nodeWidth 0
       (ResourceState IM.empty 0 0 0 0 0 0 0);
     case measured of {
       ResourceState memo edges symbols symbolBytes largest symbolLength nodeBits depth -> do {
@@ -1864,27 +1896,30 @@ module Bootstrap.Bitstream (
   -- expected shape and these canonical node IDs, preserving actual sharing
   -- instead of repeatedly reconstructing a shared subtree through Value.
   data DecodeId = DecodeId;
-  data Graph = Graph (IntMap Parsed) ([] Int) | DenseGraph (V.IndexVec DecodeId DenseInput) ([] Int) (V.IndexVec DecodeId Parsed);
+  data Graph = Graph Bool (IntMap Parsed) ([] Int) |
+    DenseGraph Bool (V.IndexVec DecodeId DenseInput) ([] Int) (V.IndexVec DecodeId Parsed);
+  graphIndexesText :: Graph -> Bool;
+  graphIndexesText graph = case graph of { Graph indexed _ _ -> indexed; DenseGraph indexed _ _ _ -> indexed };
   data GraphNode = GInt Int | GBits Int | GText String | GNode Int ([] Int);
   graphRoots :: Graph -> [] Int;
-  graphRoots graph = case graph of { Graph _ roots -> roots; DenseGraph _ roots _ -> roots };
+  graphRoots graph = case graph of { Graph _ _ roots -> roots; DenseGraph _ _ roots _ -> roots };
   graphNodeCount :: Graph -> Int;
-  graphNodeCount graph = case graph of { Graph nodes _ -> IM.size nodes; DenseGraph nodes _ _ -> V.count nodes };
+  graphNodeCount graph = case graph of { Graph _ nodes _ -> IM.size nodes; DenseGraph _ nodes _ _ -> V.count nodes };
   graphMap :: Graph -> IntMap Parsed;
   graphMap graph = case graph of {
-    Graph nodes _ -> nodes;
-    DenseGraph _ _ nodes -> IM.fromDistinctAscList (zip (range 0 (V.count nodes - 1)) (V.toList nodes))
+    Graph _ nodes _ -> nodes;
+    DenseGraph _ _ _ nodes -> IM.fromDistinctAscList (zip (range 0 (V.count nodes - 1)) (V.toList nodes))
   };
   denseLookup :: forall a. V.IndexVec DecodeId a -> Int -> Maybe a;
   denseLookup nodes index =
     if index < 0 || index >= V.count nodes then Nothing else Just (V.at nodes (V.fromInt index));
   graphParsed :: Graph -> Int -> Maybe Parsed;
   graphParsed graph index = case graph of {
-    Graph nodes _ -> IM.lookup index nodes; DenseGraph _ _ nodes -> denseLookup nodes index
+    Graph _ nodes _ -> IM.lookup index nodes; DenseGraph _ _ _ nodes -> denseLookup nodes index
   };
   lookupGraphNode :: Graph -> Int -> Either String GraphNode;
   lookupGraphNode graph index = case graph of {
-    Graph _ _ -> case graphParsed graph index of {
+    Graph _ _ _ -> case graphParsed graph index of {
       Nothing -> Left "binary graph node index out of range";
       Just (Parsed entry value _ _) -> case entry of {
         EInt integer -> Right (GInt integer);
@@ -1896,7 +1931,7 @@ module Bootstrap.Bitstream (
         }
       }
     };
-    DenseGraph nodes _ _ -> case denseLookup nodes index of {
+    DenseGraph _ nodes _ _ -> case denseLookup nodes index of {
       Nothing -> Left "binary graph node index out of range";
       Just (DenseInput entry _ _ text) -> case entry of {
         EInt integer -> Right (GInt integer);
@@ -1973,9 +2008,9 @@ module Bootstrap.Bitstream (
       else Right (Parsed entry (VBits bits) 1 1);
     EText index -> case IM.lookup index symbols of {
       Nothing -> Left "binary symbol reference has no symbol";
-      Just (Symbol text size) -> if size >= maxExpandedWork limits
-        then Left "binary expanded-work limit exceeded"
-        else Right (Parsed entry (VText text) 1 (1 + size))
+      Just (Symbol text size) -> let { textWork = textOccurrenceWork limits size } in
+        if textWork >= maxExpandedWork limits then Left "binary expanded-work limit exceeded"
+        else Right (Parsed entry (VText text) 1 (1 + textWork))
     };
     ENode tag children -> do {
       ensure (maxExpandedWork limits >= 1) "binary expanded-work limit exceeded";
@@ -2071,7 +2106,7 @@ module Bootstrap.Bitstream (
     (\error -> ioReturn (Left ("binary decode IO failure: " ++ textFromChars (ioeGetErrorString error))));
   decodeChecked :: Limits -> Int -> ByteArray -> IO (Either String ([] Value));
   decodeChecked limits schema bytes = do {
-    graph <- decodeGraphChecked [] limits schema bytes;
+    graph <- decodeGraphChecked [] (expandedLimits limits) schema bytes;
     ioReturn (bindEither graph (\value -> collectGraphRoots value (graphRoots value) []))
   };
   decodeGraph :: Limits -> Int -> ByteArray -> IO (Either String Graph);
@@ -2145,7 +2180,8 @@ module Bootstrap.Bitstream (
   -- This low-level compatibility API accepts caller-supplied Layout values.
   -- Keep its historical incremental checks and allocation behavior.
   decodeTables limits bytes geometry = do {
-    graph <- decodeGraphTablesUsing decodeNodesAndRoots [] limits (maxExpandedWork limits) bytes geometry;
+    let { ordinary = expandedLimits limits };
+    graph <- decodeGraphTablesUsing decodeNodesAndRoots [] ordinary (maxExpandedWork ordinary) bytes geometry;
     ioReturn (bindEither graph (\value -> collectGraphRoots value (graphRoots value) []))
   };
   decodeGraphTables :: [] String -> Limits -> Int -> ByteArray -> Layout -> IO (Either String Graph);
@@ -2174,7 +2210,7 @@ module Bootstrap.Bitstream (
             Left message -> ioReturn (Left message);
             Right roots -> ioReturn (do {
               canonicalGraph nodes nodeCount roots;
-              Right (Graph nodes roots)
+              Right (Graph (indexesText limits) nodes roots)
             })
           }
         }
@@ -2210,8 +2246,9 @@ module Bootstrap.Bitstream (
       EBits _ -> if maxExpandedWork limits < 1 then stReturn (Left "binary expanded-work limit exceeded") else write 1 1 "";
       EText symbol -> case IM.lookup symbol symbols of {
         Nothing -> stReturn (Left "binary symbol reference has no symbol");
-        Just (Symbol text size) -> if size >= maxExpandedWork limits
-          then stReturn (Left "binary expanded-work limit exceeded") else write 1 (1 + size) text
+        Just (Symbol text size) -> let { textWork = textOccurrenceWork limits size } in
+          if textWork >= maxExpandedWork limits then stReturn (Left "binary expanded-work limit exceeded")
+          else write 1 (1 + textWork) text
       };
       ENode _ children -> if maxExpandedWork limits < 1 then stReturn (Left "binary expanded-work limit exceeded")
         else stBind (denseChildrenMeta limits nodes children 1 1) (\measured -> case measured of {
@@ -2322,7 +2359,7 @@ module Bootstrap.Bitstream (
             Left message -> ioReturn (Left message);
             Right roots -> ioReturn (do {
               canonicalDense inputs roots;
-              Right (DenseGraph inputs roots nodes)
+              Right (DenseGraph (indexesText limits) inputs roots nodes)
             })
           }
         }

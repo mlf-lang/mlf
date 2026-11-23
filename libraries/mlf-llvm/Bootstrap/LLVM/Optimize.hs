@@ -2232,6 +2232,82 @@ module Bootstrap.LLVM.Optimize where {
       specialized <- specializeHigherOrder simple;
       iterate specialized
     };
+  -- The checked optimizer has assigned distinct identities to all binders.
+  -- In a wide mutually recursive group, keep one formal for positions that
+  -- receive the same variable at every entry and stay equal on every peer call.
+  compactRecursiveArguments :: XErased -> XErased;
+  compactRecursiveArguments expression = case expression of {
+    XELet n rhs rest -> XELet n rhs (compactRecursiveArguments rest);
+    XELetRec bindings rest -> let {
+      following = compactRecursiveArguments rest;
+      original = XELetRec bindings following;
+      members = L.map (\((,) n rhs) -> (,) n (lambdas rhs)) bindings
+    } in case members of {
+      (:) ((,) _ ((,) first _)) ((:) _ _) -> let {
+        width = L.foldlStrict (\w entry -> L.min w (L.length (L.fst (L.snd entry))))
+          (L.length first) members
+      } in if width < 16 then original else compactGroupArguments members width following original;
+      _ -> original
+    };
+    _ -> expression
+  };
+  -- Include partial applications and bare escapes. The shortest use bounds
+  -- the prefix whose evaluation and calling convention can change together.
+  recursiveArgumentUses targets params term tail = case applications term of {
+    (,) (XEVar n) args -> let { following = L.foldr (recursiveArgumentUses targets params) tail args } in
+      if S.member compareName n targets then (:) ((,) params args) following else following;
+    (,) head [] -> L.foldr (recursiveArgumentUses targets params) tail (subterms head);
+    (,) head args -> recursiveArgumentUses targets params head (L.foldr (recursiveArgumentUses targets params) tail args)
+  };
+  -- Intersect the current partition with the equality observed at one site.
+  -- Only variable identity and the caller's proven formal classes can equate
+  -- positions. Two arbitrary expressions always get distinct keys.
+  refineArgumentClasses positions classes current ((,) params args) = let {
+    formals = M.fromList compareName (L.zip params classes);
+    token pos arg = case arg of {
+      XEVar n -> case M.lookup compareName n formals of {
+        Just representative -> (,) 0 representative;
+        Nothing -> (,) 1 (nameId n)
+      };
+      _ -> (,) 2 pos
+    };
+    order = L.comparePair L.compareInt (L.comparePair L.compareInt L.compareInt);
+    step ((,) seen reversed) ((,) pos ((,) old arg)) = let { key = (,) old (token pos arg) } in
+      case M.lookup order key seen of {
+        Just representative -> (,) seen ((:) representative reversed);
+        Nothing -> (,) (M.insert order key pos seen) ((:) pos reversed)
+      }
+  } in L.reverse (L.snd (L.foldlStrict step ((,) M.empty []) (L.zip positions (L.zip current args))));
+  compactGroupArguments members arity rest original = let {
+    targets = S.fromList compareName (L.map L.fst members);
+    external = recursiveArgumentUses targets [] rest [];
+    calls = L.foldr (\((,) _ ((,) params body)) tail -> recursiveArgumentUses targets params body tail) external members;
+    width = L.foldlStrict (\n call -> L.min n (L.length (L.snd call))) arity calls;
+    positions = L.range 0 (width - 1);
+    stable classes = let { next = L.foldlStrict (refineArgumentClasses positions classes) classes calls } in
+      if L.eqList eqInt next classes then classes else stable next;
+    classes = stable (L.replicate width 0);
+    keep = L.zipWith eqInt positions classes;
+    select xs = L.append (L.map L.snd (L.filter L.fst (L.zip keep xs))) (L.drop width xs);
+    rewrite aliases t = case applications t of {
+      (,) (XEVar n) args -> do {
+        actuals <- traverseFresh (rewrite aliases) (if S.member compareName n targets then select args else args);
+        freshPure (L.foldl XEApp (XEVar (M.findWithDefault compareName n n aliases)) actuals)
+      };
+      (,) head [] -> children (rewrite aliases) head;
+      (,) head args -> do {
+        f <- rewrite aliases head;
+        actuals <- traverseFresh (rewrite aliases) args;
+        freshPure (L.foldl XEApp f actuals)
+      }
+    };
+    member ((,) n ((,) args body)) = let {
+      formals = M.fromList L.compareInt (L.zip positions args);
+      aliases = M.fromList compareName (L.zip args (L.map (\rep -> M.get L.compareInt rep formals) classes));
+      result = L.fst (runFresh (rewrite aliases body) 0)
+    } in (,) n (L.foldr XEAbs result (select args))
+  } in if L.null external || width < 2 || L.all (\v -> v) keep then original else
+    XELetRec (L.map member members) (L.fst (runFresh (rewrite M.empty rest) 0));
   -- Specialize a private recursive worker entered by one saturated call.
   -- A static function argument stays fixed when every recursive call passes
   -- the formal itself or the same primitive. Any partial application, escape,
@@ -2670,7 +2746,7 @@ module Bootstrap.LLVM.Optimize where {
   -- This extra algebraic pass is for finite checked programs. Its rewrites
   -- introduce no binders and preserve evaluation of the single input value.
   optimizeChecked expression = optimizeAfterFields (foldScopedFields M.empty expression);
-  optimizeCheckedTerm term = optimizeAfterFields (eraseScopedFields M.empty term);
+  optimizeCheckedTerm term = compactRecursiveArguments (optimizeAfterFields (eraseScopedFields M.empty term));
   optimizeAfterFields expression = optimizeOwnedWith (optimizeLetSharing True (checkedIdentities M.empty))
     (simplifyIterations M.empty (simplifyTranslations M.empty expression));
   -- A translation evaluates its one Int input once and adds a constant in

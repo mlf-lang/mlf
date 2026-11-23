@@ -2257,6 +2257,97 @@ module Bootstrap.InferenceUnit where {
     result <- monomorphicCheck globals names serial ty body;
     Right ((,,) (fst result) ty (snd result))
   };
+  -- Factor nested rank-one applications when each inner call duplicates its
+  -- argument type and each outer call projects that type back. Every call
+  -- remains in order. Local polymorphic helpers check each pair at a fresh
+  -- type, so its proof can be shared across larger enclosing argument types.
+  factorUnaryMember parameters original@((,) owner ((,,) name annotation rhs)) = let {
+    strip term = case term of {
+      SCallSite _ _ body -> strip body;
+      SSourceDefinition body -> strip body;
+      _ -> term
+    };
+    global term = case strip term of {
+      SGlobal slot _ -> Just (V.toInt slot);
+      _ -> Nothing
+    };
+    collect term calls = case term of {
+      SApp f a -> case global f of {
+        Just i -> collect a ((:) ((,) i f) calls);
+        Nothing -> Nothing
+      };
+      leaf -> Just ((,) calls leaf)
+    };
+    scheme slot = mapOptional (\((,,) _ _ ty) -> ty)
+      (find (\((,,) i _ _) -> V.toInt i == slot) parameters);
+    argument v ty = case ty of { XVar w -> T.equalTyVar v w; _ -> False };
+    accepts tag width vars ty = case ty of {
+      XForall v XBot body -> accepts tag width ((:) v vars) body;
+      XArrow (XCon other fields) (XVar result) ->
+        eqString tag other && length fields == width && length vars == width &&
+        S.size (S.fromList T.compareTyVar vars) == width &&
+        and (zipWith argument (reverse vars) fields) && elem T.equalTyVar result vars;
+      _ -> False
+    };
+    paired inner outer = case (,) (scheme inner) (scheme outer) of {
+      (,) (Just (XForall v XBot (XArrow (XVar arg) (XCon tag fields)))) (Just consume) ->
+        T.equalTyVar arg v && length fields >= 2 && all (argument v) fields &&
+        accepts tag (length fields) [] consume;
+      _ -> False
+    };
+    build source calls leaf = let {
+      half = length calls / 2;
+      parts = splitAt half calls;
+      inner = fst parts; outer = snd parts;
+      -- All operators here are resolved globals. Pick a spelling distinct
+      -- from the source argument for the innermost generated reference.
+      local = case strip leaf of { SVar n -> n; _ -> source };
+      prefix = local ++ "$unary";
+      parameter = prefix ++ "Arg";
+      helper i = prefix ++ showInt i;
+      -- Ten nested binary applications already contain 1,024 type leaves.
+      -- Balance the sections and keep the last one inline; each local scheme
+      -- then bounds type growth without producing a lambda per source call.
+      sections = (half + 9) / 10;
+      width = (half + sections - 1) / sections;
+      go i previous rows = let {
+        block = splitAt width rows;
+        applySection base = let {
+          input = foldr (\row arg -> SApp (snd (fst row)) arg) base (fst block);
+          middle = case previous of { Just ref -> SApp ref input; Nothing -> input }
+        } in foldlStrict (\arg row -> SApp (snd (snd row)) arg) middle (fst block)
+      } in case snd block of {
+        [] -> applySection leaf;
+        rest -> let { next = helper i } in SLet next (SLam parameter Nothing (applySection (SVar parameter)))
+          (go (i + 1) (Just (SVar next)) rest)
+      }
+    } in case (,) inner outer of {
+      (,) ((:) f _) ((:) g _) -> if half > 10 && length outer == half &&
+        all (\row -> fst row == fst f) inner && all (\row -> fst row == fst g) outer &&
+        paired (fst f) (fst g) then Just (go 0 Nothing (zip (reverse inner) outer)) else Nothing;
+      _ -> Nothing
+    };
+    lambda slot hint body = do {
+      (,) calls leaf <- collect body [];
+      let { bound = case strip leaf of {
+        SVar n -> eqString n hint;
+        SGlobal i _ -> case slot of { Just j -> V.toInt i == V.toInt j; Nothing -> False };
+        _ -> False
+      } };
+      if bound then build hint calls leaf else Nothing
+    };
+    visit term = case term of {
+      SSourceDefinition body -> mapOptional SSourceDefinition (visit body);
+      SCallSite label span body -> mapOptional (SCallSite label span) (visit body);
+      SDeclScope [slot] (SLam hint Nothing body) ->
+        mapOptional (\next -> SDeclScope [slot] (SLam hint Nothing next)) (lambda (Just slot) hint body);
+      SLam hint Nothing body -> mapOptional (SLam hint Nothing) (lambda Nothing hint body);
+      _ -> Nothing
+    }
+  } in case visit rhs of {
+    Just body -> (,) owner ((,,) name annotation body);
+    Nothing -> original
+  };
   prepareIndexedGroup = prepareIndexedGroupWith Surface.bindIndexedMembers;
   prepareIndexedGroupWith = prepareIndexedGroupIn Nothing;
   prepareIndexedGroupIn known bindMembers parameters datatypes members = do {
@@ -2268,7 +2359,7 @@ module Bootstrap.InferenceUnit where {
     ensure (length externalIds == IS.size (IS.fromList externalIds)) "duplicate inference parameter slot";
     ensure (not (any (\((,) i _) -> elem eqInt (V.toInt i) externalIds) members))
       "inference group also imports its own binding";
-    body <- bindMembers members (SConstructor "()");
+    body <- bindMembers (map (factorUnaryMember parameters) members) (SConstructor "()");
     let { externals = M.map (Separate.sourceSchemeIn M.empty False) externalTypes };
     let { lower program = case known of {
       Nothing -> Surface.lowerSurface program;

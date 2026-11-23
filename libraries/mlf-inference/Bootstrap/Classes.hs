@@ -2354,9 +2354,20 @@ module Bootstrap.Classes where {
   markFileRecursiveEvidence plan expected (QualifiedExpr _ expression) lowered = let {
     sameId a b = V.toInt a == V.toInt b;
     ownerSet = I.fromList (map V.toInt expected);
-    describe definition = case definition of {
+    -- A peer applied to fewer literal operands than its source lambdas is
+    -- still a function. Its definition forwards the planner's same slots.
+    arity (QualifiedExpr _ (QualifiedLambda (LexicalRef _) Nothing body)) = 1 + arity body;
+    arity _ = 0;
+    memberArity ((,) slot (QualifiedDefinition _ _ _ rhs)) = (,) (V.toInt slot) (arity rhs);
+    partial functions count (QualifiedExpr _ form) = case form of {
+      QualifiedApply function (QualifiedExpr _ (QualifiedPlain (SBoolLit _))) -> partial functions (count + 1) function;
+      QualifiedApply function (QualifiedExpr _ (QualifiedPlain (SIntLit _))) -> partial functions (count + 1) function;
+      QualifiedVariable (DeclRef slot _) _ Nothing -> count > 0 && IM.findWithDefault 0 (V.toInt slot) functions > count;
+      _ -> False
+    };
+    describe functions definition = case definition of {
       QualifiedDefinition _ InferRecursive (Just ((,) frame source)) rhs ->
-        if not (qualifiedWorkerLambda rhs) then Right Nothing else do {
+        if not (qualifiedWorkerLambda rhs || partial functions 0 rhs) then Right Nothing else do {
           slots <- Q.slotsAt plan source;
           bound <- Q.slotsAt plan (qualifiedNode rhs);
           ownership <- traverseEither (Q.slotOwner plan) slots;
@@ -2375,7 +2386,8 @@ module Bootstrap.Classes where {
       if length expected /= length owners || not (I.eqIntSet ownerSet (I.fromList (map V.toInt owners)) &&
         eqList sameId owners slots) || length owners /= length definitions || length definitions /= length values
       then Right lowered else do {
-        rows <- traverseEither describe definitions;
+        let { functions = IM.fromList (map memberArity (zip owners definitions)) };
+        rows <- traverseEither (describe functions) definitions;
         case mapM (\entry -> entry) rows of {
           Just rows@((:) ((,) first _) _) -> if not (all (\entry -> fst entry == first) rows)
             then Right lowered else do {

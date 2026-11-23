@@ -2309,6 +2309,39 @@ lambdaCaptureChecks = do
   check "deep lambda captures only the external name" [99999]
     (case chain of T.XEAbs n b -> ids (Analysis.lambdaNeeded M.empty table n b); _ -> [])
 
+recursiveArgumentChecks = do
+  env <- case Data.validateDeclarations [] of
+    T.Right ok -> pure ok
+    T.Left why -> fail (H.unpack why)
+  let name i = T.XName i "same"
+      var = T.XEVar . name
+      call = foldl T.XEApp
+      choose a b = call (T.XEPrimitive T.PIfThenElse) [T.XEBool True,a,b]
+      first = [10..25]
+      second = [30..45]
+      binding f args body = (name f,foldr (T.XEAbs . name) body args)
+      group passed enter =
+        T.XELetRec [binding 1 first (call (var 2) passed),
+                    binding 2 second (choose (call (T.XEPrimitive T.PSubInt) [var 45,var 30])
+                                             (call (var 1) (map var second)))] enter
+      external = call (var 1) (replicate 16 (var 3))
+      run t = Runtime.integer (Runtime.evaluate env (Runtime.REnv M.empty)
+                    (T.XELet (name 3) (T.XEInt 7) (T.XELet (name 4) (T.XEInt 11) t)))
+      widths (T.XELetRec bindings _) = map (length . fst . Optimize.lambdas . snd) bindings
+      widths _ = []
+  forM_ [(map var first,external,1,0),
+         (map var (init first) ++ [var 4],external,2,4),
+         (map var first,choose external (call (var 2) (replicate 15 (var 3) ++ [var 4])),2,0),
+         (map var first,T.XELet (name 5) (var 2) external,16,0),
+         (map var first,T.XELet (name 5) (call (var 2) [var 3]) external,16,0)] $
+    \(passed,entry,width,expected) -> do
+      let original = group passed entry
+          optimized = Optimize.compactRecursiveArguments original
+      check "recursive arguments respect partial uses and every incoming edge" [width,width] (widths optimized)
+      forM_ [original,optimized] $ \term -> case run term of
+        T.Right value -> check "recursive argument forwarding preserves both values" expected value
+        T.Left why -> fail (H.unpack why)
+
 -- Both arms call the previous layer with their own lambda parameters.
 -- Duplicating that captured function at each use unfolds a linear graph into
 -- a binary tree even when the program takes only one path at run time.
@@ -3359,6 +3392,39 @@ applicationPatternChecks = do
   tooSmall <- encoded (W.encodeRootsWithAtoms Structure.termAtomShapes W.defaultLimits 29 8 testRoots)
   check "repeated atoms and root references consume exact expanded work"
     (Left "binary expanded-work limit exceeded") tooSmall
+  let indexedLimits = W.IndexedText (W.Limits 1024 8 32 64 12 12 8 5)
+      shortIndexedLimits = W.IndexedText (W.Limits 1024 8 32 64 12 12 8 4)
+      smallSymbolLimits = W.IndexedText (W.Limits 1024 8 5 64 12 12 8 5)
+      indexedLeaf = W.VNode 1 [W.VText "shared name"]
+      indexedRoot = W.VNode 2 [indexedLeaf, indexedLeaf]
+  indexed <- W.encode indexedLimits 8 [indexedRoot]
+  case indexed of
+    T.Left why -> fail (H.unpack why)
+    T.Right bytes -> do
+      ordinary <- encoded (W.encode W.defaultLimits 8 [indexedRoot])
+      actual <- encoded (pure (T.Right bytes))
+      check "indexed text preserves the canonical wire bytes" ordinary actual
+      graph <- W.decodeGraph indexedLimits 8 bytes
+      opened <- case graph of
+        T.Left why -> fail (H.unpack why)
+        T.Right value -> pure value
+      case W.graphRoots opened of
+        [root] -> case W.lookupGraphNode opened root of
+          T.Right (W.GNode 2 [a, b]) -> check "indexed text retains one child index" a b
+          _ -> fail "invalid indexed text test node"
+        _ -> fail "invalid indexed text test roots"
+      let work answer = case answer of
+            T.Left why -> Left (H.unpack why)
+            T.Right value -> Right value
+      check "indexed text admits by node visits" (Right 5) (work (W.graphAdmittedWork opened))
+      check "expanded statistics still cover repeated text" (Right 27) (work (W.graphExpandedWork opened))
+      expanded <- W.decode indexedLimits 8 bytes
+      check "generic expansion charges text per occurrence" (Left "binary expanded-work limit exceeded")
+        (case expanded of T.Left why -> Left (H.unpack why); T.Right _ -> Right ())
+  rejectedNodes <- encoded (W.encode shortIndexedLimits 8 [indexedRoot])
+  check "indexed text still bounds expanded node visits" (Left "binary expanded-work limit exceeded") rejectedNodes
+  rejectedText <- encoded (W.encode smallSymbolLimits 8 [indexedRoot])
+  check "indexed text still bounds physical symbol bytes" (Left "binary symbol byte limit exceeded") rejectedText
   let underDepth = W.Limits 1024 8 32 64 12 12 1 8
       underWork = W.Limits 1024 8 32 64 12 12 8 3
       defer = error "forced a field after its limiting failure"
@@ -3968,6 +4034,7 @@ preparedPrefixControls = do
      encode (T.SCallSite "arg" (T.SourceSpan "source" "Projection" "Projection.hs" 2 1 2 21) left))
 
 main = do
+  recursiveArgumentChecks
   preparedPrefixControls
   checkedProjectionSpines
   fileImportPrefixChecks

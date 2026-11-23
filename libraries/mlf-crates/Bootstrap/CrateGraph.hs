@@ -214,12 +214,12 @@ module Bootstrap.CrateGraph where {
   -- ordinary body may belong to a valid pre-spine generation.
   checkedRawHash expected info declarations references group fragment = let {
     previous = case rawValueFor info declarations references group fragment of {
-      Left e -> ioReturn (Left e); Right value -> G.hashValue value
+      Left e -> ioReturn (Left e); Right value -> G.hashValueUsing W.indexedTextLimits value
     }
   } in case info of {
     Right _ -> previous;
     Left _ -> do {
-      hashed <- G.hashValue (checkedRawValue references group fragment);
+      hashed <- G.hashValueUsing W.indexedTextLimits (checkedRawValue references group fragment);
       case hashed of {
         Right digest -> if eqString digest expected then ioReturn hashed
           else previous;
@@ -230,14 +230,14 @@ module Bootstrap.CrateGraph where {
   recordRaw info declarations cached wanted reads references group fragment session =
     case info of {
       Left _ -> do {
-        recorded <- G.record wanted reads True (checkedRawValue references group fragment) session;
+        recorded <- G.recordUsing W.indexedTextLimits wanted reads True (checkedRawValue references group fragment) session;
         ioReturn (mapEither (\entry -> (,) entry cached) recorded)
       };
       Right template@(TemplateInfo identity _ _ _ _) -> do {
         encoded <- case M.lookup compareString identity cached of {
           Just payload -> ioReturn (Right payload);
           Nothing -> case templateValue declarations template fragment of {
-            Left e -> ioReturn (Left e); Right value -> G.encodeHashed value
+            Left e -> ioReturn (Left e); Right value -> G.encodeHashedUsing W.indexedTextLimits value
           }
         };
         ioReturn (mapEither (\payload -> let {
@@ -1342,7 +1342,7 @@ module Bootstrap.CrateGraph where {
     }; rawHash = G.nodeHash rawNode } in
     if same && not recheck then ioReturn (Right rawHash) else do {
       hashed <- if same then checkedRawHash rawHash template declarations finalRefs group final
-        else G.hashValue (rawValue finalRefs group final);
+        else G.hashValueUsing W.indexedTextLimits (rawValue finalRefs group final);
       ioReturn (do { digest <- hashed;
         ensure (not same || eqString digest rawHash) "retained final fragment SHA mismatch";
         Right digest })

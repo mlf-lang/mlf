@@ -39,15 +39,17 @@ module Bootstrap.QueryGraph where {
     runProcess directory (concatMapString (\field -> field ++ stringFromCode 0)
       (append ["1800","","",""] actual))
   };
-  encodeHashed value = do {
-    result <- W.encodeAtoms A.termAtomShapes W.defaultLimits 6 [value];
+  encodeHashed = encodeHashedUsing W.defaultLimits;
+  encodeHashedUsing limits value = do {
+    result <- W.encodeAtoms A.termAtomShapes limits 6 [value];
     case result of { Left e -> ioReturn (Left e); Right bytes -> do {
       digest <- byteArrayDigest bytes;
       ioReturn (if validHash digest then Right ((,) digest bytes) else Left "query result SHA failed")
     } }
   };
-  hashValue value = do {
-    encoded <- encodeHashed value;
+  hashValue = hashValueUsing W.defaultLimits;
+  hashValueUsing limits value = do {
+    encoded <- encodeHashedUsing limits value;
     ioReturn (mapEither fst encoded)
   };
   begin :: String -> String -> IO (Either String Session);
@@ -130,8 +132,9 @@ module Bootstrap.QueryGraph where {
   -- values only: recomputing with different reads may still produce green data.
   -- Retain the immutable encoding used by the hash, not its expanded W.Value.
   -- Publication neither traverses the raw AST again nor encodes it a second time.
-  record wanted reads persist value session = do {
-    encoded <- encodeHashed value;
+  record = recordUsing W.defaultLimits;
+  recordUsing limits wanted reads persist value session = do {
+    encoded <- encodeHashedUsing limits value;
     ioReturn (mapEither (\((,) digest bytes) -> recordDigest wanted reads
       (if persist then Just digest else Nothing) digest (if persist then Just bytes else Nothing) session) encoded)
   };

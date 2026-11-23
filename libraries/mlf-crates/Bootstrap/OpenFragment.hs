@@ -774,7 +774,7 @@ module Bootstrap.OpenFragment
       Nothing -> ordinary;
       Just ((,) version term) -> let { tag = if version == 11 then 442 else if version == 10 then 441 else 440;
         record = bodyRecord tag stage name fragment term } in
-        case bindEither (W.planGraph W.defaultLimits [envelope record])
+        case bindEither (W.planGraph (if spines then W.indexedTextLimits else W.defaultLimits) [envelope record])
           (\graph -> Structure.admitPatternsWith (version >= 10) (version == 11) graph (W.maxExpandedWork W.defaultLimits)) of {
           Right _ -> record; Left _ -> ordinary
         }
@@ -812,7 +812,7 @@ module Bootstrap.OpenFragment
       Right bytes -> do {
         actual <- byteArrayDigest bytes;
         if not (eqString actual expected) then ioReturn (Left "open fragment payload SHA mismatch") else do {
-          decoded <- W.decodeGraph W.defaultLimits 6 bytes;
+          decoded <- W.decodeGraph W.indexedTextLimits 6 bytes;
           ioReturn (do {
             graph <- decoded;
             root <- case W.graphRoots graph of { [r] -> Right r; _ -> Left "open fragment root count" };
@@ -1104,7 +1104,7 @@ module Bootstrap.OpenFragment
     then ioReturn (Left "open crate SHA mismatch")
     else do {
       decoded <- Host.phaseIO profile "wire_decode_ms" (W.decodeGraphRootBounded
-        W.defaultLimits packageWorkLimit schema bytes);
+        W.indexedTextLimits packageWorkLimit schema bytes);
       case do {
         graph <- decoded;
         roots <- case W.graphRoots graph of {
@@ -1135,7 +1135,7 @@ module Bootstrap.OpenFragment
                   "open crate fragment count mismatch";
                 bindings <- referenceList graph b;
                 declarations <- referenceList graph d;
-                physical <- W.graphExpandedWork graph;
+                physical <- W.graphAdmittedWork graph;
                 ensure (physical >= 0 && physical <= packageWorkLimit) "open crate package-work accounting mismatch";
                 (,) plans available <- if schema >= 9 then do {
                   prepared <- Structure.admitPatternsWith (schema >= 10) (schema == 11) graph (packageWorkLimit - physical);
@@ -1372,7 +1372,8 @@ module Bootstrap.OpenFragment
                   final ((,) entry selected) = case selected of {
                     Just ((,) _ wire) -> encodeFinalWire wire entry; Nothing -> encodeFinal False entry
                   };
-                  write schema format stored = W.encodeRootsWithAtoms Structure.termAtomShapes W.defaultLimits
+                  limits = if spines then W.indexedTextLimits else W.defaultLimits;
+                  write schema format stored = W.encodeRootsWithAtoms Structure.termAtomShapes limits
                     remaining schema ((:) (header format) (if stored then map final plans else map (encodeFinal False) fragments));
                   legacy = do {
                     encoded <- write 8 wireFormat8 False;
@@ -1393,9 +1394,9 @@ module Bootstrap.OpenFragment
                   case candidate of {
                     Left _ -> legacy;
                     Right bytes -> do {
-                      decoded <- W.decodeGraphRootBounded W.defaultLimits remaining schema bytes;
+                      decoded <- W.decodeGraphRootBounded limits remaining schema bytes;
                       case bindEither decoded (\graph -> do {
-                        used <- W.graphExpandedWork graph;
+                        used <- W.graphAdmittedWork graph;
                         (,) plans _ <- Structure.admitPatternsWith (schema >= 10) (schema == 11) graph (remaining - used);
                         Right (attachLinkViews graph plans fragments)
                       }) of { Left _ -> legacy; Right rows -> ioReturn (Right ((,) bytes rows)) }

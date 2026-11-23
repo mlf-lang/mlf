@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import Control.Monad (unless)
+import Control.Monad (forM_, unless)
 import System.Environment (getArgs)
 import System.Directory (createDirectoryIfMissing, makeAbsolute)
 import Data.List (isInfixOf)
@@ -92,6 +92,7 @@ main = do
       scopeTransitions (directory ++ "/scope")
       expectedReads
       directFinishReads
+      inferredDictionaryPrefix (directory ++ "/dictionary-prefix")
       groundRecursiveScope (directory ++ "/ground-scc")
       recursiveStringArms (directory ++ "/string-arms")
     _ -> fail "expected a fresh cache directory"
@@ -212,6 +213,58 @@ legacyCrate directory = do
     (cold == warm && Q.inferredCount c == 2 && Q.reusedCount w == 2)
   putStrLn "PASS public crate compatibility API, indexed lowering and named cache reuse"
 
+inferredDictionaryPrefix directory = do
+  root <- makeAbsolute directory
+  createDirectoryIfMissing True root
+  let path name = root ++ "/" ++ name
+      source = path "Main.hs"
+      spec = fromString (path "spec")
+      output = fromString (path "checked")
+      metadata = fromString (path "checked.mlfci")
+      identity = "inferred-dictionary-prefix"
+  writeFile source (unlines
+    [ "-- mlf:syntax shared-haskell-v1"
+    , "{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,"
+    , "             KindSignatures, FlexibleContexts, FlexibleInstances,"
+    , "             MultiParamTypeClasses, OverloadedStrings #-}"
+    , "module Main (main) where {"
+    , "import MLF.Primitive;"
+    , "data Box = Box Int;"
+    , "data Other = Other Int;"
+    , "class Pass a where { pass :: a -> a };"
+    , "instance Pass Box where { pass (Box x) = Box (addInt x 1) };"
+    , "instance Pass Other where { pass (Other x) = Other (addInt x 3) };"
+    , "twice x = pass (pass x);"
+    , "both x y = (twice x, twice y);"
+    , "bounded f x0 = " ++ concat ["case pass (Box x" ++ show i ++ ") of { Box x" ++ show (i+1) ++ " -> " | i <- [0..7::Int]]
+        ++ "f x8" ++ replicate 8 '}' ++ ";"
+    , "main = case both (Box 10) (Other 10) of { (Box x, Other y) -> bounded (addInt x) y }"
+    , "}"
+    ])
+  Host.v_writeFile spec (Separate.pack ["MLF-CRATE-1", identity, "Main", "true",
+    Separate.pack [Separate.pack ["Main", fromString source]], Separate.pack [],
+    fromString (path "cache"), fromString (path "builtin")])
+  let verify = do
+        _ <- Session.compileSpecFileWithVerification True T.Nothing spec output >>= expect
+        iface <- Artifact.readInterface metadata >>= expect
+        let name = Artifact.definitionName identity (Modules.Entity "Main" "twice" Modules.Value)
+        case lookup name (Artifact.crateBindings iface) of
+          Just (T.XForall a T.XBot (T.XArrow (T.XCon _ [T.XVar b]) (T.XArrow (T.XVar c) (T.XVar d)))) ->
+            check "one dictionary for the operand type" (all (XT.equalTyVar a) [b,c,d])
+          _ -> fail "twice did not export a single dictionary argument"
+        let boundedName = Artifact.definitionName identity (Modules.Entity "Main" "bounded" Modules.Value)
+        case lookup boundedName (Artifact.crateBindings iface) of
+          Just (T.XForall a (T.XForall _ T.XBot _) (T.XArrow (T.XCon _ [_]) (T.XVar b))) ->
+            check "one bounded result remains after the dictionary" (XT.equalTyVar a b)
+          _ -> fail "bounded retained repeated dictionaries or lost the callback result scheme"
+        term <- Artifact.linkFile metadata >>= expect
+        (datatypes, _) <- expect (Runtime.prepare False term)
+        value <- expect (Runtime.integer (Runtime.evaluate datatypes (Runtime.REnv M.empty) (X.erase term)))
+        check "separate instantiations use their own dictionaries" (value == 36)
+  verify
+  verify
+  putStrLn "PASS repeated inferred dictionaries, separate types and cache reuse"
+
 groundRecursiveScope directory = do
   root <- makeAbsolute directory
   createDirectoryIfMissing True root
@@ -268,6 +321,45 @@ groundRecursiveScope directory = do
     T.Left message -> check "the hidden instance must fail at evidence resolution"
       ("no instance or given constraint for Ground.Shade Ground.Mark" `isInfixOf` HostText.unpack message)
     T.Right _ -> fail "the importer supplied a dictionary outside the recursive group's defining scope"
+  writeModule "Ground" "Shade(..), Mark(..)"
+    ["class Shade a where { shade :: a -> Int };", "data Mark a = Mark a;"]
+  writeModule "Instance" ""
+    ["import Ground;", "instance Shade (Mark a) where { shade (Mark ignored) = 23 };"]
+  writeScanner ["import Instance ();"]
+  _ <- compile >>= expect
+  _ <- compile >>= expect
+  specialized <- Artifact.readInterface metadata >>= expect
+  forM_ ["collect", "resume"] $ \name -> do
+    let key = Artifact.definitionName identity (Modules.Entity "Scanner" name Modules.Value)
+    check "type-instantiated ground evidence stays discharged on warm reuse"
+      (maybe False (XT.alphaEq (T.XArrow int int)) (lookup key (Artifact.crateBindings specialized)))
+  specializedTerm <- Artifact.linkFile metadata >>= expect
+  (types, _) <- expect (Runtime.prepare False specializedTerm)
+  result <- expect (Runtime.integer (Runtime.evaluate types (Runtime.REnv M.empty) (X.erase specializedTerm)))
+  check "polymorphic instance selected at its definition site" (result == 46)
+  writeModule "Ground" "Shade(..), Mark(..)"
+    ["class Shade a where { shade :: a -> Int };", "data Mark = Mark Int;"]
+  writeModule "Instance" ""
+    ["import Ground;", "instance Shade Mark where { shade (Mark n) = addInt n 11 };"]
+  writeModule "Scanner" "reader"
+    [ "import Instance ();", "import Ground;"
+    , "collect direction fuel x = if eqInt fuel 0 then shade (Mark (if direction then x else subInt 0 x)) else resume (subInt fuel 1) x;"
+    , "positive = collect True;", "negative = collect False;"
+    , "resume fuel x = if eqInt fuel 0 then negative 0 x else positive (subInt fuel 1) x;"
+    , "reader :: Int -> Int;", "reader x = addInt (positive 0 x) (negative 0 (mulInt 2 x));"
+    ]
+  _ <- compile >>= expect
+  _ <- compile >>= expect
+  aliases <- Artifact.readInterface metadata >>= expect
+  forM_ ["positive", "negative"] $ \name -> do
+    let key = Artifact.definitionName identity (Modules.Entity "Scanner" name Modules.Value)
+    check "a partial peer application exports only the remaining value arguments"
+      (maybe False (XT.alphaEq (T.XArrow int (T.XArrow int int))) (lookup key (Artifact.crateBindings aliases)))
+  aliasTerm <- Artifact.linkFile metadata >>= expect
+  (aliasTypes, _) <- expect (Runtime.prepare False aliasTerm)
+  aliasValue <- expect (Runtime.integer (Runtime.evaluate aliasTypes (Runtime.REnv M.empty) (X.erase aliasTerm)))
+  -- reader x = (x + 11) + (11 - 2*x), main adds reader 2 and reader 3.
+  check "recursive partial aliases retain distinct literal operands on warm reuse" (aliasValue == 39)
   putStrLn "PASS ground recursive dictionary prefix and definition-site scope"
 
 recursiveStringArms directory = do
