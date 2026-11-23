@@ -7,6 +7,7 @@ module Bootstrap.LLVM.Optimize where {
   import Bootstrap.Types;
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.X.Syntax as X;
   import qualified Bootstrap.Primitive as P;
@@ -846,7 +847,9 @@ module Bootstrap.LLVM.Optimize where {
   -- Cache capped free-use counts beside each rewrite subtree. Substitution can
   -- retain an unaffected subtree without walking it, preserving rewrite order
   -- and the exact fresh-name allocation order of the original pass.
-  data UseTree = UseTree XErased (Map XName Int) UseChildren;
+  data UseTree = UseTree XErased (Map XName Int) UseChildren
+    | IndexedUses XErased (IntMap UseCount) UseChildren;
+  data UseCount = UseCount XName Int;
   data UseChildren =
     UseLeaf |
     UseAbs XName UseTree |
@@ -856,10 +859,31 @@ module Bootstrap.LLVM.Optimize where {
     UseCase UseTree ([] ((,) XPattern UseTree));
   useTerm :: UseTree -> XErased;
   useTerm (UseTree term _ _) = term;
+  useTerm (IndexedUses term _ _) = term;
   useCounts :: UseTree -> Map XName Int;
   useCounts (UseTree _ counts _) = counts;
+  useCounts (IndexedUses _ counts _) = M.fromDistinctAscList
+    (L.map (\((,) _ (UseCount name count)) -> (,) name count) (IM.toList counts));
+  countIndex :: UseTree -> IntMap UseCount;
+  countIndex (IndexedUses _ counts _) = counts;
+  countIndex (UseTree _ counts _) = IM.fromList
+    (L.map (\((,) name count) -> (,) (nameId name) (UseCount name count)) (M.toList counts));
+  useCount :: XName -> UseTree -> Int;
+  useCount name tree = case tree of {
+    UseTree _ counts _ -> M.findWithDefault compareName 0 name counts;
+    IndexedUses _ counts _ -> case IM.lookup (nameId name) counts of {
+      Nothing -> 0;
+      Just (UseCount _ count) -> count
+    }
+  };
+  usesName :: XName -> UseTree -> Bool;
+  usesName name tree = case tree of {
+    UseTree _ counts _ -> M.member compareName name counts;
+    IndexedUses _ counts _ -> IM.member (nameId name) counts
+  };
   useChildren :: UseTree -> UseChildren;
   useChildren (UseTree _ _ children) = children;
+  useChildren (IndexedUses _ _ children) = children;
   addUses :: Int -> Int -> Int;
   addUses a b = L.min 2 (a + b);
   mergeUses :: Map XName Int -> Map XName Int -> Map XName Int;
@@ -870,36 +894,47 @@ module Bootstrap.LLVM.Optimize where {
   deleteUses :: [] XName -> Map XName Int -> Map XName Int;
   deleteUses names counts =
     L.foldl (\current name -> M.delete compareName name current) counts names;
+  -- Identity comparison on these maps needs only the numeric binder key.
+  -- Retain the representative name for callers that inspect useCounts.
+  mergeCountIndex :: IntMap UseCount -> IntMap UseCount -> IntMap UseCount;
+  mergeCountIndex left right = let {
+    merge (UseCount name a) (UseCount _ b) = UseCount name (addUses a b)
+  } in if IM.size left <= IM.size right then IM.unionWith merge left right
+    else IM.unionWith merge right left;
+  dropCountIndex :: [] XName -> IntMap UseCount -> IntMap UseCount;
+  dropCountIndex names counts = L.foldl (\current name -> IM.delete (nameId name) current) counts names;
   useAbs :: XName -> UseTree -> UseTree;
   useAbs name body =
-    UseTree (XEAbs name (useTerm body)) (M.delete compareName name (useCounts body))
+    IndexedUses (XEAbs name (useTerm body)) (IM.delete (nameId name) (countIndex body))
       (UseAbs name body);
   useApp :: UseTree -> UseTree -> UseTree;
   useApp function argument =
-    UseTree (XEApp (useTerm function) (useTerm argument))
-      (mergeUses (useCounts function) (useCounts argument))
+    IndexedUses (XEApp (useTerm function) (useTerm argument))
+      (mergeCountIndex (countIndex function) (countIndex argument))
       (UseApp function argument);
   useLet :: XName -> UseTree -> UseTree -> UseTree;
   useLet name value body =
-    UseTree (XELet name (useTerm value) (useTerm body))
-      (mergeUses (useCounts value) (M.delete compareName name (useCounts body)))
+    IndexedUses (XELet name (useTerm value) (useTerm body))
+      (mergeCountIndex (countIndex value) (IM.delete (nameId name) (countIndex body)))
       (UseLet name value body);
   useRec :: [] ((,) XName UseTree) -> UseTree -> UseTree;
   useRec bindings body =
-    let { counts = bindingUses bindings body } in
-    UseTree
+    let { counts = bindingCountIndex bindings body } in
+    IndexedUses
       (XELetRec (L.map (\((,) name value) -> (,) name (useTerm value)) bindings) (useTerm body))
-      (deleteUses (L.map L.fst bindings) counts)
+      (dropCountIndex (L.map L.fst bindings) counts)
       (UseRec bindings body);
   bindingUses bindings body = L.foldl
     (\current binding -> mergeUses current (useCounts (L.snd binding))) (useCounts body) bindings;
+  bindingCountIndex bindings body = L.foldl
+    (\current binding -> mergeCountIndex current (countIndex (L.snd binding))) (countIndex body) bindings;
   -- Inlining a shared lambda with two free occurrences can multiply both
   -- incoming and outgoing dependencies at every layer. A linear wrapper
   -- forwards at most one free occurrence per use, so it can still inline.
   branchesToFreeValues value = case useChildren value of {
-    UseAbs _ _ -> case M.toList (useCounts value) of {
+    UseAbs _ _ -> case IM.toList (countIndex value) of {
       [] -> False;
-      [(,) _ count] -> count > 1;
+      [(,) _ (UseCount _ count)] -> count > 1;
       _ -> True
     };
     _ -> False
@@ -910,11 +945,11 @@ module Bootstrap.LLVM.Optimize where {
       counts =
         L.foldl
           (\current ((,) pattern body) ->
-             mergeUses current (deleteUses (X.patternNames pattern) (useCounts body)))
-          (useCounts subject)
+             mergeCountIndex current (dropCountIndex (X.patternNames pattern) (countIndex body)))
+          (countIndex subject)
           alternatives
     } in
-    UseTree
+    IndexedUses
       (XECase (useTerm subject)
          (L.map (\((,) pattern body) -> XErasedAlternative pattern (useTerm body)) alternatives))
       counts
@@ -932,8 +967,8 @@ module Bootstrap.LLVM.Optimize where {
         useCase (indexUses subject)
           (L.map (\(XErasedAlternative pattern body) -> (,) pattern (indexUses body))
              alternatives);
-      XEVar name -> UseTree term (M.singleton name 1) UseLeaf;
-      _ -> UseTree term M.empty UseLeaf
+      XEVar name -> IndexedUses term (IM.singleton (nameId name) (UseCount name 1)) UseLeaf;
+      _ -> IndexedUses term IM.empty UseLeaf
     };
   mapUseChildren :: (UseTree -> Fresh UseTree) -> UseTree -> Fresh UseTree;
   mapUseChildren f tree =
@@ -985,7 +1020,7 @@ module Bootstrap.LLVM.Optimize where {
     };
   substituteUsed :: XName -> XErased -> UseTree -> Fresh UseTree;
   substituteUsed name value tree =
-    if L.not (M.member compareName name (useCounts tree))
+    if L.not (usesName name tree)
     then freshPure tree
     else case useTerm tree of {
            XEVar actual ->
@@ -1078,7 +1113,7 @@ module Bootstrap.LLVM.Optimize where {
   -- unrelated bind elsewhere in the body.  Zero-use subtrees remain opaque.
   singleUseIOPath :: XName -> Bool -> UseTree -> Bool;
   singleUseIOPath name insideIO tree =
-    if M.findWithDefault compareName 0 name (useCounts tree) == 0
+    if useCount name tree == 0
     then True
     else case useChildren tree of {
       UseLeaf ->
@@ -1126,7 +1161,7 @@ module Bootstrap.LLVM.Optimize where {
   -- not make the RHS globally strict: an unselected branch never evaluates it.
   singleUseBranchPath :: XName -> Bool -> UseTree -> Bool;
   singleUseBranchPath name selected tree =
-    if M.findWithDefault compareName 0 name (useCounts tree) == 0
+    if useCount name tree == 0
     then True
     else case useChildren tree of {
       UseLeaf -> case useTerm tree of {
@@ -1136,16 +1171,16 @@ module Bootstrap.LLVM.Optimize where {
       UseAbs _ _ -> False;
       UseRec _ _ -> False;
       UseLet _ value body ->
-        (M.findWithDefault compareName 0 name (useCounts value) == 0) &&
+        (useCount name value == 0) &&
         singleUseBranchPath name selected body;
       UseCase subject branches ->
-        (M.findWithDefault compareName 0 name (useCounts subject) == 0) &&
+        (useCount name subject == 0) &&
         L.all (\entry -> singleUseBranchPath name True (L.snd entry)) branches;
       UseApp _ _ -> case useApplications [] tree of {
         (,) function arguments -> case useTerm function of {
           XEPrimitive PIfThenElse -> case arguments of {
             (:) condition ((:) yes ((:) no [])) ->
-              (M.findWithDefault compareName 0 name (useCounts condition) == 0) &&
+              (useCount name condition == 0) &&
               (singleUseBranchPath name True yes && singleUseBranchPath name True no);
             _ -> False
           };
@@ -1180,12 +1215,13 @@ module Bootstrap.LLVM.Optimize where {
     }
   };
   outerCallNames :: XName -> Map XName Int -> [] UseTree -> Maybe ([] XName);
-  outerCallNames target outer arguments = case arguments of {
+  outerCallNames target outer = outerCallNamesUsing target (\name -> M.member compareName name outer);
+  outerCallNamesUsing target outer arguments = case arguments of {
     [] -> Just [];
     (:) argument rest -> case useTerm argument of {
       XEVar name ->
-        if L.not (eqName target name) && M.member compareName name outer
-        then case outerCallNames target outer rest of {
+        if L.not (eqName target name) && outer name
+        then case outerCallNamesUsing target outer rest of {
           Nothing -> Nothing;
           Just names -> Just ((:) name names)
         }
@@ -1194,26 +1230,28 @@ module Bootstrap.LLVM.Optimize where {
     }
   };
   commonCalls :: XName -> Int -> Map XName Int -> UseTree -> CommonCalls;
-  commonCalls target arity outer tree =
-    if M.findWithDefault compareName 0 target (useCounts tree) == 0
+  commonCalls target arity outer = commonCallsUsing target arity (\name -> M.member compareName name outer);
+  commonCallsUsing target arity outer tree =
+    if useCount target tree == 0
     then NoCommonCalls
     else case useApplications [] tree of {
       (,) function arguments -> case useTerm function of {
         XEVar name ->
           if eqName target name
           then if L.length arguments == arity
-               then case outerCallNames target outer arguments of {
+               then case outerCallNamesUsing target outer arguments of {
                  Just names -> CommonCalls names;
                  Nothing -> DifferentCalls
                }
                else DifferentCalls
-          else commonChildCalls target arity outer tree;
-        _ -> commonChildCalls target arity outer tree
+          else commonChildCallsUsing target arity outer tree;
+        _ -> commonChildCallsUsing target arity outer tree
       }
     };
   commonChildCalls :: XName -> Int -> Map XName Int -> UseTree -> CommonCalls;
-  commonChildCalls target arity outer tree =
-    let { collect = commonCalls target arity outer;
+  commonChildCalls target arity outer = commonChildCallsUsing target arity (\name -> M.member compareName name outer);
+  commonChildCallsUsing target arity outer tree =
+    let { collect = commonCallsUsing target arity outer;
           combine values = L.foldl mergeCommonCalls NoCommonCalls (L.map collect values)
     } in case useChildren tree of {
       UseLeaf -> DifferentCalls;
@@ -1225,7 +1263,7 @@ module Bootstrap.LLVM.Optimize where {
     };
   contractCommonCalls :: XName -> UseTree -> Fresh UseTree;
   contractCommonCalls target tree =
-    if M.findWithDefault compareName 0 target (useCounts tree) == 0
+    if useCount target tree == 0
     then freshPure tree
     else case useApplications [] tree of {
       (,) function _ -> case useTerm function of {
@@ -1252,9 +1290,9 @@ module Bootstrap.LLVM.Optimize where {
   specializeSharedValue name value body = case lambdas (useTerm value) of {
     (,) [] _ -> freshPure Nothing;
     (,) parameters _ ->
-      if M.findWithDefault compareName 0 name (useCounts body) < 1
+      if useCount name body < 1
       then freshPure Nothing
-      else case commonCalls name (L.length parameters) (useCounts body) body of {
+      else case commonCallsUsing name (L.length parameters) (\wanted -> usesName wanted body) body of {
         CommonCalls arguments -> do {
           result <- contractCommonCalls name body;
           specialized <- specializeCommonParameters value arguments;
@@ -1266,7 +1304,7 @@ module Bootstrap.LLVM.Optimize where {
   rewriteOrdinaryLet :: UseTree -> XName -> UseTree -> UseTree -> Fresh UseTree;
   rewriteOrdinaryLet tree name value body =
         let {
-          uses = M.findWithDefault compareName 0 name (useCounts body)
+          uses = useCount name body
         } in
         if (uses == 0)
         then freshPure body
@@ -1494,26 +1532,27 @@ module Bootstrap.LLVM.Optimize where {
   -- A queried negative call is always a free use. Use the existing subtree
   -- counts to visit only paths where that particular name can survive.
   negativeMember :: Map XName Int -> XName -> UseTree -> Bool;
-  negativeMember outer target tree =
-    M.member compareName target (useCounts tree) && (case useChildren tree of {
+  negativeMember outer = negativeMemberUsing (\name -> M.member compareName name outer);
+  negativeMemberUsing outer target tree =
+    usesName target tree && (case useChildren tree of {
       UseLeaf -> False;
-      UseAbs _ body -> negativeMember outer target body;
+      UseAbs _ body -> negativeMemberUsing outer target body;
       UseApp function argument -> let {
         headWitness = case useTerm argument of {
           XEVar name -> eqName name target || (case useTerm function of {
-            XEVar called -> eqName called target && L.not (M.member compareName name outer);
+            XEVar called -> eqName called target && L.not (outer name);
             _ -> False
           });
           _ -> case useTerm function of { XEVar called -> eqName called target; _ -> False }
         }
-      } in headWitness || negativeMember outer target function || negativeMember outer target argument;
-      UseLet name value body -> negativeMember outer target value ||
-        (L.not (eqName name target) && negativeMember outer target body);
-      UseRec bindings body -> negativeMember outer target body ||
-        L.any (\entry -> negativeMember outer target (L.snd entry)) bindings;
-      UseCase subject alternatives -> negativeMember outer target subject ||
+      } in headWitness || negativeMemberUsing outer target function || negativeMemberUsing outer target argument;
+      UseLet name value body -> negativeMemberUsing outer target value ||
+        (L.not (eqName name target) && negativeMemberUsing outer target body);
+      UseRec bindings body -> negativeMemberUsing outer target body ||
+        L.any (\entry -> negativeMemberUsing outer target (L.snd entry)) bindings;
+      UseCase subject alternatives -> negativeMemberUsing outer target subject ||
         L.any (\entry -> L.not (L.any (eqName target) (X.patternNames (L.fst entry))) &&
-          negativeMember outer target (L.snd entry)) alternatives
+          negativeMemberUsing outer target (L.snd entry)) alternatives
     });
   -- Keep exact counts through three occurrences, with four meaning "many".
   -- This extra root summary leaves the public UseTree's 0/1/many contract
@@ -1555,10 +1594,11 @@ module Bootstrap.LLVM.Optimize where {
   -- Each pending binder is globally fresh on the checked route. Its free
   -- occurrences are indexed on the normalized use tree. A disjoint subtree
   -- consumes no replacement and can be returned with all cached uses intact.
-  shareMaterialized replacements tree = let { counts = useCounts tree;
-    overlaps small large = M.foldrWithKey (\name _ found -> M.member compareName name large || found) False small
-  } in M.null replacements || M.null counts || L.not
-    (if M.size replacements <= M.size counts then overlaps replacements counts else overlaps counts replacements);
+  shareMaterialized replacements tree = let { counts = countIndex tree;
+    overlapsReplacements = M.foldrWithKey (\name _ found -> IM.member (nameId name) counts || found) False replacements;
+    overlapsCounts = IM.foldrWithKey (\_ (UseCount name _) found -> M.member compareName name replacements || found) False counts
+  } in M.null replacements || IM.null counts || L.not
+    (if M.size replacements <= IM.size counts then overlapsReplacements else overlapsCounts);
   materializeBodyWith checked replacements tree =
     if checked && shareMaterialized replacements tree then (,) tree replacements else
     case useChildren tree of {
@@ -1646,7 +1686,7 @@ module Bootstrap.LLVM.Optimize where {
       UseApp function continuation -> case (,) (useTerm function) (useChildren continuation) of {
         (,) (XEApp (XEPrimitive PIOBind) _) (UseAbs arg result) -> case useTerm result of {
           XEVar wanted -> if eqName name wanted && L.not (eqName name arg) &&
-            L.not (M.member compareName arg (useCounts value))
+            L.not (usesName arg value)
             then Just (useApp function (useAbs arg value)) else Nothing;
           _ -> Nothing
         };
@@ -1678,7 +1718,7 @@ module Bootstrap.LLVM.Optimize where {
   -- Existing counts distinguish zero, one and two-or-more free occurrences
   -- at every subtree. Only an unmet budget above two needs any traversal.
   boundedUseCount limit target tree = let {
-    known = M.findWithDefault compareName 0 target (useCounts tree);
+    known = useCount target tree;
     appendCount count child = if count == limit then limit else
       count + boundedUseCount (limit - count) target child
   } in if known < 2 || limit <= 2 then L.min limit known else
@@ -1696,10 +1736,10 @@ module Bootstrap.LLVM.Optimize where {
     };
   afterUseBinding name value uses prior target = L.min 4
     ((if eqName name target then 0 else prior target) + uses * checkedUseCount value target);
-  beginChecked body = CheckedPending (beginPending body) (\wanted -> negativeMember (useCounts body) wanted body)
+  beginChecked body = CheckedPending (beginPending body) (\wanted -> negativeMemberUsing (\name -> usesName name body) wanted body)
     (checkedUseCount body);
   afterCallBinding name value previous wanted =
-    (L.not (eqName wanted name) && previous wanted) || negativeMember (useCounts value) wanted value;
+    (L.not (eqName wanted name) && previous wanted) || negativeMemberUsing (\name -> usesName name value) wanted value;
   -- Keep the original exported full witness set. The checked pass asks about
   -- one binder at a time and can issue that exact query without building it.
   delayCheckedLet name value pending = do {
@@ -1712,7 +1752,7 @@ module Bootstrap.LLVM.Optimize where {
     PendingBody body replacements counts calls ->
       -- With no queued substitutions, the indexed body's existing 0/1/many
       -- count suffices for all of the comparisons below.
-      let { uses = if M.null replacements then M.findWithDefault compareName 0 name (useCounts body) else countOf name;
+      let { uses = if M.null replacements then useCount name body else countOf name;
         -- A constructor applied only to atoms has no binders to freshen.
         -- The ordinary rule substitutes it immediately. Queue its sole use
         -- without rebuilding all later declarations and their use counts.
@@ -2008,6 +2048,149 @@ module Bootstrap.LLVM.Optimize where {
            then freshPure expression
            else iterationsOwnedFor checked arities (count - 1) next
          };
+  -- One checked pass owns unique names. Cache only independent RHS work
+  -- that leaves the Fresh counter unchanged. The declaration body's rewrite
+  -- still sees the entire current context and follows the original order.
+  data StableRhs = StableRhs XErased UseTree;
+  sameOwnedName :: XName -> XName -> Bool;
+  sameOwnedName (XName a hint) (XName b other) = a == b && eqString hint other;
+  sameOwnedOptional left right = case (,) left right of {
+    (,) Nothing Nothing -> True;
+    (,) (Just a) (Just b) -> sameOwnedName a b;
+    _ -> False
+  };
+  sameOwnedPattern left right = case (,) left right of {
+    (,) (XDefaultPattern a) (XDefaultPattern b) -> sameOwnedOptional a b;
+    (,) (XConstructorPattern a ns) (XConstructorPattern b ms) ->
+      eqString a b && L.eqList sameOwnedOptional ns ms;
+    _ -> False
+  };
+  sameStableInput :: XErased -> XErased -> Bool;
+  sameStableInput left right = case (,) left right of {
+    (,) (XEVar a) (XEVar b) -> sameOwnedName a b;
+    (,) (XEAbs a x) (XEAbs b y) -> sameOwnedName a b && sameStableInput x y;
+    (,) (XEApp f a) (XEApp g b) -> sameStableInput f g && sameStableInput a b;
+    (,) (XELet n v body) (XELet m w rest) ->
+      sameOwnedName n m && sameStableInput v w && sameStableInput body rest;
+    (,) (XELetRec as body) (XELetRec bs rest) ->
+      L.eqList (\((,) a x) ((,) b y) -> sameOwnedName a b && sameStableInput x y) as bs &&
+      sameStableInput body rest;
+    (,) (XECase x as) (XECase y bs) -> sameStableInput x y && L.eqList
+      (\(XErasedAlternative p a) (XErasedAlternative q b) ->
+        sameOwnedPattern p q && sameStableInput a b) as bs;
+    (,) (XEDouble a) (XEDouble b) -> doubleToBits a == doubleToBits b;
+    _ -> X.equalErased left right
+  };
+  normalizeStableRhs :: IntMap StableRhs -> IntMap StableRhs -> XName -> XErased ->
+    Fresh ((,) UseTree (IntMap StableRhs));
+  normalizeStableRhs previous current name value = let {
+    identity = nameId name;
+    save normalized entry = let { indexed = IM.insert identity entry current } in
+      seq indexed (freshPure ((,) normalized indexed));
+    normalize = do {
+      before <- freshSeed;
+      normalized <- passOwnedFor True value;
+      after <- freshSeed;
+      if before == after && remainingSize 31 value < 0
+      then save normalized (StableRhs value normalized)
+      else freshPure ((,) normalized current)
+    }
+  } in case IM.lookup identity previous of {
+    Just entry@(StableRhs input normalized) -> if sameStableInput input value
+      then save normalized entry else normalize;
+    Nothing -> normalize
+  };
+  stableBindingGroup :: IntMap StableRhs -> IntMap StableRhs -> [] ((,) XName XErased) ->
+    Fresh ((,) ([] ((,) XName UseTree)) (IntMap StableRhs));
+  stableBindingGroup previous current bindings = case bindings of {
+    [] -> freshPure ((,) [] current);
+    (:) ((,) name value) rest -> do {
+      (,) normalized found <- normalizeStableRhs previous current name value;
+      (,) following cached <- stableBindingGroup previous found rest;
+      freshPure ((,) ((:) ((,) name normalized) following) cached)
+    }
+  };
+  cachedDeclarationPass :: IntMap StableRhs -> IntMap StableRhs -> XErased ->
+    Fresh ((,) UseTree (IntMap StableRhs));
+  cachedDeclarationPass previous current expression = case expression of {
+    XELet _ _ _ -> do {
+      (,) pending cached <- cachedDeclarationSpine previous current expression;
+      freshPure ((,) (materializePendingWith True (checkedBody pending)) cached)
+    };
+    XELetRec bindings body -> do {
+      (,) normalized found <- stableBindingGroup previous current bindings;
+      (,) following cached <- cachedDeclarationPass previous found body;
+      result <- rewriteUsedFor True (useRec normalized following);
+      freshPure ((,) result cached)
+    };
+    _ -> do {
+      result <- passOwnedFor True expression;
+      freshPure ((,) result current)
+    }
+  };
+  cachedDeclarationSpine :: IntMap StableRhs -> IntMap StableRhs -> XErased ->
+    Fresh ((,) CheckedPending (IntMap StableRhs));
+  cachedDeclarationSpine previous current expression = case expression of {
+    XELet name value body -> do {
+      (,) normalized found <- normalizeStableRhs previous current name value;
+      following <- case useChildren normalized of {
+        UseAbs _ _ -> shareLocalConditional name body;
+        _ -> freshPure body
+      };
+      (,) pending cached <- cachedDeclarationSpine previous found following;
+      result <- delayCheckedPending name normalized pending;
+      freshPure ((,) result cached)
+    };
+    _ -> do {
+      (,) result cached <- cachedDeclarationPass previous current expression;
+      freshPure ((,) (beginChecked result) cached)
+    }
+  };
+  -- No projection can start in a subtree without a case whose original
+  -- scrutinee names a known constructor. A later case can become eligible
+  -- after a child rewrite, so any positive probe uses the full traversal.
+  hasConstructorProjection :: Map XName ((,) String ([] XErased)) -> XErased -> Bool;
+  hasConstructorProjection facts expression = let { visit = hasConstructorProjection facts } in
+    case expression of {
+      XEAbs _ body -> visit body;
+      XEApp function argument -> visit function || visit argument;
+      XELet _ value body -> visit value || visit body;
+      XELetRec bindings body -> L.any (\((,) _ value) -> visit value) bindings || visit body;
+      XECase subject alternatives -> (case subject of {
+          XEVar name -> M.member compareName name facts;
+          _ -> visit subject
+        }) || L.any (\(XErasedAlternative _ body) -> visit body) alternatives;
+      _ -> False
+    };
+  projectDeclarationSpine :: Map XName ((,) String ([] XErased)) -> XErased -> Fresh XErased;
+  projectDeclarationSpine facts expression = let {
+    project value = if hasConstructorProjection facts value then projectConstructors facts value else freshPure value
+  } in case expression of {
+    XELet name value body -> do {
+      rhs <- project value;
+      rest <- projectDeclarationSpine facts body;
+      freshPure (XELet name rhs rest)
+    };
+    XELetRec bindings body -> do {
+      rhs <- traverseFresh (\((,) name value) -> do {
+        projected <- project value;
+        freshPure ((,) name projected)
+      }) bindings;
+      rest <- projectDeclarationSpine facts body;
+      freshPure (XELetRec rhs rest)
+    };
+    _ -> project expression
+  };
+  stableDeclarationIterations :: Map String (Maybe Int) -> Int -> IntMap StableRhs -> XErased -> Fresh XErased;
+  stableDeclarationIterations arities count previous expression = if count == 0
+    then freshPure expression else do {
+      let { facts = constructorFacts arities expression };
+      projected <- if M.null facts then freshPure expression else projectDeclarationSpine facts expression;
+      (,) normalized cached <- cachedDeclarationPass previous IM.empty projected;
+      let { next = useTerm normalized };
+      if X.equalErased expression next then freshPure expression
+      else stableDeclarationIterations arities (count - 1) cached next
+    };
   -- Find references still needed by the entry before copying its declaration
   -- spine. A nonrecursive RHS is in the outer scope. A recursive group binds
   -- its names in every RHS and in the continuation. Any reference from the
@@ -2042,9 +2225,11 @@ module Bootstrap.LLVM.Optimize where {
         arities = constructorArities recursive
       };
       lifted <- liftConstructorFieldsFor checked arities recursive;
-      simple <- iterationsOwnedFor checked arities 16 lifted;
+      let { iterate = if checked then stableDeclarationIterations arities 16 IM.empty
+        else iterationsOwnedFor False arities 16 };
+      simple <- iterate lifted;
       specialized <- specializeHigherOrder simple;
-      iterationsOwnedFor checked arities 16 specialized
+      iterate specialized
     };
   -- Specialize a private recursive worker entered by one saturated call.
   -- A static function argument stays fixed when every recursive call passes

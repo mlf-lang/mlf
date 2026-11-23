@@ -8,6 +8,8 @@ module Bootstrap.LLVM.Codegen where {
   import Bootstrap.LLVM.Build;
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.Primitive as P;
   import qualified Bootstrap.LLVM.Analysis as A;
@@ -64,7 +66,15 @@ module Bootstrap.LLVM.Codegen where {
   generateProgram = generateWithWorkerAliases (\_ -> M.empty);
   generateWithWorkerAliases :: (Output -> Map XName XName) -> Bool -> Set String -> Map String ((,) Int Int) ->
     Map Int ((,,) Int Int CaseDispatch) -> XErased -> Either String ((,) String ([] String));
-  generateWithWorkerAliases aliases closed names cs plans term =
+  generateWithWorkerAliases = generateWorkerProgram False;
+  -- Only prepared checked terms have canonical binders. Raw clients keep their
+  -- established erased-term lowering and their original worker symbol policy.
+  generatePreparedProgram :: Bool -> Set String -> Map String ((,) Int Int) ->
+    Map Int ((,,) Int Int CaseDispatch) -> XErased -> Either String ((,) String ([] String));
+  generatePreparedProgram = generateWorkerProgram True recursiveWorkerAliases;
+  generateWorkerProgram :: Bool -> (Output -> Map XName XName) -> Bool -> Set String -> Map String ((,) Int Int) ->
+    Map Int ((,,) Int Int CaseDispatch) -> XErased -> Either String ((,) String ([] String));
+  generateWorkerProgram chains aliases closed names cs plans term =
     let {
       fs = A.analyze term
     } in
@@ -77,7 +87,7 @@ module Bootstrap.LLVM.Codegen where {
     let {
       output =
         Output 0 [] "entry" [] [] (ConstructorLayout cs plans)
-          (FunctionScope fs (A.lambdaFreeTable term))
+          (FunctionScope fs (A.lambdaFreeTable term) (Just (indexWorkerEscapes fs term)))
           S.empty M.empty ks S.empty (K.collecting fs ks) M.empty
           True
           M.empty
@@ -91,13 +101,15 @@ module Bootstrap.LLVM.Codegen where {
           rs
           (V.plan cs fs (S.union O.compareName ks (M.keysSet rs)) term) M.empty
     } in
-    let { initial = withCallbacks (workerSymbols (aliases output)) output } in
+    let { policy = if chains then withWorkers (S.insert compareString closureChainPolicy (workers output)) output
+                   else output;
+          initial = withCallbacks (workerSymbols (aliases output)) policy } in
     case runBuild (callback [] Nothing term) initial of {
       Left error -> Left error;
       Right ((,) entry out) -> let {
         needs symbol = S.member compareString symbol (workers out);
         support = L.concat [constructorDefinitions needs, thunkAllocationDefinition,
-          thunkCaptureDefinitions needs, forceDefinition]
+          thunkCaptureDefinitions needs, closureChainDefinition needs, forceDefinition]
       } in
         Right
           ((,) entry
@@ -278,7 +290,94 @@ module Bootstrap.LLVM.Codegen where {
       (L.map (\optional -> case optional of { Nothing -> "ignored"; Just _ -> "bound" }) names) fields))
   };
   callbackFresh :: Bool -> [] XName -> Maybe XName -> XErased -> Build String;
-  callbackFresh = callbackFreshWith evaluate;
+  callbackFresh private captured argument body = case (,,) private argument body of {
+    (,,) False (Just supplied) (XEAbs _ _) -> do {
+      state <- get;
+      if closureChainsEnabled state then
+        case extensionTail state captured supplied body of {
+          (,,) final binder terminal -> let { width = L.length captured; end = L.length final } in
+            if useClosureChain width (end - width) then do {
+              symbol <- fresh "@mlf.code.";
+              child <- callback final (Just binder) terminal;
+              startClosureChain symbol width end child;
+              cgPure symbol
+            } else callbackFreshWith evaluate private captured argument body
+        }
+      else callbackFreshWith evaluate private captured argument body
+    };
+    _ -> callbackFreshWith evaluate private captured argument body
+  };
+  closureChainPolicy :: String;
+  closureChainPolicy = "prepared closure chains";
+  closureChainsEnabled :: Output -> Bool;
+  closureChainsEnabled state = S.member compareString closureChainPolicy (workers state);
+  useClosureChain :: Int -> Int -> Bool;
+  useClosureChain width stages = stages >= 2 && (width >= 4 || stages >= 4);
+  -- Each accepted lambda adds just its supplied argument to the child's
+  -- complete ordered captures. Stop at the first change of layout.
+  extensionTail :: Output -> [] XName -> XName -> XErased -> (,,) ([] XName) XName XErased;
+  extensionTail state captures argument body = case body of {
+    XEAbs next inner -> let { fields = callbackNames state next inner } in
+      if L.eqList O.eqName fields (L.snoc captures argument)
+      then extensionTail state fields next inner
+      else (,,) captures argument body;
+    _ -> (,,) captures argument body
+  };
+  -- A private descriptor is shared by intermediate closures in this chain.
+  -- The first entry and the terminal callback use their ordinary environments.
+  startClosureChain :: String -> Int -> Int -> String -> Build ();
+  startClosureChain symbol width end terminal = do {
+    descriptor <- fresh "@mlf.curry.layout.";
+    let { dataRow = descriptor ++ " = private unnamed_addr constant { ptr, i64 } { ptr " ++
+      terminal ++ ", i64 " ++ showInt end ++ " }, align 8" };
+    modify (\state -> withConstants ((:) dataRow (constants state))
+      (withWorkers (S.insert compareString "@mlf.closure.chain" (workers state)) state));
+    definition symbol (args2 "ptr %env" "ptr %arg") (result
+      ("tail call ptr @mlf.closure.chain(ptr %env, ptr %arg, i64 " ++ showInt width ++ ", ptr " ++ descriptor ++ ")"))
+  };
+  closureChainDefinition :: (String -> Bool) -> [] String;
+  closureChainDefinition needs = if needs "@mlf.closure.chain" then [
+    "declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1 immarg)",
+    "define private ptr @mlf.closure.chain.next(ptr %env, ptr %arg) {",
+    "entry:",
+    "  %size = load i64, ptr %env, align 8",
+    "  %width = sub i64 %size, 1",
+    "  %slot = getelementptr ptr, ptr %env, i64 %size",
+    "  %layout = load ptr, ptr %slot, align 8",
+    "  %closure = tail call ptr @mlf.closure.chain(ptr %env, ptr %arg, i64 %width, ptr %layout)",
+    "  ret ptr %closure",
+    "}",
+    "define private ptr @mlf.closure.chain(ptr %parent, ptr %arg, i64 %width, ptr %layout) noinline {",
+    "entry:",
+    "  %endptr = getelementptr i8, ptr %layout, i64 8",
+    "  %end = load i64, ptr %endptr, align 8",
+    "  %count = add i64 %width, 1",
+    "  %last = icmp eq i64 %count, %end",
+    "  %extra = add i64 %count, 1",
+    "  %slots = select i1 %last, i64 %count, i64 %extra",
+    "  %next = call ptr @mlf_env_new(i64 %slots)",
+    "  %destination = getelementptr i8, ptr %next, i64 8",
+    "  %empty = icmp eq i64 %width, 0",
+    "  br i1 %empty, label %append, label %copy",
+    "copy:",
+    "  %source = getelementptr i8, ptr %parent, i64 8",
+    "  %bytes = shl i64 %width, 3",
+    "  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %destination, ptr align 8 %source, i64 %bytes, i1 false)",
+    "  br label %append",
+    "append:",
+    "  %slot = getelementptr ptr, ptr %destination, i64 %width",
+    "  store ptr %arg, ptr %slot, align 8",
+    "  br i1 %last, label %finish, label %continue",
+    "finish:",
+    "  %terminal = load ptr, ptr %layout, align 8",
+    "  %final = tail call ptr @mlf_closure(ptr %terminal, ptr %next)",
+    "  ret ptr %final",
+    "continue:",
+    "  %descriptor = getelementptr ptr, ptr %destination, i64 %count",
+    "  store ptr %layout, ptr %descriptor, align 8",
+    "  %partial = tail call ptr @mlf_closure(ptr @mlf.closure.chain.next, ptr %next)",
+    "  ret ptr %partial",
+    "}"] else [];
   callbackFreshWith finish private captures argument body =
     do {
       name <- fresh "@mlf.code.";
@@ -775,8 +874,20 @@ module Bootstrap.LLVM.Codegen where {
   buildWrapper name f symbol captured remaining =
     case remaining of {
       [] -> failure "LLVM empty function wrapper";
-      (:) arg rest ->
-        definition symbol (args2 "ptr %env" "ptr %arg")
+      (:) arg rest -> do {
+        enabled <- gets closureChainsEnabled;
+        let { width = L.length captured };
+        if enabled && useClosureChain width (L.length rest) then
+          case L.reverse rest of {
+            (:) last previous -> do {
+              child <- fresh "@mlf.curry.";
+              let { fields = L.append captured ((:) arg (L.reverse previous)) };
+              buildWrapper name f child fields [last];
+              startClosureChain symbol width (L.length fields) child
+            };
+            [] -> failure "LLVM empty function wrapper"
+          }
+        else definition symbol (args2 "ptr %env" "ptr %arg")
           (do {
              saved <- readEnvironment captured;
              let {
@@ -791,6 +902,7 @@ module Bootstrap.LLVM.Codegen where {
                     call "@mlf_closure" (args2 (pointer next) (pointer env))
                   }
            })
+      }
     };
   invoke :: Map XName CGBinding -> XName -> A.WorkerFunction -> [] XErased -> Build String;
   invoke scope name f args =
@@ -839,6 +951,39 @@ module Bootstrap.LLVM.Codegen where {
     }) (L.zip (A.parameters f) args);
     cgPure ((,) captured values)
   };
+  -- Only returned values contribute. Ordered effects and failures keep their
+  -- original evaluation, and all possible returning branches must agree that
+  -- the result is a compact Int. This does not assume anything about operands.
+  boxedResultRange :: XErased -> Maybe ((,) Int Int);
+  boxedResultRange expression = let {
+    child = boxedResultRange;
+    combine range value = do {
+      current <- range;
+      found <- child value;
+      Just (rangeUnion current found)
+    };
+    known value = if N.smallBounds value then Just value else Nothing
+  } in case expression of {
+    XEInt n -> known ((,) n n);
+    XELet _ _ body -> child body;
+    XELetRec _ body -> child body;
+    XECase _ ((:) (XErasedAlternative _ body) rest) -> L.foldl
+      (\range (XErasedAlternative _ arm) -> combine range arm) (child body) rest;
+    XEApp _ _ -> case O.applications expression of {
+      (,) (XEPrimitive PRemInt) [_, XEInt divisor] ->
+        if divisor > 0 && N.smallBounds ((,) divisor divisor)
+        then Just ((,) (1 - divisor) (divisor - 1)) else Nothing;
+      (,) (XEPrimitive PIfThenElse) [_,yes,no] -> combine (child yes) no;
+      (,) (XEPrimitive PSeq) [_,body] -> child body;
+      (,) (XEPrimitive primitive) [left,right] -> case primitive of {
+        PAddInt -> do { a <- child left; b <- child right; known (N.integerBounds primitive a b) };
+        PSubInt -> do { a <- child left; b <- child right; known (N.integerBounds primitive a b) };
+        _ -> Nothing
+      };
+      _ -> Nothing
+    };
+    _ -> Nothing
+  };
   invokeOrdinary :: Map XName CGBinding ->
                     XName -> A.WorkerFunction -> [] XErased -> Build String;
   invokeOrdinary scope name f args =
@@ -850,7 +995,12 @@ module Bootstrap.LLVM.Codegen where {
           symbol <- worker name f;
           preparedArguments <- workerArguments scope f args;
           let { captured = L.fst preparedArguments; values = L.snd preparedArguments };
-          call symbol (L.map pointer (L.append captured values))
+          value <- call symbol (L.map pointer (L.append captured values));
+          case boxedResultRange (A.functionBody f) of {
+            Nothing -> cgPure ();
+            Just bounds -> recordRange value bounds
+          };
+          cgPure value
         }
       }
     };
@@ -1298,6 +1448,62 @@ module Bootstrap.LLVM.Codegen where {
     Just f -> if L.length args == L.length (A.parameters f) then found else S.insert O.compareName name found;
     Nothing -> found
   };
+  -- A recursive group needs escape information only for its own captureless
+  -- workers. Collect these uses together as the syntax enters their groups.
+  -- A repeated recursive identity in raw input uses the scoped scan above.
+  indexWorkerEscapes :: Map XName A.WorkerFunction -> XErased -> WorkerEscapes;
+  indexWorkerEscapes fs expression = observe fs IM.empty
+    (WorkerEscapes IS.empty IS.empty IS.empty) expression;
+  recursiveWorkerArity fs name = case M.lookup O.compareName name fs of {
+    Just f -> if L.null (A.captures f) then Just (L.length (A.parameters f)) else Nothing;
+    Nothing -> Nothing
+  };
+  enrollWorker fs ((,) active previous) ((,) name _) =
+    case recursiveWorkerArity fs name of {
+      Just count -> case previous of {
+        WorkerEscapes entered repeated escaped ->
+          let { identity = O.nameId name;
+                duplicates = if IS.member identity entered then IS.insert identity repeated else repeated }
+          in (,) (IM.insert identity count active)
+                 (WorkerEscapes (IS.insert identity entered) duplicates escaped)
+      };
+      Nothing -> (,) active previous
+    };
+  observeWorker active previous name arity =
+    let { identity = O.nameId name } in case IM.lookup identity active of {
+      Just expected -> if arity == expected then previous else case previous of {
+        WorkerEscapes entered repeated escaped ->
+          WorkerEscapes entered repeated (IS.insert identity escaped)
+      };
+      Nothing -> previous
+    };
+  observeWorkerCall fs active arity previous expression = seq previous
+    (case expression of {
+      XEApp head argument -> observeWorkerCall fs active (arity + 1)
+        (observe fs active previous argument) head;
+      XEVar name -> observeWorker active previous name arity;
+      _ -> observe fs active previous expression
+    });
+  observe fs active previous expression = seq previous (case expression of {
+    XEVar name -> observeWorker active previous name 0;
+    XEApp _ _ -> observeWorkerCall fs active 0 previous expression;
+    XEAbs _ body -> observe fs active previous body;
+    XELet _ value body -> observe fs active (observe fs active previous value) body;
+    XELetRec bindings body -> case L.foldlStrict (enrollWorker fs) ((,) active previous) bindings of {
+      (,) local next -> observe fs local
+        (L.foldlStrict (\found entry -> observe fs local found (L.snd entry)) next bindings) body
+    };
+    XECase subject alternatives -> L.foldlStrict
+      (\found (XErasedAlternative _ body) -> observe fs active found body)
+      (observe fs active previous subject) alternatives;
+    _ -> previous
+  });
+  indexedWorkerEscape index fallback name = case index of {
+    Just (WorkerEscapes entered repeated escaped) -> let { identity = O.nameId name } in
+      if IS.member identity entered && L.not (IS.member identity repeated) then IS.member identity escaped
+      else S.member O.compareName name fallback;
+    Nothing -> S.member O.compareName name fallback
+  };
   -- In a large recursive scope retain escaping function values once, rather than
   -- rebuilding their environments at every lookup. Stack slots shorten the
   -- SSA lifetimes of recursive roots; only entry-block slots are allowed.
@@ -1305,13 +1511,14 @@ module Bootstrap.LLVM.Codegen where {
   recursiveBindings :: Map XName CGBinding -> [] ((,) XName XErased) -> XErased -> Build (Map XName CGBinding);
   recursiveBindings scope bindings body = do {
     fs <- gets functions;
+    index <- gets workerEscapeIndex;
     let {
       large = M.size scope + L.length bindings > 128 || O.remainingSize 16384 body < 0;
       escapes = L.foldlStrict (\seen binding -> escapingWorkers fs seen (L.snd binding))
         (escapingWorkers fs S.empty body) bindings;
       needsHole entry = case M.lookup O.compareName (L.fst entry) fs of {
         Nothing -> True;
-        Just f -> large && (L.not (L.null (A.captures f)) || S.member O.compareName (L.fst entry) escapes)
+        Just f -> large && (L.not (L.null (A.captures f)) || indexedWorkerEscape index escapes (L.fst entry))
       };
       values = L.filter needsHole bindings
     };
@@ -2523,12 +2730,11 @@ module Bootstrap.LLVM.Codegen where {
   -- A single thunk can use its own update root directly. Mark it busy before
   -- calling, clear captures through its callback, then force and memoize its
   -- result. Runtime fallback preserves null/cycle errors and longer spines.
-  -- Immediate values keep a short inline test. Share the ordinary heap
-  -- dispatch across call sites. Boxed worker arguments still inline the
-  -- ready-value and forwarding checks.
+  -- Share the immediate and heap dispatch for ordinary forcing sites.
+  -- Boxed worker arguments inline their ready-value and forwarding checks.
   forceDefinition :: [] String;
   forceDefinition = L.concat
-    [["define private ptr @mlf.force(ptr %value) alwaysinline {",
+    [["define private ptr @mlf.force(ptr %value) noinline {",
       "entry:",
       "  %bits = ptrtoint ptr %value to i64",
       "  %kind = and i64 %bits, 7",

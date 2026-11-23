@@ -31,7 +31,7 @@ module Bootstrap.CrateGraph where {
 
   data ContractHash = ContractHash W.Value String;
   data InferenceCaches = InferenceCaches (Map String Open.Environment) (Map String Open.Fragment)
-    (Map String ((,) String ByteArray)) (Maybe ContractHash) (Maybe LoweredSyntax);
+    (Map String ((,) String ByteArray)) (Maybe ContractHash) (Maybe LoweredSyntax) (Maybe EvidenceMemo);
   data State = State G.Session Source.CheckedContracts
     InferenceCaches ([] ((,,) String Open.Fragment ([] (V.Index Declaration)))) Int Int ([] Q.GroupResult) (Maybe IntArray);
   -- This bounded memo belongs to one compilation. A template is an abstract,
@@ -1026,13 +1026,14 @@ module Bootstrap.CrateGraph where {
           let { initial = Source.checkedIndexed contracts };
           G.elapsed statistics 0 graphStarted;
           runCheckedGroups owned occurrences declarationReads selectData verify (eqString auditSetting "1") (Separate.compactOpenGroupName crateId) inventory initial ((,) Nothing Nothing) groups
-            (State session contracts (InferenceCaches M.empty M.empty M.empty Nothing Nothing) [] 0 0 [] statistics)
+            (State session contracts (InferenceCaches M.empty M.empty M.empty Nothing Nothing Nothing) [] 0 0 [] statistics)
         } }
     };
   runGroups verify audit crateId = runGroupsWithOwner verify audit (Separate.compactOpenGroupName crateId);
   runGroupsWithOwner = runGroupsUsing Q.requiredDataIn;
   runGroupsUsing = runGroupsReading (Dependency.valueOccurrences True) (Dependency.valueOccurrences True False);
   runGroupsReading = runCheckedGroups False;
+  data CheckedRoute = OrdinaryCheck | SharedArgumentCheck | GroupedRootCheck;
   data CheckedStep = ReplayOrdinary | CheckedStep ((,) (Maybe RebuiltHash) (Maybe RebuiltHash)) State;
   -- Rejection is a source/evidence decision. Cache, hash, input and publication
   -- errors remain errors on both paths. A rejected step never returns its
@@ -1046,16 +1047,27 @@ module Bootstrap.CrateGraph where {
         step = runOneCheckedGroup owned occurrences declarationReads selectData verify audit groupName inventory initial scopeHashes owners state
       } in case readGroup contracts of {
         Left e -> ioReturn (Left e); Right ordinary@((,) slots prepared) -> do {
-          let { original = step False ordinary };
-          selected <- if not owned || not (Source.usesIndexedTerms (Source.slotScope slots)) ||
-            not (Source.sharedArgumentCandidate contracts slots prepared) then original else
-              case readGroup (Source.TrialChecked contracts) of {
-                Right alternate -> if Source.sharedArgumentReduction prepared (snd alternate) then do {
-                  trial <- step True alternate;
-                  case trial of { Right ReplayOrdinary -> original; _ -> ioReturn trial }
-                } else original;
-                Left _ -> original
-              };
+          let { original = step OrdinaryCheck ordinary;
+            indexed = owned && Source.usesIndexedTerms (Source.slotScope slots);
+            tryStep route admitted alternate fallback = case alternate of {
+              Right actual -> if admitted (snd actual) then do {
+                tried <- step route actual;
+                case tried of { Right ReplayOrdinary -> fallback; _ -> ioReturn tried }
+              } else fallback;
+              Left _ -> fallback
+            };
+            shareArguments = if indexed && Source.sharedArgumentCandidate contracts slots prepared
+              then tryStep SharedArgumentCheck (Source.sharedArgumentReduction prepared)
+                (readGroup (Source.TrialChecked contracts)) original
+              else original
+          };
+          selected <- if indexed then case Source.groupedPreparedRoot prepared of {
+            Just compact -> do {
+              tried <- step GroupedRootCheck ((,) slots compact);
+              case tried of { Right ReplayOrdinary -> shareArguments; _ -> ioReturn tried }
+            };
+            Nothing -> shareArguments
+          } else shareArguments;
           case selected of {
             Left e -> ioReturn (Left e);
             Right ReplayOrdinary -> ioReturn (Left "ordinary checking requested a replay");
@@ -1065,9 +1077,11 @@ module Bootstrap.CrateGraph where {
       }
     }
   };
-  runOneCheckedGroup owned occurrences declarationReads selectData verify audit groupName inventory initial scopeHashes owners state trial ((,) slots prepared) =
-    case state of {
-      State session contracts (InferenceCaches contexts templates payloads contractHash preparedCache) objects inferred reused reports statistics ->
+  runOneCheckedGroup owned occurrences declarationReads selectData verify audit groupName inventory initial scopeHashes owners state route ((,) slots prepared) =
+    let { trial = case route of { OrdinaryCheck -> False; _ -> True };
+          grouped = case route of { GroupedRootCheck -> True; _ -> False }
+    } in case state of {
+      State session contracts (InferenceCaches contexts templates payloads contractHash preparedCache evidenceMemo) objects inferred reused reports statistics ->
         let { scope = Source.checkedScope contracts; names = map (Source.declName scope) owners } in do {
             let { declarations = selectData inventory (Source.groupMembers prepared)
                     (append (Source.groupBindings prepared) (Source.groupCandidateBindings prepared));
@@ -1161,7 +1175,9 @@ module Bootstrap.CrateGraph where {
                                 }
                               } else mapEither (\fragment -> (,) fragment templates) (Inference.compileOpenGroup group
                                 [Q.dependencyInterface (Source.groupBindings prepared)] declarations (Source.groupMembers prepared));
-                              canonical <- Source.canonicalCheckedOpen (fst inferredResult);
+                              restored <- if grouped then Source.restoreRootDictionarySpine prepared (fst inferredResult)
+                                else Right (fst inferredResult);
+                              canonical <- Source.canonicalCheckedOpen restored;
                               Source.validatePreparedOpen slots prepared canonical;
                               Right ((,) canonical (snd inferredResult))
                             }
@@ -1177,12 +1193,12 @@ module Bootstrap.CrateGraph where {
                             case Source.prepareOpenFinish slots contracts prepared fragment of {
                               Left e -> rejectedStep trial e;
                               Right finish -> do {
-                                evidence <- resolveRequestsUsing trial env slots ((:) (G.edge scopeNode) (map G.edge dataNodes))
-                                  (Source.openFinishRequests finish) fourth;
-                                case evidence of { Left e -> ioReturn (Left e); Right ((,,) answers evidenceReads afterEvidence) ->
+                                evidence <- resolveRequestsBatch evidenceMemo trial env slots ((:) (G.edge scopeNode) (map G.edge dataNodes))
+                                  (Source.openFinishRequestBatch finish) fourth;
+                                case evidence of { Left e -> ioReturn (Left e); Right ((,,,) answers evidenceReads afterEvidence nextEvidenceMemo) ->
                                 case Source.completeOpenFinish contracts finish answers of {
                                 Left e -> rejectedStep trial e;
-                                Right completed@(Source.OpenFinalGroup body delta) -> if trial && not (Source.fullyDischarged completed)
+                                Right completed@(Source.OpenFinalGroup body delta) -> if trial && not grouped && not (Source.fullyDischarged completed)
                                   then ioReturn (Right ReplayOrdinary) else do {
                                 let { final = Source.openFinalObject fragment body };
                                 demanded <- case Source.finalParameterIds slots contracts final of {
@@ -1207,7 +1223,7 @@ module Bootstrap.CrateGraph where {
                                 case supplied of { Left e -> ioReturn (Left e); Right ((,) next nextContractHash) -> do {
                                     G.elapsed statistics 3 finishStarted;
                                     ioReturn (Right (CheckedStep ((,) inventoryHash scopeHash)
-                                      (State next (Source.publishContracts contracts delta) (InferenceCaches currentContexts nextTemplates nextPayloads nextContractHash nextPreparedCache)
+                                      (State next (Source.publishContracts contracts delta) (InferenceCaches currentContexts nextTemplates nextPayloads nextContractHash nextPreparedCache nextEvidenceMemo)
                                         ((:) ((,,) group final (map fst delta)) objects)
                                         (inferred + if hit then 0 else 1) (reused + if hit then 1 else 0)
                                         ((:) (Q.GroupResult group names hit
@@ -1357,9 +1373,40 @@ module Bootstrap.CrateGraph where {
       Right ((,) name (XName (0 - index - 1) stable))
     }) (zip (range 0 (length ids - 1)) (zip ids candidates))
   };
+  -- The provider still reads its own Scope query key. Stored evidence may
+  -- share a proof across owners with exactly the same scope content and data
+  -- dependencies. The individual ordered reads are checked before decoding.
+  evidencePayloadReads refs = case refs of {
+    (:) ((,) key digest) rest -> case Separate.unpack key of {
+      Right ["Scope",_] -> (:) ((,) (G.key "EvidenceScopeContent" "") digest) rest;
+      _ -> refs
+    };
+    [] -> []
+  };
+  sameEvidenceReads = eqList (eqPair eqString eqString);
+  data StoredEvidence = StoredEvidence W.Value XTerm String ByteArray;
+  data EvidenceMemo = EvidenceMemo ([] ((,) String String))
+    ([] Boundary.Candidate) ([] ((,) XName XName)) StoredEvidence;
+  sameEvidenceName a b = X.equalName a b && eqString (X.nameHint a) (X.nameHint b);
+  sameEvidenceCandidate a b = case (,) (Boundary.candidateTriple a) (Boundary.candidateTriple b) of {
+    (,) ((,,) role _ ty) ((,,) other _ expected) -> Evidence.sameRole role other &&
+      sameContractValue (A.toXType ty) (A.toXType expected)
+  };
+  reverseEvidenceNames = map (\((,) a b) -> (,) b a);
+  evidenceForBatch memo refs candidates aliases = case memo of {
+    Just (EvidenceMemo oldRefs oldCandidates oldAliases (StoredEvidence goal proof digest bytes)) ->
+      if sameEvidenceReads oldRefs refs && eqList sameEvidenceCandidate oldCandidates candidates &&
+        eqList (\a b -> sameEvidenceName (snd a) (snd b)) oldAliases aliases
+      then Just (StoredEvidence goal (renameEvidence (reverseEvidenceNames aliases) proof) digest bytes)
+      else Nothing;
+    Nothing -> Nothing
+  };
+  persistEvidenceMemo refs candidates aliases (StoredEvidence goal proof digest bytes) =
+    EvidenceMemo refs candidates aliases (StoredEvidence goal (renameEvidence aliases proof) digest bytes);
+  renameEvidence aliases proof = let { names = M.fromList X.compareName aliases } in
+    Separate.mapTerm (\n -> M.findWithDefault X.compareName n n names) (\a -> a) proof;
   evidenceValue goal references aliases answer = let {
-    names = M.fromList X.compareName aliases;
-    canonical = mapOptional (Separate.mapTerm (\n -> M.findWithDefault X.compareName n n names) (\a -> a)) answer
+    canonical = mapOptional (renameEvidence aliases) answer
   } in W.VNode 426 [A.toXType (Separate.normalType goal),
     A.toList (A.toPair A.toText A.toText) references,A.toMaybe A.toXTerm canonical];
   decodeEvidence graph goal references aliases = do {
@@ -1371,7 +1418,8 @@ module Bootstrap.CrateGraph where {
         ensure (T.alphaEq savedGoal goal) "evidence goal changed";
         raw <- A.decodeGraphValue (A.ShapeList (A.ShapePair A.ShapeText A.ShapeText)) graph rs;
         savedReferences <- A.expectList (A.expectPair A.expectText A.expectText) raw;
-        ensure (eqList (eqPair eqString eqString) savedReferences references) "evidence environment changed";
+        ensure (sameEvidenceReads savedReferences references ||
+          sameEvidenceReads savedReferences (evidencePayloadReads references)) "evidence environment changed";
         decoded <- A.decodeGraphValue (A.ShapeMaybe A.ShapeXTerm) graph p;
         proof <- A.expectMaybe A.expectXTerm decoded;
         let { replacements = M.fromList X.compareName (map (\((,) a b) -> (,) b a) aliases) };
@@ -1383,46 +1431,104 @@ module Bootstrap.CrateGraph where {
   resolveRequests = resolveRequestsUsing False;
   resolveRequestsUsing trial env slots dependencies requests session = case requests of {
     [] -> ioReturn (Right ((,,) [] [] session));
-    (:) ((,,) ordinal goal candidates) rest -> case evidenceNames slots candidates of {
-      Left e -> ioReturn (Left e); Right aliases -> do {
-      let { wanted = evidenceKey (EvidenceQuery slots ordinal goal);
-        validated = G.validate wanted session; previous = fst validated; current = snd validated };
-      cached <- case previous of {
-        Nothing -> ioReturn (Left "dirty evidence query");
-        Just node -> case G.nodePayload node of {
-          Nothing -> ioReturn (Left "missing evidence payload");
-          Just digest -> do {
-            read <- G.readValue (G.payloadPath current digest) (Just digest);
-            ioReturn (bindEither read (\graph -> decodeEvidence graph goal dependencies aliases))
-          }
+    (:) ((,,) ordinal goal candidates) rest -> do {
+      first <- resolveRequestsBatch Nothing trial env slots dependencies
+        (Boundary.RequestBatch candidates [(,) ordinal goal]) session;
+      case first of {
+        Left e -> ioReturn (Left e);
+        Right ((,,,) answers reads next _) -> do {
+          following <- resolveRequestsUsing trial env slots dependencies rest next;
+          ioReturn (mapEither (\((,,) tail more final) ->
+            (,,) (append answers tail) (append reads more) final) following)
         }
-      };
-      let { answer = case cached of {
-        Right value -> Right value;
-        Left _ -> case Evidence.resolveDictionaryDetailed (Open.dataEnvironment env) M.empty
-          (map Boundary.candidateTriple candidates) goal of {
-          Left (Evidence.NoEntailment _) -> Right Nothing;
-          Left (Evidence.InvalidEvidence message) ->
-            if trial then Right Nothing else Left message;
-          Right proof -> Right (Just proof)
-        }
-      } };
-      case answer of { Left e -> ioReturn (Left e); Right proof -> do {
-        recorded <- case cached of {
-          Right _ -> case previous of {
-            Just node -> ioReturn (Right ((,) node current));
-            Nothing -> ioReturn (Left "evidence validation invariant")
-          };
-          Left _ -> G.record wanted dependencies True (evidenceValue goal dependencies aliases proof) current
-        };
-        case recorded of { Left e -> ioReturn (Left e); Right ((,) node next) -> do {
-          tail <- resolveRequestsUsing trial env slots dependencies rest next;
-          ioReturn (mapEither (\((,,) answers edges final) ->
-            (,,) ((:) ((,) ordinal proof) answers) ((:) (G.edge node) edges) final) tail)
-        } }
-      } }
-    } }
+      }
+    }
   };
+  -- The checked plan supplies one ordered candidate environment for all its
+  -- requests. Admit that environment and map its binders once, then record
+  -- each source site with its complete current reads.
+  resolveRequestsBatch memo trial env slots dependencies (Boundary.RequestBatch candidates requests) session =
+    case requests of {
+      [] -> ioReturn (Right ((,,,) [] [] session memo));
+      _ -> case evidenceNames slots candidates of {
+        Left e -> ioReturn (Left e);
+        Right aliases -> let {
+          refs = evidencePayloadReads dependencies;
+          enabled = not trial && length candidates <= 64;
+          retained = if enabled then evidenceForBatch memo refs candidates aliases else Nothing;
+          group = groupIdentity slots;
+          resolver = Evidence.resolveDictionaryDetailed (Open.dataEnvironment env) M.empty
+            (map Boundary.candidateTriple candidates);
+          walk proofMemo remaining active = case remaining of {
+            [] -> ioReturn (Right ((,,,) [] [] active (case proofMemo of {
+              Nothing -> memo;
+              Just proof -> Just (persistEvidenceMemo refs candidates aliases proof)
+            })));
+            (:) ((,) ordinal goal) rest -> do {
+              let { normal = Separate.normalType goal; goalValue = A.toXType normal;
+                wanted = G.key "Evidence" (Separate.pack [group, showInt ordinal, Pretty.prettyType normal]);
+                validated = G.validateExpected wanted dependencies active;
+                previous = fst validated; current = snd validated;
+                publish digest bytes = G.recordDigest wanted dependencies (Just digest) digest (Just bytes) current;
+                proceed proof next ((,) node updated) = do {
+                  tail <- walk next rest updated;
+                  ioReturn (mapEither (\((,,,) answers edges final remembered) ->
+                    (,,,) ((:) ((,) ordinal proof) answers) ((:) (G.edge node) edges) final remembered) tail)
+                };
+                fresh = case resolver goal of {
+                  Left (Evidence.NoEntailment _) -> Right Nothing;
+                  Left (Evidence.InvalidEvidence message) -> if trial then Right Nothing else Left message;
+                  Right proof -> Right (Just proof)
+                };
+                record = case fresh of {
+                  Left e -> ioReturn (Left e);
+                  Right proof -> do {
+                    encoded <- G.encodeHashed (evidenceValue goal refs aliases proof);
+                    case encoded of {
+                      Left e -> ioReturn (Left e);
+                      Right ((,) digest bytes) -> do {
+                        next <- case proof of {
+                          Just checked -> if not enabled then ioReturn proofMemo else do {
+                            size <- lengthByteArray bytes;
+                            ioReturn (if size <= 65536 then case contractHashBudget 1 128 goalValue of {
+                              Just _ -> Just (StoredEvidence goalValue checked digest bytes);
+                              Nothing -> proofMemo
+                            } else proofMemo)
+                          };
+                          Nothing -> ioReturn proofMemo
+                        };
+                        proceed proof next (publish digest bytes)
+                      }
+                    }
+                  }
+                }
+              };
+              cached <- case previous of {
+                Nothing -> ioReturn (Left "dirty evidence query");
+                Just node -> case G.nodePayload node of {
+                  Nothing -> ioReturn (Left "missing evidence payload");
+                  Just digest -> do {
+                    read <- G.readValue (G.payloadPath current digest) (Just digest);
+                    ioReturn (bindEither read (\graph -> decodeEvidence graph goal dependencies aliases))
+                  }
+                }
+              };
+              case cached of {
+                Right proof -> case previous of {
+                  Just node -> proceed proof proofMemo ((,) node current);
+                  Nothing -> ioReturn (Left "evidence validation invariant")
+                };
+                Left _ -> case proofMemo of {
+                  Just (StoredEvidence saved proof digest bytes) -> if sameContractValue saved goalValue
+                    then proceed (Just proof) proofMemo (publish digest bytes) else record;
+                  Nothing -> record
+                }
+              }
+            }
+          }
+        } in walk retained requests session
+      }
+    };
   -- The standalone source-root boundary publishes only after every SCC has
   -- completed. CrateSession uses compile/result and owns the later IO boundary.
   compileSourceGroups verify crateId directory imports protected plan = do {

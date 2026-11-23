@@ -379,17 +379,26 @@ module Bootstrap.Constraint where {
   bindTerms env entries = foldlStrict (\scope ((,) ref value) -> bindTerm scope ref value) env entries;
   isDeclarationRef ref = case ref of { DeclRef _ _ -> True; _ -> False };
   withBoundRef ref action = if isDeclarationRef ref then withDeclarationScope action else action;
-  evidenceBinding env ((,) role ref) = case lookupTerm env ref of {
+  evidenceBinding = evidenceBindingIn M.empty;
+  evidenceBindingIn imported env ((,) role ref) = case lookupTerm env ref of {
     Just (Mono name identity) -> Right (EvidenceBinding role name identity False);
     Just (Poly name source) -> Right (EvidenceBinding role name source True);
     Just (DeclaredPoly name _ declared) -> Right (DeclaredEvidenceBinding role name declared);
     Just (RecursiveMono _ _ _) -> Left "recursive dictionary interfaces require an explicit signature";
     Just (RecursiveDictionaryMono _ _ _ _) -> Left "recursive dictionary interfaces require an explicit signature";
-    Nothing -> Left ("dictionary candidate is out of scope: " ++ termRefName ref)
+    Nothing -> let { missing = Left ("dictionary candidate is out of scope: " ++ termRefName ref) } in
+      case ref of {
+        DeclRef i _ -> case M.lookup compareRefSlot i imported of {
+          Just ((,) name declared) -> Right (DeclaredEvidenceBinding role name declared);
+          Nothing -> missing
+        };
+        LexicalRef _ -> missing
+      }
   };
-  resolveCandidateEnvironment env gen (CandidateEnvironment owner refs) =
+  resolveCandidateEnvironment = resolveCandidateEnvironmentIn M.empty;
+  resolveCandidateEnvironmentIn imported env gen (CandidateEnvironment owner refs) =
     WithCandidates (\memo state -> let {
-      resolve = traverseEither (evidenceBinding env) refs;
+      resolve = traverseEither (evidenceBindingIn imported env) refs;
       fresh rows = ResolvedCandidateEnvironment gen rows
     } in case memo of {
       SeparateEnvironments -> mapEither (\rows -> (,,) (fresh rows) state memo) resolve;
@@ -407,8 +416,12 @@ module Bootstrap.Constraint where {
   build :: DataEnv -> Map String Int -> Maybe Int -> Map String Binding -> Core -> Generate Typed;
   build datatypes typeScope parent locals = buildIn datatypes typeScope parent (BindingEnv locals M.empty);
   buildIn :: DataEnv -> Map String Int -> Maybe Int -> BindingEnv -> Core -> Generate Typed;
-  buildIn datatypes typeScope parent env core =
-    generalize parent (\gen root -> buildCore datatypes typeScope env gen root core);
+  buildIn = buildInWithEvidence M.empty;
+  -- Checked file imports that occur only in wanted inventories belong to the
+  -- evidence namespace. All public builders begin with an empty inventory.
+  buildInWithEvidence imported datatypes typeScope parent env core =
+    generalize parent (\gen root -> withBindingRoot gen (\scopeRoot ->
+      buildCoreUnderIn ((,) scopeRoot imported) datatypes typeScope env gen root core));
   generalize :: Maybe Int -> (Int -> Int -> Generate Form) -> Generate Typed;
   generalize parent makeForm = do {
     gen <- newNode (GGen (-1)) parent Flexible;
@@ -426,8 +439,9 @@ module Bootstrap.Constraint where {
     action (outermost graph gen)
   };
   buildUnder :: Int -> DataEnv -> Map String Int -> Int -> BindingEnv -> Core -> Generate Typed;
-  buildUnder scopeRoot datatypes typeScope parent env core =
-    generalize (Just parent) (\gen root -> buildCoreUnder scopeRoot datatypes typeScope env gen root core);
+  buildUnder root = buildUnderIn ((,) root M.empty);
+  buildUnderIn scopeRoot datatypes typeScope parent env core =
+    generalize (Just parent) (\gen root -> buildCoreUnderIn scopeRoot datatypes typeScope env gen root core);
   buildCore :: DataEnv ->
                Map String Int -> BindingEnv -> Int -> Int -> Core -> Generate Form;
   buildCore datatypes typeScope env gen root core = withBindingRoot gen
@@ -606,10 +620,11 @@ module Bootstrap.Constraint where {
     }) state);
   -- A complete first-order producer can prove that all of these distinct
   -- binders have one closed nominal predicate. Only their type is shared.
-  buildDictionaryPrefix common scopeRoot datatypes typeScope env gen root names body = let {
+  buildDictionaryPrefix common root = buildDictionaryPrefixIn common ((,) root M.empty);
+  buildDictionaryPrefixIn common scopeRoot datatypes typeScope env gen root names body = let {
     bottom = newNode GBot (Just gen) Flexible;
     setTag tag = setNode root (Node tag (Just gen) Flexible);
-    child = buildUnder scopeRoot datatypes typeScope gen
+    child = buildUnderIn scopeRoot datatypes typeScope gen
   } in do {
         shared <- case common of {
           Nothing -> return Nothing;
@@ -642,9 +657,10 @@ module Bootstrap.Constraint where {
         return (FBindDictionaries (map (\((,,) _ name domain) -> (,) name domain) parameters) value proof)
       };
   buildCoreUnder :: Int -> DataEnv -> Map String Int -> BindingEnv -> Int -> Int -> Core -> Generate Form;
-  buildCoreUnder scopeRoot datatypes typeScope env gen root core =
+  buildCoreUnder root = buildCoreUnderIn ((,) root M.empty);
+  buildCoreUnderIn scopeRoot datatypes typeScope env gen root core =
     let {
-      child = buildUnder scopeRoot datatypes typeScope gen
+      child = buildUnderIn scopeRoot datatypes typeScope gen
     } in
     let {
       bottom = newNode GBot (Just gen) Flexible
@@ -661,7 +677,7 @@ module Bootstrap.Constraint where {
       variable ref = case lookupTerm env ref of {
           Nothing -> case ref of {
             LexicalRef x -> case P.lookupPrimitive x of {
-              Just primitive -> buildCoreUnder scopeRoot datatypes typeScope env gen root (CPrimitive primitive);
+              Just primitive -> buildCoreUnderIn scopeRoot datatypes typeScope env gen root (CPrimitive primitive);
               Nothing -> failGenerate ("unbound variable: " ++ x)
             };
             DeclRef _ hint -> failGenerate ("unbound variable: " ++ hint)
@@ -783,7 +799,7 @@ module Bootstrap.Constraint where {
               case G.nodeAt graph target of {
                 Node (GCon required []) (Just owner) Flexible ->
                   if owner == gen && G.resolve graph target == target && eqString output required then
-                    fmap ClosedPrimitiveForm (buildCoreUnder scopeRoot datatypes typeScope env gen target expression)
+                    fmap ClosedPrimitiveForm (buildCoreUnderIn scopeRoot datatypes typeScope env gen target expression)
                   else ordinary expression target;
                 _ -> ordinary expression target
               }
@@ -914,12 +930,12 @@ module Bootstrap.Constraint where {
         rest <- edge (generalization remaining) root;
         return (FIntStringCalls operator worker' value valueProof root arms remaining rest)
       };
-      explicit refs = liftResult (mapEither FEvidence (traverseEither (evidenceBinding env) refs));
+      explicit refs = liftResult (mapEither FEvidence (traverseEither (evidenceBindingIn (snd scopeRoot) env) refs));
       wanted dictionary evidence =
         do {
           declaration <- liftResult (D.lookupDatatype datatypes dictionary);
           parameters <-
-            mapM (\parameter -> newNode (G.bottomTag (snd parameter)) (Just scopeRoot) Flexible)
+            mapM (\parameter -> newNode (G.bottomTag (snd parameter)) (Just (fst scopeRoot)) Flexible)
               (D.datatypeBinders declaration);
           let {
             ps = M.fromList compareString (zip (D.datatypeParameters declaration) parameters)
@@ -935,17 +951,17 @@ module Bootstrap.Constraint where {
       CVar x -> variable (LexicalRef x);
       CGivenScope names body -> do {
         givens <- liftResult (traverseEither (\name -> evidenceBinding env ((,) GivenEvidence (LexicalRef name))) names);
-        enclosed <- buildCoreUnder scopeRoot datatypes typeScope env gen root body;
+        enclosed <- buildCoreUnderIn scopeRoot datatypes typeScope env gen root body;
         return (FWithGivens givens enclosed)
       };
       CGlobal i hint -> variable (DeclRef i hint);
       CLam x body -> lambda (LexicalRef x) body;
-      CBindDictionaries names body -> buildDictionaryPrefix Nothing scopeRoot datatypes typeScope env gen root names body;
+      CBindDictionaries names body -> buildDictionaryPrefixIn Nothing scopeRoot datatypes typeScope env gen root names body;
       CDeclScope ids enclosed -> case (,) ids enclosed of {
         (,) [i] (CLam x body) -> lambda (DeclRef i x) body;
         (,) [i] (CLet x a b) -> binding (DeclRef i x) a b;
         (,) slots (CRec defs body) -> if length slots == length defs
-          then withDeclarationScope (buildRecursiveUnder scopeRoot datatypes typeScope env gen root
+          then withDeclarationScope (buildRecursiveUnderIn scopeRoot datatypes typeScope env gen root
             (zipWith (\i ((,,) n mode rhs) -> (,,) (DeclRef i n) mode rhs) slots defs) body)
           else failGenerate "recursive declaration slot inventory mismatch";
         _ -> failGenerate "declaration scope requires a matching top-level binder"
@@ -991,7 +1007,7 @@ module Bootstrap.Constraint where {
         _ -> ordinary
       };
       CApplyScopedDictionaries function arguments -> let {
-        ordinary = buildCoreUnder scopeRoot datatypes typeScope env gen root
+        ordinary = buildCoreUnderIn scopeRoot datatypes typeScope env gen root
           (ordinaryScopedDictionaries (caseRefTerm function) arguments);
         -- The whole source scheme was checked by groundDictionaryDomains.
         -- Adjacent wants for the same fully ground nominal argument in the
@@ -1012,7 +1028,7 @@ module Bootstrap.Constraint where {
                 value <- case (,) key previous of {
                   (,) (Just ((,) c t)) (Just ((,,,) pc pt po old)) ->
                     if owner /= po || not (eqString c pc && eqString t pt) then fresh else do {
-                      resolved <- resolveCandidateEnvironment env gen candidates;
+                      resolved <- resolveCandidateEnvironmentIn (snd scopeRoot) env gen candidates;
                       case (,) old resolved of {
                         (,) (Typed _ (FScopedEvidence (ResolvedCandidateEnvironment previous _)))
                             (ResolvedCandidateEnvironment actual _) ->
@@ -1068,7 +1084,7 @@ module Bootstrap.Constraint where {
         };
         prefixType parameters = foldM (\result ((,) _ domain) -> newNode (GArr domain result) (Just gen) Flexible)
           root (reverse parameters);
-        ordinary = buildCoreUnder scopeRoot datatypes typeScope env gen root
+        ordinary = buildCoreUnderIn scopeRoot datatypes typeScope env gen root
           (foldl CApp callee (map CVar arguments))
       } in case (,) (lookupTerm env function) (traverseEither dictionary arguments) of {
         (,) (Just (Poly name source)) (Right parameters) -> do {
@@ -1097,13 +1113,13 @@ module Bootstrap.Constraint where {
         _ -> ordinary
       };
       CLet x a b -> binding (LexicalRef x) a b;
-      CRec defs body -> buildRecursiveUnder scopeRoot datatypes typeScope env gen root
+      CRec defs body -> buildRecursiveUnderIn scopeRoot datatypes typeScope env gen root
         (map (\((,,) n mode rhs) -> (,,) (LexicalRef n) mode rhs) defs) body;
       CWanted dictionary candidates -> wanted dictionary
         (explicit (map (\((,) role n) -> (,) role (LexicalRef n)) candidates));
       CWantedRefs dictionary candidates -> wanted dictionary (explicit candidates);
       CWantedScope dictionary environment -> wanted dictionary
-        (fmap FScopedEvidence (resolveCandidateEnvironment env gen environment));
+        (fmap FScopedEvidence (resolveCandidateEnvironmentIn (snd scopeRoot) env gen environment));
       CChecked signature expression ->
         do {
           embedded <- embed datatypes typeScope signature;
@@ -1145,7 +1161,7 @@ module Bootstrap.Constraint where {
           target <- embed datatypes local expected;
           attach gen Rigid target;
           checked <-
-            buildUnder scopeRoot datatypes local gen env
+            buildUnderIn scopeRoot datatypes local gen env
               (desugar (SAnn (directed expected expression) (SAnnotation [] expected)));
           e <- edge (generalization checked) target;
           return
@@ -1275,7 +1291,7 @@ module Bootstrap.Constraint where {
           prepared <- mapM (prepareBranch datatypes gen domain parameters) alternatives;
           let { projections = concatMap preparedProjections prepared };
           unless (null projections) (projectCase projections);
-          branches <- mapM (buildPreparedBranchUnder scopeRoot datatypes typeScope env gen root) prepared;
+          branches <- mapM (buildPreparedBranchUnderIn scopeRoot datatypes typeScope env gen root) prepared;
           return (FMatch a ea branches)
         }
     };
@@ -1340,7 +1356,8 @@ module Bootstrap.Constraint where {
                     [] ((,,) TermRef RecursiveMode Core) -> Core -> Generate Form;
   buildRecursive datatypes typeScope env gen root definitions body = withBindingRoot gen
     (\scopeRoot -> buildRecursiveUnder scopeRoot datatypes typeScope env gen root definitions body);
-  buildRecursiveUnder scopeRoot datatypes typeScope env gen root definitions body =
+  buildRecursiveUnder root = buildRecursiveUnderIn ((,) root M.empty);
+  buildRecursiveUnderIn scopeRoot datatypes typeScope env gen root definitions body =
     do {
       let { signed = filter checkedRecursive definitions };
       declarations <- mapM (\((,,) ref mode rhs) -> do {
@@ -1355,7 +1372,7 @@ module Bootstrap.Constraint where {
         unsigned = filter (\definition -> not (checkedRecursive definition)) definitions
       };
       let { groups = recursiveGroups unsigned };
-      inferred <- inferRecursiveGroups scopeRoot datatypes typeScope gen signedScope groups;
+      inferred <- inferRecursiveGroupsIn scopeRoot datatypes typeScope gen signedScope groups;
       case inferred of {
         (,) scope inferredDefinitions ->
           do {
@@ -1363,7 +1380,7 @@ module Bootstrap.Constraint where {
               mapM
                 (\((,) ((,,,) n name source target) ((,,) _ _ rhs)) ->
                    do {
-                     value <- buildUnder scopeRoot datatypes typeScope gen scope rhs;
+                     value <- buildUnderIn scopeRoot datatypes typeScope gen scope rhs;
                      proof <- edge (generalization value) target;
                      return ((,) n (RecursiveDefinition name source value proof Nothing))
                    })
@@ -1374,7 +1391,7 @@ module Bootstrap.Constraint where {
                  Nothing -> failGenerate "recursive component lost a declaration";
                  Just value -> return value
                }) definitions;
-            continuation <- buildUnder scopeRoot datatypes typeScope gen scope body;
+            continuation <- buildUnderIn scopeRoot datatypes typeScope gen scope body;
             proof <- edge (generalization continuation) root;
             return (FRecursive ordered continuation proof)
           }
@@ -1383,9 +1400,10 @@ module Bootstrap.Constraint where {
   -- A batch contains only declaration SCCs with no dependency between
   -- members of distinct SCCs. Their pre-existing references must be closed
   -- declarations. Scope and type errors use the established per-SCC order.
-  inferRecursiveGroups scopeRoot datatypes typeScope parent signedScope groups = let {
-    build scope group = buildRecursiveGroupUnder scopeRoot datatypes typeScope scope parent group;
-    plan scope group = planRecursiveGroup scopeRoot datatypes typeScope scope parent group;
+  inferRecursiveGroups root = inferRecursiveGroupsIn ((,) root M.empty);
+  inferRecursiveGroupsIn scopeRoot datatypes typeScope parent signedScope groups = let {
+    build scope group = buildRecursiveGroupUnderIn scopeRoot datatypes typeScope scope parent group;
+    plan scope group = planRecursiveGroupIn scopeRoot datatypes typeScope scope parent group;
     scoped group action = if any (\((,,) ref _ _) -> isDeclarationRef ref) group
       then withDeclarationScope action else action;
     single scope group = scoped group (build scope group);
@@ -1406,7 +1424,7 @@ module Bootstrap.Constraint where {
       }
     } in case batch of {
       (:) _ ((:) _ _) -> WithCandidates (\memo state -> case state of {
-        Generation graph [] [] -> if not (closedRecursiveBatch graph scope batch)
+        Generation graph [] [] -> if not (closedRecursiveBatchIn (snd scopeRoot) graph scope batch)
           then runWithCandidates memo sequential state
           else runWithCandidates memo together state;
         _ -> runWithCandidates memo sequential state
@@ -1438,7 +1456,8 @@ module Bootstrap.Constraint where {
     [] -> [];
     (:) first rest -> batch (recursiveDeclarations first) (recursiveDeclarationReads first) [first] rest
   };
-  closedRecursiveBatch graph scope groups = let {
+  closedRecursiveBatch = closedRecursiveBatchIn M.empty;
+  closedRecursiveBatchIn imported graph scope groups = let {
     declarations = foldlStrict IS.union IS.empty (map recursiveDeclarations groups);
     refs = concatMap recursiveMentioned groups;
     declared group = IS.size (recursiveDeclarations group) == length group;
@@ -1451,8 +1470,10 @@ module Bootstrap.Constraint where {
         (,) Nothing (Just _) -> Right sources;
         _ -> Left "batch requires closed declarations"
       };
-      DeclRef _ _ -> case lookupTerm scope ref of {
+      DeclRef i _ -> case lookupTerm scope ref of {
         Just (Poly _ gen) -> Right (IS.insert gen sources);
+        Nothing -> if M.member compareRefSlot i imported then Right sources
+          else Left "batch requires closed declarations";
         _ -> Left "batch requires closed declarations"
       }
     };
@@ -1595,13 +1616,15 @@ module Bootstrap.Constraint where {
                          Generate ((,) BindingEnv ([] ((,) TermRef RecursiveDefinition)));
   buildRecursiveGroup datatypes typeScope env parent definitions = withBindingRoot parent
     (\scopeRoot -> buildRecursiveGroupUnder scopeRoot datatypes typeScope env parent definitions);
-  buildRecursiveGroupUnder scopeRoot datatypes typeScope env parent definitions = do {
-    pending <- planRecursiveGroup scopeRoot datatypes typeScope env parent definitions;
+  buildRecursiveGroupUnder root = buildRecursiveGroupUnderIn ((,) root M.empty);
+  buildRecursiveGroupUnderIn scopeRoot datatypes typeScope env parent definitions = do {
+    pending <- planRecursiveGroupIn scopeRoot datatypes typeScope env parent definitions;
     flushGeneration;
     finishRecursiveGroups env parent [pending]
   };
   data PendingRecursive = PendingRecursive Int ([] ((,,,) TermRef XName Int Int)) ([] ((,) Typed Edge));
-  planRecursiveGroup scopeRoot datatypes typeScope env parent definitions =
+  planRecursiveGroup root = planRecursiveGroupIn ((,) root M.empty);
+  planRecursiveGroupIn scopeRoot datatypes typeScope env parent definitions =
     do {
       group <- newNode (GGen (-1)) (Just parent) Flexible;
       declarations <- mapM
@@ -1624,7 +1647,7 @@ module Bootstrap.Constraint where {
       };
       bodies <- mapM
         (\((,) ((,,,) declaration _ shared _) ((,,) _ _ rhs)) -> do {
-           let { buildBody = buildUnder scopeRoot datatypes typeScope group scope; ordinary = buildBody rhs };
+           let { buildBody = buildUnderIn scopeRoot datatypes typeScope group scope; ordinary = buildBody rhs };
            value <- case declaration of {
              DeclRef _ _ -> if not (hasLambdaPrefix 8 rhs) then ordinary else fileApplication (do {
                graph <- getGraph;
@@ -1634,7 +1657,7 @@ module Bootstrap.Constraint where {
                    Nothing -> buildBody compact;
                    Just _ -> WithCandidates (\memo state -> runWithCandidates memo (case memo of {
                      BatchedEnvironments _ -> generalize (Just group) (\gen root ->
-                       buildDictionaryPrefix common scopeRoot datatypes typeScope scope gen root names body);
+                       buildDictionaryPrefixIn common scopeRoot datatypes typeScope scope gen root names body);
                      _ -> buildBody compact
                    }) state)
                  }
@@ -1775,10 +1798,11 @@ module Bootstrap.Constraint where {
                          Int -> Int -> PreparedBranch -> Generate Branch;
   buildPreparedBranch datatypes typeScope env gen root prepared = withBindingRoot gen
     (\scopeRoot -> buildPreparedBranchUnder scopeRoot datatypes typeScope env gen root prepared);
-  buildPreparedBranchUnder scopeRoot datatypes typeScope env gen root prepared =
+  buildPreparedBranchUnder root = buildPreparedBranchUnderIn ((,) root M.empty);
+  buildPreparedBranchUnderIn scopeRoot datatypes typeScope env gen root prepared =
     case prepared of {
       PreparedBranch pattern bindings body _ -> do {
-        body' <- buildUnder scopeRoot datatypes typeScope gen
+        body' <- buildUnderIn scopeRoot datatypes typeScope gen
           (bindTerms env (map (\((,) n binding) -> (,) (LexicalRef n) binding) bindings)) body;
         e <- edge (generalization body') root;
         return (Branch pattern body' e)

@@ -18,11 +18,22 @@ def mlf_commands(endpoint, emlf, spec, out):
                 ('checked-to-llvm', [emlf, '--crate-to-llvm-gc', out/'unit.mlfci'], out/'unit.ll')]
     if endpoint == 'crate-fused-v1':
         return [('source-to-llvm', [emlf, '--compile-crate-to-llvm-gc', spec, '-o', out/'unit'], out/'unit.ll')]
+    if endpoint == 'crate-plan-v1':
+        return [('source-to-llvm', [emlf, '--compile-crate-plan', out/'build.plan', spec, '-o', out/'unit'],
+                 out/'unit.ll')]
     raise ValueError('unsupported compile endpoint: ' + endpoint)
 
 
 def mlf_stage_names(endpoint):
     return [stage for stage, _, _ in mlf_commands(endpoint, Path('/emlf'), Path('/spec'), Path('/out'))] + ['llvm-to-executable']
+
+
+def dependencies(case):
+    return case.get('dependencies', [case['dependency']] if 'dependency' in case else [])
+
+
+def dependency_folder(build, libraries, index):
+    return build/('dependency' if len(libraries)==1 else f'dependency-{index}')
 
 
 def main():
@@ -51,19 +62,42 @@ def main():
         save()
         if result.returncode:
             raise SystemExit(result.returncode)
+    libraries = dependencies(case)
     if args.lane=='ghc':
+        includes = ['-i'+path for path in sorted({str(Path(lib['source']).parent) for lib in libraries})]
         run('source-to-executable',[setup['ghc'],'--make','-j1','-O2','-fforce-recomp',
             '-package-env','-','-clear-package-db','-global-package-db','-package-db',setup['package_db'],
             '-no-user-package-db','-hide-all-packages','-package','base','-package','mlf-shape-primitives',
-            '-i','-odir',out,'-hidir',out,case['source'],'-o',out/'program'])
+            '-i',*includes,'-odir',out,'-hidir',out,case['source'],'-o',out/'program'])
     else:
         emlf=Path(setup['producer'])/'bin/emlf'
         if args.lane=='mlf':
             query=out/'queries'; query.mkdir()
             spec=out/'crate.spec'
-            spec.write_text(pack(['MLF-CRATE-1','compiler-shapes/'+case['id'],'Main','false',
-                pack([pack(['Main',case['source']])]),pack([setup['builtin']+'.mlfci']),str(query),setup['builtin']]))
             endpoint = plan.get('benchmark', {}).get('endpoint', {}).get('id', 'crate-bootstrap-v1')
+            imports = [setup['builtin']+'.mlfci']
+            entries = []
+            if libraries and endpoint != 'crate-plan-v1':
+                raise ValueError('cold dependency families require crate-plan-v1')
+            compiled = []
+            for index, lib in enumerate(libraries):
+                dependency = dependency_folder(out, libraries, index)
+                dependency.mkdir()
+                dep_query = dependency/'queries'
+                dep_query.mkdir()
+                dep_spec = dependency/'crate.spec'
+                dep_spec.write_text(pack(['MLF-CRATE-1','compiler-shapes/'+case['id']+'/'+dependency.name,'',
+                    'false',pack([pack([lib['module'],lib['source']])]),pack(imports),
+                    str(dep_query),setup['builtin']]))
+                compiled.append(str(dependency/'unit.mlfci'))
+                imports = compiled[-1:]
+                entries.append(pack([str(dep_spec),str(dependency/'unit')]))
+            if compiled:
+                imports = compiled
+            if endpoint == 'crate-plan-v1':
+                (out/'build.plan').write_text(pack(['MLF-CRATE-PLAN-1',pack(entries)]))
+            spec.write_text(pack(['MLF-CRATE-1','compiler-shapes/'+case['id'],'Main','false',
+                pack([pack(['Main',case['source']])]),pack(imports),str(query),setup['builtin']]))
             for name, argv, target in mlf_commands(endpoint, emlf, spec, out):
                 run(name, argv, target)
         else:

@@ -17,7 +17,9 @@ module Bootstrap.LLVM.Build where {
   data CGBinding = CGBinding String Bool | CGWorkerArgument String Bool | CGSlot String Bool;
   data Scalar = Boxed String | Floating String;
   data NativeMode = General | UnboxedDouble | NonnegativeInt | SmallIndex;
-  data FunctionScope = FunctionScope (Map XName A.WorkerFunction) (Map XName (Maybe (Set XName)));
+  data WorkerEscapes = WorkerEscapes IntSet IntSet IntSet;
+  data FunctionScope = FunctionScope (Map XName A.WorkerFunction)
+    (Map XName (Maybe (Set XName))) (Maybe WorkerEscapes);
   data CaseDispatch = SingleCase | HeapCases | ImmediateCases | BinaryCase Int Int;
   data ConstructorLayout = ConstructorLayout (Map String ((,) Int Int)) (Map Int ((,,) Int Int CaseDispatch));
   data Output =
@@ -93,13 +95,15 @@ module Bootstrap.LLVM.Build where {
   withConstructors value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) =
     Output f0 f1 f2 f3 f4 (ConstructorLayout value M.empty) f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22;
   functions :: Output -> Map XName A.WorkerFunction;
-  functions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) = case f6 of { FunctionScope fs _ -> fs };
+  functions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) = case f6 of { FunctionScope fs _ _ -> fs };
   withFunctions :: Map XName A.WorkerFunction -> Output -> Output;
   withFunctions value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) =
-    case f6 of { FunctionScope _ names ->
-      Output f0 f1 f2 f3 f4 f5 (FunctionScope value names) f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 };
+    case f6 of { FunctionScope _ names _ ->
+      Output f0 f1 f2 f3 f4 f5 (FunctionScope value names Nothing) f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 };
+  workerEscapeIndex :: Output -> Maybe WorkerEscapes;
+  workerEscapeIndex (Output _ _ _ _ _ _ (FunctionScope _ _ index) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = index;
   callbackNames :: Output -> XName -> XErased -> [] XName;
-  callbackNames (Output _ _ _ _ _ _ (FunctionScope fs names) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) binder body =
+  callbackNames (Output _ _ _ _ _ _ (FunctionScope fs names _) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) binder body =
     S.toList (A.lambdaNeeded fs names binder body);
 
   workers :: Output -> Set String;
@@ -382,6 +386,12 @@ module Bootstrap.LLVM.Build where {
           if (startsWith "@mlf.numeric." name &&
               (L.not (startsWith "@mlf.numeric.entry." name) && L.not collectingWorker))
           then " alwaysinline"
+          -- Keep the closure entry body explicit. The ordinary workers
+          -- that carry recursive transfers still use the LLVM optimizer.
+          else if startsWith "@mlf.code." name || startsWith "@mlf.curry." name
+               then " noinline optnone"
+          else if startsWith "@mlf.worker." name && L.not (preserveWorkerOptimization name code)
+               then " noinline optnone"
           else if startsWith "@mlf.worker." name && (keepWorker || workerBodyLimit 64 code)
                then " noinline"
                else ""
@@ -416,6 +426,45 @@ module Bootstrap.LLVM.Build where {
       [] -> False;
       (:) _ rest -> workerBodyLimit (remaining - 1) rest
     };
+  -- Keep the optimizer for explicit loops and recursive numeric work.
+  -- Tail transfers that already allocate several lazy values retain the
+  -- emitter's code and its musttail guarantee.
+  preserveWorkerOptimization :: String -> [] String -> Bool;
+  preserveWorkerOptimization name code = let {
+    target = name ++ "(";
+    loop line = startsWith "sum.loop." line || startsWith "spine.loop." line;
+    transferring = L.any (workerCallBoundary target) code;
+    lazyTail = workerAllocations 3 code && L.any
+      (\line -> workerInstruction line (\offset -> workerInstructionStarts line offset " = musttail call ")) code
+  } in L.any loop code || (transferring && L.not lazyTail);
+  workerCallBoundary :: String -> String -> Bool;
+  workerCallBoundary target line = workerInstruction line (\offset ->
+    workerInstructionStarts line offset " = musttail call " ||
+      (workerInstructionStarts line offset " = call ptr " &&
+       workerInstructionStarts line (offset + 12) target));
+  workerInstruction :: String -> (Int -> Bool) -> Bool;
+  workerInstruction line accept = let {
+    width = stringLength line;
+    opcode i = if i >= width then False
+      else if stringCodeAt line i == 32 then accept i
+      else opcode (i + 1)
+  } in startsWith "  %v" line && opcode 4;
+  workerInstructionStarts :: String -> Int -> String -> Bool;
+  workerInstructionStarts line offset word = let { n = stringLength word } in
+    offset + n <= stringLength line && eqString word (stringSlice line offset n);
+  workerAllocations :: Int -> [] String -> Bool;
+  workerAllocations remaining code = if remaining <= 0 then True else case code of {
+    [] -> False;
+    (:) line rest -> let {
+      allocates = workerInstruction line (\offset ->
+        workerInstructionStarts line offset " = call ptr " &&
+        let { at = offset + 12 } in
+        workerInstructionStarts line at "@mlf.allocate.thunk" ||
+        workerInstructionStarts line at "@mlf.construct." ||
+        workerInstructionStarts line at "@mlf_closure(" ||
+        workerInstructionStarts line at "@mlf_env_new(")
+    } in workerAllocations (if allocates then remaining - 1 else remaining) rest
+  };
   startsWith :: String -> String -> Bool;
   startsWith prefix value =
     ((stringLength prefix <= stringLength value) &&

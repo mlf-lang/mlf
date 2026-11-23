@@ -218,6 +218,8 @@ def command_run(args, setup=None, *, record_only=False):
         argv += ['--cohort-output-gib', args.cohort_output_gib]
     if include_baseline:
         argv += ['--family', 'baseline']
+    if getattr(args, 'baseline_family', None):
+        argv += ['--baseline-family', args.baseline_family]
     for family in families:
         argv += ['--family', family]
     for size in sizes:
@@ -283,6 +285,8 @@ def main():
     runner.add_argument('--cohort', required=True)
     runner.add_argument('--matrix', default='default')
     runner.add_argument('--endpoint', default=registry()['default_endpoint'])
+    runner.add_argument('--baseline-family',
+                        help='measure a zero-size cell with the same dependency graph')
     add_filters(runner)
     runner.add_argument('--repeats', type=int)
     runner.add_argument('--interleave-pairs', action='store_true')

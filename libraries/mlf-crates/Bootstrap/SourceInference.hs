@@ -1559,6 +1559,25 @@ module Bootstrap.SourceInference where {
     SlotPrepared _ _ authority -> authority;
     _ -> Nothing
   };
+  -- The class planner already issued these binders in the exact evidence
+  -- order. Group only that prefix. This preserves every resolved value
+  -- occurrence, read dependency, dictionary slot and definition scope.
+  groupedPreparedRoot group = case group of {
+    SlotPrepared slots named mutual ->
+      mapOptional (\compact -> SlotPrepared slots compact mutual) (groupedPreparedRoot named);
+    PreparedGroup original@[member] [(,,) name Nothing body] bindings registry specs
+      authority@(Just (RootAuthority owner labels False _ _)) protection ->
+      if not (eqString owner name && length labels >= 16 && Classes.ordinaryRecursiveSource member)
+      then Nothing else mapOptional (\compact -> PreparedGroup original [(,,) name Nothing compact]
+        bindings registry specs authority protection) (groupPreparedDictionaryLabels labels [] body);
+    _ -> Nothing
+  };
+  groupPreparedDictionaryLabels labels reversed term = case (,) labels term of {
+    (,) [] _ -> Just (SBindDictionaries (reverse reversed) term);
+    (,) ((:) ((,,) expected _ _) rest) (SLam name Nothing body) ->
+      if eqString name expected then groupPreparedDictionaryLabels rest ((:) name reversed) body else Nothing;
+    _ -> Nothing
+  };
   groupOriginal (SlotPrepared _ named _) = groupOriginal named;
   groupOriginal (PreparedGroup original _ _ _ _ _ _) = original;
   groupMembers (SlotPrepared _ named _) = groupMembers named;
@@ -2059,6 +2078,59 @@ module Bootstrap.SourceInference where {
     };
     _ -> Left "source root did not retain a single nonrecursive checked binding"
   };
+  -- Independently checked closed dictionary domains do not capture the
+  -- result type variable. Reintroduce each result binder using the same
+  -- XHyp coercion as the ordinary one-argument-at-a-time inference.
+  restoreRootDictionarySpine prepared object = case (,) (groupAuthority prepared) (groupMembers prepared) of {
+    (,) (Just (RootAuthority _ labels False _ _)) [(,,) _ Nothing (SBindDictionaries labelsIn _)] -> do {
+      ensure (eqList eqString labelsIn (map (\((,,) n _ _) -> n) labels)) "grouped root labels changed";
+      (,,) binder ty rhs <- openRootParts object;
+      case (,) ty rhs of {
+        (,) (XForall variable bound arrows) (XTypeAbs declared annotation body) -> do {
+          ensure (Type.equalTyVar variable declared && Type.alphaEq bound annotation)
+            "grouped root reuses a different result bound";
+          let { minId identity current = if identity < current then identity else current;
+            start = advanceIdentity (Separate.foldTermIdentities minId rhs 0) (-1) };
+          (,) scheme replacement <- restoreDictionaryArrows variable bound start labels arrows body;
+          checked <- Open.check (Open.context object) (Open.parameters object)
+            (XLet binder replacement (XConstructor "()" []));
+          ensure (case Open.bindings checked of {
+            [(,) n actual] -> X.equalName n binder && Type.alphaEq scheme actual; _ -> False
+          }) "restored dictionaries changed their checked scheme";
+          Right checked
+        };
+        _ -> Left "grouped root requires one result bound"
+      }
+    };
+    _ -> Right object
+  };
+  restoreDictionaryArrows :: XTyVar -> XType -> Int -> [] ((,,) String String String) ->
+    XType -> XTerm -> Either String ((,) XType XTerm);
+  restoreDictionaryArrows variable bound identity labels arrows implementation =
+    case (,,) labels arrows implementation of {
+      (,,) ((:) ((,,) label _ dictionary) rest) (XArrow domain@(XCon owner _) result)
+        (XAbs argument declared body) -> do {
+        ensure (eqString owner dictionary && eqString (X.nameHint argument) label &&
+          Set.null (Type.freeVars domain) && Type.alphaEq domain declared)
+          "grouped dictionary needs an exact closed domain";
+        case (,) rest result of {
+          (,) [] (XVar last) -> do {
+            ensure (Type.equalTyVar variable last) "grouped root result variable changed";
+            Right ((,) (XForall variable bound (XArrow domain result))
+              (XTypeAbs variable bound (XAbs argument declared body)))
+          };
+          (,) ((:) _ _) _ -> do {
+            (,) suffix child <- restoreDictionaryArrows variable bound
+              (advanceIdentity identity (-1)) rest result body;
+            let { fresh = XTyVar identity };
+            Right ((,) (XForall fresh suffix (XArrow domain (XVar fresh)))
+              (XTypeAbs fresh suffix (XAbs argument declared (XTypeApp child (XHyp fresh)))))
+          };
+          _ -> Left "grouped root lacks a bound result"
+        }
+      };
+      _ -> Left "grouped root lost its dictionary arrows"
+    };
   -- xMLF binder IDs are local to their checked fragment. Admit its external
   -- hints at the fragment boundary and carry declaration IDs across finish.
   ownedFragmentBindings slots object = do {
@@ -2522,10 +2594,11 @@ module Bootstrap.SourceInference where {
       ([] ((,,) String String String)) Bool (Map XName (V.Index Declaration)) Boundary.CheckedPlan |
     PendingGroundRecursiveFinish GroupSlots Open.Fragment OpenFinalGroup (Map XName (V.Index Declaration))
       Boundary.GroundRecursivePlan;
-  openFinishRequests finish = case finish of {
-    ReadyOpenFinish _ -> [];
-    PendingOpenFinish _ _ _ _ _ _ _ plan -> Boundary.checkedRequests plan;
-    PendingGroundRecursiveFinish _ _ _ _ plan -> Boundary.groundRecursiveRequests plan
+  openFinishRequests finish = Boundary.requestRows (openFinishRequestBatch finish);
+  openFinishRequestBatch finish = case finish of {
+    ReadyOpenFinish _ -> Boundary.RequestBatch [] [];
+    PendingOpenFinish _ _ _ _ _ _ _ plan -> Boundary.checkedRequestBatch plan;
+    PendingGroundRecursiveFinish _ _ _ _ plan -> Boundary.groundRecursiveRequestBatch plan
   };
   completeOpenFinish checked finish answers = case finish of {
     ReadyOpenFinish group -> Right group;

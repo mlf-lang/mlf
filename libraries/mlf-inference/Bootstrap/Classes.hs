@@ -2497,8 +2497,19 @@ module Bootstrap.Classes where {
             left <- render (IM.union inherited (qualifiedParameterMap retained)) rhs;
             right <- renderWith
               (supplied (qualifiedNode rhs) inherited captures) bindings body;
-            freshPure (scopeBinding name (SLet (termRefName name)
-              (foldr (\((,,) _ n _) b -> SLam n Nothing b) left retained) right))
+            let { labels = map (\((,,) _ n _) -> n) retained;
+              ordinary = foldr (\n b -> SLam n Nothing b) left labels };
+            abstracted <- case (,) name frame of {
+              (,) (LexicalRef _) (Just owned) ->
+                if length labels < 8 || not ordinaryOwners then freshPure ordinary else do {
+                  owners <- freshLift (traverseEither (Q.slotOwner plan)
+                    (map (\((,,) slot _ _) -> slot) retained));
+                  freshPure (if all (eqInt owned) owners
+                    then SBindDictionaries labels left else ordinary)
+                };
+              _ -> freshPure ordinary
+            };
+            freshPure (scopeBinding name (SLet (termRefName name) abstracted right))
           };
           QualifiedAnnotation source annotation -> do {
             result <- render bindings source;

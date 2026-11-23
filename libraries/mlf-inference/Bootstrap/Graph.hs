@@ -2458,6 +2458,70 @@ module Bootstrap.Graph where {
           Right (PreparedExpansion root copies frontier fresh expanded)
         }
     };
+  -- Keep original nodes and their local/external classification from the
+  -- discovery pass. The ordered map supplies the same allocation order as
+  -- the old IntSet. The binder cache is only needed beyond an immediate Gen.
+  preparedExpansionEntries :: Graph -> Int -> IntMap ((,) Int Int) -> Int -> IntMap (Maybe Node);
+  preparedExpansionEntries graph gen intervals source =
+    let {
+      bounds = IM.lookup gen intervals;
+      locality scopes node = case binder node of {
+        Nothing -> (,) False scopes;
+        Just parent -> let { p = resolve graph parent } in
+          if p == gen then (,) True scopes
+          else case bounds of {
+            Nothing -> insideScopeFrom graph gen bounds intervals scopes p;
+            Just ((,) start end) -> case IM.lookup p intervals of {
+              Nothing -> insideScopeFrom graph gen bounds intervals scopes p;
+              Just ((,) position _) -> (,) (start <= position && position < end) scopes
+            }
+          }
+      };
+      visit seen scopes pending = case pending of {
+        [] -> seen;
+        (:) original rest -> let { identity = resolve graph original } in
+          if IM.member identity seen then visit seen scopes rest
+          else let { node = nodeAtRepresentative graph original identity } in
+            case locality scopes node of {
+              (,) True known -> let { next = IM.insert identity (Just node) seen } in
+                seq next (visit next known (L.append (children (tag node)) rest));
+              (,) False known -> let { next = IM.insert identity Nothing seen } in
+                seq next (visit next known rest)
+            }
+      }
+    } in visit IM.empty IM.empty ((:) source []);
+  expandPreparedRetaining :: (Graph -> [] Int -> Either String (IntMap Kind)) -> IntMap ((,) Int Int) ->
+    Int -> Int -> Graph -> Either String PreparedExpansion;
+  expandPreparedRetaining calculateKinds intervals generalization destination graph =
+    let {
+      gen = resolve graph generalization;
+      source = genRoot graph generalization;
+      first = nextId graph;
+      entries = IM.toList (preparedExpansionEntries graph gen intervals source);
+      originals = L.map L.fst entries;
+      external = L.mapMaybe (\((,) n entry) -> case entry of {
+        Nothing -> Just n; Just _ -> Nothing
+      }) entries
+    } in do {
+      kinds <- calculateKinds graph external;
+      let {
+        copies = IM.fromDistinctAscList (freshCopyEntries first originals);
+        stop = L.advanceIdentity first (L.length entries);
+        copy = copyIdentity graph copies;
+        root = IM.get source copies;
+        build ((,) n entry) identity = (,) identity (case entry of {
+          Nothing -> mkNode (bottomTag (IM.get n kinds)) (Just destination) Flexible;
+          Just node -> if n == source then mkNode (mapTag copy (tag node)) (Just destination) Flexible
+            else mkNode (mapTag copy (tag node))
+              (mapMaybeInt (\parent -> if resolve graph parent == gen then copy source else copy parent) (binder node))
+              (flag node)
+        });
+        fresh = L.zipWith build entries (L.range first (stop - 1));
+        expanded = mkGraph (IM.union (nodes graph) (nodesFromDistinctAscList fresh)) (links graph) stop;
+        frontier = L.map (\n -> (,) n (IM.get n copies)) external
+      };
+      Right (PreparedExpansion root copies frontier fresh expanded)
+    };
   -- Freeze one solved recursive member without instantiating its environment.
   -- Unlike expansion, the traversal's outer frontier retains its identities:
   -- copying it to fresh bottoms would let later uses generalize captured types.

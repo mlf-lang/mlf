@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Record serial same-source shape builds and report their performance checks."""
 from pathlib import Path
+from dataclasses import replace
 import argparse
 import hashlib
 import json
@@ -53,6 +54,7 @@ def main():
     parser.add_argument('--framework-list',action='store_true')
     parser.add_argument('--setup',type=Path,required=not listing)
     parser.add_argument('--output',type=Path,required=not listing)
+    parser.add_argument('--baseline-family')
     parser.add_argument('--pilot',action='store_true')
     parser.add_argument('--framework-child',action='store_true',help=argparse.SUPPRESS)
     parser.add_argument('--record-only',action='store_true',
@@ -97,7 +99,9 @@ def main():
     H.require(repeats>=1,'positive repeats')
     sizes = list(dict.fromkeys(size for _, size in cells if size))
     families = list(dict.fromkeys(family for family, _ in cells))
-    cases=G.generate(out/'sources',sizes=sizes,families=families)
+    cases=G.generate(out/'sources',sizes=sizes,families=families,baseline_family=args.baseline_family)
+    H.require(args.endpoint=='crate-plan-v1' or not any(worker.dependencies(c) for c in cases),
+              'the cold dependency family requires crate-plan-v1')
     seed=data['seed']; rng=random.Random(seed); order=list(cases);rng.shuffle(order)
     schedule=[]
     for index,case in enumerate(order):
@@ -116,6 +120,7 @@ def main():
         Path(setup['builtin']+'.mlfco')]}
     inputs.update(H.file_pins(Path(setup['package_db']).parent))
     inputs.update({c['source']:c['source_sha256'] for c in cases})
+    inputs.update({lib['source']:lib['sha256'] for c in cases for lib in worker.dependencies(c)})
     # Per-command output stays bounded at 512 MiB; the cohort bound covers the
     # deliberately retained evidence (69 native executables, LLVM IR and GHC
     # objects for 31 cells). It is a bound, not a target: a 31-cell cohort uses
@@ -178,6 +183,9 @@ def main():
             try:
                 H.require(H.sha(plan_path)==plan_sha,'frozen schedule unchanged')
                 H.require(H.sha(case['source'])==case['source_sha256'],'frozen same source')
+                libraries=worker.dependencies(case)
+                for lib in libraries:
+                    H.require(H.sha(lib['source'])==lib['sha256'],'frozen same dependency source')
                 command=H.Runner(leg,limits).run([sys.executable,'-B',HERE/'worker.py','--plan',plan_path,
                     '--case',case['id'],'--lane',lane,'--out',build],ROOT,leg/'command',timed=not args.pilot)
                 r['command']=command;r['stages']=H.load(build/'stages.json')
@@ -190,16 +198,47 @@ def main():
                     r['max_group_members']=max(len(g['members']) for g in q['groups'])
                     raw={s:(build/('unit'+s)).read_bytes() for s in ['.mlfci','.mlfco']}
                     groups=[{k:g[k] for k in ['id','members']} for g in q['groups']]
+                    r['checked_sha256']={s:hashlib.sha256(b).hexdigest() for s,b in raw.items()}
+                    if libraries:
+                        def normal_interface(data):
+                            doc=Q.read_document(data,3)
+                            stable=replace(doc,symbols=tuple(value.replace(str(build)+'/', '<leg>/')
+                                                            for value in doc.symbols)).values()
+                            return json.dumps(stable,ensure_ascii=False).encode()
+                        raw['.mlfci']=normal_interface(raw['.mlfci'])
+                        r['cold_dependencies']=[]
+                        for index, lib in enumerate(libraries):
+                            dep=worker.dependency_folder(build,libraries,index)
+                            report=H.load(dep/'unit.queries')
+                            H.require(report['inferred_groups']==len(report['groups'])>0 and
+                                      report['reused_groups']==0 and
+                                      all(g['cached'] is False for g in report['groups']),
+                                      'fresh target dependency groups only')
+                            interface=(dep/'unit.mlfci').read_bytes()
+                            body=(dep/'unit.mlfco').read_bytes()
+                            raw[lib['module']+'.mlfci']=normal_interface(interface)
+                            raw[lib['module']+'.mlfco']=body
+                            groups.extend({'id':g['id'],'members':g['members']} for g in report['groups'])
+                            r['cold_dependencies'].append({'module':lib['module'],
+                                'fresh_groups':report['inferred_groups'],
+                                'checked_sha256':{'.mlfci':hashlib.sha256(interface).hexdigest(),
+                                                  '.mlfco':hashlib.sha256(body).hexdigest()}})
+                        if len(libraries)==1:
+                            r['dependency_fresh_groups']=r['cold_dependencies'][0]['fresh_groups']
+                            r['dependency_checked_sha256']=r['cold_dependencies'][0]['checked_sha256']
                     if case['id'] in refs:
                         old=refs[case['id']]
-                        H.require(raw==old['raw'] and groups==old['groups'],'raw checked bytes and ordered groups stable')
+                        H.require(raw==old['raw'] and groups==old['groups'],'checked content and ordered groups stable')
                     else:refs[case['id']]={'raw':raw,'groups':groups}
-                    r['checked_sha256']={s:hashlib.sha256(b).hexdigest() for s,b in raw.items()}
                     r['raw_compared_with_first_mlf_leg']=sum(x['case']==case['id'] and x['lane']=='mlf' for x in record['runs'])>0
                 else:
                     H.require((build/'Main.o').is_file() and (build/'Main.hi').is_file(),'fresh GHC target objects')
                     r['ghc_compile_log']=(build/'source-to-executable.stdout').read_text()
                     H.require('Compiling Main' in r['ghc_compile_log'],'actual target compilation')
+                    for lib in libraries:
+                        name=lib['module']
+                        H.require((build/(name+'.o')).is_file() and (build/(name+'.hi')).is_file() and
+                                  'Compiling '+name in r['ghc_compile_log'],'fresh GHC dependency compilation')
                 for j,(value,expected) in enumerate(zip(case['inputs'],case['expected_stdout'])):
                     H.Runner(leg,limits).run([build/'program',str(value)],ROOT,leg/f'output-{j}')
                     H.require((leg/f'output-{j}/stdout').read_bytes()==expected.encode()

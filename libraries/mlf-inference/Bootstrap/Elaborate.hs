@@ -31,13 +31,54 @@ module Bootstrap.Elaborate where {
   -- A finished graph is immutable. Share its translated types and ordered
   -- bounds across resolution, elaboration and final checking. Map values are
   -- lazy, so preparing the table does not demand unused types or bounds.
-  data TypeContext = TypeContext Graph (IntMap XType) (IntMap ([] ((,) XTyVar XType))) IntSet;
+  data TypeCell = TypeCell Node XType ([] ((,) XTyVar XType));
+  data TypeContext = TypeContext Graph (IntMap XType) (IntMap ([] ((,) XTyVar XType))) IntSet |
+    DenseTypeContext Graph Int Int (Int -> Maybe TypeCell) TypeContext;
   contextGraph :: TypeContext -> Graph;
-  contextGraph (TypeContext graph types bounds parents) = graph;
+  contextGraph (TypeContext graph _ _ _) = graph;
+  contextGraph (DenseTypeContext graph _ _ _ _) = graph;
   prepareTypes :: Graph -> TypeContext;
   prepareTypes = prepareTypesWith Nothing;
   prepareSolvedTypes :: Solver -> TypeContext;
   prepareSolvedTypes solver = prepareTypesWith (Just (Solver.bindingChildren solver)) (Solver.solverGraph solver);
+  -- Only the finished solver route owns canonical live IDs disjoint from
+  -- aliases. Store the lazy translation and its bounds once per live slot.
+  prepareValidatedSolvedTypes :: Solver -> TypeContext;
+  prepareValidatedSolvedTypes solved = let {
+    graph = Solver.solverGraph solved;
+    nodes = G.nodes graph;
+    count = IM.size nodes;
+    bindings = Solver.bindingChildren solved;
+    sparse = prepareSolvedTypes solved;
+    dense low high = let {
+      result = DenseTypeContext graph low high
+        (runST (stBind (newSTArray (high - low + 1) Nothing)
+          (\table -> stBind (fillTypeCells low result bindings (IM.toList nodes) table)
+            (\_ -> freezeSTArray table)))) sparse
+    } in result
+  } in if count < 128 then sparse else case (,) (IM.lookupMin nodes) (IM.lookupMax nodes) of {
+    (,) (Just ((,) low _)) (Just ((,) high _)) ->
+      let { space = high - low } in
+      if space >= 0 && space <= 262144 && space <= 3 * count then dense low high else sparse;
+    _ -> sparse
+  };
+  fillTypeCells :: forall s. Int -> TypeContext -> IntMap IntSet -> [] ((,) Int Node)
+    -> STArray s (Maybe TypeCell) -> ST s ();
+  fillTypeCells low context bindings entries table = case entries of {
+    [] -> stReturn ();
+    (:) ((,) n node) rest -> let {
+      cell = TypeCell node (typeAtNode context n node) (boundsAtIndexed context bindings n node)
+    } in stBind (writeSTArray table (n - low) (Just cell)) (\_ -> fillTypeCells low context bindings rest table)
+  };
+  readTypeCell context n = case context of {
+    DenseTypeContext _ low high cell _ ->
+      if low <= n && n <= high then cell (n - low) else Nothing;
+    _ -> Nothing
+  };
+  lookupTypeCell context graph n = case readTypeCell context n of {
+    Just cell -> Just ((,) n cell);
+    Nothing -> let { live = G.resolve graph n } in mapOptional ((,) live) (readTypeCell context live)
+  };
   prepareTypesWith :: Maybe (IntMap IntSet) -> Graph -> TypeContext;
   prepareTypesWith bindings graph =
     let {
@@ -62,9 +103,22 @@ module Bootstrap.Elaborate where {
   typeAtIn :: TypeContext -> Int -> XType;
   typeAtIn (TypeContext graph types bounds parents) identity =
     IM.get (G.resolve graph identity) types;
+  typeAtIn context@(DenseTypeContext graph _ _ _ sparse) identity = case lookupTypeCell context graph identity of {
+    Just ((,) _ (TypeCell _ ty _)) -> ty;
+    Nothing -> typeAtIn sparse identity
+  };
   boundsAtIn :: TypeContext -> Int -> [] ((,) XTyVar XType);
   boundsAtIn (TypeContext graph types bounds parents) identity =
     IM.get (G.resolve graph identity) bounds;
+  boundsAtIn context@(DenseTypeContext graph _ _ _ sparse) identity = case lookupTypeCell context graph identity of {
+    Just ((,) _ (TypeCell _ _ bounds)) -> bounds;
+    Nothing -> boundsAtIn sparse identity
+  };
+  boundsAtRepresentative (TypeContext _ _ bounds _) identity = IM.get identity bounds;
+  boundsAtRepresentative context@(DenseTypeContext _ _ _ _ sparse) identity = case readTypeCell context identity of {
+    Just (TypeCell _ _ bounds) -> bounds;
+    Nothing -> boundsAtRepresentative sparse identity
+  };
   -- Flexible graph nodes become target binders; rigid bounds remain structure.
   typeAtRaw :: TypeContext -> Int -> XType;
   typeAtRaw context identity = let {
@@ -72,7 +126,7 @@ module Bootstrap.Elaborate where {
     resolved = G.resolve graph identity
   } in typeAtNode context resolved (G.nodeAtRepresentative graph resolved resolved);
   typeAtNode :: TypeContext -> Int -> Node -> XType;
-  typeAtNode context@(TypeContext _ _ bounds _) identity node =
+  typeAtNode context identity node =
     let {
       structure =
         case G.tag node of {
@@ -87,13 +141,17 @@ module Bootstrap.Elaborate where {
         }
     } in
     foldr (\bound body -> XForall (fst bound) (snd bound) body) structure
-      (IM.get identity bounds);
+      (boundsAtRepresentative context identity);
   childTypeIn :: TypeContext -> Int -> XType;
   childTypeIn (TypeContext graph types _ _) identity = let {
     representative = G.resolve graph identity
   } in if isFlexible (G.flag (G.nodeAtRepresentative graph identity representative))
     then XVar (XTyVar representative)
     else IM.get representative types;
+  childTypeIn context@(DenseTypeContext graph _ _ _ sparse) identity = case lookupTypeCell context graph identity of {
+    Just ((,) live (TypeCell node ty _)) -> if isFlexible (G.flag node) then XVar (XTyVar live) else ty;
+    Nothing -> childTypeIn sparse identity
+  };
   referenceIn :: TypeContext -> Int -> XType;
   referenceIn context identity =
     let {
@@ -127,8 +185,11 @@ module Bootstrap.Elaborate where {
   boundsAtIndexed :: TypeContext -> IntMap IntSet -> Int -> Node -> [] ((,) XTyVar XType);
   boundsAtIndexed context children parent node = let {
     graph = contextGraph context;
-    eligible identity = let { child = IM.get identity (G.nodes graph) } in
-      isFlexible (G.flag child) && not (G.isGen (G.tag child));
+    eligible identity = let {
+      child = case readTypeCell context identity of {
+        Just (TypeCell value _ _) -> value; Nothing -> IM.get identity (G.nodes graph)
+      }
+    } in isFlexible (G.flag child) && not (G.isGen (G.tag child));
     candidates = IS.filter eligible (IM.findWithDefault IS.empty parent children);
     ordered = case IS.toList candidates of {
       [] -> [];
@@ -148,7 +209,8 @@ module Bootstrap.Elaborate where {
                   (\identity ->
                      (sameParent resolvedParent (G.binder (G.nodeAt graph identity)) &&
                       isFlexible (G.flag (G.nodeAt graph identity))))
-                  (G.orderedBelow graph (boundRoot parent node)))
+                  (G.orderedBelow graph (boundRoot parent node)));
+      DenseTypeContext _ _ _ _ sparse -> boundsAtNode sparse parent node
     };
   schemeTypeIn context gen =
     let {
@@ -166,6 +228,36 @@ module Bootstrap.Elaborate where {
     D.withKinds (catMaybes (map nodeConstructorKind (IM.elems (G.nodes graph))));
   extendEnvironment outer bounds =
     foldl (\env bound -> M.insert T.compareTyVar (fst bound) (snd bound) env) outer bounds;
+  -- All proof checks still check the input type and the computation. Lexical
+  -- extensions can keep the earlier scope's validation: a fresh key cannot
+  -- affect the kinds of any earlier, closed-over bounds.
+  data ElaborationScope = ElaborationScope DataEnv (Map XTyVar XType) (Either String ());
+  elaborationScope :: DataEnv -> Map XTyVar XType -> ElaborationScope;
+  elaborationScope datatypes types =
+    ElaborationScope datatypes types (Check.validateTypeEnv datatypes types);
+  elaborationTypes :: ElaborationScope -> Map XTyVar XType;
+  elaborationTypes (ElaborationScope _ types _) = types;
+  extendElaborationScope :: ElaborationScope -> [] ((,) XTyVar XType) -> ElaborationScope;
+  extendElaborationScope = foldlStrict extendElaborationBound;
+  extendElaborationBound :: ElaborationScope -> (,) XTyVar XType -> ElaborationScope;
+  extendElaborationBound (ElaborationScope datatypes types checked) ((,) variable bound) = let {
+    extended = M.insert T.compareTyVar variable bound types;
+    ordinary = Check.validateTypeEnv datatypes extended;
+    admitted = case checked of {
+      Left _ -> ordinary;
+      Right _ -> case M.lookup T.compareTyVar variable types of {
+        Just _ -> ordinary;
+        Nothing -> case Check.wellFormedIn datatypes types bound of {
+          Right _ -> Right (); Left _ -> ordinary
+        }
+      }
+    }
+  } in seq extended (ElaborationScope datatypes extended admitted);
+  checkElaborationComputation :: ElaborationScope -> XComputation -> XType -> Either String XType;
+  checkElaborationComputation (ElaborationScope datatypes types checked) proof source = do {
+    checked;
+    Check.checkComputationScoped datatypes types proof source
+  };
   isRefl :: XComputation -> Bool;
   isRefl XRefl = True;
   isRefl _ = False;
@@ -178,6 +270,10 @@ module Bootstrap.Elaborate where {
                          Map XTyVar XType -> XType -> XType -> Either String XComputation;
   proveInstanceWithIn datatypes context image env source target =
     proveInstanceUsing datatypes (graphReplacementIn context image) env source target;
+  proveInstanceWithScope :: DataEnv -> TypeContext -> (Int -> Int) ->
+    ElaborationScope -> XType -> XType -> Either String XComputation;
+  proveInstanceWithScope datatypes context image =
+    proveInstanceUsingScope datatypes (graphReplacementIn context image);
   graphReplacementIn context image gamma variable =
     do {
       let {
@@ -234,7 +330,11 @@ module Bootstrap.Elaborate where {
     };
   declaredFieldComputationIn :: TypeContext -> DataEnv -> Map XTyVar XType ->
                                 XType -> Int -> Either String XComputation;
-  declaredFieldComputationIn context datatypes env declaration source = do {
+  declaredFieldComputationIn context datatypes env =
+    declaredFieldComputationScoped context datatypes (elaborationScope datatypes env);
+  declaredFieldComputationScoped :: TypeContext -> DataEnv -> ElaborationScope ->
+    XType -> Int -> Either String XComputation;
+  declaredFieldComputationScoped context datatypes scope declaration source = do {
     let { actual = declaredTypeIn context IS.empty declaration };
     case declaration of {
       -- Bare parameter fields carry the exact case-substituted identity. Their
@@ -243,19 +343,19 @@ module Bootstrap.Elaborate where {
       XVar _ -> do {
         unless (T.alphaEq actual (schemeTypeIn context source))
           (Left "projected field differs from its exact case type");
-        checked <- Check.checkComputationIn datatypes env XRefl actual;
+        checked <- checkElaborationComputation scope XRefl actual;
         unless (T.alphaEq checked (schemeTypeIn context source))
           (Left "projected field evidence has the wrong target");
         Right XRefl
       };
       _ -> do {
         let { prefix = dropUnusedLeading actual };
-        normalized <- Check.checkComputationIn datatypes env prefix actual;
+        normalized <- checkElaborationComputation scope prefix actual;
         let { kinds = M.fromList T.compareTyVar (fst (Evidence.quantifiers actual)) };
-        proof <- proveInstanceUsing datatypes (declaredReplacementIn context kinds) env
+        proof <- proveInstanceUsingScope datatypes (declaredReplacementIn context kinds) scope
           normalized (schemeTypeIn context source);
         let { combined = X.compose prefix proof };
-        checked <- Check.checkComputationIn datatypes env combined actual;
+        checked <- checkElaborationComputation scope combined actual;
         unless (T.alphaEq checked (schemeTypeIn context source))
           (Left "declared field evidence has the wrong target");
         Right combined
@@ -267,10 +367,15 @@ module Bootstrap.Elaborate where {
   proveInstanceUsing :: DataEnv ->
                         (Map XTyVar XType -> XTyVar -> Either String XType) ->
                         Map XTyVar XType -> XType -> XType -> Either String XComputation;
-  proveInstanceUsing datatypes replacement env source target =
+  proveInstanceUsing datatypes replacement env =
+    proveInstanceUsingScope datatypes replacement (elaborationScope datatypes env);
+  proveInstanceUsingScope :: DataEnv ->
+    (Map XTyVar XType -> XTyVar -> Either String XType) ->
+    ElaborationScope -> XType -> XType -> Either String XComputation;
+  proveInstanceUsingScope datatypes replacement scope source target =
     do {
-      computation <- prove datatypes replacement env source target;
-      actual <- Check.checkComputationIn datatypes env computation source;
+      computation <- prove datatypes replacement (elaborationTypes scope) source target;
+      actual <- checkElaborationComputation scope computation source;
       unless (T.alphaEq actual target) (Left "instance evidence has the wrong target");
       Right computation
     };
@@ -356,7 +461,11 @@ module Bootstrap.Elaborate where {
   -- presolution's frontier-first expansion to retain graph provenance.
   edgeComputationIn :: TypeContext ->
                        DataEnv -> Solver -> Map XTyVar XType -> Edge -> Either String XComputation;
-  edgeComputationIn context datatypes solver env edge =
+  edgeComputationIn context datatypes solver env =
+    edgeComputationScoped context datatypes solver (elaborationScope datatypes env);
+  edgeComputationScoped :: TypeContext -> DataEnv -> Solver -> ElaborationScope ->
+    Edge -> Either String XComputation;
+  edgeComputationScoped context datatypes solver scope edge =
     let {
       graph = Solver.solverGraph solver
     } in
@@ -380,7 +489,7 @@ module Bootstrap.Elaborate where {
            directImage =
              \identity -> IM.findWithDefault identity (G.resolve graph identity) positions
          } in
-         case proveInstanceWithIn datatypes context directImage env source targetType of {
+         case proveInstanceWithScope datatypes context directImage scope source targetType of {
            Right proof -> Right proof;
            Left _ ->
              do {
@@ -394,7 +503,7 @@ module Bootstrap.Elaborate where {
                let {
                  image = \identity -> G.resolve solved (IM.findWithDefault identity identity copies)
                };
-               proveInstanceWithIn datatypes context image env source targetType
+               proveInstanceWithScope datatypes context image scope source targetType
              }
          };
   candidateTypeIn context candidate =
@@ -514,27 +623,34 @@ module Bootstrap.Elaborate where {
   elaboratePreparedIn :: TypeContext -> Solver -> IntMap XTerm -> Typed -> Either String XTerm;
   elaboratePreparedIn context solver evidence typed =
     elaborateWithinIn context (graphDatatypes (contextGraph context)) evidence solver M.empty typed;
-  instantiateEdgeIn context datatypes solver env term edge =
+  instantiateEdgeIn context datatypes solver env =
+    instantiateEdgeScoped context datatypes solver (elaborationScope datatypes env);
+  instantiateEdgeScoped :: TypeContext -> DataEnv -> Solver -> ElaborationScope ->
+    XTerm -> Edge -> Either String XTerm;
+  instantiateEdgeScoped context datatypes solver scope term edge =
     do {
-      proof <- edgeComputationIn context datatypes solver env edge;
+      proof <- edgeComputationScoped context datatypes solver scope edge;
       Right (X.instantiate term proof)
     };
   elaborateEdgeIn :: TypeContext ->
                      DataEnv ->
                      IntMap XTerm ->
                      Solver -> Map XTyVar XType -> Typed -> Edge -> Either String XTerm;
-  elaborateEdgeIn context datatypes evidence solver env typed edge =
-    do {
-      let {
-        graph = contextGraph context
-      };
-      term <- elaborateWithinIn context datatypes evidence solver env typed;
-      instantiateEdgeIn context datatypes solver env term edge
-    };
-  elaborateWithinIn :: TypeContext ->
-                       DataEnv ->
-                       IntMap XTerm -> Solver -> Map XTyVar XType -> Typed -> Either String XTerm;
-  elaborateWithinIn context datatypes evidence solver outer typed =
+  elaborateEdgeIn context datatypes evidence solver env =
+    elaborateEdgeScoped context datatypes evidence solver (elaborationScope datatypes env);
+  elaborateEdgeScoped :: TypeContext -> DataEnv -> IntMap XTerm -> Solver ->
+    ElaborationScope -> Typed -> Edge -> Either String XTerm;
+  elaborateEdgeScoped context datatypes evidence solver scope typed edge = do {
+    term <- elaborateWithinScoped context datatypes evidence solver scope typed;
+    instantiateEdgeScoped context datatypes solver scope term edge
+  };
+  elaborateWithinIn :: TypeContext -> DataEnv -> IntMap XTerm -> Solver ->
+    Map XTyVar XType -> Typed -> Either String XTerm;
+  elaborateWithinIn context datatypes evidence solver outer =
+    elaborateWithinScoped context datatypes evidence solver (elaborationScope datatypes outer);
+  elaborateWithinScoped :: TypeContext -> DataEnv -> IntMap XTerm -> Solver ->
+    ElaborationScope -> Typed -> Either String XTerm;
+  elaborateWithinScoped context datatypes evidence solver outer typed =
     do {
       let {
         graph = contextGraph context
@@ -546,13 +662,13 @@ module Bootstrap.Elaborate where {
         bounds = boundsAtIn context gen
       };
       let {
-        env = extendEnvironment outer bounds
+        scope = extendElaborationScope outer bounds
       };
       let {
-        child = elaborateWithinIn context datatypes evidence solver env
+        child = elaborateWithinScoped context datatypes evidence solver scope
       };
       let {
-        childEdge = elaborateEdgeIn context datatypes evidence solver env
+        childEdge = elaborateEdgeScoped context datatypes evidence solver scope
       };
       let { dictionary = case IM.lookup gen evidence of {
         Nothing -> Left "unresolved dictionary evidence";
@@ -562,10 +678,10 @@ module Bootstrap.Elaborate where {
           FWithGivens _ enclosed -> elaborateForm enclosed;
           FVariable name Nothing -> Right (XVarTerm name);
           FVariable name (Just edge) ->
-            instantiateEdgeIn context datatypes solver env (XVarTerm name) edge;
+            instantiateEdgeScoped context datatypes solver scope (XVarTerm name) edge;
           FDeclaredVariable name declaration edge -> do {
-            proof <- declaredFieldComputationIn context datatypes env declaration (C.fromGen edge);
-            instantiateEdgeIn context datatypes solver env (X.instantiate (XVarTerm name) proof) edge
+            proof <- declaredFieldComputationScoped context datatypes scope declaration (C.fromGen edge);
+            instantiateEdgeScoped context datatypes solver scope (X.instantiate (XVarTerm name) proof) edge
           };
           FLambda name domain body edge ->
             do {
@@ -583,16 +699,16 @@ module Bootstrap.Elaborate where {
               Right (XApp a' b')
             };
           FApplyVariable name use argument proof -> do {
-            function <- instantiateEdgeIn context datatypes solver env (XVarTerm name) use;
+            function <- instantiateEdgeScoped context datatypes solver scope (XVarTerm name) use;
             operand <- childEdge argument proof;
             Right (XApp function operand)
           };
           FApplyDictionaries f proof arguments -> do {
-            function <- instantiateEdgeIn context datatypes solver env (XVarTerm f) proof;
+            function <- instantiateEdgeScoped context datatypes solver scope (XVarTerm f) proof;
             Right (foldl (\value name -> XApp value (XVarTerm name)) function arguments)
           };
           FApplyGroundDictionaries f proof arguments -> do {
-            function <- instantiateEdgeIn context datatypes solver env (XVarTerm f) proof;
+            function <- instantiateEdgeScoped context datatypes solver scope (XVarTerm f) proof;
             operands <- mapM (\((,) argument edge) -> childEdge argument edge) arguments;
             Right (foldl XApp function operands)
           };
@@ -613,7 +729,7 @@ module Bootstrap.Elaborate where {
             word <- child worker;
             subject <- childEdge value valueProof;
             let { arm (StringCallArm key text argument operand proof) = do {
-              function <- instantiateEdgeIn context datatypes solver env (XVarTerm operator) proof;
+              function <- instantiateEdgeScoped context datatypes solver scope (XVarTerm operator) proof;
               selected <- childEdge argument operand;
               let { test = XApp (XApp (XPrimitive PEqInt []) subject) (XIntTerm key);
                     branch = XApp (XApp function selected) (XStringTerm text) };
@@ -635,7 +751,8 @@ module Bootstrap.Elaborate where {
                 local = boundsAtIn context (G.genRoot graph gen)
               };
               let {
-                gamma = extendEnvironment env local
+                nested = extendElaborationScope scope local;
+                gamma = elaborationTypes nested
               };
               let {
                 domainType = referenceIn context domain
@@ -647,7 +764,7 @@ module Bootstrap.Elaborate where {
                   else typeAtIn context codomain
               };
               proof <-
-                proveInstanceWithIn datatypes context (\identity -> identity) gamma domainType
+                proveInstanceWithScope datatypes context (\identity -> identity) nested domainType
                   result;
               Right
                 (foldr (\bound inner -> XTypeAbs (fst bound) (snd bound) inner)
@@ -688,7 +805,7 @@ module Bootstrap.Elaborate where {
                            rhs' <- case closure of {
                              Nothing -> childEdge rhs rhsEdge;
                              Just (RecursiveClosure group copies) ->
-                               elaborateRecursiveIn context datatypes evidence solver env
+                               elaborateRecursiveScoped context datatypes evidence solver scope
                                  group copies declaration rhs rhsEdge
                            };
                            Right ((,,) name (schemeTypeIn context declaration) rhs')
@@ -704,11 +821,11 @@ module Bootstrap.Elaborate where {
             do {
               let {
                 local =
-                  extendEnvironment env
+                  extendElaborationScope scope
                     (map (\variable -> (,) (fst variable) (T.bottomKind (snd variable))) variables)
               };
-              body' <- elaborateWithinIn context datatypes evidence solver local body;
-              proof <- edgeComputationIn context datatypes solver local edge;
+              body' <- elaborateWithinScoped context datatypes evidence solver local body;
+              proof <- edgeComputationScoped context datatypes solver local edge;
               let {
                 abstracted =
                   foldr
@@ -733,7 +850,7 @@ module Bootstrap.Elaborate where {
                 kinds = M.fromList T.compareTyVar variables
               };
               adaptation <-
-                proveInstanceUsing datatypes (checkedReplacementIn context positions kinds) env
+                proveInstanceUsingScope datatypes (checkedReplacementIn context positions kinds) scope
                   actual
                   expected;
               Right (X.instantiate abstracted adaptation)
@@ -763,11 +880,15 @@ module Bootstrap.Elaborate where {
           (\identity -> IM.findWithDefault identity identity copies) gamma variable
       }
     };
-  elaborateRecursiveIn context datatypes evidence solver env group copies declaration rhs edge =
+  elaborateRecursiveIn context datatypes evidence solver env =
+    elaborateRecursiveScoped context datatypes evidence solver (elaborationScope datatypes env);
+  elaborateRecursiveScoped :: TypeContext -> DataEnv -> IntMap XTerm -> Solver ->
+    ElaborationScope -> Int -> IntMap Int -> Int -> Typed -> Edge -> Either String XTerm;
+  elaborateRecursiveScoped context datatypes evidence solver scope group copies declaration rhs edge =
     do {
       let { bounds = boundsAtIn context group };
-      let { local = extendEnvironment env bounds };
-      value <- elaborateEdgeIn context datatypes evidence solver local rhs edge;
+      let { local = extendElaborationScope scope bounds };
+      value <- elaborateEdgeScoped context datatypes evidence solver local rhs edge;
       let {
         source = foldr (\bound body -> XForall (fst bound) (snd bound) body)
           (referenceIn context (C.toNode edge)) bounds
@@ -775,7 +896,7 @@ module Bootstrap.Elaborate where {
       let {
         abstracted = foldr (\bound body -> XTypeAbs (fst bound) (snd bound) body) value bounds
       };
-      proof <- proveInstanceUsing datatypes (recursiveReplacementIn context copies bounds) env
+      proof <- proveInstanceUsingScope datatypes (recursiveReplacementIn context copies bounds) scope
         source (schemeTypeIn context declaration);
       Right (X.instantiate abstracted proof)
     };

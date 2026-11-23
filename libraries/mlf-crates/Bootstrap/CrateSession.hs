@@ -4,7 +4,8 @@
              MultiParamTypeClasses, OverloadedStrings #-}
 -- File-owned candidate route. No raw AST, Solver, region, or callback escapes.
 module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, compileSpecFileWithVerification, compileSpecFileUsingInstaller,
-    CompiledCrate, compiledObject, compiledInterfaces, compileSpecFileRetainedUsingInstaller) where {
+    CompiledCrate, compiledObject, compiledInterfaces, compiledMetadata, PlanInputs(..), compilerImageDigest,
+    compileSpecFileRetainedUsingInstaller, compileSpecFileRetainedInPlan) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
@@ -53,9 +54,12 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   -- successful object/query publication and owns the exact checked root plus
   -- the dependency metadata snapshot used to infer it.
   data CompiledCrate = CompiledCrate Artifact.CrateObject
-    ([] ((,) String Artifact.CrateInterface));
-  compiledObject (CompiledCrate object _) = object;
-  compiledInterfaces (CompiledCrate _ interfaces) = interfaces;
+    ([] ((,) String Artifact.CrateInterface)) (Maybe Artifact.PublishedMetadata);
+  compiledObject (CompiledCrate object _ _) = object;
+  compiledInterfaces (CompiledCrate _ interfaces _) = interfaces;
+  compiledMetadata (CompiledCrate _ _ metadata) = metadata;
+  data PlanInputs = PlanInputs String (Map String Artifact.PublishedMetadata);
+  compilerImageDigest = ioBind getExecutablePath fileDigest;
 
   compilePreparedWithEncoding :: forall a. Bool -> Bool ->
     (Artifact.CrateObject -> String -> Query.QueryReport -> a) ->
@@ -200,7 +204,8 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
     Just plan -> Source.planData plan; Nothing -> Inference.loweredData (fileLowered prepared)
   };
   compileSourcesRetainedLoading load = compileSourcesRetainedWith (withPreludeLoading load);
-  compileSourcesRetainedWith addPrelude verifyAll install shareEncoding spec sources interfaces prefix =
+  compileSourcesRetainedWith = compileSourcesRetainedUsingPlan Nothing;
+  compileSourcesRetainedUsingPlan planInputs addPrelude verifyAll install shareEncoding spec sources interfaces prefix =
     do {
       dependencies <- addPrelude install spec sources interfaces;
       case do {
@@ -216,7 +221,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
         Left message -> ioReturn (Left message);
         Right ((,,) updated loaded prepared) ->
           do {
-            result <- compileGraphSources verifyAll updated loaded prepared (filePlan prepared) prefix;
+            result <- compileGraphSources planInputs verifyAll updated loaded prepared (filePlan prepared) prefix;
             case result of {
               Left message ->
                 let {
@@ -230,26 +235,28 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
                       names
                 } in
                 ioReturn (Left (Modules.displayNames diagnostics message));
-              Right object -> ioReturn (Right (CompiledCrate object loaded))
+              Right ((,) object metadata) -> ioReturn (Right (CompiledCrate object loaded metadata))
             }
           }
       }
     };
 
-  compileGraphSources verify spec interfaces prepared plan prefix = do {
+  compileGraphSources planInputs verify spec interfaces prepared plan prefix = do {
     let { directory = Query.cachePath (specCache spec) };
     created <- Query.cacheCommand ["/bin/mkdir","-p",directory];
     if created /= 0 then ioReturn (Left "cannot create query graph cache directory") else do {
       lock <- acquireFileLock (directory ++ "/.lock");
-      result <- catchIOError (compileGraphLocked verify spec interfaces prepared plan prefix directory)
+      result <- catchIOError (compileGraphLocked planInputs verify spec interfaces prepared plan prefix directory)
         (\error -> ioReturn (Left (textFromChars (ioeGetErrorString error))));
       releaseFileLock lock;
       ioReturn result
     }
   };
-  compileGraphLocked verify spec interfaces prepared plan prefix directory = do {
-    executable <- getExecutablePath;
-    compiler <- fileDigest executable;
+  compileGraphLocked planInputs verify spec interfaces prepared plan prefix directory = do {
+    compiler <- case planInputs of {
+      Nothing -> compilerImageDigest;
+      Just (PlanInputs image _) -> ioReturn image
+    };
     let { imported = map (\((,) _ iface) -> Separate.UnitInterface (Artifact.crateId iface)
           [] [] [] [] [] (Artifact.crateBindings iface) "metadata") interfaces;
       protected = M.fromList compareString (concatMap (compose Artifact.crateProtection snd) interfaces) };
@@ -266,8 +273,17 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
           outputStarted <- QueryGraph.clock (CrateGraph.statistics state);
           made <- Artifact.makeOpenObject iface (map snd interfaces) (map (\((,,) n f _) -> (,) n f) fragments);
           case made of { Left e -> ioReturn (Left e); Right object -> do {
-            written <- Artifact.writeObjectEither prefix object;
-            case written of { Left e -> ioReturn (Left e); Right _ -> do {
+            written <- case planInputs of {
+              Nothing -> do {
+                result <- Artifact.writeObjectEither prefix object;
+                ioReturn (mapEither (\_ -> Nothing) result)
+              };
+              Just _ -> do {
+                result <- Artifact.writeOpenObjectRetaining prefix object;
+                ioReturn (mapEither Just result)
+              }
+            };
+            case written of { Left e -> ioReturn (Left e); Right metadata -> do {
               writeFile (prefix ++ ".queries") (Query.reportJSON (specIdentity spec)
                 (Artifact.semanticFingerprint (Artifact.objectInterface object)) report);
               QueryGraph.elapsed (CrateGraph.statistics state) 4 outputStarted;
@@ -275,7 +291,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
               published <- QueryGraph.publish session;
               QueryGraph.elapsed (CrateGraph.statistics state) 5 publishStarted;
               QueryGraph.writeProfile (prefix ++ ".query-profile") (CrateGraph.statistics state);
-              ioReturn (mapEither (\_ -> object) published)
+              ioReturn (mapEither (\_ -> (,) object metadata) published)
             } }
           } }
         }
@@ -347,8 +363,14 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
     result <- compileSpecFileRetainedUsingInstaller verifyAll install file prefix;
     ioReturn (mapEither (\_ -> ()) result)
   };
-  compileSpecFileRetainedUsingInstaller verifyAll install file prefix =
-    do {
+  compileSpecFileRetainedUsingInstaller = compileSpecFileRetainedFor Nothing;
+  compileSpecFileRetainedInPlan inputs = compileSpecFileRetainedFor (Just inputs);
+  compileSpecFileRetainedFor planInputs verifyAll install file prefix = let {
+    load = case planInputs of {
+      Nothing -> Artifact.loadGraph;
+      Just (PlanInputs _ retained) -> Artifact.loadGraphRetaining retained
+    }
+  } in do {
       present <- fileExists file;
       if not present
       then ioReturn (Left ("crate specification does not exist: " ++ file))
@@ -363,7 +385,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
                    let {
                      normalized = withDependencies spec paths
                    };
-                   dependencies <- Artifact.loadInterfaces paths;
+                   dependencies <- load [] [] paths;
                    case do {
                           sources <- sourceResult;
                           interfaces <- dependencies;
@@ -374,8 +396,8 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
                        -- loadInterfaces admitted every existing metadata value. Keep
                        -- that snapshot for inference and check any newly installed
                        -- dependency through the same graph loader.
-                       compileSourcesRetainedWith (Crate.withPreludeMetadata (compose Right fst)
-                         (Artifact.loadGraph [] interfaces))
+                       compileSourcesRetainedUsingPlan planInputs (Crate.withPreludeMetadata (compose Right fst)
+                         (load [] interfaces))
                          verifyAll install True normalized sources interfaces prefix
                    }
                  }
@@ -665,7 +687,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
             graph = S.solverGraph solved
           };
           let {
-            types = E.prepareSolvedTypes solved
+            types = E.prepareValidatedSolvedTypes solved
           };
           evidence <- Compiler.atPhase Resolution (E.resolveEvidenceIn types (C.skeleton constraints));
           body <-

@@ -11,6 +11,7 @@ module MLF.Entry.Emlf where {
   import qualified Bootstrap.Map as SourceMap;
   import qualified Bootstrap.Version as Version;
   import qualified Bootstrap.Std as L;
+  import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.Compiler as C;
   import qualified MLF.PreparedCompiler as Prepared;
   import qualified MLF.NativeBuild as NativeBuild;
@@ -130,16 +131,79 @@ module MLF.Entry.Emlf where {
       compileCrateLLVMUsing verifyAll file prefix (Just ((,) cache report));
     _ -> fatal crateUsage
   };
-  compileCrateLLVMUsing verifyAll file prefix cacheReport = do {
-      result <- CrateSession.compileSpecFileRetainedUsingInstaller verifyAll Prepared.installCompilerPrelude file prefix;
+  compileCrateLLVMUsing = compileCrateLLVMRetaining Nothing SourceMap.empty;
+  compileCratePlanCommand plan arguments = let {
+    compile file prefix report = do {
+      loaded <- readFile plan;
+      case cratePlanEntries loaded of {
+        Left message -> fatal message;
+        Right entries -> do {
+          compiler <- CrateSession.compilerImageDigest;
+          (,) retained headers <- compilePlanDependencies compiler SourceMap.empty SourceMap.empty entries;
+          compileCrateLLVMRetaining (Just (CrateSession.PlanInputs compiler headers)) retained False file prefix report
+        }
+      }
+    }
+  } in case arguments of {
+    [file, "-o", prefix] -> compile file prefix Nothing;
+    [file, "-o", prefix, "--codegen-cache", cache, "--query-report", report] ->
+      compile file prefix (Just ((,) cache report));
+    _ -> fatal crateUsage
+  };
+  cratePlanEntries contents = do {
+    fields <- Separate.unpack contents;
+    case fields of {
+      ["MLF-CRATE-PLAN-1", entries] -> do {
+        rows <- Separate.unpack entries;
+        L.traverseEither (\row -> do {
+          fields <- Separate.unpack row;
+          case fields of {
+            [spec,prefix] -> if eqString spec "" || eqString prefix ""
+              then Left "empty crate plan specification or output"
+              else Right ((,) spec prefix);
+            _ -> Left "invalid crate plan row"
+          }
+        }) rows
+      };
+      _ -> Left "invalid crate plan"
+    }
+  };
+  compilePlanDependencies compiler retained headers rows = case rows of {
+    [] -> ioReturn ((,) retained headers);
+    (:) ((,) spec prefix) rest -> do {
+      result <- CrateSession.compileSpecFileRetainedInPlan (CrateSession.PlanInputs compiler headers)
+        False Prepared.installCompilerPrelude spec prefix;
       case result of {
         Left message -> fatal message;
         Right compiled -> do {
-          linked <- Prepared.linkCompiledCrate compiled;
+          path <- canonicalPath (prefix ++ ".mlfci");
+          case CrateSession.compiledMetadata compiled of {
+            Nothing -> fatal "crate plan publication lacks metadata";
+            Just header -> compilePlanDependencies compiler
+              (SourceMap.insert compareString path (CrateSession.compiledObject compiled) retained)
+              (SourceMap.insert compareString path header headers) rest
+          }
+        }
+      }
+    }
+  };
+  compileCrateLLVMRetaining planInputs retained verifyAll file prefix cacheReport = do {
+    result <- case planInputs of {
+      Nothing -> CrateSession.compileSpecFileRetainedUsingInstaller verifyAll Prepared.installCompilerPrelude file prefix;
+      Just inputs -> CrateSession.compileSpecFileRetainedInPlan inputs verifyAll Prepared.installCompilerPrelude file prefix
+    };
+      case result of {
+        Left message -> fatal message;
+        Right compiled -> do {
+          linked <- Prepared.linkCompiledCrateRetaining retained compiled;
           case linked of { Left message -> fatal message;
             Right checked -> case cacheReport of {
               Nothing -> printLLVM (LLVM.emitCheckedChunks False checked);
-              Just ((,) cache report) -> emitCachedCrate cache (Just report) checked
+              Just ((,) cache report) -> case planInputs of {
+                Nothing -> emitCachedCrate cache (Just report) checked;
+                Just (CrateSession.PlanInputs compiler _) -> emitCachedCrateUsing
+                  (CrateCodegen.emitCrateCheckedUsing (ioReturn compiler)) cache (Just report) checked
+              }
             } }
         }
       }
@@ -147,6 +211,7 @@ module MLF.Entry.Emlf where {
   runArgs :: PreludeMode -> [] String -> [] String -> IO ();
   runArgs mode paths arguments = case arguments of {
     ["--test-parity-batch", request] -> testParityBatch request;
+    (:) "--compile-crate-plan" ((:) plan rest) -> compileCratePlanCommand plan rest;
     (:) "--compile-crate-to-llvm-gc" rest -> compileCrateLLVMCommand False rest;
     (:) "-Zincremental-verify-ich" ((:) "--compile-crate-to-llvm-gc" rest) -> compileCrateLLVMCommand True rest;
     (:) "-Zincremental-verify-ich" ((:) "--compile-crate" rest) -> compileCrateCommand True rest;
@@ -646,8 +711,9 @@ module MLF.Entry.Emlf where {
       Right checked -> emitCachedCrate cache report checked
     }
   };
-  emitCachedCrate cache report checked = do {
-    generated <- CrateCodegen.emitCrateChecked cache False checked;
+  emitCachedCrate = emitCachedCrateUsing CrateCodegen.emitCrateChecked;
+  emitCachedCrateUsing generate cache report checked = do {
+    generated <- generate cache False checked;
     case generated of {
       Left message -> fatal message;
       Right value -> case report of {
@@ -987,7 +1053,7 @@ module MLF.Entry.Emlf where {
     "Executable compilation: emlf [--no-prelude] [-i DIR ...] SOURCE -o OUTPUT [--build-dir FRESH]\n       emlf --compile SOURCE -o OUTPUT\nStandard libraries and runtime are reused automatically; user code is freshly compiled with one Clang -O2 job.\nInstalled native libraries: emlf --native-install-info\n       emlf [-i DIR ...] --emit-native-llvm [FILE | --expr SOURCE]\n       emlf --emit-native-library-llvm\n       emlf --native-library-metadata\nNative IR requires the authenticated link inputs from --native-install-info. Library emission and metadata commands are installation build steps.\n";
   crateUsage :: String;
   crateUsage =
-    "Crate compilation: emlf [-Zincremental-verify-ich] --compile-crate SPEC -o PREFIX\n       emlf [-Zincremental-verify-ich] --compile-crate-to-llvm-gc SPEC -o PREFIX [ --codegen-cache DIR --query-report FILE ]\n       emlf --show-crate FILE.mlfci\n       emlf --link-crate FILE.mlfci\n       emlf --run-crate FILE.mlfci [-- ARGS...]\n       emlf --crate-to-llvm[-gc] FILE.mlfci [--cache DIR [ --query-report FILE ]]\n";
+    "Crate compilation: emlf [-Zincremental-verify-ich] --compile-crate SPEC -o PREFIX\n       emlf [-Zincremental-verify-ich] --compile-crate-to-llvm-gc SPEC -o PREFIX [ --codegen-cache DIR --query-report FILE ]\n       emlf --compile-crate-plan PLAN SPEC -o PREFIX [ --codegen-cache DIR --query-report FILE ]\n       emlf --show-crate FILE.mlfci\n       emlf --link-crate FILE.mlfci\n       emlf --run-crate FILE.mlfci [-- ARGS...]\n       emlf --crate-to-llvm[-gc] FILE.mlfci [--cache DIR [ --query-report FILE ]]\n";
   baseUsage :: String;
   baseUsage =
     "Usage: emlf [--no-prelude] [-i DIR ...] [--type] [FILE | --expr SOURCE]\n       emlf --check [XMLF_FILE]\n       emlf [--no-prelude] [-i DIR ...] --run [FILE | --expr SOURCE] [-- ARG ...]\n       emlf --run-xmlf [XMLF_FILE] [-- ARG ...]\n       emlf [--no-prelude] [-i DIR ...] --emit-llvm [FILE | --expr SOURCE]\n       emlf --xmlf-to-llvm [XMLF_FILE]\n       emlf [--no-prelude] [-i DIR ...] --emit-llvm-gc [FILE | --expr SOURCE]\n       emlf --xmlf-to-llvm[-io]-gc [XMLF_FILE]\n       emlf --llvm-runtime\nWith no FILE, read eMLF from standard input.\nImports load Foo.Bar from marked Foo/Bar.hs or legacy Foo/Bar.emlf beside the entry or in -i roots; ambiguous duplicates are rejected.\nThe standard prelude supplies Monad and Monad IO; --no-prelude disables it.\nAll LLVM commands emit the compact BDWGC ABI; -gc spellings are aliases.\nLink LLVM IR with clang, runtime/mlf_runtime.c, GMP and BDWGC.\n"
