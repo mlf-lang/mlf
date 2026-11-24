@@ -2519,10 +2519,20 @@ module Bootstrap.Graph.Solver where {
         removed = L.map (\n -> let { v = G.nodeAt before n } in
           (,) n (G.mkNode (G.mapTag image (G.tag v)) (G.mapMaybeInt image (G.binder v)) (G.flag v)))
           (oldIds (IS.union editIds (IS.fromList (IM.keys aliases))));
-        replacement n = let { v = G.nodeAt skeleton n } in
-          (,) n (G.mkNode (G.mapTag image (G.tag v)) (binderAt placements n)
-            (if L.any (\original -> G.equalFlag (G.flag (G.nodeAt before original)) Rigid) (members n)
-              then Rigid else Flexible));
+        -- Incoming edges can change even for a singleton class. Its original
+        -- flag is already on the surviving node. Force the new binder identity
+        -- before publishing it so a live edge cannot retain the old quotient.
+        replacement n = let {
+          v = G.nodeAtRepresentative skeleton n n;
+          newFlag = case IM.lookup n classes of {
+            Nothing -> G.flag v;
+            Just originals -> if L.any (\original -> G.equalFlag
+              (G.flag (G.nodeAtRepresentative before original original)) Rigid) originals
+              then Rigid else Flexible
+          };
+          parent = binderAt placements n;
+          strictParent = case parent of { Nothing -> Nothing; Just key -> seq key parent }
+        } in (,) n (G.mkNode (G.mapTag image (G.tag v)) strictParent newFlag);
         -- All incoming edges of an alias acquire the same destination.
         -- Move their source set once, then patch the outgoing edges of each
         -- changed or deleted node against that renamed index.
