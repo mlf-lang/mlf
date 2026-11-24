@@ -120,14 +120,14 @@ def main():
     setup=H.load(args.setup.resolve()); H.require(setup['complete'],'qualified fixed dependencies')
     H.require(setup.get('endpoint')==args.endpoint,'setup belongs to endpoint profile '+str(setup.get('endpoint'))
               +', not '+args.endpoint)
-    setup.setdefault('source', str(ROOT))
+    source = Path(setup.setdefault('source', str(ROOT))).resolve()
     endpoint=data['endpoints'][args.endpoint]
-    auth=H.authenticate(Path(setup['producer']),Path(setup.get('source',ROOT)))
+    auth=H.authenticate(Path(setup['producer']),source)
     generated = [out, args.setup.parent, setup['producer']]
     if args.sweep_reference:
         sweep_dir = out.parent.parent
         generated.extend([out.parent, sweep_dir/'summary.csv', sweep_dir/'summary.md', sweep_dir/'growth.json'])
-    selection = compiler_reference.select_revision(setup['source'], generated) if not args.pilot else None
+    selection = compiler_reference.select_revision(source, generated) if not args.pilot else None
     if args.sweep_reference and selection != json.loads(args.sweep_reference):
         raise ValueError('candidate revision or baseline changed during sweep')
     reference = compiler_reference.prepare(setup, selection, auth['ghc']['path']) if selection else None
@@ -169,7 +169,7 @@ def main():
     # about 2.6 GiB, and the earlier 2 GiB carry-over stopped a run at leg 149.
     limits={**setup['limits'],'wall_seconds':90,'max_work_bytes':512*1024**2,
             'aggregate_cohort_bytes':args.cohort_output_gib*1024**3}
-    identity=provenance.source_identity(ROOT, out)
+    identity=provenance.source_identity(source, out)
     cohort=args.cohort or out.name
     plan={'purpose':'generator/transport qualification' if args.pilot else 'fixed measured shape matrix; paired build-time observations',
         'benchmark':{'schema':2,'suite':data['suite'],'suite_version':data['version'],'cohort':cohort,
@@ -323,7 +323,7 @@ def main():
                                  legs_checked=repeats * lanes_per_round - remaining[case['id']],
                                  **({'detail': r['error'], 'lane': lane} if 'error' in r else {}))
         H.check_pins(inputs)
-        H.require(H.authenticate(Path(setup['producer']),Path(setup.get('source',ROOT)))==auth,'ordinary producer unchanged')
+        H.require(H.authenticate(Path(setup['producer']),source)==auth,'ordinary producer unchanged')
     record.update(complete=True,all_cases_passed=not blocked,failed_cases=sorted(blocked));save()
     print('Completed; failures retained:',len(record['failures']),flush=True)
     if not args.pilot and not args.record_only:
