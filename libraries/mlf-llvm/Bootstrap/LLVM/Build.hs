@@ -22,8 +22,9 @@ module Bootstrap.LLVM.Build where {
     (Map XName (Maybe (Set XName))) (Maybe WorkerEscapes);
   data CaseDispatch = SingleCase | HeapCases | ImmediateCases | BinaryCase Int Int;
   data ConstructorLayout = ConstructorLayout (Map String ((,) Int Int)) (Map Int ((,,) Int Int CaseDispatch));
+  data FunctionInstructions = FunctionInstructions Int ([] String);
   data Output =
-    Output Int ([] String) String ([] String) ([] String) ConstructorLayout FunctionScope (Set
+    Output Int FunctionInstructions String ([] String) ([] String) ConstructorLayout FunctionScope (Set
                                                                                                                 String) (Map
                                                                                                                         XName
                                                                                                                         String) (Set
@@ -66,8 +67,10 @@ module Bootstrap.LLVM.Build where {
   withSerial value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) =
     seq value (Output value f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22);
   instructions :: Output -> [] String;
-  instructions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) = f1;
-  withInstructions :: [] String -> Output -> Output;
+  instructions state = case functionInstructions state of { FunctionInstructions _ lines -> lines };
+  functionInstructions :: Output -> FunctionInstructions;
+  functionInstructions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) = f1;
+  withInstructions :: FunctionInstructions -> Output -> Output;
   withInstructions value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) =
     Output f0 value f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22;
   block :: Output -> String;
@@ -247,7 +250,9 @@ module Bootstrap.LLVM.Build where {
       cgPure (prefix ++ showInt n)
     };
   emit :: String -> Build ();
-  emit line = modify (\state -> withInstructions ((:) line (instructions state)) state);
+  emit line = modify (\state -> case functionInstructions state of {
+    FunctionInstructions next lines -> withInstructions (FunctionInstructions next ((:) line lines)) state
+  });
   label :: String -> Build ();
   label name =
     do {
@@ -256,11 +261,16 @@ module Bootstrap.LLVM.Build where {
     };
   result :: String -> Build String;
   result expression =
-    do {
-      register <- fresh "%v";
-      emit ("  " ++ (register ++ (" = " ++ expression)));
-      cgPure register
-    };
+    Build (\state -> case functionInstructions state of {
+      FunctionInstructions slot lines -> let {
+        register = "%" ++ showInt slot;
+        line = "  " ++ register ++ " = " ++ expression;
+        next = L.advanceIdentity slot 1;
+        -- Keep module symbols stable when an instruction switches to a local slot.
+        after = withSerial (L.advanceIdentity (serial state) 1)
+          (withInstructions (FunctionInstructions next ((:) line lines)) state)
+      } in seq next (seq after (Right ((,) register after)))
+    });
   call :: String -> [] String -> Build String;
   call name arguments = callTyped "ptr" name arguments;
   callTyped :: String -> String -> [] String -> Build String;
@@ -369,7 +379,7 @@ module Bootstrap.LLVM.Build where {
       saved <- get;
       modify
         (\state ->
-           withInstructions []
+           withInstructions (FunctionInstructions 0 [])
              (withBlock "entry"
                 (withScalarRanges M.empty
                    (withArrayViews M.empty
@@ -409,7 +419,7 @@ module Bootstrap.LLVM.Build where {
       -- Store the completed function text while its instruction stream is local.
       seq text (modify
         (\state ->
-           withInstructions (instructions saved)
+           withInstructions (functionInstructions saved)
              (withBlock (block saved)
                 (withScalarRanges (scalarRanges saved)
                    (withArrayViews (arrayViews saved)
@@ -449,7 +459,8 @@ module Bootstrap.LLVM.Build where {
     opcode i = if i >= width then False
       else if stringCodeAt line i == 32 then accept i
       else opcode (i + 1)
-  } in startsWith "  %v" line && opcode 4;
+  } in startsWith "  %" line && width > 3 &&
+    ((stringCodeAt line 3 >= 48 && stringCodeAt line 3 <= 57) || stringCodeAt line 3 == 118) && opcode 4;
   workerInstructionStarts :: String -> Int -> String -> Bool;
   workerInstructionStarts line offset word = let { n = stringLength word } in
     offset + n <= stringLength line && eqString word (stringSlice line offset n);

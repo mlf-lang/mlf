@@ -86,7 +86,7 @@ module Bootstrap.LLVM.Codegen where {
     } in
     let {
       output =
-        Output 0 [] "entry" [] [] (ConstructorLayout cs plans)
+        Output 0 (FunctionInstructions 0 []) "entry" [] [] (ConstructorLayout cs plans)
           (FunctionScope fs (A.lambdaFreeTable term) (Just (indexWorkerEscapes fs term)))
           S.empty M.empty ks S.empty (K.collecting fs ks) M.empty
           True
