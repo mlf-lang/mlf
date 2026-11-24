@@ -72,6 +72,7 @@
     "retained_curried_dependencies": {"label": "Cold curried library, consumer and entry", "default": false, "work": "n escaping six-argument closures through a two-stage dependency graph"},
     "retained_packet_dependency": {"label": "Cold packet library and consumer", "default": false, "work": "n functions from a freshly checked packet library, linked and exercised by Main"},
     "delayed_packet_fanout": {"label": "Delayed packet fan-out", "default": false, "work": "n consumers inspect a shared packet, force its left field and conditionally force its right field"},
+    "wide_thunk_captures": {"label": "Wide thunk captures", "default": false, "work": "n suspended row fields each capture eight ready operands, with a runtime selector forcing one field"},
     "captured_thunk_fanout": {"label": "Captured thunk fan-out", "default": false, "work": "n rows each contain four suspended fields that capture one through four operands"},
     "repeated_ground_dictionary_demands": {"label": "Repeated ground dictionary demands", "default": false, "work": "a recursive predecessor exports n string literal demands at the same concrete type and two local branches use it"},
     "local_dictionary_branch_fanout": {"label": "Local dictionary branch fan-out", "default": false, "work": "n inferred local helpers each use the previous helper in two branches, with two overloaded string literals at the base"},

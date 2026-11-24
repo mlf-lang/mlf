@@ -1662,7 +1662,10 @@ module Bootstrap.LLVM.Optimize where {
     let {
       eligible = case useTerm value of {
         XEAbs _ _ ->
-          smallValue (useTerm value) &&
+          -- The ordinary inliner copies a single-use lambda even when its
+          -- body is large. A witnessed non-specializable call lets the
+          -- checked pass defer that same copy with its other replacements.
+          (smallValue (useTerm value) || (checked && uses == 1)) &&
           (uses > 0 && uses < 4 &&
            witnessed name);
         _ -> False

@@ -127,6 +127,23 @@ sumChain x chain = case chain of { End -> 0; More box rest -> addInt (readBox bo
         terms = [f'(probe{i} payload)' for i in range(n)]
         total = balanced(terms, lambda a, b: f'(addInt {a} {b})')
         return HEADER + declarations + f'entry x = let {{ payload = packet x }} in {total};\n' + MAIN
+    elif family == 'wide_thunk_captures':
+        declarations = '''data WideRow = WideRow Int Int;
+data WideBatch = WideEnd | WideMore WideRow WideBatch;
+readRows x batch = case batch of {
+  WideEnd -> 0;
+  WideMore row rest -> case row of {
+    WideRow wide narrow -> addInt (if ltInt x 0 then wide else narrow) (readRows x rest)
+  }
+};
+'''
+        for i in range(1, n + 1):
+            declarations += (f'make{i} a b c d e f g h = WideRow '
+                             f'(addInt {i} (addInt (addInt (mulInt a b) (mulInt c d)) '
+                             f'(addInt (mulInt e f) (mulInt g h)))) (subInt a {i});\n')
+        args = ' '.join(['x'] + [f'(addInt x {i})' for i in range(1, 8)])
+        rows = ''.join(f'WideMore (make{i} {args}) (' for i in range(1, n + 1))
+        return HEADER + declarations + f'entry x = readRows x ({rows}WideEnd' + ')' * n + ');\n' + MAIN
     elif family == 'captured_thunk_fanout':
         declarations = '''data Row = Row Int Int Int Int;
 data Batch = End | More Row Batch;
@@ -938,6 +955,12 @@ def expected(family, n, x):
         right_count = min(n, max(0, x + 4))
         right_offsets = right_count*(right_count-1)//2
         return right_count*(3-x) + (n-right_count)*(x+3) + offsets - 2*right_offsets
+    if family == 'wide_thunk_captures':
+        offsets = n * (n + 1) // 2
+        if x < 0:
+            # Four adjacent products expand to 4*x^2 + 28*x + 68.
+            return n * (4*x*x + 28*x + 68) + offsets
+        return n*x - offsets
     if family == 'captured_thunk_fanout':
         if x < 0:
             return x*n*(n+1)//2 + n*(9-x)*(2*x+3)
