@@ -2160,39 +2160,59 @@ module Bootstrap.SourceInference where {
         (,) (XForall variable bound arrows) (XTypeAbs declared annotation body) -> do {
           ensure (Type.equalTyVar variable declared && Type.alphaEq bound annotation)
             "grouped root reuses a different result bound";
-          if sharedDictionaryParameter variable labels arrows body then Right object else do {
-          let { minId identity current = if identity < current then identity else current;
-            start = advanceIdentity (Separate.foldTermIdentities minId rhs 0) (-1) };
-          (,) scheme replacement <- restoreDictionaryArrows variable bound start labels arrows body;
-          checked <- Open.check (Open.context object) (Open.parameters object)
-            (XLet binder replacement (XConstructor "()" []));
-          ensure (case Open.bindings checked of {
-            [(,) n actual] -> X.equalName n binder && Type.alphaEq scheme actual; _ -> False
-          }) "restored dictionaries changed their checked scheme";
-          Right checked
+          let { sameParameter args = case args of {
+            [XVar v] -> Type.equalTyVar variable v; _ -> False
+          } };
+          if Type.alphaEq bound (XBotKind (KArrow Star Star)) &&
+            checkedDictionarySpine sameParameter (sharedMonadResult variable) labels arrows body
+          then Right object else do {
+            let { minId identity current = if identity < current then identity else current;
+              start = advanceIdentity (Separate.foldTermIdentities minId rhs 0) (-1) };
+            (,) scheme replacement <- restoreDictionaryArrows variable bound start labels arrows body;
+            checked <- Open.check (Open.context object) (Open.parameters object)
+              (XLet binder replacement (XConstructor "()" []));
+            ensure (case Open.bindings checked of {
+              [(,) n actual] -> X.equalName n binder && Type.alphaEq scheme actual; _ -> False
+            }) "restored dictionaries changed their checked scheme";
+            Right checked
           }
         };
+        (,) (XArrow _ _) (XAbs _ _ _) ->
+          if checkedDictionarySpine (all closedMonotype) closedMonotype labels ty rhs
+          then Right object else Left "grouped root has an open dictionary prefix";
         _ -> Left "grouped root requires one result bound"
       }
     };
     _ -> Right object
   };
-  -- When every prefix domain and the remaining result use the same type
-  -- variable, its scope includes the first argument and the whole tail.
-  -- The grouped term already binds it there. Check the issued term binders
-  -- and their annotations before keeping the independently checked object.
-  sharedDictionaryParameter variable labels ty term = case (,,) labels ty term of {
-    (,,) [] (XArrow (XApply (XVar input) argument) (XApply (XVar output) result)) _ ->
-      Type.equalTyVar input variable && Type.equalTyVar output variable &&
-      closedNominal argument && closedNominal result;
-    (,,) ((:) ((,,) label _ dictionary) rest) (XArrow domain@(XCon owner [XVar v]) tail)
+  -- Closed domains and results have no variables to generalize. A single
+  -- parameter shared by every domain and both sides of the result arrow
+  -- must instead be bound outside every dictionary lambda. Both cases
+  -- already have their ordinary binder placement in the checked object.
+  checkedDictionarySpine :: ([] XType -> Bool) -> (XType -> Bool) ->
+    [] ((,,) String String String) -> XType -> XTerm -> Bool;
+  checkedDictionarySpine domains result labels ty term = case (,,) labels ty term of {
+    (,,) [] remaining _ -> result remaining;
+    (,,) ((:) ((,,) label _ dictionary) rest) (XArrow domain@(XCon owner args) tail)
          (XAbs binder annotation body) ->
       eqString label (X.nameHint binder) && eqString dictionary owner &&
-      Type.equalTyVar v variable && Type.alphaEq domain annotation &&
-      sharedDictionaryParameter variable rest tail body;
+      domains args && Type.alphaEq domain annotation &&
+      checkedDictionarySpine domains result rest tail body;
     _ -> False
   };
-  closedNominal value = case value of { XCon _ args -> all closedNominal args; _ -> False };
+  closedMonotype :: XType -> Bool;
+  closedMonotype ty = case ty of {
+    XCon _ args -> all closedMonotype args;
+    XApply function argument -> closedMonotype function && closedMonotype argument;
+    XArrow domain result -> closedMonotype domain && closedMonotype result;
+    _ -> False
+  };
+  sharedMonadResult variable ty = case ty of {
+    XArrow (XApply (XVar input) arg) (XApply (XVar output) result) ->
+      Type.equalTyVar variable input && Type.equalTyVar variable output &&
+      closedMonotype arg && closedMonotype result;
+    _ -> False
+  };
   restoreDictionaryArrows :: XTyVar -> XType -> Int -> [] ((,,) String String String) ->
     XType -> XTerm -> Either String ((,) XType XTerm);
   restoreDictionaryArrows variable bound identity labels arrows implementation =
