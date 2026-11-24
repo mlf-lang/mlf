@@ -588,6 +588,23 @@ foldPair step seed left right = foldTree step seed (Branch (Leaf left) (Leaf rig
         calls = [f'foldPair addInt x (addInt x {i}) x' for i in range(n)]
         total = balanced(calls, lambda left, right: f'addInt ({left}) ({right})')
         return HEADER + declarations + f'entry x = {total};\n' + MAIN
+    elif family == 'local_monadic_dictionary_uses':
+        steps = '\n'.join(f'    a{i} <- twice (pure (addInt a{i-1} {i}));'
+                          for i in range(1, n + 1))
+        declarations = f"""data Work a = Done a;
+instance Functor Work where {{ fmap f (Done x) = Done (f x) }};
+instance Applicative Work where {{ pure x = Done x; (<*>) (Done f) (Done x) = Done (f x) }};
+instance Monad Work where {{ (>>=) (Done x) next = next x }};
+walk start = let {{
+  step action = do {{ value <- action; return (addInt value 1) }};
+  twice action = step (step action)
+}} in do {{
+    a0 <- start;
+{steps}
+    return a{n}
+}};
+"""
+        expression = 'case walk (Done x) of { Done y -> y }'
     elif family == 'inferred_monadic_recursion':
         steps = '\n'.join(f'    a{i+1} <- pure (addInt a{i} x);' for i in range(n))
         declarations = f'''data Work a = Done a;
@@ -995,6 +1012,8 @@ def expected(family, n, x):
     if family == 'polymorphic_tree_fold':
         total = 3*n*x + n*(n-1)//2
         return (total + 2**63) % 2**64 - 2**63
+    if family == 'local_monadic_dictionary_uses':
+        return x + n*(n+1)//2 + 2*n
     if family == 'inferred_monadic_recursion':
         return ((n + 1)*x + 2**63) % 2**64 - 2**63
     if family == 'bounded_optional_writers':

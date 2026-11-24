@@ -2160,6 +2160,7 @@ module Bootstrap.SourceInference where {
         (,) (XForall variable bound arrows) (XTypeAbs declared annotation body) -> do {
           ensure (Type.equalTyVar variable declared && Type.alphaEq bound annotation)
             "grouped root reuses a different result bound";
+          if sharedDictionaryParameter variable labels arrows body then Right object else do {
           let { minId identity current = if identity < current then identity else current;
             start = advanceIdentity (Separate.foldTermIdentities minId rhs 0) (-1) };
           (,) scheme replacement <- restoreDictionaryArrows variable bound start labels arrows body;
@@ -2169,12 +2170,29 @@ module Bootstrap.SourceInference where {
             [(,) n actual] -> X.equalName n binder && Type.alphaEq scheme actual; _ -> False
           }) "restored dictionaries changed their checked scheme";
           Right checked
+          }
         };
         _ -> Left "grouped root requires one result bound"
       }
     };
     _ -> Right object
   };
+  -- When every prefix domain and the remaining result use the same type
+  -- variable, its scope includes the first argument and the whole tail.
+  -- The grouped term already binds it there. Check the issued term binders
+  -- and their annotations before keeping the independently checked object.
+  sharedDictionaryParameter variable labels ty term = case (,,) labels ty term of {
+    (,,) [] (XArrow (XApply (XVar input) argument) (XApply (XVar output) result)) _ ->
+      Type.equalTyVar input variable && Type.equalTyVar output variable &&
+      closedNominal argument && closedNominal result;
+    (,,) ((:) ((,,) label _ dictionary) rest) (XArrow domain@(XCon owner [XVar v]) tail)
+         (XAbs binder annotation body) ->
+      eqString label (X.nameHint binder) && eqString dictionary owner &&
+      Type.equalTyVar v variable && Type.alphaEq domain annotation &&
+      sharedDictionaryParameter variable rest tail body;
+    _ -> False
+  };
+  closedNominal value = case value of { XCon _ args -> all closedNominal args; _ -> False };
   restoreDictionaryArrows :: XTyVar -> XType -> Int -> [] ((,,) String String String) ->
     XType -> XTerm -> Either String ((,) XType XTerm);
   restoreDictionaryArrows variable bound identity labels arrows implementation =

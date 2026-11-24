@@ -56,6 +56,7 @@
     "deferred_constructor_spine": {"label": "Deferred constructor spine", "default": false, "work": "n nested constructor demands on a chain built lazily from runtime input, including a one-node-short branch"},
     "shared_callback_let_chain": {"label": "Shared callback let chain", "default": false, "work": "n nested shared callbacks capture the preceding value twice and are called with an outer variable or a computed operand"},
     "queued_callback_let_chain": {"label": "Queued callback let chain", "default": false, "work": "n nested callbacks capture the preceding value once and permit delayed substitution into calls"},
+    "local_monadic_dictionary_uses": {"label": "Repeated local monadic helpers", "default": false, "matched_zero": true, "work": "one inferred action calls a local helper at n binds, and the helper instantiates another local helper twice"},
     "inferred_monadic_recursion": {"label": "Inferred monadic recursion", "default": false, "work": "an explicitly typed recursive peer calls an inferred monadic helper with n bind and pure operations"},
     "bounded_optional_writers": {"label": "Bounded optional writers", "default": false, "matched_zero": true, "work": "n unsigned writers call a checked optional formatter through a fixed bounded result with repeated closed dictionaries"},
     "inferred_constructor_writers": {"label": "Inferred constructor writers", "default": false, "matched_zero": true, "work": "n unsigned declarations infer a closed type through constructor branches"},
