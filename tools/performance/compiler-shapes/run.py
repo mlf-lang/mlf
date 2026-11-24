@@ -196,7 +196,7 @@ def main():
             '-package','base','-package','mlf-shape-primitives','-i','-odir','<leg>','-hidir','<leg>','<source>','-o','<leg>/program'],
         'mlf_stages':worker.mlf_stage_names(args.endpoint),
         'timing_boundary':'exact-child worker launch through wait4; common Python dispatcher included; preparation and validation excluded'}
-    if args.endpoint == 'crate-bootstrap-production-v1':
+    if args.endpoint in worker.PRODUCTION_ENDPOINTS:
         triple = subprocess.check_output([setup['clang'], '-dumpmachine'], text=True).strip()
         if not triple or len(triple.split()) != 1:
             raise ValueError(f'Invalid Clang target triple: {triple!r}')
@@ -248,6 +248,9 @@ def main():
                 H.require(r['stages']['complete'],'every compilation stage complete')
                 r['executable_sha256']=H.sha(build/'program')
                 if lane in ('mlf','reference'):
+                    if args.endpoint == worker.CACHED_ENDPOINT:
+                        producer = plan['toolchain']['producer'] if lane == 'mlf' else plan['compiler_reference']
+                        r['codegen_cache'] = Q.cold_codegen_evidence(build, producer['emlf_sha256'])
                     q=H.load(build/'unit.queries');H.require(q['inferred_groups']==len(q['groups'])>0
                         and q['reused_groups']==0 and all(g['cached'] is False for g in q['groups']),'fresh target groups only')
                     r['fresh']=q['inferred_groups'];r['reused']=0

@@ -23,6 +23,11 @@ The plan records each lane's flags and every build records its Clang command.
 Compare cohorts within the same endpoint. The GHC command is identical across
 both endpoints.
 
+Use `--endpoint crate-bootstrap-cached-production-v1` to measure checking,
+LLVM cache publication, and native linking together. Each leg writes its own
+code generation cache. After timing, the harness checks both cache misses,
+the producer identity, and the SHA-256 of the emitted and cached LLVM.
+
 ## Compile endpoint
 
 The default measured endpoint is `crate-fused-v1`:

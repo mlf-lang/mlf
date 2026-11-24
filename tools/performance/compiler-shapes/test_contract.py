@@ -998,6 +998,33 @@ class ScheduleTests(unittest.TestCase):
                          worker.mlf_commands('crate-bootstrap-v1', *args))
         self.assertEqual(worker.ORDINARY_CLANG_FLAGS, ('-O2', '-Wno-override-module'))
 
+    def test_cold_codegen_endpoint_records_fresh_matching_llvm(self):
+        with tempfile.TemporaryDirectory() as folder:
+            out = Path(folder)
+            stages = worker.mlf_commands(worker.CACHED_ENDPOINT, Path('/bin/emlf'), out/'spec', out)
+            self.assertEqual(stages[1][1][-4:], ['--cache', out/'codegen-cache',
+                                                '--query-report', out/'codegen.json'])
+            objects = out/'codegen-cache'/'objects'
+            objects.mkdir(parents=True)
+            checksum = 'a' * 64
+            report = {'format': 1, 'input_key': 'b' * 64, 'optimized_key': checksum,
+                      'compiler': 'c' * 64, 'input_reused': False, 'optimized_reused': False}
+            (out/'unit.ll').write_bytes(b'generated LLVM')
+            stored = objects/(checksum+'.ll')
+            stored.write_bytes((out/'unit.ll').read_bytes())
+            def check():
+                (out/'codegen.json').write_text(json.dumps(report))
+                return runner.Q.cold_codegen_evidence(out, 'c' * 64)
+            self.assertEqual(check()['llvm_sha256'], hashlib.sha256(b'generated LLVM').hexdigest())
+            for field in ('input_reused', 'optimized_reused'):
+                report[field] = True
+                with self.assertRaisesRegex(ValueError, 'must be fresh'):
+                    check()
+                report[field] = False
+            stored.write_bytes(b'another artifact')
+            with self.assertRaisesRegex(ValueError, 'must match'):
+                check()
+
     def test_production_flags_are_queried_from_each_producer(self):
         triple = 'arm64-apple-darwin25'
         with mock.patch.object(runner.subprocess, 'check_output',

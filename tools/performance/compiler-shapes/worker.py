@@ -11,14 +11,21 @@ import time
 ORDINARY_CLANG_FLAGS = ('-O2', '-Wno-override-module')
 
 
+CACHED_ENDPOINT = 'crate-bootstrap-cached-production-v1'
+PRODUCTION_ENDPOINTS = ('crate-bootstrap-production-v1', CACHED_ENDPOINT)
+
+
 def pack(values):
     return ''.join(str(len(x))+':'+x for x in values)
 
 
 def mlf_commands(endpoint, emlf, spec, out):
-    if endpoint in ('crate-bootstrap-v1', 'crate-bootstrap-production-v1'):
+    if endpoint == 'crate-bootstrap-v1' or endpoint in PRODUCTION_ENDPOINTS:
+        emit = [emlf, '--crate-to-llvm-gc', out/'unit.mlfci']
+        if endpoint == CACHED_ENDPOINT:
+            emit += ['--cache', out/'codegen-cache', '--query-report', out/'codegen.json']
         return [('source-to-checked', [emlf, '--compile-crate', spec, '-o', out/'unit'], None),
-                ('checked-to-llvm', [emlf, '--crate-to-llvm-gc', out/'unit.mlfci'], out/'unit.ll')]
+                ('checked-to-llvm', emit, out/'unit.ll')]
     if endpoint == 'crate-fused-v1':
         return [('source-to-llvm', [emlf, '--compile-crate-to-llvm-gc', spec, '-o', out/'unit'], out/'unit.ll')]
     if endpoint == 'crate-plan-v1':
@@ -107,7 +114,7 @@ def main():
         else:
             run('module-source-to-llvm',[emlf,'--emit-llvm-gc',case['source']],out/'unit.ll')
         flags = ORDINARY_CLANG_FLAGS
-        if args.lane in ('mlf', 'reference') and endpoint == 'crate-bootstrap-production-v1':
+        if args.lane in ('mlf', 'reference') and endpoint in PRODUCTION_ENDPOINTS:
             flags = [*flags, *plan['native_target_policy'][args.lane]['flags']]
         run('llvm-to-executable',[setup['clang'],*flags,out/'unit.ll',
             setup['runtime'],*setup['libs'],'-lm','-lpthread','-ldl','-o',out/'program'])

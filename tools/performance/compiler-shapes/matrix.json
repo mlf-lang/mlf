@@ -5,6 +5,7 @@
   "title": "GHC / MLF compiler shape classification benchmark",
   "purpose": "Compile identical generated shared-Haskell programs with GHC and with GHC-hosted MLF, from fresh targets to native executables. This classifies compiler behaviour by program shape; it is not the C/MLF Benchmarks Game comparison in tools/bench.",
   "families": {
+    "module_string_literals": {"label": "Module string literal definitions", "default": false, "work": "a balanced runtime lookup selects among n short string constants with repeated ASCII names and distinct mixed Unicode text"},
     "mixed_unicode_literal": {"label": "ASCII run between Unicode scalars", "default": false, "work": "one typed literal has n sixteen-character ASCII blocks between two Unicode scalars and a runtime-selected scalar lookup"},
     "captured_parameter_uses": {"label": "Captured parameter used as an integer", "default": false, "work": "n inferred functions each capture an outer parameter in a local binding and use its value in integer addition"},
     "flat_functions": {"label": "Independent annotated functions", "default": true, "work": "n annotated top-level functions summed in a balanced tree"},
@@ -114,6 +115,15 @@
       "compiles_user_program_fresh": true,
       "reused_inputs": ["fixed builtin checked pair (.mlfci/.mlfco)", "prebuilt host MLF.Primitive package", "runtime.o", "GHC and Clang toolchains"],
       "cache_boundary": "same fresh targets and private query caches as crate-bootstrap-v1"
+    },
+    "crate-bootstrap-cached-production-v1": {
+      "status": "measured",
+      "summary": "Bootstrap crate stages with a fresh on-disk LLVM code generation cache and production Clang flags.",
+      "producer": "tools/shared/build.py --bootstrap-only --optimization 2",
+      "driver": "Compile the checked crate, emit LLVM with --cache and --query-report, then link with the producer's native target flags.",
+      "compiles_user_program_fresh": true,
+      "reused_inputs": ["fixed builtin checked pair (.mlfci/.mlfco)", "prebuilt host MLF.Primitive package", "runtime.o", "GHC and Clang toolchains"],
+      "cache_boundary": "Each leg starts with a new private build directory. Both code generation queries must miss and the stored LLVM must match the emitted bytes."
     },
     "crate-plan-v1": {
       "label": "GHC-hosted cold crate plan",

@@ -52,6 +52,20 @@ def program(family, n):
     """Generate one shared module with a runtime input at its IO entry."""
     if family == 'baseline':
         declarations, expression = '', 'x'
+    elif family == 'module_string_literals' and n:
+        common = ['coerce', 'Prelude', 'Bool', 'Dict_' + 'x' * 64]
+        def select(start, stop):
+            if stop - start == 1:
+                kind = start % 5
+                text = common[kind] if kind < 4 else 'λ' + 'abcdefghij' * 6 + '𐀀' + str(start)
+                return json.dumps(text, ensure_ascii=False)
+            middle = (start + stop) // 2
+            return f'(if ltInt x {middle} then {select(start, middle)} else {select(middle, stop)})'
+        declarations = 'pick :: Int -> String;\npick x = ' + select(0, n) + ';\n'
+        expression = ('let { text = pick x; size = stringLength text } in '
+                      'addInt (mulInt size 257) (stringCodeAt text (subInt size 1))')
+    elif family == 'module_string_literals':
+        declarations, expression = '', 'x'
     elif family == 'mixed_unicode_literal':
         # Positions include both Unicode scalars and both ends of the ASCII run.
         payload = 'λ' + 'abcdefghijklmnop' * n + '界'
@@ -915,6 +929,13 @@ run x (More (Job worker) rest) = let { saved = worker x (addInt x 1) } in
 
 def expected(family, n, x):
     """Closed-form specifications; no compiled results or generated helpers used."""
+    if family == 'module_string_literals':
+        if not n:
+            return x
+        i = min(max(x, 0), n - 1)
+        size, last = [(6, 101), (7, 101), (4, 108), (69, 120),
+                      (62 + len(str(i)), 48 + i % 10)][i % 5]
+        return size * 257 + last
     if family == 'mixed_unicode_literal':
         last = 16 * n + 1
         index = 0 if x < 0 else last if x == 0 else x % last
@@ -1163,7 +1184,9 @@ def generate(out, sizes=None, families=None, baseline_family=None):
         directory = out/identity; directory.mkdir()
         source = directory/'Main.hs'; source.write_text(program(source_family,n))
         inputs = [-1,0,n+3] if family == 'recursive_ring' else [-1,0,7]
-        if family == 'wide_case':
+        if family == 'module_string_literals':
+            inputs = list(dict.fromkeys([-1, 0, 1, 2, 3, 4, n//2, n-1, n+1]))
+        elif family == 'wide_case':
             inputs = [-1, n//2, n, '--all']
         elif family == 'visible_instance_inventory':
             inputs = [-2**63, -1, 0, 7, 2**63-1]

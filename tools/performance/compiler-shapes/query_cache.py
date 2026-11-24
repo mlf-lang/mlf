@@ -26,6 +26,28 @@ def digest(raw):
     return hashlib.sha256(raw).hexdigest()
 
 
+def cold_codegen_evidence(build, compiler):
+    report = json.loads((build/'codegen.json').read_text())
+    require(type(report.get('format')) is int and report['format'] == 1 and
+            report.get('compiler') == compiler, 'expected code generation producer')
+    require(report.get('input_reused') is False and report.get('optimized_reused') is False,
+            'both code generation queries must be fresh')
+    for key in ('input_key', 'optimized_key'):
+        require(isinstance(report.get(key), str) and HASH.fullmatch(report[key]),
+                'invalid code generation key')
+    cached = build/'codegen-cache'/'objects'/(report['optimized_key']+'.ll')
+    def file_sha(path):
+        hasher = hashlib.sha256()
+        with path.open('rb') as stream:
+            for block in iter(lambda: stream.read(1024*1024), b''):
+                hasher.update(block)
+        return hasher.hexdigest()
+    emitted = file_sha(build/'unit.ll')
+    require(cached.stat().st_size > 0 and file_sha(cached) == emitted,
+            'cached LLVM must match emitted LLVM')
+    return {'report': report, 'llvm_sha256': emitted}
+
+
 def pack(values):
     return ''.join(str(len(value)) + ':' + value for value in values)
 

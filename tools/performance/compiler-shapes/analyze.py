@@ -113,6 +113,11 @@ def analyze(folder):
                         row[prefix+stage+'_'+metric+'_median']=S.median(s[metric] for s in ss)
                 directories=sorted(p for p in (folder/'legs').iterdir() if p.name.endswith(case['id']+'-'+lane))
                 require(len(directories)==repeats,'all retained leg directories')
+                if row['endpoint'] == worker.CACHED_ENDPOINT:
+                    producer = plan['toolchain']['producer'] if lane == 'mlf' else plan['compiler_reference']
+                    for directory, sample in zip(directories, rs):
+                        require(sample.get('codegen_cache') == Q.cold_codegen_evidence(
+                            directory/'build', producer['emlf_sha256']), 'verified cold code generation receipt')
                 inventories=[load(d/'query-cache-inventory.json') for d in directories]
                 graph=[any(k.startswith(Q.GRAPH) or k.endswith(('.mlfqg','.mlfqr')) for k in inv)
                        for inv in inventories]
