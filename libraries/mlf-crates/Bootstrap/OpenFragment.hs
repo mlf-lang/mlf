@@ -81,16 +81,16 @@ module Bootstrap.OpenFragment
   data LinkView = LinkPattern Structure.TermPattern | LinkLambda LinkView |
     LinkLet (Maybe LinkView) (Maybe LinkView) | LinkPublishedRaw;
   data Fragment = Fragment Environment ([] ((,) XName XType)) XTerm
-    ([] ((,) XName XType)) ([] XName) String W.Value (Maybe StoredTerm) (Maybe StoredTerm) (Maybe LinkView);
+    ([] ((,) XName XType)) ([] XName) String (Maybe StoredTerm) (Maybe StoredTerm) (Maybe LinkView);
   fragmentWith env ps term bs used saved =
-    let { raw = Structure.toXTerm term } in Fragment env ps term bs used saved raw (compactTerm term) (compactTermWith spinePattern term) Nothing;
-  context (Fragment env _ _ _ _ _ _ _ _ _) = env;
-  parameters (Fragment _ ps _ _ _ _ _ _ _ _) = ps;
-  body (Fragment _ _ term _ _ _ _ _ _ _) = term;
-  bodyValue (Fragment _ _ _ _ _ _ value _ _ _) = value;
-  fragmentStorage (Fragment _ _ _ _ _ _ _ stored _ _) = stored;
-  fragmentLinkView (Fragment _ _ _ _ _ _ _ _ _ view) = view;
-  fragmentSpineStorage (Fragment _ _ _ _ _ _ _ _ stored _) = stored;
+    Fragment env ps term bs used saved (compactTerm term) (compactTermWith spinePattern term) Nothing;
+  context (Fragment env _ _ _ _ _ _ _ _) = env;
+  parameters (Fragment _ ps _ _ _ _ _ _ _) = ps;
+  body (Fragment _ _ term _ _ _ _ _ _) = term;
+  bodyValue fragment = Structure.toXTerm (body fragment);
+  fragmentStorage (Fragment _ _ _ _ _ _ stored _ _) = stored;
+  fragmentLinkView (Fragment _ _ _ _ _ _ _ _ view) = view;
+  fragmentSpineStorage (Fragment _ _ _ _ _ _ _ stored _) = stored;
   checkedStorageValue fragment = mapOptional snd (selectedStorage True fragment);
   storageValue fragment = mapOptional storedWire (fragmentStorage fragment);
   -- Rows retain variables, ground variable instantiations, primitives, literal
@@ -282,9 +282,9 @@ module Bootstrap.OpenFragment
     XWithData ds b -> node 84 [still (Structure.toList Structure.toDataDecl ds),child b];
     _ -> Nothing
   };
-  bindings (Fragment _ _ _ bs _ _ _ _ _ _) = bs;
-  usedParameters (Fragment _ _ _ _ used _ _ _ _ _) = used;
-  fingerprint (Fragment _ _ _ _ _ stamp _ _ _ _) = stamp;
+  bindings (Fragment _ _ _ bs _ _ _ _ _) = bs;
+  usedParameters (Fragment _ _ _ _ used _ _ _ _) = used;
+  fingerprint (Fragment _ _ _ _ _ stamp _ _ _) = stamp;
   -- The fingerprint frames each field with its Unicode scalar length. Hash
   -- successive pages of pretty-printer output while counting that length,
   -- then prepend the length with the same polynomial composition as pack.
@@ -581,7 +581,7 @@ module Bootstrap.OpenFragment
   checkedFragment env ps term bs used = let {
     views = termViews term;
     saved = stampEncoding env ps (prettyStamp views) bs
-  } in Fragment env ps term bs used saved (Structure.toXTerm term) (ordinaryRows views) (spineRows views) Nothing;
+  } in Fragment env ps term bs used saved (ordinaryRows views) (spineRows views) Nothing;
   stamp env ps term bs = stampEncoding env ps (termEncoding term) bs;
   declarationEncoding (Environment _ _ _ encoded) = encoded;
   -- A row is a scalar-length-framed canonical declaration, exactly one field
@@ -1315,8 +1315,8 @@ module Bootstrap.OpenFragment
           _ -> Nothing
         };
         withView = case fragment of {
-          Fragment env ps source bs used stamp raw stored spines _ ->
-            Fragment env ps source bs used stamp raw stored spines view
+          Fragment env ps source bs used stamp stored spines _ ->
+            Fragment env ps source bs used stamp stored spines view
         }
       } in seq view ((:) ((,) label withView) (attach rest tail));
       _ -> rows
@@ -1328,8 +1328,8 @@ module Bootstrap.OpenFragment
   -- Keep the marker on a copy of the exact fragment whose raw final record
   -- was written. Existing authenticated compact views remain usable.
   publishedRawRow ((,) label fragment) = (,) label (case fragment of {
-    Fragment env ps source bs used stamp raw stored spines view ->
-      Fragment env ps source bs used stamp raw stored spines (case view of {
+    Fragment env ps source bs used stamp stored spines view ->
+      Fragment env ps source bs used stamp stored spines (case view of {
         Nothing -> Just LinkPublishedRaw; Just _ -> view
       })
   });

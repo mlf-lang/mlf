@@ -626,7 +626,7 @@ foldPair step seed left right = foldTree step seed (Branch (Leaf left) (Leaf rig
         calls = [f'foldPair addInt x (addInt x {i}) x' for i in range(n)]
         total = balanced(calls, lambda left, right: f'addInt ({left}) ({right})')
         return HEADER + declarations + f'entry x = {total};\n' + MAIN
-    elif family in ('local_monadic_dictionary_uses', 'ground_monadic_dictionary_uses'):
+    elif family in ('local_monadic_dictionary_uses', 'ground_monadic_dictionary_uses', 'checked_groups_then_dictionary'):
         # A concrete first action fixes the monad throughout the same do block.
         first_action = ('(case start of { Done value -> Done value })'
                         if family == 'ground_monadic_dictionary_uses' else 'start')
@@ -645,6 +645,23 @@ walk start = let {{
     return a{n}
 }};
 """
+        if family == 'checked_groups_then_dictionary':
+            arms = 12
+            rows = ['data CheckedInput = ' + ' | '.join(f'Field{j} Int' for j in range(arms)) + ';']
+            for j in range(2*arms):
+                rows.extend([f'offset{j} :: Int -> Int;', f'offset{j} v = addInt v {j+1};'])
+            for i in range(4*n):
+                alts = [f'Field{j} v -> if ltInt v {i+j} then addInt (offset{2*j} (mulInt v {j+1})) {i} '
+                        f'else subInt (offset{2*j+1} (addInt v {j})) {i}' for j in range(arms)]
+                rows.extend([f'checked{i} :: CheckedInput -> Int;',
+                             f'checked{i} input = case input of {{ ' + '; '.join(alts) + ' };'])
+            values = [f'checked{i} input' for i in range(4*n)]
+            total = balanced(values, lambda a, b: f'addInt ({a}) ({b})') if values else 'x'
+            select = ''.join(f'if eqInt key {j} then Field{j} x else ' for j in range(arms-1)) + f'Field{arms-1} x'
+            rows.append(f'checkedPrefix :: Int -> Int;\ncheckedPrefix x = let {{ '
+                        f'key = remInt (addInt {arms} (remInt x {arms})) {arms}; input = {select} }} in {total};')
+            declarations = '\n'.join(rows) + '\n' + declarations.replace(
+                'a0 <- start;', 'seed <- start; a0 <- pure (checkedPrefix seed);')
         expression = 'case walk (Done x) of { Done y -> y }'
     elif family == 'inferred_monadic_recursion':
         steps = '\n'.join(f'    a{i+1} <- pure (addInt a{i} x);' for i in range(n))
@@ -1071,6 +1088,11 @@ def expected(family, n, x):
     if family == 'polymorphic_tree_fold':
         total = 3*n*x + n*(n-1)//2
         return (total + 2**63) % 2**64 - 2**63
+    if family == 'checked_groups_then_dictionary':
+        count = 4 * n
+        arm = x % 12
+        prefix = sum(x*(arm+1) + i + 2*arm+1 if x < i+arm else x+3*arm+2-i for i in range(count)) if count else x
+        return prefix + n * (n + 1) // 2 + 2 * n
     if family in ('local_monadic_dictionary_uses', 'ground_monadic_dictionary_uses'):
         return x + n*(n+1)//2 + 2*n
     if family == 'inferred_monadic_recursion':
