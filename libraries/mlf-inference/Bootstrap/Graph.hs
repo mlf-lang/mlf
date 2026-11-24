@@ -805,7 +805,7 @@ module Bootstrap.Graph where {
       Just ((,) low high) -> validateDense graph low high
     };
   data DenseValidation s =
-    DenseValidation Graph Int Int (STArray s (Maybe Node)) (STArray s ([] Int)) (STArray s
+    DenseValidation Graph Int Int (STArray s (IntMapTree Node)) (STArray s ([] Int)) (STArray s
                                                                                    Int) (STArray s
                                                                                          Kind) (STArray
                                                                                                 s
@@ -821,7 +821,7 @@ module Bootstrap.Graph where {
     let {
       count = ((high - low) + 1)
     } in
-    stBind (newSTArray count Nothing)
+    stBind (newSTArray count IntMapNil)
       (\table ->
          stBind (newSTArray count [])
            (\descendants ->
@@ -843,16 +843,18 @@ module Bootstrap.Graph where {
                                              ends
                                              visited
                                        } in
-                                       let {
-                                         entries = IM.toList (nodes graph)
-                                       } in
-                                       stBind (denseLoadValidation low table entries)
-                                         (\loaded -> case nodes graph of {
-                                            IntMap tree -> denseValidateEntriesWith (denseKindTree state tree) state entries
-                                          }))))))));
+                                       case nodes graph of {
+                                         IntMap tree -> stBind (denseLoadValidation low table tree)
+                                           (\_ -> denseValidateEntriesWith (denseKindTree state tree)
+                                             state (IM.toList (nodes graph)))
+                                       })))))));
   denseGetNode :: forall s. DenseValidation s -> Int -> ST s (Maybe Node);
   denseGetNode (DenseValidation graph low high table descendants colours kinds starts ends visited) n =
-    if ((n < low) || (high < n)) then stReturn Nothing else readDense low table n;
+    if ((n < low) || (high < n)) then stReturn Nothing else
+      stBind (readDense low table n) (\entry -> case entry of {
+        IntMapTip _ value -> stReturn (Just value);
+        _ -> stReturn Nothing
+      });
   denseRequire :: forall s. DenseValidation s -> Int -> ST s (Either String Node);
   denseRequire state n =
     stBind (denseGetNode state n)
@@ -3119,18 +3121,17 @@ module Bootstrap.Graph where {
     };
   -- Direct loops keep the state operations visible to checked native lowering.
   -- They preserve the corresponding ST library traversal order and error stops.
-  denseLoadValidation :: forall s. Int ->
-                                   STArray s (Maybe Node) -> [] ((,) Int Node) -> ST s ();
-  denseLoadValidation low table values =
-    case values of {
-      [] -> stReturn ();
-      (:) entry rest ->
-        stBind
-          (case entry of {
-             (,) n v -> writeDense low table n (Just v)
-           })
-          (\ignored -> denseLoadValidation low table rest)
-    };
+  -- The immutable graph already owns one leaf for every live identity.
+  -- An empty slot uses the shared nil constructor, including gaps in the range.
+  denseLoadValidation :: forall s. Int -> STArray s (IntMapTree Node) -> IntMapTree Node -> ST s ();
+  denseLoadValidation low table tree = case tree of {
+    IntMapNil -> stReturn ();
+    IntMapTip n _ -> writeDense low table n tree;
+    IntMapBin _ prefix left right -> let {
+      visit first second = stBind (denseLoadValidation low table first)
+        (\_ -> denseLoadValidation low table second)
+    } in if IT.signBranch prefix then visit right left else visit left right
+  };
   denseCheckBinders :: forall s. DenseValidation s ->
                                  [] ((,) Int Node) -> ST s (Either String ());
   denseCheckBinders state values =
