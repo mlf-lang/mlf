@@ -2580,16 +2580,21 @@ module Bootstrap.Graph where {
     materializeCheckedExportBatch parent (L.map (\((,) source destination) -> (,,) generalization source destination) members);
   materializeCheckedExportBatch :: Int -> [] ((,,) Int Int Int) -> Graph ->
     Either String ((,) ([] ((,) Int (IntMap Int))) Graph);
-  materializeCheckedExportBatch parent members graph = let {
+  materializeCheckedExportBatch = materializeBatchUsing False;
+  -- The generation barrier calls this immediately after Solver.finish.
+  materializeSolvedExportBatch = materializeBatchUsing True;
+  materializeBatchUsing solved parent members graph = let {
+    report closed item next = (,,) item next closed;
+    unpack ((,,) items result _) = (,) items result;
     copyAll audit rows current = case rows of {
-      [] -> Right ((,) [] current);
+      [] -> Right ((,,) [] current True);
       (:) ((,,) generalization source destination) rest -> do {
-        (,) item next <- materializeCheckedExportUsing audit generalization source destination parent current;
-        (,) items result <- copyAll audit rest next;
-        Right ((,) ((:) item items) result)
+        (,,) item next closed <- materializeCheckedExportWith report audit generalization source destination parent current;
+        (,,) items result restClosed <- copyAll audit rest next;
+        Right ((,,) ((:) item items) result (closed && restClosed))
       }
     };
-    ordinary = copyAll True members graph;
+    ordinary = L.mapEither unpack (copyAll True members graph);
     frozen ((,,) generalization source destination) =
       IM.member (resolve graph generalization) (nodes graph) &&
       IM.member (resolve graph source) (nodes graph) && destination < nextId graph &&
@@ -2597,9 +2602,9 @@ module Bootstrap.Graph where {
     batched = do {
       check (exportCounterValid graph && L.all frozen members)
         "recursive export requires a reserved destination and valid fresh counter";
-      answer <- copyAll False members graph;
-      validateGraph (L.snd answer);
-      Right answer
+      (,,) items result closed <- copyAll False members graph;
+      if solved && closed then Right () else validateGraph result;
+      Right ((,) items result)
     }
   } in case members of {
     (:) _ ((:) _ _) -> case batched of {
@@ -2611,7 +2616,8 @@ module Bootstrap.Graph where {
   exportCounterValid graph =
     L.all (\n -> n < nextId graph) (IM.keys (nodes graph)) &&
     L.all (\n -> n < nextId graph) (IM.keys (links graph));
-  materializeCheckedExportUsing audit generalization selected destination parent graph = do {
+  materializeCheckedExportUsing = materializeCheckedExportWith (\_ item next -> (,) item next);
+  materializeCheckedExportWith report audit generalization selected destination parent graph = do {
     groupNode <- require graph generalization;
     parentNode <- require graph parent;
     sourceNode <- require graph selected;
@@ -2628,7 +2634,7 @@ module Bootstrap.Graph where {
       (L.not audit || exportCounterValid graph))
       "recursive export requires a reserved destination and valid fresh counter";
     check (L.not (isGen (tag sourceNode))) "recursive export root must be a type node";
-    materializeExportInUsing audit graph group source destination outer
+    materializeExportInWith report audit graph group source destination outer
   };
   materializeExportIn :: Graph ->
                          Int ->
@@ -2636,7 +2642,8 @@ module Bootstrap.Graph where {
                          Int ->
                          Int -> Either String ((,) ((,) Int (IntMap Int)) Graph);
   materializeExportIn = materializeExportInUsing True;
-  materializeExportInUsing audit graph generalization source destination parent =
+  materializeExportInUsing = materializeExportInWith (\_ item next -> (,) item next);
+  materializeExportInWith report audit graph generalization source destination parent =
     case expansionVisitCached graph generalization IM.empty ((,) IS.empty IM.empty)
            ((:) source []) of {
       (,) visited scopes ->
@@ -2672,7 +2679,13 @@ module Bootstrap.Graph where {
                             result
                       } in
                       bindE (if audit then validateGraph exported else Right ())
-                        (\verified -> Right ((,) ((,) (copy source) copies) exported)))
+                        (\verified ->
+                          -- A traversal with no external frontier copies the whole rooted
+                          -- structural graph bijectively. Existing type binders keep
+                          -- their paths. Every group-bound descendant is reachable from
+                          -- the new root, which binds it under the fresh destination Gen.
+                          Right (report (IM.size copies == IS.size visited)
+                            ((,) (copy source) copies) exported)))
              })
     };
   validateExportCopy :: Graph -> Int -> Int -> IntMap Int -> Int -> Either String ();
