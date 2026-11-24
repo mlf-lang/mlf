@@ -66,7 +66,7 @@ if selected pinned-inputs; then
   sha256 -c "$work/SHA256SUMS" >/dev/null
   pass
 fi
-check transition python3 -B tools/release/check_benchmark_transition.py
+check transition python3 -B tools/release/check_benchmark_phase2_successor.py
 check transition-controls python3 -B tools/testing/run.py benchmark-transition-controls
 # Authenticate current reconciliation bytes separately from unchanged historical
 # suites. Sequential physical replays preserve each original source contract.

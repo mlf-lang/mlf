@@ -93,7 +93,7 @@
   "benchmark-transition-controls": {
     "kind": "unittest",
     "prefix": "benchmark-transition/",
-    "command": ["python3", "-B", "tools/release/test_benchmark_transition.py"],
+    "command": ["python3", "-B", "tools/release/test_benchmark_phase2_successor.py"],
     "exact": true
   },
   "benchmark-provenance": {
@@ -106,7 +106,7 @@
   "benchmark-reconciliation": {
     "kind": "unittest",
     "prefix": "benchmark-reconciliation/",
-    "command": ["python3", "-B", "tools/performance/artifact-binary/test_pr43_reconciliation.py"],
+    "command": ["python3", "-B", "tools/release/replay_phase2_benchmark_reconciliation.py"],
     "exact": true
   },
   "benchmark-predecessor-declid": {
