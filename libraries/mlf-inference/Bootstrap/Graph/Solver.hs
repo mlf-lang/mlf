@@ -613,7 +613,7 @@ module Bootstrap.Graph.Solver where {
   -- index audit in finish, so the checked result remains valid after normalization.
   finishNormalized :: Solver -> Either String Solver;
   finishNormalized solver =
-    G.bindE (finish solver) (\checked -> Right (withGraph (G.normalize checked) solver));
+    G.bindE (finish solver) (\checked -> Right (withGraph (G.normalizeUsingChildren (Just (bindingChildren solver)) checked) solver));
   -- Collect scope boundaries while inspecting each newly discovered node.
   -- The identity has just been resolved, so a second alias lookup is redundant.
   componentScopesVisit :: Solver ->

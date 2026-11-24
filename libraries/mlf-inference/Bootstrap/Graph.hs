@@ -2815,10 +2815,11 @@ module Bootstrap.Graph where {
   normalize :: Graph -> Graph;
   -- Solver.finishNormalized reuses validation across this transformation:
   -- only non-Gen flags may change; identities, tags and binders stay intact.
-  normalize graph =
+  normalize = normalizeUsingChildren Nothing;
+  normalizeUsingChildren supplied graph =
     case denseBounds graph of {
       Nothing -> normalizeSparse graph;
-      Just ((,) low high) -> normalizeDense graph low high
+      Just ((,) low high) -> normalizeDenseUsing supplied graph low high
     };
   normalizeSparse :: Graph -> Graph;
   -- Several nodes can share a generalization binder. Keep its structural
@@ -2866,24 +2867,26 @@ module Bootstrap.Graph where {
       (nextId graph);
   -- Normalize dense graphs with bounded scratch arrays. Only flags may change;
   -- the persistent sparse path remains available for arbitrary identity spans.
-  data DenseNormalization s =
-    DenseNormalization Graph Int (STArray s (Maybe Node)) (STArray s ([] Int)) (STArray s
-                                                                                  Int) (STArray s
-                                                                                        Int) (STArray
-                                                                                              s
-                                                                                              Bool) (STArray
-                                                                                                     s
-                                                                                                     ([]
-                                                                                                      Int));
+  data NormalChildren s = GatherNormalChildren (STArray s ([] Int)) |
+    CheckedNormalChildren (IntMap IntSet);
+  data DenseNormalization s = DenseNormalization Graph Int (STArray s (Maybe Node))
+    (NormalChildren s) (STArray s Int) (STArray s Int) (STArray s Bool) (STArray s ([] Int));
+  newNormalChildren :: forall s. Maybe (IntMap IntSet) -> Int -> ST s (NormalChildren s);
+  newNormalChildren supplied count = case supplied of {
+    Just index -> stReturn (CheckedNormalChildren index);
+    Nothing -> stBind (newSTArray count []) (\rows -> stReturn (GatherNormalChildren rows))
+  };
   normalizeDense :: Graph -> Int -> Int -> Graph;
-  normalizeDense graph low high =
+  normalizeDense = normalizeDenseUsing Nothing;
+  normalizeDenseUsing :: Maybe (IntMap IntSet) -> Graph -> Int -> Int -> Graph;
+  normalizeDenseUsing supplied graph low high =
     runST
       (let {
          count = ((high - low) + 1)
        } in
        stBind (newSTArray count Nothing)
          (\table ->
-            stBind (newSTArray count [])
+            stBind (newNormalChildren supplied count)
               (\descendants ->
                  stBind (newSTArray count (0 - 1))
                    (\inertness ->
@@ -2926,14 +2929,18 @@ module Bootstrap.Graph where {
             stBind (writeDense low table n (Just v))
               (\loaded ->
                  stBind
-                   (if equalFlag (flag v) Rigid
-                    then stReturn ()
-                    else case binder v of {
-                           Nothing -> stReturn ();
-                           Just parent ->
-                             stBind (readDense low descendants parent)
-                               (\previous -> writeDense low descendants parent ((:) n previous))
-                         })
+                   (case descendants of {
+                      GatherNormalChildren rows -> if equalFlag (flag v) Rigid then stReturn () else
+                        case binder v of {
+                          Nothing -> stReturn ();
+                          Just parent -> stBind (readDense low rows parent)
+                            (\previous -> writeDense low rows parent ((:) n previous))
+                        };
+                      -- Rigid children have no effect on their parent's inertness.
+                      -- The audited solver index contains all binding children.
+                      CheckedNormalChildren _ -> if equalFlag (flag v) Rigid
+                        then writeDenseInt low inertness n 1 else stReturn ()
+                    })
                    (\added -> normalLoad state rest))
         }
     };
@@ -2950,7 +2957,13 @@ module Bootstrap.Graph where {
                        stBind
                          (if isBottom (tag v)
                           then stReturn False
-                          else stBind (readDense low descendants n) (normalAllInert state))
+                          else case descendants of {
+                            GatherNormalChildren rows -> stBind (readDense low rows n) (normalAllInert state);
+                            CheckedNormalChildren index -> case IM.lookup n index of {
+                              Nothing -> stReturn True;
+                              Just row -> normalAllInert state (IS.foldl (\rest child -> (:) child rest) [] row)
+                            }
+                          })
                          (\answer ->
                             stBind (writeDenseInt low inertness n (if answer then 1 else 0))
                               (\stored -> stReturn answer))))
