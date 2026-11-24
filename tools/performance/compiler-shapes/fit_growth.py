@@ -193,6 +193,15 @@ def peak_rss_growth(sizes, pairs):
     return dict(mlf_mib_per_unit=mlf, ghc_mib_per_unit=ghc, delta_mib_per_unit_95=[cuts[0], cuts[-1]])
 
 
+def wall_check(reference):
+    return 'largest_positive_median_lower' if reference == 'reference' else TIMING_CHECKS[0]
+
+
+def lower_wall_medians(medians, reference):
+    measured = medians[-1:] if reference == 'reference' else medians
+    return all(a < b for a, b in measured)
+
+
 def growth(sizes, times, reference='ghc'):
     medians = [median_pair(cell) for cell in times]
     slope_ms = slope_estimator(sizes, 1000.)
@@ -216,7 +225,7 @@ def growth(sizes, times, reference='ghc'):
                  for deltas in (slope_deltas, power_deltas)]
     slope_ci, power_ci = ([cuts[0], cuts[-1]] for cuts in intervals)
     mlf, ghc = estimates['mlf'], estimates[reference]
-    checks = {'all_positive_medians_lower': all(a < b for a, b in medians[1:]),
+    checks = {wall_check(reference): lower_wall_medians(medians[1:], reference),
               'lower_ols_point': mlf['ols_ms_per_function'] < ghc['ols_ms_per_function'],
               'lower_endpoint_point': mlf['endpoint_ms_per_function'] < ghc['endpoint_ms_per_function'],
               'lower_power_point': mlf['power']['p'] <= ghc['power']['p'],
@@ -255,11 +264,12 @@ def family_reports(rows, samples, repeats, reference='ghc'):
             reasons.append('incomplete cells: ' + ', '.join(incomplete))
         report = {'family': family, 'sizes': [row['size'] for row in selected],
                   'pairs_per_size': repeats, 'status': 'incomplete',
-                  'reason': '. '.join(reasons), 'checks': dict.fromkeys(k.replace('ghc',reference) for k in CHECKS), 'accepted': None}
+                  'reason': '. '.join(reasons), 'checks': dict.fromkeys([wall_check(reference), *(k.replace('ghc',reference) for k in CHECKS[1:])]), 'accepted': None}
         if reasons:
-            if not any(row['case'] in incomplete for row in positives) and repeats:
-                medians = [median_pair(paired_cell(by_case[row['case']], repeats, reference=reference)) for row in positives]
-                report['checks']['all_positive_medians_lower'] = all(a < b for a, b in medians)
+            wall_rows = positives[-1:] if reference == 'reference' else positives
+            if not any(row['case'] in incomplete for row in wall_rows) and repeats:
+                medians = [median_pair(paired_cell(by_case[row['case']], repeats, reference=reference)) for row in wall_rows]
+                report['checks'][wall_check(reference)] = lower_wall_medians(medians, reference)
         else:
             observations = (sample for row in selected for sample in by_case[row['case']])
             sizes, times = paired_times(selected, observations, family, repeats, reference)
@@ -336,7 +346,8 @@ def markdown(reports, reference='ghc'):
              f'bootstrap intervals for MLF minus {label} over the measured sizes.', '']
     if not reports:
         return lines + ['No growing family selected.']
-    lines += ['| Family | Sizes | Lower wall medians at all positive sizes | OLS slope (ms/unit) '
+    wall_scope = 'at largest positive size' if reference == 'reference' else 'at all positive sizes'
+    lines += [f'| Family | Sizes | Lower wall median {wall_scope} | OLS slope (ms/unit) '
               '| Endpoint slope (ms/unit) | Exponent | OLS slope interval | Exponent interval '
               f'| Peak RSS ≤ {label} at largest positive size | Peak RSS slope (MiB/unit) | RSS slope difference 95% interval | Verdict |',
               '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |']
@@ -365,7 +376,7 @@ def markdown(reports, reference='ghc'):
                             f"({verdicts[checks[RSS_SLOPE_CHECK.replace('ghc', reference)]]})")
             interval_result = f"[{lo:.5g}, {hi:.5g}] ({verdicts[checks[RSS_CI_CHECK]]})"
         fields = [f"`{report['family']}`", ', '.join(map(str, report['sizes'])),
-                  verdicts[checks[TIMING_CHECKS[0]]], *values,
+                  verdicts[checks[wall_check(reference)]], *values,
                   'incomplete' if memory is None else verdicts[memory], slope_result, interval_result, outcome]
         lines.append('| ' + ' | '.join(fields) + ' |')
     return lines

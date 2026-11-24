@@ -137,7 +137,7 @@ checks for each selected family. The time and memory measurements cover the
 same fresh native build, including linking. The executable runs are untimed
 correctness checks.
 
-1. MLF's median wall time is lower at every measured positive size.
+1. MLF's median wall time is lower at every measured positive size against GHC. For the committed compiler comparison, use the largest measured positive size. The slope, exponent and interval checks use the full size series for both comparators.
 2. MLF's least-squares slope is lower across all measured sizes.
 3. MLF's endpoint slope is lower from zero to the largest measured size.
 4. MLF's exponent `p` is at most GHC's in the fitted model `a + b*(n/nmax)^p`.

@@ -90,6 +90,16 @@ class GrowthTests(unittest.TestCase):
         self.assertEqual(flat['sizes'], [0, 8, 16, 32])
         self.assertIsNotNone(flat['checks']['lower_ols_95'])
 
+    def test_committed_compiler_wall_gate_uses_largest_size(self):
+        sizes = [0, 8, 16, 32]
+        times = [[pair, pair] for pair in [(1, 1), (3, 2), (4, 3), (5, 7)]]
+        with patch.object(fit, 'REPLICATES', 12):
+            ghc = fit.growth(sizes, times)
+            baseline = fit.growth(sizes, times, 'reference')
+        self.assertFalse(ghc['checks']['all_positive_medians_lower'])
+        self.assertTrue(baseline['checks']['largest_positive_median_lower'])
+        self.assertEqual(ghc['paired_bootstrap'], baseline['paired_bootstrap'])
+
     def test_absolute_memory_gate_uses_largest_positive_size_and_allows_a_tie(self):
         rows = [row.copy() for row in self.rows if row['family'] in ('baseline', 'chain')]
         for row in rows[1:]:
