@@ -112,8 +112,8 @@ new inference query.
 
 See the [crate migration ledger](docs/crate-migration.md) for accepted measurements
 and the [validation record](docs/crate-validation.json) for all six native groups,
-fresh self-hosting and the exact source/tool configuration. The [earlier bootstrap memory report](tools/profile/results/2026-10-19-bootstrap-memory/README.md)
-describes the previous per-module pipeline; its results are historical.
+fresh self-hosting and the exact source/tool configuration. For the previous
+per-module pipeline, see the [historical bootstrap memory summary](tools/profile/RESULTS.md).
 
 Run all six native test groups, or select groups for development:
 
