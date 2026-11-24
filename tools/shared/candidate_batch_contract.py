@@ -18,6 +18,8 @@ CLASSES_BLOBS = (
     'f22cec64548c408602c85c8c81732fb57694927e',
     # Defining-module dictionary resolution (814571b2) kept the selector body byte-identical.
     '5f813fb61a3982644a528e7fb481210e6da56b95',
+    # Local dictionary ownership changed outside the authenticated selector.
+    'dda2ecc3356a47a590b75e3b52788b3fc0f7de88',
 )
 ORIGINAL_FIXTURE_SHA256 = '0d61d38552efcbfca9c8709257454233c3699775a106e368900da7dbe3f3fc66'
 SOURCE_BASIS = '8d80e0fb1dbf4e6d40c53de35b727674b5c74817'
