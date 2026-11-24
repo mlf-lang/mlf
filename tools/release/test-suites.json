@@ -789,7 +789,7 @@
     "command": [
       "python3",
       "-B",
-      "tools/performance/a1-private-index/test_current.py"
+      "tools/performance/a1-private-index/test_phase2_current.py"
     ],
     "prefix": "release-performance-a1-current/",
     "allow_skip": true,

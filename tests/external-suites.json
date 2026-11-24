@@ -544,7 +544,7 @@
     "command": [
       "python3",
       "-B",
-      "tools/performance/patricia/test_adapters.py"
+      "tools/release/test_phase2_patricia_adapters.py"
     ],
     "kind": "unittest",
     "prefix": "python-patricia-adapters/",

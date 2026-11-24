@@ -282,6 +282,9 @@ def checkout_source_tip(source_root):
         metadata = recorded[1]
     else:
         metadata = head
+    if git.commit(metadata) == ['8402e29040d5786d79dbcc3ccc9e8e047208c399']:
+        overlay = pinned_module(HERE, 'phase2_a1_overlay.py', 'd6b628d6e15be45bba3a0098d36988991d78f7fedbd9ba652948a312b2af0ef1')
+        metadata = overlay.predecessor(git, source_root, metadata, read, sha, oid, require)
     parents = git.commit(metadata)
     require(len(parents) == 1, 'single source-only parent for review metadata')
     tip = parents[0]

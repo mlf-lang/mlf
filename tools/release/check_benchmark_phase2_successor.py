@@ -8,7 +8,7 @@ from types import ModuleType
 
 ROOT = Path(__file__).resolve().parents[2]
 SUCCESSOR_PATH = 'tools/performance/artifact-binary/phase2_source_successor.py'
-SUCCESSOR_SHA = '8903af00193ee1d490db732a88e6c29960b1d9392d7794a7b8f1b8e508dbadf3'
+SUCCESSOR_SHA = '72041ef0f3ea9c84d5f7ff100f721c326ecbbc86c1b705bf2c45f11cb19f9f16'
 
 
 def _load():
