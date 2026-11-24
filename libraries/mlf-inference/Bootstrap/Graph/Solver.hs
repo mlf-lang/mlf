@@ -6,6 +6,7 @@ module Bootstrap.Graph.Solver where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import qualified Bootstrap.Std as L;
+  import qualified Bootstrap.ST as ST;
   import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.IntRank as Rank;
@@ -233,6 +234,44 @@ module Bootstrap.Graph.Solver where {
         (:) (ScopeEntry p _) _ -> Just p
       }
     } in seq parent (G.strictPair ((:) scope enclosing) (IM.insert n parent parents));
+  -- The initial graph is validated and canonical. Its children and binders
+  -- are live keys. Accumulate their incoming edges by offset, then construct
+  -- each set from ascending parent IDs. Duplicate edges set the same bit.
+  initialSolver graph = let {
+    entries = IM.toAscList (G.nodes graph);
+    scopes = indexScopes graph
+  } in case G.denseBounds graph of {
+    Nothing -> L.foldlStrict addNode (mkSolver graph IM.empty IM.empty scopes) entries;
+    Just ((,) low high) -> runST (initialDenseSolver graph scopes entries low high)
+  };
+  initialDenseSolver :: forall s. Graph -> ScopeIndex -> [] ((,) Int Node) ->
+    Int -> Int -> ST s Solver;
+  initialDenseSolver graph scopes entries low high = do {
+    let { size = high - low + 1 };
+    parents <- newSTArray size IS.NoState;
+    descendants <- newSTArray size IS.NoState;
+    let {
+      insertRow rows n key = stBind (G.readDense low rows key) (\old -> let {
+        next = IS.ascInsert old n
+      } in seq next (G.writeDense low rows key next));
+      add ((,) n v) = do {
+        ST.map_ (insertRow parents n) (G.children (G.tag v));
+        case G.binder v of {
+          Nothing -> stReturn ();
+          Just b -> insertRow descendants n b
+        }
+      };
+      finish rows = stBind (freezeSTArray rows) (\at -> stReturn
+        (IM.mapMaybeWithKey (\n _ -> case at (n - low) of {
+          IS.NoState -> Nothing;
+          row -> let { slots = IS.finishAsc row } in seq (forceIntSet slots) (Just slots)
+        }) (G.nodes graph)))
+    };
+    ST.map_ add entries;
+    structural <- finish parents;
+    binding <- finish descendants;
+    stReturn (mkSolver graph structural binding scopes)
+  };
   prepare :: Graph -> Either String Solver;
   prepare input =
     G.bindE (G.validateGraph input)
@@ -246,10 +285,7 @@ module Bootstrap.Graph.Solver where {
                    else let {
                           canonical = G.canonicalize input
                         } in
-                        Right
-                          (L.foldlStrict addNode
-                             (mkSolver canonical IM.empty IM.empty (indexScopes canonical))
-                             (IM.toList (G.nodes canonical))));
+                        Right (initialSolver canonical));
   equalIntervals :: IntMap ((,) Int Int) -> IntMap ((,) Int Int) -> Bool;
   equalIntervals a b =
     IM.eqIntMap

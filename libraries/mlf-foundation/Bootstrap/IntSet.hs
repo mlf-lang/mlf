@@ -138,11 +138,13 @@ module Bootstrap.IntSet where {
       if P.signBranch prefix then node prefix right left
       else ascLinkStack rest key (node prefix left right)
   };
-  fromDistinctAscList :: [] Int -> IntSet;
-  fromDistinctAscList values = wrap (case L.foldlStrict ascInsert NoState values of {
+  finishAsc :: AscState -> IntSet;
+  finishAsc state = wrap (case state of {
     NoState -> IntSetNil;
     State key bits stack -> ascLinkStack stack key (tip key bits)
   });
+  fromDistinctAscList :: [] Int -> IntSet;
+  fromDistinctAscList values = finishAsc (L.foldlStrict ascInsert NoState values);
   foldBitmap :: forall a. (Int -> a -> a) -> Int -> Int -> a -> a;
   foldBitmap action prefix bits result =
     if bits == 0 then result
