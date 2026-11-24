@@ -730,7 +730,10 @@ module Bootstrap.InferenceUnit where {
   -- to the result. The wrapper, if present, must contain exactly that variable.
   data GroundParameter = GroundBare | GroundWrapped String;
   data GroundEvidence = GroundEvidence (GroundState -> [] ((,) XTyVar GroundType) -> Either String XComputation);
-  data GroundContext = GroundContext DataEnv ([] ((,) EvidenceRole GroundBinding));
+  data GroundContext = GroundContext DataEnv ([] ((,) EvidenceRole GroundBinding)) |
+    GroundModuleContext DataEnv ([] ((,) EvidenceRole GroundBinding))
+      ([] ((,) EvidenceRole TermRef) -> Maybe (Map XTyVar XType ->
+        [] ((,,) EvidenceRole XName XType) -> XType -> Either Evidence.EvidenceFailure XTerm));
   data GroundArrowHead = GroundArrowHead Bool Int GroundType GroundType (GroundType -> GroundTerm);
   data GroundBinding = GroundLocal XName GroundType | GroundImport XName XType |
     GroundQuantifiedImport XName XType GroundEvidence |
@@ -1167,22 +1170,56 @@ module Bootstrap.InferenceUnit where {
     Just binding -> Right ((,) role binding);
     Nothing -> Left "ground evidence candidate is out of scope"
   };
-  groundCandidateType state binding = case binding of {
-    GroundLocal name ty -> mapEither ((,) name) (groundClosed state ty);
-    GroundImport name scheme -> Right ((,) name scheme);
-    GroundQuantifiedImport name scheme _ -> Right ((,) name scheme);
-    GroundPreparedImport name scheme _ -> Right ((,) name scheme);
-    GroundUnaryImport name scheme _ _ _ -> Right ((,) name scheme);
-    GroundPrincipalSelector name scheme _ -> Right ((,) name scheme);
-    GroundArrowOperand original _ -> groundCandidateType state original
+  groundCandidateWith local imported binding = case binding of {
+    GroundLocal name ty -> local name ty;
+    GroundImport name scheme -> imported name scheme;
+    GroundQuantifiedImport name scheme _ -> imported name scheme;
+    GroundPreparedImport name scheme _ -> imported name scheme;
+    GroundUnaryImport name scheme _ _ _ -> imported name scheme;
+    GroundPrincipalSelector name scheme _ -> imported name scheme;
+    GroundArrowOperand original _ -> groundCandidateWith local imported original
   };
-  groundGivenContext (GroundContext datatypes _) globals names bindings =
-    mapEither (GroundContext datatypes)
-      (traverseEither (\name -> groundCandidateReference globals names ((,) GivenEvidence (LexicalRef name))) bindings);
+  groundCandidateType state = groundCandidateWith
+    (\name ty -> mapEither ((,) name) (groundClosed state ty))
+    (\name scheme -> Right ((,) name scheme));
+  -- Declaration slots in the initial environment cannot be rebound by
+  -- groundBindLocal. Share only their immutable schemes, in request order.
+  groundModuleContext datatypes globals expression = let {
+    first = Dependency.fileOccurrencesUsing False True (\_ rest -> rest)
+      (\_ _ _ (CandidateEnvironment _ refs) _ -> Just refs) Nothing expression;
+    declared ((,) role ref) = case ref of {
+      DeclRef slot _ -> case M.lookup compareInt (V.toInt slot) globals of {
+        Just binding -> groundCandidateWith (\_ _ -> Nothing)
+          (\name ty -> Just ((,,) role name ty)) binding;
+        Nothing -> Nothing
+      };
+      LexicalRef _ -> Nothing
+    };
+    same ((,) a lhs) ((,) b rhs) = Evidence.sameRole a b && (case (,) lhs rhs of {
+      (,) (DeclRef i _) (DeclRef j _) -> V.toInt i == V.toInt j;
+      _ -> False
+    });
+    prepared = case first of {
+      Just refs -> mapOptional (\rows -> (,) refs (Evidence.scopedResolver datatypes rows)) (mapM declared refs);
+      Nothing -> Nothing
+    };
+    select refs = case prepared of {
+      Just ((,) expected resolve) -> if eqList same expected refs then Just resolve else Nothing;
+      Nothing -> Nothing
+    }
+  } in GroundModuleContext datatypes [] select;
+  groundGivenContext context globals names bindings = let {
+    within = case context of {
+      GroundContext datatypes _ -> GroundContext datatypes;
+      GroundModuleContext datatypes _ select -> \givens -> GroundModuleContext datatypes givens select
+    }
+  } in mapEither within
+    (traverseEither (\name -> groundCandidateReference globals names ((,) GivenEvidence (LexicalRef name))) bindings);
   -- Evidence is selected after the ordinary argument constraints determine
   -- the wanted type. Use the same ordered inventories and proof checker as
   -- the graph elaborator, including replacement of a lexical given frame.
-  groundWanted datatypes scoped givens globals names refs dictionary state = do {
+  groundWanted = groundWantedUsing (\_ -> Nothing);
+  groundWantedUsing select datatypes scoped givens globals names refs dictionary state = do {
     declaration <- Data.lookupDatatype datatypes dictionary;
     candidates <- traverseEither (groundCandidateReference globals names) refs;
     (,) arguments next <- groundParameters state (Data.datatypeParameters declaration);
@@ -1194,12 +1231,14 @@ module Bootstrap.InferenceUnit where {
           (,) name scheme <- groundCandidateType solved binding;
           Right ((,,) role name scheme)
         }) };
-        authorized <- types candidates;
-        if scoped then do {
+        let { inScope resolveFrom = do {
           locals <- types givens;
-          mapLeft Evidence.evidenceFailureMessage
-            (Evidence.scopedResolver datatypes authorized gamma locals ty)
-        } else Evidence.resolveDictionary datatypes gamma authorized ty
+          mapLeft Evidence.evidenceFailureMessage (resolveFrom gamma locals ty)
+        } };
+        if scoped then case select refs of {
+          Just prepared -> inScope prepared;
+          Nothing -> do { authorized <- types candidates; inScope (Evidence.scopedResolver datatypes authorized) }
+        } else do { authorized <- types candidates; Evidence.resolveDictionary datatypes gamma authorized ty }
       }
     };
     Right ((,,) (GroundWanted resolve) wanted next)
@@ -1405,7 +1444,11 @@ module Bootstrap.InferenceUnit where {
     _ -> Nothing
   };
   groundInferIn = groundInferApplication True;
-  groundInferApplication inspect context@(GroundContext datatypes givens) globals names state expression = case expression of {
+  groundInferApplication inspect context = case context of {
+    GroundContext datatypes givens -> groundInferWith inspect context datatypes givens (\_ -> Nothing);
+    GroundModuleContext datatypes givens select -> groundInferWith inspect context datatypes givens select
+  };
+  groundInferWith inspect context datatypes givens select globals names state expression = case expression of {
     SVar name -> groundUse state (M.lookup compareString name names);
     SGlobal identity _ -> groundUse state (M.lookup compareInt (V.toInt identity) globals);
     SDeclScope [identity] (SLam name annotation body) -> groundLambda context globals names state (Just identity) name annotation body;
@@ -1556,7 +1599,7 @@ module Bootstrap.InferenceUnit where {
       Right ((,,) (GroundCase scrutinee result (reverse branches)) result done)
     };
     SWantedScope dictionary (CandidateEnvironment _ refs) ->
-      groundWanted datatypes True givens globals names refs dictionary state;
+      groundWantedUsing select datatypes True givens globals names refs dictionary state;
     SWantedRefs dictionary refs -> groundWanted datatypes False [] globals names refs dictionary state;
     SWanted dictionary bindings -> groundWanted datatypes False [] globals names
       (map (\((,) role name) -> (,) role (LexicalRef name)) bindings) dictionary state;
@@ -1755,7 +1798,7 @@ module Bootstrap.InferenceUnit where {
       let { datatypes = Open.dataEnvironment env };
       (,,) expected wanted prefix <- groundDeclarationType datatypes annotation;
       source <- groundDeclaredBody annotation rhs;
-      (,) template solved <- groundCheckBody (GroundContext datatypes []) globals names
+      (,) template solved <- groundCheckBody (groundModuleContext datatypes globals source) globals names
         (GroundState 0 IM.empty IM.empty (length parameters + 1)) wanted source;
       implementation <- mapEither (groundAbstract prefix) (groundSealIn (M.fromList T.compareTyVar prefix) solved template);
       fragment <- Open.check env ps (XLet (XName (length parameters) name) implementation (XConstructor "()" []));
@@ -1870,7 +1913,7 @@ module Bootstrap.InferenceUnit where {
       env <- Open.environmentUsing known declarations;
       let { datatypes = Open.dataEnvironment env; count = length parameters };
       let { infer = do {
-        (,,) template ty solved <- groundInferIn (GroundContext datatypes []) globals names
+        (,,) template ty solved <- groundInferIn (groundModuleContext datatypes globals rhs) globals names
           (GroundState 0 IM.empty IM.empty (count + 1)) rhs;
         case groundClosed solved ty of {
           Right closed -> mapEither ((,) closed) (groundSeal solved template);
@@ -2023,7 +2066,7 @@ module Bootstrap.InferenceUnit where {
     _ -> Left "ground recursive member requires a closed monotype"
   };
   groundRecursiveBody datatypes globals names ((,) reversed serial) (GroundMember _ binder expected wanted prefix rhs) = do {
-    (,) term solved <- groundCheckBody (GroundContext datatypes []) globals names (GroundState 0 IM.empty IM.empty serial) wanted rhs;
+    (,) term solved <- groundCheckBody (groundModuleContext datatypes globals rhs) globals names (GroundState 0 IM.empty IM.empty serial) wanted rhs;
     sealed <- mapEither (groundAbstract prefix) (groundSealIn (M.fromList T.compareTyVar prefix) solved term);
     case solved of { GroundState _ _ _ next -> Right ((,) ((:) ((,,) binder expected sealed) reversed) next) }
   };

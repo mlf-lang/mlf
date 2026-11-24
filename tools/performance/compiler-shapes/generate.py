@@ -845,6 +845,12 @@ tick = Parser (\s -> if ltInt s 1 then Stop else Next s (subInt s 1));
                 + 'else ioBind (printInt (selectedScore i)) (\\_ -> printAll (addInt i 1));\n'
                 + 'main :: IO ();\nmain = ioBind (getArg 0) (\\text -> if eqString text "--all" '
                 + 'then printAll 0 else printInt (entry (readInt text)))\n}\n')
+    elif family == 'scoped_ground_method_calls':
+        declarations = ('data Token = Token Int;\n'
+                        'class Score a where { score :: a -> Int };\n'
+                        'instance Score Token where { score (Token value) = value };\n')
+        calls = [f'score (Token (addInt x {i}))' for i in range(n)]
+        expression = balanced(calls, lambda a, b: f'addInt ({a}) ({b})') if calls else '0'
     elif family == 'visible_instance_inventory':
         rows = ['class Score a where { score :: a -> Int };',
                 'instance Score Int where { score x = x };']
@@ -1217,6 +1223,8 @@ def expected(family, n, x):
         return cycles * n * (n + 1) // 2 + remainder * (remainder + 1) // 2 + remainder
     if family == 'wide_case':
         return x + 2 * max(0, min(x, n-1)) + 1
+    if family == 'scoped_ground_method_calls':
+        return (n * x + n * (n - 1) // 2 + 2**63) % 2**64 - 2**63
     if family == 'visible_instance_inventory':
         selected = min(1, n) if x < 0 else n
         return (x + 7*selected + 2**63) % 2**64 - 2**63

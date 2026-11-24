@@ -55,6 +55,7 @@ import qualified Bootstrap.IndexVec as V
 import qualified Bootstrap.IntSet as I
 import qualified Bootstrap.Parser as Parser
 import qualified Bootstrap.Primitive as Primitives
+import qualified Bootstrap.Std as Std
 import qualified Bootstrap.Map as M
 import qualified Bootstrap.Module as Modules
 import qualified Bootstrap.Types as T
@@ -3862,6 +3863,36 @@ evidenceScopeChecks = do
           check "lexical overlay agrees with complete ordered proof environment"
             (observe (Evidence.resolveDictionaryDetailed ds gamma (locals ++ globals) goal))
             (observe (resolve locals goal))
+  let decl i = T.DeclRef (V.fromInt i) "printed hint"
+      row r i = (r, decl i)
+      declared = [row T.InstanceEvidence 11, row T.InstanceEvidence 12]
+      root = M.fromList Std.compareInt
+        [(11, Inference.GroundImport (visible 1) (score int)),
+         (12, Inference.GroundImport (visible 2) (score bool)),
+         (13, Inference.GroundLocal (visible 3) (Inference.GroundVar 0))]
+      prepared rows =
+        case Inference.groundModuleContext ds root (T.SWantedScope "Score" (T.CandidateEnvironment 7 rows)) of
+          Inference.GroundModuleContext _ _ select -> select
+          _ -> error "expected a prepared ground context"
+      local = [(T.GivenEvidence, visible 10, score int)]
+      bindings = [instanceOf 1 (score int), instanceOf 2 (score bool)]
+  case prepared declared [(r,T.DeclRef i "different spelling") | (r,T.DeclRef i _) <- declared] of
+    T.Just resolve ->
+      forM_ [[],local] $ \givens -> forM_ [M.empty,M.singleton variable a] $ \gamma ->
+        forM_ [score int,score bool,base bool] $ \goal ->
+          check "ground imports preserve checked proofs and diagnostics"
+            (observe (Evidence.scopedResolver ds bindings gamma givens goal))
+            (observe (resolve gamma givens goal))
+    T.Nothing -> fail "the ordered declaration identities were not recognized"
+  forM_ [(declared,reverse declared),(declared,take 1 declared),(declared,declared++take 1 declared),
+         (declared,row T.GivenEvidence 11:tail declared)] $ \(original,other) ->
+    case prepared original other of
+      T.Nothing -> pure ()
+      _ -> fail "the resolver accepted a different candidate sequence"
+  forM_ [[row T.InstanceEvidence 13],[row T.InstanceEvidence 99],[(T.InstanceEvidence,T.LexicalRef "local")]] $ \rows ->
+    case prepared rows rows of
+      T.Nothing -> pure ()
+      _ -> fail "a local or absent declaration acquired a static ground resolver"
   let param i = T.EvidenceBinding T.GivenEvidence (visible i) i False
       moduleEnv = T.ResolvedCandidateEnvironment 47 []
       request g = T.Typed g (T.FScopedEvidence moduleEnv)

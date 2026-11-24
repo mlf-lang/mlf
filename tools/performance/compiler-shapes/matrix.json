@@ -24,6 +24,7 @@
     "local_functions": {"label": "Local let-bound functions", "default": true, "work": "flat functions placed inside one local let"},
     "wide_case": {"label": "Wide constructor dispatch", "default": true, "work": "a runtime decision selects one of n constructors, followed by a single exhaustive n-arm case"},
     "class_instances": {"label": "Typeclass instance selection", "default": true, "work": "one constrained method wrapper used at n distinct concrete types with separate instances"},
+    "scoped_ground_method_calls": {"label": "Ground method calls in one scope", "default": false, "matched_zero": true, "work": "one signed function sums n calls to a class method with the same visible instances and distinct integer arguments"},
     "visible_instance_inventory": {"label": "Visible instances at two method calls", "default": false, "work": "two method calls in one signed entry select the first or last of n visible qualified instances using a local identity at Bool and Int"},
     "dependency_diamonds": {"label": "Reconvergent dependency graph", "default": true, "work": "n top-level diamonds with two branches that depend on the same previous layer"},
     "state_updates": {"label": "Ordered IO updates", "default": true, "work": "n unrolled pairs of reads and writes to a runtime-initialized integer array"},
