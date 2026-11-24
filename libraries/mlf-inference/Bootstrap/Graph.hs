@@ -847,7 +847,9 @@ module Bootstrap.Graph where {
                                          entries = IM.toList (nodes graph)
                                        } in
                                        stBind (denseLoadValidation low table entries)
-                                         (\loaded -> denseValidateEntries state entries))))))));
+                                         (\loaded -> case nodes graph of {
+                                            IntMap tree -> denseValidateEntriesWith (denseKindTree state tree) state entries
+                                          }))))))));
   denseGetNode :: forall s. DenseValidation s -> Int -> ST s (Maybe Node);
   denseGetNode (DenseValidation graph low high table descendants colours kinds starts ends visited) n =
     if ((n < low) || (high < n)) then stReturn Nothing else readDense low table n;
@@ -923,7 +925,10 @@ module Bootstrap.Graph where {
     };
   denseValidateEntries :: forall s. DenseValidation s ->
                                     [] ((,) Int Node) -> ST s (Either String ());
-  denseValidateEntries state entries =
+  denseValidateEntries state entries = denseValidateEntriesWith (denseKindEntries state entries) state entries;
+  denseValidateEntriesWith :: forall s. ST s (Either String ()) -> DenseValidation s ->
+    [] ((,) Int Node) -> ST s (Either String ());
+  denseValidateEntriesWith checkKinds state entries =
     case L.filter
            (\entry ->
               case entry of {
@@ -939,7 +944,7 @@ module Bootstrap.Graph where {
           (\size -> stBind (denseBindingVisit state root 0)
             (\count ->
                if (count == size)
-               then denseKindEntries state entries
+               then checkKinds
                else ST.failE "cyclic binding tree"));
       _ -> ST.failE "graph must have one binding root"
     };
@@ -3109,6 +3114,16 @@ module Bootstrap.Graph where {
         })
       }
     } in visit rows 0
+  };
+  -- The full graph already owns the keys in signed ascending order. Reading
+  -- them here lets the earlier table-loading pass release its entry list.
+  denseKindTree :: forall s. DenseValidation s -> IntMapTree Node -> ST s (Either String ());
+  denseKindTree state tree = case tree of {
+    IntMapNil -> ST.pureE ();
+    IntMapTip n node -> ST.bindE (denseKind state n node) (\_ -> ST.pureE ());
+    IntMapBin _ prefix left right -> let {
+      visit first second = ST.bindE (denseKindTree state first) (\_ -> denseKindTree state second)
+    } in if IT.signBranch prefix then visit right left else visit left right
   };
   denseKindEntries :: forall s. DenseValidation s ->
                                 [] ((,) Int Node) -> ST s (Either String ());
