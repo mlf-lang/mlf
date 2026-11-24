@@ -8,6 +8,7 @@ module Bootstrap.LLVM.Optimize where {
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.X.Syntax as X;
   import qualified Bootstrap.Primitive as P;
@@ -1716,8 +1717,10 @@ module Bootstrap.LLVM.Optimize where {
   };
   -- Preserve a shared binding without forcing the substitutions queued for
   -- the rest of the declaration spine. Its RHS is outside the binder scope.
-  data CheckedPending = CheckedPending PendingBody (XName -> Bool) (XName -> Int);
+  data CheckedPending = CheckedPending PendingBody (XName -> Bool) (XName -> Int)
+    | ClosedCheckedPending PendingBody IntSet (XName -> Bool) (XName -> Int);
   checkedBody (CheckedPending body _ _) = body;
+  checkedBody (ClosedCheckedPending body _ _ _) = body;
   checkedUseCount tree name = boundedUseCount 4 name tree;
   -- Existing counts distinguish zero, one and two-or-more free occurrences
   -- at every subtree. Only an unmet budget above two needs any traversal.
@@ -1752,16 +1755,31 @@ module Bootstrap.LLVM.Optimize where {
         (\wanted -> M.findWithDefault compareName 0 wanted (pendingLimitedCounts pending)));
     freshPure (checkedBody result)
   };
-  delayCheckedPending name value state@(CheckedPending pending witnessed countOf) = case pending of {
+  delayCheckedPending name value state = case state of {
+    CheckedPending pending witnessed countOf ->
+      delayCheckedWith name value state pending IS.empty witnessed countOf;
+    ClosedCheckedPending pending removed witnessed countOf ->
+      delayCheckedWith name value state pending removed witnessed countOf
+  };
+  delayCheckedWith name value state pending removed previousWitness previousCount = case pending of {
     PendingBody body replacements counts calls ->
       -- With no queued substitutions, the indexed body's existing 0/1/many
       -- count suffices for all of the comparisons below.
-      let { uses = if M.null replacements then useCount name body else countOf name;
+      let { witnessed target = IS.notMember (nameId target) removed && previousWitness target;
+        countOf target = if IS.member (nameId target) removed then 0 else previousCount target;
+        uses = if M.null replacements then useCount name body else countOf name;
         -- A constructor applied only to atoms has no binders to freshen.
         -- The ordinary rule substitutes it immediately. Queue its sole use
         -- without rebuilding all later declarations and their use counts.
-        queue copies count = CheckedPending (queueSubstitution name copies count pending)
-          (afterCallBinding name (L.head copies) witnessed) (afterUseBinding name (L.head copies) count countOf);
+        -- A closed replacement removes its own binder and contributes no free
+        -- names. Share the previous lookup functions across consecutive closed
+        -- replacements, recording the removed names in a single bitmap index.
+        queue copies count = let { replacement = L.head copies;
+          next = queueSubstitution name copies count pending
+        } in if IM.null (countIndex replacement)
+          then ClosedCheckedPending next (IS.insert (nameId name) removed) previousWitness previousCount
+          else CheckedPending next (afterCallBinding name replacement witnessed)
+            (afterUseBinding name replacement count countOf);
         ordinary = delayLetWith True name value pending (countOf name) witnessed queue beginChecked;
         constructorValue = case useTerm value of {
           XEApp _ _ -> smallValue (useTerm value); _ -> False
