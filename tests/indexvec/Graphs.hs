@@ -109,6 +109,18 @@ package name deps mods = P.Package (H.literal ("/packages/" ++ name ++ "/mlf-pac
              ("dependencies",J.Object [(H.literal n,J.empty) | n <- deps])]) mods
 modl owner name deps = P.Module name owner (H.v_concatString name ".hs") deps
 
+permissionMemoPages = do
+  let observed n = Prim.runST $ do
+        memo <- Graph.newPermissionMemo n (0 :: H.Int)
+        let indices = [0,511,512,1024,n-1]
+        before <- mapM (Graph.readPermissionMemo memo) indices
+        forM_ (zip indices [1..]) $ \(i,v) -> Graph.writePermissionMemo memo i v
+        after <- mapM (Graph.readPermissionMemo memo) (reverse indices)
+        hole <- Graph.readPermissionMemo memo 1023
+        pure (before,after,hole)
+  forM_ [4095,4096,4101,4609] $ \n -> check "permission memo page boundaries"
+    ([0,0,0,0,0],[5,4,3,2,1],0) (observed n)
+
 groupedMergePermissions = do
   let run grouped parents permissions members = Prim.runST $ do
         let count=fromIntegral (length parents)
@@ -118,7 +130,7 @@ groupedMergePermissions = do
         forM_ (zip3 [0..] parents permissions) $ \(i,parent,permission) -> do
           Prim.writeSTArray raised i parent
           Prim.writeSTArray cache i (T.Just permission)
-        let state=Graph.DensePermissions 0 unused unused unused unused unused cache
+        let state=Graph.DensePermissions 0 unused unused unused unused unused (Graph.FlatMemo cache)
             checkClass=if grouped then Graph.denseCheckClassMerges else Graph.denseCheckMerges
         result <- checkClass 0 raised state members
         pure (case result of T.Left err -> Left (H.unpack err); T.Right () -> Right ())
@@ -4034,6 +4046,7 @@ preparedPrefixControls = do
      encode (T.SCallSite "arg" (T.SourceSpan "source" "Projection" "Projection.hs" 2 1 2 21) left))
 
 main = do
+  permissionMemoPages
   recursiveArgumentChecks
   preparedPrefixControls
   checkedProjectionSpines

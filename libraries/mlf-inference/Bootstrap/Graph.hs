@@ -1951,15 +1951,37 @@ module Bootstrap.Graph where {
   };
   -- Permission components are memoized on demand, matching the seed's lazy
   -- immutable array knot without exporting mutable state out of runST.
-  data DensePermissions s =
-    DensePermissions Int (STArray s (Maybe Node)) (STArray s (Maybe Int)) (STArray s
-                                                                           ([] Int)) (STArray s
-                                                                                        Int) (STArray
-                                                                                              s
-                                                                                              Int) (STArray
-                                                                                                    s
-                                                                                                    (Maybe
-                                                                                                     Permission));
+  -- A validation transaction can span many more identities than the
+  -- permission checks ever query. A missing memo page has its initial value.
+  data PermissionMemo s a = FlatMemo (STArray s a)
+    | PagedMemo Int a (STArray s (Maybe (STArray s a)));
+  newPermissionMemo :: forall s a. Int -> a -> ST s (PermissionMemo s a);
+  newPermissionMemo count initial =
+    if count < 4096 then stBind (newSTArray count initial) (\cells -> stReturn (FlatMemo cells))
+    else stBind (newSTArray (1 + quotInt (count - 1) 512) Nothing)
+      (\pages -> stReturn (PagedMemo count initial pages));
+  readPermissionMemo :: forall s a. PermissionMemo s a -> Int -> ST s a;
+  readPermissionMemo memo index = case memo of {
+    FlatMemo cells -> readSTArray cells index;
+    PagedMemo count initial pages -> if index < 0 || index >= count then panic "array index out of bounds"
+      else stBind (readSTArray pages (unsignedShiftRInt index 9)) (\page -> case page of {
+        Nothing -> stReturn initial; Just cells -> readSTArray cells (andInt index 511)
+      })
+  };
+  writePermissionMemo :: forall s a. PermissionMemo s a -> Int -> a -> ST s ();
+  writePermissionMemo memo index value = case memo of {
+    FlatMemo cells -> writeSTArray cells index value;
+    PagedMemo count initial pages -> if index < 0 || index >= count then panic "array index out of bounds"
+      else let { key = unsignedShiftRInt index 9; offset = andInt index 511 } in
+        stBind (readSTArray pages key) (\page -> case page of {
+          Just cells -> writeSTArray cells offset value;
+          Nothing -> stBind (newSTArray 512 initial) (\cells ->
+            stBind (writeSTArray cells offset value) (\_ -> writeSTArray pages key (Just cells)))
+        })
+  };
+  data DensePermissions s = DensePermissions Int (STArray s (Maybe Node))
+    (STArray s (Maybe Int)) (STArray s ([] Int)) (PermissionMemo s Int)
+    (PermissionMemo s Int) (PermissionMemo s (Maybe Permission));
   newDensePermissions :: forall s. Int ->
                                    Int ->
                                    STArray s (Maybe Node) ->
@@ -1971,11 +1993,11 @@ module Bootstrap.Graph where {
     } in
     stBind (newSTArray count [])
       (\descendants ->
-         stBind (newSTArray count (0 - 1))
+         stBind (newPermissionMemo count (0 - 1))
            (\inertness ->
-              stBind (newSTArray count (0 - 1))
+              stBind (newPermissionMemo count (0 - 1))
                 (\paths ->
-                   stBind (newSTArray count Nothing)
+                   stBind (newPermissionMemo count Nothing)
                      (\permissions ->
                         stBind (densePermissionChildren low binding descendants entries)
                           (\loaded ->
@@ -2021,7 +2043,7 @@ module Bootstrap.Graph where {
   denseInert state n =
     case state of {
       DensePermissions low table binding descendants inertness paths permissions ->
-        stBind (readDense low inertness n)
+        stBind (readPermissionMemo inertness (n - low))
           (\cached ->
              if (cached >= 0)
              then stReturn (cached == 1)
@@ -2033,14 +2055,14 @@ module Bootstrap.Graph where {
                           else stBind (readDense low descendants n)
                                  (\descendants -> denseAllInert state descendants))
                          (\answer ->
-                            stBind (writeDenseInt low inertness n (if answer then 1 else 0))
+                            stBind (let { mark = if answer then 1 else 0 } in seq mark (writePermissionMemo inertness (n - low) mark))
                               (\stored -> stReturn answer))))
     };
   denseFlexiblePath :: forall s. DensePermissions s -> Int -> ST s Bool;
   denseFlexiblePath state n =
     case state of {
       DensePermissions low table binding descendants inertness paths permissions ->
-        stBind (readDense low paths n)
+        stBind (readPermissionMemo paths (n - low))
           (\cached ->
              if (cached >= 0)
              then stReturn (cached == 1)
@@ -2058,14 +2080,14 @@ module Bootstrap.Graph where {
                                            Just b -> denseFlexiblePath state b
                                          }))
                          (\answer ->
-                            stBind (writeDenseInt low paths n (if answer then 1 else 0))
+                            stBind (let { mark = if answer then 1 else 0 } in seq mark (writePermissionMemo paths (n - low) mark))
                               (\stored -> stReturn answer))))
     };
   densePermission :: forall s. DensePermissions s -> Int -> ST s Permission;
   densePermission state n =
     case state of {
       DensePermissions low table binding descendants inertness paths permissions ->
-        stBind (readDense low permissions n)
+        stBind (readPermissionMemo permissions (n - low))
           (\cached ->
              case cached of {
                Just value -> stReturn value;
@@ -2083,7 +2105,7 @@ module Bootstrap.Graph where {
                                           (\flexible ->
                                              stReturn (if flexible then Green else Red))))
                         (\answer ->
-                           stBind (writeDense low permissions n (Just answer))
+                           stBind (writePermissionMemo permissions (n - low) (Just answer))
                              (\stored -> stReturn answer)))
              })
     };
