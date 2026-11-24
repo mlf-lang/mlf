@@ -2354,25 +2354,26 @@ module Bootstrap.Graph where {
     };
   allocateCopies :: Graph -> [] Int -> (,) (IntMap Int) Graph;
   allocateCopies graph originals =
-    case originals of {
-      [] -> (,) IM.empty graph;
-      (:) _ _ ->
-        if L.not (ascendingCopyIdentities originals)
-        then allocateCopiesUnordered graph originals
-        else let {
-               first = nextId graph
-             } in
-             let {
-               entries = freshCopyEntries first originals
-             } in
-             let {
-               copied = IM.fromDistinctAscList entries
-             } in
-             let {
-               next = mkGraph (nodes graph) (links graph) (L.advanceIdentity first (L.length originals))
-             } in
-             seq first (strictPair copied (strictGraph next))
-    };
+    if ascendingCopyIdentities originals then allocateOrderedCopies graph originals
+    else allocateCopiesUnordered graph originals;
+  -- Ordered graph visitors already provide distinct keys. Assign each fresh
+  -- identity while building the map and keep the checked successor as the supply.
+  allocateOrderedCopies :: Graph -> [] Int -> (,) (IntMap Int) Graph;
+  allocateOrderedCopies graph originals = let {
+    collect state fresh remaining = case remaining of {
+      [] -> case state of {
+        IM.NoState -> (,) IM.empty graph;
+        IM.State key value stack -> let {
+          copies = IM.wrap (IM.ascLinkStack stack key (IM.tip key value));
+          next = mkGraph (nodes graph) (links graph) fresh
+        } in strictPair copies next
+      };
+      (:) original rest -> let {
+        next = L.advanceIdentity fresh 1;
+        updated = IM.ascInsert state ((,) original fresh)
+      } in seq next (seq updated (collect updated next rest))
+    }
+  } in collect IM.NoState (nextId graph) originals;
   copyIdentity :: Graph -> IntMap Int -> Int -> Int;
   copyIdentity graph copies identity =
     let {
@@ -2425,7 +2426,7 @@ module Bootstrap.Graph where {
         } in
         bindE (kindsAt graph originals)
           (\kinds ->
-             case allocateCopies graph originals of {
+             case allocateOrderedCopies graph originals of {
                (,) copies allocated ->
                  let {
                    copy = copyIdentity graph copies
@@ -2651,7 +2652,7 @@ module Bootstrap.Graph where {
                 (Just generalization))
              "recursive export root must be group-bound or external")
           (\rootChecked ->
-             case allocateCopies graph originals of {
+             case allocateOrderedCopies graph originals of {
                (,) copies allocated ->
                  bindE (mapE_ (validateExportCopy graph generalization source copies) originals)
                    (\copiesChecked ->
@@ -2766,7 +2767,7 @@ module Bootstrap.Graph where {
                   (,) visited scopes ->
                     let { originals = L.filter (\n -> IM.findWithDefault False n scopes)
                       (IS.toList visited) } in
-                    case allocateCopies graph originals of {
+                    case allocateOrderedCopies graph originals of {
                       (,) copies allocated ->
                         bindE (mapE_ (validateFieldCopy graph source copies) originals)
                           (\copiesChecked ->
