@@ -2445,22 +2445,43 @@ module Bootstrap.Graph.Solver where {
     case permissions of {
       Left message -> Right (LocalRejected message);
       Right _ -> let {
-        touched = IS.union (IS.fromList (IM.keys placements))
+        touched = IS.union placedIds
           (IS.union (users structuralParents) (users bindingChildren));
         survivors = L.filter (\n -> IM.notMember n aliases)
           (L.takeWhile (\n -> n < first) (IS.toList touched));
-        removed = L.map (\n -> (,) n (G.nodeAt before n))
-          (L.takeWhile (\n -> n < first) (IS.toList (IS.union touched (IS.fromList (IM.keys aliases)))));
+        -- The quotient mutates a winner's tag, discards its aliases, and
+        -- may place a surviving binder. Every other old node retains its
+        -- outgoing edges after their destination keys have been renamed.
+        oldIds keys = L.takeWhile (\n -> n < first) (IS.toList keys);
+        placedIds = IS.fromList (IM.keys placements);
+        editIds = IS.union merged placedIds;
+        removed = L.map (\n -> let { v = G.nodeAt before n } in
+          (,) n (G.mkNode (G.mapTag image (G.tag v)) (G.mapMaybeInt image (G.binder v)) (G.flag v)))
+          (oldIds (IS.union editIds (IS.fromList (IM.keys aliases))));
         replacement n = let { v = G.nodeAt skeleton n } in
           (,) n (G.mkNode (G.mapTag image (G.tag v)) (binderAt placements n)
             (if L.any (\original -> G.equalFlag (G.flag (G.nodeAt before original)) Rigid) (members n)
               then Rigid else Flexible));
+        -- All incoming edges of an alias acquire the same destination.
+        -- Move their source set once, then patch the outgoing edges of each
+        -- changed or deleted node against that renamed index.
+        moveIncoming index alias _ = case IM.lookup alias index of {
+          Nothing -> index;
+          Just sources -> IM.insertWith IS.union (image alias) sources (IM.delete alias index)
+        };
+        renameIndex index = IM.foldlWithKey moveIncoming index aliases;
+        renamed = mkSolver current (renameIndex (structuralParents solver))
+          (renameIndex (bindingChildren solver)) scopes;
         changed = L.map replacement survivors;
         retainedFresh = L.map (\entry@((,) n _) -> if IS.member n touched then replacement n else entry)
           (L.filter (\((,) n _) -> IM.notMember n aliases) fresh);
-        result = G.mkGraph (IM.union (G.nodesFromDistinctAscList (L.append changed retainedFresh)) (G.nodes skeleton))
-          (IM.union aliases (G.links current)) (G.nextId current)
-      } in Right (LocalSolved (withGraph result (patchIndexedNodes solver removed (L.append changed retainedFresh))))
+        published = G.nodesFromDistinctAscList (L.append changed retainedFresh);
+        result = G.mkGraph (IM.union published (G.nodes skeleton))
+          (IM.union aliases (G.links current)) (G.nextId current);
+        -- Share the exact replacements already materialized for the graph.
+        indexedEdits = L.map (\n -> (,) n (IM.get n published)) (oldIds editIds)
+      } in Right (LocalSolved (withGraph result (patchIndexedNodes renamed removed
+          (L.append indexedEdits retainedFresh))))
     }
   };
   data LocalBinders = LocalBinders Graph ScopeIndex (IntMap ([] Int));
