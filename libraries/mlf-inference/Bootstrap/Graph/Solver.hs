@@ -9,6 +9,7 @@ module Bootstrap.Graph.Solver where {
   import qualified Bootstrap.ST as ST;
   import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.IntSet as IS;
+  import qualified Bootstrap.IntTree as IT;
   import qualified Bootstrap.IntRank as Rank;
   import qualified Bootstrap.Graph as G;
   -- The incremental solver projects a component closed under both directions
@@ -2402,10 +2403,22 @@ module Bootstrap.Graph.Solver where {
   };
   closeLocalQuotient :: Solver -> Graph -> Graph -> Graph -> [] ((,) Int Node) -> Either String LocalUnification;
   closeLocalQuotient = closeLocalQuotientUsing noScopeLift;
+  -- Several quotient passes ask for images in the same immutable graph.
+  -- Share each visited branch and the final representative of a queried alias.
+  localAliasImage :: Graph -> (Int -> Int);
+  localAliasImage skeleton = let {
+    search tree = case tree of {
+      IntMapNil -> \n -> n;
+      IntMapTip key next -> let { winner = G.resolve skeleton next } in
+        \n -> if n == key then winner else n;
+      IntMapBin _ prefix left right -> let { below = search left; above = search right } in
+        \n -> if IT.left n prefix then below n else above n
+    }
+  } in case G.links skeleton of { IntMap aliases -> search aliases };
   closeLocalQuotientUsing :: (Int -> Int -> Bool) -> Solver -> Graph -> Graph -> Graph -> [] ((,) Int Node) -> Either String LocalUnification;
   closeLocalQuotientUsing scopeLift solver current before skeleton fresh = do {
     let {
-      image = G.resolve skeleton;
+      image = localAliasImage skeleton;
       aliases = G.links skeleton;
       classes = IM.foldlWithKey (\found n _ ->
         let { winner = image n } in
