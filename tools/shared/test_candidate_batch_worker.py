@@ -3,6 +3,7 @@ import copy
 from pathlib import Path
 import tempfile
 import unittest
+import candidate_batch_contract as C
 import candidate_batch_worker as W
 
 class WorkerControls(unittest.TestCase):
@@ -124,6 +125,9 @@ class WorkerControls(unittest.TestCase):
         module=W.load(b'value=7\n','synthetic_source','/does-not-exist/source.py')
         self.assertEqual(module.value,7)
         self.assertEqual(module.__file__,'/does-not-exist/source.py')
+    def test_worker_and_fixture_accept_the_same_classes_sources(self):
+        self.assertEqual({W.PINS[W.CLASSES_PATH], *W.CLASSES_SUCCESSORS}, set(C.CLASSES_BLOBS))
+
     def test_every_frozen_source_tamper_fails_snapshot(self):
         raws,pins=W.snapshot()
         self.assertEqual(set(raws),set(W.PINS)|set(W.HELPERS))

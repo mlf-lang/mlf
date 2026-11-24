@@ -28,6 +28,7 @@ CLASSES_SUCCESSORS = (
     'f22cec64548c408602c85c8c81732fb57694927e',
     # The fixture's extracted selector body is unchanged from the previous blob.
     '5f813fb61a3982644a528e7fb481210e6da56b95',
+    'dda2ecc3356a47a590b75e3b52788b3fc0f7de88',
 )
 PINS = {
  'test_direct.py':'a46bd66949e81c5761dff3446201640837ec8f68',
