@@ -106,6 +106,15 @@
       "reused_inputs": ["fixed builtin checked pair (.mlfci/.mlfco)", "prebuilt host MLF.Primitive package", "runtime.o", "GHC and Clang toolchains"],
       "cache_boundary": "each leg gets a private, empty query cache directory that is inventoried and deleted after correctness checks; no target objects, .hi/.o files, LLVM or executables are reused between legs"
     },
+    "crate-bootstrap-production-v1": {
+      "status": "measured",
+      "summary": "Bootstrap crate stages with the target-specific LLVM flags of each measured compiler.",
+      "producer": "tools/shared/build.py --bootstrap-only --optimization 2",
+      "driver": "Same crate commands as crate-bootstrap-v1; clang -O2 with each producer's native target flags",
+      "compiles_user_program_fresh": true,
+      "reused_inputs": ["fixed builtin checked pair (.mlfci/.mlfco)", "prebuilt host MLF.Primitive package", "runtime.o", "GHC and Clang toolchains"],
+      "cache_boundary": "same fresh targets and private query caches as crate-bootstrap-v1"
+    },
     "crate-plan-v1": {
       "label": "GHC-hosted cold crate plan",
       "status": "measured",

@@ -8,12 +8,15 @@ import subprocess
 import time
 
 
+ORDINARY_CLANG_FLAGS = ('-O2', '-Wno-override-module')
+
+
 def pack(values):
     return ''.join(str(len(x))+':'+x for x in values)
 
 
 def mlf_commands(endpoint, emlf, spec, out):
-    if endpoint == 'crate-bootstrap-v1':
+    if endpoint in ('crate-bootstrap-v1', 'crate-bootstrap-production-v1'):
         return [('source-to-checked', [emlf, '--compile-crate', spec, '-o', out/'unit'], None),
                 ('checked-to-llvm', [emlf, '--crate-to-llvm-gc', out/'unit.mlfci'], out/'unit.ll')]
     if endpoint == 'crate-fused-v1':
@@ -103,7 +106,10 @@ def main():
                 run(name, argv, target)
         else:
             run('module-source-to-llvm',[emlf,'--emit-llvm-gc',case['source']],out/'unit.ll')
-        run('llvm-to-executable',[setup['clang'],'-O2','-Wno-override-module',out/'unit.ll',
+        flags = ORDINARY_CLANG_FLAGS
+        if args.lane in ('mlf', 'reference') and endpoint == 'crate-bootstrap-production-v1':
+            flags = [*flags, *plan['native_target_policy'][args.lane]['flags']]
+        run('llvm-to-executable',[setup['clang'],*flags,out/'unit.ll',
             setup['runtime'],*setup['libs'],'-lm','-lpthread','-ldl','-o',out/'program'])
     save(True)
 

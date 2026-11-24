@@ -343,7 +343,10 @@ module Package.Build where {
         irFlags =
           if (windows && S.any (O.starts "clang version 14.") (O.lines version))
           then O.words "-mllvm -opaque-pointers"
-          else []
+          else S.concatMap (\line -> case O.words line of {
+            ["Target:", triple] -> O.nativeTargetFlags triple;
+            _ -> []
+          }) (O.lines version)
       };
       let {
         identity =

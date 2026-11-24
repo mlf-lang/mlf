@@ -992,6 +992,24 @@ class ScheduleTests(unittest.TestCase):
             self.assertEqual(positive['expected_stdout'], ['-99\n', '-11\n', '37\n', '85\n', '-99\n'])
             self.assertEqual(Path(positive['source']).read_text().count('a <- readPiece left'), 8)
 
+    def test_production_endpoint_keeps_ordinary_crate_stages(self):
+        args = (Path('/bin/emlf'), Path('/spec'), Path('/out'))
+        self.assertEqual(worker.mlf_commands('crate-bootstrap-production-v1', *args),
+                         worker.mlf_commands('crate-bootstrap-v1', *args))
+        self.assertEqual(worker.ORDINARY_CLANG_FLAGS, ('-O2', '-Wno-override-module'))
+
+    def test_production_flags_are_queried_from_each_producer(self):
+        triple = 'arm64-apple-darwin25'
+        with mock.patch.object(runner.subprocess, 'check_output',
+                               side_effect=['emlf --native-target-flags TRIPLE', '["-mno-outline"]',
+                                            'emlf --compile SOURCE']) as query:
+            self.assertEqual(runner.native_target_policy('/candidate', triple)['flags'], ['-mno-outline'])
+            self.assertEqual(runner.native_target_policy('/baseline', triple)['flags'], [])
+        self.assertEqual([c.args[0] for c in query.call_args_list], [
+            [Path('/candidate/bin/emlf'), '--help'],
+            [Path('/candidate/bin/emlf'), '--native-target-flags', triple],
+            [Path('/baseline/bin/emlf'), '--help']])
+
     def test_fused_endpoint_has_its_own_command_and_stages(self):
         endpoint = bench.measured_endpoint('crate-fused-v1')
         self.assertIn('--compile-crate-to-llvm-gc', endpoint['driver'])

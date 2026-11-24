@@ -15,6 +15,14 @@ rather than workload gates.
 
 The [21 November 2026 comparison](../../../docs/compiler-shapes-2026-11-21.md) reports elapsed time, peak memory and incomplete builds for the 25-shape standard matrix.
 
+The optional `--endpoint crate-bootstrap-production-v1` uses the same two
+crate stages as `crate-bootstrap-v1`. It queries each measured MLF compiler
+for its production LLVM flags using the selected Clang target triple.
+Historical drivers without this query used plain Clang for native executables.
+The plan records each lane's flags and every build records its Clang command.
+Compare cohorts within the same endpoint. The GHC command is identical across
+both endpoints.
+
 ## Compile endpoint
 
 The default measured endpoint is `crate-fused-v1`:

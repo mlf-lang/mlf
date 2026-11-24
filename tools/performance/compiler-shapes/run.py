@@ -7,6 +7,7 @@ import hashlib
 import json
 import random
 import shutil
+import subprocess
 import sys
 import command_runner
 import fit_growth
@@ -16,6 +17,19 @@ import compiler_reference
 import query_cache as Q
 import provenance
 import worker
+
+
+def native_target_policy(producer, triple):
+    emlf = Path(producer) / 'bin/emlf'
+    help_text = subprocess.check_output([emlf, '--help'], text=True)
+    option = '--native-target-flags'
+    if option not in help_text.split():
+        return {'origin': 'legacy native driver', 'flags': []}
+    flags = json.loads(subprocess.check_output([emlf, option, triple], text=True))
+    if not isinstance(flags, list) or not all(isinstance(flag, str) and flag.startswith('-') for flag in flags):
+        raise ValueError(f'Invalid native target flags from {emlf}: {flags!r}')
+    return {'origin': option, 'flags': flags}
+
 
 ROOT=Path(__file__).resolve().parents[3]
 HERE=Path(__file__).resolve().parent
@@ -176,12 +190,20 @@ def main():
         'setup':setup,'cases':cases,'seed':seed,'schedule':schedule,'inputs':inputs,'limits':limits,'host':H.host(),
         'endpoint':'fresh source to native executable; fixed primitive/runtime/builtin dependencies may be reused',
         'failure_rule':'retain failure, mark case incomplete and skip its remaining scheduled legs; never replace samples',
-        'syntax_adaptations':False,'parallel_compilers':1,'ordinary_clang_flags':['-O2','-Wno-override-module'],
+        'syntax_adaptations':False,'parallel_compilers':1,'ordinary_clang_flags':list(worker.ORDINARY_CLANG_FLAGS),
         'ghc_arguments':['--make','-j1','-O2','-fforce-recomp','-package-env','-','-clear-package-db',
             '-global-package-db','-package-db',setup['package_db'],'-no-user-package-db','-hide-all-packages',
             '-package','base','-package','mlf-shape-primitives','-i','-odir','<leg>','-hidir','<leg>','<source>','-o','<leg>/program'],
         'mlf_stages':worker.mlf_stage_names(args.endpoint),
         'timing_boundary':'exact-child worker launch through wait4; common Python dispatcher included; preparation and validation excluded'}
+    if args.endpoint == 'crate-bootstrap-production-v1':
+        triple = subprocess.check_output([setup['clang'], '-dumpmachine'], text=True).strip()
+        if not triple or len(triple.split()) != 1:
+            raise ValueError(f'Invalid Clang target triple: {triple!r}')
+        policy = {'target': triple, 'mlf': native_target_policy(setup['producer'], triple)}
+        if reference:
+            policy['reference'] = native_target_policy(reference['producer'], triple)
+        plan['native_target_policy'] = policy
     if selection:
         plan['baseline_selection'] = selection
     if reference:
