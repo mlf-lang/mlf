@@ -77,6 +77,75 @@ LOCAL_WORKER_POLICY = {
         '3ec3bf20b6d1ddcd55d182430ab681d3d63171e0fade2690a9a1d126929377e7',
     ),
 }
+CHECKED_GRAPH_MANIFEST = 'foundation-checked-graph-source-migration.json'
+CHECKED_GRAPH = '3278a3e09e69031c847b3200810095e8097fe1f7'
+CHECKED_GRAPH_TREE = 'c44d1ab36554b9d27dc8e83f28522d644646979e'
+CHECKED_GRAPH_FRAMEWORK_PARENT = '265560ef383526c66126a9e79580e39bb4850973'
+CHECKED_GRAPH_FRAMEWORK_PARENT_TREE = '1ae66b30d25c084ae306ef8b7409396135be75b0'
+CHECKED_GRAPH_PARENTS = (
+    '1891f0232b7ad1feacd5dc65f62ad15ccbbc1b1f', '83dbeab115c665e83991fd74369312809d831858',
+    '83cd0fe62fc4d0162a821cb4e27c9c6068c6e7ff', '18ef7d72a21203ece47f53129abbaa21a05652ff', COLD_CRATES,
+)
+# Both lineages change the builtin identity and source lock. These are
+# source endpoints, not evidence of a fresh canonical generator run.
+CHECKED_GRAPH_MERGED = {
+    'bootstrap/MLF/BuiltinPreludeData.hs':
+        'f7ac348252aff20e7b60d7fe752b67b828df40ed6a6333a281924d07bd2fae50',
+    'mlf.lock':
+        '253109c4f37cb9b24c25f6359ca7a2a8782f0b9140ff8e8dae74ad16d5bb4ace',
+}
+
+# Follow the published dictionary-spine fast-forward from the prior tree.
+DICTIONARY_SPINE = 'b29ceb3f118b606b437dbd23ac9215bb4dd7244e'
+DICTIONARY_SPINE_TREE = 'a845f7dee50ebd2243b9474d8a55ec4870d493ed'
+DICTIONARY_SPINE_PARENT = '12888ebff944e948fd0ac0ce53c3bfa0fb9744b5'
+DICTIONARY_SPINE_PARENT_TREE = '36dd97ac864c5443d56ee57cb4392543dde312aa'
+DICTIONARY_SPINE_CHANGES = {
+    'bootstrap/MLF/BuiltinPreludeData.hs': (
+        'fe13defe8bf31903646c68251d95fa63c4d2d8227c6a62d97cb3bf99f2a25d1d',
+        '8765ad88f32a4250fb5f90516d2206db6d3124bda3f8b0815eb9734d40664ae4',
+        'f7ac348252aff20e7b60d7fe752b67b828df40ed6a6333a281924d07bd2fae50',
+        'ae182e9ab7be9fe364fa952e129560b8b198e2fe8b8bd2c12264a8dbaa1588e4',
+    ),
+    'libraries/mlf-crates/Bootstrap/SourceInference.hs': (
+        'c78e7fe48c1936bd9f60bbd5b2aa0b9f432dd811da2b6b44a0c3e9618411ed5a',
+        '7377c30b72bf5dfcfe55883d967a23fdbfe0ab1bfe9217f9dcec1b5968aa50dc',
+        'c78e7fe48c1936bd9f60bbd5b2aa0b9f432dd811da2b6b44a0c3e9618411ed5a',
+        '7377c30b72bf5dfcfe55883d967a23fdbfe0ab1bfe9217f9dcec1b5968aa50dc',
+    ),
+    'mlf.lock': (
+        '502f83f784cf97bd68d45729fdb0d3c3a67cf1f9253b870b4b38438a99cc5931',
+        '65e308f6ee4a48f7a1aa1010f9d9d70dfdfcec14512969773a1be903c58b2e9d',
+        '253109c4f37cb9b24c25f6359ca7a2a8782f0b9140ff8e8dae74ad16d5bb4ace',
+        '0fed9ed0448957d03f4a2827ef662c8140ce27a312b3bd654e5d1d8bf03b0dcd',
+    ),
+}
+
+# The closed-spine follow-up has a separate authenticated published parent.
+CLOSED_DICTIONARY_SPINE = '9b605fc5c90afa2be83950d0c9b3dfef4eafd05f'
+CLOSED_DICTIONARY_SPINE_TREE = 'a7fc2e38c4306a9d8a5fafa602a1eb0467aad28a'
+CLOSED_DICTIONARY_SPINE_PARENT = 'b29ceb3f118b606b437dbd23ac9215bb4dd7244e'
+CLOSED_DICTIONARY_SPINE_PARENT_TREE = 'a845f7dee50ebd2243b9474d8a55ec4870d493ed'
+CLOSED_DICTIONARY_SPINE_CHANGES = {
+    'bootstrap/MLF/BuiltinPreludeData.hs': (
+        '8765ad88f32a4250fb5f90516d2206db6d3124bda3f8b0815eb9734d40664ae4',
+        'a59bed925a57dc4424643c1734d8d15427a647830d0564f46ca57bb010b00e17',
+        'ae182e9ab7be9fe364fa952e129560b8b198e2fe8b8bd2c12264a8dbaa1588e4',
+        '6219f9732b967647e41edb7b59ae4ca4721dcdd80ab0db9e74368ea62e85dd91',
+    ),
+    'libraries/mlf-crates/Bootstrap/SourceInference.hs': (
+        '7377c30b72bf5dfcfe55883d967a23fdbfe0ab1bfe9217f9dcec1b5968aa50dc',
+        'a8d6f2623bbdfc01333dfb0a01ec9fe8d26eee36cdcfa6cadf590c6ee6b199e8',
+        '7377c30b72bf5dfcfe55883d967a23fdbfe0ab1bfe9217f9dcec1b5968aa50dc',
+        'a8d6f2623bbdfc01333dfb0a01ec9fe8d26eee36cdcfa6cadf590c6ee6b199e8',
+    ),
+    'mlf.lock': (
+        '65e308f6ee4a48f7a1aa1010f9d9d70dfdfcec14512969773a1be903c58b2e9d',
+        '705465fb3691a98be91c3aa259ad2440ea921f395209044b8ac6364c97e111b2',
+        '0fed9ed0448957d03f4a2827ef662c8140ce27a312b3bd654e5d1d8bf03b0dcd',
+        'a92e9f9d2f88323b743d72a7cdffe711eab83862947f7a2cc0552177b187465b',
+    ),
+}
 FOUNDATION_MERGE_PATHS = {'mlf.lock', 'tests/shared/MLF/Tests/SharedFrontend.hs'}
 HOSTED_PARITY_CHANGES = {
     'mlf.lock': (
@@ -235,9 +304,46 @@ def phase2_changes(spec, repository, files, predecessor_pin, pin_key, branch, tr
     return {path: row['merged'] for path, row in changes.items()}
 
 
+
+def dictionary_spine_changes(repository, files):
+    return dictionary_spine_transition(repository, files, DICTIONARY_SPINE, DICTIONARY_SPINE_TREE,
+                                       DICTIONARY_SPINE_PARENT, DICTIONARY_SPINE_PARENT_TREE,
+                                       DICTIONARY_SPINE_CHANGES)
+
+
+def closed_dictionary_spine_changes(repository, files):
+    return dictionary_spine_transition(repository, files,
+                                       CLOSED_DICTIONARY_SPINE, CLOSED_DICTIONARY_SPINE_TREE,
+                                       CLOSED_DICTIONARY_SPINE_PARENT, CLOSED_DICTIONARY_SPINE_PARENT_TREE,
+                                       CLOSED_DICTIONARY_SPINE_CHANGES)
+
+
+def dictionary_spine_transition(repository, files, branch_commit, branch_tree,
+                                parent_commit, parent_tree, changes):
+    git = ['git', '--no-replace-objects', '-C', repository]
+    def revision(expression):
+        return subprocess.check_output([*git, 'rev-parse', '--verify', expression], text=True).strip()
+    require(revision(branch_commit + '^{tree}') == branch_tree and
+            revision(branch_commit + '^') == parent_commit and
+            revision(parent_commit + '^{tree}') == parent_tree,
+            'pinned dictionary-spine trees and ancestry')
+    paths = subprocess.check_output([*git, 'diff-tree', '--no-commit-id', '--name-only',
+                                     '--no-renames', '-r', parent_commit,
+                                     branch_commit], text=True).splitlines()
+    require(changes.keys() == files.keys() & set(paths),
+            'complete dictionary-spine source transition')
+    for path, (parent, branch, prior, _) in changes.items():
+        def at(commit):
+            return sha(subprocess.check_output([*git, 'show', commit + ':' + path]))
+        require(at(parent_commit) == parent and at(branch_commit) == branch and
+                files[path] == prior, 'dictionary-spine endpoint: ' + path)
+    return {path: row[3] for path, row in changes.items()}
+
+
 def successor_type(predecessor_type, predecessor_manifest, framework_pin, foundation_pin,
                    phase2_pin, heap_force_pin, dictionary_demand_pin, thunk_captures_pin,
-                   checked_dispatch_pin, recursive_workers_pin, cold_crates_pin, read_implementation):
+                   checked_dispatch_pin, recursive_workers_pin, cold_crates_pin, checked_graph_pin,
+                   read_implementation):
     """Reuse exact projection operations, adding a locally reviewed inventory edge."""
 
     class Contract(predecessor_type):
@@ -264,8 +370,11 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, founda
             require(sha(recursive_workers_raw) == recursive_workers_pin,
                     'pinned recursive-workers manifest SHA')
             cold_crates_raw = read_implementation(self.directory / COLD_CRATES_MANIFEST)
-            require(sha(cold_crates_raw) == cold_crates_pin == manifest_sha256,
+            require(sha(cold_crates_raw) == cold_crates_pin,
                     'pinned cold-crates manifest SHA')
+            checked_graph_raw = read_implementation(self.directory / CHECKED_GRAPH_MANIFEST)
+            require(sha(checked_graph_raw) == checked_graph_pin == manifest_sha256,
+                    'pinned checked-graph manifest SHA')
             self.manifest_sha256 = manifest_sha256
             self.source_root = Path(source_root or Path(history_root).parents[1]).resolve(strict=True)
             repository = source_repository(history_root)
@@ -360,6 +469,19 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, founda
                 require(files[path] == previous, 'local worker policy source transition: ' + path)
                 self.changes[path] = [old_files[path], current]
                 files[path] = current
+            edge = phase2_changes(self.core.strict_json(checked_graph_raw), repository, files,
+                                  cold_crates_pin, 'cold_crates_manifest_sha256',
+                                  CHECKED_GRAPH, CHECKED_GRAPH_TREE,
+                                  CHECKED_GRAPH_FRAMEWORK_PARENT, CHECKED_GRAPH_FRAMEWORK_PARENT_TREE,
+                                  CHECKED_GRAPH_PARENTS, merged_endpoints=CHECKED_GRAPH_MERGED)
+            self.changes.update({path: [old_files[path], new] for path, new in edge.items()})
+            files.update(edge)
+            edge = dictionary_spine_changes(repository, files)
+            self.changes.update({path: [old_files[path], new] for path, new in edge.items()})
+            files.update(edge)
+            edge = closed_dictionary_spine_changes(repository, files)
+            self.changes.update({path: [old_files[path], new] for path, new in edge.items()})
+            files.update(edge)
             self.core.hash_map(files, 'current framework sources')
             paths = {n: p for n, p in old_paths.items() if n not in retired}
             self.value = {'current_files': files, 'module_paths': paths,
@@ -380,7 +502,8 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, founda
             self.metadata_paths = (*self.previous.metadata_paths, MANIFEST, FOUNDATION_MANIFEST,
                                    PHASE2_MANIFEST, HEAP_FORCE_MANIFEST, DICTIONARY_DEMAND_MANIFEST,
                                    THUNK_CAPTURES_MANIFEST, CHECKED_DISPATCH_MANIFEST,
-                                   RECURSIVE_WORKERS_MANIFEST, COLD_CRATES_MANIFEST, Path(__file__).name)
+                                   RECURSIVE_WORKERS_MANIFEST, COLD_CRATES_MANIFEST,
+                                   CHECKED_GRAPH_MANIFEST, Path(__file__).name)
             history_names = set(self.parent['frozen_history']) | set(self.maintenance_parent['files'])
             require(self.maintenance.keys() <= history_names, 'unknown maintenance owner')
             for name in history_names:

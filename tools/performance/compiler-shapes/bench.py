@@ -77,7 +77,7 @@ def resolve(matrix_name, families, sizes):
 
 
 def compile_count(cells, repeats):
-    return cells * repeats * 2
+    return cells * repeats * 3
 
 
 def command_growth(args):
@@ -101,6 +101,7 @@ def command_list(args):
     print('endpoint: ' + args.endpoint + ' (' + data['endpoints'][args.endpoint]['status'] + ')')
     print('families: ' + ', '.join(families))
     print('sizes:    ' + ', '.join(str(size) for size in sizes))
+    print('compiler baseline: HEAD when dirty, first parent when clean')
     print('baseline: ' + ('yes' if include_baseline else 'no'))
     print('cells:    ' + str(cells) + ', timed compilations: '
           + str(compile_count(cells, matrix['repeats'])))

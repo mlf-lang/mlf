@@ -8,14 +8,24 @@ import subprocess
 import time
 
 
+ORDINARY_CLANG_FLAGS = ('-O2', '-Wno-override-module')
+
+
+CACHED_ENDPOINT = 'crate-bootstrap-cached-production-v1'
+PRODUCTION_ENDPOINTS = ('crate-bootstrap-production-v1', CACHED_ENDPOINT)
+
+
 def pack(values):
     return ''.join(str(len(x))+':'+x for x in values)
 
 
 def mlf_commands(endpoint, emlf, spec, out):
-    if endpoint == 'crate-bootstrap-v1':
+    if endpoint == 'crate-bootstrap-v1' or endpoint in PRODUCTION_ENDPOINTS:
+        emit = [emlf, '--crate-to-llvm-gc', out/'unit.mlfci']
+        if endpoint == CACHED_ENDPOINT:
+            emit += ['--cache', out/'codegen-cache', '--query-report', out/'codegen.json']
         return [('source-to-checked', [emlf, '--compile-crate', spec, '-o', out/'unit'], None),
-                ('checked-to-llvm', [emlf, '--crate-to-llvm-gc', out/'unit.mlfci'], out/'unit.ll')]
+                ('checked-to-llvm', emit, out/'unit.ll')]
     if endpoint == 'crate-fused-v1':
         return [('source-to-llvm', [emlf, '--compile-crate-to-llvm-gc', spec, '-o', out/'unit'], out/'unit.ll')]
     if endpoint == 'crate-plan-v1':
@@ -40,7 +50,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--plan',type=Path,required=True)
     parser.add_argument('--case',required=True)
-    parser.add_argument('--lane',choices=['ghc','mlf','module'],required=True)
+    parser.add_argument('--lane',choices=['ghc','mlf','reference','module'],required=True)
     parser.add_argument('--out',type=Path,required=True)
     args=parser.parse_args(); plan=json.loads(args.plan.read_text()); setup=plan['setup']
     case=next(c for c in plan['cases'] if c['id']==args.case)
@@ -70,8 +80,9 @@ def main():
             '-no-user-package-db','-hide-all-packages','-package','base','-package','mlf-shape-primitives',
             '-i',*includes,'-odir',out,'-hidir',out,case['source'],'-o',out/'program'])
     else:
-        emlf=Path(setup['producer'])/'bin/emlf'
-        if args.lane=='mlf':
+        producer = plan['compiler_reference']['producer'] if args.lane == 'reference' else setup['producer']
+        emlf=Path(producer)/'bin/emlf'
+        if args.lane in ('mlf', 'reference'):
             query=out/'queries'; query.mkdir()
             spec=out/'crate.spec'
             endpoint = plan.get('benchmark', {}).get('endpoint', {}).get('id', 'crate-bootstrap-v1')
@@ -102,7 +113,10 @@ def main():
                 run(name, argv, target)
         else:
             run('module-source-to-llvm',[emlf,'--emit-llvm-gc',case['source']],out/'unit.ll')
-        run('llvm-to-executable',[setup['clang'],'-O2','-Wno-override-module',out/'unit.ll',
+        flags = ORDINARY_CLANG_FLAGS
+        if args.lane in ('mlf', 'reference') and endpoint in PRODUCTION_ENDPOINTS:
+            flags = [*flags, *plan['native_target_policy'][args.lane]['flags']]
+        run('llvm-to-executable',[setup['clang'],*flags,out/'unit.ll',
             setup['runtime'],*setup['libs'],'-lm','-lpthread','-ldl','-o',out/'program'])
     save(True)
 

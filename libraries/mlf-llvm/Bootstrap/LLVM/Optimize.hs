@@ -8,6 +8,7 @@ module Bootstrap.LLVM.Optimize where {
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.X.Syntax as X;
   import qualified Bootstrap.Primitive as P;
@@ -339,7 +340,8 @@ module Bootstrap.LLVM.Optimize where {
   -- remain distinct underneath nested lambdas, patterns and recursive groups.
   data FoldBranch = ReturnField Int | CombineFields Primitive Int Int;
   data UnaryConstructorUse = BuildsField String | SelectsField String |
-    FoldsConstructors (Map String ((,) Int FoldBranch)) | ComposesFunctions | TranslatesBy Int;
+    FoldsConstructors (Map String ((,) Int FoldBranch)) | ComposesFunctions | TranslatesBy Int |
+    ProjectsArgument Int Int;
   unaryConstructorUse term = case term of {
     XEAbs name (XEApp (XEConstructor constructor) (XEVar field)) ->
       if eqName name field then Just (BuildsField constructor) else Nothing;
@@ -1661,7 +1663,10 @@ module Bootstrap.LLVM.Optimize where {
     let {
       eligible = case useTerm value of {
         XEAbs _ _ ->
-          smallValue (useTerm value) &&
+          -- The ordinary inliner copies a single-use lambda even when its
+          -- body is large. A witnessed non-specializable call lets the
+          -- checked pass defer that same copy with its other replacements.
+          (smallValue (useTerm value) || (checked && uses == 1)) &&
           (uses > 0 && uses < 4 &&
            witnessed name);
         _ -> False
@@ -1712,8 +1717,10 @@ module Bootstrap.LLVM.Optimize where {
   };
   -- Preserve a shared binding without forcing the substitutions queued for
   -- the rest of the declaration spine. Its RHS is outside the binder scope.
-  data CheckedPending = CheckedPending PendingBody (XName -> Bool) (XName -> Int);
+  data CheckedPending = CheckedPending PendingBody (XName -> Bool) (XName -> Int)
+    | ClosedCheckedPending PendingBody IntSet (XName -> Bool) (XName -> Int);
   checkedBody (CheckedPending body _ _) = body;
+  checkedBody (ClosedCheckedPending body _ _ _) = body;
   checkedUseCount tree name = boundedUseCount 4 name tree;
   -- Existing counts distinguish zero, one and two-or-more free occurrences
   -- at every subtree. Only an unmet budget above two needs any traversal.
@@ -1748,16 +1755,31 @@ module Bootstrap.LLVM.Optimize where {
         (\wanted -> M.findWithDefault compareName 0 wanted (pendingLimitedCounts pending)));
     freshPure (checkedBody result)
   };
-  delayCheckedPending name value state@(CheckedPending pending witnessed countOf) = case pending of {
+  delayCheckedPending name value state = case state of {
+    CheckedPending pending witnessed countOf ->
+      delayCheckedWith name value state pending IS.empty witnessed countOf;
+    ClosedCheckedPending pending removed witnessed countOf ->
+      delayCheckedWith name value state pending removed witnessed countOf
+  };
+  delayCheckedWith name value state pending removed previousWitness previousCount = case pending of {
     PendingBody body replacements counts calls ->
       -- With no queued substitutions, the indexed body's existing 0/1/many
       -- count suffices for all of the comparisons below.
-      let { uses = if M.null replacements then useCount name body else countOf name;
+      let { witnessed target = IS.notMember (nameId target) removed && previousWitness target;
+        countOf target = if IS.member (nameId target) removed then 0 else previousCount target;
+        uses = if M.null replacements then useCount name body else countOf name;
         -- A constructor applied only to atoms has no binders to freshen.
         -- The ordinary rule substitutes it immediately. Queue its sole use
         -- without rebuilding all later declarations and their use counts.
-        queue copies count = CheckedPending (queueSubstitution name copies count pending)
-          (afterCallBinding name (L.head copies) witnessed) (afterUseBinding name (L.head copies) count countOf);
+        -- A closed replacement removes its own binder and contributes no free
+        -- names. Share the previous lookup functions across consecutive closed
+        -- replacements, recording the removed names in a single bitmap index.
+        queue copies count = let { replacement = L.head copies;
+          next = queueSubstitution name copies count pending
+        } in if IM.null (countIndex replacement)
+          then ClosedCheckedPending next (IS.insert (nameId name) removed) previousWitness previousCount
+          else CheckedPending next (afterCallBinding name replacement witnessed)
+            (afterUseBinding name replacement count countOf);
         ordinary = delayLetWith True name value pending (countOf name) witnessed queue beginChecked;
         constructorValue = case useTerm value of {
           XEApp _ _ -> smallValue (useTerm value); _ -> False
@@ -2231,6 +2253,82 @@ module Bootstrap.LLVM.Optimize where {
       specialized <- specializeHigherOrder simple;
       iterate specialized
     };
+  -- The checked optimizer has assigned distinct identities to all binders.
+  -- In a wide mutually recursive group, keep one formal for positions that
+  -- receive the same variable at every entry and stay equal on every peer call.
+  compactRecursiveArguments :: XErased -> XErased;
+  compactRecursiveArguments expression = case expression of {
+    XELet n rhs rest -> XELet n rhs (compactRecursiveArguments rest);
+    XELetRec bindings rest -> let {
+      following = compactRecursiveArguments rest;
+      original = XELetRec bindings following;
+      members = L.map (\((,) n rhs) -> (,) n (lambdas rhs)) bindings
+    } in case members of {
+      (:) ((,) _ ((,) first _)) ((:) _ _) -> let {
+        width = L.foldlStrict (\w entry -> L.min w (L.length (L.fst (L.snd entry))))
+          (L.length first) members
+      } in if width < 16 then original else compactGroupArguments members width following original;
+      _ -> original
+    };
+    _ -> expression
+  };
+  -- Include partial applications and bare escapes. The shortest use bounds
+  -- the prefix whose evaluation and calling convention can change together.
+  recursiveArgumentUses targets params term tail = case applications term of {
+    (,) (XEVar n) args -> let { following = L.foldr (recursiveArgumentUses targets params) tail args } in
+      if S.member compareName n targets then (:) ((,) params args) following else following;
+    (,) head [] -> L.foldr (recursiveArgumentUses targets params) tail (subterms head);
+    (,) head args -> recursiveArgumentUses targets params head (L.foldr (recursiveArgumentUses targets params) tail args)
+  };
+  -- Intersect the current partition with the equality observed at one site.
+  -- Only variable identity and the caller's proven formal classes can equate
+  -- positions. Two arbitrary expressions always get distinct keys.
+  refineArgumentClasses positions classes current ((,) params args) = let {
+    formals = M.fromList compareName (L.zip params classes);
+    token pos arg = case arg of {
+      XEVar n -> case M.lookup compareName n formals of {
+        Just representative -> (,) 0 representative;
+        Nothing -> (,) 1 (nameId n)
+      };
+      _ -> (,) 2 pos
+    };
+    order = L.comparePair L.compareInt (L.comparePair L.compareInt L.compareInt);
+    step ((,) seen reversed) ((,) pos ((,) old arg)) = let { key = (,) old (token pos arg) } in
+      case M.lookup order key seen of {
+        Just representative -> (,) seen ((:) representative reversed);
+        Nothing -> (,) (M.insert order key pos seen) ((:) pos reversed)
+      }
+  } in L.reverse (L.snd (L.foldlStrict step ((,) M.empty []) (L.zip positions (L.zip current args))));
+  compactGroupArguments members arity rest original = let {
+    targets = S.fromList compareName (L.map L.fst members);
+    external = recursiveArgumentUses targets [] rest [];
+    calls = L.foldr (\((,) _ ((,) params body)) tail -> recursiveArgumentUses targets params body tail) external members;
+    width = L.foldlStrict (\n call -> L.min n (L.length (L.snd call))) arity calls;
+    positions = L.range 0 (width - 1);
+    stable classes = let { next = L.foldlStrict (refineArgumentClasses positions classes) classes calls } in
+      if L.eqList eqInt next classes then classes else stable next;
+    classes = stable (L.replicate width 0);
+    keep = L.zipWith eqInt positions classes;
+    select xs = L.append (L.map L.snd (L.filter L.fst (L.zip keep xs))) (L.drop width xs);
+    rewrite aliases t = case applications t of {
+      (,) (XEVar n) args -> do {
+        actuals <- traverseFresh (rewrite aliases) (if S.member compareName n targets then select args else args);
+        freshPure (L.foldl XEApp (XEVar (M.findWithDefault compareName n n aliases)) actuals)
+      };
+      (,) head [] -> children (rewrite aliases) head;
+      (,) head args -> do {
+        f <- rewrite aliases head;
+        actuals <- traverseFresh (rewrite aliases) args;
+        freshPure (L.foldl XEApp f actuals)
+      }
+    };
+    member ((,) n ((,) args body)) = let {
+      formals = M.fromList L.compareInt (L.zip positions args);
+      aliases = M.fromList compareName (L.zip args (L.map (\rep -> M.get L.compareInt rep formals) classes));
+      result = L.fst (runFresh (rewrite aliases body) 0)
+    } in (,) n (L.foldr XEAbs result (select args))
+  } in if L.null external || width < 2 || L.all (\v -> v) keep then original else
+    XELetRec (L.map member members) (L.fst (runFresh (rewrite M.empty rest) 0));
   -- Specialize a private recursive worker entered by one saturated call.
   -- A static function argument stays fixed when every recursive call passes
   -- the formal itself or the same primitive. Any partial application, escape,
@@ -2584,6 +2682,32 @@ module Bootstrap.LLVM.Optimize where {
     } in body (S.singleton parameter) value;
     _ -> Nothing
   };
+  -- A saturated call to a lambda that returns its parameter does not
+  -- evaluate the remaining arguments. Keep excess applications in order.
+  scopedProjection expression = case lambdas expression of {
+    (,) ((:) first rest) (XEVar selected) -> let {
+      parameters = (:) first rest;
+      arity = L.length parameters;
+      position i remaining = case remaining of {
+        [] -> Nothing;
+        (:) name tail -> if eqName name selected then Just (ProjectsArgument arity i)
+          else position (i - 1) tail
+      }
+    } in position (arity - 1) (L.reverse parameters);
+    _ -> Nothing
+  };
+  projectApplication facts original = case applications original of {
+    (,) (XEVar name) arguments -> case M.lookup compareName name facts of {
+      Just (ProjectsArgument arity index) -> case L.splitAt arity arguments of {
+        (,) prefix rest -> if L.length prefix == arity then case L.drop index prefix of {
+          (:) argument _ -> Just (L.foldl XEApp argument rest);
+          _ -> Nothing
+        } else Nothing
+      };
+      _ -> Nothing
+    };
+    _ -> Nothing
+  };
   data ScopedInput a = OtherInput | LambdaInput XName a |
     LetInput XName a a | RecursiveInput XName a a | ApplicationInput a a;
   erasedScope term = case term of {
@@ -2595,6 +2719,7 @@ module Bootstrap.LLVM.Optimize where {
   };
   typedScope term = case skipTypeWrappers term of {
     XAbs name _ body -> LambdaInput name body;
+    XInstantiationSpine head rows -> typedScope (X.expandInstantiationSpine head rows);
     XLet name value body -> LetInput name value body;
     XLetRec [(,,) name _ rhs] body -> RecursiveInput name rhs body;
     XApp fn arg -> ApplicationInput fn arg;
@@ -2607,11 +2732,16 @@ module Bootstrap.LLVM.Optimize where {
   foldScopedUsing inspect erase foldArgument = let {
     visit facts expression = let { original = erase expression } in case inspect expression of {
       LetInput name value body -> let {
-        following = case scopedUnaryUse (erase value) of {
-          Just role -> M.insert compareName name role facts;
+        normalized = visit facts value;
+        role = case scopedProjection normalized of {
+          Just projection -> Just projection;
+          Nothing -> scopedUnaryUse (erase value)
+        };
+        following = case role of {
+          Just found -> M.insert compareName name found facts;
           Nothing -> M.delete compareName name facts
         }
-      } in XELet name (visit facts value) (visit following body);
+      } in XELet name normalized (visit following body);
       RecursiveInput name value body -> let { rhs = erase value } in case constructorFold name rhs of {
         Just rules -> XELetRec [(,) name rhs]
           (visit (M.insert compareName name (FoldsConstructors rules) facts) body);
@@ -2622,21 +2752,22 @@ module Bootstrap.LLVM.Optimize where {
         affine = case affineField facts original of {
           Just ((,,) name factor offset) -> affineIntTerm name factor offset;
           Nothing -> original
-        }
-      } in if M.null facts then original else case erase fn of {
-        XEVar name -> case M.lookup compareName name facts of {
-          Just (FoldsConstructors rules) -> L.fromMaybe original (foldArgument rules arg);
-          _ -> affine
         };
-        _ -> affine
-      };
+        ordinary = case erase fn of {
+          XEVar name -> case M.lookup compareName name facts of {
+            Just (FoldsConstructors rules) -> L.fromMaybe original (foldArgument rules arg);
+            _ -> affine
+          };
+          _ -> affine
+        }
+      } in if M.null facts then original else L.fromMaybe ordinary (projectApplication facts original);
       OtherInput -> original
     }
   } in visit;
   -- This extra algebraic pass is for finite checked programs. Its rewrites
   -- introduce no binders and preserve evaluation of the single input value.
   optimizeChecked expression = optimizeAfterFields (foldScopedFields M.empty expression);
-  optimizeCheckedTerm term = optimizeAfterFields (eraseScopedFields M.empty term);
+  optimizeCheckedTerm term = compactRecursiveArguments (optimizeAfterFields (eraseScopedFields M.empty term));
   optimizeAfterFields expression = optimizeOwnedWith (optimizeLetSharing True (checkedIdentities M.empty))
     (simplifyIterations M.empty (simplifyTranslations M.empty expression));
   -- A translation evaluates its one Int input once and adds a constant in

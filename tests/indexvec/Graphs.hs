@@ -109,6 +109,18 @@ package name deps mods = P.Package (H.literal ("/packages/" ++ name ++ "/mlf-pac
              ("dependencies",J.Object [(H.literal n,J.empty) | n <- deps])]) mods
 modl owner name deps = P.Module name owner (H.v_concatString name ".hs") deps
 
+permissionMemoPages = do
+  let observed n = Prim.runST $ do
+        memo <- Graph.newPermissionMemo n (0 :: H.Int)
+        let indices = [0,511,512,1024,n-1]
+        before <- mapM (Graph.readPermissionMemo memo) indices
+        forM_ (zip indices [1..]) $ \(i,v) -> Graph.writePermissionMemo memo i v
+        after <- mapM (Graph.readPermissionMemo memo) (reverse indices)
+        hole <- Graph.readPermissionMemo memo 1023
+        pure (before,after,hole)
+  forM_ [4095,4096,4101,4609] $ \n -> check "permission memo page boundaries"
+    ([0,0,0,0,0],[5,4,3,2,1],0) (observed n)
+
 groupedMergePermissions = do
   let run grouped parents permissions members = Prim.runST $ do
         let count=fromIntegral (length parents)
@@ -118,7 +130,7 @@ groupedMergePermissions = do
         forM_ (zip3 [0..] parents permissions) $ \(i,parent,permission) -> do
           Prim.writeSTArray raised i parent
           Prim.writeSTArray cache i (T.Just permission)
-        let state=Graph.DensePermissions 0 unused unused unused unused unused cache
+        let state=Graph.DensePermissions 0 unused unused unused unused unused (Graph.FlatMemo cache)
             checkClass=if grouped then Graph.denseCheckClassMerges else Graph.denseCheckMerges
         result <- checkClass 0 raised state members
         pure (case result of T.Left err -> Left (H.unpack err); T.Right () -> Right ())
@@ -2309,6 +2321,39 @@ lambdaCaptureChecks = do
   check "deep lambda captures only the external name" [99999]
     (case chain of T.XEAbs n b -> ids (Analysis.lambdaNeeded M.empty table n b); _ -> [])
 
+recursiveArgumentChecks = do
+  env <- case Data.validateDeclarations [] of
+    T.Right ok -> pure ok
+    T.Left why -> fail (H.unpack why)
+  let name i = T.XName i "same"
+      var = T.XEVar . name
+      call = foldl T.XEApp
+      choose a b = call (T.XEPrimitive T.PIfThenElse) [T.XEBool True,a,b]
+      first = [10..25]
+      second = [30..45]
+      binding f args body = (name f,foldr (T.XEAbs . name) body args)
+      group passed enter =
+        T.XELetRec [binding 1 first (call (var 2) passed),
+                    binding 2 second (choose (call (T.XEPrimitive T.PSubInt) [var 45,var 30])
+                                             (call (var 1) (map var second)))] enter
+      external = call (var 1) (replicate 16 (var 3))
+      run t = Runtime.integer (Runtime.evaluate env (Runtime.REnv M.empty)
+                    (T.XELet (name 3) (T.XEInt 7) (T.XELet (name 4) (T.XEInt 11) t)))
+      widths (T.XELetRec bindings _) = map (length . fst . Optimize.lambdas . snd) bindings
+      widths _ = []
+  forM_ [(map var first,external,1,0),
+         (map var (init first) ++ [var 4],external,2,4),
+         (map var first,choose external (call (var 2) (replicate 15 (var 3) ++ [var 4])),2,0),
+         (map var first,T.XELet (name 5) (var 2) external,16,0),
+         (map var first,T.XELet (name 5) (call (var 2) [var 3]) external,16,0)] $
+    \(passed,entry,width,expected) -> do
+      let original = group passed entry
+          optimized = Optimize.compactRecursiveArguments original
+      check "recursive arguments respect partial uses and every incoming edge" [width,width] (widths optimized)
+      forM_ [original,optimized] $ \term -> case run term of
+        T.Right value -> check "recursive argument forwarding preserves both values" expected value
+        T.Left why -> fail (H.unpack why)
+
 -- Both arms call the previous layer with their own lambda parameters.
 -- Duplicating that captured function at each use unfolds a linear graph into
 -- a binary tree even when the program takes only one path at run time.
@@ -3359,6 +3404,39 @@ applicationPatternChecks = do
   tooSmall <- encoded (W.encodeRootsWithAtoms Structure.termAtomShapes W.defaultLimits 29 8 testRoots)
   check "repeated atoms and root references consume exact expanded work"
     (Left "binary expanded-work limit exceeded") tooSmall
+  let indexedLimits = W.IndexedText (W.Limits 1024 8 32 64 12 12 8 5)
+      shortIndexedLimits = W.IndexedText (W.Limits 1024 8 32 64 12 12 8 4)
+      smallSymbolLimits = W.IndexedText (W.Limits 1024 8 5 64 12 12 8 5)
+      indexedLeaf = W.VNode 1 [W.VText "shared name"]
+      indexedRoot = W.VNode 2 [indexedLeaf, indexedLeaf]
+  indexed <- W.encode indexedLimits 8 [indexedRoot]
+  case indexed of
+    T.Left why -> fail (H.unpack why)
+    T.Right bytes -> do
+      ordinary <- encoded (W.encode W.defaultLimits 8 [indexedRoot])
+      actual <- encoded (pure (T.Right bytes))
+      check "indexed text preserves the canonical wire bytes" ordinary actual
+      graph <- W.decodeGraph indexedLimits 8 bytes
+      opened <- case graph of
+        T.Left why -> fail (H.unpack why)
+        T.Right value -> pure value
+      case W.graphRoots opened of
+        [root] -> case W.lookupGraphNode opened root of
+          T.Right (W.GNode 2 [a, b]) -> check "indexed text retains one child index" a b
+          _ -> fail "invalid indexed text test node"
+        _ -> fail "invalid indexed text test roots"
+      let work answer = case answer of
+            T.Left why -> Left (H.unpack why)
+            T.Right value -> Right value
+      check "indexed text admits by node visits" (Right 5) (work (W.graphAdmittedWork opened))
+      check "expanded statistics still cover repeated text" (Right 27) (work (W.graphExpandedWork opened))
+      expanded <- W.decode indexedLimits 8 bytes
+      check "generic expansion charges text per occurrence" (Left "binary expanded-work limit exceeded")
+        (case expanded of T.Left why -> Left (H.unpack why); T.Right _ -> Right ())
+  rejectedNodes <- encoded (W.encode shortIndexedLimits 8 [indexedRoot])
+  check "indexed text still bounds expanded node visits" (Left "binary expanded-work limit exceeded") rejectedNodes
+  rejectedText <- encoded (W.encode smallSymbolLimits 8 [indexedRoot])
+  check "indexed text still bounds physical symbol bytes" (Left "binary symbol byte limit exceeded") rejectedText
   let underDepth = W.Limits 1024 8 32 64 12 12 1 8
       underWork = W.Limits 1024 8 32 64 12 12 8 3
       defer = error "forced a field after its limiting failure"
@@ -3900,7 +3978,78 @@ declarationStampInventory = do
   check "restored stamps preserve varied declaration order and individual owned fields" (map snd settled)
     (map (H.unpack . Open.fingerprint . snd) (Open.packageFragments checked))
 
+checkedProjectionSpines = do
+  let first = T.XName 0 "first"
+      chosen = T.XName 1 "chosen"
+      lastArg = T.XName 2 "last"
+      callee = T.XName 3 "choose"
+      rows = [(first,T.XTyVar 0,T.Just (T.XTyVar 3)),
+              (chosen,T.XTyVar 1,T.Just (T.XTyVar 4)),
+              (lastArg,T.XTyVar 2,T.Nothing)]
+      operands = [("Int",True,T.XIntTerm 7),
+                  ("Bool",True,T.XBoolTerm True),
+                  ("Int",False,T.XIntTerm 12)]
+      projection = T.XProjection rows chosen
+      invoke = T.XInstantiationSpine callee operands
+      packed = T.XLet callee projection invoke
+      expanded = T.XLet callee (X.expandProjection rows chosen)
+                   (X.expandInstantiationSpine callee operands)
+      result checkTerm = case checkTerm of
+        T.Right ty -> Right (H.unpack (Pretty.prettyType ty))
+        T.Left message -> Left (H.unpack message)
+      require value = case value of
+        T.Right actual -> pure actual
+        T.Left message -> fail (H.unpack message)
+  check "packed projection call checks as Bool"
+    (Right "Bool") (result (XCheck.checkClosed packed))
+  check "expanded reference checker agrees with packed projection"
+    (result (Independent.infer Independent.emptyEnv expanded)) (result (XCheck.checkClosed packed))
+  check "packed call prints canonical type computations" (H.unpack (Pretty.prettyTerm expanded))
+    (H.unpack (Prim.concatStringList (Pretty.termChunks 0 packed [])))
+  env <- require (Open.environment [])
+  let terminal = T.XConstructor "()" []
+      owner = T.XName 4 "owner"
+  a <- require (Open.check env [] (T.XLet owner packed terminal))
+  b <- require (Open.check env [] (T.XLet owner expanded terminal))
+  check "expanded and packed projections have the same fingerprint"
+    (H.unpack (Open.fingerprint b)) (H.unpack (Open.fingerprint a))
+  decoded <- require (Structure.fromXTerm (Structure.toXTerm packed))
+  check "decoded projection retains its type" (Right "Bool") (result (XCheck.checkClosed decoded))
+  ty <- require (XCheck.checkClosed projection)
+  normal <- require (Fresh.runFresh [] (Separate.normalTypeIn M.empty ty))
+  check "projection normalization retains the canonical binder order" True
+    (Structure.sameEncodedXType normal (Separate.normalType ty))
+  decodedType <- require (Structure.fromXType (Structure.toStoredXType ty))
+  check "packed bounded type retains exact binder identities" True
+    (Structure.sameEncodedXType ty decodedType)
+  let invalid = T.XLet callee projection (T.XInstantiationSpine callee
+        (take 2 operands ++ [("Int",False,T.XBoolTerm False)]))
+  check "discarded operands still require type checking" (Left "application type mismatch")
+    (result (XCheck.checkClosed invalid))
+
+preparedPrefixControls = do
+  let span = T.SourceSpan "source" "Projection" "Projection.hs" 2 1 2 20
+      scope = CrateGraph.SourceOrigin id M.empty 0 M.empty 0
+      encode expression = case CrateGraph.simplePackedOrigin scope span 0 4096 expression "header" of
+        T.Just bytes -> H.unpack bytes
+        T.Nothing -> error "expected a simple prepared source"
+      selector a b chosen = T.SLam a T.Nothing (T.SLam b T.Nothing (T.SVar chosen))
+      left = T.SApp (T.SApp (T.SVar "pick") (T.SIntLit 2)) (T.SIntLit 3)
+      right = T.SApp (T.SVar "pick") (T.SApp (T.SIntLit 2) (T.SIntLit 3))
+  check "prepared projection uses lexical binder positions"
+    (encode (selector "first" "second" "first")) (encode (selector "x" "y" "x"))
+  check "prepared projection retains selected binder" False
+    (encode (selector "x" "y" "x") == encode (selector "x" "y" "y"))
+  check "prepared source retains application association" False (encode left == encode right)
+  check "prepared locations retain start and end coordinates" False
+    (encode (T.SCallSite "arg" span left) ==
+     encode (T.SCallSite "arg" (T.SourceSpan "source" "Projection" "Projection.hs" 2 1 2 21) left))
+
 main = do
+  permissionMemoPages
+  recursiveArgumentChecks
+  preparedPrefixControls
+  checkedProjectionSpines
   fileImportPrefixChecks
   declarationStampInventory
   liveDeclarationSpineChecks

@@ -299,6 +299,7 @@ module Bootstrap.X.Checked (CheckedTerm, check, term, typeOf, declarationBinding
     XAbs _ _ body -> child body;
     XApp a b -> join [child a, child b];
     XTypeAbs _ _ body -> child body;
+    XInstantiationSpine n rows -> join ((:) (Set.singleton n) (map (\((,,) _ _ val) -> child val) rows));
     XTypeApp body _ -> child body;
     XLet _ rhs body -> join [child rhs, child body];
     XLetRec definitions body -> join ((:) (child body)
@@ -377,6 +378,8 @@ module Bootstrap.X.Checked (CheckedTerm, check, term, typeOf, declarationBinding
     XAbs _ annotation body -> join [ty annotation, child body];
     XApp a b -> join [child a, child b];
     XTypeAbs _ bound body -> join [ty bound, child body];
+    XInstantiationSpine _ rows -> join (concatMap (\((,,) constructor _ value) ->
+      [Set.singleton constructor,child value]) rows);
     XTypeApp body proof -> join [child body, compositionProofNames proof];
     XLet _ rhs body -> join [child rhs, child body];
     XLetRec definitions body -> join ((:) (child body) (concatMap (\((,,) _ annotation rhs) -> [ty annotation, child rhs]) definitions));
@@ -423,6 +426,9 @@ module Bootstrap.X.Checked (CheckedTerm, check, term, typeOf, declarationBinding
       XTypeAbs a bound b ->
         XTypeAbs (variable a) (compositionMapType variable bound) (compositionMapTerm name variable b);
       XTypeApp a p -> XTypeApp (compositionMapTerm name variable a) (compositionMapComputation variable p);
+      XProjection rows selected -> X.mapProjection name variable rows selected;
+      XInstantiationSpine head rows -> XInstantiationSpine (name head)
+        (map (\((,,) ty result value) -> (,,) ty result (compositionMapTerm name variable value)) rows);
       XLet n a b -> XLet (name n) (compositionMapTerm name variable a) (compositionMapTerm name variable b);
       XLetRec bs b ->
         XLetRec
@@ -472,6 +478,9 @@ module Bootstrap.X.Checked (CheckedTerm, check, term, typeOf, declarationBinding
       XTypeAbs (XTyVar a) bound b ->
         compositionTermIdentities b (compositionTypeIdentities bound (IS.insert a seen));
       XTypeApp a p -> compositionComputationIdentities p (compositionTermIdentities a seen);
+      XProjection rows selected -> X.foldProjectionIdentities IS.insert rows selected seen;
+      XInstantiationSpine n rows -> foldl (\ids ((,,) _ _ operand) -> compositionTermIdentities operand ids)
+        (IS.insert (X.nameId n) seen) rows;
       XLet n a b -> compositionTermIdentities b (compositionTermIdentities a (IS.insert (X.nameId n) seen));
       XLetRec bs b ->
         compositionTermIdentities b

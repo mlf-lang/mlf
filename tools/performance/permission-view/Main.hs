@@ -51,7 +51,7 @@ shared low high entries = P.runST $ do
   before <- C.newDensePermissions low high ns old es
   after <- C.raisedDensePermissions before low high ns old new es
   case before of
-    C.DensePermissions _ _ _ _ _ _ cache -> C.writeDense low cache low (T.Just T.Red)
+    C.DensePermissions _ _ _ _ _ _ cache -> C.writePermissionMemo cache 0 (T.Just T.Red)
   fmap permission (C.densePermission after low)
 
 generated seed low =

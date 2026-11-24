@@ -26,6 +26,7 @@ module MLF.Entry.Emlf where {
   import qualified Bootstrap.CrateArtifact as CrateArtifact;
   import qualified Bootstrap.CrateCodegen as CrateCodegen;
   import qualified Package.Json as J;
+  import qualified Package.OS as O;
   data Command =
     PrintSource Bool |
     RunSource |
@@ -216,6 +217,7 @@ module MLF.Entry.Emlf where {
     (:) "-Zincremental-verify-ich" ((:) "--compile-crate-to-llvm-gc" rest) -> compileCrateLLVMCommand True rest;
     (:) "-Zincremental-verify-ich" ((:) "--compile-crate" rest) -> compileCrateCommand True rest;
     (:) "--compile" rest -> NativeBuild.run mode paths rest;
+    ["--native-target-flags", triple] -> putStrLn (J.render (J.stringArray (O.nativeTargetFlags triple)));
     ["--native-install-info"] -> do {
       result <- Prepared.nativeInstallInfo;
       case result of {
@@ -1050,7 +1052,7 @@ module MLF.Entry.Emlf where {
      (crateUsage ++ (nativeUsage ++ baseUsage)));
   nativeUsage :: String;
   nativeUsage =
-    "Executable compilation: emlf [--no-prelude] [-i DIR ...] SOURCE -o OUTPUT [--build-dir FRESH]\n       emlf --compile SOURCE -o OUTPUT\nStandard libraries and runtime are reused automatically; user code is freshly compiled with one Clang -O2 job.\nInstalled native libraries: emlf --native-install-info\n       emlf [-i DIR ...] --emit-native-llvm [FILE | --expr SOURCE]\n       emlf --emit-native-library-llvm\n       emlf --native-library-metadata\nNative IR requires the authenticated link inputs from --native-install-info. Library emission and metadata commands are installation build steps.\n";
+    "Executable compilation: emlf [--no-prelude] [-i DIR ...] SOURCE -o OUTPUT [--build-dir FRESH]\n       emlf --compile SOURCE -o OUTPUT\nStandard libraries and runtime are reused automatically; user code is freshly compiled with one Clang -O2 job.\nTarget-specific LLVM flags: emlf --native-target-flags TRIPLE\nInstalled native libraries: emlf --native-install-info\n       emlf [-i DIR ...] --emit-native-llvm [FILE | --expr SOURCE]\n       emlf --emit-native-library-llvm\n       emlf --native-library-metadata\nNative IR requires the authenticated link inputs from --native-install-info. Library emission and metadata commands are installation build steps.\n";
   crateUsage :: String;
   crateUsage =
     "Crate compilation: emlf [-Zincremental-verify-ich] --compile-crate SPEC -o PREFIX\n       emlf [-Zincremental-verify-ich] --compile-crate-to-llvm-gc SPEC -o PREFIX [ --codegen-cache DIR --query-report FILE ]\n       emlf --compile-crate-plan PLAN SPEC -o PREFIX [ --codegen-cache DIR --query-report FILE ]\n       emlf --show-crate FILE.mlfci\n       emlf --link-crate FILE.mlfci\n       emlf --run-crate FILE.mlfci [-- ARGS...]\n       emlf --crate-to-llvm[-gc] FILE.mlfci [--cache DIR [ --query-report FILE ]]\n";

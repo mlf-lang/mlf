@@ -66,6 +66,8 @@ module Bootstrap.EvidenceBoundary where {
     XAbs n _ b -> (:) n (names b);
     XApp a b -> append (names a) (names b);
     XTypeAbs _ _ b -> names b;
+    XProjection rows selected -> append (map (\((,,) n _ _) -> n) rows) [selected];
+    XInstantiationSpine n rows -> (:) n (concatMap (\((,,) _ _ value) -> names value) rows);
     XTypeApp b _ -> names b;
     XLet n a b -> (:) n (append (names a) (names b));
     XLetRec ds b -> append (concatMap (\((,,) n _ v) -> (:) n (names v)) ds) (names b);
@@ -91,6 +93,10 @@ module Bootstrap.EvidenceBoundary where {
     XAbs n _ body -> freeNamesOnto (bind n) body rest;
     XApp f a -> after f (after a rest);
     XTypeAbs _ _ body -> after body rest;
+    XProjection _ _ -> rest;
+    XInstantiationSpine n rows -> let {
+      arguments = foldr (\((,,) _ _ operand) pending -> after operand pending) rest rows
+    } in if allowed n then (:) n arguments else arguments;
     XTypeApp body _ -> after body rest;
     XLet n expr body -> after expr (freeNamesOnto (bind n) body rest);
     XLetRec defs body -> let {
@@ -418,7 +424,7 @@ module Bootstrap.EvidenceBoundary where {
         match = if comparablePredicate domain then find same retained else Nothing
       } in case match of {
         Nothing -> (,) ((:) row retained) aliases;
-        Just ((,,) previous _ _) -> (,) retained ((:) ((,) n previous) aliases)
+        Just ((,,) previous _ _) -> (,) retained ((:) ((,,) n domain previous) aliases)
       };
     withoutArguments [] value = value;
     withoutArguments ((:) _ remaining) (XAbs _ _ value) = withoutArguments remaining value;
@@ -436,12 +442,60 @@ module Bootstrap.EvidenceBoundary where {
         parameters <- traverseEither toParameter (zip labels domains);
         case foldlStrict share ((,) [] []) parameters of {
           (,) retained aliases -> if null aliases then Right Nothing else let {
-            renamed = foldr (\((,) n previous) b -> XLet n (XVarTerm previous) b)
-              (withoutArguments labels term) aliases
-          } in Right (Just
-            ((,,) (foldl (\t ((,,) _ _ domain) -> XArrow domain t) result retained)
+            replacements = M.fromList X.compareName
+              (map (\((,,) n domain previous) -> (,) n ((,) domain previous)) aliases);
+            owners = M.fromList X.compareName (map (\((,,) n _ _) -> (,) n ()) retained);
+            rewritten = rewriteGroundRecursiveReads M.empty replacements owners (withoutArguments labels term)
+          } in Right (mapOptional (\renamed ->
+            (,,) (foldl (\t ((,,) _ _ domain) -> XArrow domain t) result retained)
               (foldl (\value ((,,) n _ domain) -> XAbs n domain value) renamed retained)
-              (reverse (map (\((,,) _ className _) -> className) retained))))
+              (reverse (map (\((,,) _ className _) -> className) retained))) rewritten)
+        }
+      }
+    }
+  };
+
+  -- A checked result-polymorphic dictionary arrow has the form
+  -- forall (r >= suffix). D -> r. Its body instantiates the next layer at r.
+  -- Closed D can move across this quantifier. Keep the last occurrence of
+  -- each predicate so the innermost result abstraction stays in place.
+  compactBoundPrefix :: Map String String -> [] ((,,) String String String) ->
+    XType -> XTerm -> Maybe ((,,) XType XTerm ([] String));
+  compactBoundPrefix registry labels ty term = let {
+    scan rows remaining scheme value = case (,,) remaining scheme value of {
+      (,,) ((:) ((,,) label cls dict) rest) (XForall v suffix (XArrow domain@(XCon head _) (XVar result)))
+        (XTypeAbs declared bound (XAbs name actual body)) ->
+        if not (XT.equalTyVar v result && eqString label (X.nameHint name) &&
+          ground domain && XT.alphaEq domain actual && eqString dict head &&
+          case M.lookup compareString cls registry of { Just known -> eqString known dict; _ -> False })
+        then Nothing else let { next = (:) ((,,,) name cls domain declared) rows } in case rest of {
+          [] -> if XT.alphaEq suffix bound then Just ((,,) next bound body) else Nothing;
+          _ -> case body of {
+            XTypeApp child (XHyp used) -> if XT.equalTyVar declared used then scan next rest suffix child else Nothing;
+            _ -> Nothing
+          }
+        };
+      _ -> Nothing
+    };
+    share ((,) retained aliases) row@((,,,) n cls domain _) = case find
+      (\((,,,) _ prior old _) -> eqString cls prior && XT.alphaEq domain old) retained of {
+        Just ((,,,) previous _ _ _) -> (,) retained (M.insert X.compareName n ((,) domain previous) aliases);
+        Nothing -> (,) ((:) row retained) aliases
+    };
+    layer ((,,,) n _ domain v) bound body =
+      (,) (XForall v bound (XArrow domain (XVar v))) (XTypeAbs v bound (XAbs n domain body));
+    wrap ((,) bound child) row@((,,,) _ _ _ v) = layer row bound (XTypeApp child (XHyp v))
+  } in do {
+    (,,) rows bound original <- scan [] labels ty term;
+    case foldlStrict share ((,) [] M.empty) rows of {
+      (,) retained aliases -> if M.size aliases == 0 then Nothing else do {
+        let { owners = M.fromList X.compareName (map (\((,,,) n _ _ _) -> (,) n ()) retained) };
+        body <- rewriteGroundRecursiveReads M.empty aliases owners original;
+        case reverse retained of {
+          (:) last others -> case foldlStrict wrap (layer last bound body) others of {
+            (,) result rhs -> Just ((,,) result rhs (map (\((,,,) _ cls _ _) -> cls) retained))
+          };
+          [] -> Nothing
         }
       }
     }
@@ -472,7 +526,7 @@ module Bootstrap.EvidenceBoundary where {
     };
     plan (GroundRecursiveMember name labels ty rhs) =
       case groundRecursivePrefix (length labels) ty rhs of {
-        Just (GroundRecursivePrefix target abstractions parameters body@(XAbs _ _ _)) -> do {
+        Just (GroundRecursivePrefix target abstractions parameters body) -> do {
           traverseEither validate (zip labels parameters);
           Right (if not (null labels) && all (compose ground snd) parameters
             then Just (GroundRecursiveRow name target abstractions parameters body) else Nothing)
@@ -485,7 +539,7 @@ module Bootstrap.EvidenceBoundary where {
       "duplicate recursive evidence owner or candidate";
     planned <- traverseEither plan members;
     Right (case mapM (\entry -> entry) planned of {
-      Just rows -> if length rows < 2 then Nothing else
+      Just rows -> if length rows < 2 || not (callableRecursiveRows rows) then Nothing else
         Just (GroundRecursivePlan authorized (reverse (foldlStrict insert [] (concatMap domains rows))) rows);
       Nothing -> Nothing
     })
@@ -495,38 +549,66 @@ module Bootstrap.EvidenceBoundary where {
   groundRecursiveRequestBatch (GroundRecursivePlan candidates domains _) = RequestBatch candidates
     (zip (range 0 (length domains - 1)) domains);
 
-  -- A context-free declaration supplies the same value at each call. A given,
-  -- superclass projection or instance application does not qualify here.
-  finishGroundRecursivePlan :: GroundRecursivePlan -> [] ((,) Int (Maybe XTerm)) ->
+  -- Only a definition-site instance declaration, possibly instantiated at
+  -- closed types, supplies the same term-level value at every peer call.
+  finishGroundRecursivePlan = finishGroundRecursivePlanIn D.emptyDataEnv;
+  finishGroundRecursivePlanIn :: DataEnv -> GroundRecursivePlan -> [] ((,) Int (Maybe XTerm)) ->
     Either String (Maybe ((,) ([] ((,,) XName XType XTerm)) ([] XName)));
-  finishGroundRecursivePlan (GroundRecursivePlan authorized domains members) answers = let {
+  finishGroundRecursivePlanIn datatypes (GroundRecursivePlan authorized domains members) answers = let {
     candidates = M.fromList X.compareName (map (\candidate -> (,) (candidateName candidate) candidate) authorized);
-    checkedAnswer ((,) ordinal domain) = case lookup eqInt ordinal answers of {
-      Nothing -> Left "missing stable recursive evidence query result";
-      Just (Just (XVarTerm name)) -> case M.lookup X.compareName name candidates of {
+    -- Type applications erase to the same declaration. Validate each step in
+    -- the definition's data environment with an empty type-variable scope.
+    -- Evidence applications that require another term keep the original ABI.
+    instanceProof value = case value of {
+      XVarTerm name -> case M.lookup X.compareName name candidates of {
         Just (Candidate InstanceEvidence found ty) -> do {
-          ensure (eqString (X.nameHint found) (X.nameHint name) && XT.alphaEq ty domain)
-            "recursive instance proof changed identity or type";
-          Right (Just ((,) domain name))
+          ensure (eqString (X.nameHint found) (X.nameHint name)) "recursive instance proof changed identity or type";
+          Right (Just ((,) name ty))
         };
         Just _ -> Right Nothing;
         Nothing -> Left "recursive evidence proof escaped definition scope"
       };
-      Just _ -> Right Nothing
+      XTypeApp term proof -> do {
+        source <- instanceProof term;
+        case source of {
+          Nothing -> Right Nothing;
+          Just ((,) name ty) -> case Check.checkComputationIn datatypes M.empty proof ty of {
+            Right result -> Right (Just ((,) name result));
+            Left _ -> Right Nothing
+          }
+        }
+      };
+      _ -> Right Nothing
+    };
+    checkedAnswer ((,) ordinal domain) = case lookup eqInt ordinal answers of {
+      Nothing -> Left "missing stable recursive evidence query result";
+      Just Nothing -> Right Nothing;
+      Just (Just value) -> do {
+        root <- instanceProof value;
+        case root of {
+          Nothing -> Right Nothing;
+          Just ((,) name ty) -> do {
+            ensure (XT.alphaEq ty domain) "recursive instance proof changed identity or type";
+            Right (Just ((,) domain ((,) name value)))
+          }
+        }
+      }
     };
     aliasesFor available (GroundRecursiveRow name ty abstractions parameters body) = do {
-      aliases <- mapM (\((,) binder domain) -> mapOptional (\entry -> (,,) binder domain (snd entry))
+      aliases <- mapM (\((,) binder domain) -> mapOptional (\entry -> (,,) binder domain (fst (snd entry)))
         (find (\entry -> XT.alphaEq (fst entry) domain) available)) parameters;
       Just (GroundRecursiveResolvedRow name ty abstractions aliases body)
     };
     call (GroundRecursiveResolvedRow name _ abstractions aliases _) =
       (,) name (GroundRecursiveCall (length abstractions) (map (\((,,) _ domain proof) -> (,) domain proof) aliases));
-    rewrite calls proofs (GroundRecursiveResolvedRow name ty abstractions aliases body) = do {
+    rewrite known calls proofs (GroundRecursiveResolvedRow name ty abstractions aliases body) = do {
       let { local = M.fromList X.compareName (map (\((,,) binder domain proof) -> (,) binder ((,) domain proof)) aliases) };
       if length aliases /= M.size local || M.member X.compareName name proofs ||
          any (\binder -> M.member X.compareName binder calls || M.member X.compareName binder proofs) (M.keys local)
       then Nothing else do {
-        result <- rewriteGroundRecursiveReads calls local proofs body;
+        result <- rewriteGroundRecursiveReadsWith (\ty name -> mapOptional (compose snd snd)
+          (find (\entry -> X.equalName name (fst (snd entry)) && XT.alphaEq ty (fst entry)) known))
+          calls local proofs body;
         Just ((,,) name ty (foldr (\((,) var bound) rest -> XTypeAbs var bound rest) result abstractions))
       }
     }
@@ -538,10 +620,10 @@ module Bootstrap.EvidenceBoundary where {
       rows <- mapM (aliasesFor available) members;
       let {
         calls = M.fromList X.compareName (map call rows);
-        names = nubNames (map snd available);
+        names = nubNames (map (compose fst snd) available);
         proofNames = M.fromList X.compareName (map (\name -> (,) name ()) names)
       };
-      definitions <- mapM (rewrite calls proofNames) rows;
+      definitions <- mapM (rewrite available calls proofNames) rows;
       Just ((,) definitions names)
     })
   };
@@ -558,6 +640,56 @@ module Bootstrap.EvidenceBoundary where {
       else Nothing;
     (,) (XForall _ _ _) _ -> Nothing;
     (,) _ (XTypeAbs _ _ _) -> Nothing;
+    _ -> instantiatedGroundPrefix count ty term
+  };
+  -- Removing dictionary lambdas must leave each recursive value callable.
+  -- The source may partially apply a peer to literals. Check its resolved
+  -- identity and residual lambda arity before requesting definition-site
+  -- evidence. The rewrite separately verifies each forwarded dictionary.
+  callableRecursiveRows rows = let {
+    arity value = case value of {
+      XAbs _ _ inner -> 1 + arity inner;
+      XTypeAbs _ _ inner -> arity inner;
+      XTypeApp inner _ -> arity inner;
+      _ -> 0
+    };
+    member (GroundRecursiveRow name _ _ parameters body) =
+      (,) name ((,) (length parameters) (arity body));
+    functions = M.fromList X.compareName (map member rows);
+    forwarded ordinary dictionaries value = case value of {
+      XApp inner (XVarTerm _) -> forwarded ordinary (dictionaries + 1) inner;
+      XTypeApp inner _ -> forwarded ordinary dictionaries inner;
+      XVarTerm name -> case M.lookup X.compareName name functions of {
+        Just ((,) required available) -> ordinary > 0 && ordinary < available && dictionaries == required;
+        Nothing -> False
+      };
+      _ -> False
+    };
+    partial count value = case value of {
+      XApp inner (XBoolTerm _) -> partial (count + 1) inner;
+      XApp inner (XIntTerm _) -> partial (count + 1) inner;
+      XTypeAbs _ _ inner -> partial count inner;
+      XTypeApp inner _ -> partial count inner;
+      _ -> forwarded count 0 value
+    };
+    callable (GroundRecursiveRow _ _ _ _ body) = isFunction body;
+    isFunction value = case value of {
+      XAbs _ _ _ -> True;
+      XTypeAbs _ _ inner -> isFunction inner;
+      XTypeApp inner _ -> isFunction inner;
+      _ -> partial 0 value
+    }
+  } in all callable rows;
+  -- Keep the type-only wrapper in its original order. Each term domain
+  -- removed below it must agree with the closed, published argument type.
+  instantiatedGroundPrefix :: Int -> XType -> XTerm -> Maybe GroundRecursivePrefix;
+  instantiatedGroundPrefix count ty term = case term of {
+    XTypeApp inner proof -> mapOptional
+      (\(GroundRecursivePrefix result qs params body) -> GroundRecursivePrefix result qs params (XTypeApp body proof))
+      (instantiatedGroundPrefix count ty inner);
+    XTypeAbs var bound inner -> mapOptional
+      (\(GroundRecursivePrefix result qs params body) -> GroundRecursivePrefix result qs params (XTypeAbs var bound body))
+      (instantiatedGroundPrefix count ty inner);
     _ -> do {
       (,) domains result <- directPrefix count term ty;
       body <- dropGroundRecursiveLambdas count term;
@@ -594,7 +726,8 @@ module Bootstrap.EvidenceBoundary where {
 
   rewriteGroundRecursiveReads :: Map XName GroundRecursiveCall ->
     Map XName ((,) XType XName) -> Map XName () -> XTerm -> Maybe XTerm;
-  rewriteGroundRecursiveReads calls aliases proofs = let {
+  rewriteGroundRecursiveReads = rewriteGroundRecursiveReadsWith (\_ name -> Just (XVarTerm name));
+  rewriteGroundRecursiveReadsWith replacement calls aliases proofs = let {
     safe name = not (M.member X.compareName name calls ||
       M.member X.compareName name aliases || M.member X.compareName name proofs);
     dropArgs expected actual = case (,) expected actual of {
@@ -638,7 +771,7 @@ module Bootstrap.EvidenceBoundary where {
       XVarTerm name ->
         if M.member X.compareName name calls then Nothing else
         case M.lookup X.compareName name aliases of {
-          Nothing -> Just value; Just ((,) _ proof) -> Just (XVarTerm proof)
+          Nothing -> Just value; Just ((,) ty proof) -> replacement ty proof
         };
       XAbs name ty body -> if safe name then mapOptional (XAbs name ty) (visit body) else Nothing;
       XTypeAbs var bound body -> mapOptional (XTypeAbs var bound) (visit body);

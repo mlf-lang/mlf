@@ -187,6 +187,11 @@ module Tests.IndependentCheck where {
           source <- inferIn ds env t;
           checkComputationScoped ds (typeEnv env) p source
         };
+      XProjection rows selected -> do {
+        (,) _ expanded <- X.projectionParts rows selected;
+        inferIn ds env expanded
+      };
+      XInstantiationSpine name rows -> inferIn ds env (X.expandInstantiationSpine name rows);
       XLet x a b ->
         do {
           ensure (L.not (M.member X.compareName x (termEnv env))) "term binder already in scope";

@@ -116,50 +116,44 @@ module Bootstrap.CrateQuery where {
          ((:) (showInt startLine) ((:) (showInt startColumn)
             ((:) (showInt endLine) ((:) (showInt endColumn) [])))))));
   encodeExpression :: SExpr -> String;
-  encodeExpression expression =
+  encodeExpression expression = renderFields (expressionFields expression);
+  expressionFields expression = let {
+    form = frameNode;
+    leaf = fieldText;
+    nested = expressionFields
+  } in
     case expression of {
-      SGlobal i _ -> node "decl" [showInt (V.toInt i)];
-      SGivenScope names body -> encodeExpression (expandWantedScopes names body);
-      SWantedScope d base -> encodeExpression (SWantedRefs d (wantedScopeRefs [] base));
-      SDeclScope ids body -> node "declaration-scope" [encodeScopes ids,encodeExpression body];
-      SWantedRefs dictionary refs -> node "wanted-declarations"
-        [dictionary,list (\((,) role ref) -> node (encodeRole role) [encodeTermRef ref]) refs];
-      SVar n -> node "variable" ((:) n []);
-      SConstructor n -> node "constructor" ((:) n []);
-      SLam n annotation body ->
-        node "lambda"
-          ((:) n ((:) (optional encodeAnnotation annotation) ((:) (encodeExpression body) [])));
-      SBindDictionaries names body -> node "bind-dictionaries" [list id names,encodeExpression body];
-      SApp a b -> node "apply" ((:) (encodeExpression a) ((:) (encodeExpression b) []));
-      SApplyDictionaries f names -> node "apply-dictionaries" [encodeTermRef f,list id names];
-      SLet n a b -> node "let" ((:) n ((:) (encodeExpression a) ((:) (encodeExpression b) [])));
-      SAnn a annotation ->
-        node "annotate" ((:) (encodeExpression a) ((:) (encodeAnnotation annotation) []));
-      SSignature a annotation ->
-        node "signature" ((:) (encodeExpression a) ((:) (encodeAnnotation annotation) []));
-      SIntLit n -> node "integer" ((:) (showInt n) []);
-      SDoubleLit n -> node "double-bits" ((:) (showInt (doubleToBits n)) []);
-      SBoolLit b -> node "boolean" ((:) (boolean b) []);
-      SStringLit s -> node "string" ((:) s []);
-      SPrimitive p -> node "primitive" ((:) (Primitive.primitiveName p) []);
-      SCase a branches ->
-        node "case" ((:) (encodeExpression a) ((:) (list encodeAlternative branches) []));
-      SSourceDefinition body -> node "source-definition" ((:) (encodeExpression body) []);
+      SGlobal i _ -> form "decl" [leaf (showInt (V.toInt i))];
+      SGivenScope names body -> nested (expandWantedScopes names body);
+      SWantedScope d base -> nested (SWantedRefs d (wantedScopeRefs [] base));
+      SDeclScope ids body -> form "declaration-scope" [leaf (encodeScopes ids),nested body];
+      SWantedRefs dictionary refs -> form "wanted-declarations"
+        [leaf dictionary,leaf (list (\((,) role ref) -> node (encodeRole role) [encodeTermRef ref]) refs)];
+      SVar n -> form "variable" [leaf n];
+      SConstructor n -> form "constructor" [leaf n];
+      SLam n annotation body -> form "lambda" [leaf n,leaf (optional encodeAnnotation annotation),nested body];
+      SBindDictionaries names body -> form "bind-dictionaries" [leaf (list id names),nested body];
+      SApp a b -> form "apply" [nested a,nested b];
+      SApplyDictionaries f names -> form "apply-dictionaries" [leaf (encodeTermRef f),leaf (list id names)];
+      SLet n a b -> form "let" [leaf n,nested a,nested b];
+      SAnn a annotation -> form "annotate" [nested a,leaf (encodeAnnotation annotation)];
+      SSignature a annotation -> form "signature" [nested a,leaf (encodeAnnotation annotation)];
+      SIntLit n -> form "integer" [leaf (showInt n)];
+      SDoubleLit n -> form "double-bits" [leaf (showInt (doubleToBits n))];
+      SBoolLit b -> form "boolean" [leaf (boolean b)];
+      SStringLit s -> form "string" [leaf s];
+      SPrimitive p -> form "primitive" [leaf (Primitive.primitiveName p)];
+      SCase a branches -> form "case" [nested a,leaf (list encodeAlternative branches)];
+      SSourceDefinition body -> form "source-definition" [nested body];
       SCallSite label span body ->
-        node "call-site" ((:) label ((:) (encodeSourceSpan span) ((:) (encodeExpression body) [])));
+        form "call-site" [leaf label,leaf (encodeSourceSpan span),nested body];
       SSharedBind pattern action continuation bindMethod failure ->
-        node "shared-bind"
-          ((:) (encodePattern pattern) ((:) (encodeExpression action)
-             ((:) (encodeExpression continuation) ((:) (encodeExpression bindMethod)
-                ((:) (encodeExpression failure) [])))));
-      SDo statements body ->
-        node "do" ((:) (list encodeStatement statements) ((:) (encodeExpression body) []));
-      SEquations rows -> node "equations" ((:) (list encodeEquation rows) []);
-      SLetRec definitions body ->
-        node "letrec" ((:) (list encodeRecursive definitions) ((:) (encodeExpression body) []));
-      SWanted dictionary candidates ->
-        node "wanted" ((:) dictionary ((:) (list encodeCandidate candidates) []));
-      SChecked ty body -> node "checked" ((:) (encodeType ty) ((:) (encodeExpression body) []))
+        form "shared-bind" [leaf (encodePattern pattern),nested action,nested continuation,nested bindMethod,nested failure];
+      SDo statements body -> form "do" [leaf (list encodeStatement statements),nested body];
+      SEquations rows -> form "equations" [leaf (list encodeEquation rows)];
+      SLetRec definitions body -> form "letrec" [leaf (list encodeRecursive definitions),nested body];
+      SWanted dictionary candidates -> form "wanted" [leaf dictionary,leaf (list encodeCandidate candidates)];
+      SChecked ty body -> form "checked" [leaf (encodeType ty),nested body]
     };
   encodeAlternative :: SAlternative -> String;
   encodeAlternative (SAlternative pattern body) =
@@ -514,17 +508,34 @@ module Bootstrap.CrateQuery where {
           else encodeSourceDatatypesWithPool pool declarations }
     in (,) text (DatatypeContextEncoding declarations text);
   encodeXType :: XType -> String;
-  encodeXType ty =
-    case ty of {
-      XVar (XTyVar n) -> node "variable" ((:) (showInt n) []);
-      XBot -> node "bottom" [];
-      XBotKind k -> node "bottom-kind" ((:) (encodeKind k) []);
-      XArrow a b -> node "arrow" ((:) (encodeXType a) ((:) (encodeXType b) []));
-      XCon n args -> node "constructor" ((:) n ((:) (list encodeXType args) []));
-      XApply a b -> node "application" ((:) (encodeXType a) ((:) (encodeXType b) []));
-      XForall (XTyVar n) bound body ->
-        node "forall" ((:) (showInt n) ((:) (encodeXType bound) ((:) (encodeXType body) [])))
-    };
+  encodeXType ty = renderFields (typeEncoding ty);
+  renderFields encoded = case encoded of {
+    FieldEncoding _ chunks -> concatStringList (chunks [])
+  };
+  -- Frame every field with its scalar length, then join the chunks once.
+  -- Nested bounds contribute their bytes only to the final string.
+  data FieldEncoding = FieldEncoding Int ([] String -> [] String);
+  fieldText value = FieldEncoding (stringLength value) ((:) value);
+  frameFields = let {
+    framed (FieldEncoding size chunks) (FieldEncoding n remaining) = let {
+      count = showInt size
+    } in FieldEncoding (stringLength count + 1 + size + n)
+      (\tail -> (:) count ((:) ":" (chunks (remaining tail))))
+  } in foldr framed (FieldEncoding 0 (\tail -> tail));
+  frameNode tag fields = frameFields ((:) (fieldText tag) fields);
+  typeEncoding ty = let {
+    text = fieldText;
+    form = frameNode;
+    encoded = typeEncoding
+  } in case ty of {
+    XVar (XTyVar n) -> form "variable" [text (showInt n)];
+    XBot -> form "bottom" [];
+    XBotKind k -> form "bottom-kind" [text (encodeKind k)];
+    XArrow a b -> form "arrow" [encoded a,encoded b];
+    XCon n args -> form "constructor" [text n,frameFields (map encoded args)];
+    XApply a b -> form "application" [encoded a,encoded b];
+    XForall (XTyVar n) bound body -> form "forall" [text (showInt n),encoded bound,encoded body]
+  };
   normalizeXType :: XType -> XType;
   normalizeXType ty =
     case ty of {

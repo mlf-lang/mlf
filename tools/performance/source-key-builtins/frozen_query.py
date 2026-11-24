@@ -5,6 +5,8 @@ import hashlib
 _NAMED_TYPES_SHA256 = '7fd4bc9f8459459a4c3ad54da44d56bad274847e4b1af5365b1949d69793906e'
 _DICTIONARY_TYPES_SHA256 = '9c6790a0469b6e6de6ac44bc39535f15fbed27cc283e4840cc3df4a34bc54964'
 _PRIMITIVE_OPERAND_TYPES_SHA256 = 'c87f0e9e1dc675f324ecbcf5667a4f5761a30c9e16281ff19b38e925fd08d502'
+# Only XTerm was extended; the frozen encoder consumes SExpr and SPattern.
+_PROJECTION_SPINES_TYPES_SHA256 = 'dea89ecf8b8fbecdd7ba20e8b444eb8ba73a96fc75d34003c22aac1c443231f2'
 
 
 def prepare_frozen_query(source: Path, out_dir: Path, *, expected_sha256: str, types_source: Path) -> Path:
@@ -14,7 +16,8 @@ def prepare_frozen_query(source: Path, out_dir: Path, *, expected_sha256: str, t
     types_sha256 = hashlib.sha256(types_source.read_bytes()).hexdigest()
     if types_sha256 == _NAMED_TYPES_SHA256:
         dictionary_nodes = []
-    elif types_sha256 in (_DICTIONARY_TYPES_SHA256, _PRIMITIVE_OPERAND_TYPES_SHA256):
+    elif types_sha256 in (_DICTIONARY_TYPES_SHA256, _PRIMITIVE_OPERAND_TYPES_SHA256,
+                          _PROJECTION_SPINES_TYPES_SHA256):
         dictionary_nodes = [b'SApplyDictionaries _ _', b'SBindDictionaries _ _']
     else:
         raise ValueError(f'Unsupported Bootstrap.Types source SHA-256 {types_sha256}: {types_source}')

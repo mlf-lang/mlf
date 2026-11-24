@@ -9,9 +9,11 @@ module Bootstrap.ArtifactStructure where {
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.IntSet as IS;
+  import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.Bitstream as W;
+  import qualified Bootstrap.X.Syntax as X;
 
   -- Closed, versioned structural schema over the shared binary symbol/node DAG.
   -- Tags are explicit ABI numbers, never constructor ordinals. All lists retain
@@ -193,6 +195,50 @@ module Bootstrap.ArtifactStructure where {
   };
   fromXType :: W.Value -> Either String XType;
   fromXType value = S.bindEither (decodeValue ShapeXType value) expectXType;
+  -- Open interfaces can store a run of independent argument binders and
+  -- bounded results as a flat array. Reference digests still use toXType.
+  toStoredXType ty = let {
+    same (XTyVar a) (XTyVar b) = a == b;
+    collect current reversed = case current of {
+      XForall a XBot (XForall r following (XArrow (XVar input) (XVar result))) ->
+        if same a input && same r result then collect following ((:) r ((:) a reversed))
+        else (,) reversed current;
+      _ -> (,) reversed current
+    }
+  } in case collect ty [] of {
+    (,) rows@((:) _ ((:) _ ((:) _ _))) tail -> let {
+      ids = S.map (\(XTyVar id) -> id) (S.reverse rows)
+    } in case packedIntegers ids of {
+      Just column -> W.VNode 99 [toText column,toXType tail];
+      Nothing -> W.VNode 96 [toList toInt ids,toXType tail]
+    };
+    _ -> toXType ty
+  };
+  -- Retain the work charge for each identity through its decimal bytes.
+  -- Keep short and unusually large columns on the ordinary list path.
+  packedColumn encode values = let { size = S.length values } in
+    if size < 16 || size > 4096 then Nothing else let {
+      text = Separate.pack (S.map encode values)
+    } in if stringUtf8Length text <= 65536 then Just text else Nothing;
+  packedIntegers = packedColumn showInt;
+  decodeColumn text = do {
+    S.ensure (stringUtf8Length text <= 65536) "packed syntax column byte limit exceeded";
+    values <- Separate.unpack text;
+    S.ensure (S.length values <= 4096) "packed syntax column item limit exceeded";
+    Right values
+  };
+  decodeIntegerColumn text = let {
+    decimal field = let {
+      size = stringLength field;
+      start = if size > 0 && stringCodeAt field 0 == 45 then 1 else 0
+    } in if size <= start || size > 20 || Separate.digitEnd field start /= size
+      then malformed "packed syntax integer"
+      else let { n = readInt field } in if eqString field (showInt n)
+        then Right n else malformed "packed syntax integer"
+  } in do {
+    values <- decodeColumn text;
+    S.mapM decimal values
+  };
 
   toXComputation :: XComputation -> W.Value;
   toXComputation value = case value of {
@@ -228,10 +274,91 @@ module Bootstrap.ArtifactStructure where {
     XPrimitive x0 x1 -> W.VNode 81 [toPrimitive x0, (toList toXType) x1];
     XConstructor x0 x1 -> W.VNode 82 [toText x0, (toList toXType) x1];
     XCase x0 x1 x2 -> W.VNode 83 [toXTerm x0, toXType x1, (toList toXAlternative) x2];
-    XWithData x0 x1 -> W.VNode 84 [(toList toDataDecl) x0, toXTerm x1]
+    XWithData x0 x1 -> W.VNode 84 [(toList toDataDecl) x0, toXTerm x1];
+    XProjection rows selected -> case projectionColumns rows of {
+      Just ((,) hints ids) -> case (,) (packedColumn S.id hints) (packedIntegers ids) of {
+        (,) (Just labels) (Just integers) -> W.VNode 98 [toText labels,toText integers,toXName selected];
+        _ -> W.VNode 97 [toList toText hints,toList toInt ids,toXName selected]
+      };
+      Nothing -> W.VNode 94 [toList (toTriple toXName toXTyVar (toMaybe toXTyVar)) rows,toXName selected]
+    };
+    XInstantiationSpine head rows -> case instantiationColumns rows of {
+      Just fields -> W.VNode 93 ((:) (toXName head) fields);
+      Nothing -> W.VNode 95 [toXName head,toList (toTriple toText toBool toXTerm) rows]
+    }
   };
   fromXTerm :: W.Value -> Either String XTerm;
   fromXTerm value = S.bindEither (decodeValue ShapeXTerm value) expectXTerm;
+  -- An operand may share a small applicative head and supply its own final
+  -- integer argument. Intern the heads once, preserving the original order.
+  equalPackedHead :: Int -> XTerm -> XTerm -> Bool;
+  equalPackedHead depth a b = if depth == 0 then False else case (,) a b of {
+    (,) (XVarTerm (XName i x)) (XVarTerm (XName j y)) -> i == j && eqString x y;
+    (,) (XPrimitive p []) (XPrimitive q []) -> primitiveCode p == primitiveCode q;
+    (,) (XConstructor p []) (XConstructor q []) -> eqString p q;
+    (,) (XIntTerm i) (XIntTerm j) -> i == j;
+    (,) (XApp f x) (XApp g y) -> equalPackedHead (depth - 1) f g && equalPackedHead (depth - 1) x y;
+    _ -> False
+  };
+  instantiationColumns rows = let {
+    collect pending heads count tags controls literals = case pending of {
+      [] -> do {
+        types <- packedColumn S.id (S.reverse tags);
+        indices <- packedIntegers (S.reverse controls);
+        let { arguments = Separate.pack (S.map showInt (S.reverse literals)) };
+        if stringUtf8Length arguments <= 65536 then
+          Just [toList (\((,) _ term) -> toXTerm term) (S.reverse heads),toText types,toText indices,toText arguments]
+          else Nothing
+      };
+      (:) ((,,) tag result arg) rest -> let {
+        parts = case arg of { XApp fn (XIntTerm n) -> (,) fn (Just n); _ -> (,) arg Nothing };
+        head = S.fst parts;
+        literal = S.snd parts;
+        emit index known next = let { base = 4 * index + (if result then 2 else 0) } in
+          case literal of {
+            Nothing -> collect rest known next ((:) tag tags) ((:) base controls) literals;
+            Just n -> collect rest known next ((:) tag tags) ((:) (base + 1) controls) ((:) n literals)
+          }
+      } in case S.find (\((,) _ term) -> equalPackedHead 4 head term) heads of {
+        Just ((,) index _) -> emit index heads count;
+        Nothing -> if count < 16 && equalPackedHead 4 head head then
+          emit count ((:) ((,) count head) heads) (count + 1) else Nothing
+      }
+    }
+  } in if S.length rows > 4096 then Nothing else collect rows [] 0 [] [] [];
+  instantiationFromColumns heads types indices arguments = let {
+    terms = V.fromList heads;
+    invalid = malformed "packed instantiation columns";
+    collect tags controls literals reversed = case (,) tags controls of {
+      (,) [] [] -> if S.null literals then Right (S.reverse reversed) else invalid;
+      (,) ((:) tag more) ((:) code following) -> let {
+        index = quotInt code 4; flags = remInt code 4
+      } in if code < 0 || index >= V.count terms then invalid else let {
+        head = V.at terms (V.fromInt index);
+        append arg tail = collect more following tail ((:) ((,,) tag (flags >= 2) arg) reversed)
+      } in if remInt flags 2 == 0 then append head literals else case literals of {
+        (:) n tail -> append (XApp head (XIntTerm n)) tail;
+        _ -> invalid
+      };
+      _ -> invalid
+    }
+  } in if S.length heads > 16 || S.not (S.all (\term -> equalPackedHead 4 term term) heads) then invalid
+       else collect types indices arguments [];
+  projectionColumns rows = case rows of {
+    [(,,) (XName name hint) (XTyVar a) Nothing] -> Just ((,) [hint] [name,a]);
+    (:) ((,,) (XName name hint) (XTyVar a) (Just (XTyVar r))) rest ->
+      S.mapOptional (\((,) hints ids) -> (,) ((:) hint hints) ((:) name ((:) a ((:) r ids))))
+        (projectionColumns rest);
+    _ -> Nothing
+  };
+  projectionFromColumns hints ids = let {
+    collect names remaining reversed = case (,) names remaining of {
+      (,) [hint] [name,a] -> Right (S.reverse ((:) ((,,) (XName name hint) (XTyVar a) Nothing) reversed));
+      (,) ((:) hint more@((:) _ _)) ((:) name ((:) a ((:) r next))) ->
+        collect more next ((:) ((,,) (XName name hint) (XTyVar a) (Just (XTyVar r))) reversed);
+      _ -> malformed "packed projection columns"
+    }
+  } in collect hints ids [];
 
   toXPattern :: XPattern -> W.Value;
   toXPattern value = case value of {
@@ -478,8 +605,10 @@ module Bootstrap.ArtifactStructure where {
   fromUnitInterface value = S.bindEither (decodeValue ShapeUnitInterface value) expectUnitInterface;
 
   toCrateInterfaceFields :: CrateInterfaceFields -> W.Value;
-  toCrateInterfaceFields value = case value of {
-    CrateInterfaceFields x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 -> W.VNode 242 [toText x0, (toList (toTriple toText toText toText)) x1, (toList toText) x2, (toList (toPair toText (toList toEntity))) x3, (toList (toPair toText (toList toText))) x4, (toList toDataDecl) x5, (toList toSClassDecl) x6, (toList (toPair toText toInterfaceInstance)) x7, (toList toDataDecl) x8, (toList (toPair toText toXType)) x9, toText x10, toText x11, (toList (toPair toText toBool)) x12]
+  toCrateInterfaceFields = encodeCrateInterfaceFields toXType;
+  toStoredCrateInterfaceFields = encodeCrateInterfaceFields toStoredXType;
+  encodeCrateInterfaceFields encodeType value = case value of {
+    CrateInterfaceFields x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 -> W.VNode 242 [toText x0, (toList (toTriple toText toText toText)) x1, (toList toText) x2, (toList (toPair toText (toList toEntity))) x3, (toList (toPair toText (toList toText))) x4, (toList toDataDecl) x5, (toList toSClassDecl) x6, (toList (toPair toText toInterfaceInstance)) x7, (toList toDataDecl) x8, (toList (toPair toText encodeType)) x9, toText x10, toText x11, (toList (toPair toText toBool)) x12]
   };
   -- Share the ordinary encoding's field values, but let metadata receipts
   -- keep binding types in their compact typed form. Splitting at field 9 keeps
@@ -1975,6 +2104,15 @@ module Bootstrap.ArtifactStructure where {
             scheduleFields remaining 46 [(,) ShapeXTyVar x0, (,) ShapeXType x1, (,) ShapeXType x2] rest values memo;
           _ -> malformed "XForall arity"
         }
+        else if tag == 96 then case fields of {
+          [rows,tail] -> scheduleFields remaining 96
+            [(,) (ShapeList ShapeInt) rows,(,) ShapeXType tail] rest values memo;
+          _ -> malformed "bounded arrow spine arity"
+        }
+        else if tag == 99 then case fields of {
+          [rows,tail] -> scheduleFields remaining 99 [(,) ShapeText rows,(,) ShapeXType tail] rest values memo;
+          _ -> malformed "packed bounded arrow spine arity"
+        }
         else malformed "XType tag";
       _ -> malformed "XType"
     };
@@ -2105,6 +2243,34 @@ module Bootstrap.ArtifactStructure where {
           [x0, x1] ->
             scheduleFields remaining 84 [(,) (ShapeList ShapeDataDecl) x0, (,) ShapeXTerm x1] rest values memo;
           _ -> malformed "XWithData arity"
+        }
+        else if tag == 93 then case fields of {
+          [name,table,types,indices,literals] -> scheduleFields remaining 93
+            [(,) ShapeXName name,(,) (ShapeList ShapeXTerm) table,
+             (,) ShapeText types,(,) ShapeText indices,(,) ShapeText literals] rest values memo;
+          _ -> malformed "packed instantiation arity"
+        }
+        else if tag == 94 then case fields of {
+          [rows,selected] -> scheduleFields remaining 94
+            [(,) (ShapeList (ShapeTriple ShapeXName ShapeXTyVar (ShapeMaybe ShapeXTyVar))) rows,
+              (,) ShapeXName selected] rest values memo;
+          _ -> malformed "XProjection arity"
+        }
+        else if tag == 95 then case fields of {
+          [head,rows] -> scheduleFields remaining 95
+            [(,) ShapeXName head, (,) (ShapeList (ShapeTriple ShapeText ShapeBool ShapeXTerm)) rows]
+            rest values memo;
+          _ -> malformed "XInstantiationSpine arity"
+        }
+        else if tag == 97 then case fields of {
+          [hints,ids,selected] -> scheduleFields remaining 97
+            [(,) (ShapeList ShapeText) hints,(,) (ShapeList ShapeInt) ids,(,) ShapeXName selected] rest values memo;
+          _ -> malformed "packed projection arity"
+        }
+        else if tag == 98 then case fields of {
+          [hints,ids,selected] -> scheduleFields remaining 98
+            [(,) ShapeText hints,(,) ShapeText ids,(,) ShapeXName selected] rest values memo;
+          _ -> malformed "projection text columns arity"
         }
         else malformed "XTerm tag";
       _ -> malformed "XTerm"
@@ -2876,6 +3042,23 @@ module Bootstrap.ArtifactStructure where {
       };
       _ -> malformed "typed XForall assembly"
     }
+    else if tag == 96 || tag == 99 then case fields of {
+      [rows,tail] -> do {
+        ids <- if tag == 96 then expectList expectInt rows else expectText rows >>= decodeIntegerColumn;
+        base <- expectXType tail;
+        let { build remaining = case remaining of {
+          [] -> Right base;
+          (:) argument ((:) result rest) -> do {
+            following <- build rest;
+            let { a = XTyVar argument; r = XTyVar result };
+            Right (XForall a XBot (XForall r following (XArrow (XVar a) (XVar r))))
+          };
+          _ -> malformed "bounded arrow spine pairs"
+        } };
+        S.mapEither DecodedXType (build ids)
+      };
+      _ -> malformed "typed bounded arrow spine assembly"
+    }
     else if tag == 50 then case fields of {
       [] -> Right (DecodedXComputation XRefl);
       _ -> malformed "typed XRefl assembly"
@@ -3054,6 +3237,48 @@ module Bootstrap.ArtifactStructure where {
         Right (DecodedXTerm (XWithData y0 y1))
       };
       _ -> malformed "typed XWithData assembly"
+    }
+    else if tag == 93 then case fields of {
+      [head,table,types,indices,literals] -> do {
+        name <- expectXName head;
+        heads <- expectList expectXTerm table;
+        tags <- expectText types >>= decodeColumn;
+        controls <- expectText indices >>= decodeIntegerColumn;
+        arguments <- expectText literals >>= decodeIntegerColumn;
+        S.mapEither (\rows -> DecodedXTerm (XInstantiationSpine name rows))
+          (instantiationFromColumns heads tags controls arguments)
+      };
+      _ -> malformed "typed packed instantiation assembly"
+    }
+    else if tag == 94 then case fields of {
+      [rows,selected] -> do {
+        binders <- expectList (expectTriple expectXName expectXTyVar (expectMaybe expectXTyVar)) rows;
+        name <- expectXName selected;
+        _ <- X.projectionParts binders name;
+        Right (DecodedXTerm (XProjection binders name))
+      };
+      _ -> malformed "typed XProjection assembly"
+    }
+    else if tag == 95 then case fields of {
+      [head,rows] -> do {
+        name <- expectXName head;
+        arguments <- expectList (expectTriple expectText expectBool expectXTerm) rows;
+        S.ensure (S.all (\((,,) _ _ operand) -> X.plainSpineOperand operand) arguments)
+          "instantiation spine operand contains a proof";
+        Right (DecodedXTerm (XInstantiationSpine name arguments))
+      };
+      _ -> malformed "typed XInstantiationSpine assembly"
+    }
+    else if tag == 97 || tag == 98 then case fields of {
+      [hints,ids,selected] -> do {
+        names <- if tag == 97 then expectList expectText hints else expectText hints >>= decodeColumn;
+        integers <- if tag == 97 then expectList expectInt ids else expectText ids >>= decodeIntegerColumn;
+        name <- expectXName selected;
+        binders <- projectionFromColumns names integers;
+        _ <- X.projectionParts binders name;
+        Right (DecodedXTerm (XProjection binders name))
+      };
+      _ -> malformed "typed packed projection assembly"
     }
     else if tag == 90 then case fields of {
       [x0, x1] -> do {

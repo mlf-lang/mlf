@@ -5,6 +5,7 @@
 module Bootstrap.X.Pretty where {
   import MLF.Primitive;
   import Bootstrap.Types;
+  import qualified Bootstrap.X.Syntax as X;
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Data as D;
   import qualified Bootstrap.Primitive as P;
@@ -52,6 +53,8 @@ module Bootstrap.X.Pretty where {
         parenthesize (p > 0)
           ("\\(" ++ (name n ++ (" : " ++ (prettyType ty ++ (") -> " ++ termAt 0 b)))));
       XApp f a -> parenthesize (p > 1) (termAt 1 f ++ (" " ++ termAt 2 a));
+      XProjection rows selected -> termAt p (X.expandProjection rows selected);
+      XInstantiationSpine name rows -> termAt p (X.expandInstantiationSpine name rows);
       XTypeAbs a bound b ->
         parenthesize (p > 0)
           ("/\\(" ++ (variable a ++ (" >= " ++ (prettyType bound ++ (") -> " ++ termAt 0 b)))));
@@ -138,6 +141,22 @@ module Bootstrap.X.Pretty where {
     XVarTerm n -> nameChunks n rest;
     XAbs n ty b -> parenthesized (p > 0) (\tail -> (:) "\\(" (nameChunks n ((:) " : " (typeChunks 0 ty ((:) ") -> " (termChunks 0 b tail)))))) rest;
     XApp f a -> parenthesized (p > 1) (\tail -> termChunks 1 f ((:) " " (termChunks 2 a tail))) rest;
+    XProjection rows selected -> termChunks p (X.expandProjection rows selected) rest;
+    XInstantiationSpine name rows -> let {
+      operands remaining tail = case remaining of {
+        [] -> tail;
+        (:) ((,,) tag result arg) next -> (:) "[inner(bot(" ((:) tag
+          ((:) (if result then ")); elim; elim] " else ")); elim] ")
+            (termChunks 2 arg (case next of {
+              [] -> tail;
+              _ -> (:) ")" (operands next tail)
+            }))))
+      }
+    } in case rows of {
+      [] -> nameChunks name rest;
+      (:) _ following -> parenthesized (p > 1) (\tail ->
+        L.foldr (\_ chunks -> (:) "(" chunks) (nameChunks name (operands rows tail)) following) rest
+    };
     XTypeAbs a bound b -> parenthesized (p > 0) (\tail -> (:) "/\\(" ((:) (variable a) ((:) " >= " (typeChunks 0 bound ((:) ") -> " (termChunks 0 b tail)))))) rest;
     XTypeApp a phi -> termChunks 2 a ((:) "[" (computationChunks phi ((:) "]" rest)));
     XLet n a b -> parenthesized (p > 0) (\tail -> (:) "let " (nameChunks n ((:) " = " (termChunks 0 a ((:) " in " (termChunks 0 b tail)))))) rest;

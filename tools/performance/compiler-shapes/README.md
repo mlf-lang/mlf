@@ -3,8 +3,8 @@
 This benchmark compiles **the same generated shared-Haskell source bytes** with GHC
 and with GHC-hosted MLF, starting from fresh target outputs and ending at a native
 executable. The standard matrix covers 25 program shapes at sizes 8, 32, 128,
-1,024 and 8,192, plus one shared zero-size baseline. Two pairs per cell schedule
-504 native compilations. Each reported time is the median for one
+1,024 and 8,192, plus one shared zero-size baseline. Two rounds of three compilers per cell schedule
+756 native compilations. Each reported time is the median for one
 compiler, shape and size.
 
 It is **not** the C/MLF Benchmarks Game. The [native benchmark runner](../../bench/README.md)
@@ -14,6 +14,19 @@ own programs, has no application inputs, and reports per-shape compilation ratio
 rather than workload gates.
 
 The [21 November 2026 comparison](../../../docs/compiler-shapes-2026-11-21.md) reports elapsed time, peak memory and incomplete builds for the 25-shape standard matrix.
+
+The optional `--endpoint crate-bootstrap-production-v1` uses the same two
+crate stages as `crate-bootstrap-v1`. It queries each measured MLF compiler
+for its production LLVM flags using the selected Clang target triple.
+Historical drivers without this query used plain Clang for native executables.
+The plan records each lane's flags and every build records its Clang command.
+Compare cohorts within the same endpoint. The GHC command is identical across
+both endpoints.
+
+Use `--endpoint crate-bootstrap-cached-production-v1` to measure checking,
+LLVM cache publication, and native linking together. Each leg writes its own
+code generation cache. After timing, the harness checks both cache misses,
+the producer identity, and the SHA-256 of the emitted and cached LLVM.
 
 ## Compile endpoint
 
@@ -105,30 +118,62 @@ python3 tools/dev.py bench shapes --workdir .mlf-build/selected-shapes \
 ```
 
 `--family` and `--size` each accept repeated values and replace their respective
-defaults. Each cell uses two pairs by default, with one MLF and one GHC build
-per pair. Set `--repeats` for a larger cohort. Add
+defaults. Each measured round builds with the candidate MLF, a committed MLF
+baseline and GHC. The candidate runs between the controls, reversing their
+order each round. Set `--repeats` for a larger cohort. Add
 `--prune-build-products` to a sweep to remove verified native executables and
 GHC target objects from successful cells after checking them. The receipts,
 sources and per-cell measurements remain available.
 
+### Committed compiler baseline
+
+The benchmark reads the Git state of the checkout that built the candidate.
+With staged, unstaged, or nonignored untracked changes, it compares the
+working tree to its current HEAD. With a clean checkout it compares HEAD to
+its first parent, including for merge commits. A clean initial commit can
+still run the GHC comparison. Shallow CI checkouts need at least two commits.
+The zero-size workload `baseline-0` supplies the intercept for both comparisons.
+
+Preparation builds the selected commit with the same GHC and optimization
+level and records the baseline compiler's SHA-256. The plan and summary
+record the selection rule and both Git SHAs. Each compiler builds the same
+generated sources, with fresh target and code-generation outputs. The
+`mlf_over_reference` column is below 1 when the candidate is faster than
+the committed compiler. A sweep fixes the baseline across its cells.
+The nine checks are reported against each control when enough sizes are
+available. Previously recorded two-compiler cohorts retain their GHC results.
+
 ### Build performance checks
 
-The sweep, `bench.py run`, `bench.py all` and `bench.py analyze` report seven
+The sweep, `bench.py run`, `bench.py all` and `bench.py analyze` report nine
 checks for each selected family. The time and memory measurements cover the
 same fresh native build, including linking. The executable runs are untimed
 correctness checks.
 
-1. MLF's median wall time is lower at every measured positive size.
+1. MLF's median wall time is lower at every measured positive size against GHC. For the committed compiler comparison, use the largest measured positive size. The slope, exponent and interval checks use the full size series for both comparators.
 2. MLF's least-squares slope is lower across all measured sizes.
 3. MLF's endpoint slope is lower from zero to the largest measured size.
-4. MLF's exponent `p` is lower in the fitted model `a + b*(n/nmax)^p`.
+4. MLF's exponent `p` is at most GHC's in the fitted model `a + b*(n/nmax)^p`.
 5. The paired 95% interval for the slope difference (MLF minus GHC) lies below zero.
-6. The paired 95% interval for the exponent difference lies below zero.
-7. MLF's median sampled peak build process-group RSS is at most GHC's at every measured positive size.
+6. The upper endpoint of the paired 95% interval for the exponent difference is at most zero.
+7. MLF's median sampled peak build process-group RSS is at most the comparator's at the largest measured positive size. Smaller sizes still contribute to the two RSS growth checks.
+8. The OLS slope of median peak build RSS in MiB per size unit is at most GHC’s.
+9. The upper endpoint of the paired 95% interval for the RSS slope difference
+   (MLF minus GHC) is at most zero.
 
-Passing requires all seven checks and both exponent fits in the interior
-[0.101, 2.999]. A boundary fit leaves the exponent checks unresolved and the
-report `indeterminate`. Missing or failed measurements yield `incomplete`.
+The memory slopes include the zero-size build. Resample adjacent MLF/GHC
+build pairs within each size, using the same seed and count as the timing
+checks. A missing peak at any size leaves the growth checks incomplete. A
+failed or OOM build cannot contribute a successful memory observation.
+These metrics measure whole-build RSS. Profiling cumulative allocations and
+live bytes after a major collection requires separate runtime measurements.
+
+Passing requires all nine checks. Compare the unrounded fitted exponents,
+including ties at the search bounds. For example, two fits at the upper bound
+of 3 tie on check 4. Check 6 uses the same non-strict ordering for the upper
+endpoint of the interval. These checks describe the constrained fits over the
+measured sizes. The report labels estimates below 0.101 or above 2.999 as
+boundary fits. A zero fitted growth scale leaves the exponent indeterminate. Missing or failed measurements yield `incomplete`.
 The intervals use 2,000 bootstrap resamples of adjacent MLF/GHC pairs within
 each size. The estimates describe the measured range. Two pairs give quick
 feedback. Use a larger repeat count for confirmation. The analysis uses only
@@ -142,7 +187,7 @@ The multi-crate `retained_curried_job_list` family can use
 Its zero cell builds the same two libraries and entry from fresh source with
 an empty job list. This keeps fixed dependency compilation present across the
 slope fit. Use this baseline when running only that family with the crate plan
-endpoint. The seven checks and paired resampling are the same.
+endpoint. The nine checks and paired resampling are the same.
 
 Independently recorded runs keep their own checks. A sweep uses its verified
 per-cell pairs under the same setup. `bench.py run` and the direct `run.py`
@@ -153,8 +198,9 @@ include the checks in their Markdown and JSON summaries.
 Each peak is the largest sampled sum of resident bytes across the build
 process group. The monitor samples about every 100 ms and may miss short
 peaks. A missing or zero RSS observation leaves that compiler's median
-unavailable for the cell. At a positive size this makes the memory check
-incomplete, while qualified build timings remain available. The reports
+unavailable for the cell. A missing paired observation at any fitted size makes
+the RSS growth checks incomplete. A missing median at the largest size also
+leaves the absolute peak comparison incomplete. The reports
 show each compiler's median peak RSS and the MLF/GHC ratio by size.
 
 ```sh
@@ -163,7 +209,7 @@ python3 tools/dev.py bench shapes --workdir .mlf-build/fanout-growth \
 ```
 
 For a single cohort, `--interleave-pairs` spreads sizes across rounds and keeps
-the two compilers adjacent. To read just the checks from an existing cohort,
+the candidate adjacent to both controls. To read just the checks from an existing cohort,
 pass its directory and `--family` to `fit_growth.py`.
 
 ```sh
@@ -188,8 +234,8 @@ nonnegative offset and scale in `a + b*(n/nmax)^p` from medians at 8, 32, 128,
 1,024 and 8,192. The published table uses six pairs per size. Sweep analysis
 uses the pair count in the recorded plans. The `met` and `higher` outcomes
 compare the unrounded MLF and GHC point
-exponents. An estimate outside the fitter’s interior [0.101, 2.999] or a
-zero growth scale yields `indeterminate`. Missing or failed standard cells
+exponents. Equal fitted values, including ties at a boundary, yield `met`.
+A zero growth scale yields `indeterminate`. Missing or failed standard cells
 yield `incomplete`. The compiler columns identify the measured binary and
 producer receipt. Published rows also supply its Git revision.
 
@@ -374,7 +420,7 @@ the index mapping or closure and must be re-measured, not retroactively filled i
   `recursive_ring`, `wide_case`, `class_instances`, `dependency_diamonds`,
   `state_updates`, `captured_closures`, `wide_product`, `rank2_arguments`,
   `irregular_literal_table`, `nested_poly_types`, `rank2_callbacks` and `decoder_pipeline`.
-  Two pairs per cell give 52 timed compilations in one cohort. CI
+  Two rounds per cell give 78 timed compilations in one cohort. CI
   uploads the available receipts and measurements even if a build fails.
 - The manual `.github/workflows/compiler-shapes.yml` workflow runs the standard
   sweep. Dispatch inputs can filter families and sizes or set the repeat count.

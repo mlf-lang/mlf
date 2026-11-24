@@ -295,6 +295,8 @@ module Bootstrap.Types where {
     XAbs XName XType XTerm |
     XApp XTerm XTerm |
     XTypeAbs XTyVar XType XTerm |
+    XProjection ([] ((,,) XName XTyVar (Maybe XTyVar))) XName |
+    XInstantiationSpine XName ([] ((,,) String Bool XTerm)) |
     XTypeApp XTerm XComputation |
     XLet XName XTerm XTerm |
     XLetRec ([] ((,,) XName XType XTerm)) XTerm |

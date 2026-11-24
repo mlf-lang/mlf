@@ -768,6 +768,7 @@ module Bootstrap.InferenceUnit where {
     GroundQuantifiedUse XName GroundEvidence ([] ((,) XTyVar GroundType)) |
     GroundPrimitive Primitive ([] GroundType) | GroundLambda XName GroundType GroundTerm |
     GroundApplication GroundTerm GroundTerm | GroundTypeUse GroundTerm GroundType | GroundBoundUse GroundTerm |
+    GroundProjectionApplication XName ([] ((,,) GroundType Bool GroundTerm)) |
     GroundConstructor String ([] GroundType) |
     GroundCase GroundTerm GroundType ([] ((,) XPattern GroundTerm)) |
     GroundLet XName GroundTerm GroundTerm |
@@ -1027,6 +1028,68 @@ module Bootstrap.InferenceUnit where {
       groundEvidence solved source arguments
     }
   };
+  -- Recover the whole instantiation spine before building individual
+  -- XTypeApps. A compact call still carries each operand and its exact proof.
+  sealGroundSpine gamma state root = let {
+    collect term pending = case term of {
+      GroundApplication (GroundBoundUse (GroundTypeUse head ty)) operand ->
+        collect head ((:) ((,,) ty True operand) pending);
+      GroundApplication (GroundTypeUse head ty) operand ->
+        collect head ((:) ((,,) ty False operand) pending);
+      GroundLiteral (XVarTerm name) -> case pending of {
+        (:) _ ((:) _ _) -> do {
+          let { prepare ((,,) ty eliminate operand) = case groundClosed state ty of {
+            Right (XCon tag []) -> case groundSealIn gamma state operand of {
+              Right arg -> if X.plainSpineOperand arg then Just ((,,) tag eliminate arg) else Nothing;
+              _ -> Nothing
+            };
+            _ -> Nothing
+          } };
+          mapOptional (XInstantiationSpine name) (mapM prepare pending)
+        };
+        _ -> Nothing
+      };
+      _ -> Nothing
+    }
+  } in collect root [];
+  -- The saturated route already has the instantiation rows. Keep their
+  -- operands in source order and expand only when a row needs general proof.
+  sealGroundProjection gamma state name rows = let {
+    applyRow result ty eliminate operand = let {
+      witness = X.instantiate result (X.typeApplication ty)
+    } in XApp (if eliminate then X.instantiate witness XElim else witness) operand;
+    close ((,,) ty eliminate operand) = do {
+      actual <- groundClosed state ty;
+      sealed <- groundSealIn gamma state operand;
+      Right ((,,) actual eliminate sealed)
+    };
+    expanded result pending = case pending of {
+      [] -> Right result;
+      (:) row rest -> do {
+        (,,) ty eliminate operand <- close row;
+        expanded (applyRow result ty eliminate operand) rest
+      }
+    };
+    collect packed pending = case pending of {
+      [] -> Right (XInstantiationSpine name (reverse packed));
+      (:) row rest -> do {
+        (,,) ty eliminate operand <- close row;
+        let {
+          prefix = case packed of {
+            [] -> XVarTerm name;
+            [(,,) tag drops value] -> applyRow (XVarTerm name) (XCon tag []) drops value;
+            _ -> XInstantiationSpine name (reverse packed)
+          };
+          ordinary = expanded (applyRow prefix ty eliminate operand) rest
+        };
+        case ty of {
+          XCon tag [] -> if X.plainSpineOperand operand
+            then collect ((:) ((,,) tag eliminate operand) packed) rest else ordinary;
+          _ -> ordinary
+        }
+      }
+    }
+  } in collect [] rows;
   groundSeal = groundSealIn M.empty;
   groundSealIn gamma state term = case term of {
     GroundLiteral value -> Right value;
@@ -1035,7 +1098,11 @@ module Bootstrap.InferenceUnit where {
     GroundQuantifiedUse name (GroundEvidence evidence) arguments -> mapEither (X.instantiate (XVarTerm name)) (evidence state arguments);
     GroundPrimitive primitive arguments -> mapEither (XPrimitive primitive) (traverseEither (groundClosed state) arguments);
     GroundLambda name ty body -> do { actual <- groundClosed state ty; value <- groundSealIn gamma state body; Right (XAbs name actual value) };
-    GroundApplication f a -> do { x <- groundSealIn gamma state f; y <- groundSealIn gamma state a; Right (XApp x y) };
+    GroundApplication f a -> case sealGroundSpine gamma state term of {
+      Just compact -> Right compact;
+      Nothing -> do { x <- groundSealIn gamma state f; y <- groundSealIn gamma state a; Right (XApp x y) }
+    };
+    GroundProjectionApplication name rows -> sealGroundProjection gamma state name rows;
     GroundBoundUse body -> mapEither (\term -> X.instantiate term XElim) (groundSealIn gamma state body);
     GroundTypeUse body argument -> do {
       value <- groundSealIn gamma state body;
@@ -1223,8 +1290,11 @@ module Bootstrap.InferenceUnit where {
   -- subtype before seeing the rest of the actual argument list.
   groundBoundArrow variable bound body = case body of {
     XArrow domain (XVar result) ->
-      if T.equalTyVar variable result && S.null (T.freeVars domain) && monomorphicTarget domain
-      then Just (XArrow domain bound) else Nothing;
+      let { independent = case domain of {
+        XVar input -> not (T.equalTyVar variable input);
+        _ -> S.null (T.freeVars domain) && monomorphicTarget domain
+      } } in if T.equalTyVar variable result && independent
+        then Just (XArrow domain bound) else Nothing;
     _ -> Nothing
   };
   groundImportedApplication context globals names state expression = let {
@@ -1249,7 +1319,32 @@ module Bootstrap.InferenceUnit where {
       XArrow _ body -> nested True body;
       _ -> False
     };
-    apply variables actual ty arguments following = case ty of {
+    instantiateArgument eliminate actual ty = let { prepared = GroundTypeUse actual ty }
+      in if eliminate then GroundBoundUse prepared else prepared;
+    argumentType independent variables actual tail rest following =
+      case rest of {
+        [] -> Left "direct selector needs a saturated argument";
+        (:) argument remaining -> do {
+          (,,) operand ty solved <- groundInferIn context globals names following argument;
+          let {
+            fn = instantiateArgument (snd independent) actual ty;
+            bindings = M.insert T.compareTyVar (fst independent) ty variables
+          };
+          apply bindings (GroundApplication fn operand) tail remaining solved
+        }
+      };
+    apply variables actual ty arguments following = let {
+      ordinary = applyOrdinary variables actual ty arguments following;
+      solved a result tail = argumentType ((,) a result) variables actual tail arguments following
+    } in if null arguments then ordinary else case ty of {
+      XForall a XBot (XForall r bound (XArrow (XVar input) (XVar output))) ->
+        if T.equalTyVar a input && T.equalTyVar r output && not (T.equalTyVar a r)
+          then solved a True bound else ordinary;
+      XForall a XBot (XArrow (XVar input) result) ->
+        if T.equalTyVar a input then solved a False result else ordinary;
+      _ -> ordinary
+    };
+    applyOrdinary variables actual ty arguments following = case ty of {
       XForall v bound result -> case bound of {
         XBot -> instantiate variables actual v result arguments following;
         XBotKind _ -> instantiate variables actual v result arguments following;
@@ -1273,16 +1368,38 @@ module Bootstrap.InferenceUnit where {
     instantiate variables actual variable result arguments following = case groundFresh following of {
       (,) argument next -> apply (M.insert T.compareTyVar variable argument variables)
         (GroundTypeUse actual argument) result arguments next
+    };
+    direct name scheme arguments = let {
+      root = GroundLiteral (XVarTerm name);
+      ordinary = apply M.empty root scheme arguments state;
+      project selected index answer reversed pending following = case pending of {
+        [] -> case answer of {
+          Just ty -> Right ((,,) (GroundProjectionApplication name (reverse reversed)) ty following);
+          Nothing -> Left "projection does not select an argument"
+        };
+        (:) argument rest -> do {
+          (,,) operand ty solved <- groundInferIn context globals names following argument;
+          let {
+            next = (:) ((,,) ty (not (null rest)) operand) reversed;
+            result = if index == selected then Just ty else answer
+          };
+          project selected (index + 1) result next rest solved
+        }
+      }
+    } in case T.projectionTypeLayout scheme of {
+      Just ((,) width selected) -> if width == length arguments
+        then project selected 0 Nothing [] arguments state else ordinary;
+      Nothing -> ordinary
     }
   } in case spine expression [] of {
     (,) (Just (GroundPrincipalSelector name ty width)) arguments ->
       Just (do {
         ensure (length arguments == width) "inferred selector must be fully applied";
-        apply M.empty (GroundLiteral (XVarTerm name)) ty arguments state
+        direct name ty arguments
       });
     (,) (Just binding) arguments -> case imported binding of {
       Right ((,) name ty) -> if nested False ty then
-        Just (apply M.empty (GroundLiteral (XVarTerm name)) ty arguments state) else Nothing;
+        Just (direct name ty arguments) else Nothing;
       Left _ -> Nothing
     };
     _ -> Nothing
@@ -1670,6 +1787,59 @@ module Bootstrap.InferenceUnit where {
       _ -> if afterArrow && mono t then Just count else Nothing
     }
   } in visit 0 False ty;
+  -- An inferred lambda spine returning one of its own parameters has no
+  -- equations between distinct parameter types. Give each lambda the same
+  -- independent bottom bound and bounded result as ordinary elaboration.
+  groundProjection :: GroundState -> GroundTerm -> Either String ((,) XType XTerm);
+  groundProjection (GroundState next _ _ _) term = let {
+    collect reversed expression = case expression of {
+      GroundLambda name (GroundVar slot) body -> let {
+        result = case body of { GroundLambda _ _ _ -> Just (XTyVar (advanceIdentity next slot)); _ -> Nothing }
+      } in collect ((:) ((,,) name (XTyVar slot) result) reversed) body;
+      GroundLiteral (XVarTerm name) -> do {
+        let { rows = reverse reversed };
+        ensure (case rows of { (:) _ ((:) _ _) -> True; _ -> False })
+          "projection has no bounded result binder";
+        (,) ty _ <- X.projectionParts rows name;
+        Right ((,) ty (XProjection rows name))
+      };
+      _ -> Left "projection requires an unannotated lambda spine"
+    }
+  } in collect [] term;
+  -- The resolved lambda spine supplies all identities needed for this proof.
+  -- Delay construction of the bounded result rows until its width is known.
+  sourceProjection start expression = let {
+    finish count reversed selected = case selected of {
+      Nothing -> Nothing;
+      Just ((,,) _ name _) -> if count < 2 then Nothing else let {
+        binders pending = case pending of {
+          [] -> [];
+          (:) ((,,) _ binder arg) rest -> let {
+            result = case rest of { [] -> Nothing; _ -> Just (XTyVar (advanceIdentity count arg)) }
+          } in (:) ((,,) binder (XTyVar arg) result) (binders rest)
+        };
+        rows = binders (reverse reversed)
+      } in case X.projectionParts rows name of {
+        Right ((,) ty _) -> Just ((,) ty (XProjection rows name));
+        Left _ -> Nothing
+      }
+    };
+    walk count serial seen reversed term = let {
+      enter identity hint body ids = walk (advanceIdentity count 1) (advanceIdentity serial 1) ids
+        ((:) ((,,) identity (XName serial hint) count) reversed) body
+    } in case term of {
+      SDeclScope [slot] (SLam hint Nothing body) -> let { i = V.toInt slot } in
+        if IS.member i seen then Nothing else enter (Just i) hint body (IS.insert i seen);
+      SLam hint Nothing body -> enter Nothing hint body seen;
+      SCallSite _ _ body -> walk count serial seen reversed body;
+      SSourceDefinition body -> walk count serial seen reversed body;
+      SVar hint -> finish count reversed (find (\((,,) _ name _) -> eqString hint (X.nameHint name)) reversed);
+      SGlobal slot _ -> finish count reversed (find (\((,,) i _ _) -> case i of {
+        Just identity -> identity == V.toInt slot; Nothing -> False
+      }) reversed);
+      _ -> Nothing
+    }
+  } in walk 0 start IS.empty [] expression;
   -- Keep the declared source binding and all use sites; the root is
   -- admitted only if its result and its complete checked term are solved
   -- without any expected type. Every admitted import has rank one.
@@ -1699,10 +1869,18 @@ module Bootstrap.InferenceUnit where {
       };
       env <- Open.environmentUsing known declarations;
       let { datatypes = Open.dataEnvironment env; count = length parameters };
-      (,,) template ty solved <- groundInferIn (GroundContext datatypes []) globals names
-        (GroundState 0 IM.empty IM.empty (count + 1)) rhs;
-      expected <- groundClosed solved ty;
-      implementation <- groundSeal solved template;
+      let { infer = do {
+        (,,) template ty solved <- groundInferIn (GroundContext datatypes []) globals names
+          (GroundState 0 IM.empty IM.empty (count + 1)) rhs;
+        case groundClosed solved ty of {
+          Right closed -> mapEither ((,) closed) (groundSeal solved template);
+          Left reason -> if null parameters then groundProjection solved template else Left reason
+        }
+      } };
+      (,) expected implementation <- case (if null parameters then sourceProjection 1 rhs else Nothing) of {
+        Just proof -> Right proof;
+        Nothing -> infer
+      };
       fragment <- Open.check env ps (XLet (XName count name) implementation (XConstructor "()" []));
       ensure (case Open.bindings fragment of {
         [(,) actual ty] -> eqString (X.nameHint actual) name && T.alphaEq expected ty;
@@ -2079,6 +2257,97 @@ module Bootstrap.InferenceUnit where {
     result <- monomorphicCheck globals names serial ty body;
     Right ((,,) (fst result) ty (snd result))
   };
+  -- Factor nested rank-one applications when each inner call duplicates its
+  -- argument type and each outer call projects that type back. Every call
+  -- remains in order. Local polymorphic helpers check each pair at a fresh
+  -- type, so its proof can be shared across larger enclosing argument types.
+  factorUnaryMember parameters original@((,) owner ((,,) name annotation rhs)) = let {
+    strip term = case term of {
+      SCallSite _ _ body -> strip body;
+      SSourceDefinition body -> strip body;
+      _ -> term
+    };
+    global term = case strip term of {
+      SGlobal slot _ -> Just (V.toInt slot);
+      _ -> Nothing
+    };
+    collect term calls = case term of {
+      SApp f a -> case global f of {
+        Just i -> collect a ((:) ((,) i f) calls);
+        Nothing -> Nothing
+      };
+      leaf -> Just ((,) calls leaf)
+    };
+    scheme slot = mapOptional (\((,,) _ _ ty) -> ty)
+      (find (\((,,) i _ _) -> V.toInt i == slot) parameters);
+    argument v ty = case ty of { XVar w -> T.equalTyVar v w; _ -> False };
+    accepts tag width vars ty = case ty of {
+      XForall v XBot body -> accepts tag width ((:) v vars) body;
+      XArrow (XCon other fields) (XVar result) ->
+        eqString tag other && length fields == width && length vars == width &&
+        S.size (S.fromList T.compareTyVar vars) == width &&
+        and (zipWith argument (reverse vars) fields) && elem T.equalTyVar result vars;
+      _ -> False
+    };
+    paired inner outer = case (,) (scheme inner) (scheme outer) of {
+      (,) (Just (XForall v XBot (XArrow (XVar arg) (XCon tag fields)))) (Just consume) ->
+        T.equalTyVar arg v && length fields >= 2 && all (argument v) fields &&
+        accepts tag (length fields) [] consume;
+      _ -> False
+    };
+    build source calls leaf = let {
+      half = length calls / 2;
+      parts = splitAt half calls;
+      inner = fst parts; outer = snd parts;
+      -- All operators here are resolved globals. Pick a spelling distinct
+      -- from the source argument for the innermost generated reference.
+      local = case strip leaf of { SVar n -> n; _ -> source };
+      prefix = local ++ "$unary";
+      parameter = prefix ++ "Arg";
+      helper i = prefix ++ showInt i;
+      -- Ten nested binary applications already contain 1,024 type leaves.
+      -- Balance the sections and keep the last one inline; each local scheme
+      -- then bounds type growth without producing a lambda per source call.
+      sections = (half + 9) / 10;
+      width = (half + sections - 1) / sections;
+      go i previous rows = let {
+        block = splitAt width rows;
+        applySection base = let {
+          input = foldr (\row arg -> SApp (snd (fst row)) arg) base (fst block);
+          middle = case previous of { Just ref -> SApp ref input; Nothing -> input }
+        } in foldlStrict (\arg row -> SApp (snd (snd row)) arg) middle (fst block)
+      } in case snd block of {
+        [] -> applySection leaf;
+        rest -> let { next = helper i } in SLet next (SLam parameter Nothing (applySection (SVar parameter)))
+          (go (i + 1) (Just (SVar next)) rest)
+      }
+    } in case (,) inner outer of {
+      (,) ((:) f _) ((:) g _) -> if half > 10 && length outer == half &&
+        all (\row -> fst row == fst f) inner && all (\row -> fst row == fst g) outer &&
+        paired (fst f) (fst g) then Just (go 0 Nothing (zip (reverse inner) outer)) else Nothing;
+      _ -> Nothing
+    };
+    lambda slot hint body = do {
+      (,) calls leaf <- collect body [];
+      let { bound = case strip leaf of {
+        SVar n -> eqString n hint;
+        SGlobal i _ -> case slot of { Just j -> V.toInt i == V.toInt j; Nothing -> False };
+        _ -> False
+      } };
+      if bound then build hint calls leaf else Nothing
+    };
+    visit term = case term of {
+      SSourceDefinition body -> mapOptional SSourceDefinition (visit body);
+      SCallSite label span body -> mapOptional (SCallSite label span) (visit body);
+      SDeclScope [slot] (SLam hint Nothing body) ->
+        mapOptional (\next -> SDeclScope [slot] (SLam hint Nothing next)) (lambda (Just slot) hint body);
+      SLam hint Nothing body -> mapOptional (SLam hint Nothing) (lambda Nothing hint body);
+      _ -> Nothing
+    }
+  } in case visit rhs of {
+    Just body -> (,) owner ((,,) name annotation body);
+    Nothing -> original
+  };
   prepareIndexedGroup = prepareIndexedGroupWith Surface.bindIndexedMembers;
   prepareIndexedGroupWith = prepareIndexedGroupIn Nothing;
   prepareIndexedGroupIn known bindMembers parameters datatypes members = do {
@@ -2090,7 +2359,7 @@ module Bootstrap.InferenceUnit where {
     ensure (length externalIds == IS.size (IS.fromList externalIds)) "duplicate inference parameter slot";
     ensure (not (any (\((,) i _) -> elem eqInt (V.toInt i) externalIds) members))
       "inference group also imports its own binding";
-    body <- bindMembers members (SConstructor "()");
+    body <- bindMembers (map (factorUnaryMember parameters) members) (SConstructor "()");
     let { externals = M.map (Separate.sourceSchemeIn M.empty False) externalTypes };
     let { lower program = case known of {
       Nothing -> Surface.lowerSurface program;

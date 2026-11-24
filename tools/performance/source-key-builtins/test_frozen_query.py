@@ -1,4 +1,4 @@
-"""Maintain the historical query bytes across the three pinned host source endpoints."""
+"""Maintain the historical query bytes across the pinned host source endpoints."""
 import hashlib
 import json
 from pathlib import Path
@@ -11,6 +11,7 @@ from frozen_query import prepare_frozen_query
 ROOT = Path(__file__).resolve().parents[3]
 TYPES = Path('libraries/mlf-foundation/Bootstrap/Types.hs')
 BASE = '720dd649627fbf8b19c7447493a4fdf6fd05eb39'
+PRE_SPINES = '265560ef383526c66126a9e79580e39bb4850973'
 DICTIONARY_AST = 'fa863042fe3fe16ca7e0a9d43b43a0d8abe728de'
 DATA = ROOT / 'tools/performance/datatype-context'
 SPARSE = ROOT / 'tools/performance/sparse-contracts'
@@ -29,6 +30,9 @@ class FrozenQueryTests(unittest.TestCase):
                 dictionary = out / 'Dictionary.hs'
                 dictionary.write_bytes(subprocess.check_output(['git', '-C', str(ROOT), 'show',
                                                                 f'{DICTIONARY_AST}:{TYPES.as_posix()}']))
+                pre_spines = out / 'PreSpines.hs'
+                pre_spines.write_bytes(subprocess.check_output(['git', '-C', str(ROOT), 'show',
+                                                                f'{PRE_SPINES}:{TYPES.as_posix()}']))
                 source = folder / 'FrozenCrateQuery.hs'
                 orig = source.read_bytes()
                 oracle = json.loads((folder / 'oracle.json').read_text())
@@ -39,6 +43,8 @@ class FrozenQueryTests(unittest.TestCase):
                 old = prepare_frozen_query(source, out, expected_sha256=pin, types_source=named).read_bytes()
                 new = prepare_frozen_query(source, out, expected_sha256=pin, types_source=ROOT / TYPES).read_bytes()
                 previous = prepare_frozen_query(source, out, expected_sha256=pin, types_source=dictionary).read_bytes()
+                prior = prepare_frozen_query(source, out, expected_sha256=pin, types_source=pre_spines).read_bytes()
+                self.assertEqual(new, prior)
                 self.assertEqual(new, previous)
                 for branch in EXCLUSIONS:
                     self.assertNotIn(branch, old)

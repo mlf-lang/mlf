@@ -81,16 +81,16 @@ module Bootstrap.OpenFragment
   data LinkView = LinkPattern Structure.TermPattern | LinkLambda LinkView |
     LinkLet (Maybe LinkView) (Maybe LinkView) | LinkPublishedRaw;
   data Fragment = Fragment Environment ([] ((,) XName XType)) XTerm
-    ([] ((,) XName XType)) ([] XName) String W.Value (Maybe StoredTerm) (Maybe StoredTerm) (Maybe LinkView);
+    ([] ((,) XName XType)) ([] XName) String (Maybe StoredTerm) (Maybe StoredTerm) (Maybe LinkView);
   fragmentWith env ps term bs used saved =
-    let { raw = Structure.toXTerm term } in Fragment env ps term bs used saved raw (compactTerm term) (compactTermWith spinePattern term) Nothing;
-  context (Fragment env _ _ _ _ _ _ _ _ _) = env;
-  parameters (Fragment _ ps _ _ _ _ _ _ _ _) = ps;
-  body (Fragment _ _ term _ _ _ _ _ _ _) = term;
-  bodyValue (Fragment _ _ _ _ _ _ value _ _ _) = value;
-  fragmentStorage (Fragment _ _ _ _ _ _ _ stored _ _) = stored;
-  fragmentLinkView (Fragment _ _ _ _ _ _ _ _ _ view) = view;
-  fragmentSpineStorage (Fragment _ _ _ _ _ _ _ _ stored _) = stored;
+    Fragment env ps term bs used saved (compactTerm term) (compactTermWith spinePattern term) Nothing;
+  context (Fragment env _ _ _ _ _ _ _ _) = env;
+  parameters (Fragment _ ps _ _ _ _ _ _ _) = ps;
+  body (Fragment _ _ term _ _ _ _ _ _) = term;
+  bodyValue fragment = Structure.toXTerm (body fragment);
+  fragmentStorage (Fragment _ _ _ _ _ _ stored _ _) = stored;
+  fragmentLinkView (Fragment _ _ _ _ _ _ _ _ view) = view;
+  fragmentSpineStorage (Fragment _ _ _ _ _ _ _ stored _) = stored;
   checkedStorageValue fragment = mapOptional snd (selectedStorage True fragment);
   storageValue fragment = mapOptional storedWire (fragmentStorage fragment);
   -- Rows retain variables, ground variable instantiations, primitives, literal
@@ -282,9 +282,9 @@ module Bootstrap.OpenFragment
     XWithData ds b -> node 84 [still (Structure.toList Structure.toDataDecl ds),child b];
     _ -> Nothing
   };
-  bindings (Fragment _ _ _ bs _ _ _ _ _ _) = bs;
-  usedParameters (Fragment _ _ _ _ used _ _ _ _ _) = used;
-  fingerprint (Fragment _ _ _ _ _ stamp _ _ _ _) = stamp;
+  bindings (Fragment _ _ _ bs _ _ _ _ _) = bs;
+  usedParameters (Fragment _ _ _ _ used _ _ _ _) = used;
+  fingerprint (Fragment _ _ _ _ _ stamp _ _ _) = stamp;
   -- The fingerprint frames each field with its Unicode scalar length. Hash
   -- successive pages of pretty-printer output while counting that length,
   -- then prepend the length with the same polynomial composition as pack.
@@ -331,7 +331,41 @@ module Bootstrap.OpenFragment
       _ -> ordinary
     }
   } in case term of { XApp f _ -> select 1 f; _ -> ordinary };
-  termEncoding term = let {
+  -- Preserve the expanded pretty term's fingerprint while sharing its type
+  -- suffix. Each projection binder prints the suffix in the same scope.
+  projectionEncoding rows selected = case find (\((,,) n _ _) -> X.equalName n selected) rows of {
+    Nothing -> termEncodingOrdinary (XProjection rows selected);
+    Just ((,,) _ chosen _) -> let {
+      text = Separate.encodingText;
+      prepend = Separate.encodingConcat;
+      answer = Pretty.variable chosen;
+      step ((,,) name variable result) ((,) ty body) = let {
+        a = Pretty.variable variable;
+        lambda = "\\(" ++ Pretty.name name ++ " : " ++ a ++ ") -> ";
+        generalize = "/\\(" ++ a ++ " >= bot) -> ";
+        prefix = "forall " ++ a ++ ". "
+      } in case result of {
+        Nothing -> (,) (text (prefix ++ a ++ " -> " ++ answer))
+          (text (generalize ++ lambda ++ Pretty.name selected));
+        Just bound -> let { r = Pretty.variable bound } in (,)
+          (prepend [text (prefix ++ "forall (" ++ r ++ " >= "),ty,text ("). " ++ a ++ " -> " ++ r)])
+          (prepend [text (generalize ++ "/\\(" ++ r ++ " >= "),ty,
+            text (") -> " ++ lambda ++ "("),body,text (")[hyp(" ++ r ++ ")]")])
+      }
+    } in snd (foldr step ((,) (text "") (text "")) rows)
+  };
+  termEncoding term = case term of {
+    XProjection rows selected -> projectionEncoding rows selected;
+    XLet name rhs body ->
+      stampThen (Separate.encodingText ("let " ++ Pretty.name name ++ " = "))
+        (stampThen (termEncoding rhs)
+          (stampThen (Separate.encodingText " in ") (termEncoding body)));
+    XAbs name ty body ->
+      stampThen (Separate.encodingText ("\\(" ++ Pretty.name name ++ " : " ++ typeText ty ++ ") -> "))
+        (termEncoding body);
+    _ -> termEncodingOrdinary term
+  };
+  termEncodingOrdinary term = let {
     -- Long repeated chunks, such as qualified names, have the same length
     -- and polynomial contribution at every occurrence. Bound the number
     -- and size of saved pieces within this term.
@@ -534,7 +568,7 @@ module Bootstrap.OpenFragment
       nested = termViews body;
       stored select = compactNode 71 [(,) (Structure.toXName name) Nothing,(,) (Structure.toXType ty) Nothing,
         (,) (Structure.toXTerm body) (select nested)];
-      summary = stampThen (Separate.encodingText ("\\(" ++ Pretty.name name ++ " : " ++ Pretty.prettyType ty ++ ") -> "))
+      summary = stampThen (Separate.encodingText ("\\(" ++ Pretty.name name ++ " : " ++ typeText ty ++ ") -> "))
         (prettyStamp nested)
     } in TermViews (stored ordinaryRows) (stored spineRows) summary;
     XApp _ _ -> let {
@@ -547,7 +581,7 @@ module Bootstrap.OpenFragment
   checkedFragment env ps term bs used = let {
     views = termViews term;
     saved = stampEncoding env ps (prettyStamp views) bs
-  } in Fragment env ps term bs used saved (Structure.toXTerm term) (ordinaryRows views) (spineRows views) Nothing;
+  } in Fragment env ps term bs used saved (ordinaryRows views) (spineRows views) Nothing;
   stamp env ps term bs = stampEncoding env ps (termEncoding term) bs;
   declarationEncoding (Environment _ _ _ encoded) = encoded;
   -- A row is a scalar-length-framed canonical declaration, exactly one field
@@ -556,11 +590,14 @@ module Bootstrap.OpenFragment
   framedDeclaration declaration = Separate.encodingPack
     [Separate.encodingText (D.prettyDeclaration (canonicalDeclaration declaration))];
   stampEncoding env ps summary bs = stampWithDeclarations (declarationEncoding env) ps summary bs;
+  -- Join the existing canonical type chunks once. A nested bound can be a
+  -- large suffix, so rendering it with repeated concatenation copies it.
+  typeText ty = concatStringList (Pretty.typeChunks 0 ty []);
   stampWithDeclarations declared ps summary bs = Separate.encodingFingerprint (Separate.encodingPack
     [declared,
-     Separate.encodingText (Separate.pack (map (\((,) n ty) -> Separate.pack [showInt (X.nameId n), X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) ps)),
+     Separate.encodingText (Separate.pack (map (\((,) n ty) -> Separate.pack [showInt (X.nameId n), X.nameHint n, typeText (Separate.normalType ty)]) ps)),
      summary,
-     Separate.encodingText (Separate.pack (map (\((,) n ty) -> Separate.pack [X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) bs))]);
+     Separate.encodingText (Separate.pack (map (\((,) n ty) -> Separate.pack [X.nameHint n, typeText (Separate.normalType ty)]) bs))]);
   -- The independent checker admits free term variables only from ps. Once
   -- every parameter has appeared, the remaining term cannot add another use.
   -- Keep the first occurrence itself, including its diagnostic name hint.
@@ -585,7 +622,6 @@ module Bootstrap.OpenFragment
     mapM_ (Check.termType ds M.empty) (map snd ps);
     answer <- Check.inferDeclarationSpine ds scope term;
     owned <- snd answer;
-    ensure (all (\p -> S.null (T.freeVars (snd p))) owned) "open fragment exports an open type";
     Right (make env ps term owned)
   };
   fromChecked checked = do {
@@ -724,6 +760,13 @@ module Bootstrap.OpenFragment
   };
   encodeRaw = encodeRawWith False;
   encodeCheckedRaw = encodeRawWith True;
+  compactCheckedBody term = case term of {
+    XProjection _ _ -> True;
+    XInstantiationSpine _ _ -> True;
+    XAbs _ _ body -> compactCheckedBody body;
+    XLet _ value body -> compactCheckedBody value || compactCheckedBody body;
+    _ -> False
+  };
   encodeRawWith spines references stage name fragment = let {
     envelope record = W.VNode 425 [references,record];
     ordinary = encodeBody stage name fragment;
@@ -731,20 +774,24 @@ module Bootstrap.OpenFragment
       Nothing -> ordinary;
       Just ((,) version term) -> let { tag = if version == 11 then 442 else if version == 10 then 441 else 440;
         record = bodyRecord tag stage name fragment term } in
-        case bindEither (W.planGraph W.defaultLimits [envelope record])
+        case bindEither (W.planGraph (if spines then W.indexedTextLimits else W.defaultLimits) [envelope record])
           (\graph -> Structure.admitPatternsWith (version >= 10) (version == 11) graph (W.maxExpandedWork W.defaultLimits)) of {
           Right _ -> record; Left _ -> ordinary
         }
     }
     -- The ordinary record writes its header and logical fingerprint before
     -- its term. Inspect literal runs only after those earlier fields succeed.
-  } in envelope (seq stage (seq name (seq (fingerprint fragment) choose)));
-  bodyRecord tag stage name fragment term = W.VNode tag
-    [W.VText stage, W.VText name, W.VText (fingerprint fragment),
+  } in if spines && eqString stage "raw" && compactCheckedBody (body fragment)
+    then envelope (bodyRecordWithStamp 443 "" stage name fragment (bodyValue fragment))
+    else envelope (seq stage (seq name (seq (fingerprint fragment) choose)));
+  bodyRecord tag stage name fragment term =
+    bodyRecordWithStamp tag (fingerprint fragment) stage name fragment term;
+  bodyRecordWithStamp tag saved stage name fragment term = W.VNode tag
+    [W.VText stage, W.VText name, W.VText saved,
      Structure.toList (Structure.toPair Structure.toXName (\p -> W.VText p))
        (map (\((,) n _) -> (,) n (X.nameHint n)) (parameters fragment)),
      term,
-     Structure.toList (Structure.toPair Structure.toXName Structure.toXType) (bindings fragment),
+     Structure.toList (Structure.toPair Structure.toXName Structure.toStoredXType) (bindings fragment),
      Structure.toList Structure.toXName (usedParameters fragment)];
   -- A reader cannot attach a claimed type to an AST. It must acquire the
   -- immutable bytes whose SHA came from the trusted generation/object index.
@@ -765,7 +812,7 @@ module Bootstrap.OpenFragment
       Right bytes -> do {
         actual <- byteArrayDigest bytes;
         if not (eqString actual expected) then ioReturn (Left "open fragment payload SHA mismatch") else do {
-          decoded <- W.decodeGraph W.defaultLimits 6 bytes;
+          decoded <- W.decodeGraph W.indexedTextLimits 6 bytes;
           ioReturn (do {
             graph <- decoded;
             root <- case W.graphRoots graph of { [r] -> Right r; _ -> Left "open fragment root count" };
@@ -783,7 +830,8 @@ module Bootstrap.OpenFragment
             value <- W.lookupGraphNode graph record;
             case value of {
               W.GNode tag [s,n,h,ps,t,bs,uses] -> do {
-                ensure (tag == 400 || tag == 440 || tag == 441 || tag == 442) "unknown open fragment storage; rebuild cache";
+                ensure (tag == 400 || tag == 440 || tag == 441 || tag == 442 || tag == 443)
+                  "unknown open fragment storage; rebuild cache";
                 savedStage <- textAt graph s;
                 savedName <- textAt graph n;
                 savedStamp <- textAt graph h;
@@ -800,7 +848,10 @@ module Bootstrap.OpenFragment
                   ensure (eqString key stable) "open fragment dependency inventory mismatch";
                   Right ((,) binder ty)
                 }) (zip pairs expectedParameters);
-                term <- if tag == 400 then Structure.fromGraphXTerm graph t else Structure.storedTermWith (tag >= 441) (tag == 442) graph t;
+                term <- if tag == 400 || tag == 443 then Structure.fromGraphXTerm graph t
+                  else Structure.storedTermWith (tag >= 441) (tag == 442) graph t;
+                ensure (tag /= 443 || (eqString stage "raw" && eqString savedStamp "" && compactCheckedBody term))
+                  "invalid compact checked query body";
                 ownedValues <- decodedList
                   (Structure.ShapePair Structure.ShapeXName Structure.ShapeXType) graph bs;
                 owned <- traverseEither (Structure.expectPair Structure.expectXName Structure.expectXType) ownedValues;
@@ -809,7 +860,11 @@ module Bootstrap.OpenFragment
                 usedValues <- decodedList Structure.ShapeXName graph uses;
                 used <- traverseEither Structure.expectXName usedValues;
                 validateBinders typed owned used;
-                let { result = fragmentWith env typed term owned used savedStamp };
+                -- This raw record has the same SHA and dependency checks as
+                -- other query payloads. Derive its logical stamp lazily from
+                -- the reconstructed scope for publication or semantic audit.
+                let { result = if tag == 443 then checkedFragment env typed term owned used
+                      else fragmentWith env typed term owned used savedStamp };
                 -- ICH verification is serialization/fingerprint verification,
                 -- independent of the explicit semantic-audit operation.
                 Right result
@@ -1049,7 +1104,7 @@ module Bootstrap.OpenFragment
     then ioReturn (Left "open crate SHA mismatch")
     else do {
       decoded <- Host.phaseIO profile "wire_decode_ms" (W.decodeGraphRootBounded
-        W.defaultLimits packageWorkLimit schema bytes);
+        W.indexedTextLimits packageWorkLimit schema bytes);
       case do {
         graph <- decoded;
         roots <- case W.graphRoots graph of {
@@ -1080,7 +1135,7 @@ module Bootstrap.OpenFragment
                   "open crate fragment count mismatch";
                 bindings <- referenceList graph b;
                 declarations <- referenceList graph d;
-                physical <- W.graphExpandedWork graph;
+                physical <- W.graphAdmittedWork graph;
                 ensure (physical >= 0 && physical <= packageWorkLimit) "open crate package-work accounting mismatch";
                 (,) plans available <- if schema >= 9 then do {
                   prepared <- Structure.admitPatternsWith (schema >= 10) (schema == 11) graph (packageWorkLimit - physical);
@@ -1207,7 +1262,7 @@ module Bootstrap.OpenFragment
   -- fragments using that name. The local parameter identity is still framed
   -- at every occurrence, and the complete ordered inventories are rehashed.
   namedBindingEncoding name ty = Separate.encodingPack [Separate.encodingText name,
-    Separate.encodingText (Pretty.prettyType (Separate.normalType ty))];
+    Separate.encodingText (typeText (Separate.normalType ty))];
   restoredStamp fields declared ps term bs = let {
     named ((,) name ty) = M.findWithDefault compareString
       (namedBindingEncoding (X.nameHint name) ty) (X.nameHint name) fields;
@@ -1260,8 +1315,8 @@ module Bootstrap.OpenFragment
           _ -> Nothing
         };
         withView = case fragment of {
-          Fragment env ps source bs used stamp raw stored spines _ ->
-            Fragment env ps source bs used stamp raw stored spines view
+          Fragment env ps source bs used stamp stored spines _ ->
+            Fragment env ps source bs used stamp stored spines view
         }
       } in seq view ((:) ((,) label withView) (attach rest tail));
       _ -> rows
@@ -1273,8 +1328,8 @@ module Bootstrap.OpenFragment
   -- Keep the marker on a copy of the exact fragment whose raw final record
   -- was written. Existing authenticated compact views remain usable.
   publishedRawRow ((,) label fragment) = (,) label (case fragment of {
-    Fragment env ps source bs used stamp raw stored spines view ->
-      Fragment env ps source bs used stamp raw stored spines (case view of {
+    Fragment env ps source bs used stamp stored spines view ->
+      Fragment env ps source bs used stamp stored spines (case view of {
         Nothing -> Just LinkPublishedRaw; Just _ -> view
       })
   });
@@ -1317,7 +1372,8 @@ module Bootstrap.OpenFragment
                   final ((,) entry selected) = case selected of {
                     Just ((,) _ wire) -> encodeFinalWire wire entry; Nothing -> encodeFinal False entry
                   };
-                  write schema format stored = W.encodeRootsWithAtoms Structure.termAtomShapes W.defaultLimits
+                  limits = if spines then W.indexedTextLimits else W.defaultLimits;
+                  write schema format stored = W.encodeRootsWithAtoms Structure.termAtomShapes limits
                     remaining schema ((:) (header format) (if stored then map final plans else map (encodeFinal False) fragments));
                   legacy = do {
                     encoded <- write 8 wireFormat8 False;
@@ -1338,9 +1394,9 @@ module Bootstrap.OpenFragment
                   case candidate of {
                     Left _ -> legacy;
                     Right bytes -> do {
-                      decoded <- W.decodeGraphRootBounded W.defaultLimits remaining schema bytes;
+                      decoded <- W.decodeGraphRootBounded limits remaining schema bytes;
                       case bindEither decoded (\graph -> do {
-                        used <- W.graphExpandedWork graph;
+                        used <- W.graphAdmittedWork graph;
                         (,) plans _ <- Structure.admitPatternsWith (schema >= 10) (schema == 11) graph (remaining - used);
                         Right (attachLinkViews graph plans fragments)
                       }) of { Left _ -> legacy; Right rows -> ioReturn (Right ((,) bytes rows)) }

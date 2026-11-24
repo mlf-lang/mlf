@@ -8,6 +8,7 @@ from pathlib import Path
 import analyze
 import bench
 import command_runner
+import compiler_reference
 import fit_growth
 import framework_results as framework
 import provenance
@@ -39,12 +40,14 @@ def failure_detail(folder, receipt):
     return lane, failure.get('error', 'compiler or executable check failed')[:400]
 
 
-def completed_pairs(runs):
+def completed_pairs(runs, with_reference=False):
+    lanes_per_round = 3 if with_reference else 2
+    expected = {'mlf', 'ghc', 'reference'} if with_reference else {'mlf', 'ghc'}
     pairs = {}
     for run in runs:
         if run['complete'] and run['output_correct']:
-            pairs.setdefault(run['position'] // 2, set()).add(run['lane'])
-    return sum(lanes == {'mlf', 'ghc'} for lanes in pairs.values())
+            pairs.setdefault(run['position'] // lanes_per_round, set()).add(run['lane'])
+    return sum(lanes == expected for lanes in pairs.values())
 
 
 def measure(folder, setup, row, args, repeats, reference):
@@ -52,6 +55,7 @@ def measure(folder, setup, row, args, repeats, reference):
     argv = [sys.executable, '-B', bench.HERE / 'run.py', '--output', folder, '--setup', setup,
             '--cohort', folder.name, '--family', family, '--endpoint', args.endpoint,
             '--repeats', repeats, '--interleave-pairs', '--record-only', '--framework-child']
+    argv += ['--sweep-reference', json.dumps(args.baseline_selection)]
     if size:
         argv += ['--size', size]
     if args.cohort_output_gib is not None:
@@ -63,7 +67,9 @@ def measure(folder, setup, row, args, repeats, reference):
     receipt_path = folder / 'receipt.json'
     receipt = analyze.load(receipt_path) if receipt_path.is_file() else {}
     runs = receipt.get('runs', [])
-    row['completed_pairs'] = completed_pairs(runs)
+    plan_file = folder/'plan.json'
+    has_reference = plan_file.is_file() and bool(analyze.load(plan_file).get('compiler_reference'))
+    row['completed_pairs'] = completed_pairs(runs, has_reference)
     if receipt:
         row['evidence'] += '/receipt.json'
     if status or not receipt.get('all_cases_passed') or not receipt.get('complete') or receipt['failures']:
@@ -82,6 +88,12 @@ def measure(folder, setup, row, args, repeats, reference):
     row.update(status='passed', mlf_seconds=metrics['mlf_wall_median'],
                ghc_seconds=metrics['ghc_wall_median'], mlf_over_ghc=metrics['mlf_over_ghc'],
                **{field: metrics[field] for field in fit_growth.PEAK_RSS_FIELDS})
+    if has_reference:
+        row.update(reference_commit=plan['compiler_reference']['commit'],
+                   reference_seconds=metrics['reference_wall_median'],
+                   mlf_over_reference=metrics['mlf_over_reference'],
+                   reference_peak_rss_bytes=metrics['reference_peak_rss_bytes'],
+                   mlf_over_reference_peak_rss=metrics['mlf_over_reference_peak_rss'])
     return samples
 
 
@@ -142,7 +154,7 @@ def comparison_table(by_cell, families, sizes, format_cell):
     return lines
 
 
-def save_tables(root, rows, repeats, endpoint, growth=None):
+def save_tables(root, rows, repeats, endpoint, growth=None, reference_growth=None, selection=None):
     out = io.StringIO(newline='')
     writer = csv.DictWriter(out, fieldnames=list(rows[0]))
     writer.writeheader()
@@ -164,6 +176,10 @@ def save_tables(root, rows, repeats, endpoint, growth=None):
         return f'{mlf} / {ghc} ({ratio})'
 
     lines.extend(comparison_table(by_cell, families, sizes, memory_cell))
+    if selection:
+        show = [dict(row,mlf_wall_median=row['mlf_seconds'],reference_wall_median=row['reference_seconds'])
+                for row in rows if row['status']=='passed' and row.get('reference_seconds') != '']
+        lines += analyze.baseline_table(show, {'baseline_selection':selection})
     failures = [row for row in rows if row['status'] == 'failed']
     if failures:
         lines.extend(['', '## Failed cells', ''])
@@ -175,7 +191,11 @@ def save_tables(root, rows, repeats, endpoint, growth=None):
     if growth is not None:
         lines += ['', '## Build performance checks', '', *fit_growth.markdown(growth), '',
                   '[Full-precision check results](growth.json)']
-        files['growth.json'] = json.dumps({'endpoint': endpoint, 'growth': growth}, indent=2) + '\n'
+        result = {'endpoint':endpoint,'growth':growth,'baseline_selection':selection}
+        if reference_growth is not None:
+            result['reference_growth'] = reference_growth
+            lines += ['', '## Growth against the committed compiler', '', *fit_growth.markdown(reference_growth,'reference')]
+        files['growth.json'] = json.dumps(result, indent=2) + '\n'
     lines += ['', '[Full-precision timings, median peak RSS in bytes, and outcomes](summary.csv)', '']
     files['summary.md'] = '\n'.join(lines)
     for filename, content in files.items():
@@ -216,7 +236,10 @@ def run(args):
     except BaseException:
         cohorts.rmdir()
         raise
-    rows = [dict(family=family, size=size, status='pending', completed_pairs=0,
+    args.baseline_selection = compiler_reference.select_revision(setup_record.get('source',bench.ROOT),
+        [cohorts,setup.parent,setup_record.get('producer',root/'producer'),root/'summary.md',root/'summary.csv',root/'growth.json'])
+    rows = [dict(reference_seconds='',reference_commit='',mlf_over_reference='',reference_peak_rss_bytes=None,
+                 mlf_over_reference_peak_rss=None,family=family, size=size, status='pending', completed_pairs=0,
                  mlf_seconds='', ghc_seconds='', mlf_over_ghc='', **dict.fromkeys(fit_growth.PEAK_RSS_FIELDS),
                  lane='', reason='',
                  evidence=f'cohorts/{family}-{size}', pruned_files=0, pruned_bytes=0)
@@ -226,22 +249,24 @@ def run(args):
         cell = (row['family'], row['size'])
         framework.start(ids, cell, endpoint=args.endpoint, repeats=repeats)
         row['status'] = 'running'
-        save_tables(root, rows, repeats, args.endpoint)
+        save_tables(root, rows, repeats, args.endpoint, selection=args.baseline_selection)
         folder = root / row['evidence']
         try:
             samples.extend(measure(folder, setup, row, args, repeats, reference))
         except (OSError, ValueError, KeyError, RuntimeError) as exc:
             row.update(status='failed', reason=f'{type(exc).__name__}: {exc}')
-        save_tables(root, rows, repeats, args.endpoint)
+        save_tables(root, rows, repeats, args.endpoint, selection=args.baseline_selection)
         if args.prune_build_products and row['status'] == 'passed':
             row['pruned_files'], row['pruned_bytes'] = prune_products(folder)
-            save_tables(root, rows, repeats, args.endpoint)
+            save_tables(root, rows, repeats, args.endpoint, selection=args.baseline_selection)
         framework.result(ids, cell, 'pass' if row['status'] == 'passed' else 'fail',
                          completed_pairs=row['completed_pairs'], lane=row['lane'], reason=row['reason'],
                          receipt=str(root / row['evidence']))
     cases = [dict(row, case=f"{row['family']}-{row['size']}") for row in rows]
     growth = fit_growth.family_reports(cases, samples, repeats)
-    save_tables(root, rows, repeats, args.endpoint, growth)
+    reference_growth = (fit_growth.family_reports(cases,samples,repeats,'reference')
+                        if any(s['lane']=='reference' for s in samples) or (not samples and args.baseline_selection['commit']) else None)
+    save_tables(root, rows, repeats, args.endpoint, growth, reference_growth, args.baseline_selection)
     print(root / 'summary.md', flush=True)
     if any(row['status'] != 'passed' for row in rows):
         raise SystemExit(1)

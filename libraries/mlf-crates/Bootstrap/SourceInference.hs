@@ -134,6 +134,24 @@ module Bootstrap.SourceInference where {
       _ -> Left "source finalization expected a constructor node"
     }
   };
+  finalProjectionTag graph identity = do {
+    node <- Wire.lookupGraphNode graph identity;
+    case node of {
+      Wire.GNode tag [_,_] -> if tag == 94 then Right tag else Left "source finalization expected a projection";
+      Wire.GNode tag [_,_,_] -> if tag == 97 || tag == 98 then Right tag
+        else Left "source finalization expected a projection";
+      _ -> Left "source finalization expected a projection"
+    }
+  };
+  finalInstantiationTag :: Wire.Graph -> Int -> Either String Int;
+  finalInstantiationTag graph identity = do {
+    node <- Wire.lookupGraphNode graph identity;
+    case node of {
+      Wire.GNode 93 [_,_,_,_,_] -> Right 93;
+      Wire.GNode 95 [_,_] -> Right 95;
+      _ -> Left "source finalization expected an instantiation"
+    }
+  };
   finalSyntaxEdges :: Wire.Graph -> [] FinalSyntaxEdge -> [] ((,) Int Int) -> Int -> Int -> Either String ((,) ([] ((,) Int Int)) Int);
   finalSyntaxEdges graph edges keys deepest count = case edges of {
     [] -> Right ((,) (reverse keys) deepest);
@@ -315,6 +333,8 @@ module Bootstrap.SourceInference where {
     } } in case original of {
       FinalTerm term -> case term of {
         XVarTerm _ -> schedule 70 [];
+        XProjection _ _ -> do { tag <- finalProjectionTag graph identity; schedule tag [] };
+        XInstantiationSpine _ _ -> do { tag <- finalInstantiationTag graph identity; schedule tag [] };
         XAbs _ _ body -> finalSyntaxTermChild graph identity original 71 2 body rest values state;
         XApp a b -> finalSyntaxTermPair graph identity original 72 0 a 1 b rest values state;
         XTypeAbs _ _ body -> finalSyntaxTermChild graph identity original 73 2 body rest values state;
@@ -446,6 +466,8 @@ module Bootstrap.SourceInference where {
     } in case original of {
       FinalTerm term -> case (,,) term references children of {
         (,,) (XVarTerm _) [_] [] -> untouched 70;
+        (,,) (XProjection _ _) _ [] -> do { tag <- finalProjectionTag graph identity; untouched tag };
+        (,,) (XInstantiationSpine _ _) _ [] -> do { tag <- finalInstantiationTag graph identity; untouched tag };
         (,,) (XAbs name ty _) [n,t,b] [body] -> do {
           value <- finalSyntaxTerm body;
           finish 71 [FinalOriginalEdge n,FinalOriginalEdge t,FinalResultEdge body]
@@ -852,6 +874,8 @@ module Bootstrap.SourceInference where {
       Right (combineEdits (\t alts -> XCase t ty alts) a bs x y)
     };
     XWithData ds b -> one (XWithData ds) b;
+    XProjection _ _ -> Right Nothing;
+    XInstantiationSpine _ _ -> Right Nothing;
     XVarTerm _ -> Right Nothing; XIntTerm _ -> Right Nothing; XDoubleTerm _ -> Right Nothing;
     XBoolTerm _ -> Right Nothing; XStringTerm _ -> Right Nothing; XPrimitive _ _ -> Right Nothing;
     XConstructor _ _ -> Right Nothing
@@ -1866,6 +1890,48 @@ module Bootstrap.SourceInference where {
          else mapOptional (\ordinals -> (,) (ground signature) ordinals)
            (walk 0 False [] classes (leading signature))
   };
+  -- In a composition of selectors with scheme forall a. D a -> a -> a,
+  -- every call takes and returns the operand's type. Its dictionary domain is
+  -- consequently fixed before graph inference. Read the selector by declaration
+  -- ID and keep one generated argument per ordinary class in this source root.
+  compositionEvidence :: CheckedContracts -> Map String String -> [] ((,,) String String String) ->
+    SExpr -> Maybe ((,) SExpr ([] ((,,) String String String)));
+  compositionEvidence checked registry labels expression = let {
+    peel [] value = Just value;
+    peel ((:) ((,,) expected _ _) rest) (SLam n Nothing body) =
+      if eqString n expected then peel rest body else Nothing;
+    peel _ _ = Nothing;
+    selector i dict = case checkedBinding checked i of {
+      Right (SourceContract (XForall a XBot (XArrow (XCon name [XVar b])
+        (XArrow (XVar c) (XVar d)))) _ False) ->
+          eqString dict name && all (Type.equalTyVar a) [b,c,d];
+      _ -> False
+    };
+    calls arg [] _ kept (SVar n) = if eqString n arg then Just ((,) (reverse kept) (SVar n)) else Nothing;
+    calls arg ((:) row@((,,) binder cls dict) rest) seen kept
+      (SApp (SApp target@(SGlobal i _) (SVar supplied)) operand) =
+      if not (eqString supplied binder && not (eqString binder arg) && selector i dict &&
+        case M.lookup compareString cls registry of { Just name -> eqString name dict; _ -> False })
+      then Nothing else let {
+        next alias known rows = mapOptional (\((,) retained body) ->
+          (,) retained (SApp (SApp target (SVar alias)) body)) (calls arg rest known rows operand)
+      } in case M.lookup compareString cls seen of {
+        Just previous -> next previous seen kept;
+        Nothing -> next binder (M.insert compareString cls binder seen) ((:) row kept)
+      };
+    calls _ _ _ _ _ = Nothing
+  } in case labels of {
+    (:) _ ((:) _ _) -> case peel labels expression of {
+      Just (SLam arg Nothing operand) -> case calls arg labels M.empty [] operand of {
+        Just ((,) retained body) -> if length retained < length labels then Just ((,)
+          (foldr (\((,,) n _ _) inner -> SLam n Nothing inner) (SLam arg Nothing body) retained)
+          retained) else Nothing;
+        Nothing -> Nothing
+      };
+      _ -> Nothing
+    };
+    _ -> Nothing
+  };
   sharedArgumentCandidate contracts slots group = case groupAuthority group of {
     Just (RootAuthority _ labels False _ _) -> case labels of {
       (:) _ ((:) _ _) -> any (\i -> isJust (checkedDuplicateArguments (groupRegistry group) contracts i)) (parameterIds slots);
@@ -1946,7 +2012,12 @@ module Bootstrap.SourceInference where {
                 (\_ _ env suffix -> Classes.sourceEnvironmentNames env suffix) owner;
               Just _ -> lower references Classes.sourceOwnedEnvironmentNames owner
             }) inventory overloads protected name rhs;
-            case lowered of { Classes.SourceRootLowering body labels candidates protected -> do {
+            case lowered of { Classes.SourceRootLowering originalBody issued candidates protected -> do {
+              let { compacted = case checked of {
+                Just current -> if protected then (,) originalBody issued else
+                  fromMaybe ((,) originalBody issued) (compositionEvidence current registry issued originalBody);
+                Nothing -> (,) originalBody issued
+              }; body = fst compacted; labels = snd compacted };
               -- Lowering still sees the complete definition scope. Once it
               -- produces no evidence slots, prepareOpenFinish cannot ask that
               -- scope for an answer. Actual references in the lowered body
@@ -2089,20 +2160,58 @@ module Bootstrap.SourceInference where {
         (,) (XForall variable bound arrows) (XTypeAbs declared annotation body) -> do {
           ensure (Type.equalTyVar variable declared && Type.alphaEq bound annotation)
             "grouped root reuses a different result bound";
-          let { minId identity current = if identity < current then identity else current;
-            start = advanceIdentity (Separate.foldTermIdentities minId rhs 0) (-1) };
-          (,) scheme replacement <- restoreDictionaryArrows variable bound start labels arrows body;
-          checked <- Open.check (Open.context object) (Open.parameters object)
-            (XLet binder replacement (XConstructor "()" []));
-          ensure (case Open.bindings checked of {
-            [(,) n actual] -> X.equalName n binder && Type.alphaEq scheme actual; _ -> False
-          }) "restored dictionaries changed their checked scheme";
-          Right checked
+          let { sameParameter args = case args of {
+            [XVar v] -> Type.equalTyVar variable v; _ -> False
+          } };
+          if Type.alphaEq bound (XBotKind (KArrow Star Star)) &&
+            checkedDictionarySpine sameParameter (sharedMonadResult variable) labels arrows body
+          then Right object else do {
+            let { minId identity current = if identity < current then identity else current;
+              start = advanceIdentity (Separate.foldTermIdentities minId rhs 0) (-1) };
+            (,) scheme replacement <- restoreDictionaryArrows variable bound start labels arrows body;
+            checked <- Open.check (Open.context object) (Open.parameters object)
+              (XLet binder replacement (XConstructor "()" []));
+            ensure (case Open.bindings checked of {
+              [(,) n actual] -> X.equalName n binder && Type.alphaEq scheme actual; _ -> False
+            }) "restored dictionaries changed their checked scheme";
+            Right checked
+          }
         };
+        (,) (XArrow _ _) (XAbs _ _ _) ->
+          if checkedDictionarySpine (all closedMonotype) closedMonotype labels ty rhs
+          then Right object else Left "grouped root has an open dictionary prefix";
         _ -> Left "grouped root requires one result bound"
       }
     };
     _ -> Right object
+  };
+  -- Closed domains and results have no variables to generalize. A single
+  -- parameter shared by every domain and both sides of the result arrow
+  -- must instead be bound outside every dictionary lambda. Both cases
+  -- already have their ordinary binder placement in the checked object.
+  checkedDictionarySpine :: ([] XType -> Bool) -> (XType -> Bool) ->
+    [] ((,,) String String String) -> XType -> XTerm -> Bool;
+  checkedDictionarySpine domains result labels ty term = case (,,) labels ty term of {
+    (,,) [] remaining _ -> result remaining;
+    (,,) ((:) ((,,) label _ dictionary) rest) (XArrow domain@(XCon owner args) tail)
+         (XAbs binder annotation body) ->
+      eqString label (X.nameHint binder) && eqString dictionary owner &&
+      domains args && Type.alphaEq domain annotation &&
+      checkedDictionarySpine domains result rest tail body;
+    _ -> False
+  };
+  closedMonotype :: XType -> Bool;
+  closedMonotype ty = case ty of {
+    XCon _ args -> all closedMonotype args;
+    XApply function argument -> closedMonotype function && closedMonotype argument;
+    XArrow domain result -> closedMonotype domain && closedMonotype result;
+    _ -> False
+  };
+  sharedMonadResult variable ty = case ty of {
+    XArrow (XApply (XVar input) arg) (XApply (XVar output) result) ->
+      Type.equalTyVar variable input && Type.equalTyVar variable output &&
+      closedMonotype arg && closedMonotype result;
+    _ -> False
   };
   restoreDictionaryArrows :: XTyVar -> XType -> Int -> [] ((,,) String String String) ->
     XType -> XTerm -> Either String ((,) XType XTerm);
@@ -2275,6 +2384,8 @@ module Bootstrap.SourceInference where {
     XAbs name ty body -> one (XAbs name ty) body;
     XTypeAbs name ty body -> one (XTypeAbs name ty) body;
     XWithData declarations body -> one (XWithData declarations) body;
+    XProjection _ _ -> Just Nothing;
+    XInstantiationSpine _ _ -> Just Nothing;
     XVarTerm _ -> Just Nothing; XIntTerm _ -> Just Nothing; XDoubleTerm _ -> Just Nothing;
     XBoolTerm _ -> Just Nothing; XStringTerm _ -> Just Nothing; XPrimitive _ _ -> Just Nothing;
     XConstructor _ _ -> Just Nothing; XLetRec _ _ -> Nothing; XCase _ _ _ -> Nothing
@@ -2417,7 +2528,7 @@ module Bootstrap.SourceInference where {
       compact <- Open.normalize object term;
       ensure (eqList (eqPair X.equalName Type.alphaEq) (Open.bindings object) (Open.bindings compact))
         "factored open fragment changed exported types";
-      canonicalOpenPlanned compact
+      canonicalOpenPlannedWith Wire.indexedTextLimits compact
     }
   } in case factorCheckedCalls object of {
     Just term -> validate term;
@@ -2431,7 +2542,8 @@ module Bootstrap.SourceInference where {
   canonicalCheckedOpen = canonicalOpenUsing True Open.checkedStorageValue;
   canonicalOpenUsing spines storage object = let {
     geometry = finalTreeGeometryUsing spines (Wire.maxDepth Wire.defaultLimits);
-    planned = case canonicalOpenPlanned object of {
+    limits = if spines then Wire.indexedTextLimits else Wire.defaultLimits;
+    planned = case canonicalOpenPlannedWith limits object of {
       Left e -> if spines && (eqString e "binary expanded-work limit exceeded" ||
         eqString e "binary graph depth limit exceeded") then factorOversizedOpen object e else Left e;
       Right admitted -> Right admitted
@@ -2464,8 +2576,9 @@ module Bootstrap.SourceInference where {
     Nothing -> ordinary;
     Just stored -> case geometry True stored of { Just False -> Right object; _ -> ordinary }
   };
-  canonicalOpenPlanned object = do {
-    plan <- Wire.prepareGraphPlanWithAtoms Structure.termAtomShapes Wire.defaultLimits [Open.bodyValue object];
+  canonicalOpenPlanned = canonicalOpenPlannedWith Wire.defaultLimits;
+  canonicalOpenPlannedWith limits object = do {
+    plan <- Wire.prepareGraphPlanWithAtoms Structure.termAtomShapes limits [Open.bodyValue object];
     graph <- Wire.realizeGraphPlan plan;
     identity <- case Wire.graphRoots graph of { [root] -> Right root; _ -> Left "open raw root count" };
     normalized <- finalSyntaxRun graph [FinalVisit identity (FinalTerm (Open.body object))] []
@@ -2485,23 +2598,31 @@ module Bootstrap.SourceInference where {
             Just dict -> Right ((,,) spelling className dict)
           }) (zip names classes);
           (,,) binder ty rhs <- openRootParts object;
-          compact <- Boundary.compactInferredPrefix (groupRegistry prepared) labels ty rhs;
-          case compact of {
-            Nothing -> Right Nothing;
-            Just ((,,) result body retained) -> do {
-              checked <- Open.check (Open.context object) (Open.parameters object)
-                (XLet binder body (XConstructor "()" []));
-              ensure (case Open.bindings checked of {
-                [(,) n scheme] -> X.equalName n binder && Type.alphaEq scheme result;
-                _ -> False
-              }) "compact recursive evidence changed exported binding";
-              final <- canonicalCheckedOpen checked;
-              Right (Just ((,,) final result retained))
-            }
-          }
+          compactOpenPrefix (groupRegistry prepared) object labels binder ty rhs
         }
       };
     _ -> Right Nothing
+  };
+  compactOpenPrefix registry object labels binder ty rhs = do {
+    direct <- Boundary.compactInferredPrefix registry labels ty rhs;
+    let { compact = case direct of {
+      Just _ -> direct;
+      Nothing -> Boundary.compactBoundPrefix registry labels ty rhs
+    } };
+    case compact of {
+      Nothing -> Right Nothing;
+      Just ((,,) result body retained) -> case Open.check (Open.context object) (Open.parameters object)
+        (XLet binder body (XConstructor "()" [])) of {
+          Left _ -> Right Nothing;
+          Right checked -> case Open.bindings checked of {
+            [(,) n scheme] -> if X.equalName n binder && Type.alphaEq scheme result then do {
+              final <- canonicalCheckedOpen checked;
+              Right (Just ((,,) final result retained))
+            } else Right Nothing;
+            _ -> Right Nothing
+          }
+        }
+    }
   };
   prepareOpenFinish group checked prepared object = do {
     owners <- ownedFragmentBindings group object;
@@ -2561,13 +2682,24 @@ module Bootstrap.SourceInference where {
         ensure (eqString name (declName scope owner)) "raw source identity mismatch";
         parts <- openRootParts object;
         case parts of { (,,) binder ty rhs -> let {
-          unchanged = \flag -> Right (ReadyOpenFinish (OpenFinalGroup KeepRawBody
-            [(,) owner (SourceContract ty (map (\((,,) _ cls _) -> cls) labels) flag)]));
-          isProtected = protected || usedProtected
-        } in if isProtected || null labels then unchanged isProtected else do {
+          unchanged = \flag -> OpenFinalGroup KeepRawBody
+            [(,) owner (SourceContract ty (map (\((,,) _ cls _) -> cls) labels) flag)];
+          isProtected = protected || usedProtected;
+          retain = case labels of {
+            (:) _ ((:) _ _) -> do {
+              compact <- compactOpenPrefix (groupRegistry prepared) object labels binder ty rhs;
+              case compact of {
+                Nothing -> Right (unchanged False);
+                Just ((,,) final result retained) -> Right (OpenFinalGroup (AdaptedBody final)
+                  [(,) owner (SourceContract result retained False)])
+              }
+            };
+            _ -> Right (unchanged False)
+          }
+        } in if isProtected || null labels then Right (ReadyOpenFinish (unchanged isProtected)) else do {
           slots <- targetSlots labels rhs;
           case slots of {
-            Nothing -> unchanged isProtected;
+            Nothing -> mapEither ReadyOpenFinish retain;
             Just mapped -> do {
               authorized <- candidateParameters (Open.parameters object) (Open.body object) candidates;
               let { boundary = Boundary.Boundary 0 Boundary.UnsignedRoot False 0
@@ -2581,7 +2713,7 @@ module Bootstrap.SourceInference where {
               ensure (length authorized == length (candidateIds group)) "evidence candidate inventory changed";
               let { aliases = M.fromList X.compareName
                     (zip (map Boundary.candidateName authorized) (candidateIds group)) };
-              Right (PendingOpenFinish object owner binder ty labels isProtected aliases plan)
+              Right (PendingOpenFinish object owner binder ty labels retain aliases plan)
             }
           }
         } }
@@ -2591,7 +2723,7 @@ module Bootstrap.SourceInference where {
 
   data OpenFinish = ReadyOpenFinish OpenFinalGroup |
     PendingOpenFinish Open.Fragment (V.Index Declaration) XName XType
-      ([] ((,,) String String String)) Bool (Map XName (V.Index Declaration)) Boundary.CheckedPlan |
+      ([] ((,,) String String String)) (Either String OpenFinalGroup) (Map XName (V.Index Declaration)) Boundary.CheckedPlan |
     PendingGroundRecursiveFinish GroupSlots Open.Fragment OpenFinalGroup (Map XName (V.Index Declaration))
       Boundary.GroundRecursivePlan;
   openFinishRequests finish = Boundary.requestRows (openFinishRequestBatch finish);
@@ -2603,7 +2735,7 @@ module Bootstrap.SourceInference where {
   completeOpenFinish checked finish answers = case finish of {
     ReadyOpenFinish group -> Right group;
     PendingGroundRecursiveFinish group object unchanged authority plan -> do {
-      compact <- Boundary.finishGroundRecursivePlan plan answers;
+      compact <- Boundary.finishGroundRecursivePlanIn (Open.dataEnvironment (Open.context object)) plan answers;
       case compact of {
         Nothing -> Right unchanged;
         Just ((,) definitions supports) -> do {
@@ -2614,26 +2746,30 @@ module Bootstrap.SourceInference where {
           if any (compose contractProtected snd) bindings then Right unchanged else do {
             let { parameters = map (\((,) name c) -> (,) name (contractType c)) bindings };
             required <- Boundary.mergeTypes (append (Open.parameters object) parameters);
-            rewritten <- Open.check (Open.context object) required (XLetRec definitions (XConstructor "()" []));
-            let { types = M.fromList X.compareName (map (\((,,) name ty _) -> (,) name ty) definitions) };
-            ensure (length definitions == length (Open.bindings rewritten) &&
-              all (\((,) name ty) -> case M.lookup X.compareName name types of {
-                Just expected -> Type.alphaEq expected ty;
-                Nothing -> False
-              }) (Open.bindings rewritten)) "checked recursive evidence adapter type mismatch";
-            exports <- ownedFragmentBindings group rewritten;
-            final <- canonicalCheckedOpen rewritten;
-            Right (OpenFinalGroup (AdaptedBody final) (map (\((,) i ty) -> (,) i (SourceContract ty [] False)) exports))
+            case Open.check (Open.context object) required (XLetRec definitions (XConstructor "()" [])) of {
+              Left _ -> Right unchanged;
+              Right rewritten -> do {
+                let { types = M.fromList X.compareName (map (\((,,) name ty _) -> (,) name ty) definitions) };
+                ensure (length definitions == length (Open.bindings rewritten) &&
+                  all (\((,) name ty) -> case M.lookup X.compareName name types of {
+                    Just expected -> Type.alphaEq expected ty;
+                    Nothing -> False
+                  }) (Open.bindings rewritten)) "checked recursive evidence adapter type mismatch";
+                exports <- ownedFragmentBindings group rewritten;
+                final <- canonicalCheckedOpen rewritten;
+                Right (OpenFinalGroup (AdaptedBody final) (map (\((,) i ty) -> (,) i (SourceContract ty [] False)) exports))
+              }
+            }
           }
         }
       }
     };
-    PendingOpenFinish object owner binder ty labels protected candidates plan -> do {
+    PendingOpenFinish object owner binder ty labels retain candidates plan -> do {
       recipe <- Boundary.finishCheckedPlan plan answers;
       let { unchanged = \flag -> Right (OpenFinalGroup KeepRawBody
         [(,) owner (SourceContract ty (map (\((,,) _ cls _) -> cls) labels) flag)]) };
       case recipe of {
-        Boundary.KeepRecipe -> unchanged protected;
+        Boundary.KeepRecipe -> retain;
         Boundary.ChangeRecipe result body required supports -> do {
           flags <- traverseEither (\n -> case M.lookup X.compareName n candidates of {
             Nothing -> Left "proof support lacks a declaration";

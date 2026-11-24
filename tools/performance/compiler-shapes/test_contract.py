@@ -135,6 +135,87 @@ class BindingShapeTests(unittest.TestCase):
                                      sum(value * weight for value, weight in zip(values, reversed(fields))))
 
 
+class CompilerReferenceTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.repo = Path(directory.name)
+        self.git('init', '-q', '-b', 'main')
+        self.git('config', 'user.name', 'Compiler shape test')
+        self.git('config', 'user.email', 'test@example.invalid')
+        self.source = self.repo / 'source'
+        self.source.write_text('one')
+        self.git('add', 'source')
+        self.git('commit', '-qm', 'first')
+        self.first = self.git('rev-parse', 'HEAD')
+
+    def git(self, *args):
+        return subprocess.check_output(['git', '-C', self.repo, *args], text=True).strip()
+
+    def test_revision_follows_staged_unstaged_untracked_and_clean_states(self):
+        select = runner.compiler_reference.select_revision
+        self.assertIsNone(select(self.repo)['commit'])
+        self.source.write_text('two')
+        self.assertEqual(select(self.repo)['commit'], self.first)
+        self.git('add', 'source')
+        self.assertTrue(select(self.repo)['dirty'])
+        self.git('commit', '-qm', 'second')
+        second = self.git('rev-parse', 'HEAD')
+        self.assertEqual(select(self.repo), dict(candidate_commit=second, dirty=False,
+                                                commit=self.first, basis='HEAD vs first parent'))
+        generated = self.repo / 'benchmark-output'
+        generated.mkdir()
+        (generated / 'sample').touch()
+        self.assertEqual(select(self.repo, [generated])['commit'], self.first)
+        self.assertEqual(select(self.repo)['commit'], second)
+        self.git('add', 'benchmark-output/sample')
+        self.assertEqual(select(self.repo, [generated])['commit'], second)
+
+    def test_clean_merge_uses_first_parent(self):
+        self.git('switch', '-qc', 'feature')
+        (self.repo / 'feature').touch()
+        self.git('add', 'feature')
+        self.git('commit', '-qm', 'feature')
+        self.git('switch', '-q', 'main')
+        self.git('merge', '--no-ff', '-qm', 'merge', 'feature')
+        self.assertEqual(runner.compiler_reference.select_revision(self.repo)['commit'], self.first)
+
+    def test_reference_growth_keeps_both_controls_in_the_recorded_round(self):
+        sizes = [0, 8, 32, 64]
+        rows = []
+        samples = []
+        for size in sizes:
+            family = 'flat_functions' if size else 'baseline'
+            case = f'{family}-{size}'
+            rows.append(dict(family=family, size=size, case=case, mlf_peak_rss_bytes=100,
+                             reference_peak_rss_bytes=150, ghc_peak_rss_bytes=200,
+                             mlf_over_reference_peak_rss=2/3, mlf_over_ghc_peak_rss=.5))
+            paired = [dict(case=case, lane=lane, position=i) for i,lane in enumerate(runner.lanes_for(0,2))]
+            for leg in runner.with_reference(paired):
+                cost = {'mlf': 1, 'reference': 2, 'ghc': 3}[leg['lane']]
+                samples.append(dict(leg,order=len(samples),wall_seconds=cost*(size+1),
+                                    sampled_process_tree_peak_rss_bytes=cost*(size+1)*1024))
+        with mock.patch.object(runner.fit_growth, 'REPLICATES', 50):
+            for control in ('ghc', 'reference'):
+                report, = runner.fit_growth.family_reports(rows, samples, 2, control)
+                self.assertEqual(len(report['checks']), 9)
+                self.assertEqual(set(report['estimates']), {'mlf', control})
+                self.assertTrue(report['checks']['lower_ols_95'])
+                self.assertIn(control+'_mib_per_unit', report['peak_rss_growth'])
+
+    def test_pairs_share_one_candidate_and_keep_both_controls_adjacent(self):
+        original = [dict(case='x', lane=lane, position=i) for i,lane in enumerate(runner.lanes_for(0,2))]
+        triple = runner.with_reference(original)
+        self.assertEqual([r['lane'] for r in triple],
+                         ['ghc','mlf','reference','reference','mlf','ghc'])
+        samples = [dict(r, order=i, wall_seconds=i+1) for i,r in enumerate(triple)]
+        self.assertEqual(runner.fit_growth.paired_cell(samples,2), [(2,1),(5,6)])
+        self.assertEqual(runner.fit_growth.paired_cell(samples,2,reference='reference'), [(2,3),(5,4)])
+        samples[-1]['order'] += 1
+        with self.assertRaisesRegex(ValueError,'nonadjacent'):
+            runner.fit_growth.paired_cell(samples,2)
+
+
 class ScheduleTests(unittest.TestCase):
     def test_interleaving_visits_each_cell_once_per_round_and_keeps_pairs(self):
         cases = ['baseline', 'small', 'medium', 'large']
@@ -290,6 +371,78 @@ class ScheduleTests(unittest.TestCase):
             for value in [-1, 0, 7]:
                 self.assertEqual(generate.expected('inferred_functions', size, value),
                                  size * value + size * (size - 1) // 2)
+
+    def test_repeated_dictionary_arguments(self):
+        family = 'repeated_dictionary_arguments'
+        for size in (1, 4, 16):
+            source = generate.program(family, size)
+            self.assertEqual(source.count('(pass '), size)
+            self.assertIn('case worker (Box x)', source)
+            self.assertEqual(generate.expected_output(family, size, -10), f'{size - 10}\n')
+            self.assertEqual(generate.expected(family, size, 2**63 - 1), -2**63 + size - 1)
+
+    def test_recursive_dictionary_forwarding(self):
+        family = 'recursive_dictionary_forwarding'
+        for n in (0, 1, 2, 17, 32):
+            source = generate.program(family, n)
+            self.assertEqual(source.count('(step (Box') + source.count('(step (Tag'), n)
+            self.assertIn('else second (subInt fuel 1) x', source)
+            self.assertIn('else first (subInt fuel 1) x', source)
+            alias = generate.program('recursive_dictionary_alias', n)
+            self.assertIn('bridge = first True;', alias)
+            self.assertIn('else bridge (subInt fuel 1) x', alias)
+            for x in (-2**63, -3, 0, 7, 2**63 - 1):
+                seed = self.signed_int(x + 1)
+                value = seed
+                for i in range(n):
+                    item = self.signed_int(seed + i)
+                    value = self.signed_int(value + (item if i % 2 == 0 else -item))
+                self.assertEqual(generate.expected(family, n, x), value)
+                self.assertEqual(generate.expected('recursive_dictionary_alias', n, x), value)
+
+    def test_closed_dictionary_result(self):
+        family = 'closed_dictionary_result'
+        for n in (0, 1, 2, 17, 32):
+            source = generate.program(family, n)
+            self.assertEqual(source.count('(step (Box') + source.count('(step (Tag'), n)
+            self.assertIn('entry x = addInt x (worker x);', source)
+            for x in (-2**63, -3, 0, 7, 2**63 - 1):
+                terms = [self.signed_int(x + i) for i in range(n)]
+                total = x + sum(terms[::2]) - sum(terms[1::2])
+                self.assertEqual(generate.expected(family, n, x), self.signed_int(total))
+
+    def test_bounded_dictionary_arguments(self):
+        family = 'bounded_dictionary_arguments'
+        for size in (1, 8, 32):
+            source = generate.program(family, size)
+            self.assertEqual(source.count('case pass (Box x'), size)
+            self.assertIn(f'callback x{size}', source)
+            self.assertEqual(generate.expected_output(family, size, -7), f'{size - 7}\n')
+            self.assertEqual(generate.expected(family, size, 2**63 - 1), -2**63 + size - 1)
+
+    def test_duplicated_type_arguments_preserves_input(self):
+        family = 'duplicated_type_arguments'
+        for depth in (1, 4, 19):
+            source = generate.program(family, depth)
+            self.assertIn('a -> Fork a a;', source)
+            self.assertEqual(source.count('(duplicate '), depth)
+            self.assertEqual(source.count('(left '), depth)
+            for value in (-2**63, -1, 7, 2**63 - 1):
+                self.assertEqual(generate.expected_output(family, depth, value), f'{value}\n')
+
+    def test_polymorphic_import_spine_grows_one_inferred_application(self):
+        family = 'polymorphic_import_spine'
+        self.assertFalse(generate.REGISTRY['families'][family]['default'])
+        for size in (1, 8, 64):
+            source = generate.program(family, size)
+            self.assertNotRegex(source, r'(?m)^(keep|entry) ::')
+            predecessor, = re.findall(r'(?m)^keep seed(.*?) = seed;$', source)
+            self.assertEqual(predecessor.split(), [f'unused{i}' for i in range(size)])
+            caller, = re.findall(r'(?m)^entry x = keep x(.*);$', source)
+            self.assertEqual(re.findall(r'\((ltInt|addInt) x (\d+)\)', caller),
+                             [('ltInt' if i % 2 else 'addInt', str(i)) for i in range(size)])
+            for value in (-2**63, -1, 0, 7, 2**63-1):
+                self.assertEqual(generate.expected_output(family, size, value), f'{value}\n')
 
     def test_polymorphic_import_fanout_retains_each_predecessor(self):
         family = 'polymorphic_import_fanout'
@@ -734,7 +887,7 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual(matrix['repeats'], 2)
         self.assertTrue(baseline)
         listing = subprocess.check_output([sys.executable, '-B', HERE / 'bench.py', 'list'], text=True)
-        self.assertIn('cells:    126, timed compilations: 504', listing)
+        self.assertIn('cells:    126, timed compilations: 756', listing)
         with tempfile.TemporaryDirectory() as directory:
             # Enumerate the whole public generator schedule without building 8,192-node sources.
             with mock.patch.object(generate, 'program', return_value='module Main where\n'):
@@ -838,6 +991,51 @@ class ScheduleTests(unittest.TestCase):
             self.assertEqual(zero['expected_stdout'], ['-99\n'] * 5)
             self.assertEqual(positive['expected_stdout'], ['-99\n', '-11\n', '37\n', '85\n', '-99\n'])
             self.assertEqual(Path(positive['source']).read_text().count('a <- readPiece left'), 8)
+
+    def test_production_endpoint_keeps_ordinary_crate_stages(self):
+        args = (Path('/bin/emlf'), Path('/spec'), Path('/out'))
+        self.assertEqual(worker.mlf_commands('crate-bootstrap-production-v1', *args),
+                         worker.mlf_commands('crate-bootstrap-v1', *args))
+        self.assertEqual(worker.ORDINARY_CLANG_FLAGS, ('-O2', '-Wno-override-module'))
+
+    def test_cold_codegen_endpoint_records_fresh_matching_llvm(self):
+        with tempfile.TemporaryDirectory() as folder:
+            out = Path(folder)
+            stages = worker.mlf_commands(worker.CACHED_ENDPOINT, Path('/bin/emlf'), out/'spec', out)
+            self.assertEqual(stages[1][1][-4:], ['--cache', out/'codegen-cache',
+                                                '--query-report', out/'codegen.json'])
+            objects = out/'codegen-cache'/'objects'
+            objects.mkdir(parents=True)
+            checksum = 'a' * 64
+            report = {'format': 1, 'input_key': 'b' * 64, 'optimized_key': checksum,
+                      'compiler': 'c' * 64, 'input_reused': False, 'optimized_reused': False}
+            (out/'unit.ll').write_bytes(b'generated LLVM')
+            stored = objects/(checksum+'.ll')
+            stored.write_bytes((out/'unit.ll').read_bytes())
+            def check():
+                (out/'codegen.json').write_text(json.dumps(report))
+                return runner.Q.cold_codegen_evidence(out, 'c' * 64)
+            self.assertEqual(check()['llvm_sha256'], hashlib.sha256(b'generated LLVM').hexdigest())
+            for field in ('input_reused', 'optimized_reused'):
+                report[field] = True
+                with self.assertRaisesRegex(ValueError, 'must be fresh'):
+                    check()
+                report[field] = False
+            stored.write_bytes(b'another artifact')
+            with self.assertRaisesRegex(ValueError, 'must match'):
+                check()
+
+    def test_production_flags_are_queried_from_each_producer(self):
+        triple = 'arm64-apple-darwin25'
+        with mock.patch.object(runner.subprocess, 'check_output',
+                               side_effect=['emlf --native-target-flags TRIPLE', '["-mno-outline"]',
+                                            'emlf --compile SOURCE']) as query:
+            self.assertEqual(runner.native_target_policy('/candidate', triple)['flags'], ['-mno-outline'])
+            self.assertEqual(runner.native_target_policy('/baseline', triple)['flags'], [])
+        self.assertEqual([c.args[0] for c in query.call_args_list], [
+            [Path('/candidate/bin/emlf'), '--help'],
+            [Path('/candidate/bin/emlf'), '--native-target-flags', triple],
+            [Path('/baseline/bin/emlf'), '--help']])
 
     def test_fused_endpoint_has_its_own_command_and_stages(self):
         endpoint = bench.measured_endpoint('crate-fused-v1')

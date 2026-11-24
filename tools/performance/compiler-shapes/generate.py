@@ -48,10 +48,57 @@ packet x = if eqInt x 0 then Missing else Payload (addInt x 3) (subInt 3 x);
     return declarations
 
 
+def local_recursive_checks(n):
+    count = max(n, 1)
+    helpers = []
+    for i in range(count):
+        following = (i + 1) % count
+        helpers.append(f"""visit{i} term = let {{
+  both a b = do {{ l <- visit{following} a; r <- visit{following} b; return (addInt l r) }};
+  fallback a b = case visit{following} a of {{ Good value -> Good value; Refused -> do {{ value <- visit{following} b; return (addInt value {i}) }} }}
+}} in case term of {{
+  Leaf x -> Good (addInt x {i}); Pair a b -> both a b; Choice a b -> fallback a b; Absent -> Refused
+}}""")
+    return HEADER + '''data Subject = Leaf Int | Pair Subject Subject | Choice Subject Subject | Absent;
+data Check a = Refused | Good a;
+instance Functor Check where { fmap f value = case value of { Refused -> Refused; Good x -> Good (f x) } };
+instance Applicative Check where { pure = Good; (<*>) vf vx = case vf of { Refused -> Refused; Good f -> fmap f vx } };
+instance Monad Check where { (>>=) action next = case action of { Refused -> Refused; Good x -> next x } };
+wrap k subject = if ltInt k 1 then subject else Choice Absent (wrap (subInt k 1) subject);
+walk subject = let {
+''' + ';\n'.join(helpers) + '''
+} in visit0 subject;
+entry x = case walk (wrap ''' + str(n) + ''' (Pair (Choice Absent (Leaf x)) (Pair (Leaf 4) (Leaf 7)))) of {
+  Refused -> 0; Good value -> value
+};
+''' + MAIN
+
+
 def program(family, n):
     """Generate one shared module with a runtime input at its IO entry."""
     if family == 'baseline':
         declarations, expression = '', 'x'
+    elif family == 'module_string_literals' and n:
+        common = ['coerce', 'Prelude', 'Bool', 'Dict_' + 'x' * 64]
+        def select(start, stop):
+            if stop - start == 1:
+                kind = start % 5
+                text = common[kind] if kind < 4 else 'λ' + 'abcdefghij' * 6 + '𐀀' + str(start)
+                return json.dumps(text, ensure_ascii=False)
+            middle = (start + stop) // 2
+            return f'(if ltInt x {middle} then {select(start, middle)} else {select(middle, stop)})'
+        declarations = 'pick :: Int -> String;\npick x = ' + select(0, n) + ';\n'
+        expression = ('let { text = pick x; size = stringLength text } in '
+                      'addInt (mulInt size 257) (stringCodeAt text (subInt size 1))')
+    elif family == 'module_string_literals':
+        declarations, expression = '', 'x'
+    elif family == 'mixed_unicode_literal':
+        # Positions include both Unicode scalars and both ends of the ASCII run.
+        payload = 'λ' + 'abcdefghijklmnop' * n + '界'
+        declarations = f'literal :: String;\nliteral = "{payload}";\n'
+        expression = ('let { last = subInt (stringLength literal) 1; index = '
+                      'if ltInt x 0 then 0 else if eqInt x 0 then last else remInt x last } '
+                      'in addInt (stringLength literal) (stringCodeAt literal index)')
     elif family == 'captured_parameter_uses':
         declarations = ''.join(
             f'f{i} x = let {{ y = x }} in addInt y {i+1};\n' for i in range(n))
@@ -120,6 +167,23 @@ sumChain x chain = case chain of { End -> 0; More box rest -> addInt (readBox bo
         terms = [f'(probe{i} payload)' for i in range(n)]
         total = balanced(terms, lambda a, b: f'(addInt {a} {b})')
         return HEADER + declarations + f'entry x = let {{ payload = packet x }} in {total};\n' + MAIN
+    elif family == 'wide_thunk_captures':
+        declarations = '''data WideRow = WideRow Int Int;
+data WideBatch = WideEnd | WideMore WideRow WideBatch;
+readRows x batch = case batch of {
+  WideEnd -> 0;
+  WideMore row rest -> case row of {
+    WideRow wide narrow -> addInt (if ltInt x 0 then wide else narrow) (readRows x rest)
+  }
+};
+'''
+        for i in range(1, n + 1):
+            declarations += (f'make{i} a b c d e f g h = WideRow '
+                             f'(addInt {i} (addInt (addInt (mulInt a b) (mulInt c d)) '
+                             f'(addInt (mulInt e f) (mulInt g h)))) (subInt a {i});\n')
+        args = ' '.join(['x'] + [f'(addInt x {i})' for i in range(1, 8)])
+        rows = ''.join(f'WideMore (make{i} {args}) (' for i in range(1, n + 1))
+        return HEADER + declarations + f'entry x = readRows x ({rows}WideEnd' + ')' * n + ');\n' + MAIN
     elif family == 'captured_thunk_fanout':
         declarations = '''data Row = Row Int Int Int Int;
 data Batch = End | More Row Batch;
@@ -156,6 +220,64 @@ producer x = if ltInt x 0 then next (subInt 0 x) else addInt x ({total});
                                f'then level{i-1} (addInt z {i}) else level{i-1} (subInt z {i})')
         return (HEADER + 'hotTransaction start = let {\n' + ';\n'.join(definitions)
                 + f'\n}} in level{n} start;\nentry x = hotTransaction x;\n' + MAIN)
+    elif family in ('recursive_dictionary_forwarding', 'recursive_dictionary_alias',
+                    'closed_dictionary_result'):
+        declarations = """data Box a = Box Int a;
+data Tag a = Tag Int a;
+class Step a where { step :: a -> Int };
+instance Step (Box a) where { step (Box value ignored) = value };
+instance Step (Tag a) where { step (Tag value ignored) = subInt 0 value };
+"""
+        terms = [f'(step ({"Box" if i % 2 == 0 else "Tag"} (addInt x {i}) x))' for i in range(n)]
+        subtotal = balanced(terms, lambda a, b: f'(addInt {a} {b})') if terms else '0'
+        if family == 'closed_dictionary_result':
+            return HEADER + declarations + f'worker x = {subtotal};\nentry x = addInt x (worker x);\n' + MAIN
+        if family == 'recursive_dictionary_alias':
+            return (HEADER + declarations
+                    + 'first direction fuel x = if ltInt fuel 1 then '
+                    + f'addInt (if direction then x else subInt 0 x) {subtotal} else second (subInt fuel 1) x;\n'
+                    + 'bridge = first True;\n'
+                    + 'second fuel x = if ltInt fuel 1 then bridge 0 (addInt x 1) else bridge (subInt fuel 1) x;\n'
+                    + 'entry x = second 2 x;\n' + MAIN)
+        return (HEADER + declarations
+                + f'first fuel x = if ltInt fuel 1 then addInt x {subtotal} else second (subInt fuel 1) x;\n'
+                + 'second fuel x = if ltInt fuel 1 then first 0 (addInt x 1) else first (subInt fuel 1) x;\n'
+                + 'entry x = second 2 x;\n' + MAIN)
+    elif family in ('repeated_dictionary_arguments', 'bounded_dictionary_arguments'):
+        declarations = """data Box = Box Int;
+class Pass a where { pass :: a -> a };
+instance Pass Box where { pass (Box x) = Box (addInt x 1) };
+"""
+        if family == 'bounded_dictionary_arguments':
+            body = f'callback x{n}'
+            for i in reversed(range(n)):
+                body = f'case pass (Box x{i}) of {{ Box x{i+1} -> {body} }}'
+            return (HEADER + declarations + f'worker callback x0 = {body};\n'
+                    + 'entry x = worker (\\y -> y) x;\n' + MAIN)
+        calls = '(pass ' * n + 'x' + ')' * n
+        return (HEADER + declarations + f'worker x = {calls};\n'
+                + 'entry x = case worker (Box x) of { Box y -> y };\n' + MAIN)
+    elif family == 'duplicated_type_arguments':
+        # Each call shares its value but uses its type in both result slots.
+        expression = 'x'
+        for _ in range(n):
+            expression = f'(duplicate {expression})'
+        for _ in range(n):
+            expression = f'(left {expression})'
+        declarations = ('data Fork a b = ForkValue a b;\n'
+                        'duplicate :: forall a. a -> Fork a a;\n'
+                        'duplicate x = ForkValue x x;\n'
+                        'left :: forall a b. Fork a b -> a;\n'
+                        'left (ForkValue x _) = x;\n')
+        return HEADER + declarations + f'entry x = {expression};\n' + MAIN
+    elif family == 'polymorphic_import_spine':
+        parameters = ''.join(f' unused{i}' for i in range(n))
+        operands = ''.join(
+            f' ({"ltInt" if i % 2 else "addInt"} x {i})' for i in range(n))
+        # Inference gives each ignored argument its own type variable. The
+        # caller imports that scheme and successively applies its wide arrow.
+        declarations = f'keep seed{parameters} = seed;\n'
+        return HEADER + declarations + f'entry x = keep x{operands};\n' + MAIN
     elif family == 'polymorphic_import_fanout':
         declarations = ''.join(f'helper{i} x = x;\n' for i in range(n))
         terms = [f'helper{i} (addInt x {i})' for i in range(n)]
@@ -530,6 +652,73 @@ foldPair step seed left right = foldTree step seed (Branch (Leaf left) (Leaf rig
         calls = [f'foldPair addInt x (addInt x {i}) x' for i in range(n)]
         total = balanced(calls, lambda left, right: f'addInt ({left}) ({right})')
         return HEADER + declarations + f'entry x = {total};\n' + MAIN
+    elif family == 'local_recursive_checks':
+        return local_recursive_checks(n)
+    elif family in ('local_monadic_dictionary_uses', 'ground_monadic_dictionary_uses', 'checked_groups_then_dictionary'):
+        # A concrete first action fixes the monad throughout the same do block.
+        first_action = ('(case start of { Done value -> Done value })'
+                        if family == 'ground_monadic_dictionary_uses' else 'start')
+        steps = '\n'.join(f'    a{i} <- twice (pure (addInt a{i-1} {i}));'
+                          for i in range(1, n + 1))
+        declarations = f"""data Work a = Done a;
+instance Functor Work where {{ fmap f (Done x) = Done (f x) }};
+instance Applicative Work where {{ pure x = Done x; (<*>) (Done f) (Done x) = Done (f x) }};
+instance Monad Work where {{ (>>=) (Done x) next = next x }};
+walk start = let {{
+  step action = do {{ value <- action; return (addInt value 1) }};
+  twice action = step (step action)
+}} in do {{
+    a0 <- {first_action};
+{steps}
+    return a{n}
+}};
+"""
+        if family == 'checked_groups_then_dictionary':
+            arms = 12
+            rows = ['data CheckedInput = ' + ' | '.join(f'Field{j} Int' for j in range(arms)) + ';']
+            for j in range(2*arms):
+                rows.extend([f'offset{j} :: Int -> Int;', f'offset{j} v = addInt v {j+1};'])
+            for i in range(4*n):
+                alts = [f'Field{j} v -> if ltInt v {i+j} then addInt (offset{2*j} (mulInt v {j+1})) {i} '
+                        f'else subInt (offset{2*j+1} (addInt v {j})) {i}' for j in range(arms)]
+                rows.extend([f'checked{i} :: CheckedInput -> Int;',
+                             f'checked{i} input = case input of {{ ' + '; '.join(alts) + ' };'])
+            values = [f'checked{i} input' for i in range(4*n)]
+            total = balanced(values, lambda a, b: f'addInt ({a}) ({b})') if values else 'x'
+            select = ''.join(f'if eqInt key {j} then Field{j} x else ' for j in range(arms-1)) + f'Field{arms-1} x'
+            rows.append(f'checkedPrefix :: Int -> Int;\ncheckedPrefix x = let {{ '
+                        f'key = remInt (addInt {arms} (remInt x {arms})) {arms}; input = {select} }} in {total};')
+            declarations = '\n'.join(rows) + '\n' + declarations.replace(
+                'a0 <- start;', 'seed <- start; a0 <- pure (checkedPrefix seed);')
+        expression = 'case walk (Done x) of { Done y -> y }'
+    elif family in ('recursive_monad_peers', 'nested_recursive_monad_peers'):
+        preamble = HEADER + '''data Check a = Failed | Good a;
+instance Functor Check where { fmap f value = case value of { Failed -> Failed; Good x -> Good (f x) } };
+instance Applicative Check where { pure = Good; (<*>) vf vx = case vf of { Failed -> Failed; Good f -> fmap f vx } };
+instance Monad Check where { (>>=) value next = case value of { Failed -> Failed; Good x -> next x } };
+tick :: Int -> Check Int;
+tick x = Good (addInt x 1);
+'''
+        steps = ''.join(f'  x{i+1} <- tick x{i};\n' for i in range(n))
+        if family == 'nested_recursive_monad_peers':
+            def nested_peer(i):
+                following = (i + 1) % 4
+                return (f'walk{i} remaining x0 = let {{\n'
+                        f'  local k arg = if ltInt k 1 then walk{following} (subInt remaining 1) '
+                        f'(addInt arg {i+1}) else do {{ next <- tick arg; local (subInt k 1) next }}\n'
+                        f'}} in if ltInt remaining 1 then Good x0 else do {{\n'
+                        + steps + f'  local 1 x{n}\n}};\n')
+
+            peers = ''.join(nested_peer(i) for i in range(4))
+            return preamble + peers + 'entry x = case walk0 4 x of { Failed -> 0; Good answer -> answer };\n' + MAIN
+
+        def peer(name, other, offset):
+            return (f'{name} remaining x0 = if ltInt remaining 1 then Good x0 else do {{\n'
+                    + steps + f'  {other} (subInt remaining 1) (addInt x{n} {offset})\n}};\n')
+
+        return preamble + peer('leftPeer', 'rightPeer', 2) + peer('rightPeer', 'leftPeer', 3) + '''
+entry x = case leftPeer 4 x of { Failed -> 0; Good answer -> answer };
+''' + MAIN
     elif family == 'inferred_monadic_recursion':
         steps = '\n'.join(f'    a{i+1} <- pure (addInt a{i} x);' for i in range(n))
         declarations = f'''data Work a = Done a;
@@ -813,8 +1002,32 @@ run x (More (Job worker) rest) = let { saved = worker x (addInt x 1) } in
 
 def expected(family, n, x):
     """Closed-form specifications; no compiled results or generated helpers used."""
+    if family == 'module_string_literals':
+        if not n:
+            return x
+        i = min(max(x, 0), n - 1)
+        size, last = [(6, 101), (7, 101), (4, 108), (69, 120),
+                      (62 + len(str(i)), 48 + i % 10)][i % 5]
+        return size * 257 + last
+    if family == 'mixed_unicode_literal':
+        last = 16 * n + 1
+        index = 0 if x < 0 else last if x == 0 else x % last
+        code = ord('λ') if index == 0 else ord('界') if index == last else ord('a') + (index - 1) % 16
+        return last + 1 + code
     if family == 'baseline':
         return x
+    if family in ('polymorphic_import_spine', 'duplicated_type_arguments'):
+        return x
+    if family == 'closed_dictionary_result':
+        total = x - n // 2 + (x + n - 1 if n % 2 else 0)
+        return (total + 2**63) % 2**64 - 2**63
+    if family in ('recursive_dictionary_forwarding', 'recursive_dictionary_alias'):
+        # Each Box/Tag pair contributes -1. An unpaired Box contributes seed + n - 1.
+        seed = x + 1
+        total = seed - n // 2 + (seed + n - 1 if n % 2 else 0)
+        return (total + 2**63) % 2**64 - 2**63
+    if family in ('repeated_dictionary_arguments', 'bounded_dictionary_arguments'):
+        return (x + n + 2**63) % 2**64 - 2**63
     if family == 'captured_parameter_uses':
         total = n*x + n*(n+1)//2
         return (total + 2**63) % 2**64 - 2**63
@@ -836,6 +1049,12 @@ def expected(family, n, x):
         right_count = min(n, max(0, x + 4))
         right_offsets = right_count*(right_count-1)//2
         return right_count*(3-x) + (n-right_count)*(x+3) + offsets - 2*right_offsets
+    if family == 'wide_thunk_captures':
+        offsets = n * (n + 1) // 2
+        if x < 0:
+            # Four adjacent products expand to 4*x^2 + 28*x + 68.
+            return n * (4*x*x + 28*x + 68) + offsets
+        return n*x - offsets
     if family == 'captured_thunk_fanout':
         if x < 0:
             return x*n*(n+1)//2 + n*(9-x)*(2*x+3)
@@ -925,6 +1144,24 @@ def expected(family, n, x):
     if family == 'polymorphic_tree_fold':
         total = 3*n*x + n*(n-1)//2
         return (total + 2**63) % 2**64 - 2**63
+    if family == 'nested_recursive_monad_peers':
+        # Each of four peers takes n ticks plus one local tick. The peer
+        # offsets add 1 + 2 + 3 + 4 during the complete circuit.
+        return x + 4*n + 14
+    if family == 'recursive_monad_peers':
+        return x + 4*n + 10
+    if family == 'local_recursive_checks':
+        # The outer choices visit one complete ring. The three leaves are
+        # two levels below the root, and the left choice falls back at depth one.
+        count = max(n, 1)
+        return x + 11 + n * (n - 1) // 2 + 3 * (2 % count) + 1 % count
+    if family == 'checked_groups_then_dictionary':
+        count = 4 * n
+        arm = x % 12
+        prefix = sum(x*(arm+1) + i + 2*arm+1 if x < i+arm else x+3*arm+2-i for i in range(count)) if count else x
+        return prefix + n * (n + 1) // 2 + 2 * n
+    if family in ('local_monadic_dictionary_uses', 'ground_monadic_dictionary_uses'):
+        return x + n*(n+1)//2 + 2*n
     if family == 'inferred_monadic_recursion':
         return ((n + 1)*x + 2**63) % 2**64 - 2**63
     if family == 'bounded_optional_writers':
@@ -1036,7 +1273,9 @@ def generate(out, sizes=None, families=None, baseline_family=None):
         directory = out/identity; directory.mkdir()
         source = directory/'Main.hs'; source.write_text(program(source_family,n))
         inputs = [-1,0,n+3] if family == 'recursive_ring' else [-1,0,7]
-        if family == 'wide_case':
+        if family == 'module_string_literals':
+            inputs = list(dict.fromkeys([-1, 0, 1, 2, 3, 4, n//2, n-1, n+1]))
+        elif family == 'wide_case':
             inputs = [-1, n//2, n, '--all']
         elif family == 'visible_instance_inventory':
             inputs = [-2**63, -1, 0, 7, 2**63-1]

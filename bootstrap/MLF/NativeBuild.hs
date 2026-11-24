@@ -189,7 +189,9 @@ module MLF.NativeBuild (run) where {
             save build receipt;
             writeFile (build ++ "/program.ll") (S.concatStrings (Prepared.nativeChunks compiled));
             afterLLVM <- runPhase build receipt "llvm"
-              [clang, "-O2", "-Wno-override-module", "-c", build ++ "/program.ll", "-o", build ++ "/program.o"];
+              (S.append [clang, "-O2", "-Wno-override-module"]
+                (S.append (O.nativeTargetFlags Native.targetTriple)
+                  ["-c", build ++ "/program.ll", "-o", build ++ "/program.o"]));
             validateFiles objectRows;
             validateFiles linkRows;
             afterLink <- runPhase build afterLLVM "link"

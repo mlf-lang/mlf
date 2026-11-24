@@ -329,6 +329,107 @@ module Bootstrap.ClassDemand where {
     } in
     discover frames uses nodes dependents [] initial;
 
+  -- A reference or union with a single productive predecessor forwards each
+  -- incoming slot exactly once. Its final set is its predecessor's set. A
+  -- productive chain of such aliases ends at a seed, merge or instantiation:
+  -- a cycle containing only aliases has no incoming seed.
+  productiveNodes dependents pending seen =
+    if IS.null pending then seen else let {
+      reached = IS.union seen pending;
+      next = IS.foldl (\acc n -> IS.union acc (IM.get n dependents)) IS.empty pending
+    } in productiveNodes dependents (IS.difference next reached) reached;
+  forwardedInput productive node demand =
+    if not (IS.member node productive) then Nothing else case demand of {
+      RefNode input -> Just input;
+      UnionNodes inputs -> let {
+        active = IS.fromList (filter (\input -> IS.member input productive) inputs)
+      } in if IS.size active == 1 then Just (IS.findMin active) else Nothing;
+      _ -> Nothing
+    };
+  -- The FIFO carries the outgoing edges themselves. A discovered sink has
+  -- no later effect; its reachable set is still recorded before this point.
+  data DiscoveryEdge = ForwardFact ([] DiscoveryEdge) | MergeFact Int ([] DiscoveryEdge)
+    | TransportFact Int Use ([] DiscoveryEdge);
+  data DiscoveryWork = DiscoveryWork Int ([] DiscoveryEdge);
+  enqueue edges slot pending = case edges of {
+    [] -> pending; _ -> (:) (DiscoveryWork slot edges) pending
+  };
+  data DiscoveryIndex = DiscoveryIndex Int (IntMap Int) (IntMap Demand);
+  discoverValidated :: IntMap Frame -> IntMap Seed -> IntMap Use -> IntMap Demand ->
+                       IntMap IntSet -> Either String Discovery;
+  discoverValidated frames seeds uses nodes dependents =
+    case (,) (IM.lookupMin nodes) (IM.lookupMax nodes) of {
+      (,) (Just ((,) low _)) (Just ((,) high _)) -> let {
+        span = high - low;
+        count = IM.size nodes
+      } in if low >= 0 && span >= 0 && quotInt span 4 < count && span < 1152921504606846975
+        then runST (stBind (newSTArray (span + 1) IS.empty)
+          (\rows -> let {
+            universe = allocateSeeds seeds;
+            facts = IM.foldrWithKey (\node demand rest -> case demand of {
+              SeedNode seed -> (:) ((,) node (IM.get seed (universeSeeds universe))) rest;
+              _ -> rest
+            }) [] nodes;
+            productive = productiveNodes dependents (seedWork nodes) IS.empty;
+            aliases = IM.mapMaybeWithKey (forwardedInput productive) nodes;
+            edge output = let { following = IM.get output edges } in
+              if IM.member output aliases then ForwardFact following else
+              case IM.get output nodes of {
+                InstantiateNode use _ -> TransportFact output (IM.get use uses) following;
+                _ -> MergeFact output following
+              };
+            edges = IM.map (\targets -> map edge (IS.toAscList targets)) dependents;
+            index = DiscoveryIndex low aliases nodes;
+            work = foldr (\((,) node slot) rest -> enqueue (IM.get node edges) slot rest) [] facts
+          } in denseSeedFacts low rows facts (denseDiscover frames index rows universe work [])))
+        else discoverUniverse frames seeds uses nodes dependents;
+      _ -> discoverUniverse frames seeds uses nodes dependents
+    };
+  denseSeedFacts :: forall s a. Int -> STArray s IntSet -> [] ((,) Int Int) -> ST s a -> ST s a;
+  denseSeedFacts low rows facts done =
+    case facts of {
+      [] -> done;
+      (:) ((,) node slot) rest -> stBind (writeSTArray rows (node - low) (IS.singleton slot))
+        (\_ -> denseSeedFacts low rows rest done)
+    };
+  denseDiscover :: forall s. IntMap Frame -> DiscoveryIndex -> STArray s IntSet -> Universe ->
+                   [] DiscoveryWork -> [] DiscoveryWork -> ST s (Either String Discovery);
+  denseDiscover frames index@(DiscoveryIndex low aliases nodes) rows universe front pending =
+    case front of {
+      [] -> case pending of {
+        [] -> stBind (freezeSTArray rows) (\at -> let {
+          stored node = case IM.lookup node aliases of {
+            Nothing -> at (node - low); Just parent -> stored parent
+          }
+        } in stReturn (Right (Discovery universe (IM.mapWithKey (\n _ -> stored n) nodes) [])));
+        _ -> denseDiscover frames index rows universe (reverse pending) []
+      };
+      (:) (DiscoveryWork slot edges) rest ->
+        denseDependents frames index rows universe rest pending slot edges
+    };
+  denseDependents :: forall s. IntMap Frame -> DiscoveryIndex -> STArray s IntSet -> Universe ->
+                     [] DiscoveryWork -> [] DiscoveryWork -> Int -> [] DiscoveryEdge ->
+                     ST s (Either String Discovery);
+  denseDependents frames index@(DiscoveryIndex low _ _) rows universe rest pending slot outputs =
+    case outputs of {
+      [] -> denseDiscover frames index rows universe rest pending;
+      (:) edge remaining -> let {
+        continue next work = denseDependents frames index rows next rest work slot remaining;
+        record output target next following = stBind (readSTArray rows (output - low))
+          (\previous -> if IS.member target previous then continue next pending
+            else let { updated = IS.insert target previous } in
+              seq updated (stBind (writeSTArray rows (output - low) updated)
+                (\_ -> continue next (enqueue following target pending))))
+      } in case edge of {
+        ForwardFact following -> continue universe (enqueue following slot pending);
+        MergeFact output following -> record output slot universe following;
+        TransportFact output use following -> case allocateAt frames use slot universe of {
+          Left err -> stReturn (Left err);
+          Right ((,) target next) -> record output target next following
+        }
+      }
+    };
+
   -- This phase receives an immutable, already allocated universe. Every
   -- operation below is set union or transition lookup: no new origin exists
   -- in the fixed-point loop, and missing preallocation is an explicit error.
@@ -564,7 +665,7 @@ module Bootstrap.ClassDemand where {
           Just [] -> solveInherited seeds nodes dependents;
           Just [only] -> solveSingleCopy frames seeds uses nodes dependents only;
           _ -> do {
-            Discovery universe reached _ <- discoverUniverse frames seeds uses nodes dependents;
+            Discovery universe reached _ <- discoverValidated frames seeds uses nodes dependents;
             (,) values updates <- saturate universe (IM.keysSet (universeSlots universe))
               nodes dependents (seedWork nodes) (IM.map (\_ -> IS.empty) nodes) 0;
             ensure (IM.eqIntMap IS.eqIntSet reached values)

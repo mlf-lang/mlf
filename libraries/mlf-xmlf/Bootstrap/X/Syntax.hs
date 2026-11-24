@@ -25,6 +25,54 @@ module Bootstrap.X.Syntax where {
   instantiate (XTypeApp t a) b = XTypeApp t (compose a b);
   instantiate t p = XTypeApp t p;
   typeApplication t = XThen (XInner (XBottom t)) XElim;
+  -- A projection has independent argument types. A nonfinal lambda's
+  -- result is abstracted at the exact type of the remaining projection.
+  projectionParts :: [] ((,,) XName XTyVar (Maybe XTyVar)) -> XName -> Either String ((,) XType XTerm);
+  projectionParts rows selected = case L.find (\((,,) n _ _) -> equalName n selected) rows of {
+    Nothing -> Left "projection does not return one of its parameters";
+    Just ((,,) _ chosen _) -> let {
+      build binders = case binders of {
+        [(,,) n a Nothing] -> Right ((,) (XForall a XBot (XArrow (XVar a) (XVar chosen)))
+          (XTypeAbs a XBot (XAbs n (XVar a) (XVarTerm selected))));
+        (:) ((,,) n a (Just r)) rest -> do {
+          (,) ty body <- build rest;
+          Right ((,) (XForall a XBot (XForall r ty (XArrow (XVar a) (XVar r))))
+            (XTypeAbs a XBot (XTypeAbs r ty (XAbs n (XVar a) (XTypeApp body (XHyp r))))))
+        };
+        _ -> Left "malformed projection parameter spine"
+      }
+    } in build rows
+  };
+  expandProjection rows selected = case projectionParts rows selected of {
+    Right ((,) _ term) -> term;
+    Left e -> panic e
+  };
+  mapProjection name variable rows selected = XProjection (L.map
+    (\((,,) n a r) -> (,,) (name n) (variable a) (L.mapOptional variable r)) rows) (name selected);
+  foldProjectionIdentities :: forall a. (Int -> a -> a) ->
+    [] ((,,) XName XTyVar (Maybe XTyVar)) -> XName -> a -> a;
+  foldProjectionIdentities add rows selected initial = let {
+    step seen ((,,) n arg result) = let { current = add ((\(XTyVar id) -> id) arg) (add (nameId n) seen) }
+      in case result of { Nothing -> current; Just r -> add ((\(XTyVar id) -> id) r) current }
+  } in add (nameId selected) (L.foldl step initial rows);
+  expandInstantiationSpine :: XName -> [] ((,,) String Bool XTerm) -> XTerm;
+  expandInstantiationSpine name rows = let {
+    step head ((,,) constructor result arg) = let {
+      first = XInner (XBottom (XCon constructor []));
+      proof = XThen first (if result then XThen XElim XElim else XElim)
+    } in XApp (XTypeApp head proof) arg
+  } in L.foldl step (XVarTerm name) rows;
+  -- The packed row carries exactly its own proof. Disallow nested operand
+  -- proofs so graph readers need no second normalization pass over a row.
+  plainSpineOperand :: XTerm -> Bool;
+  plainSpineOperand term = case term of {
+    XApp f a -> plainSpineOperand f && plainSpineOperand a;
+    XVarTerm _ -> True;
+    XIntTerm _ -> True; XDoubleTerm _ -> True;
+    XBoolTerm _ -> True; XStringTerm _ -> True;
+    XPrimitive _ _ -> True; XConstructor _ _ -> True;
+    _ -> False
+  };
   erase :: XTerm -> XErased;
   erase term =
     case term of {
@@ -32,7 +80,11 @@ module Bootstrap.X.Syntax where {
       XAbs n _ b -> XEAbs n (erase b);
       XApp f a -> XEApp (erase f) (erase a);
       XTypeAbs _ _ b -> erase b;
+      XProjection rows selected ->
+        L.foldr (\((,,) n _ _) body -> XEAbs n body) (XEVar selected) rows;
       XTypeApp a _ -> erase a;
+      XInstantiationSpine name rows -> L.foldl
+        (\head ((,,) _ _ operand) -> XEApp head (erase operand)) (XEVar name) rows;
       XLet n a b -> XELet n (erase a) (erase b);
       XLetRec ds b -> XELetRec (L.map eraseBinding ds) (erase b);
       XIntTerm i -> XEInt i;

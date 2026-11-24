@@ -6,6 +6,7 @@ module Bootstrap.Graph.Solver where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import qualified Bootstrap.Std as L;
+  import qualified Bootstrap.ST as ST;
   import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.IntRank as Rank;
@@ -106,6 +107,27 @@ module Bootstrap.Graph.Solver where {
     if (count <= 0)
     then []
     else (:) parents (scopeJumps (count - 1) (IM.map (\n -> IM.get n parents) parents));
+  -- In a complete single-root scope tree, a jump that has reached the
+  -- root never changes. Keep those Patricia branches across later levels.
+  rootedScopeJumps :: Int -> Int -> IntMap Int -> [] (IntMap Int);
+  rootedScopeJumps count root parents@(IntMap tree) = let {
+    advance branch = case branch of {
+      IntMapNil -> Nothing;
+      IntMapTip key parent ->
+        if parent == root then Nothing else let { next = IM.get parent parents } in
+          seq next (Just (IntMapTip key next));
+      IntMapBin size prefix left right -> case (,) (advance left) (advance right) of {
+        (,) Nothing Nothing -> Nothing;
+        (,) (Just a) Nothing -> Just (IntMapBin size prefix a right);
+        (,) Nothing (Just b) -> Just (IntMapBin size prefix left b);
+        (,) (Just a) (Just b) -> Just (IntMapBin size prefix a b)
+      }
+    };
+    more = if count <= 1 then [] else case advance tree of {
+      Nothing -> L.replicate (count - 1) parents;
+      Just next -> rootedScopeJumps (count - 1) root (IM.wrap next)
+    }
+  } in if count <= 0 then [] else (:) parents more;
   indexScopes :: Graph -> ScopeIndex;
   indexScopes graph =
     let {
@@ -155,7 +177,11 @@ module Bootstrap.Graph.Solver where {
     } in
     -- The largest jump only needs to reach the root from the deepest scope.
     case L.foldlStrict (scopeVisit descendants 0) ((,,) 0 0 IM.empty) roots of {
-      (,,) _ depth intervals -> ScopeIndex intervals (scopeJumps (scopeLevels depth) parents)
+      (,,) _ depth intervals -> let { levels = scopeLevels depth } in ScopeIndex intervals (case roots of {
+        (:) root [] -> if IM.size intervals == IM.size parents then rootedScopeJumps levels root parents
+          else scopeJumps levels parents;
+        _ -> scopeJumps levels parents
+      })
     };
   scopeContains :: ScopeIndex -> Int -> Int -> Bool;
   scopeContains (ScopeIndex intervals jumps) a b = G.intervalContains intervals a b;
@@ -233,6 +259,44 @@ module Bootstrap.Graph.Solver where {
         (:) (ScopeEntry p _) _ -> Just p
       }
     } in seq parent (G.strictPair ((:) scope enclosing) (IM.insert n parent parents));
+  -- The initial graph is validated and canonical. Its children and binders
+  -- are live keys. Accumulate their incoming edges by offset, then construct
+  -- each set from ascending parent IDs. Duplicate edges set the same bit.
+  initialSolver graph = let {
+    entries = IM.toAscList (G.nodes graph);
+    scopes = indexScopes graph
+  } in case G.denseBounds graph of {
+    Nothing -> L.foldlStrict addNode (mkSolver graph IM.empty IM.empty scopes) entries;
+    Just ((,) low high) -> runST (initialDenseSolver graph scopes entries low high)
+  };
+  initialDenseSolver :: forall s. Graph -> ScopeIndex -> [] ((,) Int Node) ->
+    Int -> Int -> ST s Solver;
+  initialDenseSolver graph scopes entries low high = do {
+    let { size = high - low + 1 };
+    parents <- newSTArray size IS.NoState;
+    descendants <- newSTArray size IS.NoState;
+    let {
+      insertRow rows n key = stBind (G.readDense low rows key) (\old -> let {
+        next = IS.ascInsert old n
+      } in seq next (G.writeDense low rows key next));
+      add ((,) n v) = do {
+        ST.map_ (insertRow parents n) (G.children (G.tag v));
+        case G.binder v of {
+          Nothing -> stReturn ();
+          Just b -> insertRow descendants n b
+        }
+      };
+      finish rows = stBind (freezeSTArray rows) (\at -> stReturn
+        (IM.mapMaybeWithKey (\n _ -> case at (n - low) of {
+          IS.NoState -> Nothing;
+          row -> let { slots = IS.finishAsc row } in seq (forceIntSet slots) (Just slots)
+        }) (G.nodes graph)))
+    };
+    ST.map_ add entries;
+    structural <- finish parents;
+    binding <- finish descendants;
+    stReturn (mkSolver graph structural binding scopes)
+  };
   prepare :: Graph -> Either String Solver;
   prepare input =
     G.bindE (G.validateGraph input)
@@ -246,10 +310,7 @@ module Bootstrap.Graph.Solver where {
                    else let {
                           canonical = G.canonicalize input
                         } in
-                        Right
-                          (L.foldlStrict addNode
-                             (mkSolver canonical IM.empty IM.empty (indexScopes canonical))
-                             (IM.toList (G.nodes canonical))));
+                        Right (initialSolver canonical));
   equalIntervals :: IntMap ((,) Int Int) -> IntMap ((,) Int Int) -> Bool;
   equalIntervals a b =
     IM.eqIntMap
@@ -2462,22 +2523,53 @@ module Bootstrap.Graph.Solver where {
     case permissions of {
       Left message -> Right (LocalRejected message);
       Right _ -> let {
-        touched = IS.union (IS.fromList (IM.keys placements))
+        touched = IS.union placedIds
           (IS.union (users structuralParents) (users bindingChildren));
         survivors = L.filter (\n -> IM.notMember n aliases)
           (L.takeWhile (\n -> n < first) (IS.toList touched));
-        removed = L.map (\n -> (,) n (G.nodeAt before n))
-          (L.takeWhile (\n -> n < first) (IS.toList (IS.union touched (IS.fromList (IM.keys aliases)))));
-        replacement n = let { v = G.nodeAt skeleton n } in
-          (,) n (G.mkNode (G.mapTag image (G.tag v)) (binderAt placements n)
-            (if L.any (\original -> G.equalFlag (G.flag (G.nodeAt before original)) Rigid) (members n)
-              then Rigid else Flexible));
+        -- The quotient mutates a winner's tag, discards its aliases, and
+        -- may place a surviving binder. Every other old node retains its
+        -- outgoing edges after their destination keys have been renamed.
+        oldIds keys = L.takeWhile (\n -> n < first) (IS.toList keys);
+        placedIds = IS.fromList (IM.keys placements);
+        editIds = IS.union merged placedIds;
+        removed = L.map (\n -> let { v = G.nodeAt before n } in
+          (,) n (G.mkNode (G.mapTag image (G.tag v)) (G.mapMaybeInt image (G.binder v)) (G.flag v)))
+          (oldIds (IS.union editIds (IS.fromList (IM.keys aliases))));
+        -- Incoming edges can change even for a singleton class. Its original
+        -- flag is already on the surviving node. Force the new binder identity
+        -- before publishing it so a live edge cannot retain the old quotient.
+        replacement n = let {
+          v = G.nodeAtRepresentative skeleton n n;
+          newFlag = case IM.lookup n classes of {
+            Nothing -> G.flag v;
+            Just originals -> if L.any (\original -> G.equalFlag
+              (G.flag (G.nodeAtRepresentative before original original)) Rigid) originals
+              then Rigid else Flexible
+          };
+          parent = binderAt placements n;
+          strictParent = case parent of { Nothing -> Nothing; Just key -> seq key parent }
+        } in (,) n (G.mkNode (G.mapTag image (G.tag v)) strictParent newFlag);
+        -- All incoming edges of an alias acquire the same destination.
+        -- Move their source set once, then patch the outgoing edges of each
+        -- changed or deleted node against that renamed index.
+        moveIncoming index alias _ = case IM.lookup alias index of {
+          Nothing -> index;
+          Just sources -> IM.insertWith IS.union (image alias) sources (IM.delete alias index)
+        };
+        renameIndex index = IM.foldlWithKey moveIncoming index aliases;
+        renamed = mkSolver current (renameIndex (structuralParents solver))
+          (renameIndex (bindingChildren solver)) scopes;
         changed = L.map replacement survivors;
         retainedFresh = L.map (\entry@((,) n _) -> if IS.member n touched then replacement n else entry)
           (L.filter (\((,) n _) -> IM.notMember n aliases) fresh);
-        result = G.mkGraph (IM.union (G.nodesFromDistinctAscList (L.append changed retainedFresh)) (G.nodes skeleton))
-          (IM.union aliases (G.links current)) (G.nextId current)
-      } in Right (LocalSolved (withGraph result (patchIndexedNodes solver removed (L.append changed retainedFresh))))
+        published = G.nodesFromDistinctAscList (L.append changed retainedFresh);
+        result = G.mkGraph (IM.union published (G.nodes skeleton))
+          (IM.union aliases (G.links current)) (G.nextId current);
+        -- Share the exact replacements already materialized for the graph.
+        indexedEdits = L.map (\n -> (,) n (IM.get n published)) (oldIds editIds)
+      } in Right (LocalSolved (withGraph result (patchIndexedNodes renamed removed
+          (L.append indexedEdits retainedFresh))))
     }
   };
   data LocalBinders = LocalBinders Graph ScopeIndex (IntMap ([] Int));

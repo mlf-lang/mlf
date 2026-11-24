@@ -446,20 +446,39 @@ module Bootstrap.Separate where {
           y <- normalTypeIn env b;
           freshPure (XApply x y)
         };
-      XForall a bound b ->
-        do {
-          bound2 <- normalTypeIn env bound;
+      XForall a XBot body@(XForall r tail (XArrow (XVar input) (XVar output))) ->
+        if T.equalTyVar a input && T.equalTyVar r output && not (T.equalTyVar a r) then do {
           i <- freshInteger;
-          body <- normalTypeIn (M.insert T.compareTyVar a (XTyVar i) env) b;
-          freshPure (XForall (XTyVar i) bound2 body)
-        };
+          let { variable = XTyVar i };
+          bound <- normalTypeIn (M.insert T.compareTyVar a variable env) tail;
+          j <- freshInteger;
+          let { result = XTyVar j };
+          freshPure (XForall variable XBot (XForall result bound (XArrow (XVar variable) (XVar result))))
+        } else normalForall env a XBot body;
+      XForall a bound b -> normalForall env a bound b;
       _ -> freshPure ty
     };
-  normalType ty =
-    case runFresh [] (normalTypeIn M.empty ty) of {
+  normalForall env a bound body = do {
+    bound2 <- normalTypeIn env bound;
+    i <- freshInteger;
+    let { v = XTyVar i };
+    result <- normalTypeIn (M.insert T.compareTyVar a v env) body;
+    freshPure (XForall v bound2 result)
+  };
+  normalType ty = case T.projectionTypeLayout ty of {
+    Just ((,) width selected) -> let {
+      -- Match normalTypeIn's allocation order. The argument binder comes
+      -- before its suffix and the result binder comes after that suffix.
+      argument index = let { a = XTyVar index; next = index + 1 } in
+        if next == width then XForall a XBot (XArrow (XVar a) (XVar (XTyVar selected)))
+        else let { r = XTyVar (2 * (width - 1) - index) } in
+          XForall a XBot (XForall r (argument next) (XArrow (XVar a) (XVar r)))
+    } in argument 0;
+    Nothing -> case runFresh [] (normalTypeIn M.empty ty) of {
       Right t -> t;
       Left e -> panic e
     };
+  };
   cleanSource source = cleanSourceWith hygiene source;
   cleanParsedSource = cleanParsedReserving True;
   cleanParsedReserving possible = cleanSourceWith (\e ->
@@ -659,10 +678,25 @@ module Bootstrap.Separate where {
     } in seq nextA (seq nextB (canonicalFingerprintState rest nextA nextB));
     _ -> fingerprintStateChars chars a b
   };
+  canonicalFingerprintText text index size a b =
+    if index == 0 && size > 1024 && size == stringLength text && size /= stringUtf8Length text
+    then fingerprintBlocks text 0 size a b else canonicalFingerprintBlock text index size a b;
+  -- A few Unicode scalars in an otherwise ASCII artifact should only require
+  -- streaming their own block. Each block continues both polynomial states.
+  fingerprintBlocks text index size a b =
+    if index == size then (,) a b else let {
+      count = if size - index < 1024 then size - index else 1024;
+      block = stringSlice text index count;
+      states = if stringUtf8Length block == count
+        then canonicalFingerprintBlock block 0 count a b
+        else canonicalFingerprintState (textToChars block) a b
+    } in case states of {
+      (,) nextA nextB -> seq nextA (seq nextB (fingerprintBlocks text (index + count) size nextA nextB))
+    };
   -- ASCII fields are common in artifacts. Read four scalars directly without
   -- allocating a character-list cell for each byte. On the first non-ASCII
   -- block, stream just the remaining suffix so Unicode stays a linear scan.
-  canonicalFingerprintText text index size a b =
+  canonicalFingerprintBlock text index size a b =
     if size - index < 4 then canonicalFingerprintState
       (textToChars (stringSlice text index (size - index))) a b
     else let {
@@ -671,7 +705,7 @@ module Bootstrap.Separate where {
     } in if x0 < 128 && x1 < 128 && x2 < 128 && x3 < 128 then let {
       nextA = (a * 1172642095 + x0 * 780718649 + x1 * 8261507 + x2 * 65599 + x3) % 2147483647;
       nextB = (b * 294499921 + x0 * 2248091 + x1 * 17161 + x2 * 131 + x3) % 2147483629
-    } in seq nextA (seq nextB (canonicalFingerprintText text (index + 4) size nextA nextB))
+    } in seq nextA (seq nextB (canonicalFingerprintBlock text (index + 4) size nextA nextB))
     else canonicalFingerprintState (textToChars (stringSlice text index (size - index))) a b;
   fingerprint text = case canonicalFingerprintText text 0 (stringLength text) 0 1 of {
     (,) a b -> showInt a ++ "-" ++ showInt b
@@ -1396,6 +1430,9 @@ module Bootstrap.Separate where {
       XTypeAbs a bound b ->
         XTypeAbs (variable a) (mapType variable bound) (walk b);
       XTypeApp a p -> XTypeApp (walk a) (proof p);
+      XProjection rows selected -> X.mapProjection name variable rows selected;
+      XInstantiationSpine head rows -> XInstantiationSpine (name head)
+        (map (\((,,) spelling eliminate operand) -> (,,) spelling eliminate (walk operand)) rows);
       XLet n a b -> XLet (name n) (walk a) (walk b);
       XLetRec bs b ->
         XLetRec
@@ -1451,6 +1488,9 @@ module Bootstrap.Separate where {
       XTypeAbs (XTyVar a) bound b ->
         foldTermIdentities add b (foldTypeIdentities add bound (add a seen));
       XTypeApp a p -> foldComputationIdentities add p (foldTermIdentities add a seen);
+      XProjection rows selected -> X.foldProjectionIdentities add rows selected seen;
+      XInstantiationSpine n rows -> foldl (\ids ((,,) _ _ operand) -> foldTermIdentities add operand ids)
+        (add (X.nameId n) seen) rows;
       XLet n a b -> foldTermIdentities add b (foldTermIdentities add a (add (X.nameId n) seen));
       XLetRec bs b ->
         foldTermIdentities add b

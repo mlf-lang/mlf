@@ -17,7 +17,7 @@ ROOT=Path(__file__).resolve().parents[3]
 # Endpoint profiles that can be prepared here. emlf-source-v1 is declared in
 # matrix.json but has no preparation path in this revision, so it is not listed.
 PROFILES={name:{'producer_kind':'empty','label':'bootstrap crate producer (no installed native data)'}
-          for name in ['crate-bootstrap-v1', 'crate-fused-v1', 'crate-plan-v1']}
+          for name in ['crate-bootstrap-v1', 'crate-bootstrap-production-v1', 'crate-bootstrap-cached-production-v1', 'crate-fused-v1', 'crate-plan-v1']}
 
 
 def pack(values):
