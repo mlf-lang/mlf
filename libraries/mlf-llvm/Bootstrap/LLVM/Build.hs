@@ -406,7 +406,8 @@ module Bootstrap.LLVM.Build where {
                   "entry:")
                (L.snoc code "}"))
       };
-      modify
+      -- Store the completed function text while its instruction stream is local.
+      seq text (modify
         (\state ->
            withInstructions (instructions saved)
              (withBlock (block saved)
@@ -414,7 +415,7 @@ module Bootstrap.LLVM.Build where {
                    (withArrayViews (arrayViews saved)
                       (withUnboxedDoubles (unboxedDoubles saved)
                          (withForcedValues (forcedValues saved)
-                            (withDefinitions ((:) text (definitions state)) state)))))))
+                            (withDefinitions ((:) text (definitions state)) state))))))))
     };
   -- Keep large ordinary workers as optimization boundaries. Their bodies are
   -- still compiled at the caller's normal optimization level; avoiding repeated
