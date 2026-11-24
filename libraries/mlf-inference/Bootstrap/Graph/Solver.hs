@@ -107,6 +107,27 @@ module Bootstrap.Graph.Solver where {
     if (count <= 0)
     then []
     else (:) parents (scopeJumps (count - 1) (IM.map (\n -> IM.get n parents) parents));
+  -- In a complete single-root scope tree, a jump that has reached the
+  -- root never changes. Keep those Patricia branches across later levels.
+  rootedScopeJumps :: Int -> Int -> IntMap Int -> [] (IntMap Int);
+  rootedScopeJumps count root parents@(IntMap tree) = let {
+    advance branch = case branch of {
+      IntMapNil -> Nothing;
+      IntMapTip key parent ->
+        if parent == root then Nothing else let { next = IM.get parent parents } in
+          seq next (Just (IntMapTip key next));
+      IntMapBin size prefix left right -> case (,) (advance left) (advance right) of {
+        (,) Nothing Nothing -> Nothing;
+        (,) (Just a) Nothing -> Just (IntMapBin size prefix a right);
+        (,) Nothing (Just b) -> Just (IntMapBin size prefix left b);
+        (,) (Just a) (Just b) -> Just (IntMapBin size prefix a b)
+      }
+    };
+    more = if count <= 1 then [] else case advance tree of {
+      Nothing -> L.replicate (count - 1) parents;
+      Just next -> rootedScopeJumps (count - 1) root (IM.wrap next)
+    }
+  } in if count <= 0 then [] else (:) parents more;
   indexScopes :: Graph -> ScopeIndex;
   indexScopes graph =
     let {
@@ -156,7 +177,11 @@ module Bootstrap.Graph.Solver where {
     } in
     -- The largest jump only needs to reach the root from the deepest scope.
     case L.foldlStrict (scopeVisit descendants 0) ((,,) 0 0 IM.empty) roots of {
-      (,,) _ depth intervals -> ScopeIndex intervals (scopeJumps (scopeLevels depth) parents)
+      (,,) _ depth intervals -> let { levels = scopeLevels depth } in ScopeIndex intervals (case roots of {
+        (:) root [] -> if IM.size intervals == IM.size parents then rootedScopeJumps levels root parents
+          else scopeJumps levels parents;
+        _ -> scopeJumps levels parents
+      })
     };
   scopeContains :: ScopeIndex -> Int -> Int -> Bool;
   scopeContains (ScopeIndex intervals jumps) a b = G.intervalContains intervals a b;

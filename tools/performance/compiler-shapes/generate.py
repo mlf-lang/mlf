@@ -691,6 +691,21 @@ walk start = let {{
             declarations = '\n'.join(rows) + '\n' + declarations.replace(
                 'a0 <- start;', 'seed <- start; a0 <- pure (checkedPrefix seed);')
         expression = 'case walk (Done x) of { Done y -> y }'
+    elif family == 'recursive_monad_peers':
+        def peer(name, other, offset):
+            steps = ''.join(f'  x{i+1} <- tick x{i};\n' for i in range(n))
+            return (f'{name} remaining x0 = if ltInt remaining 1 then Good x0 else do {{\n'
+                    + steps + f'  {other} (subInt remaining 1) (addInt x{n} {offset})\n}};\n')
+
+        return HEADER + '''data Check a = Failed | Good a;
+instance Functor Check where { fmap f value = case value of { Failed -> Failed; Good x -> Good (f x) } };
+instance Applicative Check where { pure = Good; (<*>) vf vx = case vf of { Failed -> Failed; Good f -> fmap f vx } };
+instance Monad Check where { (>>=) value next = case value of { Failed -> Failed; Good x -> next x } };
+tick :: Int -> Check Int;
+tick x = Good (addInt x 1);
+''' + peer('leftPeer', 'rightPeer', 2) + peer('rightPeer', 'leftPeer', 3) + '''
+entry x = case leftPeer 4 x of { Failed -> 0; Good answer -> answer };
+''' + MAIN
     elif family == 'inferred_monadic_recursion':
         steps = '\n'.join(f'    a{i+1} <- pure (addInt a{i} x);' for i in range(n))
         declarations = f'''data Work a = Done a;
@@ -1116,6 +1131,8 @@ def expected(family, n, x):
     if family == 'polymorphic_tree_fold':
         total = 3*n*x + n*(n-1)//2
         return (total + 2**63) % 2**64 - 2**63
+    if family == 'recursive_monad_peers':
+        return x + 4*n + 10
     if family == 'local_recursive_checks':
         # The outer choices visit one complete ring. The three leaves are
         # two levels below the root, and the left choice falls back at depth one.
