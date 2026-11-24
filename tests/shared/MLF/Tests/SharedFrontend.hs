@@ -24,6 +24,7 @@ module MLF.Tests.SharedFrontend where {
   import qualified Bootstrap.Lexer as L;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Surface as Surface;
+  import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.SourceEquality as SourceEquality;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Compiler as C;
@@ -1721,6 +1722,7 @@ module MLF.Tests.SharedFrontend where {
     checkedGroundUses;
     groundAliasChecks;
     groundRecursiveChecks;
+    groundRecursiveSourceRoutes;
     groundCaseEvidenceCheck;
     let { a = XTyVar 100; b = XTyVar 101; c = XTyVar 102;
       xa = XVar a; xb = XVar b; xc = XVar c;
@@ -1762,6 +1764,7 @@ module MLF.Tests.SharedFrontend where {
       (row int (SApp (SApp use (SIntLit 7)) localIdentity));
     groundGroupCase "ground specialization leaves local generalization to solver" False []
       (row int (SLet "id" localIdentity (SApp (SVar "id") (SIntLit 7))));
+    groundLocalLetChecks;
     groundGroupCase "ground specialization never generalizes unsigned exports" False []
       [(,) (Index.fromInt 10) ((,,) "function" Nothing localIdentity)];
     groundGroupCase "ground specialization leaves higher-rank argument to solver" False
@@ -1789,6 +1792,107 @@ module MLF.Tests.SharedFrontend where {
       check "ground invalid use rejects combined route"
         (isLeft (Inference.compileOpenGroupIndexed "control" (parameter identity) [] members))
     }) bad
+  };
+  groundLocalLetChecks = do {
+    let { int = recursiveInt; a = Index.fromInt 33; b = Index.fromInt 34;
+      sig = Just (SAnnotation [] (SCon "Int" []));
+      identity = SLam "value" Nothing (SVar "value");
+      app f x = SApp f (SIntLit x);
+      add x y = SApp (SApp (SPrimitive PAddInt) x) y;
+      conditional b yes no = SApp (SApp (SApp (SPrimitive PIfThenElse) b) yes) no;
+      lexical = SVar "id"; owned = SGlobal a "misleading"; shadow = SGlobal b "id";
+      local body = SLet "id" identity body;
+      indexed body = SDeclScope [a] (local body);
+      selected route = case route of { Inference.IndexedSignedGround -> True; _ -> False };
+      ordinary route = case route of { Inference.IndexedOrdinary -> True; _ -> False };
+      run label strict route rhs answer = groundLocalLetCase label sig strict route rhs int
+        (\term -> groundLocalInt label term answer);
+      candidate ref = SWantedScope "CaseDictionary" (CandidateEnvironment 0 [(,) GivenEvidence ref]);
+      lexicalWanted = candidate (LexicalRef "id");
+      ownedWanted = candidate (DeclRef a "other hint") };
+    run "signed lexical one-use specialization" False selected (local (app lexical 7)) 7;
+    run "signed resolved one-use with an identically named shadow" False selected
+      (indexed (add (app owned 7) (app (SDeclScope [b] (SLam "id" Nothing shadow)) 2))) 9;
+    run "repeated polymorphic local at different types" False ordinary
+      (local (conditional (SApp lexical (SBoolLit True)) (app lexical 7) (SIntLit 0))) 7;
+    run "repeated polymorphic local at the same type" False ordinary
+      (indexed (add (app owned 7) (app (SGlobal a "id") 8))) 15;
+    run "repeated closed local stays specialized" True selected
+      (SLet "f" (SLam "x" Nothing (add (SVar "x") (SIntLit 1)))
+        (add (app (SVar "f") 7) (app (SVar "f") 9))) 18;
+    check "one potential implicit use is not one explicit use"
+      (not (Inference.groundSingleUse Nothing "id" lexicalWanted));
+    check "an explicit use plus a lexical wanted candidate cannot specialize"
+      (not (Inference.groundSingleUse Nothing "id" (SApp lexical lexicalWanted)));
+    check "an explicit use plus a resolved wanted candidate cannot specialize"
+      (not (Inference.groundSingleUse (Just a) "id" (SApp owned ownedWanted)));
+    check "two implicit sites cannot specialize"
+      (not (Inference.groundSingleUse (Just a) "id" (SApp ownedWanted ownedWanted)));
+    check "an unrelated same-spelled resolved candidate is not a use"
+      (Inference.groundSingleUse (Just a) "owner" (SApp owned (candidate (DeclRef b "owner"))));
+    groundLocalLetCase "escaped local identity retains its principal export"
+      Nothing False ordinary (local lexical) recursiveIdentity groundLocalPrincipalUse;
+    let { collision =
+      "class LocalRouteValue a where { localRouteValue :: a -> Int }\n" ++
+      ("instance LocalRouteValue Int where { localRouteValue x = addInt x 3 }\n" ++
+        ("useLocalRoute :: forall a. LocalRouteValue a => a -> Int\n" ++
+          ("useLocalRoute givenDictionary0 = let once = \\v -> v in if once True then (\\givenDictionary1 -> addInt (localRouteValue givenDictionary0) givenDictionary1) 4 else 0\n" ++
+            "main = useLocalRoute 7"))) };
+    result <- recursiveRight "qualified source permits user givenDictionary names"
+      (mapLeft C.prettyError (C.compile "Example.hs" (source collision)));
+    check "qualified source collision result type"
+      (IndependentType.alphaEq recursiveInt (C.inferredType result));
+    groundLocalInt "qualified source given names do not capture evidence" (C.compiledTerm result) 14
+  };
+  groundLocalLetCase label annotation strict route rhs expected use = do {
+    let { members = [(,) (Index.fromInt 10) ((,,) "answer" annotation rhs)];
+      bind = Surface.bindIndexedMembers };
+    env <- recursiveRight (label ++ " environment") (Open.environment []);
+    (,) external lowered <- recursiveRight (label ++ " prepare")
+      (Inference.prepareIndexedGroupIn (Just env) bind [] [] members);
+    check (label ++ " conservative admission")
+      (isRight (Inference.groundIndexed [] members lowered) == strict);
+    (,) selected actual <- recursiveRight (label ++ " file compiler")
+      (Inference.compileFileGroupRoutingIn (,) env bind "local-let-control" [] [] members);
+    check (label ++ " selected route") (route selected);
+    ordinary <- recursiveRight (label ++ " ordinary solver") (Inference.finishOpenGroup external (map snd members) lowered);
+    let { target fragment = case (,) (Open.bindings fragment) (Open.body fragment) of {
+      (,) [(,) binder ty] (XLet owner value (XConstructor "()" [])) ->
+        if eqString (X.nameHint binder) "answer" && X.equalName owner binder && XT.alphaEq ty expected
+        then Right (XWithData (Open.declarations (Open.context fragment)) (XLet owner value (XVarTerm binder)))
+        else Left "wrong export";
+      _ -> Left "expected one exported let"
+    } };
+    actualTerm <- recursiveRight (label ++ " select actual export") (target actual);
+    ordinaryTerm <- recursiveRight (label ++ " select ordinary export") (target ordinary);
+    recursiveCheckedType (label ++ " actual independent export") expected (Independent.checkClosed actualTerm);
+    recursiveCheckedType (label ++ " ordinary independent export") expected (Independent.checkClosed ordinaryTerm);
+    check (label ++ " erasure agrees with ordinary")
+      (monomorphicErasure M.empty (monomorphicAdministrative M.empty (X.erase actualTerm))
+        (monomorphicAdministrative M.empty (X.erase ordinaryTerm)));
+    use actualTerm;
+    use ordinaryTerm
+  };
+  groundLocalInt label term expected = do {
+    state <- recursiveRight (label ++ " runtime data") (Runtime.prepare False term);
+    actual <- recursiveRight label (Runtime.evaluate (fst state) (Runtime.REnv M.empty) (X.erase term));
+    check label (case actual of { Runtime.RInteger n -> n == expected; _ -> False })
+  };
+  groundLocalPrincipalUse term = case term of {
+    XWithData datatypes (XLet owner rhs variable) -> do {
+      let { applied ty arg =
+        XWithData datatypes (XLet owner rhs (XApp (X.instantiate variable (X.typeApplication ty)) arg));
+        int = applied recursiveInt (XIntTerm 7);
+        bool = applied recursiveBool (XBoolTerm True) };
+      recursiveCheckedType "escaped identity instantiated at Int" recursiveInt (Independent.checkClosed int);
+      recursiveCheckedType "escaped identity instantiated at Bool" recursiveBool (Independent.checkClosed bool);
+      groundLocalInt "escaped identity runtime at Int" int 7;
+      state <- recursiveRight "escaped identity Bool runtime data" (Runtime.prepare False bool);
+      value <- recursiveRight "escaped identity Bool evaluation"
+        (Runtime.evaluate (fst state) (Runtime.REnv M.empty) (X.erase bool));
+      check "escaped identity runtime at Bool" (case value of { Runtime.RBoolean actual -> actual; _ -> False })
+    };
+    _ -> check "escaped identity target has one let" False
   };
   groundCaseEvidenceCheck = let {
     datatypes = [DataDecl "CaseDictionary" ["a"]
@@ -1835,6 +1939,74 @@ module MLF.Tests.SharedFrontend where {
         (,) (Left expected) (Left actual) -> eqString expected actual;
         _ -> False
       })
+  };
+  groundRecursiveSourceRoutes = do {
+    let { sourceRows = "goSigned :: Int -> Int\ngoSigned x = if eqInt x 0 then 7 else goForward x\n";
+      forwarder = "goForward x = goSigned x";
+      mixed route = case route of { Inference.IndexedMixedForwarder -> True; _ -> False };
+      signed route = case route of { Inference.IndexedSignedRecursion -> True; _ -> False };
+      ordinary route = case route of { Inference.IndexedOrdinary -> True; _ -> False } };
+    groundRecursiveSourceCase "one unsigned forwarder selects mixed recursion" mixed (sourceRows ++ forwarder);
+    groundRecursiveSourceCase "two signed peers select signed recursion" signed
+      (sourceRows ++ ("goForward :: Int -> Int\n" ++ forwarder));
+    groundRecursiveSourceCase "unsigned computation falls back to ordinary recursion" ordinary
+      (sourceRows ++ "goForward x = addInt (goSigned x) 1")
+  };
+  groundRecursiveSourceCase label expectedRoute text = do {
+    parsed <- recursiveRight (label ++ " parse") (parse text);
+    resolved <- recursiveRight (label ++ " resolve")
+      (Modules.resolveCrate NoImplicitPrelude M.empty Modules.spelling [parsed]);
+    -- Resolution installs the primitive facade as a real module. Its own
+    -- declarations are not members of the test's source compilation unit.
+    let { modules = filter (\entry -> eqString (Modules.moduleIdentity parsed)
+          (Modules.moduleIdentity (Modules.resolvedSource entry))) (Modules.resolvedCrateModules resolved);
+      values = Modules.boundIn resolved modules;
+      scopes = Modules.resolvedValueScopesIn resolved modules;
+      reads = Dependency.fileLastDeclarationOccurrences;
+      bind = Surface.bindIndexedMembersWith (Dependency.occurrenceGlobalIds reads) };
+    (,) planned _ <- recursiveRight (label ++ " plan")
+      (Source.prepareResolvedSourcePlan values M.empty [] [] [] [] scopes []);
+    original <- case planned of { Just plan -> ioReturn plan; Nothing -> panic (label ++ " lacks a resolved plan") };
+    (,) plan open <- recursiveRight (label ++ " query plan")
+      (Source.protectedQueryPlanReading Dependency.fileDeclarationOccurrences original M.empty);
+    contracts <- recursiveRight (label ++ " initial contracts") (Source.initialContracts plan M.empty M.empty);
+    (,) checked steps <- recursiveRight (label ++ " open contracts") (open contracts);
+    (,) owners prepare <- case steps of {
+      [step] -> ioReturn step; _ -> panic (label ++ " must be one source SCC")
+    };
+    (,) slots prepared <- recursiveRight (label ++ " prepared slots") (do {
+      group <- prepare checked;
+      Source.slotPreparedWith (Dependency.fileLastValueOccurrences False) checked owners group
+    });
+    members <- recursiveRight (label ++ " indexed members") (Source.indexedMembers slots prepared);
+    inventory <- recursiveRight (label ++ " datatype inventory") (Query.prepareData (Source.planData plan));
+    let { parameters = Source.expectedParameters slots prepared;
+      datatypes = Query.requiredFileDataIn inventory (Source.groupMembers prepared)
+        (append (Source.groupBindings prepared) (Source.groupCandidateBindings prepared));
+      int = XCon "Int" []; expectedType = XArrow int int;
+      types fragment = let { bindings = Open.bindings fragment } in
+        eqList eqString (sortBy compareString (map (compose X.nameHint fst) bindings)) ["goForward","goSigned"] &&
+        all (\entry -> XT.alphaEq expectedType (snd entry)) bindings;
+      knot fragment = case Open.body fragment of {
+        XLetRec [_,_] (XConstructor "()" []) -> True;
+        _ -> False
+      } };
+    check (label ++ " closed inputs") (null parameters);
+    env <- recursiveRight (label ++ " environment") (Open.environment datatypes);
+    (,) route actual <- recursiveRight (label ++ " file compile")
+      (Inference.compileFileGroupRoutingIn (,) env bind "mixed-source-control" parameters datatypes members);
+    check (label ++ " selected route") (expectedRoute route);
+    _ <- recursiveRight (label ++ " validate prepared fragment") (Source.validatePreparedOpen slots prepared actual);
+    (,) external lowered <- recursiveRight (label ++ " prepare ordinary")
+      (Inference.prepareIndexedGroupIn (Just env) bind parameters datatypes members);
+    ordinary <- recursiveRight (label ++ " ordinary") (Inference.finishOpenGroup external (map snd members) lowered);
+    check (label ++ " exact exports and recursive knot") (types actual && types ordinary && knot actual && knot ordinary);
+    let { a = Open.closedTerm actual; b = Open.closedTerm ordinary };
+    check (label ++ " erasure") (monomorphicErasure M.empty (monomorphicAdministrative M.empty (X.erase a))
+      (monomorphicAdministrative M.empty (X.erase b)));
+    actualType <- recursiveRight (label ++ " frozen target") (Independent.checkClosed a);
+    ordinaryType <- recursiveRight (label ++ " ordinary frozen target") (Independent.checkClosed b);
+    check (label ++ " independent type") (XT.alphaEq actualType ordinaryType)
   };
   groundAliasDepth known identity = case IM.lookup identity known of {
     Just (Inference.GroundVar next) -> 1 + groundAliasDepth known next;

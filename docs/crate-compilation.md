@@ -43,9 +43,14 @@ variables separate uses, an occurs check rejects recursive types, and non-bottom
 MLF bounds contribute constraints and explicit instance computations. Sealing
 resolves every required type before the independent checker admits a fragment.
 This route does not generalize unsigned exports, choose default types, or replace
-bounded MLF schemes with rank-1 schemes. Ambiguous arguments, local
-generalization, unsupported syntax and failed checks use the ordinary solver.
-The general path retains inferred-type and source-erasure agreement checks.
+bounded MLF schemes with rank-1 schemes. The conservative signed checker
+rejects local lets that require generalization. The dispatch path can specialize
+a nonrecursive local let at exactly one explicit use, with no additional
+implicit evidence occurrence of the binder. The use must leave the checked
+term fully determined, and its let binding is retained. Multiple uses that
+require generalization, ambiguous types, unsupported syntax and failed checks
+use the ordinary solver. The general path retains inferred-type and
+source-erasure agreement checks.
 All paths produce closed normalized schemes
 and independently checked implementations abstracted over their imports. Solver
 graphs are transient. A cached fragment is decoded and checked again, including

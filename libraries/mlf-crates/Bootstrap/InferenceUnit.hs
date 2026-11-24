@@ -351,31 +351,39 @@ module Bootstrap.InferenceUnit where {
       Left _ -> ordinary
     }
   };
+  -- Route evidence is projected from the branch that actually returned a
+  -- checked fragment, not from a second attempt against the same source.
+  data IndexedInferenceRoute = IndexedSpecialized | IndexedSignedGround |
+    IndexedSignedRecursion | IndexedMixedForwarder | IndexedOrdinary;
   compileIndexedUsing = compileIndexedIn Nothing;
-  compileFileGroupIn env = compileIndexedIn (Just env) (finishFileGroupIn (Just env));
-  compileIndexedIn known finish bindMembers name parameters datatypes members =
+  compileFileGroupIn = compileFileGroupRoutingIn (\_ fragment -> fragment);
+  compileFileGroupRoutingIn report env =
+    compileIndexedRoutingIn report (Just env) (finishFileGroupIn (Just env));
+  compileIndexedIn = compileIndexedRoutingIn (\_ fragment -> fragment);
+  compileIndexedRoutingIn report known finish bindMembers name parameters datatypes members =
     case signedApplicationGroupIn known parameters datatypes members of {
-      Right fragment -> Right fragment;
-      Left _ -> compileElaboratedIn known finish bindMembers parameters datatypes members
+      Right fragment -> Right (report IndexedSpecialized fragment);
+      Left _ -> compileElaboratedRoutingIn report known finish bindMembers parameters datatypes members
     };
   compileElaboratedGroup = compileElaboratedGroupWith Surface.bindIndexedMembers;
   compileElaboratedGroupWith = compileElaboratedUsing (\_ -> finishOpenGroupWith Compiler.finishCompilation);
   compileElaboratedUsing = compileElaboratedIn Nothing;
-  compileElaboratedIn known finish bindMembers parameters datatypes members = do {
+  compileElaboratedIn = compileElaboratedRoutingIn (\_ fragment -> fragment);
+  compileElaboratedRoutingIn report known finish bindMembers parameters datatypes members = do {
     (,) externalTypes lowered <- prepareIndexedGroupIn known bindMembers parameters datatypes members;
     case monomorphicIndexedIn known parameters members lowered of {
-      Right fragment -> Right fragment;
+      Right fragment -> Right (report IndexedSpecialized fragment);
       Left _ -> case signedDataGroupIn known parameters members lowered of {
-        Right fragment -> Right fragment;
+        Right fragment -> Right (report IndexedSpecialized fragment);
         Left _ -> case signedLocalGroupIn known parameters members lowered of {
-          Right fragment -> Right fragment;
+          Right fragment -> Right (report IndexedSpecialized fragment);
           Left _ -> case groundIndexedIn known parameters members lowered of {
-            Right fragment -> Right fragment;
-            Left _ -> case groundRecursiveIndexedIn known parameters members lowered of {
-              Right fragment -> Right fragment;
+            Right fragment -> Right (report IndexedSignedGround fragment);
+            Left _ -> case groundRecursiveDispatchIn report known parameters members lowered of {
+              Right result -> Right result;
               Left _ -> case unsignedGroundIndexedIn known parameters members lowered of {
-                Right fragment -> Right fragment;
-                Left _ -> finish parameters externalTypes (map snd members) lowered
+                Right fragment -> Right (report IndexedSpecialized fragment);
+                Left _ -> mapEither (report IndexedOrdinary) (finish parameters externalTypes (map snd members) lowered)
               }
             }
           }
@@ -730,7 +738,8 @@ module Bootstrap.InferenceUnit where {
   -- to the result. The wrapper, if present, must contain exactly that variable.
   data GroundParameter = GroundBare | GroundWrapped String;
   data GroundEvidence = GroundEvidence (GroundState -> [] ((,) XTyVar GroundType) -> Either String XComputation);
-  data GroundContext = GroundContext DataEnv ([] ((,) EvidenceRole GroundBinding));
+  data GroundLetPolicy = GroundMonomorphicLets | GroundSingleUseLets;
+  data GroundContext = GroundContext GroundLetPolicy DataEnv ([] ((,) EvidenceRole GroundBinding));
   data GroundArrowHead = GroundArrowHead Bool Int GroundType GroundType (GroundType -> GroundTerm);
   data GroundBinding = GroundLocal XName GroundType | GroundImport XName XType |
     GroundQuantifiedImport XName XType GroundEvidence |
@@ -1176,8 +1185,8 @@ module Bootstrap.InferenceUnit where {
     GroundPrincipalSelector name scheme _ -> Right ((,) name scheme);
     GroundArrowOperand original _ -> groundCandidateType state original
   };
-  groundGivenContext (GroundContext datatypes _) globals names bindings =
-    mapEither (GroundContext datatypes)
+  groundGivenContext (GroundContext localLets datatypes _) globals names bindings =
+    mapEither (GroundContext localLets datatypes)
       (traverseEither (\name -> groundCandidateReference globals names ((,) GivenEvidence (LexicalRef name))) bindings);
   -- Evidence is selected after the ordinary argument constraints determine
   -- the wanted type. Use the same ordered inventories and proof checker as
@@ -1281,7 +1290,7 @@ module Bootstrap.InferenceUnit where {
     actual <- groundType known ty;
     Right ((,,) (GroundPrimitive primitive (reverse reversed)) actual next)
   } };
-  groundInfer = groundInferIn (GroundContext Data.emptyDataEnv []);
+  groundInfer = groundInferIn (GroundContext GroundSingleUseLets Data.emptyDataEnv []);
   -- A declared selector can bind types after receiving its dictionary.
   -- Admit only a direct, resolved call with bottom bounds along the result
   -- spine. Its operands keep their own constraints and final xMLF checks.
@@ -1405,7 +1414,7 @@ module Bootstrap.InferenceUnit where {
     _ -> Nothing
   };
   groundInferIn = groundInferApplication True;
-  groundInferApplication inspect context@(GroundContext datatypes givens) globals names state expression = case expression of {
+  groundInferApplication inspect context@(GroundContext _ datatypes givens) globals names state expression = case expression of {
     SVar name -> groundUse state (M.lookup compareString name names);
     SGlobal identity _ -> groundUse state (M.lookup compareInt (V.toInt identity) globals);
     SDeclScope [identity] (SLam name annotation body) -> groundLambda context globals names state (Just identity) name annotation body;
@@ -1625,11 +1634,14 @@ module Bootstrap.InferenceUnit where {
     [_] -> any owns (Dependency.valueOccurrences False False body);
     _ -> False
   };
-  groundLet context globals names state identity hint rhs body = do {
+  groundLet context@(GroundContext localLets _ _) globals names state identity hint rhs body = do {
     (,,) value ty following <- groundInferIn context globals names state rhs;
     case groundLocalMonotype names following ty of {
       Right _ -> Right ();
-      Left reason -> ensure (groundSingleUse identity hint body) reason
+      Left reason -> case localLets of {
+        GroundMonomorphicLets -> Left reason;
+        GroundSingleUseLets -> ensure (groundSingleUse identity hint body) reason
+      }
     };
     (,,,) name scope locals next <- groundBindLocal globals names following identity hint ty;
     (,,) enclosed result done <- groundInferIn context scope locals next body;
@@ -1733,8 +1745,12 @@ module Bootstrap.InferenceUnit where {
     _ -> Right expression
   };
   groundAbstract prefix term = foldr (\((,) v bound) -> XTypeAbs v bound) term prefix;
-  groundIndexed = groundIndexedIn Nothing;
-  groundIndexedIn known parameters members lowered = case (,) members lowered of {
+  -- The conservative signed checker admits only already-monomorphic local
+  -- lets. Dispatch may also specialize one explicit use, but it must seal
+  -- that use and target-check the same result before publishing a fragment.
+  groundIndexed = groundIndexedUsing GroundMonomorphicLets Nothing;
+  groundIndexedIn = groundIndexedUsing GroundSingleUseLets;
+  groundIndexedUsing localLets known parameters members lowered = case (,) members lowered of {
     (,) [(,) identity ((,,) name (Just annotation) _)] ((,) (SProgram declarations expression) _) -> do {
       let { entries = zip parameters (range 0 (length parameters - 1));
         binding = \((,,) _ hint ty) serial -> prepareGroundApplication (XName serial hint) ty;
@@ -1755,7 +1771,7 @@ module Bootstrap.InferenceUnit where {
       let { datatypes = Open.dataEnvironment env };
       (,,) expected wanted prefix <- groundDeclarationType datatypes annotation;
       source <- groundDeclaredBody annotation rhs;
-      (,) template solved <- groundCheckBody (GroundContext datatypes []) globals names
+      (,) template solved <- groundCheckBody (GroundContext localLets datatypes []) globals names
         (GroundState 0 IM.empty IM.empty (length parameters + 1)) wanted source;
       implementation <- mapEither (groundAbstract prefix) (groundSealIn (M.fromList T.compareTyVar prefix) solved template);
       fragment <- Open.check env ps (XLet (XName (length parameters) name) implementation (XConstructor "()" []));
@@ -1870,7 +1886,7 @@ module Bootstrap.InferenceUnit where {
       env <- Open.environmentUsing known declarations;
       let { datatypes = Open.dataEnvironment env; count = length parameters };
       let { infer = do {
-        (,,) template ty solved <- groundInferIn (GroundContext datatypes []) globals names
+        (,,) template ty solved <- groundInferIn (GroundContext GroundSingleUseLets datatypes []) globals names
           (GroundState 0 IM.empty IM.empty (count + 1)) rhs;
         case groundClosed solved ty of {
           Right closed -> mapEither ((,) closed) (groundSeal solved template);
@@ -1895,12 +1911,34 @@ module Bootstrap.InferenceUnit where {
   -- in a peer's closed signature. Only the term identity supply crosses RHSs.
   data GroundMember = GroundMember Int XName XType GroundType ([] ((,) XTyVar XType)) SExpr;
   groundRecursiveIndexed = groundRecursiveIndexedIn Nothing;
-  groundRecursiveIndexedIn known parameters members lowered = case lowered of {
-    (,) (SProgram declarations expression) _ -> groundRecursiveGroupIn known parameters members declarations expression;
+  groundRecursiveIndexedIn = groundRecursiveIndexedUsing groundRecursiveGroupIn;
+  groundRecursiveDispatchIn report = groundRecursiveIndexedUsing
+    (groundRecursiveGroupUsing (groundRecursiveRoutes report));
+  groundRecursiveIndexedUsing :: forall a b c d e.
+    (a -> b -> c -> [] DataDecl -> SExpr -> Either String d) ->
+    a -> b -> c -> (,) SProgram e -> Either String d;
+  groundRecursiveIndexedUsing group known parameters members lowered = case lowered of {
+    (,) (SProgram declarations expression) _ -> group known parameters members declarations expression;
     _ -> Left "ground recursive group requires lowered declarations"
   };
   groundRecursiveGroup = groundRecursiveGroupIn Nothing;
-  groundRecursiveGroupIn known parameters members declarations expression = do {
+  groundRecursiveGroupIn = groundRecursiveGroupUsing
+    (\datatypes declared count _ definitions complete -> do {
+      rows <- groundSignedRecursiveRows datatypes declared count definitions;
+      complete rows
+    });
+  -- The signed and mixed routes share inventory validation and target checking.
+  -- Share the signed attempt too: a signed RHS failure must not retry as mixed.
+  groundRecursiveRoutes report datatypes declared count imported definitions complete =
+    case groundSignedRecursiveRows datatypes declared count definitions of {
+      Right rows -> mapEither (report IndexedSignedRecursion) (complete rows);
+      Left reason -> do {
+        rows <- groundMixedForwarderRows datatypes declared count imported definitions reason;
+        mapEither (report IndexedMixedForwarder) (complete rows)
+      }
+    };
+  groundSignedRecursiveRows datatypes declared count = traverseEither (groundMember datatypes declared count);
+  groundRecursiveGroupUsing selectRows known parameters members declarations expression = do {
     let { sorted = sortBy (\((,,) _ n _) ((,,) _ m _) -> compareString n m) parameters;
       imported = mapIndexed (\serial ((,,) i name ty) -> (,,) (V.toInt i) (XName serial name) ty) sorted;
       count = length imported;
@@ -1927,62 +1965,64 @@ module Bootstrap.InferenceUnit where {
     };
     let {
       importedBindings = map (\((,,) i n ty) -> (,,) i n (prepareGroundImport n ty)) imported;
-      memberBinding (GroundMember i n scheme ty prefix _) = (,,) i n
-        (if null prefix then GroundLocal n ty else prepareGroundImport n scheme);
-      bySlot rows = M.fromList compareInt (map (\((,,) i _ value) -> (,) i value) rows);
-      byName rows = M.fromList compareString (map (\((,,) _ n value) -> (,) (X.nameHint n) value) rows)
-    };
-    rows <- case traverseEither (groundMember datatypes declared count) definitions of {
-      Right signed -> Right signed;
-      Left reason -> do {
-        let {
-          pending = filter groundUnsignedMember definitions;
-          signed = filter (\value -> not (groundUnsignedMember value)) definitions
-        };
-        case pending of {
-          [(,) ordinal ((,) i ((,,) name InferRecursive rhs))] -> do {
-            ensure (not (null signed) && groundForwardingBody rhs) reason;
-            case M.lookup compareInt (V.toInt i) declared of {
-              Just ((,,) hint Nothing _) -> ensure (eqString name hint) reason;
-              _ -> Left reason
-            };
-            checked <- traverseEither (groundMember datatypes declared count) signed;
-            ensure (all (\(GroundMember _ _ scheme _ prefix _) -> null prefix && monomorphicTarget scheme)
-              checked) reason;
-            let {
-              principalImports = mapMaybe (\((,,) slot binder scheme) ->
-                if groundPrincipalScheme scheme then Just ((,,) slot binder (prepareGroundImport binder scheme))
-                else Nothing) imported;
-              bindings = append principalImports (map memberBinding checked)
-            };
-            ensure (M.size (bySlot bindings) == length bindings && M.size (byName bindings) == length bindings) reason;
-            (,,) _ wanted solved <- groundInferIn (GroundContext datatypes []) (bySlot bindings) (byName bindings)
-              (GroundState 0 IM.empty IM.empty (advanceIdentity count (length definitions))) rhs;
-            scheme <- groundClosed solved wanted;
-            ty <- groundType M.empty scheme;
-            let { member = GroundMember (V.toInt i) (XName (advanceIdentity count ordinal) name) scheme ty [] rhs;
-              pair = splitAt ordinal checked };
-            Right (append (fst pair) ((:) member (snd pair)))
-          };
-          _ -> Left reason
-        }
+      complete rows = do {
+        let { bindings = append importedBindings (map groundRecursiveMemberBinding rows);
+          globals = groundRecursiveSlots bindings;
+          names = groundRecursiveNames bindings;
+          ps = map (\((,,) _ n ty) -> (,) n ty) imported;
+          memberTypes = map (\(GroundMember _ n ty _ _ _) -> (,) n ty) rows };
+        ensure (M.size globals == length bindings && M.size names == length bindings) "duplicate ground recursive binding";
+        (,) reversed _ <- foldM (groundRecursiveBody datatypes globals names)
+          ((,) [] (advanceIdentity count (length rows))) rows;
+        fragment <- Open.check env ps (XLetRec (reverse reversed) (XConstructor "()" []));
+        ensure (eqList (\((,) n ty) ((,) m other) -> X.equalName n m && T.alphaEq ty other)
+          memberTypes (Open.bindings fragment)) "ground recursive export mismatch";
+        Right fragment
       }
     };
-    let { bindings = append importedBindings (map memberBinding rows);
-      globals = bySlot bindings;
-      names = byName bindings;
-      ps = map (\((,,) _ n ty) -> (,) n ty) imported;
-      memberTypes = map (\(GroundMember _ n ty _ _ _) -> (,) n ty) rows };
-    ensure (M.size globals == length bindings && M.size names == length bindings) "duplicate ground recursive binding";
-    (,) reversed _ <- foldM (groundRecursiveBody datatypes globals names)
-      ((,) [] (advanceIdentity count (length rows))) rows;
-    fragment <- Open.check env ps (XLetRec (reverse reversed) (XConstructor "()" []));
-    ensure (eqList (\((,) n ty) ((,) m other) -> X.equalName n m && T.alphaEq ty other)
-      memberTypes (Open.bindings fragment)) "ground recursive export mismatch";
-    Right fragment
+    selectRows datatypes declared count imported definitions complete
   };
+  groundRecursiveMemberBinding (GroundMember i n scheme ty prefix _) = (,,) i n
+    (if null prefix then GroundLocal n ty else prepareGroundImport n scheme);
+  groundRecursiveSlots rows = M.fromList compareInt (map (\((,,) i _ value) -> (,) i value) rows);
+  groundRecursiveNames rows = M.fromList compareString (map (\((,,) _ n value) -> (,) (X.nameHint n) value) rows);
   -- The unknown member may use its signed peers but receives no constraints
   -- from the rest of the SCC. Reject local generalization and class evidence.
+  groundMixedForwarderRows datatypes declared count imported definitions reason = do {
+    let {
+      pending = filter groundUnsignedMember definitions;
+      signed = filter (\value -> not (groundUnsignedMember value)) definitions
+    };
+    case pending of {
+      [(,) ordinal ((,) i ((,,) name InferRecursive rhs))] -> do {
+        ensure (not (null signed) && groundForwardingBody rhs) reason;
+        case M.lookup compareInt (V.toInt i) declared of {
+          Just ((,,) hint Nothing _) -> ensure (eqString name hint) reason;
+          _ -> Left reason
+        };
+        checked <- groundSignedRecursiveRows datatypes declared count signed;
+        ensure (all (\(GroundMember _ _ scheme _ prefix _) -> null prefix && monomorphicTarget scheme)
+          checked) reason;
+        let {
+          principalImports = mapMaybe (\((,,) slot binder scheme) ->
+            if groundPrincipalScheme scheme then Just ((,,) slot binder (prepareGroundImport binder scheme))
+            else Nothing) imported;
+          bindings = append principalImports (map groundRecursiveMemberBinding checked);
+          globals = groundRecursiveSlots bindings;
+          names = groundRecursiveNames bindings
+        };
+        ensure (M.size globals == length bindings && M.size names == length bindings) reason;
+        (,,) _ wanted solved <- groundInferIn (GroundContext GroundSingleUseLets datatypes []) globals names
+          (GroundState 0 IM.empty IM.empty (advanceIdentity count (length definitions))) rhs;
+        scheme <- groundClosed solved wanted;
+        ty <- groundType M.empty scheme;
+        let { member = GroundMember (V.toInt i) (XName (advanceIdentity count ordinal) name) scheme ty [] rhs;
+          pair = splitAt ordinal checked };
+        Right (append (fst pair) ((:) member (snd pair)))
+      };
+      _ -> Left reason
+    }
+  };
   groundUnsignedMember declaration = case declaration of {
     (,) _ ((,) _ ((,,) _ InferRecursive _)) -> True;
     _ -> False
@@ -2023,7 +2063,7 @@ module Bootstrap.InferenceUnit where {
     _ -> Left "ground recursive member requires a closed monotype"
   };
   groundRecursiveBody datatypes globals names ((,) reversed serial) (GroundMember _ binder expected wanted prefix rhs) = do {
-    (,) term solved <- groundCheckBody (GroundContext datatypes []) globals names (GroundState 0 IM.empty IM.empty serial) wanted rhs;
+    (,) term solved <- groundCheckBody (GroundContext GroundSingleUseLets datatypes []) globals names (GroundState 0 IM.empty IM.empty serial) wanted rhs;
     sealed <- mapEither (groundAbstract prefix) (groundSealIn (M.fromList T.compareTyVar prefix) solved term);
     case solved of { GroundState _ _ _ next -> Right ((,) ((:) ((,,) binder expected sealed) reversed) next) }
   };

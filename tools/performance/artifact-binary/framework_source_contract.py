@@ -146,6 +146,25 @@ CLOSED_DICTIONARY_SPINE_CHANGES = {
         'a92e9f9d2f88323b743d72a7cdffe711eab83862947f7a2cc0552177b187465b',
     ),
 }
+# Extend the Foundation endpoints with the two separately reviewed admission splits.
+INFERENCE_ADMISSION_CHANGES = {
+    'libraries/mlf-crates/Bootstrap/InferenceUnit.hs': (
+        'b0340adef4cc594e89639026ea51ad254477598207066407dff6bf8cbd107880',
+        'ab2c78c4699ae9d28446e063d32f04c1db9c1277ebf4fb27f6f980ca89eb06a6',
+    ),
+    'tests/shared/MLF/Tests/SharedFrontend.hs': (
+        '0cd275af5b468182e5f8bd48a6f8f706b67bf8369f023f17b23629b1105fc2c8',
+        'ebb4120d9ec3abb5fb8ff4f829dba01e9f5d3717106bdf44cb5d2a1ec3a46474',
+    ),
+    'bootstrap/MLF/BuiltinPreludeData.hs': (
+        '6219f9732b967647e41edb7b59ae4ca4721dcdd80ab0db9e74368ea62e85dd91',
+        'c06e31af69b3b5b584b46521a589f7bf380be9b80bc73aec1a2f26d6fd3a55ea',
+    ),
+    'mlf.lock': (
+        'a92e9f9d2f88323b743d72a7cdffe711eab83862947f7a2cc0552177b187465b',
+        'c2a42407201430c3e0aaa178293347787f154a8d6df5735a9a9598d12eaf4972',
+    ),
+}
 FOUNDATION_MERGE_PATHS = {'mlf.lock', 'tests/shared/MLF/Tests/SharedFrontend.hs'}
 HOSTED_PARITY_CHANGES = {
     'mlf.lock': (
@@ -482,6 +501,10 @@ def successor_type(predecessor_type, predecessor_manifest, framework_pin, founda
             edge = closed_dictionary_spine_changes(repository, files)
             self.changes.update({path: [old_files[path], new] for path, new in edge.items()})
             files.update(edge)
+            for path, (previous, current) in INFERENCE_ADMISSION_CHANGES.items():
+                require(files[path] == previous, 'inference admission source transition: ' + path)
+                self.changes[path] = [old_files[path], current]
+                files[path] = current
             self.core.hash_map(files, 'current framework sources')
             paths = {n: p for n, p in old_paths.items() if n not in retired}
             self.value = {'current_files': files, 'module_paths': paths,
