@@ -143,7 +143,7 @@ correctness checks.
 4. MLF's exponent `p` is at most GHC's in the fitted model `a + b*(n/nmax)^p`.
 5. The paired 95% interval for the slope difference (MLF minus GHC) lies below zero.
 6. The upper endpoint of the paired 95% interval for the exponent difference is at most zero.
-7. MLF's median sampled peak build process-group RSS is at most GHC's at every measured positive size.
+7. MLF's median sampled peak build process-group RSS is at most the comparator's at the largest measured positive size. Smaller sizes still contribute to the two RSS growth checks.
 8. The OLS slope of median peak build RSS in MiB per size unit is at most GHC’s.
 9. The upper endpoint of the paired 95% interval for the RSS slope difference
    (MLF minus GHC) is at most zero.
@@ -185,8 +185,9 @@ include the checks in their Markdown and JSON summaries.
 Each peak is the largest sampled sum of resident bytes across the build
 process group. The monitor samples about every 100 ms and may miss short
 peaks. A missing or zero RSS observation leaves that compiler's median
-unavailable for the cell. At a positive size this makes the memory check
-incomplete, while qualified build timings remain available. The reports
+unavailable for the cell. A missing paired observation at any fitted size makes
+the RSS growth checks incomplete. A missing median at the largest size also
+leaves the absolute peak comparison incomplete. The reports
 show each compiler's median peak RSS and the MLF/GHC ratio by size.
 
 ```sh

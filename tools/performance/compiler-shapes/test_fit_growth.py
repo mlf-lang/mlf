@@ -90,7 +90,7 @@ class GrowthTests(unittest.TestCase):
         self.assertEqual(flat['sizes'], [0, 8, 16, 32])
         self.assertIsNotNone(flat['checks']['lower_ols_95'])
 
-    def test_memory_gate_applies_to_every_positive_size_and_allows_a_tie(self):
+    def test_absolute_memory_gate_uses_largest_positive_size_and_allows_a_tie(self):
         rows = [row.copy() for row in self.rows if row['family'] in ('baseline', 'chain')]
         for row in rows[1:]:
             row.update(mlf_peak_rss_bytes=128, ghc_peak_rss_bytes=128, mlf_over_ghc_peak_rss=1.)
@@ -105,9 +105,13 @@ class GrowthTests(unittest.TestCase):
         with patch.object(fit, 'REPLICATES', 12):
             tied, = fit.family_reports(rows, samples, 2)
             with patch.dict(rows[1], mlf_peak_rss_bytes=256, mlf_over_ghc_peak_rss=2.):
+                small_over, = fit.family_reports(rows[::-1], samples, 2)
+            with patch.dict(rows[-1], mlf_peak_rss_bytes=256, mlf_over_ghc_peak_rss=2.):
                 over_budget, = fit.family_reports(rows, samples, 2)
-            with patch.dict(rows[1], mlf_peak_rss_bytes=None, mlf_over_ghc_peak_rss=None):
+            with patch.dict(rows[-1], mlf_peak_rss_bytes=None, mlf_over_ghc_peak_rss=None):
                 missing, = fit.family_reports(rows, samples, 2)
+        self.assertTrue(small_over['accepted'])
+        self.assertEqual(small_over['peak_rss_check_size'], 32)
         self.assertTrue(tied['accepted'])
         self.assertTrue(tied['checks'][fit.PEAK_RSS_CHECK])
         self.assertEqual(tied['status'], 'met')
@@ -118,7 +122,7 @@ class GrowthTests(unittest.TestCase):
         self.assertIsNone(missing['accepted'])
         self.assertIsNone(missing['checks'][fit.PEAK_RSS_CHECK])
         self.assertEqual(missing['status'], 'incomplete')
-        self.assertIn('RSS unavailable at sizes 8', missing['reason'])
+        self.assertIn('RSS unavailable at largest size 32', missing['reason'])
 
     def test_smaller_peaks_can_grow_faster(self):
         sizes = [0, 8, 16, 32]

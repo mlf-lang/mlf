@@ -167,7 +167,7 @@ class SweepTests(unittest.TestCase):
         result, = json.loads((self.root / 'growth.json').read_text())['growth']
         self.assertEqual(result['status'], 'incomplete')
         self.assertIsNone(result['checks']['peak_rss_at_most_ghc'])
-        self.assertIn('peak build RSS unavailable at sizes 8, 32', result['reason'])
+        self.assertIn('peak build RSS unavailable at largest size 32', result['reason'])
 
     def test_fresh_sweep_prepares_only_missing_inputs(self):
         self.args.setup = None

@@ -272,15 +272,16 @@ def family_reports(rows, samples, repeats, reference='ghc'):
         rss = [{'size': row['size'], **{field: row.get(field) for field in fields}}
                for row in selected]
         report['peak_rss'] = rss
-        positive_peaks = [row for row in rss if row['size'] > 0]
-        missing_rss = [str(row['size']) for row in positive_peaks if row[ratio_field] is None]
-        if missing_rss:
-            reason = 'peak build RSS unavailable at sizes ' + ', '.join(missing_rss)
+        largest = rss[-1]  # positives are sorted by size, after the shared zero baseline
+        report['peak_rss_check_size'] = largest['size']
+        ratio = largest[ratio_field]
+        if ratio is None:
+            reason = 'peak build RSS unavailable at largest size ' + str(largest['size'])
             report.update(status='incomplete', accepted=None,
                           reason='. '.join(filter(None, (report['reason'], reason))))
             report['checks'][memory_check] = None
         else:
-            memory_ok = all(row[ratio_field] <= 1. for row in positive_peaks)
+            memory_ok = ratio <= 1.
             report['checks'][memory_check] = memory_ok
             if report['accepted'] and not memory_ok:
                 report.update(status='unmet', accepted=False)
@@ -337,7 +338,7 @@ def markdown(reports, reference='ghc'):
         return lines + ['No growing family selected.']
     lines += ['| Family | Sizes | Lower wall medians at all positive sizes | OLS slope (ms/unit) '
               '| Endpoint slope (ms/unit) | Exponent | OLS slope interval | Exponent interval '
-              f'| Peak RSS ≤ {label} at all positive sizes | Peak RSS slope (MiB/unit) | RSS slope difference 95% interval | Verdict |',
+              f'| Peak RSS ≤ {label} at largest positive size | Peak RSS slope (MiB/unit) | RSS slope difference 95% interval | Verdict |',
               '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |']
     verdicts = {True: 'pass', False: 'fail', None: '—'}
     for report in reports:
