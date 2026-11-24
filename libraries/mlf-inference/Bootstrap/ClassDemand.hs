@@ -8,6 +8,7 @@ module Bootstrap.ClassDemand where {
   import Bootstrap.Std;
   import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.IntSet as IS;
+  import qualified Bootstrap.IntTree as IT;
 
   -- Frames denote RHS abstraction regions, not the entire scope of a let.
   -- A child finishes before its parent; an instantiated binding finishes
@@ -354,6 +355,20 @@ module Bootstrap.ClassDemand where {
   enqueue edges slot pending = case edges of {
     [] -> pending; _ -> (:) (DiscoveryWork slot edges) pending
   };
+  -- Each row buffers its last touched bitmap word. Older words remain in
+  -- the persistent tree. Revisiting a word resumes from its existing bits.
+  data DiscoveryRow = DiscoveryRow Int Int IntSetTree;
+  frozenRow (DiscoveryRow prefix bits older) =
+    if bits == 0 then IS.wrap older else IS.wrap (IS.insertBM prefix bits older);
+  seedRow slot = DiscoveryRow (IT.prefixOf slot) (IT.bitmapOf slot) IntSetNil;
+  insertRowSlot slot (DiscoveryRow prefix bits older) = let {
+    key = IT.prefixOf slot;
+    current = if key == prefix then bits else IS.bitmapAt key older;
+    combined = orInt current (IT.bitmapOf slot)
+  } in if current == combined then Nothing else let {
+    saved = if key == prefix || bits == 0 then older else IS.insertBM prefix bits older
+  } in seq key (seq combined (seq saved (Just (DiscoveryRow key combined saved))));
+  insertSetSlot slot previous = if IS.member slot previous then Nothing else Just (IS.insert slot previous);
   data DiscoveryIndex = DiscoveryIndex Int (IntMap Int) (IntMap Demand);
   discoverValidated :: IntMap Frame -> IntMap Seed -> IntMap Use -> IntMap Demand ->
                        IntMap IntSet -> Either String Discovery;
@@ -363,7 +378,7 @@ module Bootstrap.ClassDemand where {
         span = high - low;
         count = IM.size nodes
       } in if low >= 0 && span >= 0 && quotInt span 4 < count && span < 1152921504606846975
-        then runST (stBind (newSTArray (span + 1) IS.empty)
+        then runST (stBind (newSTArray (span + 1) (DiscoveryRow 0 0 IntSetNil))
           (\rows -> let {
             universe = allocateSeeds seeds;
             facts = IM.foldrWithKey (\node demand rest -> case demand of {
@@ -381,45 +396,57 @@ module Bootstrap.ClassDemand where {
             edges = IM.map (\targets -> map edge (IS.toAscList targets)) dependents;
             index = DiscoveryIndex low aliases nodes;
             work = foldr (\((,) node slot) rest -> enqueue (IM.get node edges) slot rest) [] facts
-          } in denseSeedFacts low rows facts (denseDiscover frames index rows universe work [])))
+          } in denseSeedFactsWith seedRow low rows facts
+            (denseDiscoverWith frozenRow insertRowSlot frames index rows universe work [])))
         else discoverUniverse frames seeds uses nodes dependents;
       _ -> discoverUniverse frames seeds uses nodes dependents
     };
   denseSeedFacts :: forall s a. Int -> STArray s IntSet -> [] ((,) Int Int) -> ST s a -> ST s a;
-  denseSeedFacts low rows facts done =
+  denseSeedFacts = denseSeedFactsWith IS.singleton;
+  denseSeedFactsWith :: forall s a row. (Int -> row) -> Int -> STArray s row -> [] ((,) Int Int) -> ST s a -> ST s a;
+  denseSeedFactsWith seed low rows facts done =
     case facts of {
       [] -> done;
-      (:) ((,) node slot) rest -> stBind (writeSTArray rows (node - low) (IS.singleton slot))
-        (\_ -> denseSeedFacts low rows rest done)
+      (:) ((,) node slot) rest -> stBind (writeSTArray rows (node - low) (seed slot))
+        (\_ -> denseSeedFactsWith seed low rows rest done)
     };
   denseDiscover :: forall s. IntMap Frame -> DiscoveryIndex -> STArray s IntSet -> Universe ->
                    [] DiscoveryWork -> [] DiscoveryWork -> ST s (Either String Discovery);
-  denseDiscover frames index@(DiscoveryIndex low aliases nodes) rows universe front pending =
+  denseDiscover = denseDiscoverWith (\a -> a) insertSetSlot;
+  denseDiscoverWith :: forall s row. (row -> IntSet) -> (Int -> row -> Maybe row) ->
+    IntMap Frame -> DiscoveryIndex -> STArray s row -> Universe -> [] DiscoveryWork -> [] DiscoveryWork ->
+    ST s (Either String Discovery);
+  denseDiscoverWith freeze add frames index@(DiscoveryIndex low aliases nodes) rows universe front pending =
     case front of {
       [] -> case pending of {
         [] -> stBind (freezeSTArray rows) (\at -> let {
           stored node = case IM.lookup node aliases of {
-            Nothing -> at (node - low); Just parent -> stored parent
+            Nothing -> freeze (at (node - low)); Just parent -> stored parent
           }
         } in stReturn (Right (Discovery universe (IM.mapWithKey (\n _ -> stored n) nodes) [])));
-        _ -> denseDiscover frames index rows universe (reverse pending) []
+        _ -> denseDiscoverWith freeze add frames index rows universe (reverse pending) []
       };
       (:) (DiscoveryWork slot edges) rest ->
-        denseDependents frames index rows universe rest pending slot edges
+        denseDependentsWith freeze add frames index rows universe rest pending slot edges
     };
   denseDependents :: forall s. IntMap Frame -> DiscoveryIndex -> STArray s IntSet -> Universe ->
                      [] DiscoveryWork -> [] DiscoveryWork -> Int -> [] DiscoveryEdge ->
                      ST s (Either String Discovery);
-  denseDependents frames index@(DiscoveryIndex low _ _) rows universe rest pending slot outputs =
+  denseDependents = denseDependentsWith (\a -> a) insertSetSlot;
+  denseDependentsWith :: forall s row. (row -> IntSet) -> (Int -> row -> Maybe row) ->
+    IntMap Frame -> DiscoveryIndex -> STArray s row -> Universe -> [] DiscoveryWork -> [] DiscoveryWork ->
+    Int -> [] DiscoveryEdge -> ST s (Either String Discovery);
+  denseDependentsWith freeze add frames index@(DiscoveryIndex low _ _) rows universe rest pending slot outputs =
     case outputs of {
-      [] -> denseDiscover frames index rows universe rest pending;
+      [] -> denseDiscoverWith freeze add frames index rows universe rest pending;
       (:) edge remaining -> let {
-        continue next work = denseDependents frames index rows next rest work slot remaining;
+        continue next work = denseDependentsWith freeze add frames index rows next rest work slot remaining;
         record output target next following = stBind (readSTArray rows (output - low))
-          (\previous -> if IS.member target previous then continue next pending
-            else let { updated = IS.insert target previous } in
-              seq updated (stBind (writeSTArray rows (output - low) updated)
-                (\_ -> continue next (enqueue following target pending))))
+          (\previous -> case add target previous of {
+            Nothing -> continue next pending;
+            Just updated -> seq updated (stBind (writeSTArray rows (output - low) updated)
+              (\_ -> continue next (enqueue following target pending)))
+          })
       } in case edge of {
         ForwardFact following -> continue universe (enqueue following slot pending);
         MergeFact output following -> record output slot universe following;
