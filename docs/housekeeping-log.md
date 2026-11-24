@@ -7,3 +7,4 @@ pauses. Sum recorded minutes to calculate the daily total. See the
 
 | Date | Job | Active work intervals (with zone) | Recorded minutes | Verified outcome |
 | --- | --- | --- | ---: | --- |
+| 2026-11-24 | Restore the October 18 native benchmark reader path | 09:09:35–09:11:18 MYT (UTC+08:00) | 2 | Rendered and verified the October 18 summary anchor, removed the stale raw link, and preserved sample counts, commands and later sections. |

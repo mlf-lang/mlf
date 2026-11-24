@@ -23,7 +23,12 @@ Seven samples were collected for each compiler/workload with alternating order, 
 | reverse-complement | 127.317 | 337.822 | 2.653392713 | 195.893 | 293.922 | 1.500421148 | PASS |
 | k-nucleotide | 149.863 | 369.828 | 2.467773900 | 170.390 | 280.410 | 1.645695170 | PASS |
 
-[The raw native report](../tools/profile/results/2026-10-18-compile3/bench-final.json) contains all 189 compilation and 189 runtime samples. [The detailed report](../tools/profile/RESULTS.md) includes ranges, MADs, stage overlap, diagnostic phases, rejected experiments, reproducible commands, source/toolchain hashes and all six native test groups. All 63 final standard LLVM outputs match the starting compiler.
+The removed raw native report contained all 189 compilation and 189 runtime
+samples. The [retained October 18 summary](../tools/profile/RESULTS.md#native-compilation-optimization--2026-10-18)
+includes ranges, MADs, stage overlap, diagnostic phases, rejected experiments,
+reproducible commands and results for all six native test groups. It describes
+the source/toolchain hashes recorded in the original evidence. All 63 final
+standard LLVM outputs match the starting compiler.
 
 Ordinary self-compilation on identical frozen sources measured 257.289 s for the original and 181.955 s for the candidate (-29.280%). This is the separately reported source-to-LLVM boundary.
 
