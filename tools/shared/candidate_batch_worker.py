@@ -36,6 +36,7 @@ CLASSES_SUCCESSORS = (
     '7918a00c5ec4ed660cf7643bbca22d46b4db4b96',
     # Recursive dictionary partials (1891f023) preserve the complete selector fixture.
     '900551ce15e533c2b9cfa267c5f8890d1ec66707',
+    'dda2ecc3356a47a590b75e3b52788b3fc0f7de88',
 )
 PINS = {
  'test_direct.py':'a46bd66949e81c5761dff3446201640837ec8f68',
