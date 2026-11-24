@@ -1970,10 +1970,11 @@ module Bootstrap.Parser where {
   operatorName :: Parser String;
   operatorName = pSatisfy (\name -> Set.member compareString name sharedOperatorSet) "supported value operator";
   operatorReference :: Parser String;
-  operatorReference = do {
+  operatorReference = operatorReferenceWith qualifiedName operatorName;
+  operatorReferenceWith build suffix = do {
     prefixes <- pMany (pTry (pBefore upperIdentifier (pSymbolPrefix ".")));
-    name <- operatorName;
-    pPure (foldr (\prefix suffix -> prefix ++ ("." ++ suffix)) name prefixes)
+    item <- suffix;
+    pPure (build prefixes item)
   };
   bindingName :: Parser String;
   bindingName = pChoice lowerIdentifier (pParens operatorName);
@@ -1990,14 +1991,27 @@ module Bootstrap.Parser where {
     if elem eqString (referenceLeaf name) ((:) "==" ((:) "/=" []))
     then name else "$MLF.Infix." ++ name;
   sharedSourceName name = if elem eqString name ((:) "True" ((:) "False" [])) then "$MLF.Source." ++ name else name;
-  sharedOperatorParser choices = do {
-    located <- pWithSpan (sharedInfix choices);
-    case located of {
-      (,) location operator -> pPure (\a b ->
-        SApp (SApp (SCallSite (referenceLeaf operator) location
-                    (SVar (sourceOperatorName operator))) a) b)
+  -- A successful infix ends at the operator token, including the suffix
+  -- left when a qualifier consumes the dot of a combined token such as ".+".
+  sharedOperatorParser choices = pTry (do {
+    original <- pState;
+    first <- referenceToken;
+    located <- operatorReferenceWith (\prefixes ((,) final name) ->
+      (,) final (qualifiedName prefixes name)) (do {
+        final <- referenceToken;
+        name <- operatorName;
+        pPure ((,) final name)
+      });
+    case located of { (,) final operator -> let { leaf = referenceLeaf operator } in
+      if elem eqString leaf choices then case original of {
+        ParseState file _ _ _ sourceModule sourcePackage -> let {
+          location = SourceSpan sourcePackage sourceModule file (tokenLine first) (tokenColumn first)
+            (tokenEndLine final) (tokenEndColumn final)
+        } in pPure (\a b -> SApp (SApp (SCallSite leaf location
+          (SVar (sourceOperatorName operator))) a) b)
+      } else pFail "operator at another precedence"
     }
-  };
+  });
   sharedApplyExpr :: Parser SExpr;
   sharedApplyExpr = pChainr sharedBindExpr (sharedOperatorParser ["$"]);
   sharedBindExpr :: Parser SExpr;

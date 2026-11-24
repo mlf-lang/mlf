@@ -691,6 +691,13 @@ walk start = let {{
             declarations = '\n'.join(rows) + '\n' + declarations.replace(
                 'a0 <- start;', 'seed <- start; a0 <- pure (checkedPrefix seed);')
         expression = 'case walk (Done x) of { Done y -> y }'
+    elif family == 'single_token_infix_sites':
+        steps = ['step0 :: Int -> Int;', 'step0 value = value;']
+        for i in range(1, n + 1):
+            steps.extend([f'step{i} :: Int -> Int;',
+                          f'step{i} value = step{i - 1} value + 1;'])
+        declarations = '\n'.join(steps) + '\n'
+        expression = f'step{n} x'
     elif family in ('recursive_monad_peers', 'nested_recursive_monad_peers'):
         preamble = HEADER + '''data Check a = Failed | Good a;
 instance Functor Check where { fmap f value = case value of { Failed -> Failed; Good x -> Good (f x) } };
@@ -1144,6 +1151,8 @@ def expected(family, n, x):
     if family == 'polymorphic_tree_fold':
         total = 3*n*x + n*(n-1)//2
         return (total + 2**63) % 2**64 - 2**63
+    if family == 'single_token_infix_sites':
+        return x + n
     if family == 'nested_recursive_monad_peers':
         # Each of four peers takes n ticks plus one local tick. The peer
         # offsets add 1 + 2 + 3 + 4 during the complete circuit.

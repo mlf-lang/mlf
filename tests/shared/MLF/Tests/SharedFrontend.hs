@@ -2129,7 +2129,10 @@ module MLF.Tests.SharedFrontend where {
   -- associativity and non-associative comparison diagnostic are tested together.
   precedenceParserChecks :: IO ();
   precedenceParserChecks = let {
-    at choices = P.sharedOperatorParser choices;
+    at choices = Parsing.pMap (\((,) location operator) a b ->
+      SApp (SApp (SCallSite (P.referenceLeaf operator) location
+        (SVar (P.sourceOperatorName operator))) a) b)
+      (Parsing.pWithSpan (P.sharedInfix choices));
     product = Parsing.pChainl P.operand (at ["*","/","%"]);
     sum = Parsing.pChainl product (at ["+","-"]);
     concatOp = Parsing.pChoice (Parsing.pMap (\_ -> P.sourceConsExpression) (Parsing.pToken ":")) (at ["++"]);
@@ -2157,7 +2160,7 @@ module MLF.Tests.SharedFrontend where {
     };
     operators = append [":"] Lexer.sharedValueOperators;
     combinations = concatMap (\a -> map (\b -> ["x",a,"y",b,"z",")"]) operators) operators;
-    examples = [[],["x"],["x","M",".","+","y"],["x","M","."],["M",".","x","+","y"],["x","+"],
+    examples = [[],["x"],["x","M",".","+","y"],["x","M",".+","y"],["x","M",".","N",".++","y"],["x","M","."],["M",".","x","+","y"],["x","+"],
       ["x","<","y","==","z"],["(","x","+","y",")","*","z"],["(",")"],["(","-","1",")"],
       ["(","+",")","x"],["(",",",")"],["1.5",";"],["f","[","x",",","y","]"],["(","let"],["1","(","x"]]
   } in check "shared infix precedence, associativity, spans, residual tokens and errors"
