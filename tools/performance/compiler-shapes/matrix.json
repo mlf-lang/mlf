@@ -5,6 +5,7 @@
   "title": "GHC / MLF compiler shape classification benchmark",
   "purpose": "Compile identical generated shared-Haskell programs with GHC and with GHC-hosted MLF, from fresh targets to native executables. This classifies compiler behaviour by program shape; it is not the C/MLF Benchmarks Game comparison in tools/bench.",
   "families": {
+    "mixed_unicode_literal": {"label": "ASCII run between Unicode scalars", "default": false, "work": "one typed literal has n sixteen-character ASCII blocks between two Unicode scalars and a runtime-selected scalar lookup"},
     "captured_parameter_uses": {"label": "Captured parameter used as an integer", "default": false, "work": "n inferred functions each capture an outer parameter in a local binding and use its value in integer addition"},
     "flat_functions": {"label": "Independent annotated functions", "default": true, "work": "n annotated top-level functions summed in a balanced tree"},
     "inferred_functions": {"label": "Independent inferred functions", "default": true, "work": "the flat_functions family with no signatures on the n generated functions"},

@@ -678,10 +678,25 @@ module Bootstrap.Separate where {
     } in seq nextA (seq nextB (canonicalFingerprintState rest nextA nextB));
     _ -> fingerprintStateChars chars a b
   };
+  canonicalFingerprintText text index size a b =
+    if index == 0 && size > 1024 && size == stringLength text && size /= stringUtf8Length text
+    then fingerprintBlocks text 0 size a b else canonicalFingerprintBlock text index size a b;
+  -- A few Unicode scalars in an otherwise ASCII artifact should only require
+  -- streaming their own block. Each block continues both polynomial states.
+  fingerprintBlocks text index size a b =
+    if index == size then (,) a b else let {
+      count = if size - index < 1024 then size - index else 1024;
+      block = stringSlice text index count;
+      states = if stringUtf8Length block == count
+        then canonicalFingerprintBlock block 0 count a b
+        else canonicalFingerprintState (textToChars block) a b
+    } in case states of {
+      (,) nextA nextB -> seq nextA (seq nextB (fingerprintBlocks text (index + count) size nextA nextB))
+    };
   -- ASCII fields are common in artifacts. Read four scalars directly without
   -- allocating a character-list cell for each byte. On the first non-ASCII
   -- block, stream just the remaining suffix so Unicode stays a linear scan.
-  canonicalFingerprintText text index size a b =
+  canonicalFingerprintBlock text index size a b =
     if size - index < 4 then canonicalFingerprintState
       (textToChars (stringSlice text index (size - index))) a b
     else let {
@@ -690,7 +705,7 @@ module Bootstrap.Separate where {
     } in if x0 < 128 && x1 < 128 && x2 < 128 && x3 < 128 then let {
       nextA = (a * 1172642095 + x0 * 780718649 + x1 * 8261507 + x2 * 65599 + x3) % 2147483647;
       nextB = (b * 294499921 + x0 * 2248091 + x1 * 17161 + x2 * 131 + x3) % 2147483629
-    } in seq nextA (seq nextB (canonicalFingerprintText text (index + 4) size nextA nextB))
+    } in seq nextA (seq nextB (canonicalFingerprintBlock text (index + 4) size nextA nextB))
     else canonicalFingerprintState (textToChars (stringSlice text index (size - index))) a b;
   fingerprint text = case canonicalFingerprintText text 0 (stringLength text) 0 1 of {
     (,) a b -> showInt a ++ "-" ++ showInt b

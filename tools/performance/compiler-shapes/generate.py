@@ -52,6 +52,13 @@ def program(family, n):
     """Generate one shared module with a runtime input at its IO entry."""
     if family == 'baseline':
         declarations, expression = '', 'x'
+    elif family == 'mixed_unicode_literal':
+        # Positions include both Unicode scalars and both ends of the ASCII run.
+        payload = 'λ' + 'abcdefghijklmnop' * n + '界'
+        declarations = f'literal :: String;\nliteral = "{payload}";\n'
+        expression = ('let { last = subInt (stringLength literal) 1; index = '
+                      'if ltInt x 0 then 0 else if eqInt x 0 then last else remInt x last } '
+                      'in addInt (stringLength literal) (stringCodeAt literal index)')
     elif family == 'captured_parameter_uses':
         declarations = ''.join(
             f'f{i} x = let {{ y = x }} in addInt y {i+1};\n' for i in range(n))
@@ -891,6 +898,11 @@ run x (More (Job worker) rest) = let { saved = worker x (addInt x 1) } in
 
 def expected(family, n, x):
     """Closed-form specifications; no compiled results or generated helpers used."""
+    if family == 'mixed_unicode_literal':
+        last = 16 * n + 1
+        index = 0 if x < 0 else last if x == 0 else x % last
+        code = ord('λ') if index == 0 else ord('界') if index == last else ord('a') + (index - 1) % 16
+        return last + 1 + code
     if family == 'baseline':
         return x
     if family in ('polymorphic_import_spine', 'duplicated_type_arguments'):
