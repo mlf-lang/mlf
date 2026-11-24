@@ -886,9 +886,14 @@ module Bootstrap.Classes where {
       let { wanted = inventoryWantedScopes inventory;
             available = case owner of { Nothing -> Dependency.lookupScope name wanted; Just i -> Dependency.scopeAt wanted i }
       };
-      let { groups = if not usesManaged && ordinaryRecursiveSource ((,,) name Nothing body)
-              then duplicates else (\_ -> Nothing) };
-      lowered <- lowerExprInAtWith groups Nothing (Dependency.nestedScopes wanted) ds infos environment
+      let { ordinary = not usesManaged && ordinaryRecursiveSource ((,,) name Nothing body);
+            groups = if ordinary then duplicates else (\_ -> Nothing);
+            -- A file-issued definition scope owns the lexical bindings in
+            -- this unsigned body. Their planner checks each retained slot
+            -- before rendering a grouped dictionary prefix.
+            owned = isJust owner && ordinary
+      };
+      lowered <- lowerExprInAtWithOwner owned groups Nothing (Dependency.nestedScopes wanted) ds infos environment
         (fromMaybe (wantedScope valueScopes candidates) available) body;
       case lowered of {
         (,) rhs wanted -> do {
@@ -2617,11 +2622,13 @@ module Bootstrap.Classes where {
   lowerExprAt site valueScopes ds infos env candidates = lowerExprInAt site
     (Dependency.mapScopes (wantedScope valueScopes) valueScopes) ds infos env (wantedScope valueScopes candidates);
   lowerExprInAt = lowerExprInAtWith (\_ -> Nothing);
-  lowerExprInAtWith duplicates site valueScopes ds infos env candidates expression = do {
+  lowerExprInAtWith = lowerExprInAtWithOwner False;
+  lowerExprInAtWithOwner ordinaryOwners duplicates site valueScopes ds infos env candidates expression = do {
     result <- prepareQualifiedWith duplicates site valueScopes ds infos env candidates expression;
     case result of { (,,) planned plan frames -> do {
       parameters <- qualifiedParameters plan planned;
-      lowered <- renderQualified plan frames infos (qualifiedParameterMap parameters) planned;
+      lowered <- renderQualifiedFileEvidence ordinaryOwners plan frames infos IM.empty IM.empty
+        (qualifiedParameterMap parameters) planned;
       freshPure ((,) lowered (qualifiedWants parameters))
     } }
   };

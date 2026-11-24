@@ -48,6 +48,32 @@ packet x = if eqInt x 0 then Missing else Payload (addInt x 3) (subInt 3 x);
     return declarations
 
 
+def local_recursive_checks(n):
+    count = max(n, 1)
+    helpers = []
+    for i in range(count):
+        following = (i + 1) % count
+        helpers.append(f"""visit{i} term = let {{
+  both a b = do {{ l <- visit{following} a; r <- visit{following} b; return (addInt l r) }};
+  fallback a b = case visit{following} a of {{ Good value -> Good value; Refused -> do {{ value <- visit{following} b; return (addInt value {i}) }} }}
+}} in case term of {{
+  Leaf x -> Good (addInt x {i}); Pair a b -> both a b; Choice a b -> fallback a b; Absent -> Refused
+}}""")
+    return HEADER + '''data Subject = Leaf Int | Pair Subject Subject | Choice Subject Subject | Absent;
+data Check a = Refused | Good a;
+instance Functor Check where { fmap f value = case value of { Refused -> Refused; Good x -> Good (f x) } };
+instance Applicative Check where { pure = Good; (<*>) vf vx = case vf of { Refused -> Refused; Good f -> fmap f vx } };
+instance Monad Check where { (>>=) action next = case action of { Refused -> Refused; Good x -> next x } };
+wrap k subject = if ltInt k 1 then subject else Choice Absent (wrap (subInt k 1) subject);
+walk subject = let {
+''' + ';\n'.join(helpers) + '''
+} in visit0 subject;
+entry x = case walk (wrap ''' + str(n) + ''' (Pair (Choice Absent (Leaf x)) (Pair (Leaf 4) (Leaf 7)))) of {
+  Refused -> 0; Good value -> value
+};
+''' + MAIN
+
+
 def program(family, n):
     """Generate one shared module with a runtime input at its IO entry."""
     if family == 'baseline':
@@ -626,6 +652,8 @@ foldPair step seed left right = foldTree step seed (Branch (Leaf left) (Leaf rig
         calls = [f'foldPair addInt x (addInt x {i}) x' for i in range(n)]
         total = balanced(calls, lambda left, right: f'addInt ({left}) ({right})')
         return HEADER + declarations + f'entry x = {total};\n' + MAIN
+    elif family == 'local_recursive_checks':
+        return local_recursive_checks(n)
     elif family in ('local_monadic_dictionary_uses', 'ground_monadic_dictionary_uses', 'checked_groups_then_dictionary'):
         # A concrete first action fixes the monad throughout the same do block.
         first_action = ('(case start of { Done value -> Done value })'
@@ -1088,6 +1116,11 @@ def expected(family, n, x):
     if family == 'polymorphic_tree_fold':
         total = 3*n*x + n*(n-1)//2
         return (total + 2**63) % 2**64 - 2**63
+    if family == 'local_recursive_checks':
+        # The outer choices visit one complete ring. The three leaves are
+        # two levels below the root, and the left choice falls back at depth one.
+        count = max(n, 1)
+        return x + 11 + n * (n - 1) // 2 + 3 * (2 % count) + 1 % count
     if family == 'checked_groups_then_dictionary':
         count = 4 * n
         arm = x % 12
