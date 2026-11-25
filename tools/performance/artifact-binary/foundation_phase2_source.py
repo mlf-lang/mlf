@@ -33,6 +33,8 @@ ARTIFACT_STACK_PARENT = 'f000c8bcd9108b90814be518995c4edeb25e2c3c'
 ARTIFACT_STACK = 'f21cba5d133da862a4eca6e6174290cc6b5882e0'
 OPEN_PACKAGE_LIMIT_PARENT = 'd92bb349935f25c58d89626b18053ff094880814'
 OPEN_PACKAGE_LIMIT = 'b02e208b617fd34d36e08047875c3b642a906332'
+BACKEND_PATHS_PARENT = '148cbb3f8cb47863987fb146745b389ddd0e6e17'
+BACKEND_PATHS = 'a57e46fd89740410607685473bed6dcc70649dd8'
 ORIGINAL = 'tools/performance/artifact-binary/phase2_source_successor.py'
 ORIGINAL_SHA = '72041ef0f3ea9c84d5f7ff100f721c326ecbbc86c1b705bf2c45f11cb19f9f16'
 EXTRA_MERGE_ROLES = {
@@ -82,6 +84,7 @@ OPEN_PACKAGE_LIMIT_ROLES = {
     'bootstrap/MLF/BuiltinPreludeData.hs', 'mlf.lock',
     'testing/tools/mlf.lock', 'tests/mlf.lock', 'tests/shared/mlf.lock',
 }
+BACKEND_PATHS_ROLES = {'tests/Tests/Separate.emlf', 'tests/Tests/Readability.emlf', 'tests/mlf.lock'}
 
 
 def repository(root, *args):
@@ -190,11 +193,17 @@ def qualified_contract(root, source_root=None):
     stack_changes = set(live_git.run(
         'diff', '--name-only', OPEN_PACKAGE_LIMIT_PARENT, OPEN_PACKAGE_LIMIT).decode().splitlines())
     proof.require(stack_changes == OPEN_PACKAGE_LIMIT_ROLES, 'exact open package budget source roles')
+    live_git.run('merge-base', '--is-ancestor', OPEN_PACKAGE_LIMIT, BACKEND_PATHS_PARENT)
+    live_git.commit(BACKEND_PATHS, parents=[BACKEND_PATHS_PARENT])
+    live_git.run('merge-base', '--is-ancestor', BACKEND_PATHS, 'HEAD')
+    backend_changes = set(live_git.run(
+        'diff', '--name-only', BACKEND_PATHS_PARENT, BACKEND_PATHS).decode().splitlines())
+    proof.require(backend_changes == BACKEND_PATHS_ROLES, 'exact backend path test source roles')
     auxiliary_roles = (
         EXTRA_MERGE_ROLES | WRITER_SIGNATURE_ROLES | PARITY_INPUT_ROLES | LLVM_NONRETURN_ROLES | F1_HYGIENE_ROLES
-        | OPTIMIZER_RAW_ROLES | QUERY_WIRE_ROLES | LIFECYCLE_STRING_ROLES | ARTIFACT_STACK_ROLES | OPEN_PACKAGE_LIMIT_ROLES
+        | OPTIMIZER_RAW_ROLES | QUERY_WIRE_ROLES | LIFECYCLE_STRING_ROLES | ARTIFACT_STACK_ROLES | OPEN_PACKAGE_LIMIT_ROLES | BACKEND_PATHS_ROLES
     ) - paths
-    expected = live_git.inventory(OPEN_PACKAGE_LIMIT, paths | auxiliary_roles)
+    expected = live_git.inventory(BACKEND_PATHS, paths | auxiliary_roles)
     if source_root == root:
         auxiliary = {p: proof.read(source_root, p) for p in auxiliary_roles}
         proof.require(all(proof.oid(raw) == expected[p] for p, raw in auxiliary.items()),
