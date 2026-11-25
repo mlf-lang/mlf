@@ -76,8 +76,8 @@ class GateControls(unittest.TestCase):
                          gate.FOUNDATION_MODULES,{})[1]),15)
         modules = gate.manifest_inputs(framework,'mlf-test',gate.FRAMEWORK_MODULES,
                                       {'mlf-foundation':'../libraries/mlf-foundation'})[1]
-        self.assertEqual(len(modules),14)
-        self.assertEqual(sum(p.suffix=='.hs' for _,p in modules),7)
+        self.assertEqual(len(modules),15)
+        self.assertEqual(sum(p.suffix=='.hs' for _,p in modules),8)
         self.assertEqual(sum(p.suffix=='.emlf' for _,p in modules),7)
     def test_equal_size_module_replacement_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:

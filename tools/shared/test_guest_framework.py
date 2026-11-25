@@ -73,6 +73,7 @@ FOUNDATION_MODULES = {
 FRAMEWORK_MODULES = {
     "Test.Assert": "Test/Assert.hs",
     "Test.Case": "Test/Case.hs",
+    "Test.CaseSelection": "Test/CaseSelection.hs",
     "Test.Runner": "Test/Runner.hs",
     "Test.Descriptor": "Test/Descriptor.hs",
     "Test.Registry": "Test/Registry.hs",
@@ -166,15 +167,16 @@ def main():
         framework, framework_modules = manifest_inputs(framework_path, 'mlf-test', FRAMEWORK_MODULES,
                                                        {'mlf-foundation': '../libraries/mlf-foundation'})
         require(all(path.suffix == '.hs' for _, path in foundation_modules), 'foundation is not shared source')
-        require(sum(path.suffix == '.hs' for _, path in framework_modules) == 7 and
-                sum(path.suffix == '.emlf' for _, path in framework_modules) == 7,
+        shared_count = sum(path.suffix == '.hs' for _, path in framework_modules)
+        guest_count = sum(path.suffix == '.emlf' for _, path in framework_modules)
+        require(shared_count == 8 and guest_count == 7,
                 'mixed framework source boundary changed')
         inputs = [Path(__file__), WATCHDOG, ROOT/'tools/shared/test_direct.py', ROOT/'tools/shared/build.py',
                   foundation_path, framework_path, receipt, compiler,
                   *[path for _, path in foundation_modules+framework_modules]]
         before = {str(path): digest(path) for path in inputs}
         record.update(producer_receipt_sha256=digest(receipt), inputs=before,
-                      library_modules={'foundation': len(FOUNDATION_MODULES), 'framework_shared': 7, 'framework_guest': 7},
+                      library_modules={'foundation': len(FOUNDATION_MODULES), 'framework_shared': shared_count, 'framework_guest': guest_count},
                       producer_object_count=len(producer['object_inputs']))
         save()
         builtin = output/'foundation/builtin/unit'
@@ -258,7 +260,7 @@ def main():
         if selected:
             summary['selected_ids'] = record['selected_ids']
         else:
-            summary['framework_modules'] = 14
+            summary['framework_modules'] = len(framework_modules)
         print(json.dumps(summary))
     except BaseException as error:
         record['error'] = type(error).__name__+': '+str(error)
