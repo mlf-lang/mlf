@@ -35,6 +35,8 @@ OPEN_PACKAGE_LIMIT_PARENT = 'd92bb349935f25c58d89626b18053ff094880814'
 OPEN_PACKAGE_LIMIT = 'b02e208b617fd34d36e08047875c3b642a906332'
 BACKEND_PATHS_PARENT = '148cbb3f8cb47863987fb146745b389ddd0e6e17'
 BACKEND_PATHS = 'a57e46fd89740410607685473bed6dcc70649dd8'
+CORE_LEAF_SELECTION_PARENT = '222afddb378bdf55a9bf3ad343d9a77fc5d1d52d'
+CORE_LEAF_SELECTION = 'ef3d0106036758b9fd7847ecce7750955097d817'
 ORIGINAL = 'tools/performance/artifact-binary/phase2_source_successor.py'
 ORIGINAL_SHA = '72041ef0f3ea9c84d5f7ff100f721c326ecbbc86c1b705bf2c45f11cb19f9f16'
 EXTRA_MERGE_ROLES = {
@@ -85,6 +87,7 @@ OPEN_PACKAGE_LIMIT_ROLES = {
     'testing/tools/mlf.lock', 'tests/mlf.lock', 'tests/shared/mlf.lock',
 }
 BACKEND_PATHS_ROLES = {'tests/Tests/Separate.emlf', 'tests/Tests/Readability.emlf', 'tests/mlf.lock'}
+CORE_LEAF_SELECTION_ROLES = {'tests/Tests/CoreRunner.emlf', 'tests/mlf.lock'}
 
 
 def repository(root, *args):
@@ -199,11 +202,18 @@ def qualified_contract(root, source_root=None):
     backend_changes = set(live_git.run(
         'diff', '--name-only', BACKEND_PATHS_PARENT, BACKEND_PATHS).decode().splitlines())
     proof.require(backend_changes == BACKEND_PATHS_ROLES, 'exact backend path test source roles')
+    live_git.run('merge-base', '--is-ancestor', BACKEND_PATHS, CORE_LEAF_SELECTION_PARENT)
+    live_git.commit(CORE_LEAF_SELECTION, parents=[CORE_LEAF_SELECTION_PARENT])
+    live_git.run('merge-base', '--is-ancestor', CORE_LEAF_SELECTION, 'HEAD')
+    selection_changes = set(live_git.run(
+        'diff', '--name-only', CORE_LEAF_SELECTION_PARENT, CORE_LEAF_SELECTION).decode().splitlines())
+    proof.require(selection_changes == CORE_LEAF_SELECTION_ROLES, 'exact Core leaf selection source roles')
     auxiliary_roles = (
         EXTRA_MERGE_ROLES | WRITER_SIGNATURE_ROLES | PARITY_INPUT_ROLES | LLVM_NONRETURN_ROLES | F1_HYGIENE_ROLES
         | OPTIMIZER_RAW_ROLES | QUERY_WIRE_ROLES | LIFECYCLE_STRING_ROLES | ARTIFACT_STACK_ROLES | OPEN_PACKAGE_LIMIT_ROLES | BACKEND_PATHS_ROLES
+        | CORE_LEAF_SELECTION_ROLES
     ) - paths
-    expected = live_git.inventory(BACKEND_PATHS, paths | auxiliary_roles)
+    expected = live_git.inventory(CORE_LEAF_SELECTION, paths | auxiliary_roles)
     if source_root == root:
         auxiliary = {p: proof.read(source_root, p) for p in auxiliary_roles}
         proof.require(all(proof.oid(raw) == expected[p] for p, raw in auxiliary.items()),
