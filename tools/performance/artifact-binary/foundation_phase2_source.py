@@ -31,6 +31,8 @@ LIFECYCLE_STRING_PARENT = '8ac74b0ab7cf11db1f9a11cf9c483a4304b90695'
 LIFECYCLE_STRING = 'ec13adb93e5e71770f20b19db448c5181de62030'
 ARTIFACT_STACK_PARENT = 'f000c8bcd9108b90814be518995c4edeb25e2c3c'
 ARTIFACT_STACK = 'f21cba5d133da862a4eca6e6174290cc6b5882e0'
+OPEN_PACKAGE_LIMIT_PARENT = 'd92bb349935f25c58d89626b18053ff094880814'
+OPEN_PACKAGE_LIMIT = 'b02e208b617fd34d36e08047875c3b642a906332'
 ORIGINAL = 'tools/performance/artifact-binary/phase2_source_successor.py'
 ORIGINAL_SHA = '72041ef0f3ea9c84d5f7ff100f721c326ecbbc86c1b705bf2c45f11cb19f9f16'
 EXTRA_MERGE_ROLES = {
@@ -72,6 +74,11 @@ LIFECYCLE_STRING_ROLES = {
 }
 ARTIFACT_STACK_ROLES = {
     'libraries/mlf-crates/Bootstrap/Bitstream.hs', 'libraries/mlf-crates/Bootstrap/QueryGraph.hs',
+    'bootstrap/MLF/BuiltinPreludeData.hs', 'mlf.lock',
+    'testing/tools/mlf.lock', 'tests/mlf.lock', 'tests/shared/mlf.lock',
+}
+OPEN_PACKAGE_LIMIT_ROLES = {
+    'libraries/mlf-crates/Bootstrap/OpenFragment.hs',
     'bootstrap/MLF/BuiltinPreludeData.hs', 'mlf.lock',
     'testing/tools/mlf.lock', 'tests/mlf.lock', 'tests/shared/mlf.lock',
 }
@@ -177,11 +184,17 @@ def qualified_contract(root, source_root=None):
     stack_changes = set(live_git.run(
         'diff', '--name-only', ARTIFACT_STACK_PARENT, ARTIFACT_STACK).decode().splitlines())
     proof.require(stack_changes == ARTIFACT_STACK_ROLES, 'exact artifact stack source roles')
+    live_git.run('merge-base', '--is-ancestor', ARTIFACT_STACK, OPEN_PACKAGE_LIMIT_PARENT)
+    live_git.commit(OPEN_PACKAGE_LIMIT, parents=[OPEN_PACKAGE_LIMIT_PARENT])
+    live_git.run('merge-base', '--is-ancestor', OPEN_PACKAGE_LIMIT, 'HEAD')
+    stack_changes = set(live_git.run(
+        'diff', '--name-only', OPEN_PACKAGE_LIMIT_PARENT, OPEN_PACKAGE_LIMIT).decode().splitlines())
+    proof.require(stack_changes == OPEN_PACKAGE_LIMIT_ROLES, 'exact open package budget source roles')
     auxiliary_roles = (
         EXTRA_MERGE_ROLES | WRITER_SIGNATURE_ROLES | PARITY_INPUT_ROLES | LLVM_NONRETURN_ROLES | F1_HYGIENE_ROLES
-        | OPTIMIZER_RAW_ROLES | QUERY_WIRE_ROLES | LIFECYCLE_STRING_ROLES | ARTIFACT_STACK_ROLES
+        | OPTIMIZER_RAW_ROLES | QUERY_WIRE_ROLES | LIFECYCLE_STRING_ROLES | ARTIFACT_STACK_ROLES | OPEN_PACKAGE_LIMIT_ROLES
     ) - paths
-    expected = live_git.inventory(ARTIFACT_STACK, paths | auxiliary_roles)
+    expected = live_git.inventory(OPEN_PACKAGE_LIMIT, paths | auxiliary_roles)
     if source_root == root:
         auxiliary = {p: proof.read(source_root, p) for p in auxiliary_roles}
         proof.require(all(proof.oid(raw) == expected[p] for p, raw in auxiliary.items()),
