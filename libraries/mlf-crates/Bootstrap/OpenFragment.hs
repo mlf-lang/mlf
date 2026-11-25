@@ -945,6 +945,10 @@ module Bootstrap.OpenFragment
   wireFormat11 = "MLF-OPEN-CRATE-5/checker-1";
   applicationFormat :: Int -> String;
   applicationFormat schema = if schema == 11 then wireFormat11 else if schema == 10 then wireFormat10 else if schema == 9 then wireFormat9 else wireFormat8;
+  -- Spine-aware packages retain strings by symbol index. Earlier formats
+  -- charge expanded text in both the writer and the reader.
+  packageLimits :: Int -> W.Limits;
+  packageLimits schema = if schema == 11 then W.indexedTextLimits else W.defaultLimits;
   -- Candidate engineering resource class; qualification is required.
   packageWorkLimit :: Int;
   packageWorkLimit = Storage.maxBytes;
@@ -1104,7 +1108,7 @@ module Bootstrap.OpenFragment
     then ioReturn (Left "open crate SHA mismatch")
     else do {
       decoded <- Host.phaseIO profile "wire_decode_ms" (W.decodeGraphRootBounded
-        W.indexedTextLimits packageWorkLimit schema bytes);
+        (packageLimits schema) packageWorkLimit schema bytes);
       case do {
         graph <- decoded;
         roots <- case W.graphRoots graph of {
@@ -1372,8 +1376,7 @@ module Bootstrap.OpenFragment
                   final ((,) entry selected) = case selected of {
                     Just ((,) _ wire) -> encodeFinalWire wire entry; Nothing -> encodeFinal False entry
                   };
-                  limits = if spines then W.indexedTextLimits else W.defaultLimits;
-                  write schema format stored = W.encodeRootsWithAtoms Structure.termAtomShapes limits
+                  write schema format stored = W.encodeRootsWithAtoms Structure.termAtomShapes (packageLimits schema)
                     remaining schema ((:) (header format) (if stored then map final plans else map (encodeFinal False) fragments));
                   legacy = do {
                     encoded <- write 8 wireFormat8 False;
@@ -1394,7 +1397,7 @@ module Bootstrap.OpenFragment
                   case candidate of {
                     Left _ -> legacy;
                     Right bytes -> do {
-                      decoded <- W.decodeGraphRootBounded limits remaining schema bytes;
+                      decoded <- W.decodeGraphRootBounded (packageLimits schema) remaining schema bytes;
                       case bindEither decoded (\graph -> do {
                         used <- W.graphAdmittedWork graph;
                         (,) plans _ <- Structure.admitPatternsWith (schema >= 10) (schema == 11) graph (remaining - used);
