@@ -192,8 +192,8 @@ const validate = text => {
   const o2Only = [
     ...migrated,
     ...graphChecks,
-    'python3 -B tools/performance/patricia/test_adapters.py',
-    'python3 -O -B tools/performance/patricia/test_adapters.py',
+    'python3 -B tools/release/test_phase2_patricia_adapters.py',
+    'python3 -O -B tools/release/test_phase2_patricia_adapters.py',
     'tools/shared/test_source_context_cache.py',
     'tools/shared/test_artifact_binary.py',
     'tools/shared/test_recursive_managed.py',
@@ -530,6 +530,8 @@ const controls = [
   ['binary native dependencies omitted', '--gc-prefix "$PWD/.mlf-build/io-action-gc"', ''],
   ['binary resource guard relaxed', '--rss-mib 5120 --max-output-mib 640 --disk-free-mib 4096 .mlf-build/artifact-binary-guard', '--rss-mib 6144 --max-output-mib 640 --disk-free-mib 4096 .mlf-build/artifact-binary-guard'],
   ['binary evidence omitted', '            .mlf-build/artifact-binary-guard/results/**/*.json\n', ''],
+  ['Phase 2 Patricia normal omitted', 'python3 -B tools/release/test_phase2_patricia_adapters.py', 'python3 -B tools/performance/patricia/test_adapters.py'],
+  ['Phase 2 Patricia optimized omitted', 'python3 -O -B tools/release/test_phase2_patricia_adapters.py', 'python3 -O -B tools/performance/patricia/test_adapters.py'],
   ['retained P123 omitted', 'run_integrated.py --suite p123', 'run_integrated.py --suite graph'],
   ['retained graph omitted', 'run_integrated.py --suite graph', 'run_integrated.py --suite builtin'],
   ['retained validation omitted', 'run_integrated.py --suite validation', 'run_integrated.py --suite builtin'],
@@ -549,7 +551,7 @@ const prefix = 'release/native-ci-partition/';
 const cases = [
   [prefix + 'schedule', () => {
     const actual = job(workflowSource, 'native');
-    for (const adapter of ['source-smoke', 'direct-candidate', 'framework-direct', 'release-build-receipts', 'figure12-direct', 'tuple-list-native', 'indexvec']) {
+    for (const adapter of ['source-smoke', 'direct-candidate', 'framework-direct', 'release-build-receipts', 'figure12-direct', 'tuple-list-native', 'indexvec', 'python-patricia-adapters']) {
       assert.match(actual, new RegExp('tools/testing/run[.]py ' + adapter + '\\b'));
     }
     validate(workflow);
