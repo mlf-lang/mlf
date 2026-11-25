@@ -38,6 +38,28 @@ def signal_group(pid, sig):
             raise
 
 
+def wait_for_group(child, cancelled, cancellation_grace=0.5, *, cleanup_on_exit=True):
+    """Supervise an owned session with its leader PID reserved until cleanup."""
+    exited = False
+    try:
+        wait_for_exit(child.pid, cancelled)
+        exited = not cancelled
+    finally:
+        try:
+            if cancelled:
+                signal_group(child.pid, cancelled[0])
+                signal_group(child.pid, signal.SIGCONT)
+                time.sleep(cancellation_grace)
+        finally:
+            # A finished leader can still have stopped or signal-ignoring children.
+            try:
+                if cleanup_on_exit or cancelled or not exited:
+                    signal_group(child.pid, signal.SIGKILL)
+            finally:
+                child.wait()
+    return child.returncode
+
+
 def run_build(argv, cwd, *, cancellation_grace=0.5):
     """Return the child's exit status. The POSIX CLI owns the child's process group.
 
@@ -61,20 +83,7 @@ def run_build(argv, cwd, *, cancellation_grace=0.5):
                 previous[sig] = signal.signal(sig, remember)
         # Record cancellation even if it arrives before Popen returns the pid.
         child = subprocess.Popen(argv, cwd=cwd, start_new_session=True)
-        try:
-            wait_for_exit(child.pid, cancelled)
-        finally:
-            try:
-                if cancelled:
-                    signal_group(child.pid, cancelled[0])
-                    signal_group(child.pid, signal.SIGCONT)
-                    time.sleep(cancellation_grace)
-            finally:
-                # A finished leader can still have stopped or signal-ignoring children.
-                try:
-                    signal_group(child.pid, signal.SIGKILL)
-                finally:
-                    child.wait()
+        wait_for_group(child, cancelled, cancellation_grace)
         return -cancelled[0] if cancelled else child.returncode
     finally:
         for sig, handler in previous.items():

@@ -116,6 +116,30 @@ def program(family, n):
         if family == 'local_functions':
             expression = 'let {\n'+declarations+'} in '+expression
             declarations = ''
+    elif family == 'demand_forwarding_chain':
+        declarations = ('data Box = Box Int; data Wrap = Wrap Int;\n'
+                        'class Score a where { score :: a -> Int };\n'
+                        'instance Score Box where { score (Box x) = addInt x 1 };\n'
+                        'instance Score Wrap where { score (Wrap x) = subInt x 1 };\n')
+        chain = ['ref0 value = score value']
+        chain.extend(f'ref{i} value = ref{i-1} value' for i in range(1, n+1))
+        expression = ('let { ' + ';\n'.join(chain) + ' } in '
+                      f'addInt (ref{n} (Box x)) (ref{n} (Wrap x))')
+    elif family == 'independent_wide_recursive_groups':
+        args = [f'p{i}' for i in range(16)]
+        formals = ' '.join(args)
+        sum_args = balanced(args, lambda a, b: f'(addInt {a} {b})')
+        signature = ' -> '.join(['Int'] * 18)
+        workers = []
+        for i in range(n):
+            for current, peer in [('left', 'right'), ('right', 'left')]:
+                workers.append(f'{current}{i} :: {signature};\n'
+                               f'{current}{i} fuel {formals} = if ltInt fuel 1 then addInt {sum_args} {i} '
+                               f'else {peer}{i} (subInt fuel 1) {formals};\n')
+        actuals = ' '.join(f'(addInt x {i})' for i in range(16))
+        declarations = ''.join(workers)
+        expression = balanced([f'(left{i} 2 {actuals})' for i in range(n)],
+                              lambda a, b: f'(addInt {a} {b})') if n else '0'
     elif family == 'class_declaration_reservations':
         declarations = '''data Token = Token Int;
 class Score a where { score :: a -> Int };
@@ -1015,6 +1039,10 @@ run x (More (Job worker) rest) = let { saved = worker x (addInt x 1) } in
 
 def expected(family, n, x):
     """Closed-form specifications; no compiled results or generated helpers used."""
+    if family == 'demand_forwarding_chain':
+        return (2*x + 2**63) % 2**64 - 2**63
+    if family == 'independent_wide_recursive_groups':
+        return (n*(16*x + 120) + n*(n-1)//2 + 2**63) % 2**64 - 2**63
     if family == 'module_string_literals':
         if not n:
             return x

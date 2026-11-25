@@ -15,6 +15,7 @@ import qualified Bootstrap.BuiltinPreludeLiteral as BuiltinLiteral
 import qualified Bootstrap.Constraint as C
 import qualified Bootstrap.Graph as Graph
 import qualified Bootstrap.Graph.Solver as Solver
+import qualified Bootstrap.ClassDemand as Demand
 import qualified Bootstrap.Classes as Classes
 import qualified Bootstrap.Compiler as Compiler
 import qualified Bootstrap.CompilerCore as CompilerCore
@@ -322,6 +323,25 @@ inferredDictionaryPrefixChecks = do
       datatypes <- right (Data.validateDeclarations [T.DataDecl "DictTest" ["a"] [T.ConstructorDecl "TestDict" []]])
       actual <- right (XCheck.inferWithData datatypes (T.XEnv M.empty M.empty) term)
       check "compacted dictionary alias checks" True (XT.alphaEq actual target)
+  let concrete = T.XCon "DictTest" [T.XCon "Int" []]
+      headName = T.XName 80 "identity"
+      headType = T.XForall a T.XBot (T.XArrow concrete concrete)
+      env = T.XEnv M.empty (M.singleton headName headType)
+      originalType = T.XArrow concrete (T.XArrow concrete concrete)
+      rows = [("Int",False,T.XVarTerm d2)]
+  datatypes <- right (Data.validateDeclarations [T.DataDecl "DictTest" ["a"] [T.ConstructorDecl "TestDict" []]])
+  forM_ [T.XInstantiationSpine headName rows, X.expandInstantiationSpine headName rows,
+         T.XInstantiationSpine d2 []] $ \body -> do
+    let original = T.XAbs d1 concrete (T.XAbs d2 concrete body)
+    before <- right (XCheck.inferWithData datatypes env original)
+    check "dictionary spine fixture is well typed" True (XT.alphaEq before originalType)
+    compacted <- right (EvidenceBoundary.compactInferredPrefix registry labels originalType original)
+    case compacted of
+      T.Just (ty,term,[_]) -> do
+        after <- right (XCheck.inferWithData datatypes env term)
+        check "spine heads and operands refer to the retained dictionary" True
+          (XT.alphaEq ty after && XT.alphaEq ty (T.XArrow concrete concrete))
+      _ -> fail "expected exactly one retained dictionary"
   distinct <- compact (dictionary b)
   case distinct of
     T.Nothing -> pure ()
@@ -2355,6 +2375,55 @@ recursiveArgumentChecks = do
         T.Right value -> check "recursive argument forwarding preserves both values" expected value
         T.Left why -> fail (H.unpack why)
 
+  -- Each reachable entry passes sixteen distinct variables. Every peer
+  -- retains all its arguments, regardless of the number of unrelated groups.
+  let many = foldr independent (T.XEInt 0) [1..512]
+      independent i rest =
+        let base = 100*i
+            worker f peer args = binding f args (call (var peer) (map var args))
+        in T.XELetRec [worker base (base+1) [base+10..base+25],
+                       worker (base+1) base [base+30..base+45]]
+           (T.XELet (name (base+2)) (call (var base) (map var [-16..(-1)])) rest)
+  check "independent uncompressible groups retain all uses" True
+    (X.equalErased many (Optimize.compactRecursiveArguments many))
+  -- Compacting the nested group makes its call into the outer group uniform.
+  let inner = T.XELetRec [binding 60 [70..85] (call (var 1) (map var [70..85])),
+                          binding 61 [90..105] (call (var 60) (map var [90..105]))]
+                         (call (var 61) (replicate 16 (var 3)))
+      nested = Optimize.compactRecursiveArguments (group (map var first) inner)
+  case nested of
+    T.XELetRec _ (T.XELetRec ((_,rhs):_) _) -> do
+      check "outer argument analysis sees rewritten inner formals" [1,1] (widths nested)
+      check "a nested call applies the outer mask exactly once" 1
+        (length (snd (Optimize.applications (snd (Optimize.lambdas rhs)))))
+    _ -> fail "expected two nested recursive groups"
+
+conditionalConstructorChecks = do
+  let name = T.XName 17 "flag"
+      cond = T.XEVar name
+      choose a b = foldl T.XEApp (T.XEPrimitive T.PIfThenElse) [cond,a,b]
+      tree = Optimize.indexUses (choose (T.XEConstructor "A") (T.XEConstructor "B"))
+      branches = [(T.XConstructorPattern n [],Optimize.indexUses (T.XEInt i)) | (n,i) <- [("A",1),("B",2)]]
+  case Optimize.selectConditionalConstructors tree branches of
+    T.Just folded -> check "indexed constructor arms preserve the runtime condition" True
+      (X.equalErased (Optimize.useTerm folded) (choose (T.XEInt 1) (T.XEInt 2)))
+    _ -> fail "conditional constructor fold missed production use indexing"
+
+longDemandChainChecks = do
+  let n = 4000
+      frames = [Demand.Frame 0 T.Nothing 3,Demand.Frame 1 (T.Just 0) 2,Demand.Frame 2 (T.Just 1) 1]
+      uses = [Demand.Use 100 2 1,Demand.Use 101 2 1]
+      right (T.Right value) = pure value
+      right (T.Left message) = fail (H.unpack message)
+  forM_ [id,(n-)] $ \key -> do
+    let nodes = IntMap.fromList $ (key 0,Demand.SeedNode 10):
+          [(key i,Demand.RefNode (key (i-1))) | i <- [1..n]] ++
+          [(n+1,Demand.InstantiateNode 100 (key n)),(n+2,Demand.InstantiateNode 101 (key n))]
+    plan <- right (Demand.solve frames [Demand.Seed 10 "Inspect" 2] uses nodes)
+    check "two real copies survive dense alias discovery" 3 (Demand.universeSize plan)
+    forM_ [0..n] $ \i -> right (Demand.slotsAt plan (key i)) >>= check "forwarded seed" [0]
+    forM_ [1,2] $ \i -> right (Demand.slotsAt plan (n+i)) >>= check "distinct copy slot" [i]
+
 -- Both arms call the previous layer with their own lambda parameters.
 -- Duplicating that captured function at each use unfolds a linear graph into
 -- a binary tree even when the program takes only one path at run time.
@@ -4079,6 +4148,8 @@ preparedPrefixControls = do
 main = do
   permissionMemoPages
   recursiveArgumentChecks
+  conditionalConstructorChecks
+  longDemandChainChecks
   preparedPrefixControls
   checkedProjectionSpines
   fileImportPrefixChecks

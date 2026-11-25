@@ -104,6 +104,66 @@ class BuildProcessTests(unittest.TestCase):
                 self.assertFalse((root / 'next').exists())
 
     @unittest.skipUnless(os.name == 'posix', 'POSIX process groups')
+    def test_dispatcher_cancels_owned_producer_and_discovery(self):
+        for phase, ignore in [('run', False), ('run', True), ('discovery', True), ('list', True)]:
+            with self.subTest(phase=phase, ignore=ignore), tempfile.TemporaryDirectory() as cwd:
+                root = Path(cwd)
+                script = ('import signal, sys\nfrom pathlib import Path\n'
+                          f'sys.path.insert(0, {str(SCRIPT.parent)!r})\n'
+                          'from test_process import fixture\n')
+                if ignore:
+                    script += 'signal.signal(signal.SIGTERM, signal.SIG_IGN)\n'
+                check_tools_fixture(root, script + 'fixture("leader", Path.cwd())\n')
+                if phase != 'run':
+                    (root / 'tools/developer/fixture-suites.json').write_text(json.dumps({
+                        'release-developer-commands': {
+                            'command': ['python3', 'tools/developer/test_commands.py'],
+                            'kind': 'receipt', 'prefix': 'fixture/', 'list_args': ['--list'],
+                            'receipt': {'output': '--output', 'cases': 'cases'},
+                        }}))
+                record = root / 'report.json'
+                cli = subprocess.Popen([sys.executable, root / 'tools/testing/run.py',
+                                        'release-developer-commands', '--report', record,
+                                        *(['--list'] if phase == 'list' else [])],
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
+                try:
+                    wait_for(root / 'ready')
+                    cli.terminate()
+                    _, err = cli.communicate(timeout=5)
+                    self.assertEqual(cli.returncode, 143, err)
+                    if phase != 'list':
+                        self.assertEqual(json.loads(record.read_text())['status'], 'interrupted')
+                    # The stopped descendant inherited stderr in both phases.
+                    # communicate() returning proves that its descriptor closed.
+                finally:
+                    if not cli.stderr.closed:
+                        if (root / 'ready').exists():
+                            process.signal_group(int((root / 'ready').read_text()), signal.SIGKILL)
+                        process.signal_group(cli.pid, signal.SIGKILL)
+                        cli.communicate(timeout=5)
+
+    def test_receipt_path_follows_last_output_option(self):
+        for options in [('--output', 'a', '--output', 'b'), ('--output=a', '--output', 'b'),
+                        ('--output', 'a', '--output=b'), ('--output=a', '--output=b')]:
+            with self.subTest(options=options), tempfile.TemporaryDirectory() as cwd:
+                root = Path(cwd)
+                producer = ('import argparse\nfrom pathlib import Path\n'
+                            'p = argparse.ArgumentParser()\np.add_argument("--output")\n'
+                            'out = Path(p.parse_args().output)\nout.mkdir()\n'
+                            f'out.joinpath("receipt.json").write_text({json.dumps({"complete": True, "cases": ["one"]})!r})')
+                check_tools_fixture(root, producer)
+                (root / 'tools/developer/fixture-suites.json').write_text(json.dumps({
+                    'fixture': {'command': ['python3', 'tools/developer/test_commands.py'],
+                                'kind': 'receipt', 'prefix': 'sample/',
+                                'receipt': {'output': '--output', 'inventory': ['one'], 'cases': 'cases'}}}))
+                report = root / 'report.json'
+                result = subprocess.run([sys.executable, root / 'tools/testing/run.py', 'fixture',
+                                         '--report', report, '--', *options], capture_output=True, timeout=5)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(Path(json.loads(report.read_text())['adapter_receipt']['path']),
+                                 (root / 'b/receipt.json').resolve())
+
+    @unittest.skipUnless(os.name == 'posix', 'POSIX process groups')
     def test_signalling_check_tools_cleans_up_the_active_suite(self):
         for sig in (signal.SIGTERM, signal.SIGINT):
             with self.subTest(sig=sig), tempfile.TemporaryDirectory() as cwd:

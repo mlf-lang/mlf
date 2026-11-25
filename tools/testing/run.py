@@ -2,6 +2,7 @@
 """Select, run, and reconcile a registered external test adapter."""
 
 import argparse
+from contextlib import contextmanager
 import hashlib
 import json
 import os
@@ -17,6 +18,9 @@ import receipt_adapter
 from receipt_adapter import decode
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools"))
+from developer.process import wait_for_group
+
 CATALOG = ROOT / "tests/test-catalog.json"
 STATUSES = {"pass", "fail", "skip", "unsupported", "timeout", "crash", "cancelled"}
 
@@ -97,7 +101,7 @@ def child_environment(suite, spec, exact, path=None):
     return env
 
 
-def discover(suite, spec, args, extra, capture=None):
+def discover(suite, spec, args, extra, capture):
     receipt = spec["kind"] == "receipt"
     if receipt and "list_args" not in spec and "inventory" in spec["receipt"]:
         inventory = ids_in([spec["prefix"] + receipt_adapter.slug(label)
@@ -115,12 +119,7 @@ def discover(suite, spec, args, extra, capture=None):
         command = argv_for(spec, [*spec["list_args"], *extra], args.python_optimization, inventory=True)
     else:
         raise ValueError(f"{suite} requires a running adapter to enumerate its plan")
-    if capture is None:
-        result = subprocess.run(command, cwd=ROOT, env=env, stdout=subprocess.PIPE, check=True)
-        output = result.stdout
-    else:
-        output = capture(command, env)
-    return ids_in(decode(output), spec["prefix"])
+    return ids_in(decode(capture(command, env)), spec["prefix"])
 
 
 def reconcile(path, spec, exact, evidence):
@@ -164,6 +163,56 @@ def reconcile(path, spec, exact, evidence):
     return [identity for identity in plan if identity not in by_id]
 
 
+@contextmanager
+def supervise(inherit_process_group):
+    cancelled = []
+    owns_session = os.name == "posix" and not inherit_process_group
+
+    def remember(signum, _frame):
+        if not cancelled:
+            cancelled.append(signum)
+
+    def run_child(argv, environment, stdout=None):
+        child = subprocess.Popen(argv, cwd=ROOT, env=environment,
+                                 stdout=stdout, start_new_session=owns_session)
+        if owns_session:
+            return wait_for_group(child, cancelled, cleanup_on_exit=False)
+        # An outer watchdog owns this group. Signal only our direct child.
+        while not cancelled:
+            try:
+                return child.wait(timeout=0.05)
+            except subprocess.TimeoutExpired:
+                pass
+        if os.name == "posix":
+            child.send_signal(cancelled[0])
+        else:
+            child.terminate()
+        try:
+            return child.wait(timeout=0.5)
+        except subprocess.TimeoutExpired:
+            child.kill()
+            return child.wait()
+
+    def capture_inventory(argv, environment):
+        # A descendant can retain a pipe after its leader exits. A temporary
+        # file also lets the supervisor drain large inventories without a reader.
+        with tempfile.TemporaryFile() as output:
+            status = run_child(argv, environment, output)
+            if status or cancelled:
+                raise subprocess.CalledProcessError(status or -cancelled[0], argv)
+            output.seek(0)
+            return output.read()
+
+    handlers = {}
+    try:
+        for signum in (signal.SIGINT, signal.SIGTERM):
+            handlers[signum] = signal.signal(signum, remember)
+        yield cancelled, run_child, capture_inventory
+    finally:
+        for signum, handler in handlers.items():
+            signal.signal(signum, handler)
+
+
 def execute(suite, spec, args, extra):
     run = uuid.uuid4().hex
     path = (Path(args.report) if args.report else
@@ -191,70 +240,33 @@ def execute(suite, spec, args, extra):
         "status": "running",
     }
     report(path, evidence)
-    child = None
-    interrupted = None
-    owns_session = os.name == "posix" and not args.inherit_process_group
-
-    def forward(signum, _frame):
-        nonlocal interrupted
-        interrupted = signum
-        if child is not None and child.poll() is None:
-            try:
-                if owns_session:
-                    os.killpg(child.pid, signum)
-                elif os.name == "posix":
-                    child.send_signal(signum)
-                else:
-                    child.terminate()
-            except ProcessLookupError:
-                pass
-
-    def spawn(argv, environment, stdout=None):
-        nonlocal child
-        child = subprocess.Popen(argv, cwd=ROOT, env=environment,
-                                 stdout=stdout, start_new_session=owns_session)
-        if interrupted is not None:
-            forward(interrupted, None)
-        return child
-
-    def capture_inventory(argv, environment):
-        process = spawn(argv, environment, subprocess.PIPE)
-        output, _ = process.communicate()
-        if process.returncode:
-            raise subprocess.CalledProcessError(process.returncode, argv)
-        return output
-
-    handlers = {}
-    for signum in (signal.SIGINT, signal.SIGTERM):
-        handlers[signum] = signal.signal(signum, forward)
     status = None
     available = set()
     receipt_path = None
     setup_failed = False
-    try:
-        if spec["kind"] == "receipt":
-            try:
-                inventory = discover(suite, spec, args, extra, capture_inventory)
-                available = set(inventory)
-                if args.exact and args.exact not in available:
-                    raise ValueError(f"unknown case: {args.exact}")
-                evidence["expected_ids"] = [args.exact] if args.exact else inventory
-                evidence["missing_ids"] = evidence["expected_ids"].copy()
-                if args.exact:
-                    evidence["prerequisite_results"] = []
-                report(path, evidence)
-                receipt_path = receipt_adapter.source(ROOT, spec["receipt"], extra)
-                receipt_before = receipt_adapter.fingerprint(receipt_path)
-            except (OSError, ValueError, IndexError, KeyError, subprocess.CalledProcessError) as error:
-                evidence["launch_error"] = str(error)
-                setup_failed = True
-        if not setup_failed and interrupted is None:
-            status = spawn(command, env).wait()
-    except OSError as error:
-        evidence["launch_error"] = str(error)
-    finally:
-        for signum, handler in handlers.items():
-            signal.signal(signum, handler)
+    with supervise(args.inherit_process_group) as (cancelled, run_child, capture_inventory):
+        try:
+            if spec["kind"] == "receipt":
+                try:
+                    inventory = discover(suite, spec, args, extra, capture_inventory)
+                    available = set(inventory)
+                    if args.exact and args.exact not in available:
+                        raise ValueError(f"unknown case: {args.exact}")
+                    evidence["expected_ids"] = [args.exact] if args.exact else inventory
+                    evidence["missing_ids"] = evidence["expected_ids"].copy()
+                    if args.exact:
+                        evidence["prerequisite_results"] = []
+                    report(path, evidence)
+                    receipt_path = receipt_adapter.source(ROOT, spec["receipt"], extra)
+                    receipt_before = receipt_adapter.fingerprint(receipt_path)
+                except (OSError, ValueError, IndexError, KeyError, subprocess.CalledProcessError) as error:
+                    evidence["launch_error"] = str(error)
+                    setup_failed = True
+            if not setup_failed and not cancelled:
+                status = run_child(command, env)
+        except OSError as error:
+            evidence["launch_error"] = str(error)
+    interrupted = cancelled[0] if cancelled else None
     if status is not None:
         evidence["exit_code"] = status if status >= 0 else None
         evidence["signal"] = -status if status < 0 else None
@@ -332,7 +344,14 @@ def main(argv=None):
             if not args.list and not (spec.get("exact") or spec["kind"] == "exit"):
                 raise ValueError("this adapter keeps the original combined invocation")
         if args.list:
-            inventory = discover(args.suite, spec, args, extra)
+            with supervise(args.inherit_process_group) as (cancelled, _, capture):
+                try:
+                    inventory = discover(args.suite, spec, args, extra, capture)
+                except subprocess.CalledProcessError:
+                    if not cancelled:
+                        raise
+                if cancelled:
+                    return 128 + cancelled[0]
             if args.exact:
                 if spec["kind"] == "receipt":
                     if args.exact not in inventory:

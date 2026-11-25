@@ -420,10 +420,12 @@ module Bootstrap.ClassDemand where {
     case front of {
       [] -> case pending of {
         [] -> stBind (freezeSTArray rows) (\at -> let {
-          stored node = case IM.lookup node aliases of {
-            Nothing -> freeze (at (node - low)); Just parent -> stored parent
-          }
-        } in stReturn (Right (Discovery universe (IM.mapWithKey (\n _ -> stored n) nodes) [])));
+          -- IntMap tips are lazy. Each productive forwarding node shares its
+          -- predecessor's frozen set, including forward references by ID.
+          sets = IM.mapWithKey (\node _ -> case IM.lookup node aliases of {
+            Nothing -> freeze (at (node - low)); Just parent -> IM.get parent sets
+          }) nodes
+        } in stReturn (Right (Discovery universe sets [])));
         _ -> denseDiscoverWith freeze add frames index rows universe (reverse pending) []
       };
       (:) (DiscoveryWork slot edges) rest ->

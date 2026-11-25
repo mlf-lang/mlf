@@ -742,6 +742,7 @@ module Bootstrap.EvidenceBoundary where {
     };
     spine args value = case value of {
       XApp f x -> spine ((:) x args) f;
+      XInstantiationSpine name rows -> spine args (X.expandInstantiationSpine name rows);
       _ -> (,) value args
     };
     headUse value = case value of {
@@ -768,6 +769,7 @@ module Bootstrap.EvidenceBoundary where {
     };
     visit value = case value of {
       XApp _ _ -> case spine [] value of { (,) head args -> changeCall head args };
+      XInstantiationSpine name rows -> visit (X.expandInstantiationSpine name rows);
       XVarTerm name ->
         if M.member X.compareName name calls then Nothing else
         case M.lookup X.compareName name aliases of {
@@ -794,7 +796,13 @@ module Bootstrap.EvidenceBoundary where {
         Just (XCase selected ty branches)
       };
       XWithData _ _ -> Nothing;
-      _ -> Just value
+      XProjection _ _ -> Just value;
+      XIntTerm _ -> Just value;
+      XDoubleTerm _ -> Just value;
+      XBoolTerm _ -> Just value;
+      XStringTerm _ -> Just value;
+      XPrimitive _ _ -> Just value;
+      XConstructor _ _ -> Just value
     }
   } in visit;
 }

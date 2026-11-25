@@ -24,8 +24,17 @@ def source(root, spec, args):
     if isinstance(output, int):
         directory = args[output]
     else:
-        attached = next((arg.split("=", 1)[1] for arg in args if arg.startswith(output + "=")), None)
-        directory = attached if attached is not None else args[args.index(output) + 1]
+        directory = None
+        tokens = iter(args)
+        for arg in tokens:
+            if arg == "--":
+                break
+            if arg == output:
+                directory = next(tokens, None)
+            elif arg.startswith(output + "="):
+                directory = arg.split("=", 1)[1]
+        if directory is None:
+            raise ValueError(f"missing receipt directory for {output}")
     return (root / directory / spec.get("file", "receipt.json")).resolve()
 
 

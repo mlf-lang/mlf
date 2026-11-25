@@ -2,6 +2,7 @@ module Tests.BackendSuite where
 import Prelude hiding (Monad, return, bind)
 import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
+import qualified Bootstrap.Map as M
 import qualified Bootstrap.Std as S
 import qualified Tests.Backends as B
 import qualified Tests.Helpers as H
@@ -95,9 +96,9 @@ caseId family label = family ++ "/" ++ S.concatMapString (\index ->
  else "_" ++ showInt code ++ "_") (S.range 0 (stringLength label - 1))
 
 registry backends allCases entries =
- let owners = S.concatMap (\((,) family cases) -> S.map (\entry -> (,) (S.fst entry) family) cases) entries in
+ let owners = M.fromList compareString (S.concatMap (\((,) family cases) -> S.map (\entry -> (,) (S.fst entry) family) cases) entries) in
  S.map (\((,) label action) ->
-  let family = case S.lookup eqString label owners of { Just value -> value; Nothing -> panic "backend fixture has no family" } in
+  let family = case M.lookup compareString label owners of { Just value -> value; Nothing -> panic "backend fixture has no family" } in
   let identity = caseId family label in
   Case.test identity label ((:) ("family:" ++ family) [])
    (B.recoverCase (B.inRegisteredCase backends identity label (do { putStrLn label; action })))) allCases
@@ -127,13 +128,14 @@ main = do
   validateSuite allCases
   validateFamilies allCases entries
   let cases = registry B.inventoryContext allCases entries
-  (,,) options _ _ <- selectedCases cases args
-  if Runner.listing options then runRegistry B.inventoryContext cases args
-  else B.withBackends (\backends ->
-   runRegistry backends (registry backends (suite backends) (families backends)) args)
+  (,,) options selected selection <- selectedCases cases args
+  if Runner.listing options then runRegistry B.inventoryContext cases args ((,,) options selected selection)
+  else B.withBackends (\backends -> do
+   let runnable = registry backends (suite backends) (families backends)
+   selected <- selectedCases runnable args
+   runRegistry backends runnable args selected)
 
-runRegistry backends cases args = do
- (,,) options selected selection <- selectedCases cases args
+runRegistry backends cases args ((,,) options selected selection) = do
  reported <- B.reportArgs (case args of
   (:) "--from" _ -> []
   (:) "--families" _ -> []
