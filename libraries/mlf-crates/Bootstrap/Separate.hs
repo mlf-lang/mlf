@@ -236,11 +236,13 @@ module Bootstrap.Separate where {
     }
   } in fromMaybe expression (changed expression);
   hygieneApplication env term = hygieneApplicationWith hygieneIn env term;
-  hygieneApplicationWith walk env term = let { child = hygieneApplicationWith walk env } in case term of {
-    SApp f a -> do { x <- child f; y <- child a; freshPure (SApp x y) };
-    SCallSite n span e -> do { b <- child e; freshPure (SCallSite n span b) };
-    _ -> walk env term
-  };
+  hygieneApplicationWith walk env term = let {
+    child expression = case expression of {
+      SApp f a -> do { x <- child f; y <- child a; freshPure (SApp x y) };
+      SCallSite n span e -> do { b <- child e; freshPure (SCallSite n span b) };
+      _ -> walk env expression
+    }
+  } in child term;
   hygieneIn :: Map String String -> SExpr -> Fresh SExpr;
   hygieneIn env expression = hygieneWith renamePlain env expression;
   hygieneWith rename env expression = let { walk = hygieneWith rename } in case expression of {
