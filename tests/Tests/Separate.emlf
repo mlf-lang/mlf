@@ -40,6 +40,7 @@ cratePathSpec source cache prelude = Fragment.pack
   ((:) (Fragment.pack ((:) (Fragment.pairEncoding ((,) "Main" source)) []))
   ((:) (Fragment.pack []) ((:) cache ((:) prelude []))))))))
 
+cratePaths : IO ()
 cratePaths = do
   S.mapM_ (\path -> do
     spec <- H.right (Crate.decodeSpec (cratePathSpec path path path))
@@ -55,13 +56,13 @@ cratePaths = do
     ((:) "c:\\a\\λ crate\\Main.emlf"
     ((:) "//server/share/Main.emlf"
     ((:) "\\\\server\\share\\Main.emlf" [])))))
-  S.mapM_ (\path -> do
+  A.orExit (S.mapM_ (\path -> do
     expect "crate source path must be absolute" (Crate.decodeSpec (cratePathSpec path "/queries" "/prelude"))
     expect "crate query cache path must be absolute" (Crate.decodeSpec (cratePathSpec "/Main.emlf" path "/prelude"))
     expect "shared prelude artifact prefix must be absolute" (Crate.decodeSpec (cratePathSpec "/Main.emlf" "/queries" path))
     expect "crate dependency metadata path must be absolute" (Artifact.decodeDependency (Artifact.encodeDependency ((,,) "dependency" path "semantic"))))
     ((:) "" ((:) "Main.emlf" ((:) "./Main.emlf" ((:) "../Main.emlf"
-    ((:) "D:Main.emlf" ((:) "D:" ((:) "\\Main.emlf" ((:) "1:/Main.emlf" []))))))))
+    ((:) "D:Main.emlf" ((:) "D:" ((:) "\\Main.emlf" ((:) "1:/Main.emlf" [])))))))))
   S.mapM_ (\((,) path parent) -> H.assert (eqString (Crate.parentDirectory path) parent) "crate parent directory changed")
     ((:) ((,) "/unit" "/") ((:) ((,) "D:/unit" "D:/")
     ((:) ((,) "D:\\unit" "D:\\") ((:) ((,) "D:\\cache\\unit" "D:\\cache") []))))
