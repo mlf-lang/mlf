@@ -337,7 +337,7 @@ per-workload limits**. Geometric means do not replace individual workload checks
 
 Wall-clock medians in milliseconds. MLF total includes checked eMLF -> xMLF
 -> LLVM emission, IR writes, compiling the complete C runtime afresh and linking.
-The general [native build driver](../scripts/compile_native.py) overlaps the
+The general [native build driver](https://github.com/mlf-lang/mlf/blob/10f1a0f8593a7cbe779d4cb73c4d66bcd01a4576/scripts/compile_native.py) overlaps the
 frontend with fresh runtime compilation, then compiles and links the LLVM IR.
 At most two compiler processes overlap within a build; samples and languages
 run serially. No emitted LLVM or runtime object is reused between samples.

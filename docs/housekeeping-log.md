@@ -7,3 +7,4 @@ pauses. Sum recorded minutes to calculate the daily total. See the
 
 | Date | Job | Active work intervals (with zone) | Recorded minutes | Verified outcome |
 | --- | --- | --- | ---: | --- |
+| 2026-11-25 | Restore the October 13 native build driver link | 08:20:13–08:22:37, 08:22:46–08:22:56 MYT (UTC+08:00) | 3 | Rendered the Stage 2 link and verified the historical driver bytes against all three reports; only the href changed. |
