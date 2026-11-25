@@ -26,6 +26,10 @@ from receipt_selection import identity, select
 HELPERS = ('artifact_binary_reference.py', 'artifact_binary_cases.py',
            'artifact_binary_typed.py', 'artifact_binary_integration.py', 'artifact_binary_open.py',
            'artifact_structure_contract.json', 'artifact_binary_golden.json', 'test_query_index.py')
+LEGACY_GHC_FIXTURE = 'tools/shared/fixtures/item4/ArtifactBinary.hs'
+LEGACY_GHC_FIXTURE_SHA = '3ad0cdf7dfc23eda8086b087b36003fc06fc25c4edb8c45bed897daaad1c42a0'
+LEGACY_QUERY_FIXTURE = 'tools/shared/fixtures/item4/QueryIndex.hs'
+LEGACY_QUERY_FIXTURE_SHA = '0327c68c8e1954dd367109eda47e18d26a5152c9595e40dfbfb079df8012919f'
 
 
 def require(ok, message):
@@ -39,6 +43,41 @@ def sha(path):
         for block in iter(lambda: stream.read(1024 * 1024), b''):
             digest.update(block)
     return digest.hexdigest()
+
+
+def add_indexed_limit_rejections(lines, names):
+    for name in names:
+        prefix = name + b' '
+        matches = [index for index, line in enumerate(lines)
+                   if line.startswith(prefix) and b' (W.Limits ' in line]
+        require(len(matches) == 1, 'archived resource limit match: ' + name.decode('ascii'))
+        lines.insert(matches[0] + 1,
+                     name + b' _ (W.IndexedText _) = error "expected a legacy wire limit"\n')
+
+
+def project_legacy_limits_fixture(raw):
+    """Keep the archived cases and caps while admitting the added sum constructor."""
+    require(hashlib.sha256(raw).hexdigest() == LEGACY_GHC_FIXTURE_SHA,
+            'archived GHC artifact fixture identity mismatch')
+    lines = raw.splitlines(keepends=True)
+    for expression in (
+        b'                  W.Limits z c t total nodes edges depth _ -> W.Limits z c t total nodes edges depth n\n',
+        b'                    in W.Limits size c (min size t) (min size total) nodes edges depth limit\n',
+    ):
+        require(lines.count(expression) == 1, 'archived default wire limit match')
+        lines.insert(lines.index(expression) + 1,
+                     b'                  W.IndexedText _ -> error "expected legacy default wire limits"\n')
+    add_indexed_limit_rejections(lines, (b'rbWork', b'rbNodes', b'rbEdges', b'rbSymbols',
+                                         b'rbSingle', b'rbTotal', b'rbDepth'))
+    return b''.join(lines)
+
+
+def project_legacy_query_fixture(raw):
+    require(hashlib.sha256(raw).hexdigest() == LEGACY_QUERY_FIXTURE_SHA,
+            'archived GHC query fixture identity mismatch')
+    lines = raw.splitlines(keepends=True)
+    add_indexed_limit_rejections(lines, (b'withWork',))
+    return b''.join(lines)
 
 
 def regular(path):
@@ -412,9 +451,13 @@ def main():
     require(source.resolve(strict=True) == source and source.is_dir(), 'real source root required')
     receipt_path = regular(args.build_receipt)
     producer_dir = receipt_path.parent
-    fixture = regular(args.fixture or source / 'tools/shared/fixtures/item4/ArtifactBinary.hs')
+    archive = source / LEGACY_GHC_FIXTURE
+    query_archive = source / LEGACY_QUERY_FIXTURE
+    fixture = regular(args.fixture or archive)
     shared = regular(args.shared_fixture or source / 'tools/shared/fixtures/item4/RawBinaryShared.hs')
-    query_fixture = regular(args.query_fixture or source / 'tools/shared/fixtures/item4/QueryIndex.hs')
+    query_fixture = regular(args.query_fixture or query_archive)
+    projections = {'ghc': (archive, project_legacy_limits_fixture),
+                   'query-index-ghc': (query_archive, project_legacy_query_fixture)}
     controls = regular(args.controls or source / 'tools/shared/run_artifact_binary_controls.py')
     helpers = [regular(controls.with_name(name)) for name in HELPERS]
     build_path = regular(source / 'tools/shared/build.py')
@@ -546,6 +589,18 @@ def main():
                 continue
             directory = output / (label + '-build'); directory.mkdir()
             obj, hi, binary = directory / 'Main.o', directory / 'Main.hi', directory / 'fixture'
+            if label in projections and source_file == projections[label][0]:
+                archived, project = projections[label]
+                projected = directory / archived.name
+                with projected.open('xb') as stream:
+                    stream.write(project(archived.read_bytes()))
+                artifacts[str(projected)] = sha(projected)
+                record.setdefault('legacy_fixture_projections', {})[label] = {
+                    'archive': str(archived), 'archive_sha256': inputs[str(archived)],
+                    'source': str(projected), 'source_sha256': artifacts[str(projected)],
+                }
+                save()
+                source_file = projected
             runner.run('compile-' + label, [ghc, '-c', *flags, *build.EXHAUSTIVENESS_FLAGS,
                 '-i', '-i' + str(producer_dir / 'objects'), '-o', obj, '-ohi', hi, source_file], timeout=120)
             runner.run('link-' + label, [ghc, *flags, '-rtsopts=ignoreAll', obj,
