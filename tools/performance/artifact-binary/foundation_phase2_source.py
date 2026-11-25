@@ -13,12 +13,23 @@ HERE = Path(__file__).resolve().parent
 DRAFT = '8afe7d1978ca67b29c438329b1014176b045dd64'
 FOUNDATION = '9345d58b2b1675fbe0fcf899b5dc3d2f229e1acf'
 MERGE = 'd72950ed771d4fd48145cd4f467ff9ce43ef13d4'
+WRITER_PREDECESSOR = 'ccaded50dbf189b89d164cea0add9742965ff6be'
+WRITER_SIGNATURES = '0eea12495edd0b1572d5c330379005fb59a1052e'
 ORIGINAL = 'tools/performance/artifact-binary/phase2_source_successor.py'
 ORIGINAL_SHA = '72041ef0f3ea9c84d5f7ff100f721c326ecbbc86c1b705bf2c45f11cb19f9f16'
 EXTRA_MERGE_ROLES = {
     'testing/tools/mlf.lock', 'tests/indexvec/Graphs.hs', 'tests/mlf.lock',
     'tests/shared/mlf.lock', 'tools/performance/compiler-shapes/generate.py',
     'tools/performance/compiler-shapes/matrix.json',
+}
+WRITER_SIGNATURE_ROLES = {
+    'bootstrap/MLF/BuiltinPreludeData.hs',
+    'libraries/mlf-crates/Bootstrap/Bitstream.hs',
+    'mlf.lock',
+    'testing/tools/mlf.lock',
+    'tests/mlf.lock',
+    'tests/shared/mlf.lock',
+    'tools/shared/test_packed_writer.py',
 }
 
 
@@ -68,14 +79,21 @@ def qualified_contract(root, source_root=None):
     paths = set(before)
     known_changes = set(live_git.run('diff', '--name-only', DRAFT, MERGE).decode().splitlines())
     proof.require(known_changes <= paths | EXTRA_MERGE_ROLES, 'exact Foundation integration source roles')
-    expected = live_git.inventory(MERGE, paths | EXTRA_MERGE_ROLES)
+    live_git.run('merge-base', '--is-ancestor', MERGE, WRITER_PREDECESSOR)
+    live_git.commit(WRITER_SIGNATURES, parents=[WRITER_PREDECESSOR])
+    live_git.run('merge-base', '--is-ancestor', WRITER_SIGNATURES, 'HEAD')
+    writer_changes = set(live_git.run(
+        'diff', '--name-only', WRITER_PREDECESSOR, WRITER_SIGNATURES).decode().splitlines())
+    proof.require(writer_changes == WRITER_SIGNATURE_ROLES, 'exact packed writer signature source roles')
+    auxiliary_roles = (EXTRA_MERGE_ROLES | WRITER_SIGNATURE_ROLES) - paths
+    expected = live_git.inventory(WRITER_SIGNATURES, paths | auxiliary_roles)
     if source_root == root:
-        auxiliary = {p: proof.read(source_root, p) for p in EXTRA_MERGE_ROLES}
+        auxiliary = {p: proof.read(source_root, p) for p in auxiliary_roles}
         proof.require(all(proof.oid(raw) == expected[p] for p, raw in auxiliary.items()),
-                      'exact Foundation test, lock and shape inputs')
+                      'exact Foundation and packed writer test, lock and shape inputs')
     current = {p: proof.read(source_root, p) for p in paths}
     proof.require(all(proof.oid(raw) == expected[p] for p, raw in current.items()),
-                  'exact merged source inventory')
+                  'exact merged and signed source inventory')
     after = {p: proof.sha(raw) for p, raw in current.items()}
     changed = {p for p in paths if before[p] != after[p]}
     archive = reviewed.contract.archived
