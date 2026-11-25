@@ -16,6 +16,7 @@ import qualified Test.Process as Process
 import qualified Test.NativeProcess as Native
 import qualified Async.Process as Async
 
+rejected : forall a. Either String a -> Bool
 rejected result = case result of { Left _ -> true; Right _ -> false }
 check name condition = C.test ("lifecycle/" ++ name) name [] (A.assert condition name)
 fixtureFailure = do
@@ -31,7 +32,9 @@ sealed join cleanup = do
  cleaning <- Adapter.beginCleanup validated
  finished <- Adapter.finishCleanup join cleanup cleaning
  Adapter.seal finished
+accepted : Either String Adapter.Attempt -> Bool
 accepted result = case result of { Right attempt -> Adapter.successful attempt; Left _ -> false }
+leaseControl : Either String ()
 leaseControl = do
  budget <- Resources.create Resources.serial
  first <- Resources.acquire "first" Resources.serial budget
