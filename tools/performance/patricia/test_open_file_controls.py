@@ -171,6 +171,7 @@ class PlumbingControls(unittest.TestCase):
 
     def test_frozen_driver_fixture_and_independent_oracle_inputs(self):
         c4 = Path(A.__file__).resolve().parent.parent / 'c4-local-transaction'
+        self.assertEqual(sha(c4 / 'run_controls.py'), A.C4_DRIVER_SHA)
         for relative, expected in A.FROZEN_INPUTS.items():
             self.assertEqual(sha(c4 / relative), expected)
         for relative, expected in A.Comparison.ORACLE_PINS.items():

@@ -10,8 +10,9 @@ import open_file_comparison as Comparison
 
 HERE = Path(__file__).resolve().parent
 SUFFIXES = ('.mlfci', '.mlfco')
+# Current C4 driver after the Darwin supervisor update in 2fecd82b.
+C4_DRIVER_SHA = '9c0906a007046c6c745059ced7cfc620558afe28ccc99bcf8795b05ba9f8d389'
 FROZEN_INPUTS = {
-    'run_controls.py': 'cf7b83d81db2a591fac5bb042b4e12e0effbab6239ecb8ef9a1f8741ffd6bb20',
     'controls/FileControls.hs': '86fb166dabbff970025e5201a58905b220e73aa5f8e4d709be277a32256b755a',
     'fixtures/file-cases.json': 'b7878c17609b3c7bf59e4b9a8942b0df61ea2d691edab7de97b102fabe1a94f8',
 }
@@ -230,9 +231,11 @@ def run_session_files(H, output, record, inputs, binaries, producer, source,
     """Reuse the complete, already passed ordinary gate's exact sources/oracles."""
     output = output.resolve()
     baseline = record['routes']['crate']['file_cases']
-    fixture_path = HERE.parent / 'c4-local-transaction/fixtures/file-cases.json'
+    c4 = HERE.parent / 'c4-local-transaction'
+    fixture_path = c4 / 'fixtures/file-cases.json'
+    H.require(H.sha(c4 / 'run_controls.py') == C4_DRIVER_SHA, 'exact current C4 file driver')
     for relative, digest in FROZEN_INPUTS.items():
-        H.require(H.sha(HERE.parent / 'c4-local-transaction' / relative) == digest,
+        H.require(H.sha(c4 / relative) == digest,
                   'unchanged frozen C4 source: ' + relative)
     authored = H.load(fixture_path)
     H.require(authored['case_count'] == len(authored['cases']) == 9, 'original nine-case inventory')
