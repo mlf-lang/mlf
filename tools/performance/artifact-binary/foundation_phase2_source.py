@@ -17,6 +17,8 @@ WRITER_PREDECESSOR = 'ccaded50dbf189b89d164cea0add9742965ff6be'
 WRITER_SIGNATURES = '0eea12495edd0b1572d5c330379005fb59a1052e'
 PARITY_INPUT_PARENT = '86cd25e18258bd2adafd8d3786e16d02448167f6'
 PARITY_INPUTS = '93872016affaa8b731fd35c263899b8ebb50dc40'
+RECURSIVE_PARITY_PARENT = 'f49b13e154ea6a166fdce5aa86d94a29e77509b3'
+RECURSIVE_PARITY_INPUT = 'd16fe59419ab7baa0398e9698960a1948d3ebc1a'
 ORIGINAL = 'tools/performance/artifact-binary/phase2_source_successor.py'
 ORIGINAL_SHA = '72041ef0f3ea9c84d5f7ff100f721c326ecbbc86c1b705bf2c45f11cb19f9f16'
 EXTRA_MERGE_ROLES = {
@@ -97,7 +99,13 @@ def qualified_contract(root, source_root=None):
         'diff', '--name-only', PARITY_INPUT_PARENT, PARITY_INPUTS).decode().splitlines())
     proof.require(parity_changes == PARITY_INPUT_ROLES, 'exact frozen parity input projection roles')
     auxiliary_roles = (EXTRA_MERGE_ROLES | WRITER_SIGNATURE_ROLES | PARITY_INPUT_ROLES) - paths
-    expected = live_git.inventory(PARITY_INPUTS, paths | auxiliary_roles)
+    live_git.run('merge-base', '--is-ancestor', PARITY_INPUTS, RECURSIVE_PARITY_PARENT)
+    live_git.commit(RECURSIVE_PARITY_INPUT, parents=[RECURSIVE_PARITY_PARENT])
+    live_git.run('merge-base', '--is-ancestor', RECURSIVE_PARITY_INPUT, 'HEAD')
+    recursive_parity_changes = set(live_git.run(
+        'diff', '--name-only', RECURSIVE_PARITY_PARENT, RECURSIVE_PARITY_INPUT).decode().splitlines())
+    proof.require(recursive_parity_changes == PARITY_INPUT_ROLES, 'exact recursive parity input projection roles')
+    expected = live_git.inventory(RECURSIVE_PARITY_INPUT, paths | auxiliary_roles)
     if source_root == root:
         auxiliary = {p: proof.read(source_root, p) for p in auxiliary_roles}
         proof.require(all(proof.oid(raw) == expected[p] for p, raw in auxiliary.items()),
