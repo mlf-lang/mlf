@@ -396,10 +396,11 @@ module Bootstrap.LLVM.Build where {
           if (startsWith "@mlf.numeric." name &&
               (L.not (startsWith "@mlf.numeric.entry." name) && L.not collectingWorker))
           then " alwaysinline"
-          -- Keep the closure entry body explicit. The ordinary workers
-          -- that carry recursive transfers still use the LLVM optimizer.
+          -- Keep closure entries out of the inliner. A direct boxed worker can
+          -- be inferred noreturn even when its caller has optnone. Allow LLVM
+          -- to optimize that caller so codegen preserves the worker transfer.
           else if startsWith "@mlf.code." name || startsWith "@mlf.curry." name
-               then " noinline optnone"
+               then if L.any callsBoxedWorker code then " noinline optsize" else " noinline optnone"
           else if startsWith "@mlf.worker." name then let {
             boundary = keepWorker || workerBodyLimit 64 code
           } in case workerBodyPolicy name code of {
@@ -462,6 +463,9 @@ module Bootstrap.LLVM.Build where {
     workerInstructionStarts line offset " = musttail call " ||
       (workerInstructionStarts line offset " = call ptr " &&
        workerInstructionStarts line (offset + 12) target));
+  callsBoxedWorker :: String -> Bool;
+  callsBoxedWorker line = workerInstruction line (\offset ->
+    workerInstructionStarts line offset " = call ptr @mlf.worker.");
   workerInstruction :: String -> (Int -> Bool) -> Bool;
   workerInstruction line accept = let {
     width = stringLength line;
