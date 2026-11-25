@@ -100,11 +100,17 @@ class ManifestParity(unittest.TestCase):
     def test_closed_corpus_has_matching_137_modules_13_executables(self):
         # Keep the registered test ID after retiring Tests.TupleListLegacy.
         manifest = self.check()
-        self.assertEqual(len(manifest['modules']), 136)
+        self.assertEqual(len(manifest['modules']), 142)
         modules = {entry['module']: entry for entry in manifest['modules']}
-        self.assertEqual(len(modules), 136)
+        self.assertEqual(len(modules), 142)
         self.assertNotIn('Tests.TupleListLegacy', modules)
         for name, path, role in (
+            ('Bootstrap.Graph.ScopeIndex', 'libraries/mlf-inference/Bootstrap/Graph/ScopeIndex.hs', 'implementation'),
+            ('Bootstrap.LLVM.FunctionPolicy', 'libraries/mlf-llvm/Bootstrap/LLVM/FunctionPolicy.hs', 'implementation'),
+            ('Bootstrap.LLVM.RecursiveArguments', 'libraries/mlf-llvm/Bootstrap/LLVM/RecursiveArguments.hs', 'implementation'),
+            ('Bootstrap.GroundProofEdit', 'libraries/mlf-crates/Bootstrap/GroundProofEdit.hs', 'implementation'),
+            ('Bootstrap.X.Traversal', 'libraries/mlf-xmlf/Bootstrap/X/Traversal.hs', 'implementation'),
+            ('Test.CaseSelection', 'testing/Test/CaseSelection.hs', 'implementation'),
             ('Bootstrap.Bitstream', 'libraries/mlf-crates/Bootstrap/Bitstream.hs', 'implementation'),
             ('Bootstrap.ArtifactStorage', 'libraries/mlf-crates/Bootstrap/ArtifactStorage.hs', 'implementation'),
             ('Bootstrap.ArtifactStructure', 'libraries/mlf-crates/Bootstrap/ArtifactStructure.hs', 'implementation'),
