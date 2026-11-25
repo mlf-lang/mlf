@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Bounded Python source-proof controls only. No Git, GHC or target executions.
-MAP_POLICY_SOURCE chooses physical selected files; every byte must match remote
-5d pins, so neither local HEAD nor this environment variable authorizes drift.
+MAP_POLICY_SOURCE chooses physical selected files; every byte must match the
+Foundation pins, so neither local HEAD nor this environment variable authorizes drift.
 """
 import os
 import hashlib

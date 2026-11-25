@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Prepare an exact limited-source Map qualification, never a full producer.
 Historical Map comes from physical fc300 Git bytes, not restore_path. Current
-selected bytes are bound to immutable remote5d contents, not local HEAD.
+selected bytes are bound to an immutable Foundation revision, not local HEAD.
 """
 import argparse
 import hashlib
@@ -11,15 +11,15 @@ from pathlib import Path
 import stat
 import subprocess
 
-CURRENT_COMMIT = '5d590d53d701dfb7053c813ca068ea1f0ef0ed55'
-CURRENT_TREE = '7a3297c550fe33ff0e0321f188a786c7cc6e5d71'
+CURRENT_COMMIT = '9345d58b2b1675fbe0fcf899b5dc3d2f229e1acf'
+CURRENT_TREE = 'aa17813b861d6a574d0d4e72686c3656b4769a48'
 HISTORICAL_COMMIT = 'fc300bc9fdc389b585cbef0630fc8915d53e89c5'
 HISTORICAL_TREE = '386f0b41ab5f9b39fca273f3040f51d73df924a1'
 MAP = 'libraries/mlf-foundation/Bootstrap/Map.hs'
 BALANCE = 'tools/performance/map-balance/BalanceControls.hs'
 BASELINE = 'tools/performance/map-balance/BaselineMap.hs'
 FROZEN = 'tools/performance/a1-private-index/controls/FrozenMap.hs'
-CURRENT_MAP_SHA = 'c2d233fcee19279dc730582683c13b40edf62d0caa2091c3d75d86953a551996'
+CURRENT_MAP_SHA = '2133abfa3038097d353e66745a5af0789190c82739218ef28f9d054e74de2f06'
 HISTORICAL_MAP_SHA = '1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0'
 HISTORICAL_MAP_BLOB = '7a96f912d4a5bbd7e8291c0df4042bd56a9c8c65'
 ORACLE_SHA = {
@@ -27,18 +27,18 @@ ORACLE_SHA = {
     FROZEN: '0cdeb2b572f38a59e82e5a91d3c47b118b5dc0928292a66849115e1679d18e31',
     BASELINE: 'fca037e0cd1719142ff7bc825aa811359d9f84b9030d774713ffa5046d1bf7e7',
 }
-# GitHub Contents API, each path fetched at CURRENT_COMMIT.
+# Git blobs from CURRENT_COMMIT, the reviewed Foundation source basis.
 CURRENT_BLOBS = {
     "runtime/mlf_process_supervisor_posix.h": "4ab02a329811f04172ffed9413cb2f8165bce060",
     "runtime/mlf_windows_path.h": "d93a6d2c98da5d0e976b2eb746cb0e2fc1c9412d",
     "runtime/mlf_system_windows.h": "da1d174365ef245ad701949058f1c060552eb1b1",
-    "libraries/mlf-foundation/Bootstrap/Map.hs": "39bf6af3d4175fa187d81a0112dcb2f755444521",
-    "libraries/mlf-foundation/Bootstrap/Types.hs": "ed4a3788f5c8a500e497e3a136a430983b157eb7",
-    "libraries/mlf-foundation/Bootstrap/Std.hs": "8e7a513d336815f313ab63be975ce4af3303554c",
+    "libraries/mlf-foundation/Bootstrap/Map.hs": "68d84e3727155ae46158c0145808a6785248cea1",
+    "libraries/mlf-foundation/Bootstrap/Types.hs": "bd768135ea44674637e5db4573d97e781af4dcf6",
+    "libraries/mlf-foundation/Bootstrap/Std.hs": "beb4d699b87ebbc17292c2252309855f1df79952",
     "libraries/mlf-foundation/Bootstrap/IndexVec.hs": "33a339e71ad7dede8c866a1903bf85bad1034d13",
-    "host/ghc/MLF/Primitive.hs": "2ede543a36ffd6e5bffb51702853b4e16209cda9",
-    "host/ghc/MLF/Host/Base.hs": "9b1eeed9e1299492bb83c7255014e6b2da8d5bb2",
-    "host/ghc/MLF/Host/IO.hs": "5cefc2fdd2ea036cddc75803254ed5956b4401a0",
+    "host/ghc/MLF/Primitive.hs": "b767e0953822f9e2561bcfff06f965c229e3d59c",
+    "host/ghc/MLF/Host/Base.hs": "a473c657207182e30587147eb7c26986a629fc6a",
+    "host/ghc/MLF/Host/IO.hs": "0fbed615ec34c9f175951baadb220e469d3b33d5",
     "host/ghc/MLF/Host/Async.hs": "601bb2e08f7be500646d9cae520b068c83640686",
     "host/ghc/cbits/host.c": "0c5880eadb1c94d8fe2431e645f0317e52a401f7",
     "runtime/mlf_process_supervisor.c": "7efde0ab6d2d5542f30c44422bf90f95885918e3",
@@ -46,7 +46,7 @@ CURRENT_BLOBS = {
     "runtime/mlf_byte_file.h": "b07a62af37d6dff4211070897246e29ec9e8f0a2",
     "runtime/mlf_process_binding.h": "0c685af2677aa71a47471eb3978bb94742b523c6",
     "runtime/mlf_process_supervisor.h": "dd5b4300c178423497727e0de9f6bc56beeadf59",
-    "runtime/mlf_system.h": "b7212f33d646729bcd10842ade489f54da125349",
+    "runtime/mlf_system.h": "f00637e1f7154844cbca9aa9ce5021f61e6107df",
     "runtime/mlf_windows.h": "3b35be83f13ee4d31a879a801e94250538e2a61a",
     "tools/performance/map-balance/BalanceControls.hs": "f5f96a00e424f89f6b082c943d139d17d4ce367d",
     "tools/performance/map-balance/BaselineMap.hs": "9767ba8ffc25380fd86b1bb5862a189d7d2f2c40",
