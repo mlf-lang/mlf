@@ -543,8 +543,11 @@ module Bootstrap.QueryGraph where {
     in QueryNode (text wanted) (text digest)
       (map (\((,) k h) -> (,) (text k) (text h)) reads) (mapOptional text location);
 
-  decodeIndex configuration graph = mapEither fst (admitIndex configuration graph);
-  admitIndex configuration graph = do {
+  -- Standalone decoding retains the legacy wire depth bound and diagnostic.
+  -- Cache admission uses the iterative closure policy shared by publication.
+  decodeIndex configuration graph = mapEither fst (admitIndexUsing validateLegacyClosure configuration graph);
+  admitIndex = admitIndexUsing validateClosure;
+  admitIndexUsing closeLegacy configuration graph = do {
     root <- case W.graphRoots graph of { [r] -> Right r; _ -> Left "query graph root count" };
     value <- W.lookupGraphNode graph root;
     case value of {
@@ -569,7 +572,7 @@ module Bootstrap.QueryGraph where {
         nodes <- traverseEither (decodeNode graph reads) indices;
         let { names = map nodeKey nodes; table = M.fromList compareString (map (\n -> (,) (nodeKey n) n) nodes) };
         ensure (length names == M.size table) "duplicate query node";
-        validateLegacyClosure table;
+        closeLegacy table;
         Right ((,) table False)
       };
       _ -> Left "unsupported query graph index"
