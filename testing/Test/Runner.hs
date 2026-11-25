@@ -410,6 +410,7 @@ module Test.Runner where {
     Left message -> do { putErr ("test: " ++ message ++ "\n"); ioReturn 2 };
     Right selection -> runSelected observe options selection
   };
+  runSelected :: (Result -> IO ()) -> Options -> Selection.CaseSelection -> IO Int;
   runSelected observe options selection =
     do {
       let { selected = Selection.cases selection };
