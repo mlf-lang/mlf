@@ -193,6 +193,50 @@ migrateSourceApiRows registry directory = do
  -- independently authenticated crate-cycle lines have already been migrated.
  writeFile (directory ++ "/manifest.jsonl") (S.unlines (S.map (\((,) line row) -> if S.isJust (sourceApiLookup registry (J.getText "id" "" row)) then J.render row else line) (S.zip lines migrated)))
 
+-- These four inputs retain their frozen acceptance, checked type and output.
+-- The archive, historical renderer and reviewed source/API registry are checked first.
+parityInputProjection : String -> Maybe ((,,) String String String)
+parityInputProjection identity = case identity of
+   "annotation-000005" -> Just ((,,) "28530bba0f78f35887bf7a3ff31de5302e8ecc5e933141ff1c0362c8ad403ec8"
+       "(\\(x :: Int) -> x)\n"
+       "use the unambiguous annotation delimiter for this generated lambda")
+   "annotation-000008" -> Just ((,,) "d4b7d42751545a98485759b1be3eff8cbd800c2ff775e2f166fffd32448c2f8a"
+       "(\\(x :: Bool) -> x)\n"
+       "use the unambiguous annotation delimiter for this generated lambda")
+   "state-runtime-000011" -> Just ((,,) "a27ce49a4147fd7253b8ac589c9d3259141d7f8cbaa9ace3e540974138c738f7"
+       "putStrLn (showInteger (runST (stBind (newSTArray 1 (readInteger \"1267650600228229401496703205376\")) (\\a -> stBind (readSTArray a 0) (\\n -> stBind (writeSTArray a 0 (subInteger (intToInteger 0) n)) (\\_ -> readSTArray a 0))))))\n"
+       "use explicit Integer for the original arbitrary-precision ST array test")
+   "state-runtime-000022" -> Just ((,,) "6d269e66523868cfa8c0cc01a30fccae2b43da480c6509c9a7f54c49e97401c3"
+       "putStrLn (showInteger (addInteger (runST (stReturn (readInteger \"123456789012345678901234567890\"))) (intToInteger 1)))\n"
+       "use explicit Integer for the original arbitrary-precision ST return and addition")
+   _ -> Nothing
+
+projectParityInputs : String -> IO ()
+projectParityInputs directory = do
+ let path = directory ++ "/manifest.jsonl"
+ original <- readFile path
+ manifest <- rows directory
+ let lines = O.nonempty (H.lines original)
+ let selected row = S.isJust (parityInputProjection (J.getText "id" "" row))
+ let identities = S.map (J.getText "id" "") (S.filter selected manifest)
+ H.assert (S.length lines == S.length manifest && S.length identities == 4 &&
+   M.size (M.fromList compareString (S.map (\identity -> ((,) identity ())) identities)) == 4)
+   "parity input projections must match four distinct original cases"
+ projected <- S.mapM (\((,) line row) -> do
+  let identity = J.getText "id" "" row
+  case parityInputProjection identity of
+   Nothing -> return line
+   Just ((,,) expected source reason) -> do
+    let file = directory ++ "/" ++ J.getText "source_path" "" row
+    before <- fileDigest file
+    H.assert (eqString before expected) ("parity input projection original bytes changed: " ++ identity)
+    after <- sourceApiDigest source
+    writeFile file source
+    return (J.render (J.set "input_projection_reason" (J.str reason)
+      (J.set "input_projection_previous_sha256" (J.str before)
+        (J.set "source_sha256" (J.str after) row))))) (S.zip lines manifest)
+ writeFile path (S.unlines projected)
+
 main : String -> IO ()
 main directory = do
  root <- canonicalPath "."
@@ -221,4 +265,5 @@ main directory = do
  S.mapM_ (checkRepositoryInput registry root directory) files
  migrateCrateCycles directory manifest
  migrateSourceApiRows registry directory
+ projectParityInputs directory
  putStrLn "Fresh MLF corpus: 7086 rows; generated inputs checked; 179 authenticated source/API projections"

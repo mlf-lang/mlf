@@ -23,7 +23,7 @@ CORPUS = {
     'Tests.Set': ('tests/Tests/Set.emlf', '07a3b77d3ade77e08aa7cd72e03e5a7023c3d7b3c976bbf652e35745a6989920'),
     'Tests.Figure12': ('tests/Tests/Figure12.emlf', 'dd7f8b94c22d9cc1634867d75317ff177282a6562f617b28c4391577c65857a1'),
     'Tests.Oracle': ('tests/Tests/Oracle.emlf', 'eab513eeba291a299ad8ab645e2f4c2bb563e5bc6d01c716c07bd981d0d32722'),
-    'Tests.Corpus': ('tests/Tests/Corpus.emlf', 'e21a6bb77c59ebc0d5553e28c62145a5b1a5462e4912a37edc252af0c1dfdda6'),
+    'Tests.Corpus': ('tests/Tests/Corpus.emlf', '3d2a4c92455bde99f9f9654d09992e8cb451bbb37cd6dce4ad56a5a5e5680427'),
     'CorpusMain': ('tests/CorpusMain.emlf', 'd353b1db226ea57079ff4486dcc0fdbb07650bb4466cd95580574136078eeb12'),
 }
 CHECKER = ('tests/CheckTarget.emlf', '90efc9b11d3864ecc8185e687474766c6dfc6df31a8b6fb3425bb56fc78e6861')
