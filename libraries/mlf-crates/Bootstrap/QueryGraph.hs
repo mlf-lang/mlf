@@ -508,13 +508,18 @@ module Bootstrap.QueryGraph where {
         Nothing -> Left "unpublished query dependency";
         Just target -> ensure (expected == indexHash target) "query publication has stale dependency version"
       }) (indexReads row)) rows;
-    _ <- foldM (\heights row -> mapEither snd
-      (indexHeight table S.empty 0 heights (indexKey row))) M.empty rows;
+    let { dependencies = \wanted -> case M.lookup compareInt wanted table of {
+      Just node -> Right (map fst (indexReads node));
+      Nothing -> Left "dangling query graph edge" } };
+    checkIndexDepth dependencies (map indexKey rows);
     Right table
   };
   -- Memoize actual subtree height, not just membership in a completed set:
   -- otherwise dependency-first key order can hide a chain longer than 4096.
-  indexHeight nodes visiting depth heights wanted = do {
+  checkIndexDepth dependencies roots = mapEither (\_ -> ())
+    (foldM (\heights root -> mapEither snd
+      (indexHeight dependencies S.empty 0 heights root)) M.empty roots);
+  indexHeight dependencies visiting depth heights wanted = do {
     ensure (depth < 4096) "cyclic/deep query graph";
     case M.lookup compareInt wanted heights of {
       Just height -> do {
@@ -523,12 +528,11 @@ module Bootstrap.QueryGraph where {
       };
       Nothing -> do {
         ensure (not (S.member compareInt wanted visiting)) "cyclic/deep query graph";
-        node <- case M.lookup compareInt wanted nodes of {
-          Just node -> Right node; Nothing -> Left "dangling query graph edge" };
-        result <- foldM (\((,) largest done) ((,) dependency _) -> do {
-          child <- indexHeight nodes (S.insert compareInt wanted visiting) (depth + 1) done dependency;
+        children <- dependencies wanted;
+        result <- foldM (\((,) largest done) dependency -> do {
+          child <- indexHeight dependencies (S.insert compareInt wanted visiting) (depth + 1) done dependency;
           Right ((,) (max largest (fst child)) (snd child))
-        }) ((,) 0 heights) (indexReads node);
+        }) ((,) 0 heights) children;
         let { height = fst result + 1; next = M.insert compareInt wanted height (snd result) };
         seq height (seq next (Right ((,) height next)))
       }
@@ -565,7 +569,7 @@ module Bootstrap.QueryGraph where {
         nodes <- traverseEither (decodeNode graph reads) indices;
         let { names = map nodeKey nodes; table = M.fromList compareString (map (\n -> (,) (nodeKey n) n) nodes) };
         ensure (length names == M.size table) "duplicate query node";
-        validateClosure table;
+        validateLegacyClosure table;
         Right ((,) table False)
       };
       _ -> Left "unsupported query graph index"
@@ -896,7 +900,18 @@ module Bootstrap.QueryGraph where {
   -- Resolve and check each recorded version before cycle detection. Dense
   -- ordinals follow the old lexical root order and never enter the index file.
   validateClosure nodes = mapEither (\_ -> ()) (resolveClosure nodes);
-  resolveClosure nodes = do {
+  -- The on-disk legacy reader retains the wire-format depth limit. Live
+  -- publication uses its separate iterative cycle-only traversal.
+  validateLegacyClosure nodes = do {
+    rows <- resolveQueryReads nodes;
+    let { edges = V.fromList rows;
+      dependencies = \wanted -> if wanted < 0 || wanted >= V.count edges
+        then Left "dangling query graph edge"
+        else Right (map V.toInt (V.at edges (V.fromInt wanted))) };
+    checkIndexDepth dependencies (range 0 (V.count edges - 1))
+  };
+  resolveQueryReads :: Map String QueryNode -> Either String ([] ([] (V.Index QueryId)));
+  resolveQueryReads nodes =
     let { ordered = M.elems nodes;
       bindings = M.fromDistinctAscList (zipWith (\entry n ->
         (,) (fst entry) ((,) (V.fromInt n) (nodeHash (snd entry))))
@@ -906,8 +921,9 @@ module Bootstrap.QueryGraph where {
         Just ((,) i actual) -> if eqString digest actual then Right i
           else Left "query publication has stale dependency version"
       }
-    };
-    rows <- traverseEither (\node -> traverseEither resolve (nodeReads node)) ordered;
+    } in traverseEither (\node -> traverseEither resolve (nodeReads node)) ordered;
+  resolveClosure nodes = do {
+    rows <- resolveQueryReads nodes;
     let { edges = V.fromList rows };
     _ <- runST (stBind (V.fixedFilled (V.count edges) Unseen) (\marks ->
       visit edges marks (V.indices edges) []));
