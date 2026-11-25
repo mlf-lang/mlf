@@ -15,6 +15,8 @@ FOUNDATION = '9345d58b2b1675fbe0fcf899b5dc3d2f229e1acf'
 MERGE = 'd72950ed771d4fd48145cd4f467ff9ce43ef13d4'
 WRITER_PREDECESSOR = 'ccaded50dbf189b89d164cea0add9742965ff6be'
 WRITER_SIGNATURES = '0eea12495edd0b1572d5c330379005fb59a1052e'
+PARITY_INPUT_PARENT = '86cd25e18258bd2adafd8d3786e16d02448167f6'
+PARITY_INPUTS = '93872016affaa8b731fd35c263899b8ebb50dc40'
 ORIGINAL = 'tools/performance/artifact-binary/phase2_source_successor.py'
 ORIGINAL_SHA = '72041ef0f3ea9c84d5f7ff100f721c326ecbbc86c1b705bf2c45f11cb19f9f16'
 EXTRA_MERGE_ROLES = {
@@ -30,6 +32,9 @@ WRITER_SIGNATURE_ROLES = {
     'tests/mlf.lock',
     'tests/shared/mlf.lock',
     'tools/shared/test_packed_writer.py',
+}
+PARITY_INPUT_ROLES = {
+    'tests/Tests/Corpus.emlf', 'tests/mlf.lock', 'tools/shared/prepare_parity.py',
 }
 
 
@@ -85,12 +90,18 @@ def qualified_contract(root, source_root=None):
     writer_changes = set(live_git.run(
         'diff', '--name-only', WRITER_PREDECESSOR, WRITER_SIGNATURES).decode().splitlines())
     proof.require(writer_changes == WRITER_SIGNATURE_ROLES, 'exact packed writer signature source roles')
-    auxiliary_roles = (EXTRA_MERGE_ROLES | WRITER_SIGNATURE_ROLES) - paths
-    expected = live_git.inventory(WRITER_SIGNATURES, paths | auxiliary_roles)
+    live_git.run('merge-base', '--is-ancestor', WRITER_SIGNATURES, PARITY_INPUT_PARENT)
+    live_git.commit(PARITY_INPUTS, parents=[PARITY_INPUT_PARENT])
+    live_git.run('merge-base', '--is-ancestor', PARITY_INPUTS, 'HEAD')
+    parity_changes = set(live_git.run(
+        'diff', '--name-only', PARITY_INPUT_PARENT, PARITY_INPUTS).decode().splitlines())
+    proof.require(parity_changes == PARITY_INPUT_ROLES, 'exact frozen parity input projection roles')
+    auxiliary_roles = (EXTRA_MERGE_ROLES | WRITER_SIGNATURE_ROLES | PARITY_INPUT_ROLES) - paths
+    expected = live_git.inventory(PARITY_INPUTS, paths | auxiliary_roles)
     if source_root == root:
         auxiliary = {p: proof.read(source_root, p) for p in auxiliary_roles}
         proof.require(all(proof.oid(raw) == expected[p] for p, raw in auxiliary.items()),
-                      'exact Foundation and packed writer test, lock and shape inputs')
+                      'exact Foundation, packed writer and frozen parity test, lock and shape inputs')
     current = {p: proof.read(source_root, p) for p in paths}
     proof.require(all(proof.oid(raw) == expected[p] for p, raw in current.items()),
                   'exact merged and signed source inventory')
