@@ -153,7 +153,9 @@ def main():
     for name in ["Graphs", "Vector", "World", "DeclQueryControls", "ImportBindings", "PreparedImports", "FragmentAdmission", "DeclCore"]:
         obj = out / name
         obj.mkdir()
-        run([*ghc, *(["-i" + str(ROOT / "tests/shared")] if name == "Graphs" else []), "-odir", obj, "-hidir", obj, HERE / (name + ".hs"), *host, "-o", obj / "probe"])
+        test_roots = [ROOT / "tests/shared", ROOT / "testing"] if name == "Graphs" else []
+        run([*ghc, *["-i" + str(root) for root in test_roots], "-odir", obj, "-hidir", obj,
+             HERE / (name + ".hs"), *host, "-o", obj / "probe"])
     observe("host/graphs", run,
         [out / "Graphs/probe"],
         expected=b"1032 ordered SCC and reach comparisons, query DAG and package controls passed\n",
