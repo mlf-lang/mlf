@@ -206,7 +206,9 @@ runSelected target settings names entries requested selected full = do
   let start = Runner.prefix "start" ++ Runner.selectionFields (S.length entries) (S.length selected) ++
         (",\"ids\":" ++ Runner.strings (S.map C.id selected) ++ "}\n")
   Runner.saveReport options start
-  Selection.begin "core" full completedFamilies
+  -- A leaf selection can execute cases without completing a family.
+  let reportsFamilies = S.not (S.null completedFamilies)
+  if reportsFamilies then Selection.begin "core" full completedFamilies else return ()
   Coverage.begin "core" full
   workspace <- getEnv "MLF_TEST_WORK"
   let needsScratch entry = Registry.isIsolated entry || inFamily "core/separate-compilation" entry
@@ -221,7 +223,7 @@ runSelected target settings names entries requested selected full = do
    if S.null substrings then return () else Coverage.metric "core" "substring-executed" (S.length substrings)
    S.mapM_ (Selection.passed "core") completedFamilies
    Coverage.finish "core"
-   Selection.finish "core"
+   if reportsFamilies then Selection.finish "core" else return ()
   else exitWith code
 
 reportDestination : Runner.Options -> IO Runner.Options
