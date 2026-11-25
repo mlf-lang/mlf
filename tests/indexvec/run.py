@@ -3,6 +3,7 @@
 
 import argparse
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import hashlib
@@ -91,6 +92,18 @@ def run(argv, expected=None, failure=None, stdout=None):
             f"{argv}: exit {result.returncode}, stdout={result.stdout!r}, stderr={result.stderr[-1200:]!r}"
         )
     return result.stdout
+
+
+def check_codec_output(case, accepted, result):
+    if accepted:
+        if not result.startswith(b"OK\n"):
+            raise ValueError(f"native wire acceptance differs: {case.name}")
+        if not result.endswith(hashlib.sha256(case.data).hexdigest().encode() + b"\n"):
+            raise ValueError(f"native wire did not roundtrip exactly: {case.name}")
+    else:
+        rejection = re.fullmatch(rb"E ([^\r\n]+)\n", result)
+        if rejection is None or not rejection[1].strip():
+            raise ValueError(f"native wire expected one rejection line: {case.name}, got {result[:200]!r}")
 
 
 def main():
@@ -232,10 +245,7 @@ def main():
         except Invalid:
             accepted = False
         result = run([out / "codec-native", "check", path])
-        if result.startswith(b"OK\n") != accepted:
-            raise ValueError(f"native wire acceptance differs: {case.name}")
-        if accepted and not result.endswith(hashlib.sha256(case.data).hexdigest().encode() + b"\n"):
-            raise ValueError(f"native wire did not roundtrip exactly: {case.name}")
+        check_codec_output(case, accepted, result)
         return result
 
     for index, case in wire_cases:
