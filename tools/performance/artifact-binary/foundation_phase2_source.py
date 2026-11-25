@@ -106,6 +106,8 @@ BOUNDARY_REVIEW = 'b72168feaf229b575390d5c6ac391824bb75ec9e'
 BOUNDARY_TREE = 'f1981c36912a101cbedde819690200ecc7d4e920'
 BOUNDARY_TYPED = '682ccd4cdd2190e22d0fb0d4dc3ab058e72c7b7a'
 BOUNDARY_TYPED_TREE = 'a3a63abcbaf49969832d45addc2b448ec4aff84a'
+INVENTORY_CLEANUP = '0e64b4e02dda60106e959f7782b6a17fce1e3cef'
+INVENTORY_CLEANUP_TREE = 'b5b806d87cd89ea31bb48cbeb56913827da7be36'
 BOUNDARY_MODULES = {
     'Bootstrap.Graph.ScopeIndex': 'libraries/mlf-inference/Bootstrap/Graph/ScopeIndex.hs',
     'Bootstrap.GroundProofEdit': 'libraries/mlf-crates/Bootstrap/GroundProofEdit.hs',
@@ -286,7 +288,14 @@ def qualified_contract(root, source_root=None):
         | OPTIMIZER_RAW_ROLES | QUERY_WIRE_ROLES | LIFECYCLE_STRING_ROLES | ARTIFACT_STACK_ROLES | OPEN_PACKAGE_LIMIT_ROLES | BACKEND_PATHS_ROLES
         | CORE_LEAF_SELECTION_ROLES | REVIEW_FIX_ROLES | BOUNDARY_ROLES
     ) - paths
+    # The compiler projection is unchanged by the removal of test-only source lists.
+    # Verify the two auxiliary fixture drivers against their subsequent reviewed tree.
+    live_git.commit(INVENTORY_CLEANUP, tree=INVENTORY_CLEANUP_TREE)
+    live_git.run('merge-base', '--is-ancestor', BOUNDARY_TYPED, INVENTORY_CLEANUP)
+    live_git.run('merge-base', '--is-ancestor', INVENTORY_CLEANUP, 'HEAD')
     expected = live_git.inventory(BOUNDARY_TYPED, paths | auxiliary_roles)
+    fixture_drivers = {'tools/shared/test_artifact_binary.py', 'tools/shared/test_artifact_binary_modular.py'}
+    expected.update(live_git.inventory(INVENTORY_CLEANUP, fixture_drivers))
     if source_root == root:
         auxiliary = {p: proof.read(source_root, p) for p in auxiliary_roles}
         proof.require(all(proof.oid(raw) == expected[p] for p, raw in auxiliary.items()),
