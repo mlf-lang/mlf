@@ -691,6 +691,13 @@ walk start = let {{
             declarations = '\n'.join(rows) + '\n' + declarations.replace(
                 'a0 <- start;', 'seed <- start; a0 <- pure (checkedPrefix seed);')
         expression = 'case walk (Done x) of { Done y -> y }'
+    elif family == 'single_token_infix_sites':
+        steps = ['step0 :: Int -> Int;', 'step0 value = value;']
+        for i in range(1, n + 1):
+            steps.extend([f'step{i} :: Int -> Int;',
+                          f'step{i} value = step{i - 1} value + 1;'])
+        declarations = '\n'.join(steps) + '\n'
+        expression = f'step{n} x'
     elif family in ('recursive_monad_peers', 'nested_recursive_monad_peers'):
         preamble = HEADER + '''data Check a = Failed | Good a;
 instance Functor Check where { fmap f value = case value of { Failed -> Failed; Good x -> Good (f x) } };
@@ -838,6 +845,12 @@ tick = Parser (\s -> if ltInt s 1 then Stop else Next s (subInt s 1));
                 + 'else ioBind (printInt (selectedScore i)) (\\_ -> printAll (addInt i 1));\n'
                 + 'main :: IO ();\nmain = ioBind (getArg 0) (\\text -> if eqString text "--all" '
                 + 'then printAll 0 else printInt (entry (readInt text)))\n}\n')
+    elif family == 'scoped_ground_method_calls':
+        declarations = ('data Token = Token Int;\n'
+                        'class Score a where { score :: a -> Int };\n'
+                        'instance Score Token where { score (Token value) = value };\n')
+        calls = [f'score (Token (addInt x {i}))' for i in range(n)]
+        expression = balanced(calls, lambda a, b: f'addInt ({a}) ({b})') if calls else '0'
     elif family == 'visible_instance_inventory':
         rows = ['class Score a where { score :: a -> Int };',
                 'instance Score Int where { score x = x };']
@@ -1144,6 +1157,8 @@ def expected(family, n, x):
     if family == 'polymorphic_tree_fold':
         total = 3*n*x + n*(n-1)//2
         return (total + 2**63) % 2**64 - 2**63
+    if family == 'single_token_infix_sites':
+        return x + n
     if family == 'nested_recursive_monad_peers':
         # Each of four peers takes n ticks plus one local tick. The peer
         # offsets add 1 + 2 + 3 + 4 during the complete circuit.
@@ -1208,6 +1223,8 @@ def expected(family, n, x):
         return cycles * n * (n + 1) // 2 + remainder * (remainder + 1) // 2 + remainder
     if family == 'wide_case':
         return x + 2 * max(0, min(x, n-1)) + 1
+    if family == 'scoped_ground_method_calls':
+        return (n * x + n * (n - 1) // 2 + 2**63) % 2**64 - 2**63
     if family == 'visible_instance_inventory':
         selected = min(1, n) if x < 0 else n
         return (x + 7*selected + 2**63) % 2**64 - 2**63

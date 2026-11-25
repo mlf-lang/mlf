@@ -805,7 +805,7 @@ module Bootstrap.Graph where {
       Just ((,) low high) -> validateDense graph low high
     };
   data DenseValidation s =
-    DenseValidation Graph Int Int (STArray s (Maybe Node)) (STArray s ([] Int)) (STArray s
+    DenseValidation Graph Int Int (STArray s (IntMapTree Node)) (STArray s ([] Int)) (STArray s
                                                                                    Int) (STArray s
                                                                                          Kind) (STArray
                                                                                                 s
@@ -821,7 +821,7 @@ module Bootstrap.Graph where {
     let {
       count = ((high - low) + 1)
     } in
-    stBind (newSTArray count Nothing)
+    stBind (newSTArray count IntMapNil)
       (\table ->
          stBind (newSTArray count [])
            (\descendants ->
@@ -843,16 +843,18 @@ module Bootstrap.Graph where {
                                              ends
                                              visited
                                        } in
-                                       let {
-                                         entries = IM.toList (nodes graph)
-                                       } in
-                                       stBind (denseLoadValidation low table entries)
-                                         (\loaded -> case nodes graph of {
-                                            IntMap tree -> denseValidateEntriesWith (denseKindTree state tree) state entries
-                                          }))))))));
+                                       case nodes graph of {
+                                         IntMap tree -> stBind (denseLoadValidation low table tree)
+                                           (\_ -> denseValidateEntriesWith (denseKindTree state tree)
+                                             state (IM.toList (nodes graph)))
+                                       })))))));
   denseGetNode :: forall s. DenseValidation s -> Int -> ST s (Maybe Node);
   denseGetNode (DenseValidation graph low high table descendants colours kinds starts ends visited) n =
-    if ((n < low) || (high < n)) then stReturn Nothing else readDense low table n;
+    if ((n < low) || (high < n)) then stReturn Nothing else
+      stBind (readDense low table n) (\entry -> case entry of {
+        IntMapTip _ value -> stReturn (Just value);
+        _ -> stReturn Nothing
+      });
   denseRequire :: forall s. DenseValidation s -> Int -> ST s (Either String Node);
   denseRequire state n =
     stBind (denseGetNode state n)
@@ -2354,25 +2356,26 @@ module Bootstrap.Graph where {
     };
   allocateCopies :: Graph -> [] Int -> (,) (IntMap Int) Graph;
   allocateCopies graph originals =
-    case originals of {
-      [] -> (,) IM.empty graph;
-      (:) _ _ ->
-        if L.not (ascendingCopyIdentities originals)
-        then allocateCopiesUnordered graph originals
-        else let {
-               first = nextId graph
-             } in
-             let {
-               entries = freshCopyEntries first originals
-             } in
-             let {
-               copied = IM.fromDistinctAscList entries
-             } in
-             let {
-               next = mkGraph (nodes graph) (links graph) (L.advanceIdentity first (L.length originals))
-             } in
-             seq first (strictPair copied (strictGraph next))
-    };
+    if ascendingCopyIdentities originals then allocateOrderedCopies graph originals
+    else allocateCopiesUnordered graph originals;
+  -- Ordered graph visitors already provide distinct keys. Assign each fresh
+  -- identity while building the map and keep the checked successor as the supply.
+  allocateOrderedCopies :: Graph -> [] Int -> (,) (IntMap Int) Graph;
+  allocateOrderedCopies graph originals = let {
+    collect state fresh remaining = case remaining of {
+      [] -> case state of {
+        IM.NoState -> (,) IM.empty graph;
+        IM.State key value stack -> let {
+          copies = IM.wrap (IM.ascLinkStack stack key (IM.tip key value));
+          next = mkGraph (nodes graph) (links graph) fresh
+        } in strictPair copies next
+      };
+      (:) original rest -> let {
+        next = L.advanceIdentity fresh 1;
+        updated = IM.ascInsert state ((,) original fresh)
+      } in seq next (seq updated (collect updated next rest))
+    }
+  } in collect IM.NoState (nextId graph) originals;
   copyIdentity :: Graph -> IntMap Int -> Int -> Int;
   copyIdentity graph copies identity =
     let {
@@ -2425,7 +2428,7 @@ module Bootstrap.Graph where {
         } in
         bindE (kindsAt graph originals)
           (\kinds ->
-             case allocateCopies graph originals of {
+             case allocateOrderedCopies graph originals of {
                (,) copies allocated ->
                  let {
                    copy = copyIdentity graph copies
@@ -2579,16 +2582,21 @@ module Bootstrap.Graph where {
     materializeCheckedExportBatch parent (L.map (\((,) source destination) -> (,,) generalization source destination) members);
   materializeCheckedExportBatch :: Int -> [] ((,,) Int Int Int) -> Graph ->
     Either String ((,) ([] ((,) Int (IntMap Int))) Graph);
-  materializeCheckedExportBatch parent members graph = let {
+  materializeCheckedExportBatch = materializeBatchUsing False;
+  -- The generation barrier calls this immediately after Solver.finish.
+  materializeSolvedExportBatch = materializeBatchUsing True;
+  materializeBatchUsing solved parent members graph = let {
+    report closed item next = (,,) item next closed;
+    unpack ((,,) items result _) = (,) items result;
     copyAll audit rows current = case rows of {
-      [] -> Right ((,) [] current);
+      [] -> Right ((,,) [] current True);
       (:) ((,,) generalization source destination) rest -> do {
-        (,) item next <- materializeCheckedExportUsing audit generalization source destination parent current;
-        (,) items result <- copyAll audit rest next;
-        Right ((,) ((:) item items) result)
+        (,,) item next closed <- materializeCheckedExportWith report audit generalization source destination parent current;
+        (,,) items result restClosed <- copyAll audit rest next;
+        Right ((,,) ((:) item items) result (closed && restClosed))
       }
     };
-    ordinary = copyAll True members graph;
+    ordinary = L.mapEither unpack (copyAll True members graph);
     frozen ((,,) generalization source destination) =
       IM.member (resolve graph generalization) (nodes graph) &&
       IM.member (resolve graph source) (nodes graph) && destination < nextId graph &&
@@ -2596,9 +2604,9 @@ module Bootstrap.Graph where {
     batched = do {
       check (exportCounterValid graph && L.all frozen members)
         "recursive export requires a reserved destination and valid fresh counter";
-      answer <- copyAll False members graph;
-      validateGraph (L.snd answer);
-      Right answer
+      (,,) items result closed <- copyAll False members graph;
+      if solved && closed then Right () else validateGraph result;
+      Right ((,) items result)
     }
   } in case members of {
     (:) _ ((:) _ _) -> case batched of {
@@ -2610,7 +2618,8 @@ module Bootstrap.Graph where {
   exportCounterValid graph =
     L.all (\n -> n < nextId graph) (IM.keys (nodes graph)) &&
     L.all (\n -> n < nextId graph) (IM.keys (links graph));
-  materializeCheckedExportUsing audit generalization selected destination parent graph = do {
+  materializeCheckedExportUsing = materializeCheckedExportWith (\_ item next -> (,) item next);
+  materializeCheckedExportWith report audit generalization selected destination parent graph = do {
     groupNode <- require graph generalization;
     parentNode <- require graph parent;
     sourceNode <- require graph selected;
@@ -2627,7 +2636,7 @@ module Bootstrap.Graph where {
       (L.not audit || exportCounterValid graph))
       "recursive export requires a reserved destination and valid fresh counter";
     check (L.not (isGen (tag sourceNode))) "recursive export root must be a type node";
-    materializeExportInUsing audit graph group source destination outer
+    materializeExportInWith report audit graph group source destination outer
   };
   materializeExportIn :: Graph ->
                          Int ->
@@ -2635,7 +2644,8 @@ module Bootstrap.Graph where {
                          Int ->
                          Int -> Either String ((,) ((,) Int (IntMap Int)) Graph);
   materializeExportIn = materializeExportInUsing True;
-  materializeExportInUsing audit graph generalization source destination parent =
+  materializeExportInUsing = materializeExportInWith (\_ item next -> (,) item next);
+  materializeExportInWith report audit graph generalization source destination parent =
     case expansionVisitCached graph generalization IM.empty ((,) IS.empty IM.empty)
            ((:) source []) of {
       (,) visited scopes ->
@@ -2651,7 +2661,7 @@ module Bootstrap.Graph where {
                 (Just generalization))
              "recursive export root must be group-bound or external")
           (\rootChecked ->
-             case allocateCopies graph originals of {
+             case allocateOrderedCopies graph originals of {
                (,) copies allocated ->
                  bindE (mapE_ (validateExportCopy graph generalization source copies) originals)
                    (\copiesChecked ->
@@ -2671,7 +2681,13 @@ module Bootstrap.Graph where {
                             result
                       } in
                       bindE (if audit then validateGraph exported else Right ())
-                        (\verified -> Right ((,) ((,) (copy source) copies) exported)))
+                        (\verified ->
+                          -- A traversal with no external frontier copies the whole rooted
+                          -- structural graph bijectively. Existing type binders keep
+                          -- their paths. Every group-bound descendant is reachable from
+                          -- the new root, which binds it under the fresh destination Gen.
+                          Right (report (IM.size copies == IS.size visited)
+                            ((,) (copy source) copies) exported)))
              })
     };
   validateExportCopy :: Graph -> Int -> Int -> IntMap Int -> Int -> Either String ();
@@ -2766,7 +2782,7 @@ module Bootstrap.Graph where {
                   (,) visited scopes ->
                     let { originals = L.filter (\n -> IM.findWithDefault False n scopes)
                       (IS.toList visited) } in
-                    case allocateCopies graph originals of {
+                    case allocateOrderedCopies graph originals of {
                       (,) copies allocated ->
                         bindE (mapE_ (validateFieldCopy graph source copies) originals)
                           (\copiesChecked ->
@@ -2815,10 +2831,11 @@ module Bootstrap.Graph where {
   normalize :: Graph -> Graph;
   -- Solver.finishNormalized reuses validation across this transformation:
   -- only non-Gen flags may change; identities, tags and binders stay intact.
-  normalize graph =
+  normalize = normalizeUsingChildren Nothing;
+  normalizeUsingChildren supplied graph =
     case denseBounds graph of {
       Nothing -> normalizeSparse graph;
-      Just ((,) low high) -> normalizeDense graph low high
+      Just ((,) low high) -> normalizeDenseUsing supplied graph low high
     };
   normalizeSparse :: Graph -> Graph;
   -- Several nodes can share a generalization binder. Keep its structural
@@ -2866,24 +2883,26 @@ module Bootstrap.Graph where {
       (nextId graph);
   -- Normalize dense graphs with bounded scratch arrays. Only flags may change;
   -- the persistent sparse path remains available for arbitrary identity spans.
-  data DenseNormalization s =
-    DenseNormalization Graph Int (STArray s (Maybe Node)) (STArray s ([] Int)) (STArray s
-                                                                                  Int) (STArray s
-                                                                                        Int) (STArray
-                                                                                              s
-                                                                                              Bool) (STArray
-                                                                                                     s
-                                                                                                     ([]
-                                                                                                      Int));
+  data NormalChildren s = GatherNormalChildren (STArray s ([] Int)) |
+    CheckedNormalChildren (IntMap IntSet);
+  data DenseNormalization s = DenseNormalization Graph Int (STArray s (Maybe Node))
+    (NormalChildren s) (STArray s Int) (STArray s Int) (STArray s Bool) (STArray s ([] Int));
+  newNormalChildren :: forall s. Maybe (IntMap IntSet) -> Int -> ST s (NormalChildren s);
+  newNormalChildren supplied count = case supplied of {
+    Just index -> stReturn (CheckedNormalChildren index);
+    Nothing -> stBind (newSTArray count []) (\rows -> stReturn (GatherNormalChildren rows))
+  };
   normalizeDense :: Graph -> Int -> Int -> Graph;
-  normalizeDense graph low high =
+  normalizeDense = normalizeDenseUsing Nothing;
+  normalizeDenseUsing :: Maybe (IntMap IntSet) -> Graph -> Int -> Int -> Graph;
+  normalizeDenseUsing supplied graph low high =
     runST
       (let {
          count = ((high - low) + 1)
        } in
        stBind (newSTArray count Nothing)
          (\table ->
-            stBind (newSTArray count [])
+            stBind (newNormalChildren supplied count)
               (\descendants ->
                  stBind (newSTArray count (0 - 1))
                    (\inertness ->
@@ -2926,14 +2945,18 @@ module Bootstrap.Graph where {
             stBind (writeDense low table n (Just v))
               (\loaded ->
                  stBind
-                   (if equalFlag (flag v) Rigid
-                    then stReturn ()
-                    else case binder v of {
-                           Nothing -> stReturn ();
-                           Just parent ->
-                             stBind (readDense low descendants parent)
-                               (\previous -> writeDense low descendants parent ((:) n previous))
-                         })
+                   (case descendants of {
+                      GatherNormalChildren rows -> if equalFlag (flag v) Rigid then stReturn () else
+                        case binder v of {
+                          Nothing -> stReturn ();
+                          Just parent -> stBind (readDense low rows parent)
+                            (\previous -> writeDense low rows parent ((:) n previous))
+                        };
+                      -- Rigid children have no effect on their parent's inertness.
+                      -- The audited solver index contains all binding children.
+                      CheckedNormalChildren _ -> if equalFlag (flag v) Rigid
+                        then writeDenseInt low inertness n 1 else stReturn ()
+                    })
                    (\added -> normalLoad state rest))
         }
     };
@@ -2950,7 +2973,13 @@ module Bootstrap.Graph where {
                        stBind
                          (if isBottom (tag v)
                           then stReturn False
-                          else stBind (readDense low descendants n) (normalAllInert state))
+                          else case descendants of {
+                            GatherNormalChildren rows -> stBind (readDense low rows n) (normalAllInert state);
+                            CheckedNormalChildren index -> case IM.lookup n index of {
+                              Nothing -> stReturn True;
+                              Just row -> normalAllInert state (IS.foldl (\rest child -> (:) child rest) [] row)
+                            }
+                          })
                          (\answer ->
                             stBind (writeDenseInt low inertness n (if answer then 1 else 0))
                               (\stored -> stReturn answer))))
@@ -3092,18 +3121,17 @@ module Bootstrap.Graph where {
     };
   -- Direct loops keep the state operations visible to checked native lowering.
   -- They preserve the corresponding ST library traversal order and error stops.
-  denseLoadValidation :: forall s. Int ->
-                                   STArray s (Maybe Node) -> [] ((,) Int Node) -> ST s ();
-  denseLoadValidation low table values =
-    case values of {
-      [] -> stReturn ();
-      (:) entry rest ->
-        stBind
-          (case entry of {
-             (,) n v -> writeDense low table n (Just v)
-           })
-          (\ignored -> denseLoadValidation low table rest)
-    };
+  -- The immutable graph already owns one leaf for every live identity.
+  -- An empty slot uses the shared nil constructor, including gaps in the range.
+  denseLoadValidation :: forall s. Int -> STArray s (IntMapTree Node) -> IntMapTree Node -> ST s ();
+  denseLoadValidation low table tree = case tree of {
+    IntMapNil -> stReturn ();
+    IntMapTip n _ -> writeDense low table n tree;
+    IntMapBin _ prefix left right -> let {
+      visit first second = stBind (denseLoadValidation low table first)
+        (\_ -> denseLoadValidation low table second)
+    } in if IT.signBranch prefix then visit right left else visit left right
+  };
   denseCheckBinders :: forall s. DenseValidation s ->
                                  [] ((,) Int Node) -> ST s (Either String ());
   denseCheckBinders state values =

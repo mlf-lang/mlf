@@ -1420,7 +1420,7 @@ module Bootstrap.Constraint where {
       together = do {
         pending <- mapM (\group -> scoped group (plan scope group)) batch;
         flushGeneration;
-        finishRecursiveGroups scope parent pending
+        finishRecursiveGroupsUsing G.materializeSolvedExportBatch scope parent pending
       }
     } in case batch of {
       (:) _ ((:) _ _) -> WithCandidates (\memo state -> case state of {
@@ -1620,7 +1620,7 @@ module Bootstrap.Constraint where {
   buildRecursiveGroupUnderIn scopeRoot datatypes typeScope env parent definitions = do {
     pending <- planRecursiveGroupIn scopeRoot datatypes typeScope env parent definitions;
     flushGeneration;
-    finishRecursiveGroups env parent [pending]
+    finishRecursiveGroupsUsing G.materializeSolvedExportBatch env parent [pending]
   };
   data PendingRecursive = PendingRecursive Int ([] ((,,,) TermRef XName Int Int)) ([] ((,) Typed Edge));
   planRecursiveGroup root = planRecursiveGroupIn ((,) root M.empty);
@@ -1670,7 +1670,8 @@ module Bootstrap.Constraint where {
          }) (zip declarations definitions);
       return (PendingRecursive group declarations bodies)
     };
-  finishRecursiveGroups env parent pending = do {
+  finishRecursiveGroups = finishRecursiveGroupsUsing G.materializeCheckedExportBatch;
+  finishRecursiveGroupsUsing materialize env parent pending = do {
     graph <- getGraph;
     let {
       items (PendingRecursive group declarations bodies) = map (\((,) declaration body) -> (,,) group declaration body)
@@ -1681,7 +1682,7 @@ module Bootstrap.Constraint where {
         (,) n (RecursiveDefinition name export value proof (Just (RecursiveClosure group copies)));
       exportedScope = bindTerms env (map (\((,,) _ ((,,,) n name _ export) _) -> (,) n (Poly name export)) members)
     };
-    (,) completed next <- liftResult (G.materializeCheckedExportBatch parent (map request members) graph);
+    (,) completed next <- liftResult (materialize parent (map request members) graph);
     setGraph next;
     return ((,) exportedScope (zipWith freeze members completed))
   };

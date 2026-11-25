@@ -46,7 +46,29 @@ module Bootstrap.LLVM.Optimize where {
   eqName :: XName -> XName -> Bool;
   eqName a b = (nameId a == nameId b);
   free :: XErased -> Set XName;
-  free expression = freeWith free expression;
+  free expression = case expression of {
+    XEApp _ _ -> S.fromDistinctAscList (IM.elems (applicationFree IS.empty IM.empty expression));
+    _ -> freeWith free expression
+  };
+  -- Accumulate one representative per free identity across an application.
+  -- Visit the left operand first, matching the left-biased union of free sets.
+  applicationFree :: IntSet -> IntMap XName -> XErased -> IntMap XName;
+  applicationFree bound found expression = case expression of {
+    XEVar n -> let { key = nameId n } in
+      if IS.member key bound || IM.member key found then found else IM.insert key n found;
+    XEApp f a -> applicationFree bound (applicationFree bound found f) a;
+    XEAbs n body -> applicationFree (IS.insert (nameId n) bound) found body;
+    XELet n rhs body -> applicationFree (IS.insert (nameId n) bound)
+      (applicationFree bound found rhs) body;
+    XELetRec ds body -> let {
+      inside = L.foldlStrict (\scope binding -> IS.insert (nameId (L.fst binding)) scope) bound ds
+    } in L.foldlStrict (\names binding -> applicationFree inside names (L.snd binding))
+      (applicationFree inside found body) ds;
+    XECase subject branches -> L.foldlStrict (\names (XErasedAlternative pattern body) ->
+      let { inside = L.foldlStrict (\scope n -> IS.insert (nameId n) scope) bound (X.patternNames pattern) }
+      in applicationFree inside names body) (applicationFree bound found subject) branches;
+    _ -> found
+  };
   freeWith :: (XErased -> Set XName) -> XErased -> Set XName;
   freeWith descend expression = case expression of {
     XEVar n -> S.singleton n;
