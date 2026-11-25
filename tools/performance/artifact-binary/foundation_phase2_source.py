@@ -19,6 +19,8 @@ PARITY_INPUT_PARENT = '86cd25e18258bd2adafd8d3786e16d02448167f6'
 PARITY_INPUTS = '93872016affaa8b731fd35c263899b8ebb50dc40'
 RECURSIVE_PARITY_PARENT = 'f49b13e154ea6a166fdce5aa86d94a29e77509b3'
 RECURSIVE_PARITY_INPUT = 'd16fe59419ab7baa0398e9698960a1948d3ebc1a'
+LLVM_NONRETURN_PARENT = '92ced54fa5166afa99528479e62c25c64b838e4f'
+LLVM_NONRETURN = 'fc073d50687efb196ecdf27662a79471afbe8f6d'
 ORIGINAL = 'tools/performance/artifact-binary/phase2_source_successor.py'
 ORIGINAL_SHA = '72041ef0f3ea9c84d5f7ff100f721c326ecbbc86c1b705bf2c45f11cb19f9f16'
 EXTRA_MERGE_ROLES = {
@@ -37,6 +39,10 @@ WRITER_SIGNATURE_ROLES = {
 }
 PARITY_INPUT_ROLES = {
     'tests/Tests/Corpus.emlf', 'tests/mlf.lock', 'tools/shared/prepare_parity.py',
+}
+LLVM_NONRETURN_ROLES = {
+    'libraries/mlf-llvm/Bootstrap/LLVM/Build.hs', 'mlf.lock', 'testing/tools/mlf.lock',
+    'tests/mlf.lock', 'tests/shared/mlf.lock', 'tools/shared/test_ordinary_tail.py',
 }
 
 
@@ -98,14 +104,20 @@ def qualified_contract(root, source_root=None):
     parity_changes = set(live_git.run(
         'diff', '--name-only', PARITY_INPUT_PARENT, PARITY_INPUTS).decode().splitlines())
     proof.require(parity_changes == PARITY_INPUT_ROLES, 'exact frozen parity input projection roles')
-    auxiliary_roles = (EXTRA_MERGE_ROLES | WRITER_SIGNATURE_ROLES | PARITY_INPUT_ROLES) - paths
     live_git.run('merge-base', '--is-ancestor', PARITY_INPUTS, RECURSIVE_PARITY_PARENT)
     live_git.commit(RECURSIVE_PARITY_INPUT, parents=[RECURSIVE_PARITY_PARENT])
     live_git.run('merge-base', '--is-ancestor', RECURSIVE_PARITY_INPUT, 'HEAD')
     recursive_parity_changes = set(live_git.run(
         'diff', '--name-only', RECURSIVE_PARITY_PARENT, RECURSIVE_PARITY_INPUT).decode().splitlines())
     proof.require(recursive_parity_changes == PARITY_INPUT_ROLES, 'exact recursive parity input projection roles')
-    expected = live_git.inventory(RECURSIVE_PARITY_INPUT, paths | auxiliary_roles)
+    live_git.run('merge-base', '--is-ancestor', RECURSIVE_PARITY_INPUT, LLVM_NONRETURN_PARENT)
+    live_git.commit(LLVM_NONRETURN, parents=[LLVM_NONRETURN_PARENT])
+    live_git.run('merge-base', '--is-ancestor', LLVM_NONRETURN, 'HEAD')
+    llvm_changes = set(live_git.run(
+        'diff', '--name-only', LLVM_NONRETURN_PARENT, LLVM_NONRETURN).decode().splitlines())
+    proof.require(llvm_changes == LLVM_NONRETURN_ROLES, 'exact LLVM nonreturning worker source roles')
+    auxiliary_roles = (EXTRA_MERGE_ROLES | WRITER_SIGNATURE_ROLES | PARITY_INPUT_ROLES | LLVM_NONRETURN_ROLES) - paths
+    expected = live_git.inventory(LLVM_NONRETURN, paths | auxiliary_roles)
     if source_root == root:
         auxiliary = {p: proof.read(source_root, p) for p in auxiliary_roles}
         proof.require(all(proof.oid(raw) == expected[p] for p, raw in auxiliary.items()),
