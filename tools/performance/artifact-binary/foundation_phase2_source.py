@@ -21,6 +21,8 @@ RECURSIVE_PARITY_PARENT = 'f49b13e154ea6a166fdce5aa86d94a29e77509b3'
 RECURSIVE_PARITY_INPUT = 'd16fe59419ab7baa0398e9698960a1948d3ebc1a'
 LLVM_NONRETURN_PARENT = '92ced54fa5166afa99528479e62c25c64b838e4f'
 LLVM_NONRETURN = 'fc073d50687efb196ecdf27662a79471afbe8f6d'
+F1_HYGIENE_PARENT = 'e836cbc4b9e5f0405e73988fba8d6bbafd008e44'
+F1_HYGIENE = 'd103b9271cd5520113e17bb2a27309df077e3fc4'
 ORIGINAL = 'tools/performance/artifact-binary/phase2_source_successor.py'
 ORIGINAL_SHA = '72041ef0f3ea9c84d5f7ff100f721c326ecbbc86c1b705bf2c45f11cb19f9f16'
 EXTRA_MERGE_ROLES = {
@@ -43,6 +45,11 @@ PARITY_INPUT_ROLES = {
 LLVM_NONRETURN_ROLES = {
     'libraries/mlf-llvm/Bootstrap/LLVM/Build.hs', 'mlf.lock', 'testing/tools/mlf.lock',
     'tests/mlf.lock', 'tests/shared/mlf.lock', 'tools/shared/test_ordinary_tail.py',
+}
+F1_HYGIENE_ROLES = {
+    'bootstrap/MLF/BuiltinPreludeData.hs',
+    'libraries/mlf-crates/Bootstrap/Separate.hs', 'mlf.lock', 'testing/tools/mlf.lock',
+    'tests/mlf.lock', 'tests/shared/mlf.lock',
 }
 
 
@@ -116,8 +123,16 @@ def qualified_contract(root, source_root=None):
     llvm_changes = set(live_git.run(
         'diff', '--name-only', LLVM_NONRETURN_PARENT, LLVM_NONRETURN).decode().splitlines())
     proof.require(llvm_changes == LLVM_NONRETURN_ROLES, 'exact LLVM nonreturning worker source roles')
-    auxiliary_roles = (EXTRA_MERGE_ROLES | WRITER_SIGNATURE_ROLES | PARITY_INPUT_ROLES | LLVM_NONRETURN_ROLES) - paths
-    expected = live_git.inventory(LLVM_NONRETURN, paths | auxiliary_roles)
+    live_git.run('merge-base', '--is-ancestor', LLVM_NONRETURN, F1_HYGIENE_PARENT)
+    live_git.commit(F1_HYGIENE, parents=[F1_HYGIENE_PARENT])
+    live_git.run('merge-base', '--is-ancestor', F1_HYGIENE, 'HEAD')
+    f1_changes = set(live_git.run(
+        'diff', '--name-only', F1_HYGIENE_PARENT, F1_HYGIENE).decode().splitlines())
+    proof.require(f1_changes == F1_HYGIENE_ROLES, 'exact F1 hygiene source roles')
+    auxiliary_roles = (
+        EXTRA_MERGE_ROLES | WRITER_SIGNATURE_ROLES | PARITY_INPUT_ROLES | LLVM_NONRETURN_ROLES | F1_HYGIENE_ROLES
+    ) - paths
+    expected = live_git.inventory(F1_HYGIENE, paths | auxiliary_roles)
     if source_root == root:
         auxiliary = {p: proof.read(source_root, p) for p in auxiliary_roles}
         proof.require(all(proof.oid(raw) == expected[p] for p, raw in auxiliary.items()),
