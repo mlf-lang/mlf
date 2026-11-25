@@ -1,0 +1,104 @@
+"""Authenticate the Foundation merge on top of the unchanged PR55 source proof."""
+from contextlib import ExitStack, contextmanager
+from functools import lru_cache
+import hashlib
+import os
+from pathlib import Path
+import subprocess
+import tarfile
+from tempfile import TemporaryDirectory
+from types import ModuleType
+
+HERE = Path(__file__).resolve().parent
+DRAFT = '8afe7d1978ca67b29c438329b1014176b045dd64'
+FOUNDATION = '9345d58b2b1675fbe0fcf899b5dc3d2f229e1acf'
+MERGE = 'd72950ed771d4fd48145cd4f467ff9ce43ef13d4'
+ORIGINAL = 'tools/performance/artifact-binary/phase2_source_successor.py'
+ORIGINAL_SHA = '72041ef0f3ea9c84d5f7ff100f721c326ecbbc86c1b705bf2c45f11cb19f9f16'
+EXTRA_MERGE_ROLES = {
+    'testing/tools/mlf.lock', 'tests/indexvec/Graphs.hs', 'tests/mlf.lock',
+    'tests/shared/mlf.lock', 'tools/performance/compiler-shapes/generate.py',
+    'tools/performance/compiler-shapes/matrix.json',
+}
+
+
+def repository(root, *args):
+    return subprocess.check_output(
+        ['git', '--no-replace-objects', '-C', str(root), *args], stderr=subprocess.PIPE,
+    ).decode().strip()
+
+
+def original_proof(root):
+    path = root / ORIGINAL
+    raw = path.read_bytes()
+    if len(raw) > 65536 or hashlib.sha256(raw).hexdigest() != ORIGINAL_SHA:
+        raise ValueError('unexpected reviewed PR55 source verifier')
+    module = ModuleType('_mlf_original_phase2_draft')
+    module.__file__ = str(path)
+    exec(compile(raw, module.__file__, 'exec'), module.__dict__)
+    return module
+
+
+@lru_cache(maxsize=1)
+def reviewed_draft(root):
+    proof = original_proof(root)
+    git = proof.Git(repository(root, 'rev-parse', '--path-format=absolute', '--git-dir'))
+    git.commit(DRAFT)
+    objects = Path(repository(root, 'rev-parse', '--path-format=absolute', '--git-common-dir')) / 'objects'
+    with ExitStack() as stack:
+        draft = Path(stack.enter_context(TemporaryDirectory(prefix='mlf-pr55-draft-source-')))
+        with subprocess.Popen([*git.command, 'archive', DRAFT], stdout=subprocess.PIPE) as child:
+            with tarfile.open(fileobj=child.stdout, mode='r|') as stream:
+                stream.extractall(draft, filter='data')
+            proof.require(child.wait() == 0, 'archived reviewed PR55 draft')
+        repository(draft, 'init', '-q')
+        (draft / '.git/objects/info/alternates').write_text(str(objects) + '\n')
+        repository(draft, 'update-ref', '--no-deref', 'HEAD', DRAFT)
+        opened = stack.enter_context(original_proof(draft).qualified(draft))
+        return stack.pop_all(), proof, opened
+
+def qualified_contract(root, source_root=None):
+    root = Path(root).resolve(strict=True)
+    source_root = Path(source_root).resolve(strict=True) if source_root is not None else root
+    _, proof, reviewed = reviewed_draft(root)
+    live_git = proof.Git(repository(root, 'rev-parse', '--path-format=absolute', '--git-dir'))
+    live_git.commit(MERGE, parents=[DRAFT, FOUNDATION])
+    live_git.run('merge-base', '--is-ancestor', MERGE, 'HEAD')
+    before = reviewed.contract.edge.before
+    paths = set(before)
+    known_changes = set(live_git.run('diff', '--name-only', DRAFT, MERGE).decode().splitlines())
+    proof.require(known_changes <= paths | EXTRA_MERGE_ROLES, 'exact Foundation integration source roles')
+    expected = live_git.inventory(MERGE, paths | EXTRA_MERGE_ROLES)
+    if source_root == root:
+        auxiliary = {p: proof.read(source_root, p) for p in EXTRA_MERGE_ROLES}
+        proof.require(all(proof.oid(raw) == expected[p] for p, raw in auxiliary.items()),
+                      'exact Foundation test, lock and shape inputs')
+    current = {p: proof.read(source_root, p) for p in paths}
+    proof.require(all(proof.oid(raw) == expected[p] for p, raw in current.items()),
+                  'exact merged source inventory')
+    after = {p: proof.sha(raw) for p, raw in current.items()}
+    changed = {p for p in paths if before[p] != after[p]}
+    archive = reviewed.contract.archived
+    old = {p: proof.read(archive, p) for p in changed}
+    new = {p: current[p] for p in changed}
+    edge = proof.Projection(before, after, old, new)
+    proof.require(not os.path.lexists(source_root / proof.RETIRED), 'retired source present')
+    predecessor = reviewed.contract.previous
+    contract = proof.composed_type(type(predecessor))(predecessor, edge, source_root, archive)
+    contract.directory = HERE
+    contract.manifest_sha256 = proof.sha(proof.read(root, Path(__file__).relative_to(root).as_posix()))
+    contract.metadata_paths = (*contract.metadata_paths, Path(__file__).name)
+    contract.live_registry(source_root)
+    return proof.Qualified(contract, live_git, reviewed.tip)
+
+
+@contextmanager
+def qualified(root):
+    opened = qualified_contract(root)
+    contract = opened.contract
+    current = {p: contract.core.read_file(contract.source_root, p) for p in contract.value['current_files']}
+    historic = contract.project_tree_bytes(current)
+    additions = {p: current[p] for p in contract.added_paths}
+    if contract.advance_tree_bytes(historic, additions) != current:
+        raise ValueError('complete Foundation source round trip through the original contract')
+    yield opened

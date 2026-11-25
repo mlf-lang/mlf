@@ -22,9 +22,7 @@ class Phase2Overlay(unittest.TestCase):
         (self.root/'.git/objects/info/alternates').write_text(str(Path(odb)/'objects')+'\n')
         for k,v in [('user.name','test'),('user.email','test@example.invalid')]:
             self.git('config',k,v)
-        self.head = subprocess.check_output(['git','-C',str(ROOT),'rev-parse','HEAD'],text=True).strip()
-        if len(self.git('show','-s','--format=%P',self.head).split()) == 2:
-            self.head = self.git('rev-parse',self.head+'^2').decode().strip()
+        self.head = '8afe7d1978ca67b29c438329b1014176b045dd64'
         self.git('update-ref','--no-deref','HEAD',self.head)
         self.git('read-tree',self.head)
         self.paths = self.git('diff','--name-only',PARENT,self.head).decode().splitlines()
