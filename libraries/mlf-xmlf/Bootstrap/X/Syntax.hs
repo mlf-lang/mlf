@@ -185,5 +185,57 @@ module Bootstrap.X.Syntax where {
   equalErasedBinding ((,) n a) ((,) m b) = (equalName n m && equalErased a b);
   equalErasedAlternative :: XErasedAlternative -> XErasedAlternative -> Bool;
   equalErasedAlternative (XErasedAlternative p a) (XErasedAlternative q b) =
-    (equalPattern p q && equalErased a b)
+    (equalPattern p q && equalErased a b);
+  applications :: XErased -> (,) XErased ([] XErased);
+  applications expression = collectApplications [] expression;
+  collectApplications :: [] XErased -> XErased -> (,) XErased ([] XErased);
+  collectApplications args expression =
+    case expression of {
+      XEApp f a -> collectApplications ((:) a args) f;
+      _ -> (,) expression args
+    };
+  lambdas :: XErased -> (,) ([] XName) XErased;
+  lambdas expression =
+    case expression of {
+      XEAbs n b ->
+        case lambdas b of {
+          (,) ns body -> (,) ((:) n ns) body
+        };
+      _ -> (,) [] expression
+    };
+  subterms :: XErased -> [] XErased;
+  subterms expression =
+    case expression of {
+      XEAbs n b -> (:) b [];
+      XEApp f a -> (:) f ((:) a []);
+      XELet n a b -> (:) a ((:) b []);
+      XELetRec ds b ->
+        L.snoc
+          (L.map
+             (\entry ->
+                case entry of {
+                  (,) n a -> a
+                })
+             ds)
+          b;
+      XECase a branches ->
+        (:) a
+          (L.map
+             (\branch ->
+                case branch of {
+                  XErasedAlternative p b -> b
+                })
+             branches);
+      XEVar _ -> []; XEInt _ -> []; XEDouble _ -> []; XEBool _ -> [];
+      XEString _ -> []; XEPrimitive _ -> []; XEEvidenceHole _ -> []; XEConstructor _ -> []
+    };
+  mapErasedChildren f term = case term of {
+    XEAbs n body -> XEAbs n (f body);
+    XEApp a b -> XEApp (f a) (f b);
+    XELet n a b -> XELet n (f a) (f b);
+    XELetRec ds body -> XELetRec (L.map (\((,) n v) -> (,) n (f v)) ds) (f body);
+    XECase a bs -> XECase (f a) (L.map (\(XErasedAlternative pat b) -> XErasedAlternative pat (f b)) bs);
+    XEVar _ -> term; XEInt _ -> term; XEDouble _ -> term; XEBool _ -> term;
+    XEString _ -> term; XEPrimitive _ -> term; XEEvidenceHole _ -> term; XEConstructor _ -> term
+  };
 }

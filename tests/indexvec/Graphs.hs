@@ -43,6 +43,11 @@ import qualified Bootstrap.InferenceUnit as Inference
 import qualified Bootstrap.ImportedRoot as ImportedRoot
 import qualified Bootstrap.OpenFragment as Open
 import qualified Bootstrap.Separate as Separate
+import qualified Test.Assert as Assert
+import qualified Test.Case as Case
+import qualified Test.CaseSelection as Selection
+import qualified Bootstrap.X.Traversal as Traversal
+import qualified Bootstrap.LLVM.FunctionPolicy as Policy
 import qualified Bootstrap.LLVM.Analysis as Analysis
 import qualified Bootstrap.LLVM.Codegen as Codegen
 import qualified Bootstrap.LLVM.Optimize as Optimize
@@ -4145,7 +4150,45 @@ preparedPrefixControls = do
     (encode (T.SCallSite "arg" span left) ==
      encode (T.SCallSite "arg" (T.SourceSpan "source" "Projection" "Projection.hs" 2 1 2 21) left))
 
+reviewBoundaryChecks :: IO ()
+reviewBoundaryChecks = do
+  let entry i label action = Case.test i label ["group"] action
+      a = entry "first" "First" (Assert.succeed ())
+      b = entry "second" "Second" (Assert.succeed ())
+      bad label selected message = case Selection.project [a,b] selected of
+        T.Right _ -> fail label
+        T.Left errorText -> check label message (H.unpack errorText)
+  bad "duplicate selection" [a,a] "duplicate test ID"
+  bad "empty selection" [] "empty required test selection"
+  bad "unknown selection" [entry "unknown" "Unknown" (Assert.succeed ())] "unknown test ID"
+  bad "stale descriptor" [entry "second" "Changed" (Assert.succeed ())] "selected test descriptor changed"
+  case Selection.rebind [a,b] [entry "second" "Second" (Assert.fail "placeholder"),a] of
+    T.Left message -> fail (H.unpack message)
+    T.Right plan -> do
+      check "selection order" ["second","first"] (map (H.unpack . Case.id) (Selection.cases plan))
+      forM_ (Selection.cases plan) $ \c -> do
+        r <- Assert.run (Case.action c)
+        case r of { T.Right () -> pure (); T.Left _ -> fail "placeholder action escaped planning" }
+  let v = T.XName 7 "bound"
+      f = T.XName 9 "free"
+      body = T.XInstantiationSpine f [("Int",False,T.XVarTerm v)]
+      pattern = T.XDefaultPattern (T.Just v)
+      tree = T.XLet v (T.XVarTerm v) (T.XCase body T.XBot [T.XAlternative pattern body])
+  check "free spine head and shadowed operands" [7,9,9] (map X.nameId (Traversal.freeNames tree))
+  check "binder and operand occurrence order" [7,7,9,7,7,9,7] (map X.nameId (Traversal.names tree))
+  let name = "@mlf.worker.7"
+      policy = H.unpack . Policy.attributes False False name
+      small = Policy.empty name
+      tailCall = Policy.markTail (iterate (Policy.pointerCall "@mlf_closure") small !! 3)
+  check "worker threshold below 64" "" (policy (iterate Policy.instruction small !! 63))
+  check "worker threshold at 64" " noinline optnone" (policy (iterate Policy.instruction small !! 64))
+  check "allocating musttail" " noinline optnone" (policy tailCall)
+  check "explicit loop" "" (policy (Policy.markLoop tailCall))
+  check "boxed transfer from closure" " noinline optsize"
+    (H.unpack (Policy.attributes False False "@mlf.code.x" (Policy.pointerCall name small)))
+
 main = do
+  reviewBoundaryChecks
   permissionMemoPages
   recursiveArgumentChecks
   conditionalConstructorChecks

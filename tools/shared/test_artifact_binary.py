@@ -225,13 +225,13 @@ Bootstrap.ArtifactStorage Bootstrap.ArtifactStructure Bootstrap.Bitstream
 Bootstrap.ClassDemand Bootstrap.Classes Bootstrap.CompilerCore Bootstrap.Constraint
 Bootstrap.CrateArtifact Bootstrap.Data Bootstrap.Dependency Bootstrap.Resolved Bootstrap.Desugar
 Bootstrap.Elaborate Bootstrap.Evidence Bootstrap.EvidenceBoundary Bootstrap.Fresh Bootstrap.Graph
-Bootstrap.Graph.Solver Bootstrap.Host Bootstrap.IndexVec Bootstrap.IntMap Bootstrap.IntRank
+Bootstrap.Graph.Solver Bootstrap.Graph.ScopeIndex Bootstrap.Host Bootstrap.IndexVec Bootstrap.IntMap Bootstrap.IntRank
 Bootstrap.IntSet Bootstrap.IntTree Bootstrap.Kind Bootstrap.Kinding Bootstrap.Layout
 Bootstrap.Lexer Bootstrap.Map Bootstrap.Module Bootstrap.OpenFragment Bootstrap.Parsec Bootstrap.Parser
 Bootstrap.Prelude Bootstrap.Primitive Bootstrap.QueryGraph Bootstrap.ST Bootstrap.Separate Bootstrap.Set
 Bootstrap.SourceEquality Bootstrap.Std Bootstrap.Surface Bootstrap.Types
 Bootstrap.Unicode Bootstrap.X.Check Bootstrap.X.Checked Bootstrap.X.Parser
-Bootstrap.X.Pretty Bootstrap.X.Syntax Bootstrap.X.Type Main
+Bootstrap.X.Pretty Bootstrap.X.Syntax Bootstrap.X.Traversal Bootstrap.X.Type Main
 """.split())
 NATIVE_BUILTINS = frozenset(('MLF.Primitive', 'Prelude'))
 
@@ -261,8 +261,8 @@ def native_source_closure(source, fixture, manifest):
         found[name] = {'module': name, 'path': str(path), 'bytes': path.stat().st_size,
                        'sha256': sha(path), 'imports': imports}
         pending.extend(imports)
-    require(set(found) == NATIVE_MODULES and len(found) == 51,
-            'native fixture must retain exact reviewed 51-module closure')
+    require(set(found) == NATIVE_MODULES and len(found) == 53,
+            'native fixture must retain exact reviewed 53-module closure')
     return [found[name] for name in sorted(found)]
 
 

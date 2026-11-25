@@ -42,6 +42,7 @@
       "Bootstrap.Separate": "Bootstrap/Separate.hs",
       "Bootstrap.SourceEquality": "Bootstrap/SourceEquality.hs",
       "Bootstrap.SourceInference": "Bootstrap/SourceInference.hs",
+      "Bootstrap.GroundProofEdit": "Bootstrap/GroundProofEdit.hs",
       "Bootstrap.OpenFragment": "Bootstrap/OpenFragment.hs",
       "Bootstrap.QueryGraph": "Bootstrap/QueryGraph.hs",
       "Bootstrap.CrateGraph": "Bootstrap/CrateGraph.hs",

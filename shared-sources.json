@@ -184,6 +184,11 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.Graph.ScopeIndex",
+      "path": "libraries/mlf-inference/Bootstrap/Graph/ScopeIndex.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.Host",
       "path": "libraries/mlf-foundation/Bootstrap/Host.hs",
       "role": "implementation"
@@ -259,6 +264,11 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.LLVM.FunctionPolicy",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/FunctionPolicy.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.LLVM.Codegen",
       "path": "libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs",
       "role": "implementation"
@@ -286,6 +296,11 @@
     {
       "module": "Bootstrap.LLVM.Optimize",
       "path": "libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.LLVM.RecursiveArguments",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/RecursiveArguments.hs",
       "role": "implementation"
     },
     {
@@ -404,6 +419,11 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.GroundProofEdit",
+      "path": "libraries/mlf-crates/Bootstrap/GroundProofEdit.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.SourceUnit",
       "path": "libraries/mlf-crates/Bootstrap/SourceUnit.hs",
       "role": "implementation"
@@ -461,6 +481,11 @@
     {
       "module": "Bootstrap.X.Syntax",
       "path": "libraries/mlf-xmlf/Bootstrap/X/Syntax.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.X.Traversal",
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Traversal.hs",
       "role": "implementation"
     },
     {
@@ -641,6 +666,11 @@
     {
       "module": "Test.Registry",
       "path": "testing/Test/Registry.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Test.CaseSelection",
+      "path": "testing/Test/CaseSelection.hs",
       "role": "implementation"
     },
     {

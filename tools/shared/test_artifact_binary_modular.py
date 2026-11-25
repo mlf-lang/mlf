@@ -16,7 +16,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--source-root', type=Path, default=HERE.parents[1])
 args, rest = parser.parse_known_args()
 SOURCE = args.source_root.resolve(strict=True)
-REQUIRED_NATIVE_ADDITIONS = ('Bootstrap.EvidenceBoundary', 'Bootstrap.OpenFragment',
+REQUIRED_NATIVE_ADDITIONS = ('Bootstrap.Graph.ScopeIndex', 'Bootstrap.X.Traversal', 'Bootstrap.EvidenceBoundary', 'Bootstrap.OpenFragment',
                              'Bootstrap.QueryGraph')
 
 
@@ -259,7 +259,7 @@ class ModularControls(unittest.TestCase):
                 M.require_control_commands(rows)
 
     def test_complete_source_closure(self):
-        self.assertEqual(len(self.rows), 51)
+        self.assertEqual(len(self.rows), 53)
         self.assertEqual({r['module'] for r in self.rows}, M.NATIVE_MODULES)
         self.assertEqual([r['module'] for r in self.rows], sorted(M.NATIVE_MODULES))
         for name in REQUIRED_NATIVE_ADDITIONS:
@@ -276,7 +276,7 @@ class ModularControls(unittest.TestCase):
         names = ['mlf-foundation', 'mlf-language-core', 'mlf-frontend',
                  'mlf-xmlf', 'mlf-inference', 'mlf-crates', 'fixture']
         self.assertEqual([p['name'] for p in plan], names)
-        self.assertEqual([len(p['modules']) for p in plan], [13, 4, 10, 6, 9, 8, 1])
+        self.assertEqual([len(p['modules']) for p in plan], [13, 4, 10, 7, 10, 8, 1])
         all_modules = [name for p in plan for name in p['modules']]
         self.assertEqual(sorted(all_modules), sorted(M.NATIVE_MODULES))
         self.assertEqual(len(all_modules), len(set(all_modules)))
@@ -411,7 +411,7 @@ class ModularControls(unittest.TestCase):
         for row in self.rows:
             with self.subTest(module=row['module']):
                 reduced = [r for r in self.rows if r['module'] != row['module']]
-                self.assertEqual(len(reduced), 50)
+                self.assertEqual(len(reduced), 52)
                 with self.assertRaisesRegex(ValueError, '^native crate inventory order/identity mismatch$'):
                     M.native_crate_plan(reduced, Path('/fresh'), SOURCE)
 
@@ -430,12 +430,12 @@ class ModularControls(unittest.TestCase):
         text = text.replace(anchor, anchor + '\n  import ' + extra['module'] + ';', 1)
         with tempfile.TemporaryDirectory() as d:
             p = Path(d).resolve() / 'Main.hs'; p.write_text(text)
-            with self.assertRaisesRegex(ValueError, '^native fixture must retain exact reviewed 51-module closure$'):
+            with self.assertRaisesRegex(ValueError, '^native fixture must retain exact reviewed 53-module closure$'):
                 M.native_source_closure(SOURCE, p, self.manifest)
 
     def test_spec_rejects_extra_module(self):
         rows = sorted([*self.rows, self.extra_module_row()], key=lambda r: r['module'])
-        self.assertEqual(len(rows), 52)
+        self.assertEqual(len(rows), 54)
         with self.assertRaisesRegex(ValueError, '^native crate inventory order/identity mismatch$'):
             M.native_crate_plan(rows, Path('/fresh'), SOURCE)
 
@@ -445,7 +445,7 @@ class ModularControls(unittest.TestCase):
             with self.subTest(module=name):
                 rows = sorted([extra if r['module'] == name else r for r in self.rows],
                               key=lambda r: r['module'])
-                self.assertEqual(len(rows), 51)
+                self.assertEqual(len(rows), 53)
                 with self.assertRaisesRegex(ValueError, '^native crate inventory order/identity mismatch$'):
                     M.native_crate_plan(rows, Path('/fresh'), SOURCE)
 

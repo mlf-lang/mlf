@@ -546,3 +546,20 @@ it: preserve compiler depth-limit failures in the receipt and report them.
 `bench.py run --setup PATH` uses that existing setup (and still authenticates
 its producer and endpoint). For the disk-entry phase diagnostic, see
 [`MLF_CRATE_PROFILE`](../../../docs/crate-compilation.md#profiling-the-disk-to-llvm-entry).
+
+### Boxed worker attributes on macOS
+
+Run from the repository root with Clang, GMP and BDWGC available through
+`pkg-config`. The optional reference compiler checks the emitted IR byte for
+byte before the Clang comparison.
+
+```sh
+python3 tools/performance/compiler-shapes/worker_policy.py \
+  --compiler .mlf-build/bin/emlf --reference-compiler /path/to/reference/emlf \
+  --size 16 --iterations 32768 --samples 3 --out .mlf-build/worker-policy
+```
+
+The driver times IR emission once and alternates the Clang build order.
+Each executable warms up before a timed loop over varying arguments. The
+driver checks its sum against the family oracle and writes raw wall times,
+peak resident sizes and executable sizes to `results.json`.

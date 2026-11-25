@@ -368,7 +368,6 @@ module Bootstrap.ClassDemand where {
   } in if current == combined then Nothing else let {
     saved = if key == prefix || bits == 0 then older else IS.insertBM prefix bits older
   } in seq key (seq combined (seq saved (Just (DiscoveryRow key combined saved))));
-  insertSetSlot slot previous = if IS.member slot previous then Nothing else Just (IS.insert slot previous);
   data DiscoveryIndex = DiscoveryIndex Int (IntMap Int) (IntMap Demand);
   discoverValidated :: IntMap Frame -> IntMap Seed -> IntMap Use -> IntMap Demand ->
                        IntMap IntSet -> Either String Discovery;
@@ -401,8 +400,6 @@ module Bootstrap.ClassDemand where {
         else discoverUniverse frames seeds uses nodes dependents;
       _ -> discoverUniverse frames seeds uses nodes dependents
     };
-  denseSeedFacts :: forall s a. Int -> STArray s IntSet -> [] ((,) Int Int) -> ST s a -> ST s a;
-  denseSeedFacts = denseSeedFactsWith IS.singleton;
   denseSeedFactsWith :: forall s a row. (Int -> row) -> Int -> STArray s row -> [] ((,) Int Int) -> ST s a -> ST s a;
   denseSeedFactsWith seed low rows facts done =
     case facts of {
@@ -410,9 +407,6 @@ module Bootstrap.ClassDemand where {
       (:) ((,) node slot) rest -> stBind (writeSTArray rows (node - low) (seed slot))
         (\_ -> denseSeedFactsWith seed low rows rest done)
     };
-  denseDiscover :: forall s. IntMap Frame -> DiscoveryIndex -> STArray s IntSet -> Universe ->
-                   [] DiscoveryWork -> [] DiscoveryWork -> ST s (Either String Discovery);
-  denseDiscover = denseDiscoverWith (\a -> a) insertSetSlot;
   denseDiscoverWith :: forall s row. (row -> IntSet) -> (Int -> row -> Maybe row) ->
     IntMap Frame -> DiscoveryIndex -> STArray s row -> Universe -> [] DiscoveryWork -> [] DiscoveryWork ->
     ST s (Either String Discovery);
@@ -431,10 +425,6 @@ module Bootstrap.ClassDemand where {
       (:) (DiscoveryWork slot edges) rest ->
         denseDependentsWith freeze add frames index rows universe rest pending slot edges
     };
-  denseDependents :: forall s. IntMap Frame -> DiscoveryIndex -> STArray s IntSet -> Universe ->
-                     [] DiscoveryWork -> [] DiscoveryWork -> Int -> [] DiscoveryEdge ->
-                     ST s (Either String Discovery);
-  denseDependents = denseDependentsWith (\a -> a) insertSetSlot;
   denseDependentsWith :: forall s row. (row -> IntSet) -> (Int -> row -> Maybe row) ->
     IntMap Frame -> DiscoveryIndex -> STArray s row -> Universe -> [] DiscoveryWork -> [] DiscoveryWork ->
     Int -> [] DiscoveryEdge -> ST s (Either String Discovery);

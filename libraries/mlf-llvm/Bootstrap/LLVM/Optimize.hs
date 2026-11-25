@@ -4,6 +4,7 @@
              MultiParamTypeClasses, OverloadedStrings #-}
 module Bootstrap.LLVM.Optimize where {
   import MLF.Primitive;
+  import qualified Bootstrap.LLVM.RecursiveArguments as Recursive;
   import Bootstrap.Types;
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Map as M;
@@ -86,23 +87,9 @@ module Bootstrap.LLVM.Optimize where {
   freeAlternative = freeAlternativeWith free;
   freeAlternativeWith descend (XErasedAlternative pattern body) =
     S.difference compareName (descend body) (S.fromList compareName (X.patternNames pattern));
-  applications :: XErased -> (,) XErased ([] XErased);
-  applications expression = collectApplications [] expression;
-  collectApplications :: [] XErased -> XErased -> (,) XErased ([] XErased);
-  collectApplications args expression =
-    case expression of {
-      XEApp f a -> collectApplications ((:) a args) f;
-      _ -> (,) expression args
-    };
-  lambdas :: XErased -> (,) ([] XName) XErased;
-  lambdas expression =
-    case expression of {
-      XEAbs n b ->
-        case lambdas b of {
-          (,) ns body -> (,) ((:) n ns) body
-        };
-      _ -> (,) [] expression
-    };
+  applications = X.applications;
+  collectApplications = X.collectApplications;
+  lambdas = X.lambdas;
   -- Match the seed's bounded size query: a function larger than the inlining
   -- threshold need not have its remaining tree traversed.
   remainingSize :: Int -> XErased -> Int;
@@ -664,31 +651,7 @@ module Bootstrap.LLVM.Optimize where {
   -- Arity evidence comes from independently checked constructor patterns. No
   -- constructor spelling or runtime tag is special; absent/conflicting evidence
   -- disables propagation, and partial applications are never treated as data.
-  subterms :: XErased -> [] XErased;
-  subterms expression =
-    case expression of {
-      XEAbs n b -> (:) b [];
-      XEApp f a -> (:) f ((:) a []);
-      XELet n a b -> (:) a ((:) b []);
-      XELetRec ds b ->
-        L.snoc
-          (L.map
-             (\entry ->
-                case entry of {
-                  (,) n a -> a
-                })
-             ds)
-          b;
-      XECase a branches ->
-        (:) a
-          (L.map
-             (\branch ->
-                case branch of {
-                  XErasedAlternative p b -> b
-                })
-             branches);
-      _ -> []
-    };
+  subterms = X.subterms;
   agreeArity :: Maybe Int -> Maybe Int -> Maybe Int;
   agreeArity a b =
     case a of {
@@ -957,8 +920,6 @@ module Bootstrap.LLVM.Optimize where {
       (XELetRec (L.map (\((,) name value) -> (,) name (useTerm value)) bindings) (useTerm body))
       (dropCountIndex (L.map L.fst bindings) counts)
       (UseRec bindings body);
-  bindingUses bindings body = L.foldl
-    (\current binding -> mergeUses current (useCounts (L.snd binding))) (useCounts body) bindings;
   bindingCountIndex bindings body = L.foldl
     (\current binding -> mergeCountIndex current (countIndex (L.snd binding))) (countIndex body) bindings;
   -- Inlining a shared lambda with two free occurrences can multiply both
@@ -2281,116 +2242,7 @@ module Bootstrap.LLVM.Optimize where {
       specialized <- specializeHigherOrder simple;
       iterate specialized
     };
-  -- The checked optimizer has assigned distinct identities to all binders.
-  -- In a wide mutually recursive group, keep one formal for positions that
-  -- receive the same variable at every entry and stay equal on every peer call.
-  compactRecursiveArguments :: XErased -> XErased;
-  compactRecursiveArguments expression = case planRecursiveArguments IS.empty expression of {
-    (,,) prepared _ masks -> if IM.null masks then expression else
-      L.fst (runFresh (rewriteRecursiveArguments masks M.empty prepared) 0)
-  };
-  -- Index the continuation once, returning only sites for in-scope wide
-  -- groups. A bare variable and a partial application are sites too.
-  indexArgumentCalls :: IntSet -> XErased -> IntMap ([] ([] XErased)) -> IntMap ([] ([] XErased));
-  indexArgumentCalls targets term sites = if IS.null targets then sites else case applications term of {
-    (,) head args -> let {
-      visit = indexArgumentCalls targets;
-      inside = L.foldr visit sites args
-    } in case head of {
-      XEVar n -> if IS.member (nameId n) targets
-        then IM.insertWith L.append (nameId n) [args] inside else inside;
-      _ -> L.foldr visit inside (subterms head)
-    }
-  };
-  planRecursiveArguments :: IntSet -> XErased -> (,,) XErased (IntMap ([] ([] XErased))) (IntMap ([] Bool));
-  planRecursiveArguments outer expression = case expression of {
-    XELet n rhs rest -> case planRecursiveArguments outer rest of {
-      (,,) body sites masks -> (,,) (XELet n rhs body) (indexArgumentCalls outer rhs sites) masks
-    };
-    XELetRec bindings rest -> let {
-      members = L.map (\((,) n rhs) -> (,) n (lambdas rhs)) bindings;
-      width = case members of {
-        (:) ((,) _ ((,) first _)) ((:) _ _) ->
-          L.foldlStrict (\w entry -> L.min w (L.length (L.fst (L.snd entry)))) (L.length first) members;
-        _ -> 0
-      };
-      ids = L.map (L.compose nameId L.fst) bindings;
-      scope = if width < 16 then outer else L.foldlStrict (L.flip IS.insert) outer ids
-    } in case planRecursiveArguments scope rest of {
-      (,,) body sites masks -> let {
-        external = L.concatMap (\key -> IM.findWithDefault [] key sites) ids;
-        finish group next = let {
-          remaining = L.foldlStrict (L.flip IM.delete) sites ids;
-          calls = L.foldr (\binding -> indexArgumentCalls outer (L.snd binding)) remaining group
-        } in (,,) (XELetRec group body) calls next
-      } in if width < 16 || L.null external then finish bindings masks else
-        case compactGroupArguments members width external of {
-          Nothing -> finish bindings masks;
-          Just ((,) group keep) -> finish group (L.foldlStrict (\m k -> IM.insert k keep m) masks ids)
-        }
-    };
-    _ -> (,,) expression (indexArgumentCalls outer expression IM.empty) IM.empty
-  };
-  -- Intersect the current partition with the equality observed at one site.
-  -- Only variable identity and the caller's proven formal classes can equate
-  -- positions. Two arbitrary expressions always get distinct keys.
-  refineArgumentClasses positions classes current ((,) params args) = let {
-    formals = M.fromList compareName (L.zip params classes);
-    token pos arg = case arg of {
-      XEVar n -> case M.lookup compareName n formals of {
-        Just representative -> (,) 0 representative;
-        Nothing -> (,) 1 (nameId n)
-      };
-      _ -> (,) 2 pos
-    };
-    order = L.comparePair L.compareInt (L.comparePair L.compareInt L.compareInt);
-    step ((,) seen reversed) ((,) pos ((,) old arg)) = let { key = (,) old (token pos arg) } in
-      case M.lookup order key seen of {
-        Just representative -> (,) seen ((:) representative reversed);
-        Nothing -> (,) (M.insert order key pos seen) ((:) pos reversed)
-      }
-  } in L.reverse (L.snd (L.foldlStrict step ((,) M.empty []) (L.zip positions (L.zip current args))));
-  compactGroupArguments members arity external = let {
-    ids = L.map (L.compose nameId L.fst) members;
-    targets = IS.fromList ids;
-    peerSites ((,) _ ((,) params body)) = let {
-      found = indexArgumentCalls targets body IM.empty
-    } in L.map ((,) params) (L.concat (IM.elems found));
-    calls = L.append (L.concatMap peerSites members) (L.map ((,) []) external);
-    width = L.foldlStrict (\n call -> L.min n (L.length (L.snd call))) arity calls;
-    positions = L.range 0 (width - 1);
-    stable classes = let { next = L.foldlStrict (refineArgumentClasses positions classes) classes calls } in
-      if L.eqList eqInt next classes then classes else stable next;
-    classes = stable (L.replicate width 0);
-    keep = L.zipWith eqInt positions classes;
-    member ((,) n ((,) args body)) = let {
-      formals = M.fromList L.compareInt (L.zip positions args);
-      aliases = M.fromList compareName (L.zip args (L.map (\rep -> M.get L.compareInt rep formals) classes));
-      result = L.fst (runFresh (rewriteRecursiveArguments IM.empty aliases body) 0)
-    } in (,) n (L.foldr XEAbs result (selectRecursiveArguments keep args))
-  } in if width < 2 || L.all (\v -> v) keep then Nothing else Just ((,) (L.map member members) keep);
-  selectRecursiveArguments keep args =
-    L.append (L.map L.snd (L.filter L.fst (L.zip keep args))) (L.drop (L.length keep) args);
-  -- A removed actual is a duplicate variable, so a retained copy still
-  -- records any bare escape. Member aliases were already applied before
-  -- indexing their calls into enclosing groups. Apply all call masks once.
-  rewriteRecursiveArguments masks aliases term = let {
-    visit = rewriteRecursiveArguments masks aliases
-  } in case applications term of {
-    (,) (XEVar n) args -> do {
-      let { kept = case IM.lookup (nameId n) masks of {
-        Nothing -> args; Just keep -> selectRecursiveArguments keep args
-      } };
-      actuals <- traverseFresh visit kept;
-      freshPure (L.foldl XEApp (XEVar (M.findWithDefault compareName n n aliases)) actuals)
-    };
-    (,) head [] -> children visit head;
-    (,) head args -> do {
-      f <- visit head;
-      actuals <- traverseFresh visit args;
-      freshPure (L.foldl XEApp f actuals)
-    }
-  };
+  compactRecursiveArguments = Recursive.compactRecursiveArguments;
   -- Specialize a private recursive worker entered by one saturated call.
   -- A static function argument stays fixed when every recursive call passes
   -- the formal itself or the same primitive. Any partial application, escape,

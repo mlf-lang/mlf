@@ -8,6 +8,7 @@ module Test.Runner where {
   import qualified Bootstrap.Std as S;
   import qualified Test.Assert as A;
   import qualified Test.Case as C;
+  import qualified Test.CaseSelection as Selection;
   import qualified Test.Descriptor as D;
   import qualified Test.Registry as Registry;
   import qualified Test.Outcome as Outcome;
@@ -263,16 +264,15 @@ module Test.Runner where {
   validate :: [] C.Case -> Either String ();
   validate cases = Registry.validate (S.map C.descriptor cases);
   plan :: [] String -> [] C.Case -> Either String ((,) Options ([] C.Case));
-  plan args cases =
-    do {
-      options <- parse args;
-      validate cases;
-      let {
-        selected =
-          S.filter (\entry -> S.all (\selector -> matches selector entry) (selectors options)) cases
-      };
-      if S.null selected then Left "no tests matched selection" else Right ((,) options selected)
-    };
+  plan args cases = do {
+    (,) options selection <- executionPlan args cases;
+    Right ((,) options (Selection.cases selection))
+  };
+  executionPlan args cases = do {
+    options <- parse args;
+    selection <- Selection.matching (\entry -> S.all (\selector -> matches selector entry) (selectors options)) cases;
+    Right ((,) options selection)
+  };
   typedOutcome :: Result -> Outcome.Outcome;
   typedOutcome (Result _ result) =
     case result of {
@@ -393,23 +393,28 @@ module Test.Runner where {
   run = runObserved (\_ -> ioReturn ());
   runObserved :: (Result -> IO ()) -> [] String -> [] C.Case -> IO Int;
   runObserved observe args cases =
-    case plan args cases of {
+    case executionPlan args cases of {
       Left error ->
         do {
           putErr ("test: " ++ (error ++ "\n"));
           ioReturn 2
         };
-      Right ((,) options selected) -> runOptionsObserved observe options cases selected
+      Right ((,) options selected) -> runSelected observe options selected
     };
   runOptions :: Options -> [] C.Case -> [] C.Case -> IO Int;
   runOptions = runOptionsObserved (\_ -> ioReturn ());
   -- Selection adapters pass a validated projection of the full inventory.
   -- Replace a stale report before running and check exact result identities.
   runOptionsObserved :: (Result -> IO ()) -> Options -> [] C.Case -> [] C.Case -> IO Int;
-  runOptionsObserved observe options cases selected =
+  runOptionsObserved observe options cases selected = case Selection.project cases selected of {
+    Left message -> do { putErr ("test: " ++ message ++ "\n"); ioReturn 2 };
+    Right selection -> runSelected observe options selection
+  };
+  runSelected observe options selection =
     do {
+      let { selected = Selection.cases selection };
       let {
-        total = S.length cases
+        total = Selection.total selection
       };
       let {
         count = S.length selected

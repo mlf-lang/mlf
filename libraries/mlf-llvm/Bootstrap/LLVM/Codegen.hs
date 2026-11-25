@@ -86,7 +86,7 @@ module Bootstrap.LLVM.Codegen where {
     } in
     let {
       output =
-        Output 0 (FunctionInstructions 0 []) "entry" [] [] (ConstructorLayout cs plans)
+        Output 0 (emptyInstructions "") "entry" [] [] (ConstructorLayout cs plans)
           (FunctionScope fs (A.lambdaFreeTable term) (Just (indexWorkerEscapes fs term)))
           S.empty M.empty ks S.empty (K.collecting fs ks) M.empty
           True
@@ -586,8 +586,6 @@ module Bootstrap.LLVM.Codegen where {
       if A.demandComplete (A.entrySummary f) then "total" else "barrier", showInt (L.length slots)],
       L.map showInt slots, fields])
   };
-  emitWorker :: XName -> A.WorkerFunction -> Build String;
-  emitWorker name = emitWorkerAt (workerSymbol name) name;
   emitWorkerAt :: String -> XName -> A.WorkerFunction -> Build String;
   emitWorkerAt symbol name f =
     do {
@@ -727,7 +725,7 @@ module Bootstrap.LLVM.Codegen where {
     nextCount <- fresh "%v";
     nextSum <- fresh "%v";
     emit ("  br label %" ++ loop);
-    label loop;
+    loopLabel loop;
     bits <- phi "i64" [((,) (showInt (2 * start + 1)) origin), ((,) nextBits continue)];
     remaining <- phi "i64" [((,) (showInt count) origin), ((,) nextCount continue)];
     total <- phi "ptr" [((,) (immediate 1) origin), ((,) nextSum continue)];
@@ -772,8 +770,8 @@ module Bootstrap.LLVM.Codegen where {
   -- Keep specialized entry selection, operand demand order and outlining rules.
   finishOrdinary :: Int -> Map XName CGBinding -> XErased -> Build ();
   finishOrdinary arity scope expression = do {
-    prior <- gets instructions;
-    if O.remainingSize 128 expression < 0 && workerBodyLimit 4097 prior then do {
+    prior <- gets emittedCount;
+    if O.remainingSize 128 expression < 0 && prior >= 4097 then do {
       value <- evaluate scope expression;
       emit ("  ret ptr " ++ value)
     } else finishOrdinaryBody arity scope expression
@@ -844,8 +842,7 @@ module Bootstrap.LLVM.Codegen where {
           Just f -> do {
             symbol <- worker name f;
             prepared <- workerArguments scope f args;
-            value <- result ("musttail call ptr " ++ symbol ++ "(" ++
-              L.intercalate ", " (L.map pointer (L.append (L.fst prepared) (L.snd prepared))) ++ ")");
+            value <- mustTailPointer symbol (L.map pointer (L.append (L.fst prepared) (L.snd prepared)));
             emit ("  ret ptr " ++ value)
           };
           Nothing -> finishOrdinaryValue scope expression
@@ -1331,8 +1328,8 @@ module Bootstrap.LLVM.Codegen where {
   -- unchanged. Both the expression and instruction scans are bounded.
   evaluate = evaluateSkippingCases 0;
   evaluateSkippingCases skipped scope expression = do {
-    prior <- gets instructions;
-    if O.remainingSize 128 expression < 0 && workerBodyLimit 4097 prior then do {
+    prior <- gets emittedCount;
+    if O.remainingSize 128 expression < 0 && prior >= 4097 then do {
       fs <- gets functions;
       let { names = S.toList (A.needed fs expression) };
       -- Loading an oversized environment could itself cross the instruction
@@ -1584,7 +1581,7 @@ module Bootstrap.LLVM.Codegen where {
     short <- fresh "spine.short."; join <- fresh "spine.join.";
     next <- fresh "%spine.next."; decremented <- fresh "%spine.count.";
     emit ("  br label %" ++ loop);
-    label loop;
+    loopLabel loop;
     value <- phi "ptr" [(,) first entry,(,) next advance];
     remaining <- phi "i64" [(,) (showInt depth) entry,(,) decremented advance];
     actual <- constructorTag value;
@@ -2072,14 +2069,7 @@ module Bootstrap.LLVM.Codegen where {
                          preparedArguments <- workerArguments scope f args;
                          let { captured = L.fst preparedArguments; values = L.snd preparedArguments };
                          value <-
-                           result
-                             ("musttail call ptr " ++
-                              (symbol ++
-                               ("(" ++
-                                (L.intercalate ", "
-                                   ((:) ("i64 " ++ tailFuel)
-                                      (L.map pointer (L.append captured values))) ++
-                                 ")"))));
+                           mustTailPointer symbol ((:) ("i64 " ++ tailFuel) (L.map pointer (L.append captured values)));
                          emit ("  ret ptr " ++ value)
                        }
                   else finishST fuel scope expression;

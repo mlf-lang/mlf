@@ -9,6 +9,7 @@ module Bootstrap.LLVM.Build where {
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.Primitive as P;
+  import qualified Bootstrap.LLVM.FunctionPolicy as Policy;
   import qualified Bootstrap.LLVM.Analysis as A;
   import qualified Bootstrap.LLVM.Optimize as O;
   import qualified Bootstrap.LLVM.Result as R;
@@ -22,7 +23,14 @@ module Bootstrap.LLVM.Build where {
     (Map XName (Maybe (Set XName))) (Maybe WorkerEscapes);
   data CaseDispatch = SingleCase | HeapCases | ImmediateCases | BinaryCase Int Int;
   data ConstructorLayout = ConstructorLayout (Map String ((,) Int Int)) (Map Int ((,,) Int Int CaseDispatch));
-  data FunctionInstructions = FunctionInstructions Int ([] String);
+  data FunctionInstructions = FunctionInstructions Int ([] String) Policy.Facts;
+  emptyInstructions name = FunctionInstructions 0 [] (Policy.empty name);
+  instructionFacts state = case functionInstructions state of { FunctionInstructions _ _ facts -> facts };
+  markInstruction update = modify (\state -> case functionInstructions state of {
+    FunctionInstructions slot lines facts -> let { next = update facts } in
+      seq next (withInstructions (FunctionInstructions slot lines next) state)
+  });
+  emittedCount state = Policy.instructionCount (instructionFacts state);
   data Output =
     Output Int FunctionInstructions String ([] String) ([] String) ConstructorLayout FunctionScope (Set
                                                                                                                 String) (Map
@@ -67,7 +75,7 @@ module Bootstrap.LLVM.Build where {
   withSerial value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) =
     seq value (Output value f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22);
   instructions :: Output -> [] String;
-  instructions state = case functionInstructions state of { FunctionInstructions _ lines -> lines };
+  instructions state = case functionInstructions state of { FunctionInstructions _ lines _ -> lines };
   functionInstructions :: Output -> FunctionInstructions;
   functionInstructions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) = f1;
   withInstructions :: FunctionInstructions -> Output -> Output;
@@ -251,7 +259,8 @@ module Bootstrap.LLVM.Build where {
     };
   emit :: String -> Build ();
   emit line = modify (\state -> case functionInstructions state of {
-    FunctionInstructions next lines -> withInstructions (FunctionInstructions next ((:) line lines)) state
+    FunctionInstructions next lines facts -> let { updated = Policy.instruction facts } in
+      seq updated (withInstructions (FunctionInstructions next ((:) line lines) updated) state)
   });
   label :: String -> Build ();
   label name =
@@ -259,23 +268,31 @@ module Bootstrap.LLVM.Build where {
       emit (name ++ ":");
       modify (withBlock name)
     };
+  loopLabel name = do { markInstruction Policy.markLoop; label name };
+  mustTailPointer target arguments = do {
+    markInstruction Policy.markTail;
+    result ("musttail call ptr " ++ target ++ "(" ++ L.intercalate ", " arguments ++ ")")
+  };
   result :: String -> Build String;
   result expression =
     Build (\state -> case functionInstructions state of {
-      FunctionInstructions slot lines -> let {
+      FunctionInstructions slot lines facts -> let {
+        updated = Policy.instruction facts;
         register = "%" ++ showInt slot;
         line = "  " ++ register ++ " = " ++ expression;
         next = L.advanceIdentity slot 1;
         -- Keep module symbols stable when an instruction switches to a local slot.
         after = withSerial (L.advanceIdentity (serial state) 1)
-          (withInstructions (FunctionInstructions next ((:) line lines)) state)
-      } in seq next (seq after (Right ((,) register after)))
+          (withInstructions (FunctionInstructions next ((:) line lines) updated) state)
+      } in seq updated (seq next (seq after (Right ((,) register after))))
     });
   call :: String -> [] String -> Build String;
   call name arguments = callTyped "ptr" name arguments;
   callTyped :: String -> String -> [] String -> Build String;
-  callTyped ty name arguments =
-    result ("call " ++ (ty ++ (" " ++ (name ++ ("(" ++ (L.intercalate ", " arguments ++ ")"))))));
+  callTyped ty name arguments = do {
+    if eqString ty "ptr" then markInstruction (Policy.pointerCall name) else cgPure ();
+    result ("call " ++ (ty ++ (" " ++ (name ++ ("(" ++ (L.intercalate ", " arguments ++ ")"))))))
+  };
   pointer :: String -> String;
   pointer value = ("ptr " ++ value);
   number :: Int -> String;
@@ -379,35 +396,21 @@ module Bootstrap.LLVM.Build where {
       saved <- get;
       modify
         (\state ->
-           withInstructions (FunctionInstructions 0 [])
+           withInstructions (emptyInstructions name)
              (withBlock "entry"
                 (withScalarRanges M.empty
                    (withArrayViews M.empty
                       (withUnboxedDoubles M.empty (withForcedValues M.empty state))))));
       body;
       code <- gets (\state -> L.reverse (instructions state));
+      facts <- gets instructionFacts;
       collectors <- gets collectingKernels;
       let {
         collectingWorker =
           L.any (\n -> eqString (showInt (O.nameId n)) (symbolIdentity name)) (S.toList collectors)
       };
       let {
-        attributes =
-          if (startsWith "@mlf.numeric." name &&
-              (L.not (startsWith "@mlf.numeric.entry." name) && L.not collectingWorker))
-          then " alwaysinline"
-          -- Keep closure entries out of the inliner. A direct boxed worker can
-          -- be inferred noreturn even when its caller has optnone. Allow LLVM
-          -- to optimize that caller so codegen preserves the worker transfer.
-          else if startsWith "@mlf.code." name || startsWith "@mlf.curry." name
-               then if L.any callsBoxedWorker code then " noinline optsize" else " noinline optnone"
-          else if startsWith "@mlf.worker." name then let {
-            boundary = keepWorker || workerBodyLimit 64 code
-          } in case workerBodyPolicy name code of {
-            OptimizableWorker -> if boundary then " noinline" else "";
-            LazyTailWorker -> " noinline optnone";
-            OrdinaryWorker -> if boundary then " noinline optnone" else ""
-          } else ""
+        attributes = Policy.attributes keepWorker collectingWorker name facts
       };
       let {
         text =
@@ -430,70 +433,8 @@ module Bootstrap.LLVM.Build where {
                          (withForcedValues (forcedValues saved)
                             (withDefinitions ((:) text (definitions state)) state))))))))
     };
-  -- Keep large workers as call boundaries. Loop and recursive-transfer
-  -- bodies still receive LLVM optimizations there; ordinary small workers
-  -- retain the inliner's choice unless a caller explicitly requests a boundary.
-  workerBodyLimit :: Int -> [] String -> Bool;
-  workerBodyLimit remaining lines =
-    if remaining <= 0 then True else case lines of {
-      [] -> False;
-      (:) _ rest -> workerBodyLimit (remaining - 1) rest
-    };
-  -- Keep the optimizer for explicit loops and recursive numeric work.
-  -- Tail transfers that already allocate several lazy values retain the
-  -- emitter's code and its musttail guarantee.
-  data WorkerBodyPolicy = OptimizableWorker | LazyTailWorker | OrdinaryWorker;
-  preserveWorkerOptimization :: String -> [] String -> Bool;
-  preserveWorkerOptimization name code = case workerBodyPolicy name code of {
-    OptimizableWorker -> True;
-    _ -> False
-  };
-  workerBodyPolicy :: String -> [] String -> WorkerBodyPolicy;
-  workerBodyPolicy name code = let {
-    target = name ++ "(";
-    loop line = startsWith "sum.loop." line || startsWith "spine.loop." line;
-    transferring = L.any (workerCallBoundary target) code;
-    lazyTail = workerAllocations 3 code && L.any
-      (\line -> workerInstruction line (\offset -> workerInstructionStarts line offset " = musttail call ")) code
-  } in if L.any loop code then OptimizableWorker
-       else if L.not transferring then OrdinaryWorker
-       else if lazyTail then LazyTailWorker else OptimizableWorker;
-  workerCallBoundary :: String -> String -> Bool;
-  workerCallBoundary target line = workerInstruction line (\offset ->
-    workerInstructionStarts line offset " = musttail call " ||
-      (workerInstructionStarts line offset " = call ptr " &&
-       workerInstructionStarts line (offset + 12) target));
-  callsBoxedWorker :: String -> Bool;
-  callsBoxedWorker line = workerInstruction line (\offset ->
-    workerInstructionStarts line offset " = call ptr @mlf.worker.");
-  workerInstruction :: String -> (Int -> Bool) -> Bool;
-  workerInstruction line accept = let {
-    width = stringLength line;
-    opcode i = if i >= width then False
-      else if stringCodeAt line i == 32 then accept i
-      else opcode (i + 1)
-  } in startsWith "  %" line && width > 3 &&
-    ((stringCodeAt line 3 >= 48 && stringCodeAt line 3 <= 57) || stringCodeAt line 3 == 118) && opcode 4;
-  workerInstructionStarts :: String -> Int -> String -> Bool;
-  workerInstructionStarts line offset word = let { n = stringLength word } in
-    offset + n <= stringLength line && eqString word (stringSlice line offset n);
-  workerAllocations :: Int -> [] String -> Bool;
-  workerAllocations remaining code = if remaining <= 0 then True else case code of {
-    [] -> False;
-    (:) line rest -> let {
-      allocates = workerInstruction line (\offset ->
-        workerInstructionStarts line offset " = call ptr " &&
-        let { at = offset + 12 } in
-        workerInstructionStarts line at "@mlf.allocate.thunk" ||
-        workerInstructionStarts line at "@mlf.construct." ||
-        workerInstructionStarts line at "@mlf_closure(" ||
-        workerInstructionStarts line at "@mlf_env_new(")
-    } in workerAllocations (if allocates then remaining - 1 else remaining) rest
-  };
   startsWith :: String -> String -> Bool;
-  startsWith prefix value =
-    ((stringLength prefix <= stringLength value) &&
-     eqString prefix (stringSlice value 0 (stringLength prefix)));
+  startsWith = Policy.startsWith;
   symbolIdentity :: String -> String;
   symbolIdentity name = if (stringLength name < 13) then "" else symbolIdentityAt name 13 13;
   symbolIdentityAt :: String -> Int -> Int -> String;

@@ -28,6 +28,7 @@ import qualified Tests.HigherOrderSpecialization as Hi
 import qualified Package.OS as O
 import qualified Tests.Selection as Selection
 import qualified Test.Case as Case
+import qualified Test.CaseSelection as Planned
 import qualified Test.Runner as Runner
 suite : B.Backends -> [] ((,) String (IO ()))
 suite backends = S.append (Wr.backendTests backends) (S.concat ((:) (Io.ioTests backends) ((:) (Pr.preludeTests backends) ((:) (Sn.snakeTests backends) ((:) (Ba.backendTests backends) ((:) (Na.nativeOptimizationTests backends) ((:) (Co.constructorProjectionTests backends) ((:) (Fo.forceReuseTests backends) ((:) (Bo.boolConditionTests backends) ((:) (En.environmentAccessTests backends) ((:) (St.strictFieldTests backends) ((:) (Nu.numericArrayTests backends) ((:) (By.byteArrayTests backends) ((:) (Dn.dnaTests backends) ((:) (Mo.moduleBackendTests backends) ((:) (Se.separateBackendTests backends) ((:) (Bs.bootstrapPrimitiveTests backends) ((:) (Sr.stateRuntimeTests backends) ((:) (Hi.higherOrderTests backends) [])))))))))))))))))))
@@ -129,26 +130,29 @@ main = do
   validateFamilies allCases entries
   let cases = registry B.inventoryContext allCases entries
   (,,) options selected selection <- selectedCases cases args
-  if Runner.listing options then runRegistry B.inventoryContext cases args ((,,) options selected selection)
+  if Runner.listing options then do
+   plan <- H.right (Planned.project cases selected)
+   runRegistry B.inventoryContext args options selection plan
   else B.withBackends (\backends -> do
    let runnable = registry backends (suite backends) (families backends)
-   selected <- selectedCases runnable args
-   runRegistry backends runnable args selected)
+   plan <- H.right (Planned.rebind runnable selected)
+   runRegistry backends args options selection plan)
 
-runRegistry backends cases args ((,,) options selected selection) = do
+runRegistry backends args options selection plan = do
+ let selected = Planned.cases plan
  reported <- B.reportArgs (case args of
   (:) "--from" _ -> []
   (:) "--families" _ -> []
   _ -> args)
  reportOptions <- H.right (Runner.parse reported)
  let wholeInvocation = case args of { (:) "--from" _ -> false; (:) "--families" _ -> false; _ -> true }
- let full = S.length selected == S.length cases && S.null (Runner.selectors options) && wholeInvocation
+ let full = S.length selected == Planned.total plan && S.null (Runner.selectors options) && wholeInvocation
  if Runner.listing options then do
-  code <- Runner.runOptions reportOptions cases selected
+  code <- Runner.runSelected (\_ -> return ()) reportOptions plan
   if code == 0 then return () else exitWith code
  else do
   case selection of { Nothing -> return (); Just names -> Selection.begin "backends" full names }
-  code <- Runner.runOptions reportOptions cases selected
+  code <- Runner.runSelected (\_ -> return ()) reportOptions plan
   if code == 0 then do
    _ <- if full then B.auditBackends backends else B.auditSelectedBackends backends
    case selection of

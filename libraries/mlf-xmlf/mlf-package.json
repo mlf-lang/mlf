@@ -20,6 +20,7 @@
       "Bootstrap.X.Parser": "Bootstrap/X/Parser.hs",
       "Bootstrap.X.Pretty": "Bootstrap/X/Pretty.hs",
       "Bootstrap.X.Syntax": "Bootstrap/X/Syntax.hs",
+      "Bootstrap.X.Traversal": "Bootstrap/X/Traversal.hs",
       "Bootstrap.X.Type": "Bootstrap/X/Type.hs"
     }
   },

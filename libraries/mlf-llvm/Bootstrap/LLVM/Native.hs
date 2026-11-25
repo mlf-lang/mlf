@@ -419,9 +419,7 @@ module Bootstrap.LLVM.Native where {
              label fast;
              code <- kernelWorker name f narrowed;
              value <-
-               result
-                 ("musttail call ptr " ++
-                  (code ++ ("(" ++ (L.intercalate ", " (L.map scalarArgument values) ++ ")"))));
+               mustTailPointer code (L.map scalarArgument values);
              emit ("  ret ptr " ++ value);
              label slow;
              body

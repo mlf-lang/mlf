@@ -11,6 +11,7 @@ module Bootstrap.EvidenceBoundary where {
   import qualified Bootstrap.X.Checked as Checked;
   import qualified Bootstrap.X.Type as XT;
   import qualified Bootstrap.X.Syntax as X;
+  import qualified Bootstrap.X.Traversal as Traversal;
   -- These records are issued by the validated source lowerer. They are not
   -- authority reconstructed from dictionary-shaped types or identifier text.
   data Origin = UnsignedRoot | SignedRoot | RecursiveRoot | CopiedHelper | InstanceSupport | NestedLocal;
@@ -60,59 +61,9 @@ module Bootstrap.EvidenceBoundary where {
   uniqueInts :: [] Int -> Bool;
   uniqueInts [] = True;
   uniqueInts ((:) n ns) = not (any (eqInt n) ns) && uniqueInts ns;
-  names :: XTerm -> [] XName;
-  names term = case term of {
-    XVarTerm n -> (:) n [];
-    XAbs n _ b -> (:) n (names b);
-    XApp a b -> append (names a) (names b);
-    XTypeAbs _ _ b -> names b;
-    XProjection rows selected -> append (map (\((,,) n _ _) -> n) rows) [selected];
-    XInstantiationSpine n rows -> (:) n (concatMap (\((,,) _ _ value) -> names value) rows);
-    XTypeApp b _ -> names b;
-    XLet n a b -> (:) n (append (names a) (names b));
-    XLetRec ds b -> append (concatMap (\((,,) n _ v) -> (:) n (names v)) ds) (names b);
-    XCase a _ bs -> append (names a) (concatMap (\(XAlternative p b) -> append (X.patternNames p) (names b)) bs);
-    XWithData _ b -> names b;
-    XIntTerm _ -> [];
-    XDoubleTerm _ -> [];
-    XBoolTerm _ -> [];
-    XStringTerm _ -> [];
-    XPrimitive _ _ -> [];
-    XConstructor _ _ -> []
-  };
-  freeNames :: XTerm -> [] XName;
-  freeNames term = freeNamesOnto (\_ -> True) term [];
-  -- Produce each free occurrence directly into the consumer's tail. Test
-  -- inner scopes before outer ones so rejected variables keep their laziness.
-  freeNamesOnto allowed term rest = let {
-    after = freeNamesOnto allowed;
-    bind name n = not (X.equalName name n) && allowed n;
-    bindMany names n = not (any (X.equalName n) names) && allowed n
-  } in case term of {
-    XVarTerm n -> if allowed n then (:) n rest else rest;
-    XAbs n _ body -> freeNamesOnto (bind n) body rest;
-    XApp f a -> after f (after a rest);
-    XTypeAbs _ _ body -> after body rest;
-    XProjection _ _ -> rest;
-    XInstantiationSpine n rows -> let {
-      arguments = foldr (\((,,) _ _ operand) pending -> after operand pending) rest rows
-    } in if allowed n then (:) n arguments else arguments;
-    XTypeApp body _ -> after body rest;
-    XLet n expr body -> after expr (freeNamesOnto (bind n) body rest);
-    XLetRec defs body -> let {
-      bound = bindMany (map (\((,,) n _ _) -> n) defs);
-      visit = freeNamesOnto bound
-    } in foldr (\((,,) _ _ rhs) tail -> visit rhs tail) (visit body rest) defs;
-    XCase a _ branches -> after a (foldr (\(XAlternative pat body) tail ->
-      freeNamesOnto (bindMany (X.patternNames pat)) body tail) rest branches);
-    XWithData _ body -> after body rest;
-    XIntTerm _ -> rest;
-    XDoubleTerm _ -> rest;
-    XBoolTerm _ -> rest;
-    XStringTerm _ -> rest;
-    XPrimitive _ _ -> rest;
-    XConstructor _ _ -> rest
-  };
+  names = Traversal.names;
+  freeNames = Traversal.freeNames;
+  freeNamesOnto = Traversal.freeNamesOnto;
   ground :: XType -> Bool;
   ground ty = case ty of {
     XCon _ xs -> all ground xs;
@@ -775,34 +726,7 @@ module Bootstrap.EvidenceBoundary where {
         case M.lookup X.compareName name aliases of {
           Nothing -> Just value; Just ((,) ty proof) -> replacement ty proof
         };
-      XAbs name ty body -> if safe name then mapOptional (XAbs name ty) (visit body) else Nothing;
-      XTypeAbs var bound body -> mapOptional (XTypeAbs var bound) (visit body);
-      XTypeApp body proof -> mapOptional (\term -> XTypeApp term proof) (visit body);
-      XLet name rhs body -> if not (safe name) then Nothing else do {
-        binding <- visit rhs;
-        result <- visit body;
-        Just (XLet name binding result)
-      };
-      XLetRec definitions body ->
-        if not (all (\((,,) name _ _) -> safe name) definitions) then Nothing else do {
-          bindings <- mapM (\((,,) name ty rhs) -> mapOptional (\result -> (,,) name ty result) (visit rhs)) definitions;
-          result <- visit body;
-          Just (XLetRec bindings result)
-        };
-      XCase scrutinee ty alternatives -> do {
-        selected <- visit scrutinee;
-        branches <- mapM (\(XAlternative pattern body) -> if all safe (X.patternNames pattern)
-          then mapOptional (XAlternative pattern) (visit body) else Nothing) alternatives;
-        Just (XCase selected ty branches)
-      };
-      XWithData _ _ -> Nothing;
-      XProjection _ _ -> Just value;
-      XIntTerm _ -> Just value;
-      XDoubleTerm _ -> Just value;
-      XBoolTerm _ -> Just value;
-      XStringTerm _ -> Just value;
-      XPrimitive _ _ -> Just value;
-      XConstructor _ _ -> Just value
+      _ -> Traversal.rewriteGuardedChildren safe visit value
     }
   } in visit;
 }
