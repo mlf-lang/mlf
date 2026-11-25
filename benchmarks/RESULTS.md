@@ -68,15 +68,15 @@ collection and exit remain inside the timed run. This avoids the operating
 system's one-time verification of a newly linked executable dominating runtime
 ratios. The [runner instructions](../tools/bench/README.md) describe reproduction.
 
-An [earlier run](../tools/profile/results/2026-10-16/earlier-unwarmed-v2-benchmark.json)
-using an intermediate compiler failed n-body compilation at 5.006x and lacked
-this exact-file runtime warm-up. Its runtime ratios are not the final results.
-A [controlled first-launch check](../tools/profile/results/2026-10-16/first-launch.json)
-recorded 0.7742 s on first execution versus 0.1089 s on repeat execution of the
-same n-body binary. The failed run is retained as diagnostic evidence.
+An earlier run using an intermediate compiler failed n-body compilation at
+5.006x and lacked this exact-file runtime warm-up. Its runtime ratios are not
+the final results. A controlled first-launch check recorded 0.7742 s on first
+execution versus 0.1089 s on repeat execution of the same n-body binary. The
+repository no longer includes the raw files for these two diagnostics.
 
-See the [self-compilation report](../tools/profile/RESULTS.md) for the compiler
-changes, phase profiles, ordinary compiler comparison and native validation.
+See the [October 16 self-compilation report](../tools/profile/RESULTS.md#native-self-compilation-profiling-milestone--2026-10-16)
+for the compiler changes, phase profiles, ordinary compiler comparison and
+native validation.
 
 ---
 
