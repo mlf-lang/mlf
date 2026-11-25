@@ -101,6 +101,51 @@ REVIEW_FIX_ROLES = {
     'tools/testing/receipt_adapter.py', 'tools/testing/run.py',
 }
 
+BOUNDARY_PARENT = 'b6d8a489b9774791fae928c9a3264f910f3672a8'
+BOUNDARY_REVIEW = 'b72168feaf229b575390d5c6ac391824bb75ec9e'
+BOUNDARY_TREE = 'f1981c36912a101cbedde819690200ecc7d4e920'
+BOUNDARY_TYPED = '682ccd4cdd2190e22d0fb0d4dc3ab058e72c7b7a'
+BOUNDARY_TYPED_TREE = 'a3a63abcbaf49969832d45addc2b448ec4aff84a'
+BOUNDARY_MODULES = {
+    'Bootstrap.Graph.ScopeIndex': 'libraries/mlf-inference/Bootstrap/Graph/ScopeIndex.hs',
+    'Bootstrap.GroundProofEdit': 'libraries/mlf-crates/Bootstrap/GroundProofEdit.hs',
+    'Bootstrap.LLVM.FunctionPolicy': 'libraries/mlf-llvm/Bootstrap/LLVM/FunctionPolicy.hs',
+    'Bootstrap.LLVM.RecursiveArguments': 'libraries/mlf-llvm/Bootstrap/LLVM/RecursiveArguments.hs',
+    'Bootstrap.X.Traversal': 'libraries/mlf-xmlf/Bootstrap/X/Traversal.hs',
+    'Test.CaseSelection': 'testing/Test/CaseSelection.hs',
+}
+BOUNDARY_ROLES = set(BOUNDARY_MODULES.values()) | {
+    'bootstrap/MLF/BuiltinPreludeData.hs',
+    'libraries/mlf-crates/Bootstrap/SourceInference.hs',
+    'libraries/mlf-crates/mlf-package.json',
+    'libraries/mlf-inference/Bootstrap/ClassDemand.hs',
+    'libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs',
+    'libraries/mlf-inference/Bootstrap/Graph/Solver.hs',
+    'libraries/mlf-inference/mlf-package.json',
+    'libraries/mlf-llvm/Bootstrap/LLVM/Build.hs',
+    'libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs',
+    'libraries/mlf-llvm/Bootstrap/LLVM/Native.hs',
+    'libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs',
+    'libraries/mlf-llvm/mlf-package.json',
+    'libraries/mlf-xmlf/Bootstrap/X/Syntax.hs',
+    'libraries/mlf-xmlf/mlf-package.json',
+    'mlf-shared.cabal',
+    'mlf.lock',
+    'shared-sources.json',
+    'testing/Test/Runner.hs',
+    'testing/mlf-package.json',
+    'testing/tools/mlf.lock',
+    'tests/Tests/BackendSuite.emlf',
+    'tests/indexvec/Graphs.hs',
+    'tests/mlf.lock',
+    'tests/shared/mlf.lock',
+    'tools/performance/compiler-shapes/README.md',
+    'tools/performance/compiler-shapes/worker_policy.py',
+    'tools/shared/fixtures/native/CallbackSharingAudit.hs',
+    'tools/shared/test_artifact_binary.py',
+    'tools/shared/test_artifact_binary_modular.py',
+}
+
 
 def repository(root, *args):
     return subprocess.check_output(
@@ -227,12 +272,21 @@ def qualified_contract(root, source_root=None):
     for parent, result in [(CORE_LEAF_SELECTION_PARENT, REVIEW_FIXES), (CORE_LEAF_PROOF, REVIEW_MERGE)]:
         changes = live_git.run('diff', '--name-only', parent, result).decode().splitlines()
         proof.require(set(changes) == REVIEW_FIX_ROLES, 'exact compiler and dispatcher review changes')
+    live_git.commit(BOUNDARY_PARENT, parents=[REVIEW_MERGE])
+    live_git.commit(BOUNDARY_REVIEW, tree=BOUNDARY_TREE, parents=[BOUNDARY_PARENT])
+    live_git.commit(BOUNDARY_TYPED, tree=BOUNDARY_TYPED_TREE, parents=[BOUNDARY_REVIEW])
+    typed_changes = live_git.run('diff', '--name-only', BOUNDARY_REVIEW, BOUNDARY_TYPED).decode().splitlines()
+    proof.require(set(typed_changes) == {'testing/Test/Runner.hs', 'mlf.lock', 'tests/mlf.lock',
+                  'testing/tools/mlf.lock', 'tests/shared/mlf.lock'}, 'exact runner signature and lock changes')
+    live_git.run('merge-base', '--is-ancestor', BOUNDARY_TYPED, 'HEAD')
+    changed_roles = live_git.run('diff', '--name-only', BOUNDARY_PARENT, BOUNDARY_REVIEW).decode().splitlines()
+    proof.require(set(changed_roles) == BOUNDARY_ROLES, 'exact compiler boundary refactoring roles')
     auxiliary_roles = (
         EXTRA_MERGE_ROLES | WRITER_SIGNATURE_ROLES | PARITY_INPUT_ROLES | LLVM_NONRETURN_ROLES | F1_HYGIENE_ROLES
         | OPTIMIZER_RAW_ROLES | QUERY_WIRE_ROLES | LIFECYCLE_STRING_ROLES | ARTIFACT_STACK_ROLES | OPEN_PACKAGE_LIMIT_ROLES | BACKEND_PATHS_ROLES
-        | CORE_LEAF_SELECTION_ROLES | REVIEW_FIX_ROLES
+        | CORE_LEAF_SELECTION_ROLES | REVIEW_FIX_ROLES | BOUNDARY_ROLES
     ) - paths
-    expected = live_git.inventory(REVIEW_MERGE, paths | auxiliary_roles)
+    expected = live_git.inventory(BOUNDARY_TYPED, paths | auxiliary_roles)
     if source_root == root:
         auxiliary = {p: proof.read(source_root, p) for p in auxiliary_roles}
         proof.require(all(proof.oid(raw) == expected[p] for p, raw in auxiliary.items()),
@@ -248,7 +302,35 @@ def qualified_contract(root, source_root=None):
     edge = proof.Projection(before, after, old, new)
     proof.require(not os.path.lexists(source_root / proof.RETIRED), 'retired source present')
     predecessor = reviewed.contract.previous
-    contract = proof.composed_type(type(predecessor))(predecessor, edge, source_root, archive)
+    # The historical byte projection covers replacements. Added modules have
+    # no predecessor bytes and must be supplied explicitly on the forward path.
+    class BoundaryContract(proof.composed_type(type(predecessor))):
+        def project_tree_bytes(self, current):
+            self._require_raw_map(current, self.value['current_files'], 'current boundary')
+            return super().project_tree_bytes({p: current[p] for p in edge.after})
+
+        def advance_tree_bytes(self, parent, additions):
+            self._require_raw_map(additions, {p: self.value['current_files'][p] for p in self.added_paths},
+                                  'boundary additions')
+            earlier = {p: self._older_bytes(additions[p], p) for p in predecessor.added_paths}
+            current = edge.advance(predecessor.advance_tree_bytes(parent, earlier))
+            current.update({p: additions[p] for p in BOUNDARY_MODULES.values()})
+            proof.require(self.project_tree_bytes(current) == parent, 'boundary source round trip')
+            return current
+
+    contract = BoundaryContract(predecessor, edge, source_root, archive)
+    files = contract.value['current_files']
+    manifest = proof.strict_json(current['shared-sources.json'])
+    registered = {item['module']: item['path'] for item in manifest['modules']}
+    for module, path in BOUNDARY_MODULES.items():
+        proof.require(registered.get(module) == path and path not in files, 'new module registration: ' + module)
+        raw = proof.read(source_root, path)
+        proof.require(proof.oid(raw) == expected[path], 'new module contents: ' + module)
+        files[path] = proof.sha(raw)
+        contract.value['module_paths'][module] = path
+        contract.value['current_registry'][module] = files[path]
+    contract.added_paths = sorted(set(contract.added_paths) | set(BOUNDARY_MODULES.values()))
+    contract.added_modules = {**contract.added_modules, **BOUNDARY_MODULES}
     contract.directory = HERE
     contract.manifest_sha256 = proof.sha(proof.read(root, Path(__file__).relative_to(root).as_posix()))
     contract.metadata_paths = (*contract.metadata_paths, Path(__file__).name)

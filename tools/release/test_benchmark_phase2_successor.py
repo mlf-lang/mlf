@@ -21,6 +21,25 @@ class BenchmarkTransition(original.BenchmarkTransition):
     def test_phase2_full_live_transition(self):
         successor.validate_new_benchmark(ROOT, self.opened)
 
+    def test_new_modules_require_exact_bytes_in_both_directions(self):
+        contract = self.contract
+        current = {p: successor.read(ROOT, p) for p in contract.value['current_files']}
+        historic = contract.project_tree_bytes(current)
+        additions = {p: current[p] for p in contract.added_paths}
+        path = contract.value['module_paths']['Bootstrap.Graph.ScopeIndex']
+        self.assertNotIn(path, historic)
+        self.assertEqual(contract.advance_tree_bytes(historic, additions), current)
+        for inventory, check in ((current, contract.project_tree_bytes),
+                                 (additions, lambda data: contract.advance_tree_bytes(historic, data))):
+            with self.subTest(direction=check.__name__):
+                altered = dict(inventory)
+                altered[path] += b'\\n'
+                with self.assertRaises(ValueError):
+                    check(altered)
+                del altered[path]
+                with self.assertRaises(ValueError):
+                    check(altered)
+
     def test_phase2_intset_must_not_be_stale_or_altered(self):
         old = successor.parse_intset(self.opened.git, self.intset)
         for raw in (old, self.intset + b'\n', self.intset.replace(b'finishAsc', b'otherAsc', 1)):
