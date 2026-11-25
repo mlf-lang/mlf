@@ -1188,6 +1188,8 @@ module Bootstrap.Bitstream (
   -- At most 56 source bits plus seven pending bits fit in a nonnegative
   -- Int64. Merge once, then flush complete bytes without rebuilding each
   -- byte from the original field. Wider fields retain the bounded split.
+  packedBits :: forall a. ByteArray -> Int -> Int -> Int -> Int -> Int ->
+    (Int -> Int -> Int -> IO a) -> IO a;
   packedBits bytes index used pending width bits next =
     if width == 0 then next index used pending
     else if width <= 56 then let {
@@ -1203,6 +1205,8 @@ module Bootstrap.Bitstream (
       writeByteArray bytes index byte;
       packedBits bytes (index + 1) 0 0 (width - room) (unsignedShiftRInt bits room) next
     });
+  packedField :: forall a. ByteArray -> Int -> Int -> Int ->
+    (Int -> Int -> Int -> IO a) -> IO a;
   packedField bytes index width bits next =
     if width >= 16 then do {
       writeByteArray bytes index (andInt bits 255);
@@ -1217,6 +1221,8 @@ module Bootstrap.Bitstream (
   -- A varint emits an already bounded byte. Across any pending-bit offset,
   -- that byte flushes exactly one output byte and preserves the offset.
   -- Avoid reentering the general-width writer for its remaining high bits.
+  packedByte :: forall a. ByteArray -> Int -> Int -> Int -> Int ->
+    (Int -> Int -> Int -> IO a) -> IO a;
   packedByte bytes index used pending bits next = let {
     byte = andInt (orInt pending (shiftLInt bits used)) 255;
     following = unsignedShiftRInt bits (8 - used)
@@ -1225,12 +1231,16 @@ module Bootstrap.Bitstream (
     seq following (next (index + 1) used following)
   });
   -- The final varint byte can use the caller's continuation directly.
+  packedVar :: forall a. ByteArray -> Int -> Int -> Int -> Int ->
+    (Int -> Int -> Int -> IO a) -> IO a;
   packedVar bytes index used pending bits next =
     if unsignedLtInt bits 128 then packedByte bytes index used pending bits next
     else packedByte bytes index used pending (orInt (andInt bits 127) 128)
       (\i u p -> packedVar bytes i u p (unsignedShiftRInt bits 7) next);
   -- Two bounded references fit the general writer's 56-bit field. Keep the
   -- low reference within its own width, including when testing raw values.
+  packedRefs :: forall a. ByteArray -> Int -> [] Int -> Int -> Int -> Int ->
+    (Int -> Int -> Int -> IO a) -> IO a;
   packedRefs bytes width references index used pending next = case references of {
     [] -> next index used pending;
     (:) first more -> case more of {
@@ -1250,6 +1260,8 @@ module Bootstrap.Bitstream (
   -- Most constructor entries fit in one machine field, including their
   -- references. Put their complete little-endian field through one flush.
   -- Wider entries use the same split header and reference writer.
+  packedEntry :: forall a. ByteArray -> Int -> Int -> Entry -> Int -> Int -> Int ->
+    (Int -> Int -> Int -> IO a) -> IO a;
   packedEntry bytes nodeWidth symbolWidth entry index used pending next = let {
     field width value = packedBits bytes index used pending width value next;
     old = packedEntryFields bytes nodeWidth symbolWidth entry index used pending next;
@@ -1270,6 +1282,8 @@ module Bootstrap.Bitstream (
     EText symbol -> field (2 + symbolWidth) (orInt 2 (shiftLInt symbol 2));
     EBits _ -> old
   };
+  packedEntryFields :: forall a. ByteArray -> Int -> Int -> Entry -> Int -> Int -> Int ->
+    (Int -> Int -> Int -> IO a) -> IO a;
   packedEntryFields bytes nodeWidth symbolWidth entry index used pending next = case entry of {
     ENode tag children -> let {
       arity = length children;
@@ -1290,6 +1304,8 @@ module Bootstrap.Bitstream (
     EText symbol -> packedBits bytes index used pending 2 2 (\i u p ->
       packedBits bytes i u p symbolWidth symbol next)
   };
+  packedEntries :: forall a. ByteArray -> Int -> Int -> [] Entry -> Int -> Int -> Int ->
+    (Int -> Int -> Int -> IO a) -> IO a;
   packedEntries bytes nodeWidth symbolWidth entries index used pending next = case entries of {
     [] -> next index used pending;
     (:) entry rest -> packedEntry bytes nodeWidth symbolWidth entry index used pending
