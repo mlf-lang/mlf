@@ -347,16 +347,25 @@ module Bootstrap.LLVM.Optimize where {
       _ -> freshPure expression
     };
   identities :: XErased -> Fresh XErased;
-  identities expression =
+  identities = identitiesWith reduceIdentity;
+  identitiesWith :: (XErased -> Fresh XErased) -> XErased -> Fresh XErased;
+  identitiesWith reduce expression =
     do {
-      normalized <- children identities expression;
-      reduceIdentity normalized
+      normalized <- children (identitiesWith reduce) expression;
+      reduce normalized
     };
   reduceIdentity normalized = case normalized of {
     XEApp (XEAbs n (XEVar other)) argument ->
       if eqName n other then freshPure argument else freshPure normalized;
     XELet n (XEVar a) b -> copy (M.singleton n (XEVar a)) b;
     _ -> freshPure normalized
+  };
+  -- The checked identity pass can contract a let that returns its RHS.
+  -- Pending inlining still uses the ordinary rewrite when admission fails.
+  reduceCheckedIdentity normalized = case normalized of {
+    XELet name rhs (XEVar returned) ->
+      freshPure (if eqName name returned then rhs else XEVar returned);
+    _ -> reduceIdentity normalized
   };
   -- Recognize helpers on the freshened declaration spine. These identities
   -- remain distinct underneath nested lambdas, patterns and recursive groups.
@@ -534,7 +543,7 @@ module Bootstrap.LLVM.Optimize where {
         Just role -> M.insert compareName name role known; Nothing -> known
       } };
       result <- checkedIdentities following body;
-      reduceIdentity (XELet name rhs result)
+      reduceCheckedIdentity (XELet name rhs result)
     };
     XELetRec [(,) name value] body -> do {
       rhs <- constructorIdentities known value;
@@ -547,7 +556,7 @@ module Bootstrap.LLVM.Optimize where {
     _ -> constructorIdentities known expression
   };
   constructorIdentities known expression = if M.null known
-    then identities expression else constructorApplications known expression;
+    then identitiesWith reduceCheckedIdentity expression else constructorApplications known expression;
   -- Inspect only partial applications built from checked composition roles
   -- and variables. Their ordinary child pass preserves the input syntax and
   -- seed. Callback roles are needed only when the erased result is demanded.
@@ -607,9 +616,9 @@ module Bootstrap.LLVM.Optimize where {
         freshPure (L.fromMaybe term (combineIntSummands left right));
       XEApp function argument -> case function of {
         XEApp (XEApp (XEVar _) _) _ -> freshPure (applyComposed known function argument);
-        _ -> reduceIdentity term
+        _ -> reduceCheckedIdentity term
       };
-      _ -> reduceIdentity term
+      _ -> reduceCheckedIdentity term
     }
   };
   fixedPoints :: XErased -> Fresh XErased;
@@ -1392,23 +1401,20 @@ module Bootstrap.LLVM.Optimize where {
           UseAbs name body -> freshPure (useLet name argument body);
           UseLet name value body -> freshPure (useLet name value (useApp body argument));
           UseRec bindings body -> freshPure (useRec bindings (useApp body argument));
-          UseApp operator left -> case useTerm operator of {
+          UseApp operator left -> if checked then case useTerm operator of {
             XEPrimitive PAddInt -> case combineIntSummands (useTerm left) (useTerm argument) of {
               Just reduced -> freshPure (indexUses reduced);
               Nothing -> freshPure tree
             };
             _ -> freshPure tree
-          };
+          } else freshPure tree;
           _ -> freshPure tree
         };
-      UseLet name value body -> case useTerm body of {
-        XEVar result -> freshPure (if eqName name result then value else body);
-        _ -> do {
-          shared <- specializeSharedValue name value body;
-          case shared of {
-            Just result -> freshPure result;
-            Nothing -> rewriteOrdinaryLet tree name value body
-          }
+      UseLet name value body -> do {
+        shared <- specializeSharedValue name value body;
+        case shared of {
+          Just result -> freshPure result;
+          Nothing -> rewriteOrdinaryLet tree name value body
         }
       };
       UseRec bindings body ->
@@ -2262,7 +2268,7 @@ module Bootstrap.LLVM.Optimize where {
   optimizeOwnedUsing = optimizeLetSharing False;
   optimizeLetSharing checked cleanInput expression =
     do {
-      unique <- copy M.empty (L.fst (liveDeclarationSpine expression));
+      unique <- copy M.empty (if checked then L.fst (liveDeclarationSpine expression) else expression);
       clean <- cleanInput unique;
       recursive <- fixedPoints clean;
       let {
