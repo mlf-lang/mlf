@@ -37,6 +37,9 @@ BACKEND_PATHS_PARENT = '148cbb3f8cb47863987fb146745b389ddd0e6e17'
 BACKEND_PATHS = 'a57e46fd89740410607685473bed6dcc70649dd8'
 CORE_LEAF_SELECTION_PARENT = '222afddb378bdf55a9bf3ad343d9a77fc5d1d52d'
 CORE_LEAF_SELECTION = 'ef3d0106036758b9fd7847ecce7750955097d817'
+CORE_LEAF_PROOF = '6167fe44a0e6a47fe9bf72a96d5de114d3c6ae31'
+REVIEW_FIXES = 'c50d8b256b52670e6c0cb4213b367f15f01a9e2d'
+REVIEW_MERGE = 'd8b0c0313f6d3b3c9b93e1ec6367599d3d22db14'
 ORIGINAL = 'tools/performance/artifact-binary/phase2_source_successor.py'
 ORIGINAL_SHA = '72041ef0f3ea9c84d5f7ff100f721c326ecbbc86c1b705bf2c45f11cb19f9f16'
 EXTRA_MERGE_ROLES = {
@@ -88,6 +91,15 @@ OPEN_PACKAGE_LIMIT_ROLES = {
 }
 BACKEND_PATHS_ROLES = {'tests/Tests/Separate.emlf', 'tests/Tests/Readability.emlf', 'tests/mlf.lock'}
 CORE_LEAF_SELECTION_ROLES = {'tests/Tests/CoreRunner.emlf', 'tests/mlf.lock'}
+
+REVIEW_FIX_ROLES = {
+    'bootstrap/MLF/BuiltinPreludeData.hs', 'libraries/mlf-inference/Bootstrap/ClassDemand.hs',
+    'libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs', 'libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs',
+    'mlf.lock', 'testing/tools/mlf.lock', 'tests/Tests/BackendSuite.emlf', 'tests/indexvec/Graphs.hs',
+    'tests/mlf.lock', 'tests/shared/mlf.lock', 'tools/developer/process.py', 'tools/developer/test_process.py',
+    'tools/performance/compiler-shapes/generate.py', 'tools/performance/compiler-shapes/matrix.json',
+    'tools/testing/receipt_adapter.py', 'tools/testing/run.py',
+}
 
 
 def repository(root, *args):
@@ -208,12 +220,19 @@ def qualified_contract(root, source_root=None):
     selection_changes = set(live_git.run(
         'diff', '--name-only', CORE_LEAF_SELECTION_PARENT, CORE_LEAF_SELECTION).decode().splitlines())
     proof.require(selection_changes == CORE_LEAF_SELECTION_ROLES, 'exact Core leaf selection source roles')
+    live_git.commit(CORE_LEAF_PROOF, parents=[CORE_LEAF_SELECTION])
+    live_git.commit(REVIEW_FIXES, parents=[CORE_LEAF_SELECTION_PARENT])
+    live_git.commit(REVIEW_MERGE, parents=[REVIEW_FIXES, CORE_LEAF_PROOF])
+    live_git.run('merge-base', '--is-ancestor', REVIEW_MERGE, 'HEAD')
+    for parent, result in [(CORE_LEAF_SELECTION_PARENT, REVIEW_FIXES), (CORE_LEAF_PROOF, REVIEW_MERGE)]:
+        changes = live_git.run('diff', '--name-only', parent, result).decode().splitlines()
+        proof.require(set(changes) == REVIEW_FIX_ROLES, 'exact compiler and dispatcher review changes')
     auxiliary_roles = (
         EXTRA_MERGE_ROLES | WRITER_SIGNATURE_ROLES | PARITY_INPUT_ROLES | LLVM_NONRETURN_ROLES | F1_HYGIENE_ROLES
         | OPTIMIZER_RAW_ROLES | QUERY_WIRE_ROLES | LIFECYCLE_STRING_ROLES | ARTIFACT_STACK_ROLES | OPEN_PACKAGE_LIMIT_ROLES | BACKEND_PATHS_ROLES
-        | CORE_LEAF_SELECTION_ROLES
+        | CORE_LEAF_SELECTION_ROLES | REVIEW_FIX_ROLES
     ) - paths
-    expected = live_git.inventory(CORE_LEAF_SELECTION, paths | auxiliary_roles)
+    expected = live_git.inventory(REVIEW_MERGE, paths | auxiliary_roles)
     if source_root == root:
         auxiliary = {p: proof.read(source_root, p) for p in auxiliary_roles}
         proof.require(all(proof.oid(raw) == expected[p] for p, raw in auxiliary.items()),
