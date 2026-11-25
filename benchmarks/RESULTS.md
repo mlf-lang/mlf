@@ -7,6 +7,10 @@
 > to the original raw records.
 
 
+**Current reader note for October 13:** The [Stage 2 native build driver](https://github.com/mlf-lang/mlf/blob/10f1a0f8593a7cbe779d4cb73c4d66bcd01a4576/scripts/compile_native.py)
+matches the driver hash in all three stage reports. Their worktrees had local
+changes, so this verifies the driver file, not the entire checkout.
+
 All nine workloads pass the median 3× C compilation / 2× C runtime gate, with every observed maximum MLF sample also below the limit relative to the corresponding minimum C sample.
 
 Seven samples were collected for each compiler/workload with alternating order, fresh runtime/object/output directories, unchanged C reference flags, equal exact-executable runtime warm-up and independent output validation. All compilation stages, including runtime C, LLVM compilation and linking, remain timed. Decisions use unrounded ratios.
@@ -337,7 +341,7 @@ per-workload limits**. Geometric means do not replace individual workload checks
 
 Wall-clock medians in milliseconds. MLF total includes checked eMLF -> xMLF
 -> LLVM emission, IR writes, compiling the complete C runtime afresh and linking.
-The general [native build driver](https://github.com/mlf-lang/mlf/blob/10f1a0f8593a7cbe779d4cb73c4d66bcd01a4576/scripts/compile_native.py) overlaps the
+The general [native build driver](../scripts/compile_native.py) overlaps the
 frontend with fresh runtime compilation, then compiles and links the LLVM IR.
 At most two compiler processes overlap within a build; samples and languages
 run serially. No emitted LLVM or runtime object is reused between samples.
