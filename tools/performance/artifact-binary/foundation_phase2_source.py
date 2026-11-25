@@ -29,6 +29,8 @@ QUERY_WIRE_PARENT = '5fa22510b94e6a9772da0b5c34cfeb7f552a0f3a'
 QUERY_WIRE = '1a3d593884b5dbb5fe2aa6d9878bb9262bbd9ea7'
 LIFECYCLE_STRING_PARENT = '8ac74b0ab7cf11db1f9a11cf9c483a4304b90695'
 LIFECYCLE_STRING = 'ec13adb93e5e71770f20b19db448c5181de62030'
+ARTIFACT_STACK_PARENT = 'f000c8bcd9108b90814be518995c4edeb25e2c3c'
+ARTIFACT_STACK = 'f21cba5d133da862a4eca6e6174290cc6b5882e0'
 ORIGINAL = 'tools/performance/artifact-binary/phase2_source_successor.py'
 ORIGINAL_SHA = '72041ef0f3ea9c84d5f7ff100f721c326ecbbc86c1b705bf2c45f11cb19f9f16'
 EXTRA_MERGE_ROLES = {
@@ -67,6 +69,11 @@ QUERY_WIRE_ROLES = {
 }
 LIFECYCLE_STRING_ROLES = {
     'testing/tools/LifecycleMain.emlf', 'testing/tools/mlf.lock', 'tests/mlf.lock',
+}
+ARTIFACT_STACK_ROLES = {
+    'libraries/mlf-crates/Bootstrap/Bitstream.hs', 'libraries/mlf-crates/Bootstrap/QueryGraph.hs',
+    'bootstrap/MLF/BuiltinPreludeData.hs', 'mlf.lock',
+    'testing/tools/mlf.lock', 'tests/mlf.lock', 'tests/shared/mlf.lock',
 }
 
 
@@ -164,11 +171,17 @@ def qualified_contract(root, source_root=None):
     lifecycle_changes = set(live_git.run(
         'diff', '--name-only', LIFECYCLE_STRING_PARENT, LIFECYCLE_STRING).decode().splitlines())
     proof.require(lifecycle_changes == LIFECYCLE_STRING_ROLES, 'exact lifecycle lease source roles')
+    live_git.run('merge-base', '--is-ancestor', LIFECYCLE_STRING, ARTIFACT_STACK_PARENT)
+    live_git.commit(ARTIFACT_STACK, parents=[ARTIFACT_STACK_PARENT])
+    live_git.run('merge-base', '--is-ancestor', ARTIFACT_STACK, 'HEAD')
+    stack_changes = set(live_git.run(
+        'diff', '--name-only', ARTIFACT_STACK_PARENT, ARTIFACT_STACK).decode().splitlines())
+    proof.require(stack_changes == ARTIFACT_STACK_ROLES, 'exact artifact stack source roles')
     auxiliary_roles = (
         EXTRA_MERGE_ROLES | WRITER_SIGNATURE_ROLES | PARITY_INPUT_ROLES | LLVM_NONRETURN_ROLES | F1_HYGIENE_ROLES
-        | OPTIMIZER_RAW_ROLES | QUERY_WIRE_ROLES | LIFECYCLE_STRING_ROLES
+        | OPTIMIZER_RAW_ROLES | QUERY_WIRE_ROLES | LIFECYCLE_STRING_ROLES | ARTIFACT_STACK_ROLES
     ) - paths
-    expected = live_git.inventory(LIFECYCLE_STRING, paths | auxiliary_roles)
+    expected = live_git.inventory(ARTIFACT_STACK, paths | auxiliary_roles)
     if source_root == root:
         auxiliary = {p: proof.read(source_root, p) for p in auxiliary_roles}
         proof.require(all(proof.oid(raw) == expected[p] for p, raw in auxiliary.items()),
