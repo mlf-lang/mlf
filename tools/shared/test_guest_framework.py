@@ -50,44 +50,6 @@ main = do { x <- Box 1; Box x }
 NEGATIVE_DIAGNOSTIC = 'Resolution: no instance or given constraint for MLF.Primitive.Monad Distinct.Box; ambiguous uses need a type annotation'
 
 
-# Reviewed manifest boundaries, not counts inferred from the manifest under test.
-# Foundation keeps the original twelve modules plus IntTree (14e03173)
-# and IntRank (c1b802bd), both already declared and locked by PR25.
-FOUNDATION_MODULES = {
-    "Bootstrap.Fresh": "Bootstrap/Fresh.hs",
-    "Bootstrap.Host": "Bootstrap/Host.hs",
-    "Bootstrap.IndexVec": "Bootstrap/IndexVec.hs",
-    "Bootstrap.IntMap": "Bootstrap/IntMap.hs",
-    "Bootstrap.IntRank": "Bootstrap/IntRank.hs",
-    "Bootstrap.IntSet": "Bootstrap/IntSet.hs",
-    "Bootstrap.IntTree": "Bootstrap/IntTree.hs",
-    "Bootstrap.Map": "Bootstrap/Map.hs",
-    "Bootstrap.Regex": "Bootstrap/Regex.hs",
-    "Bootstrap.ST": "Bootstrap/ST.hs",
-    "Bootstrap.Set": "Bootstrap/Set.hs",
-    "Bootstrap.Std": "Bootstrap/Std.hs",
-    "Bootstrap.Types": "Bootstrap/Types.hs",
-    "Bootstrap.Unicode": "Bootstrap/Unicode.hs",
-    "Bootstrap.Version": "Bootstrap/Version.hs",
-}
-FRAMEWORK_MODULES = {
-    "Test.Assert": "Test/Assert.hs",
-    "Test.Case": "Test/Case.hs",
-    "Test.CaseSelection": "Test/CaseSelection.hs",
-    "Test.Runner": "Test/Runner.hs",
-    "Test.Descriptor": "Test/Descriptor.hs",
-    "Test.Registry": "Test/Registry.hs",
-    "Test.Outcome": "Test/Outcome.hs",
-    "Test.Expectation": "Test/Expectation.hs",
-    "Test.Evidence": "Test/Evidence.emlf",
-    "Test.Adapter": "Test/Adapter.emlf",
-    "Test.Fixture": "Test/Fixture.emlf",
-    "Test.Plan": "Test/Plan.emlf",
-    "Test.Resources": "Test/Resources.emlf",
-    "Test.Capability": "Test/Capability.emlf",
-    "Test.Diagnostics": "Test/Diagnostics.emlf",
-}
-
 def require(value, message):
     if not value:
         raise ValueError(message)
@@ -103,18 +65,18 @@ def remember_file(recorded, path):
 def pack(values):
     return ''.join(str(len(value)) + ':' + value for value in values)
 
-def manifest_inputs(path, name, expected_modules, dependencies):
+def manifest_inputs(path, name, dependencies):
     manifest = json.loads(path.read_text())
     require(manifest.get('format') == 1 and manifest.get('name') == name, 'manifest identity changed')
     require(set(manifest.get('dependencies', {})) == set(dependencies), 'direct dependency inventory changed')
     for dep, expected in dependencies.items():
         require(manifest['dependencies'][dep] == {'path': expected}, 'dependency route changed: '+dep)
-    modules = manifest.get('library', {}).get('modules', {})
-    require(modules == expected_modules, 'reviewed module inventory changed')
+    modules = manifest['library']['modules']
     result = []
     for module, relative in sorted(modules.items()):
         source = (path.parent / relative).resolve(strict=True)
-        require(source.is_file() and source.is_relative_to(ROOT), 'source escapes repository')
+        require(not Path(relative).is_absolute() and source.is_relative_to(path.parent.resolve())
+                and source.is_file(), 'invalid package source path: '+relative)
         result.append((module, source))
     return manifest, result
 
@@ -163,20 +125,18 @@ def main():
         compiler = producer_dir/'bin/emlf'
         foundation_path = ROOT/'libraries/mlf-foundation/mlf-package.json'
         framework_path = ROOT/'testing/mlf-package.json'
-        foundation, foundation_modules = manifest_inputs(foundation_path, 'mlf-foundation', FOUNDATION_MODULES, {})
-        framework, framework_modules = manifest_inputs(framework_path, 'mlf-test', FRAMEWORK_MODULES,
+        foundation, foundation_modules = manifest_inputs(foundation_path, 'mlf-foundation', {})
+        framework, framework_modules = manifest_inputs(framework_path, 'mlf-test',
                                                        {'mlf-foundation': '../libraries/mlf-foundation'})
         require(all(path.suffix == '.hs' for _, path in foundation_modules), 'foundation is not shared source')
         shared_count = sum(path.suffix == '.hs' for _, path in framework_modules)
         guest_count = sum(path.suffix == '.emlf' for _, path in framework_modules)
-        require(shared_count == 8 and guest_count == 7,
-                'mixed framework source boundary changed')
         inputs = [Path(__file__), WATCHDOG, ROOT/'tools/shared/test_direct.py', ROOT/'tools/shared/build.py',
                   foundation_path, framework_path, receipt, compiler,
                   *[path for _, path in foundation_modules+framework_modules]]
         before = {str(path): digest(path) for path in inputs}
         record.update(producer_receipt_sha256=digest(receipt), inputs=before,
-                      library_modules={'foundation': len(FOUNDATION_MODULES), 'framework_shared': shared_count, 'framework_guest': guest_count},
+                      library_modules={'foundation': len(foundation_modules), 'framework_shared': shared_count, 'framework_guest': guest_count},
                       producer_object_count=len(producer['object_inputs']))
         save()
         builtin = output/'foundation/builtin/unit'

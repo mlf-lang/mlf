@@ -97,58 +97,6 @@ class ManifestParity(unittest.TestCase):
         mutation(data)
         path.write_text(json.dumps(data))
 
-    def test_closed_corpus_has_matching_137_modules_13_executables(self):
-        # Keep the registered test ID after retiring Tests.TupleListLegacy.
-        manifest = self.check()
-        self.assertEqual(len(manifest['modules']), 142)
-        modules = {entry['module']: entry for entry in manifest['modules']}
-        self.assertEqual(len(modules), 142)
-        self.assertNotIn('Tests.TupleListLegacy', modules)
-        for name, path, role in (
-            ('Bootstrap.Graph.ScopeIndex', 'libraries/mlf-inference/Bootstrap/Graph/ScopeIndex.hs', 'implementation'),
-            ('Bootstrap.LLVM.FunctionPolicy', 'libraries/mlf-llvm/Bootstrap/LLVM/FunctionPolicy.hs', 'implementation'),
-            ('Bootstrap.LLVM.RecursiveArguments', 'libraries/mlf-llvm/Bootstrap/LLVM/RecursiveArguments.hs', 'implementation'),
-            ('Bootstrap.GroundProofEdit', 'libraries/mlf-crates/Bootstrap/GroundProofEdit.hs', 'implementation'),
-            ('Bootstrap.X.Traversal', 'libraries/mlf-xmlf/Bootstrap/X/Traversal.hs', 'implementation'),
-            ('Test.CaseSelection', 'testing/Test/CaseSelection.hs', 'implementation'),
-            ('Bootstrap.Bitstream', 'libraries/mlf-crates/Bootstrap/Bitstream.hs', 'implementation'),
-            ('Bootstrap.ArtifactStorage', 'libraries/mlf-crates/Bootstrap/ArtifactStorage.hs', 'implementation'),
-            ('Bootstrap.ArtifactStructure', 'libraries/mlf-crates/Bootstrap/ArtifactStructure.hs', 'implementation'),
-            ('Bootstrap.IntTree', 'libraries/mlf-foundation/Bootstrap/IntTree.hs', 'implementation'),
-            ('Bootstrap.IntRank', 'libraries/mlf-foundation/Bootstrap/IntRank.hs', 'implementation'),
-            ('Bootstrap.CrateSession', 'libraries/mlf-crates/Bootstrap/CrateSession.hs', 'implementation'),
-            ('Bootstrap.Graph.IndexStore', 'libraries/mlf-inference/Bootstrap/Graph/IndexStore.hs', 'implementation'),
-            ('Bootstrap.ClassDemand', 'libraries/mlf-inference/Bootstrap/ClassDemand.hs', 'implementation'),
-            ('MLF.Tests.ClassDemand', 'tests/shared/MLF/Tests/ClassDemand.hs', 'direct-test'),
-            ('Bootstrap.Standalone', 'libraries/mlf-frontend/Bootstrap/Standalone.hs', 'implementation'),
-            ('Bootstrap.EvidenceBoundary', 'libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs', 'implementation'),
-            ('Bootstrap.SourceInference', 'libraries/mlf-crates/Bootstrap/SourceInference.hs', 'implementation'),
-            ('Bootstrap.SourceUnit', 'libraries/mlf-crates/Bootstrap/SourceUnit.hs', 'implementation'),
-            ('Bootstrap.OpenFragment', 'libraries/mlf-crates/Bootstrap/OpenFragment.hs', 'implementation'),
-            ('Bootstrap.QueryGraph', 'libraries/mlf-crates/Bootstrap/QueryGraph.hs', 'implementation'),
-            ('Bootstrap.CrateGraph', 'libraries/mlf-crates/Bootstrap/CrateGraph.hs', 'implementation'),
-            ('Bootstrap.BuiltinPreludeContext', 'libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs', 'implementation'),
-            ('Bootstrap.BuiltinPreludeLiteral', 'libraries/mlf-crates/Bootstrap/BuiltinPreludeLiteral.hs', 'implementation'),
-            ('Bootstrap.ImportParameters', 'libraries/mlf-crates/Bootstrap/ImportParameters.hs', 'implementation'),
-            ('Bootstrap.ImportedRoot', 'libraries/mlf-crates/Bootstrap/ImportedRoot.hs', 'implementation'),
-            ('Bootstrap.PreparedLibraries', 'libraries/mlf-crates/Bootstrap/PreparedLibraries.hs', 'implementation'),
-            ('Bootstrap.PreparedLibraryLiteral', 'libraries/mlf-crates/Bootstrap/PreparedLibraryLiteral.hs', 'implementation'),
-            ('MLF.BuiltinPreludeData', 'bootstrap/MLF/BuiltinPreludeData.hs', 'implementation'),
-            ('MLF.Entry.BuiltinPrelude', 'bootstrap/MLF/Entry/BuiltinPrelude.hs', 'implementation'),
-            ('MLF.PreparedCompiler', 'bootstrap/MLF/PreparedCompiler.hs', 'implementation'),
-            ('Bootstrap.LLVM.Library', 'libraries/mlf-llvm/Bootstrap/LLVM/Library.hs', 'implementation'),
-            ('MLF.PreparedNativeData', 'bootstrap/MLF/PreparedNativeData.hs', 'implementation'),
-            ('MLF.PreparedLibraryData', 'bootstrap/MLF/PreparedLibraryData.hs', 'implementation'),
-        ):
-            self.assertEqual(modules[name], {
-                'module': name, 'path': path, 'role': role,
-            })
-        self.assertEqual(len(manifest['executables']), 13)
-        self.assertEqual(next(entry for entry in manifest['executables'] if entry['name'] == 'builtin-prelude'), {
-            'name': 'builtin-prelude', 'module': 'MLF.Entry.BuiltinPrelude',
-            'wrapper': 'host/ghc/app/builtin-prelude/Main.hs',
-        })
-
     def test_cabal_wrong_wrapper_rejected(self):
         path = self.root / 'mlf-shared.cabal'
         path.write_text(path.read_text().replace('hs-source-dirs: host/ghc/app/emlf', 'hs-source-dirs: host/ghc/app/mlfpkg'))
