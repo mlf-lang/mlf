@@ -25,6 +25,8 @@ F1_HYGIENE_PARENT = 'e836cbc4b9e5f0405e73988fba8d6bbafd008e44'
 F1_HYGIENE = 'd103b9271cd5520113e17bb2a27309df077e3fc4'
 OPTIMIZER_RAW_PARENT = '1ebe7605aafb98d085993481114aee5a5f180f05'
 OPTIMIZER_RAW = 'f70057609fd59adb4e8aafb0ad556b3de2566338'
+QUERY_WIRE_PARENT = '5fa22510b94e6a9772da0b5c34cfeb7f552a0f3a'
+QUERY_WIRE = '1a3d593884b5dbb5fe2aa6d9878bb9262bbd9ea7'
 ORIGINAL = 'tools/performance/artifact-binary/phase2_source_successor.py'
 ORIGINAL_SHA = '72041ef0f3ea9c84d5f7ff100f721c326ecbbc86c1b705bf2c45f11cb19f9f16'
 EXTRA_MERGE_ROLES = {
@@ -55,6 +57,10 @@ F1_HYGIENE_ROLES = {
 }
 OPTIMIZER_RAW_ROLES = {
     'libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs', 'mlf.lock',
+    'testing/tools/mlf.lock', 'tests/mlf.lock', 'tests/shared/mlf.lock',
+}
+QUERY_WIRE_ROLES = {
+    'libraries/mlf-crates/Bootstrap/QueryGraph.hs', 'bootstrap/MLF/BuiltinPreludeData.hs', 'mlf.lock',
     'testing/tools/mlf.lock', 'tests/mlf.lock', 'tests/shared/mlf.lock',
 }
 
@@ -141,11 +147,17 @@ def qualified_contract(root, source_root=None):
     optimizer_changes = set(live_git.run(
         'diff', '--name-only', OPTIMIZER_RAW_PARENT, OPTIMIZER_RAW).decode().splitlines())
     proof.require(optimizer_changes == OPTIMIZER_RAW_ROLES, 'exact raw LLVM optimizer source roles')
+    live_git.run('merge-base', '--is-ancestor', OPTIMIZER_RAW, QUERY_WIRE_PARENT)
+    live_git.commit(QUERY_WIRE, parents=[QUERY_WIRE_PARENT])
+    live_git.run('merge-base', '--is-ancestor', QUERY_WIRE, 'HEAD')
+    query_changes = set(live_git.run(
+        'diff', '--name-only', QUERY_WIRE_PARENT, QUERY_WIRE).decode().splitlines())
+    proof.require(query_changes == QUERY_WIRE_ROLES, 'exact legacy query wire source roles')
     auxiliary_roles = (
         EXTRA_MERGE_ROLES | WRITER_SIGNATURE_ROLES | PARITY_INPUT_ROLES | LLVM_NONRETURN_ROLES | F1_HYGIENE_ROLES
-        | OPTIMIZER_RAW_ROLES
+        | OPTIMIZER_RAW_ROLES | QUERY_WIRE_ROLES
     ) - paths
-    expected = live_git.inventory(OPTIMIZER_RAW, paths | auxiliary_roles)
+    expected = live_git.inventory(QUERY_WIRE, paths | auxiliary_roles)
     if source_root == root:
         auxiliary = {p: proof.read(source_root, p) for p in auxiliary_roles}
         proof.require(all(proof.oid(raw) == expected[p] for p, raw in auxiliary.items()),
