@@ -110,12 +110,16 @@ class HostContract(unittest.TestCase):
     def test_later_host_delta_corruption_is_rejected(self):
         # The complete physical source was admitted above. Relocate only the
         # subsequently read host proof to exercise its independent byte gate.
-        # The live framework stage retains Reconciliation, then DeclId, then
-        # the authenticated builtin-regeneration stage. Corrupt that stage's
-        # exact historical owner through the complete live forward/reverse bridge.
-        historical = self.binary.previous.previous.previous
-        self.assertEqual(historical.manifest_sha256,
-                         'fb8335e198e463d3a25b336f124d56dac141c6ad2063df531c09ade8e7411559')
+        # Select the exact builtin-regeneration stage in the live bridge.
+        expected = 'fb8335e198e463d3a25b336f124d56dac141c6ad2063df531c09ade8e7411559'
+        stages = []
+        contract = self.binary
+        while contract is not None:
+            if getattr(contract, 'manifest_sha256', None) == expected:
+                stages.append(contract)
+            contract = getattr(contract, 'previous', None)
+        self.assertEqual(len(stages), 1, 'one authenticated builtin-regeneration stage')
+        historical, = stages
         row = historical.frozen_value['deltas'][OWNER]
         original = (historical.directory / row['file']).read_bytes()
         with tempfile.TemporaryDirectory() as directory:
