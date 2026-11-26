@@ -147,25 +147,37 @@ module Bootstrap.LLVM.Analysis where {
     addCaller index caller ((,) names _) = L.foldlStrict
       (\tree name -> if M.member O.compareName name fs
         then M.insertWith O.compareName L.append name [caller] tree else tree) index names;
-    -- Read from the previous wave throughout. Only callers of changed
-    -- workers can see different captures on the next wave.
+    -- Store only changed capture sets. Unchanged workers keep their initial
+    -- captures; lexical names outside the worker table still capture themselves.
+    neededSet previous name = case M.lookup O.compareName name previous of {
+      Just captured -> captured;
+      Nothing -> neededName fs name
+    };
+    unchanged previous name captured = case M.lookup O.compareName name previous of {
+      Just old -> S.eqSet O.eqName old captured;
+      Nothing -> case captures (M.get O.compareName name fs) of {
+        [] -> S.null captured;
+        old -> sameNames old (S.toList captured)
+      }
+    };
     propagate previous pending = let {
-      update ((,) current dirty) name = let {
-        f = M.get O.compareName name previous;
-        input = M.get O.compareName name inputs
-      } in case input of { (,) names parameterNames -> let {
-        captured = S.toList (S.difference O.compareName
-          (S.unions O.compareName (L.map (neededName previous) names)) parameterNames)
-      } in if sameNames captured (captures f) then (,) current dirty else let {
-        updated = WorkerFunction (parameters f) (functionBody f) captured (strict f) (entrySummary f);
-        next = M.insert O.compareName name updated current;
-        dependents = M.findWithDefault O.compareName [] name callers;
-        affected = L.foldlStrict (\set caller -> S.insert O.compareName caller set) dirty dependents
-      } in seq next (seq affected ((,) next affected)) }
+      update ((,) current dirty) name = case M.get O.compareName name inputs of {
+        (,) names parameterNames -> let {
+          captured = S.difference O.compareName
+            (S.unions O.compareName (L.map (neededSet previous) names)) parameterNames
+        } in if unchanged previous name captured then (,) current dirty else let {
+          next = M.insert O.compareName name captured current;
+          dependents = M.findWithDefault O.compareName [] name callers;
+          affected = L.foldlStrict (\set caller -> S.insert O.compareName caller set) dirty dependents
+        } in seq next (seq affected ((,) next affected))
+      }
     } in case L.foldlStrict update ((,) previous S.empty) pending of {
       (,) current dirty -> if S.null dirty then current else propagate current (S.toList dirty)
-    }
-  } in propagate fs (M.keys fs);
+    };
+    publish table name captured = M.adjust O.compareName
+      (\f -> WorkerFunction (parameters f) (functionBody f) (S.toList captured)
+        (strict f) (entrySummary f)) name table
+  } in M.foldlWithKeyStrict publish fs (propagate M.empty (M.keys fs));
   demandFixed :: Map XName WorkerFunction -> Map XName WorkerFunction;
   demandFixed fs =
     let {
