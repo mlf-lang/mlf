@@ -2203,7 +2203,15 @@ module Bootstrap.Graph.Solver where {
   solveLocalExpansionUsing = solveLocalExpansionWithKinds False;
   solveLocalExpansionWithKinds :: Bool -> (Int -> Int -> Bool) -> Bool -> [] ((,) Int Int) -> Solver ->
     Graph -> [] ((,) Int Node) -> Either String LocalUnification;
-  solveLocalExpansionWithKinds prepared scopeLift projectedErrors equations solver current fresh = do {
+  solveLocalExpansionWithKinds = solveLocalExpansionDemand CompareSurvivors;
+  data SurvivorDemand = CompareSurvivors | SourcePayloads ();
+  -- Source graphs contain finite names and kinds. Demand them once, on the
+  -- first successful local quotient. Expansion copies these payloads; solving
+  -- changes only validated identities, links, binders and flags. Comparing
+  -- survivors thereafter cannot introduce a new payload demand.
+  sourcePayloads graph = SourcePayloads
+    (IM.foldr (\node rest -> seq (G.equalNode node node) rest) () (G.nodes graph));
+  solveLocalExpansionDemand demand prepared scopeLift projectedErrors equations solver current fresh = do {
     let {
       before = G.mkGraph (G.nodes current) IM.empty (G.nextId current);
       canonical = L.map (\((,) a b) -> (,) (G.resolve current a) (G.resolve current b)) equations;
@@ -2237,10 +2245,13 @@ module Bootstrap.Graph.Solver where {
       Right skeleton -> case closeLocalQuotientUsing scopeLift solver current before skeleton fresh of {
         Left message -> Right (LocalNeedsComponent message skeleton);
         Right result -> if L.not projectedErrors then Right result else case result of {
-          LocalSolved solved -> G.bindE projection
-            (\((,,,) _ _ originals _) -> G.bindE
-              (compareExpandedSurvivors (graph solved) originals)
-              (\_ -> Right result));
+          LocalSolved solved -> case demand of {
+            SourcePayloads proof -> seq proof (Right result);
+            CompareSurvivors -> G.bindE projection
+              (\((,,,) _ _ originals _) -> G.bindE
+                (compareExpandedSurvivors (graph solved) originals)
+                (\_ -> Right result))
+          };
           _ -> Right result
         }
       }
@@ -2712,32 +2723,34 @@ module Bootstrap.Graph.Solver where {
     (instantiateClosedWith Uncached source target solver);
   instantiateClosedWith cache source target solver = runInstantiation (CloseOne cache source target solver);
   solveGenerated input equations steps = L.mapEither L.fst (runInstantiation (SolveGenerated input equations steps));
+  solveFileGraph input equations steps = L.mapEither L.fst (runInstantiation (SolveFileGraph input equations steps));
   data InstantiationRequest = ExpandOne UnificationCache Int Int Solver | CloseOne UnificationCache Int Int Solver |
-    SolveGenerated Graph ([] ((,) Int Int)) ([] SolveStep);
-  data InstantiationInput = Supplied Solver | Generated Solver;
+    SolveGenerated Graph ([] ((,) Int Int)) ([] SolveStep) | SolveFileGraph Graph ([] ((,) Int Int)) ([] SolveStep);
+  data InstantiationInput = Supplied Solver | Generated Solver SurvivorDemand;
   -- Only the generated request prepares a graph and can enter the certified fold.
   -- Every step preserves the original generalization scopes and their binders.
   runInstantiation request = let {
-    current input = case input of { Supplied s -> s; Generated s -> s };
+    current input = case input of { Supplied s -> s; Generated s _ -> s };
     closed input cache source target = let { solver = current input } in case groundGraft source target solver of {
       Just grafted -> Right ((,) grafted cache);
       Nothing -> if groundInstance (graph solver) source target then Right ((,) solver cache)
         else expanded input cache source target
     };
-    advance ((,) solver cache) step = case step of {
-      Instantiate (Edge source target) -> closed (Generated solver) cache source target;
+    advance demand ((,) solver cache) step = case step of {
+      Instantiate (Edge source target) -> closed (Generated solver demand) cache source target;
       ProjectCase fields -> L.mapEither (\result -> (,) result cache) (projectCaseFields fields solver)
     };
     expanded input cache source target = let {
       solver = current input;
-      checkedKinds = case input of { Supplied _ -> False; Generated _ -> True };
+      checkedKinds = case input of { Supplied _ -> False; Generated _ _ -> True };
+      demand = case input of { Supplied _ -> CompareSurvivors; Generated _ known -> known };
       expansion = if checkedKinds then expandUsing (G.expandPreparedRetaining G.preparedFrontierKinds)
         else expandPrepared
     } in G.bindE (expansion source target solver)
         (\(G.PreparedExpansion root _ frontier fresh current) ->
           let { first = G.nextId (graph solver);
             fragmentCheck = preparedFragmentCheck first;
-            scopeLift = case input of { Supplied _ -> noScopeLift; Generated s -> scopeContains (scopeIndex s) };
+            scopeLift = case input of { Supplied _ -> noScopeLift; Generated s _ -> scopeContains (scopeIndex s) };
             prepared = checkedKinds;
             indexed = L.foldlStrict addNode (withGraph current solver) fresh;
             equations = L.append frontier ((:) ((,) root target) []);
@@ -2757,7 +2770,7 @@ module Bootstrap.Graph.Solver where {
             -- prepare has already ruled out Gen nodes as structural children.
             plan destination = if L.not (localExpansionAdmissible fragmentCheck current destination fresh root)
               then component else do {
-                result <- solveLocalExpansionWithKinds checkedKinds scopeLift True equations solver current fresh;
+                result <- solveLocalExpansionDemand demand checkedKinds scopeLift True equations solver current fresh;
                 case result of {
                   LocalRejected message -> Left message;
                   LocalSolved solved -> Right ((,) solved cache);
@@ -2795,14 +2808,16 @@ module Bootstrap.Graph.Solver where {
                   }
                 }
                 else ordinary)
-             else ordinary))
+             else ordinary));
+    generated demandFor input equations steps = do {
+      prepared <- prepare input;
+      initial <- solverUnify equations prepared;
+      G.foldE (advance (demandFor (graph initial))) ((,) initial emptyUnificationCache) steps
+    }
   } in case request of {
     ExpandOne cache source target solver -> expanded (Supplied solver) cache source target;
     CloseOne cache source target solver -> closed (Supplied solver) cache source target;
-    SolveGenerated input equations steps -> do {
-      prepared <- prepare input;
-      initial <- solverUnify equations prepared;
-      G.foldE advance ((,) initial emptyUnificationCache) steps
-    }
+    SolveGenerated input equations steps -> generated (\_ -> CompareSurvivors) input equations steps;
+    SolveFileGraph input equations steps -> generated sourcePayloads input equations steps
   }
 }

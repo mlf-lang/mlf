@@ -232,8 +232,7 @@ module Bootstrap.ImportedRoot
       lowered <- Surface.lowerExpression expression;
       C.validateAnnotations datatypes lowered;
       if null signatures then do {
-        result <- C.runGeneration memo (C.build datatypes M.empty Nothing M.empty (C.desugar lowered))
-          (C.Generation G.emptyGraph [] []);
+        result <- C.startGeneration memo (C.build datatypes M.empty Nothing M.empty (C.desugar lowered));
         case result of { (,) typed (C.Generation graph equalities steps) -> do {
           validate graph;
           Right ((,,) (Constraints graph typed (reverse equalities) (reverse steps)) [] [])
@@ -248,8 +247,7 @@ module Bootstrap.ImportedRoot
             "direct import contract is not closed") signatures;
           definitions <- traverseEither parameter parameters;
           let { admitted = case (,) compact ids of { (,) True (Just actual) -> evidenceOnly actual signatures inner; _ -> M.empty } };
-          result <- C.runGeneration memo (buildImported admitted datatypes ids definitions inner)
-            (C.Generation G.emptyGraph [] []);
+          result <- C.startGeneration memo (buildImported admitted datatypes ids definitions inner);
           case result of {
             (,) ((,,) typed imports allocated) (C.Generation graph equalities steps) -> do {
               validate graph;

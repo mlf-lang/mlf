@@ -78,6 +78,17 @@ def program(family, n):
     """Generate one shared module with a runtime input at its IO entry."""
     if family == 'baseline':
         declarations, expression = '', 'x'
+    elif family == 'recursive_worker_callbacks':
+        declarations = """data Job = Job (Int -> Int);
+runJob (Job callback) value = callback value;
+walk depth value = if ltInt depth 1 then value else walk (subInt depth 1) (addInt value 1);
+"""
+        terms = []
+        for i in range(n):
+            declarations += (f'make{i} seed = let {{ apply value = walk {i + 1} (addInt seed value) }} '
+                             f'in Job apply;\n')
+            terms.append(f'(runJob (make{i} x) {i})')
+        expression = balanced(terms, lambda a, b: f'(addInt {a} {b})') if terms else 'x'
     elif family == 'module_string_literals' and n:
         common = ['coerce', 'Prelude', 'Bool', 'Dict_' + 'x' * 64]
         def select(start, stop):
@@ -1043,6 +1054,8 @@ def expected(family, n, x):
         return (2*x + 2**63) % 2**64 - 2**63
     if family == 'independent_wide_recursive_groups':
         return (n*(16*x + 120) + n*(n-1)//2 + 2**63) % 2**64 - 2**63
+    if family == 'recursive_worker_callbacks':
+        return n * (x + n) if n else x
     if family == 'module_string_literals':
         if not n:
             return x

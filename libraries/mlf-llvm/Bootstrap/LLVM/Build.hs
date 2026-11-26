@@ -410,7 +410,12 @@ module Bootstrap.LLVM.Build where {
           L.any (\n -> eqString (showInt (O.nameId n)) (symbolIdentity name)) (S.toList collectors)
       };
       let {
-        attributes = Policy.attributes keepWorker collectingWorker name facts
+        attributes = Policy.attributes keepWorker collectingWorker name facts;
+        -- An optnone closure must execute even a pure worker that never returns.
+        -- LLVM lowers sideeffect without a runtime call, while retaining the
+        -- observable transfer during interprocedural optimization and codegen.
+        workerCode = if startsWith "@mlf.worker." name
+          then (:) "  call void @llvm.sideeffect()" code else code
       };
       let {
         text =
@@ -420,7 +425,7 @@ module Bootstrap.LLVM.Build where {
                   ("define private " ++ (ty ++ (" " ++
                    (name ++ ("(" ++ (L.intercalate ", " args ++ (")" ++ (attributes ++ " {"))))))))
                   "entry:")
-               (L.snoc code "}"))
+               (L.snoc workerCode "}"))
       };
       -- Store the completed function text while its instruction stream is local.
       seq text (modify

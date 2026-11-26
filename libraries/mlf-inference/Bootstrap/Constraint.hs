@@ -39,15 +39,25 @@ module Bootstrap.Constraint where {
     SeparateEnvironments -> SeparateEnvironments
   };
   data Generate a = Generate (Generation -> Either String ((,) a Generation)) |
-    WithCandidates (CandidateMemo -> Generation -> Either String ((,,) a Generation CandidateMemo));
-  runWithCandidates memo action state = case action of {
+    WithCandidates ((Graph -> [] ((,) Int Int) -> [] SolveStep -> Either String Solver) ->
+      CandidateMemo -> Generation -> Either String ((,,) a Generation CandidateMemo));
+  runWithSolver solveGraph memo action state = case action of {
     Generate f -> case f state of {
       Left message -> Left message;
       Right ((,) value after) -> Right ((,,) value after memo)
     };
-    WithCandidates f -> f memo state
+    WithCandidates f -> f solveGraph memo state
   };
-  runGeneration memo action state = case runWithCandidates memo action state of {
+  runWithCandidates = runWithSolver Solver.solveGenerated;
+  runGeneration = runUsing Solver.solveGenerated;
+  -- Only a file builder starting with an empty graph owns every node payload.
+  -- Callers supplying a Generation retain the ordinary survivor demand order.
+  startGeneration memo action = let { solveGraph = case memo of {
+    SeparateEnvironments -> Solver.solveGenerated;
+    SharedEnvironments _ -> Solver.solveFileGraph;
+    BatchedEnvironments _ -> Solver.solveFileGraph
+  } } in runUsing solveGraph memo action (Generation G.emptyGraph [] []);
+  runUsing solveGraph memo action state = case runWithSolver solveGraph memo action state of {
     Left message -> Left message;
     Right ((,,) value after _) -> Right ((,) value after)
   };
@@ -55,16 +65,16 @@ module Bootstrap.Constraint where {
   generatePure :: forall a. a -> Generate a;
   generatePure value = Generate (\state -> Right ((,) value state));
   generateBind :: forall a b. Generate a -> (a -> Generate b) -> Generate b;
-  generateBind action next = WithCandidates (\memo state ->
-    case runWithCandidates memo action state of {
+  generateBind action next = WithCandidates (\solveGraph memo state ->
+    case runWithSolver solveGraph memo action state of {
       Left message -> Left message;
-      Right ((,,) value after memo2) -> seq after (runWithCandidates memo2 (next value) after)
+      Right ((,,) value after memo2) -> seq after (runWithSolver solveGraph memo2 (next value) after)
     });
   -- Lexical binders cannot change a declaration slot. A declaration binder
   -- installs a different slot table, whose memo lives only inside its body.
-  withDeclarationScope action = WithCandidates (\memo state -> case memo of {
-    SeparateEnvironments -> runWithCandidates SeparateEnvironments action state;
-    _ -> case runWithCandidates (replaceCandidateTable memo IM.empty) action state of {
+  withDeclarationScope action = WithCandidates (\solveGraph memo state -> case memo of {
+    SeparateEnvironments -> runWithSolver solveGraph SeparateEnvironments action state;
+    _ -> case runWithSolver solveGraph (replaceCandidateTable memo IM.empty) action state of {
       Left message -> Left message;
       Right ((,,) value after _) -> Right ((,,) value after memo)
     }
@@ -160,17 +170,13 @@ module Bootstrap.Constraint where {
   -- or frozen exports. Recursive assumptions contribute equalities only.
   -- Keep the surrounding unfinished graph unnormalized across this boundary.
   flushGeneration :: Generate ();
-  flushGeneration =
-    Generate
-      (\state ->
-         case state of {
-           Generation graph eqs es ->
-             do {
-               solved <- Solver.solveGenerated graph (reverse eqs) (reverse es);
-               finished <- Solver.finish solved;
-               Right ((,) () (Generation finished [] []))
-             }
-         });
+  flushGeneration = WithCandidates (\solveGraph memo state -> case state of {
+    Generation graph eqs es -> do {
+      solved <- solveGraph graph (reverse eqs) (reverse es);
+      finished <- Solver.finish solved;
+      Right ((,,) () (Generation finished [] []) memo)
+    }
+  });
   equality a b =
     Generate
       (\state ->
@@ -349,8 +355,7 @@ module Bootstrap.Constraint where {
           lowered <- Surface.lowerExpression expression;
           validateAnnotations datatypes lowered;
           result <-
-            runGeneration memo (build datatypes M.empty Nothing M.empty (desugar lowered))
-              (Generation G.emptyGraph [] []);
+            startGeneration memo (build datatypes M.empty Nothing M.empty (desugar lowered));
           case result of {
             (,) typed (Generation graph eqs es) ->
               Right (Constraints graph typed (reverse eqs) (reverse es))
@@ -397,7 +402,7 @@ module Bootstrap.Constraint where {
   };
   resolveCandidateEnvironment = resolveCandidateEnvironmentIn M.empty;
   resolveCandidateEnvironmentIn imported env gen (CandidateEnvironment owner refs) =
-    WithCandidates (\memo state -> let {
+    WithCandidates (\_ memo state -> let {
       resolve = traverseEither (evidenceBindingIn imported env) refs;
       fresh rows = ResolvedCandidateEnvironment gen rows
     } in case memo of {
@@ -613,8 +618,8 @@ module Bootstrap.Constraint where {
     };
     _ -> Nothing
   };
-  fileApplication specialized ordinary = WithCandidates (\memo state ->
-    runWithCandidates memo (case memo of {
+  fileApplication specialized ordinary = WithCandidates (\solveGraph memo state ->
+    runWithSolver solveGraph memo (case memo of {
       SeparateEnvironments -> ordinary;
       _ -> specialized
     }) state);
@@ -756,7 +761,7 @@ module Bootstrap.Constraint where {
         };
         _ -> ordinary
       }) ordinary;
-      verifiedCall source ref count alreadyGround = WithCandidates (\memo state -> runWithCandidates memo (case (,) memo ref of {
+      verifiedCall source ref count alreadyGround = WithCandidates (\solveGraph memo state -> runWithSolver solveGraph memo (case (,) memo ref of {
         (,) (BatchedEnvironments _) (DeclRef _ _) -> do {
           graph <- getGraph;
           case repeatedDictionaryCall graph source count alreadyGround of {
@@ -1063,7 +1068,7 @@ module Bootstrap.Constraint where {
                 return ((,) use pending)
               }
             };
-            operands <- WithCandidates (\memo state -> runWithCandidates memo (case memo of {
+            operands <- WithCandidates (\solveGraph memo state -> runWithSolver solveGraph memo (case memo of {
               BatchedEnvironments _ -> values graph (G.genRoot graph source) (zip arguments domains) Nothing;
               _ -> mapM (\((,) ((,) dictionary candidates) domain) -> do {
               value <- child env (CWantedScope dictionary candidates);
@@ -1423,17 +1428,17 @@ module Bootstrap.Constraint where {
         finishRecursiveGroupsUsing G.materializeSolvedExportBatch scope parent pending
       }
     } in case batch of {
-      (:) _ ((:) _ _) -> WithCandidates (\memo state -> case state of {
+      (:) _ ((:) _ _) -> WithCandidates (\solveGraph memo state -> case state of {
         Generation graph [] [] -> if not (closedRecursiveBatchIn (snd scopeRoot) graph scope batch)
-          then runWithCandidates memo sequential state
-          else runWithCandidates memo together state;
-        _ -> runWithCandidates memo sequential state
+          then runWithSolver solveGraph memo sequential state
+          else runWithSolver solveGraph memo together state;
+        _ -> runWithSolver solveGraph memo sequential state
       });
       _ -> sequential
     }
-  } in WithCandidates (\memo state -> case memo of {
-    BatchedEnvironments _ -> runWithCandidates memo candidate state;
-    _ -> runWithCandidates memo ordinary state
+  } in WithCandidates (\solveGraph memo state -> case memo of {
+    BatchedEnvironments _ -> runWithSolver solveGraph memo candidate state;
+    _ -> runWithSolver solveGraph memo ordinary state
   });
   recursiveDeclarations group = IS.fromList (mapMaybe (\((,,) ref _ _) -> case ref of {
     DeclRef i _ -> Just (V.toInt i); LexicalRef _ -> Nothing
@@ -1655,7 +1660,7 @@ module Bootstrap.Constraint where {
                  Nothing -> ordinary;
                  Just ((,,) names body common) -> let { compact = CBindDictionaries names body } in case common of {
                    Nothing -> buildBody compact;
-                   Just _ -> WithCandidates (\memo state -> runWithCandidates memo (case memo of {
+                   Just _ -> WithCandidates (\solveGraph memo state -> runWithSolver solveGraph memo (case memo of {
                      BatchedEnvironments _ -> generalize (Just group) (\gen root ->
                        buildDictionaryPrefixIn common scopeRoot datatypes typeScope scope gen root names body);
                      _ -> buildBody compact

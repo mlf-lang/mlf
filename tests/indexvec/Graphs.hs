@@ -570,6 +570,10 @@ localExpansionChecks = do
       (Solver.solveGenerated (original T.Flexible (T.GArr 12 12)) [] [T.Instantiate (T.Edge source destination)])
     batchGraph <- right "audit the batch-owned scope index" (Solver.finish batch)
     check "scope ancestry preserves the raw graph and alias chain" True (same expected batchGraph)
+    fileBatch <- right "solve the file-generated graph"
+      (Solver.solveFileGraph (original T.Flexible (T.GArr 12 12)) [] [T.Instantiate (T.Edge source destination)])
+    fileGraph <- right "finish the file-generated graph" (Solver.finish fileBatch)
+    check "file-generated expansion preserves nodes, links and identities" True (same expected fileGraph)
     let T.Solver raw parents descendants (T.ScopeIndex intervals jumps) = initial
         falseInterval = IntMap.get (at 5) intervals
         forged = T.Solver raw parents descendants (T.ScopeIndex (IntMap.insert (at 2) falseInterval intervals) jumps)
@@ -4184,10 +4188,33 @@ reviewBoundaryChecks = do
   check "worker threshold at 64" " noinline optnone" (policy (iterate Policy.instruction small !! 64))
   check "allocating musttail" " noinline optnone" (policy tailCall)
   check "explicit loop" "" (policy (Policy.markLoop tailCall))
-  check "boxed transfer from closure" " noinline optsize"
+  check "boxed worker calls keep the closure out of the optimizer" " noinline optnone"
     (H.unpack (Policy.attributes False False "@mlf.code.x" (Policy.pointerCall name small)))
 
+-- The copied arrow shares a surviving grandchild. Its name is demanded by
+-- expansion, while a disconnected generalization can carry an unevaluated name.
+manualSurvivorDemand = do
+  let node tag parent = T.Node tag (T.Just parent) T.Flexible
+      base = [(0,T.Node (T.GGen 1) T.Nothing T.Flexible), (1,node (T.GCon "Int" []) 0),
+              (2,node (T.GGen 3) 0), (3,node (T.GArr 4 5) 2), (4,node (T.GArr 6 6) 3),
+              (5,node T.GBot 3), (7,node (T.GGen 8) 0), (8,node (T.GArr 9 10) 7),
+              (9,node T.GBot 8), (10,node T.GBot 8)]
+      name = errorWithoutStackTrace "surviving name demanded"
+      live = [(6,node (T.GArr 11 11) 4), (11,node (T.GCon name []) 6)]
+      unused = [(6,node T.GBot 4), (20,node (T.GGen 21) 0), (21,node (T.GCon name []) 20)]
+      observe memo extra = do
+        let graph = Graph.mkGraph (IntMap.fromList (base ++ extra)) IntMap.empty (1 + maximum (map fst extra))
+            state = C.Generation graph [] [T.Instantiate (T.Edge 2 8)]
+        result <- try (evaluate (case C.runGeneration memo C.flushGeneration state of
+          T.Left why -> error (H.unpack why)
+          T.Right (_, C.Generation solved _ _) -> Graph.nextId solved > 0)) :: IO (Either ErrorCall Bool)
+        pure (either (Left . displayException) Right result)
+  forM_ [C.SharedEnvironments IntMap.empty, C.BatchedEnvironments IntMap.empty] $ \memo -> do
+    check "manual graph checks the surviving name" (Left "surviving name demanded") =<< observe memo live
+    check "manual graph leaves disconnected names lazy" (Right True) =<< observe memo unused
+
 main = do
+  manualSurvivorDemand
   reviewBoundaryChecks
   permissionMemoPages
   recursiveArgumentChecks

@@ -2832,7 +2832,7 @@ module Bootstrap.LLVM.Codegen where {
             ((:) "!3 = !{!1, !1, i64 0}" ((:) "!4 = !{!2, !2, i64 0}" []))));
   runtimeDeclarations :: [] String;
   runtimeDeclarations =
-    L.append ["declare ptr @mlf_st_freeze_array(ptr)", "@mlf_ascii_string_indices = external global i64",
+    L.append ["declare void @llvm.sideeffect()", "declare ptr @mlf_st_freeze_array(ptr)", "@mlf_ascii_string_indices = external global i64",
       "declare ptr @mlf_string_utf8_length(ptr)",
       "declare ptr @mlf_string_length(ptr)", "declare ptr @mlf_string_code_at(ptr, ptr)",
       "declare ptr @mlf_concat_string_list(ptr)",
