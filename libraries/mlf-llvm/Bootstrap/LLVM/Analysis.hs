@@ -142,25 +142,30 @@ module Bootstrap.LLVM.Analysis where {
       fs;
   captureIndexed :: Map XName ((,) ([] XName) (Set XName)) ->
                     Map XName WorkerFunction -> Map XName WorkerFunction;
-  captureIndexed inputs fs =
-    let {
-      next =
-        M.mapWithKey
-          (\name f ->
-             case M.get O.compareName name inputs of {
-               (,) names parameterNames ->
-                 WorkerFunction (parameters f) (functionBody f)
-                   (S.toList
-                      (S.difference O.compareName
-                         (S.unions O.compareName (L.map (neededName fs) names))
-                         parameterNames))
-                   (strict f) (entrySummary f)
-             })
-          fs
-    } in
-    if M.eqMap O.eqName (\a b -> sameNames (captures a) (captures b)) fs next
-    then fs
-    else captureIndexed inputs next;
+  captureIndexed inputs fs = let {
+    callers = M.foldlWithKeyStrict addCaller M.empty inputs;
+    addCaller index caller ((,) names _) = L.foldlStrict
+      (\tree name -> if M.member O.compareName name fs
+        then M.insertWith O.compareName L.append name [caller] tree else tree) index names;
+    -- Read from the previous wave throughout. Only callers of changed
+    -- workers can see different captures on the next wave.
+    propagate previous pending = let {
+      update ((,) current dirty) name = let {
+        f = M.get O.compareName name previous;
+        input = M.get O.compareName name inputs
+      } in case input of { (,) names parameterNames -> let {
+        captured = S.toList (S.difference O.compareName
+          (S.unions O.compareName (L.map (neededName previous) names)) parameterNames)
+      } in if sameNames captured (captures f) then (,) current dirty else let {
+        updated = WorkerFunction (parameters f) (functionBody f) captured (strict f) (entrySummary f);
+        next = M.insert O.compareName name updated current;
+        dependents = M.findWithDefault O.compareName [] name callers;
+        affected = L.foldlStrict (\set caller -> S.insert O.compareName caller set) dirty dependents
+      } in seq next (seq affected ((,) next affected)) }
+    } in case L.foldlStrict update ((,) previous S.empty) pending of {
+      (,) current dirty -> if S.null dirty then current else propagate current (S.toList dirty)
+    }
+  } in propagate fs (M.keys fs);
   demandFixed :: Map XName WorkerFunction -> Map XName WorkerFunction;
   demandFixed fs =
     let {

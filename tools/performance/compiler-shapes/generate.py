@@ -396,6 +396,13 @@ instance Pass Box where { pass (Box x) = Box (addInt x 1) };
         rows.extend(['entry :: Int -> Int;',
                      f'entry x = let {{ key = remInt x 11 }} in score (makeTokens (if eqInt key 6 then {n-1} else {n}) (ltInt key 0)) key;'])
         return HEADER + '\n'.join(rows) + '\n' + MAIN
+    elif family == 'forwarded_worker_capture':
+        workers = [f'worker{n} v = addInt x v']
+        for i in reversed(range(n)):
+            workers.append(f'worker{i} v = addInt 1 (if ltInt v 0 then worker{i+1} (subInt 0 v) '
+                           f'else worker{i+1} v)')
+        declarations = ''
+        expression = 'let { ' + '; '.join(workers) + ' } in worker0 x'
     elif family == 'recursive_lookup_workers':
         declarations = (
             'data Tree = Empty | Branch Tree Int Int Tree;\n'
@@ -1171,6 +1178,9 @@ def expected(family, n, x):
         # For a nonnegative key their saved calls contribute the sum of odd indices.
         result = 9*odd + even*(even+1) if key < 0 else odd*key + 2*odd*odd + 3*even
         return (result + 2**63) % 2**64 - 2**63
+    if family == 'forwarded_worker_capture':
+        argument = abs(x) if n else x
+        return (x + argument + n + 2**63) % 2**64 - 2**63
     if family == 'recursive_lookup_workers':
         # Each stored key contributes once if its signed Int64 offset is visited.
         modulus = 2**64

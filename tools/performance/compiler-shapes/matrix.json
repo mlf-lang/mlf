@@ -37,6 +37,7 @@
     "rank2_callbacks": {"label": "Many rank-2 callback consumers", "default": true, "work": "n distinct consumers use their polymorphic callback at both Int and Bool"},
     "decoder_pipeline": {"label": "Dependent decoder stages", "default": true, "work": "n field reads with state-dependent checks and an early malformed-input exit"},
     "nested_worker_applications": {"label": "Nested recursive worker applications", "default": false, "work": "n binary token matches enclose n local recursive functions, all called directly and alternating functions also stored after their first argument"},
+    "forwarded_worker_capture": {"label": "Forwarded worker captures", "default": false, "work": "n local functions forward an argument through conditional calls to a worker that captures the outer input"},
     "recursive_lookup_workers": {"label": "Distinct recursive tree lookups", "default": false, "work": "n independently bound recursive binary-search workers, each called on an offset runtime key"},
     "stable_recursive_workers": {"label": "Stable recursive workers", "default": false, "work": "n reachable recursive functions beside a fully applied 24-argument lambda reduced over successive optimizer passes"},
     "escaping_curried_jobs": {"label": "Stored curried functions", "default": false, "work": "n distinct twelve-argument functions stored in a job list and partially applied and reused with two suffixes"},
