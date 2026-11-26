@@ -142,7 +142,17 @@ class HostContract(unittest.TestCase):
         # A current host alone must never authenticate an obsolete or mixed tree.
         sources = {path: (ROOT / path).read_bytes()
                    for path in self.binary.value['current_files']}
-        self.assertEqual(len(sources), 197)
+        self.assertEqual(len(sources), 203)
+        # Pin the six additions independently of the live module registry.
+        previous = self.binary.previous.value['current_files']
+        self.assertEqual(set(sources), previous.keys() | {
+            'libraries/mlf-crates/Bootstrap/GroundProofEdit.hs',
+            'libraries/mlf-inference/Bootstrap/Graph/ScopeIndex.hs',
+            'libraries/mlf-llvm/Bootstrap/LLVM/FunctionPolicy.hs',
+            'libraries/mlf-llvm/Bootstrap/LLVM/RecursiveArguments.hs',
+            'libraries/mlf-xmlf/Bootstrap/X/Traversal.hs',
+            'testing/Test/CaseSelection.hs',
+        })
         self.assertNotIn('tests/Tests/TupleListLegacy.hs', sources)
         self.assertIn('libraries/mlf-foundation/Bootstrap/IndexVec.hs', sources)
         self.assertIn('libraries/mlf-frontend/Bootstrap/Resolved.hs', sources)
