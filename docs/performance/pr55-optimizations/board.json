@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "board_revision": 4,
+  "board_revision": 5,
   "mode": "standard",
   "project": {
     "name": "PR55 algorithmic optimizations",
@@ -17,7 +17,8 @@
       "Optimization branch started at 45ddd6da0f2488523fbf9f773a2bd83c5c78d1ea.",
       "Latest observed PR55 head 94e086c15c40aaf220c764f0e723cc3cfe627587 was fast-forwarded locally.",
       "Capture propagation, lexical let summary sharing and normalizeRow cons/reverse were already present at that head.",
-      "Resumed from the existing staged implementation; upstream PR55 now has three test-only commits through 1297b5c. Keep the recorded 94e086c production baseline for comparisons."
+      "Resumed from the existing staged implementation; upstream PR55 now has three test-only commits through 1297b5c. Keep the recorded 94e086c production baseline for comparisons.",
+      "Published implementation 2c16cd5e439ab2e55775a790de57ff6de950290f was read back from the requested branch; tree65429583e9528ede635b134fdb42388a81fbba8f exactly matched the tested local tree."
     ]
   },
   "profile": {
@@ -96,10 +97,10 @@
         "child_goal_ids": []
       },
       "assessment": {
-        "support": "unsupported",
-        "acceptance": "pending",
-        "evaluated_board_revision": 4,
-        "rationale": "Implementation, targeted semantic tests and reduced-shape performance threshold pass. Remote publication is the remaining criterion."
+        "support": "supported",
+        "acceptance": "accepted",
+        "evaluated_board_revision": 5,
+        "rationale": "All five criteria pass for the scoped ten-path integration, targeted semantic checks, reduced-shape medians and published implementation. Full backend/self-host/platform campaigns and growth qualification remain outside these claims."
       }
     }
   ],
@@ -149,8 +150,8 @@
       "goal_id": "G1",
       "goal_revision": 2,
       "required": true,
-      "evaluation": "unknown",
-      "rationale": "Verification pending"
+      "evaluation": "satisfied",
+      "rationale": "GitHub branch readback matched implementation commit 2c16cd5e439ab2e55775a790de57ff6de950290f with the exact tested tree. This subsequent board-only closure leaves production source identities unchanged."
     },
     {
       "id": "C5",
@@ -192,7 +193,7 @@
         "docs/pr55-algorithmic-optimizations.md",
         "docs/performance/pr55-optimizations/validation.json"
       ],
-      "next_action": "Implementation and targeted regression verification complete; integration owner finishes timing and publication."
+      "next_action": "Delivered; no remaining work in the scoped implementation task."
     },
     {
       "id": "T2",
@@ -221,7 +222,7 @@
         "docs/pr55-algorithmic-optimizations.md",
         "docs/performance/pr55-optimizations/validation.json"
       ],
-      "next_action": "Implementation and targeted regression verification complete; integration owner finishes timing and publication."
+      "next_action": "Delivered; no remaining work in the scoped implementation task."
     },
     {
       "id": "T3",
@@ -252,7 +253,7 @@
         "docs/pr55-algorithmic-optimizations.md",
         "docs/performance/pr55-optimizations/validation.json"
       ],
-      "next_action": "Implementation and targeted regression verification complete; integration owner finishes timing and publication."
+      "next_action": "Delivered; no remaining work in the scoped implementation task."
     },
     {
       "id": "T4",
@@ -280,7 +281,7 @@
         "docs/pr55-algorithmic-optimizations.md",
         "docs/performance/pr55-optimizations/validation.json"
       ],
-      "next_action": "Implementation and targeted regression verification complete; integration owner finishes timing and publication."
+      "next_action": "Delivered; no remaining work in the scoped implementation task."
     },
     {
       "id": "T5",
@@ -308,7 +309,7 @@
         "docs/pr55-algorithmic-optimizations.md",
         "docs/performance/pr55-optimizations/validation.json"
       ],
-      "next_action": "Implementation and targeted regression verification complete; integration owner finishes timing and publication."
+      "next_action": "Delivered; no remaining work in the scoped implementation task."
     },
     {
       "id": "T6",
@@ -336,7 +337,7 @@
         "docs/pr55-algorithmic-optimizations.md",
         "docs/performance/pr55-optimizations/validation.json"
       ],
-      "next_action": "Implementation and targeted regression verification complete; integration owner finishes timing and publication."
+      "next_action": "Delivered; no remaining work in the scoped implementation task."
     },
     {
       "id": "T7",
@@ -364,7 +365,7 @@
         "docs/pr55-algorithmic-optimizations.md",
         "docs/performance/pr55-optimizations/validation.json"
       ],
-      "next_action": "Implementation and targeted regression verification complete; integration owner finishes timing and publication."
+      "next_action": "Delivered; no remaining work in the scoped implementation task."
     },
     {
       "id": "T8",
@@ -392,7 +393,7 @@
         "docs/pr55-algorithmic-optimizations.md",
         "docs/performance/pr55-optimizations/validation.json"
       ],
-      "next_action": "Implementation and targeted regression verification complete; integration owner finishes timing and publication."
+      "next_action": "Delivered; no remaining work in the scoped implementation task."
     },
     {
       "id": "T9",
@@ -420,7 +421,7 @@
         "docs/pr55-algorithmic-optimizations.md",
         "docs/performance/pr55-optimizations/validation.json"
       ],
-      "next_action": "Implementation and targeted regression verification complete; integration owner finishes timing and publication."
+      "next_action": "Delivered; no remaining work in the scoped implementation task."
     },
     {
       "id": "T10",
@@ -448,7 +449,7 @@
         "docs/pr55-algorithmic-optimizations.md",
         "docs/performance/pr55-optimizations/validation.json"
       ],
-      "next_action": "Implementation and targeted regression verification complete; integration owner finishes timing and publication."
+      "next_action": "Delivered; no remaining work in the scoped implementation task."
     }
   ],
   "attempts": [
@@ -503,6 +504,15 @@
       "kind": "benchmark_evaluation",
       "subject": "12 full-compilation medians; arithmetic independently rechecked",
       "artifact": "docs/performance/pr55-optimizations/validation.json"
+    },
+    {
+      "id": "E-publish",
+      "kind": "remote_ref_readback",
+      "repository": "mlf-lang/mlf",
+      "branch": "codex/pr55-algorithmic-optimizations",
+      "commit": "2c16cd5e439ab2e55775a790de57ff6de950290f",
+      "tree": "65429583e9528ede635b134fdb42388a81fbba8f",
+      "method": "GitHub content-addressed blobs and tree matched local Git objects; non-forced ref update checked expected45ddd6d; git fetch and ls-remote independently confirmed the new commit."
     }
   ],
   "evidence_bindings": [
@@ -530,6 +540,13 @@
     {
       "evidence_id": "E-threshold",
       "criterion_id": "C5",
+      "criterion_revision": 1,
+      "applicability": "current",
+      "evaluation": "satisfied"
+    },
+    {
+      "evidence_id": "E-publish",
+      "criterion_id": "C4",
       "criterion_revision": 1,
       "applicability": "current",
       "evaluation": "satisfied"
