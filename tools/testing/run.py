@@ -185,8 +185,10 @@ def supervise(inherit_process_group):
                 pass
         if os.name == "posix":
             child.send_signal(cancelled[0])
-        else:
-            child.terminate()
+            # The group owner enforces the deadline. A suite may still be
+            # reaping a nested session whose workers hold our output pipes.
+            return child.wait()
+        child.terminate()
         try:
             return child.wait(timeout=0.5)
         except subprocess.TimeoutExpired:

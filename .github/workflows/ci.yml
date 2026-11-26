@@ -308,6 +308,7 @@ jobs:
         if: ${{ !cancelled() && steps.native_lifecycle.outcome == 'success' && matrix.suite == 'routine' }}
         run: |
           set -euo pipefail
+          . tools/release/native-environment.sh
           toolset="$PWD/.mlf-build/shared-ghc/bin"
           export MLF_BUILD_RUNNER="$toolset/mlf-build-runner"
           "$toolset/compiler-tests" backends --manager "$toolset/mlfpkg" --compiler "$toolset/emlf" \

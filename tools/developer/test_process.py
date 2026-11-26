@@ -170,9 +170,9 @@ class BuildProcessTests(unittest.TestCase):
                 root = Path(cwd)
                 script = ('import sys, os\nfrom pathlib import Path\n'
                           f'sys.path.insert(0, {str(SCRIPT.parent)!r})\n'
-                          'from test_process import fixture\n'
                           'Path("suite-pid").write_text(str(os.getpid()))\n'
-                          'fixture("driver", Path.cwd())\n')
+                          'from test_process import args, process\n'
+                          'process.run_build(args("leader", Path.cwd()), Path.cwd(), cancellation_grace=0.8)\n')
                 argv = check_tools_fixture(root, script)
                 with subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as cli:
                     try:
