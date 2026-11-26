@@ -364,7 +364,7 @@ module Tests.CompilerTests where {
                (J.set "case_report_sha256" (J.str digest)
                   (J.set "framework_case_ids" (J.stringArray actual) J.empty)))
     };
-  coreRegistryDiscovery :: TestContext -> String -> String -> IO J.Json;
+  coreRegistryDiscovery :: TestContext -> String -> String -> IO ((,) Int J.Json);
   coreRegistryDiscovery c target binary =
     do {
       let {
@@ -374,18 +374,18 @@ module Tests.CompilerTests where {
                    else CorePartitions.forTarget target
       };
       contract <- J.read contractPath;
+      contractDigest <- fileDigest contractPath;
       capture c ((:) binary (O.words "--list --format json")) path;
       text <- readFile path;
-      case Coverage.validateRegistryDiscovery contract families text of {
+      total <- case Coverage.validateRegistryDiscovery contract families text of {
         Left message -> O.fatal (target ++ (": " ++ message));
-        Right _ -> return ()
+        Right value -> return value
       };
       digest <- fileDigest path;
-      contractDigest <- fileDigest contractPath;
-      return (J.set "path" (J.str path)
+      return ((,) total (J.set "path" (J.str path)
         (J.set "sha256" (J.str digest)
           (J.set "contract_path" (J.str contractPath)
-            (J.set "contract_sha256" (J.str contractDigest) J.empty))))
+            (J.set "contract_sha256" (J.str contractDigest) J.empty)))))
     };
   suiteArgsEvidence :: TestContext ->
                        String ->
@@ -403,8 +403,8 @@ module Tests.CompilerTests where {
       let {
         unit = if shard then "core" else target
       };
-      registry <- if eqString unit "core" then coreRegistryDiscovery c target binary
-                  else return J.empty;
+      (,) registryTotal registry <- if eqString unit "core" then coreRegistryDiscovery c target binary
+                                   else return ((,) 0 J.empty);
       let {
         structural =
           (shard ||
@@ -454,7 +454,7 @@ module Tests.CompilerTests where {
       cases <- if eqString unit "core" then do {
         contract <- J.read (J.getText "contract_path" "" registry);
         text <- readFile casePath;
-        case Coverage.validateRegistryCases contract expectedFamilies text of {
+        case Coverage.validateRegistryCases contract expectedFamilies registryTotal text of {
           Left message -> O.fatal (target ++ (": " ++ message));
           Right _ -> return ()
         };

@@ -241,7 +241,7 @@ module Tests.Coverage where {
             "registry ID, name, order or family ownership changed"
         }) (S.zip expected actual)
     };
-  validateRegistryDiscovery :: J.Json -> [] String -> String -> Either String ();
+  validateRegistryDiscovery :: J.Json -> [] String -> String -> Either String Int;
   validateRegistryDiscovery inventory families text =
     do {
       expected <- registryProjection inventory families;
@@ -257,10 +257,11 @@ module Tests.Coverage where {
         J.Array values -> Right values;
         _ -> Left "registry discovery cases must be an array"
       };
-      registryDescriptors expected actual
+      registryDescriptors expected actual;
+      return (S.length expected)
     };
-  validateRegistryCases :: J.Json -> [] String -> String -> Either String ();
-  validateRegistryCases inventory families text =
+  validateRegistryCases :: J.Json -> [] String -> Int -> String -> Either String ();
+  validateRegistryCases inventory families total text =
     do {
       expected <- registryProjection inventory families;
       rows <- parse text;
@@ -277,10 +278,9 @@ module Tests.Coverage where {
       };
       ensure (kind "start" first && strictStrings (J.get "ids" first) &&
               S.eqList eqString (J.getStrings "ids" first) ids &&
-              natural (J.get "total" first) &&
+              J.equal (J.get "total" first) (J.num total) &&
               J.equal (J.get "selected" first) (J.num count))
         "registry case plan differs from the independent selection";
-      let { total = case J.get "total" first of { J.Number value -> readInt value; _ -> 0 } };
       ensure (total >= count &&
               J.equal (J.get "scope" first) (J.str (if total == count then "full" else "partial")) &&
               J.equal (J.get "scope" last) (J.get "scope" first))
