@@ -24,7 +24,7 @@ fixture directory evidence manifest = do
  let package = directory ++ "/package"
  O.mkdir (package ++ "/evidence")
  O.mkdir (package ++ "/runtime")
- S.mapM_ (\name -> do { writeFile (package ++ "/" ++ name) "test executable\n"; O.run "" ((:) "/bin/chmod" ((:) "+x" ((:) (package ++ "/" ++ name) []))) }) (O.words "emlf emlf-compile")
+ S.mapM_ (\name -> do { writeFile (package ++ "/" ++ name) ("#!/bin/sh\nprintf '%s\\n' '" ++ name ++ "' \"$@\"\n"); O.run "" ((:) "/bin/chmod" ((:) "+x" ((:) (package ++ "/" ++ name) []))) }) (O.words "emlf emlf-compile")
  hash <- fileDigest (package ++ "/emlf")
  writeFile (package ++ "/runtime/mlf_runtime.c") "runtime\n"
  let changed = O.replace "compiler-hash" hash (J.render evidence)
@@ -115,6 +115,18 @@ stepChecks = do
  Coverage.passed "harness" "test_gate_does_not_inherit_compiler_or_collector_overrides"
  putStrLn "PASS test_gate_does_not_inherit_compiler_or_collector_overrides"
 
+-- Exercise each installed command from an unrelated working directory. The
+-- literal argument also catches wrappers that lose quoting after relocation.
+installedCommands : String -> String -> IO ()
+installedCommands scratch bin = S.mapM_ (\name -> do
+ let output = scratch ++ "/" ++ name ++ ".out"
+ let errors = scratch ++ "/" ++ name ++ ".err"
+ let argument = "literal $() λ with spaces"
+ code <- O.exec scratch ((:) (bin ++ "/" ++ name) ((:) argument [])) "" output errors 5
+ text <- readFile output
+ err <- readFile errors
+ H.assert (code == 0 && eqString text (name ++ "\n" ++ argument ++ "\n") && eqString err "") ("installed command failed: " ++ name)) (O.words "emlf emlf-compile")
+
 installationChecks : J.Json -> J.Json -> IO ()
 installationChecks evidence manifest = do
  H.withScratch (\directory -> do
@@ -135,20 +147,24 @@ installationChecks evidence manifest = do
   fixture directory evidence manifest
   let prefix = directory ++ "/prefix with spaces"
   count <- newIntArray 1 0
-  let smoke = \_ -> do { n <- readIntArray count 0; writeIntArray count 0 (n + 1) }
+  let smoke = \installed -> do { installedCommands directory installed; n <- readIntArray count 0; writeIntArray count 0 (n + 1) }
   first <- V.installWithSmoke directory prefix smoke
   H.right first
   n <- readIntArray count 0
   H.assert (n == 1) "installation smoke was skipped or repeated"
   second <- V.installWithSmoke directory prefix smoke
   H.right second
+  n <- readIntArray count 0
+  H.assert (n == 2) "reinstallation smoke was skipped or repeated"
+  installedCommands directory (prefix ++ "/bin")
   a <- canonicalPath (prefix ++ "/bin/emlf")
   b <- canonicalPath (prefix ++ "/bin/emlf-compile")
   H.assert (eqString (O.parent a) (O.parent b)) "installed commands target different packages"
   let moved = directory ++ "/relocated"
   O.move prefix moved
-  present <- fileExists (moved ++ "/bin/emlf")
-  H.assert present "installation is not relocatable"
+  present <- directoryExists prefix
+  H.assert (S.not present) "relocation retained the old prefix"
+  installedCommands directory (moved ++ "/bin")
   H.removeFile (moved ++ "/bin/emlf")
   writeFile (moved ++ "/bin/emlf") "other compiler"
   rejected <- V.installWithSmoke directory moved smoke

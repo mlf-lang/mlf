@@ -206,29 +206,23 @@ runWorkload c checkOnly limits eventPath selected work = do
       finishCase eventPath selected identity false (one (pair "detail" (J.str message)))
       O.fatal message
  startCase eventPath selected correctnessId
- if checkOnly then do
+ B.runWorkloadMode checkOnly (do
   result <- checkWorkload c work (check correctnessId)
   checked
-  return ((,) result [])
- else do
+  return result) (do
   result <- workload c work (check correctnessId) (check performanceId) (do
    checked
    startCase eventPath selected performanceId)
   let checks = B.performanceChecks (one result) limits
   finishCase eventPath selected performanceId (S.all (J.getBool "passed" false) checks)
    (two (pair "checks" (J.Array checks)) (pair "samples_per_language" (J.num (runs c))))
-  return ((,) result checks)
+  return ((,) result checks))
 
 main = do
  args <- O.allArguments
  case args of
   (:) compiler ((:) before ((:) output ((:) count ((:) cc options)))) -> do
-   (,,) cliCheckOnly limits selected <- case options of
-    [] -> return ((,,) false (row (two (pair "compilation" (J.num 5)) (pair "runtime" (J.num 2)))) [])
-    (:) option [] -> if eqString option "--check-only" then return ((,,) true (row (two (pair "compilation" (J.num 5)) (pair "runtime" (J.num 2)))) []) else O.fatal "supply both compilation and runtime limits, or only --check-only"
-    (:) compileLimit ((:) runtimeLimit names) -> return ((,,) false (row (two (pair "compilation" (J.Number compileLimit)) (pair "runtime" (J.Number runtimeLimit)))) names)
-   O.require (B.validateLimits limits) "limits must be finite positive numbers"
-   O.require (S.all (\name -> S.elem eqString name V.workloads) selected && S.length selected == S.length (S.nubBy eqString selected)) "invalid workload selection"
+   (,,) cliCheckOnly limits selected <- right (B.runnerOptions options)
    suite <- getEnv "MLF_TEST_SUITE"
    let registered = eqString suite "benchmark-game" || eqString suite "application-benchmarks"
    eventPath <- if registered then getEnv "MLF_TEST_EVENTS" else return ""
@@ -260,6 +254,7 @@ main = do
    O.require (S.not checkOnly || S.not (eqString exact "") || S.eqList eqString (S.sortBy compareString (S.map (V.text "name") workloads)) (S.sortBy compareString V.workloads)) "check-only requires the complete canonical workload inventory"
    let expected = if S.null chosen then V.workloads else chosen
    O.require (S.eqList eqString (S.sortBy compareString (S.map (V.text "name") workloads)) (S.sortBy compareString expected)) "benchmark manifest does not supply the requested workloads"
+   requirements <- right (B.packageRequirements workloads)
    let identities = S.concatMap (\work ->
         let name = V.text "name" work in if checkOnly then one (caseId "correctness" name)
         else two (caseId "correctness" name) (caseId "performance" name)) workloads
@@ -277,13 +272,9 @@ main = do
    gc <- B.collectorFlags directory
    gcIdentity <- Build.flagIdentity gc
    J.write (directory ++ "/collector.json") gcIdentity
-   let packageNames = S.nubBy eqString (S.concatMap (\work -> S.concatMap (\language -> J.getStrings language (J.getObject "pkg_config" work)) (O.words "c mlf")) workloads)
-   packageEntries <- S.mapM (\name -> do
-    let versions = S.nubBy eqString (S.map (\work -> V.text name (J.getObject "pkg_config_versions" work)) (S.filter (\work -> S.any (\language -> S.elem eqString name (J.getStrings language (J.getObject "pkg_config" work))) (O.words "c mlf")) workloads))
-    O.require (S.length versions == 1 && stringLength (S.head versions) > 0) ("missing or conflicting benchmark library pin: " ++ name)
-    let headers = S.nubBy eqString (S.concatMap (\work -> J.getStrings name (J.getObject "pkg_config_headers" work)) workloads)
-    identity <- B.benchmarkPackage (directory ++ "/native-dependencies/" ++ name) name (S.head versions) headers
-    return ((,) name identity)) packageNames
+   packageEntries <- S.mapM (\((,,) name version headers) -> do
+    identity <- B.benchmarkPackage (directory ++ "/native-dependencies/" ++ name) name version headers
+    return ((,) name identity)) requirements
    let nativePackages = row packageEntries
    J.write (directory ++ "/native-dependencies.json") nativePackages
    let c = Context directory candidate baseline clang backend baselineBackend (Build.flags gmp) gc nativePackages n
@@ -304,9 +295,10 @@ main = do
    _ <- right integrity
    let checks = S.concatMap S.snd observed
    let passed = S.all (J.getBool "passed" false) checks
-   let result = (J.set "native_dependencies" nativePackages (J.set "limits" limits (J.set "workload_selection" (J.stringArray (S.map (V.text "name") workloads)) (row ((:) (pair "status" (J.str (if checkOnly then "correctness-passed" else if passed then "passed" else "failed"))) ((:) (pair "implementation" (J.str "MLF")) ((:) (pair "runs" (J.num (if checkOnly then 0 else n))) ((:) (pair "fingerprints" (row (S.map (\((,) path hash) -> (,) path (J.str hash)) fingerprints))) ((:) (pair "benchmarks" (J.Array rows)) (one (pair "performance_checks" (J.Array checks))))))))))))
+   summary <- right (B.runnerReport checkOnly n rows checks)
+   let result = J.set "native_dependencies" nativePackages (J.set "limits" limits (J.set "workload_selection" (J.stringArray (S.map (V.text "name") workloads)) (J.set "fingerprints" (row (S.map (\((,) path hash) -> (,) path (J.str hash)) fingerprints)) summary)))
    let recorded = J.set "build_environment" (row buildEnvironment) result
-   J.write report (if checkOnly then J.set "mode" (J.str "check-only") (J.set "performance_checked" (J.Boolean false) recorded) else recorded)
+   J.write report recorded
    O.require passed "performance limits exceeded; see results.json"
    putStrLn (if checkOnly then "All " ++ showInt (S.length rows) ++ " workloads passed correctness checks; performance was not measured." else "All " ++ showInt (S.length rows) ++ " selected workloads pass the requested compilation and runtime limits.")
   _ -> O.fatal "bench COMPILER BASELINE OUTPUT RUNS CLANG [MAX_COMPILE MAX_RUNTIME [WORKLOAD...] | --check-only] (run from repository root)"

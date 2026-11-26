@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check actual declaration-name controls and isolated portable c1 codec bodies."""
+"""Check actual declaration-name APIs and the imported portable c1 codec."""
 from pathlib import Path
 import argparse
 import json
@@ -10,6 +10,7 @@ from test_direct import CommandRunner, authenticate_build, sha
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'libraries/mlf-crates/Bootstrap/Separate.hs'
+CODEC = ROOT / 'libraries/mlf-foundation/Bootstrap/NameEncoding.hs'
 HOST = ROOT / 'tools/shared/fixtures/OwnerEncodingControls.hs'
 
 
@@ -35,7 +36,7 @@ def main():
         parser.error('independent output directory required')
     output.mkdir(parents=True, exist_ok=False)
     record = {'complete': False, 'commands': [], 'inputs': {}, 'artifacts': {},
-              'scope': 'actual host identity/owner APIs; exact production component bodies isolated for interpreter/native tests',
+              'scope': 'actual host identity/owner APIs; production NameEncoding module imported by interpreter/native tests',
               'native_self_bootstrap_qualified': False, 'native_toolchain_closure_complete': False}
     def save():
         (output / 'receipt.json').write_text(json.dumps(record, indent=2) + '\n')
@@ -44,7 +45,7 @@ def main():
         producer = authenticate_build(receipt, build / 'bin')
         native = configuration(args.clang)
         record['native_configuration'] = native
-        inputs = [receipt, SOURCE, HOST, Path(__file__).resolve(),
+        inputs = [receipt, SOURCE, CODEC, HOST, Path(__file__).resolve(),
                   ROOT / 'tools/shared/test_direct.py', ROOT / 'tools/shared/default_stdlib.py',
                   ROOT / 'runtime/mlf_runtime.c', *sorted((ROOT / 'runtime').glob('*.h')),
                   Path(native['clang']), Path(sys.executable).resolve(), build / 'host.o', build / 'supervisor.o']
@@ -61,13 +62,8 @@ def main():
         runner.run('host-link', [producer['ghc']['path'], *flags, '-rtsopts=ignoreAll', output / 'Main.o',
                    *objects, build / 'host.o', build / 'supervisor.o', '-o', host])
         runner.run('host-controls', [host], timeout=180)
-        # A full native compiler bootstrap is a separate qualification. Keep
-        # the production codec text exact, so this checks the real algorithm
-        # without compiling the rest of Separate's compiler dependency graph.
-        source = SOURCE.read_text()
-        body = source[source.index('  compactNameCode code ='):source.index('  queryGroupName crateId members =')]
-        if body.count('  compactName ') != 1 or body.count('  compactNameChunks ') != 1:
-            raise ValueError('codec extraction boundary changed')
+        # Import the production module through its public codec API. Internal
+        # helper names, their order and source formatting are not test inputs.
         fixture = output / 'Codec.hs'
         fixture.write_text('''-- mlf:syntax shared-haskell-v1
 {-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
@@ -77,15 +73,15 @@ module Main where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import qualified Bootstrap.Std as S;
-''' + body + '''
+  import qualified Bootstrap.NameEncoding as Encoding;
   codes a b = if a > b then [] else (:) (stringFromCode a) (codes (a + 1) b);
   main = do {
     mode <- getArg 0; arg <- getArg 1;
     if eqString mode "range" then do {
-      end <- getArg 2; putStrLn (compactName (concatStringList (codes (readInt arg) (readInt end))))
+      end <- getArg 2; putStrLn (Encoding.compactName (concatStringList (codes (readInt arg) (readInt end))))
     } else if eqString mode "repeat" then
-      putStrLn (compactName (concatStringList (S.replicate (readInt arg) "a:z_λ😀")))
-    else putStrLn (compactName arg)
+      putStrLn (Encoding.compactName (concatStringList (S.replicate (readInt arg) "a:z_λ😀")))
+    else putStrLn (Encoding.compactName arg)
   }
 }
 ''')

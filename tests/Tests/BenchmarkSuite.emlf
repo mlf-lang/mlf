@@ -19,7 +19,72 @@ fixture name manifest = S.fromMaybe (panic "missing benchmark workload") (S.find
 -- Each entry retains the original check and action. The final CLI case also
 -- retains its unlabelled invalid-configuration controls before family completion.
 cases : J.Json -> [] ((,) String (IO ()))
-cases manifest = S.concat ((:) (initialCases manifest) ((:) (provenanceCases manifest) ((:) (operationalCases manifest) ((:) buildFailureCases ((:) (S.map (\((,) label action) -> (,) label (check label action)) ABI.suite) [])))))
+cases manifest = S.concat ((:) runnerContractCases ((:) (initialCases manifest) ((:) (provenanceCases manifest) ((:) (operationalCases manifest) ((:) buildFailureCases ((:) (S.map (\((,) label action) -> (,) label (check label action)) ABI.suite) []))))))
+
+-- These call the same domain operations as the real benchmark CLI. Local
+-- names, case syntax, helper order and runner formatting are not expectations.
+runnerContractCases : [] ((,) String (IO ()))
+runnerContractCases = S.map (\((,) label action) -> (,) label (check label action))
+ ((:) ((,) "test_runner_modes_preserve_limits_and_reject_invalid_options" runnerOptionChecks)
+ ((:) ((,) "test_runner_optional_package_maps_preserve_dependency_pins" runnerPackageChecks)
+ ((:) ((,) "test_runner_reports_distinguish_correctness_from_performance" runnerReportChecks) [])))
+
+runnerOptionChecks : IO ()
+runnerOptionChecks = do
+ let expect arguments checkOnly limits selected = do
+      (,,) actualMode actualLimits actualSelected <- H.right (B.runnerOptions arguments)
+      expectedLimits <- H.right (J.parse limits)
+      H.assert (H.eq actualMode checkOnly && J.equal actualLimits expectedLimits && S.eqList eqString actualSelected selected) "benchmark options changed meaning"
+ expect [] false "{\"compilation\":5,\"runtime\":2}" []
+ expect ((:) "--check-only" []) true "{\"compilation\":5,\"runtime\":2}" []
+ expect (O.words "3.14159265358979 0.25 reverse-complement binary-trees") false "{\"compilation\":3.14159265358979,\"runtime\":0.25}" (O.words "reverse-complement binary-trees")
+ S.mapM_ (\arguments -> H.assert (S.isLeft (B.runnerOptions (O.words arguments))) ("invalid benchmark options accepted: " ++ arguments))
+  ((:) "--unknown" ((:) "2" ((:) "--check-only binary-trees" ((:) "--check-only 5" ((:) "5 2 --check-only" ((:) "0 2" ((:) "NaN 2" ((:) "Infinity 2" ((:) "1 -2" ((:) "1 2 unknown" ((:) "1 2 binary-trees binary-trees" [])))))))))))
+ calls <- newIntArray 2 0
+ let mark index = do { n <- readIntArray calls index; writeIntArray calls index (n + 1) }
+ let correctness = do { mark 0; return (J.str "correctness") }
+ let measured = do { mark 1; return ((,) (J.str "measured") ((:) (J.str "timing") [])) }
+ checked <- B.runWorkloadMode true correctness measured
+ firstCount <- readIntArray calls 0
+ secondCount <- readIntArray calls 1
+ H.assert (firstCount == 1 && secondCount == 0 && J.equal (S.fst checked) (J.str "correctness") && S.null (S.snd checked)) "correctness-only mode executed measurements"
+ timed <- B.runWorkloadMode false correctness measured
+ firstCount <- readIntArray calls 0
+ secondCount <- readIntArray calls 1
+ H.assert (firstCount == 1 && secondCount == 1 && J.equal (S.fst timed) (J.str "measured") && J.equal (J.Array (S.snd timed)) (J.stringArray ((:) "timing" []))) "measured mode skipped or repeated its workload"
+
+runnerPackageChecks : IO ()
+runnerPackageChecks = do
+ absent <- H.right (B.packageRequirements ((:) J.empty []))
+ H.assert (S.null absent) "absent optional package maps are not empty"
+ empty <- H.right (J.parse "{\"pkg_config\":{},\"pkg_config_versions\":{},\"pkg_config_headers\":{}}")
+ emptyResult <- H.right (B.packageRequirements ((:) empty []))
+ H.assert (S.null emptyResult) "empty optional package maps are not empty"
+ first <- H.right (J.parse "{\"pkg_config\":{\"c\":[\"example\"],\"mlf\":[\"example\"]},\"pkg_config_versions\":{\"example\":\"1.2\"},\"pkg_config_headers\":{\"example\":[\"first.h\"]}}")
+ second <- H.right (J.parse "{\"pkg_config\":{\"mlf\":[\"example\"]},\"pkg_config_versions\":{\"example\":\"1.2\"},\"pkg_config_headers\":{\"example\":[\"first.h\",\"second.h\"]}}")
+ resolved <- H.right (B.packageRequirements ((:) first ((:) J.empty ((:) second []))))
+ H.assert (case resolved of { (:) ((,,) name version headers) [] -> eqString name "example" && eqString version "1.2" && S.eqList eqString headers (O.words "first.h second.h"); _ -> false }) "package requirements lost pins, headers or deduplication"
+ withoutHeaders <- H.right (B.packageRequirements ((:) (V.remove "pkg_config_headers" first) []))
+ H.assert (case withoutHeaders of { (:) ((,,) _ _ headers) [] -> S.null headers; _ -> false }) "absent header map is not empty"
+ let wrongVersion = J.set "pkg_config_versions" (J.Object ((:) ((,) "example" (J.str "2.0")) [])) second
+ H.assert (S.isLeft (B.packageRequirements ((:) first ((:) wrongVersion []))) && S.isLeft (B.packageRequirements ((:) (V.remove "pkg_config_versions" first) [])))) "missing or conflicting package pin accepted"
+ S.mapM_ (\field -> S.mapM_ (\wrong -> H.assert (S.isLeft (B.packageRequirements ((:) (J.set field wrong first) []))) ("malformed optional map accepted: " ++ field))
+   ((:) J.Null ((:) (J.str "wrong") ((:) (J.Array []) ((:) (J.Boolean false) ((:) (J.num 0) [])))))) (O.words "pkg_config pkg_config_versions pkg_config_headers")
+ S.mapM_ (\source -> do { malformed <- H.right (J.parse source); H.assert (S.isLeft (B.packageRequirements ((:) malformed []))) "malformed package map entry accepted" })
+  ((:) "{\"pkg_config\":{\"c\":null}}" ((:) "{\"pkg_config\":{\"c\":[1]}}" ((:) "{\"pkg_config_versions\":{\"example\":1}}" ((:) "{\"pkg_config_headers\":{\"example\":\"header.h\"}}" ((:) "{\"pkg_config_headers\":{\"example\":[false]}}" [])))))
+
+runnerReportChecks : IO ()
+runnerReportChecks = do
+ row <- H.right (J.parse "{\"benchmark\":\"fixture\",\"status\":\"correctness-passed\",\"check_inputs\":[1]}")
+ correctness <- H.right (B.runnerReport true 7 ((:) row []) [])
+ expected <- H.right (J.parse "{\"status\":\"correctness-passed\",\"implementation\":\"MLF\",\"runs\":0,\"benchmarks\":[{\"benchmark\":\"fixture\",\"status\":\"correctness-passed\",\"check_inputs\":[1]}],\"performance_checks\":[],\"mode\":\"check-only\",\"performance_checked\":false}")
+ H.assert (J.equal correctness expected) "correctness-only report fabricated measurement claims"
+ passed <- H.right (J.parse "{\"benchmark\":\"fixture\",\"passed\":true,\"mlf_over_c\":0.25}")
+ measured <- H.right (B.runnerReport false 7 ((:) row []) ((:) passed []))
+ H.assert (eqString (V.text "status" measured) "passed" && V.int "runs" measured == 7 && J.equal (J.get "performance_checks" measured) (J.Array ((:) passed [])) && S.not (J.has "mode" measured) && S.not (J.has "performance_checked" measured)) "measured report lost its actual samples or claims"
+ failed <- H.right (B.runnerReport false 7 ((:) row []) ((:) passed ((:) (J.set "passed" (J.Boolean false) passed) [])))
+ H.assert (eqString (V.text "status" failed) "failed") "failed performance check reported success"
+ H.assert (S.isLeft (B.runnerReport true 7 ((:) row []) ((:) passed []))) "correctness-only report accepted performance checks"
 
 initialCases : J.Json -> [] ((,) String (IO ()))
 initialCases manifest =
