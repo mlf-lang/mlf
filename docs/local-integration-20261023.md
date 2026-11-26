@@ -71,6 +71,6 @@ GitHub 只读元数据显示四个 PR 都开放且为 draft，base 名均为 `ma
 
 ## 测试统一接入规划
 
-详见[主计划](test-framework-integration-plan-20261023.md)、[完整机器清单](testing-migration-inventory-20261023.json)、[全仓资产表](testing-inventory-20261023.tsv)和[外部逐入口表](testing-external-entrypoints-20261023.tsv)。目标是所有测试由框架实际管理发现/选择/执行/判定/清理/报告，而不是永远保留粗粒度 wrapper。各 adapter 保留独立 oracle、负例阶段、native/平台语义、fresh self-host、SDK 与性能采样要求；真实发布副作用仍独立。
+详见[主计划](test-framework-integration-plan-20261023.md)、[完整机器清单](https://github.com/mlf-lang/mlf/blob/496dcae024cae1a93096d9bdb9d6b93e57359dc0/docs/testing-migration-inventory-20261023.json)、[全仓资产表](https://github.com/mlf-lang/mlf/blob/496dcae024cae1a93096d9bdb9d6b93e57359dc0/docs/testing-inventory-20261023.tsv)和[外部逐入口表](https://github.com/mlf-lang/mlf/blob/496dcae024cae1a93096d9bdb9d6b93e57359dc0/docs/testing-external-entrypoints-20261023.tsv)。目标是所有测试由框架实际管理发现/选择/执行/判定/清理/报告，而不是永远保留粗粒度 wrapper。各 adapter 保留独立 oracle、负例阶段、native/平台语义、fresh self-host、SDK 与性能采样要求；真实发布副作用仍独立。
 
 输入范围、machine handoff 和完整 merge-base 记录分别见 [code-handoff.json](integration-evidence-20261023/code-handoff.json) 与 [dependencies.json](integration-evidence-20261023/dependencies.json)。

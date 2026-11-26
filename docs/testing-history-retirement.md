@@ -26,7 +26,9 @@ last complete archive of that infrastructure is commit
   reference reader in `oracles/file-format`. The reference reader's own format
   and dependency format have explicit validation parameters. Frozen query
   adaptation checks the supported constructor interface rather than the hash
-  of the entire current Types module.
+  of the entire current Types module. Run its four interface tests with
+  `python3 -B tools/testing/run.py python-frozen-query`. The O2 CI job runs
+  them before compiling the datatype-context controls.
 - Current package/lock snapshots, producer identities, source immutability
   during execution, binary compatibility, independent algorithm oracles and
   failure propagation remain qualification boundaries.

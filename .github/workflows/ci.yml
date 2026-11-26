@@ -209,6 +209,7 @@ jobs:
       - name: Check complete datatype context reuse against frozen encoder
         if: matrix.optimization == '2'
         run: |
+          python3 -B tools/testing/run.py python-frozen-query
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/datatype-context-guard python3 -B tools/testing/run.py --inherit-process-group datatype-context -- --producer .mlf-build/shared-ghc --output .mlf-build/datatype-context
       - name: Check contract encoding reuse against frozen encoder
         if: matrix.optimization == '2'
@@ -694,8 +695,6 @@ jobs:
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          fetch-depth: 0
       - name: Decide whether expensive async parity was explicitly requested
         id: scope
         run: python3 tools/release/async-change-scope.py --output .mlf-build/async-change-scope/decision.json

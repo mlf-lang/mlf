@@ -164,7 +164,6 @@ check('async-platforms', () => {
   for (const step of async.steps) if (step.run) step.run = projectAdapterCommands(step.run);
   const scope = commandStep(async,'tools/release/async-change-scope.py');
   assert.ok(scope.id);
-  assert.equal(String(actionStep(async,'actions/checkout').with['fetch-depth']),'0');
   const commands = ['tools/shared/prepare_async_ghc.py','tests/fixtures/async-completion/check.sh',
     'tools/release/test-async-process.sh','tools/release/test-async-task.sh','tools/release/test-async-package.sh'];
   for (const command of commands) {

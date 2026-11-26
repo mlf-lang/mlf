@@ -13,7 +13,7 @@
 
 本次只交付设计和静态清单，不改变完整 campaign 的覆盖，不重写所有测试，不运行完整测试、bootstrap、self-host 或基准。
 
-相关交付：[本地整合与验证记录](local-integration-20261023.md)、[完整迁移清单 JSON](testing-migration-inventory-20261023.json)、[全仓资产清单 TSV](testing-inventory-20261023.tsv)、[外部入口逐项矩阵](testing-external-entrypoints-20261023.tsv)。
+相关交付：[本地整合与验证记录](local-integration-20261023.md)、[完整迁移清单 JSON](https://github.com/mlf-lang/mlf/blob/496dcae024cae1a93096d9bdb9d6b93e57359dc0/docs/testing-migration-inventory-20261023.json)、[全仓资产清单 TSV](https://github.com/mlf-lang/mlf/blob/496dcae024cae1a93096d9bdb9d6b93e57359dc0/docs/testing-inventory-20261023.tsv)、[外部入口逐项矩阵](https://github.com/mlf-lang/mlf/blob/496dcae024cae1a93096d9bdb9d6b93e57359dc0/docs/testing-external-entrypoints-20261023.tsv)。
 
 ## 2. 现状与清单契约
 

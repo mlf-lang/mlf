@@ -490,6 +490,16 @@
     "prefix": "python-crate-query-graph-verify/",
     "exact": true
   },
+  "python-frozen-query": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/source-key-builtins/test_frozen_query.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-frozen-query/",
+    "exact": true
+  },
   "python-full-compiler-contract": {
     "command": [
       "python3",
