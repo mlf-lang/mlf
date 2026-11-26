@@ -110,7 +110,7 @@ checks = do
  -- Reviewed separately from the migrated registry: dropping/renaming this case
  -- must not redefine the expected inventory or the existing Core label.
  ok (S.eqList eqString (S.map C.id Unions.cases) ((:) "int-set/union-sorted-list" []))
- ok (S.eqList eqString (S.map S.fst Unions.suite) ((:) "size-biased set unions agree with independent sorted lists" []))
+ ok (S.eqList eqString (S.map (\entry -> S.fst (C.toLegacy entry)) Unions.cases) ((:) "size-biased set unions agree with independent sorted lists" []))
  A.liftIO (putStrLn "Test framework contracts passed")
 
 -- These fault controls compare independent inputs and outcomes for the receipt evaluator.
