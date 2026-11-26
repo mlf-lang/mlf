@@ -7,6 +7,8 @@ report="$unit/verification.json"
 sha256() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi | awk '{print $1}'; }
 targets='["core-crates","core-language","core-modules","core-solver","figure12","harness","int-set-unions","regex","test-framework"]'
 shards='["core-crates","core-solver","core-language","core-modules"]'
+registry_contract="$root/tests/golden/core-registry-contract.json"
+registry_contract_sha256=$(sha256 "$registry_contract")
 jq -e --argjson targets "$targets" --argjson shards "$shards" '
   def digest: type == "string" and test("^[0-9a-f]{64}$");
   # Bind the report before the predicate: jq 1.8 changed `as` precedence.
@@ -66,6 +68,40 @@ for name in core core-crates core-solver core-language core-modules; do
   test "$(sha256 "$unit/$name.families.jsonl")" = "$(jq -er --arg name "$name" '.family_reports[$name].sha256' "$report")"
   test "$(sha256 "$unit/$name.log")" = "$(jq -er --arg name "$name" '.suites[$name].log_sha256' "$report")"
   if [ "$name" != core ]; then
+    # Producer paths are informational after relocation. Reopen the retained
+    # per-shard files and compare descriptors to the independent repository
+    # contract, even when an envelope has consistently rehashed altered output.
+    test "$(sha256 "$unit/$name.inventory.json")" = "$(jq -er --arg name "$name" '.suites[$name].registry_inventory.sha256' "$report")"
+    test "$registry_contract_sha256" = "$(jq -er --arg name "$name" '.suites[$name].registry_inventory.contract_sha256' "$report")"
+    test "$(sha256 "$unit/$name.cases.jsonl")" = "$(jq -er --arg name "$name" '.suites[$name].case_report_sha256' "$report")"
+    jq -se --slurpfile contract "$registry_contract" \
+      --slurpfile discovery "$unit/$name.inventory.json" \
+      --slurpfile families "$unit/$name.families.jsonl" \
+      --slurpfile verification "$report" --arg name "$name" '
+      def descriptor:
+        if type == "object" and (.tags | type == "array") and
+           all(.tags[]; type == "string")
+        then {id,name,families:[.tags[] | select(startswith("family:"))]}
+        else null end;
+      $families[0].selected as $selected |
+      [$contract[0].cases[] | select(.family as $family | $selected | index($family))] as $wanted |
+      [$wanted[] | {id,name,families:["family:" + .family]}] as $descriptors |
+      [$wanted[].id] as $ids | ($wanted | length) as $count |
+      ($count > 0) and ($discovery | length) == 1 and
+      ($discovery[0] | .schema_version == 1 and .event == "inventory" and
+        .scope == "full" and .total == $count and .selected == $count and
+        [.cases[] | descriptor] == $descriptors) and
+      .[0].event == "start" and .[0].ids == $ids and
+      .[0].scope == "full" and .[0].total == $count and .[0].selected == $count and
+      .[-1].event == "summary" and .[-1].complete == true and
+      .[-1].scope == "full" and .[-1].total == $count and
+      .[-1].selected == $count and .[-1].executed == $count and
+      .[-1].passed == $count and .[-1].failed == 0 and
+      all(.[]; .schema_version == 1) and
+      all(.[1:-1][]; .event == "case" and .status == "passed") and
+      [.[1:-1][] | descriptor] == $descriptors and
+      $verification[0].suites[$name].framework_case_ids == $ids
+    ' "$unit/$name.cases.jsonl" >/dev/null
     jq -se '
       .[0].event == "start" and .[0].scope == "partial" and
       .[-1].event == "summary" and .[-1].complete == true and

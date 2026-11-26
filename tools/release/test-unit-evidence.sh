@@ -36,7 +36,31 @@ for name in core-crates core-solver core-language core-modules; do
     [$ids[] | {schema_version:1,unit:"core",event:"family",id:.,status:"passed"}] +
     [{schema_version:1,unit:"core",event:"summary",complete:true,families:($ids|length)}] | .[]
   ' "$scratch/families.json" > "$unit/$name.families.jsonl"
+  jq --argjson index "$index" --slurpfile contract "$root/tests/golden/core-registry-contract.json" '
+    [.[$index][].id] as $families |
+    [$contract[0].cases[] | select(.family as $family | $families | index($family)) |
+     {id,name,tags:["family:" + .family]}] as $cases |
+    {schema_version:1,event:"inventory",scope:"full",total:($cases|length),selected:($cases|length),cases:$cases}
+  ' "$scratch/families.json" > "$unit/$name.inventory.json"
+  jq -c '
+    .cases as $cases | ($cases|length) as $count |
+    [{schema_version:1,event:"start",scope:"full",total:$count,selected:$count,ids:[$cases[].id]}] +
+    [$cases[] | . + {schema_version:1,event:"case",status:"passed"}] +
+    [{schema_version:1,event:"summary",scope:"full",total:$count,selected:$count,
+      executed:$count,passed:$count,failed:0,complete:true}] | .[]
+  ' "$unit/$name.inventory.json" > "$unit/$name.cases.jsonl"
   index=$((index+1))
+done
+for name in core-crates core-solver core-language core-modules; do
+  jq --arg name "$name" --arg contract "$(sha256 "$root/tests/golden/core-registry-contract.json")" \
+    --arg discovery "$(sha256 "$unit/$name.inventory.json")" \
+    --arg cases "$(sha256 "$unit/$name.cases.jsonl")" \
+    --slurpfile inventory "$unit/$name.inventory.json" '
+    .suites[$name] += {registry_inventory:{path:("/old/location/"+$name+".inventory.json"),sha256:$discovery,
+      contract_path:"/old/source/core-registry-contract.json",contract_sha256:$contract},
+      case_report:("/old/location/"+$name+".cases.jsonl"),case_report_sha256:$cases,
+      framework_case_ids:[$inventory[0].cases[].id]}' "$report" > "$scratch/report.tmp"
+  mv "$scratch/report.tmp" "$report"
 done
 jq -cs 'map(select(.event != "start" and .event != "summary")) |
   [{schema_version:1,suite:"core",event:"start",scope:"full"}] + . +
@@ -149,4 +173,65 @@ for name in core-crates core; do
   mv "$scratch/report.tmp" "$report"
 done
 reject rehashed-inventory 'consistently rehashed altered inventory is rejected'
+resign_registry() {
+  local name=core-crates
+  jq --arg name "$name" --arg discovery "$(sha256 "$unit/$name.inventory.json")" \
+    --arg cases "$(sha256 "$unit/$name.cases.jsonl")" --slurpfile rows "$unit/$name.cases.jsonl" '
+    .suites[$name].registry_inventory.sha256=$discovery |
+    .suites[$name].case_report_sha256=$cases |
+    .suites[$name].framework_case_ids=[$rows[]|select(.event=="case")|.id] |
+    .suites.core.components[$name]=.suites[$name]' "$report" > "$scratch/report.tmp"
+  mv "$scratch/report.tmp" "$report"
+}
+# Reformat and add unrelated descriptors without changing public identities.
+release_begin release/unit-evidence/registry-formatting
+jq '.cases |= map(. + {elapsed:7} | .tags += ["new-classification"])' "$unit/core-crates.inventory.json" > "$scratch/discovery.tmp"
+mv "$scratch/discovery.tmp" "$unit/core-crates.inventory.json"
+jq 'if .event == "case" then . + {elapsed:7} | .tags += ["new-classification"] else . end' \
+  "$unit/core-crates.cases.jsonl" > "$scratch/cases.tmp"
+mv "$scratch/cases.tmp" "$unit/core-crates.cases.jsonl"
+resign_registry
+"$scripts/verify-unit-evidence.sh" "$unit" > "$scratch/verify.log"
+check 'registry formatting and unrelated metadata remain free to change'
+rm -rf "$unit"; cp -R "$scratch/original" "$unit"
+rm "$unit/core-crates.inventory.json"
+reject missing-registry-discovery 'missing actual registry discovery is rejected'
+printf '\n' >> "$unit/core-crates.inventory.json"
+reject changed-registry-discovery 'changed retained discovery bytes are rejected'
+jq '.suites."core-crates".registry_inventory.contract_sha256="unreviewed" |
+    .suites.core.components."core-crates"=.suites."core-crates"' "$report" > "$scratch/report.tmp"
+mv "$scratch/report.tmp" "$report"
+reject changed-registry-contract 'changed registry contract binding is rejected'
+rm "$unit/core-crates.cases.jsonl"
+reject missing-semantic-case-report 'missing semantic case observations are rejected'
+for mutation in id name family duplicate missing; do
+  case "$mutation" in
+    id) edit='.id += "-changed"' ;;
+    name) edit='.name += " changed"' ;;
+    family) edit='.tags=["family:core/unknown"]' ;;
+    duplicate) edit='.' ;;
+    missing) edit='.' ;;
+  esac
+  if [ "$mutation" = duplicate ]; then
+    jq '.cases[-1]=.cases[0]' "$unit/core-crates.inventory.json" > "$scratch/discovery.tmp"
+  elif [ "$mutation" = missing ]; then
+    jq '.cases |= .[:-1] | .total-=1 | .selected-=1' "$unit/core-crates.inventory.json" > "$scratch/discovery.tmp"
+  else
+    jq ".cases[0] |= ($edit)" "$unit/core-crates.inventory.json" > "$scratch/discovery.tmp"
+  fi
+  mv "$scratch/discovery.tmp" "$unit/core-crates.inventory.json"
+  jq -c '.cases as $cases | ($cases|length) as $count |
+    [{schema_version:1,event:"start",scope:"full",total:$count,selected:$count,ids:[$cases[].id]}] +
+    [$cases[] | . + {schema_version:1,event:"case",status:"passed"}] +
+    [{schema_version:1,event:"summary",scope:"full",total:$count,selected:$count,
+      executed:$count,passed:$count,failed:0,complete:true}] | .[]' \
+    "$unit/core-crates.inventory.json" > "$unit/core-crates.cases.jsonl"
+  resign_registry
+  reject "rehashed-registry/$mutation" "consistently rehashed registry $mutation is rejected"
+done
+jq -c 'if .event == "start" or .event == "summary" then .total += 1 | .scope="partial" else . end' \
+  "$unit/core-crates.cases.jsonl" > "$scratch/cases.tmp"
+mv "$scratch/cases.tmp" "$unit/core-crates.cases.jsonl"
+resign_registry
+reject rehashed-registry/total 'case report cannot inflate the authenticated physical inventory'
 printf '%d split unit evidence checks passed\n' "$passed"
