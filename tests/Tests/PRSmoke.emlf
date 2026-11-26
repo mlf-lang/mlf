@@ -97,4 +97,4 @@ main = do
    if Runner.json options then return () else do
     if S.length selected - backendCount == 4 then putStrLn "4 independent target controls; 0 failures" else return ()
     putStrLn (showInt backendCount ++ " PR smoke backend fixtures; 0 failures")
-  else exitWith code)
+  else do { B.flushRows; exitWith code })

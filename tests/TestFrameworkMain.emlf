@@ -56,7 +56,7 @@ runFramework full args directory unions = do
    else do
     Coverage.begin "test-framework" (full && S.null (R.selectors options))
     code <- R.runOptionsObserved recordFramework options cases selected
-    if code == 0 then Coverage.finish "test-framework" else exitWith code
+    if code == 0 then Coverage.finish "test-framework" else do { Coverage.flush; exitWith code }
 
 main : IO ()
 main = do

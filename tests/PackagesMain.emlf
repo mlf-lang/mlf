@@ -48,7 +48,7 @@ runPackages args = do
      if S.all (\entry -> S.elem eqString (C.id entry) identities) (R.cases dummyResolver) then putStrLn "22 package resolver tests passed" else return ()
      if S.all (\entry -> S.elem eqString entry identities) (O.words "packages/build/local-cache packages/build/checked-crate packages/build/non-entry-body packages/build/native-pgo packages/build/shared-cache") then putStrLn "29 package integration cases passed" else return ()
      Coverage.finish "packages"
-    else exitWith code
+    else do { Coverage.flush; exitWith code }
 
 main : IO ()
 main = do

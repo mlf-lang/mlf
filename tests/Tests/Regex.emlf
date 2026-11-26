@@ -123,4 +123,4 @@ main = do
      Coverage.metric "regex" "invalid-patterns-executed" (S.length invalid)
      Coverage.finish "regex"
      if Runner.json options then return () else putStrLn "regular-expression tests passed"
-    else exitWith code
+    else do { Coverage.flush; exitWith code }

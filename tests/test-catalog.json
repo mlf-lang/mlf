@@ -3715,6 +3715,12 @@
           "strict unary representation: lazy poison remains unforced",
           "strict unary representation: mixed and escaping constructor",
           "strict unary representation: recursive lazy field"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1
         ]
       }
     },
@@ -3766,6 +3772,34 @@
           "IO rejection: IO has a fixed arity",
           "IO rejection: IO cannot take two parameters",
           "IO: unknown target primitive is rejected"
+        ],
+        "row_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
         ]
       }
     },
@@ -3815,6 +3849,32 @@
           "IO: recursive dictionary methods",
           "IO: generic Monad IO bind",
           "IO: generic Monad IO input"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
         ]
       }
     },
@@ -3852,6 +3912,18 @@
           "IO target: target IO type cannot be forged",
           "IO: pure programs are not executable entry points",
           "IO: target verification happens before any effects"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
         ]
       }
     },
@@ -3882,6 +3954,11 @@
           "IO monad law: left identity",
           "IO monad law: right identity",
           "IO monad law: associativity"
+        ],
+        "row_counts": [
+          2,
+          2,
+          2
         ]
       }
     },
@@ -3910,6 +3987,10 @@
         "labels": [
           "IO: EOF is reported and stops the continuation",
           "IO: backend output errors are reported"
+        ],
+        "row_counts": [
+          1,
+          1
         ]
       }
     },
@@ -3947,6 +4028,20 @@
           "prelude rejection: user instance is still checked",
           "prelude rejection: missing user instance",
           "prelude rejection: no implicit monad defaulting"
+        ],
+        "row_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
         ]
       }
     },
@@ -3983,6 +4078,18 @@
           "prelude: unused imports preserve ordinary bind continuation shadows return",
           "prelude: unused imports preserve single-expression do",
           "prelude: unused imports preserve unrelated class method"
+        ],
+        "row_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
         ]
       }
     },
@@ -4018,6 +4125,18 @@
           "prelude runtime: given dictionary and lexical shadowing coexist",
           "prelude runtime: local class method shadows only the imported method",
           "prelude runtime: local Monad cannot hide canonical IO do instance"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
         ]
       }
     },
@@ -4048,6 +4167,10 @@
         "labels": [
           "Snake: playable source and xMLF sessions",
           "Snake: pure rules, departing tail, food search, and full-board win"
+        ],
+        "row_counts": [
+          8,
+          1
         ]
       }
     },
@@ -4104,6 +4227,38 @@
           "backend: surface: instance method equations and qualified declaration",
           "backend: state dictionary result",
           "backend: superclass dictionary result"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
         ]
       }
     },
@@ -4138,6 +4293,16 @@
           "backend: guards runtime: case bodies and lazy wildcard",
           "backend: guards runtime: contextual otherwise compatibility",
           "backend: guards runtime: dynamic selection and primitive hygiene"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
         ]
       }
     },
@@ -4168,6 +4333,12 @@
           "backend target: bad computation",
           "backend target: bad unused branch",
           "backend target: free identity"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1
         ]
       }
     },
@@ -4198,6 +4369,13 @@
           "backend: nul",
           "backend: final line without newline",
           "backend: unused input is retained"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1,
+          1
         ]
       }
     },
@@ -4234,6 +4412,19 @@
           "backend: lazy default case",
           "backend: lazy returned value",
           "backend: recursive demand fails"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
         ]
       }
     },
@@ -4261,6 +4452,9 @@
         "fixtures": 1,
         "labels": [
           "backend: all examples execute"
+        ],
+        "row_counts": [
+          16
         ]
       }
     },
@@ -4287,6 +4481,9 @@
         "fixtures": 1,
         "labels": [
           "backend: binary-trees benchmark"
+        ],
+        "row_counts": [
+          2
         ]
       }
     },
@@ -4314,6 +4511,10 @@
         "labels": [
           "native optimization: tagged integer boundaries",
           "native optimization: ordinary products and division preserve Integer boundaries"
+        ],
+        "row_counts": [
+          1,
+          1
         ]
       }
     },
@@ -4360,6 +4561,27 @@
           "native optimization: seq preserves ignored arguments and unused results",
           "native optimization: three-field constructor partially applied",
           "native optimization: generic arithmetic crosses immediate range"
+        ],
+        "row_counts": [
+          1,
+          1,
+          2,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
         ]
       }
     },
@@ -4395,6 +4617,17 @@
           "constructor projections: same spelling in disjoint scopes",
           "constructor projections: escaping constructor shares its fields",
           "constructor projections: default branch preserves its bound constructor"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
         ]
       }
     },
@@ -4426,6 +4659,13 @@
           "force reuse: branch joins retain conditional laziness",
           "force reuse: case alternatives isolate forced operands",
           "force reuse: escaping closures preserve forcing and repeated actions"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1,
+          1
         ]
       }
     },
@@ -4457,6 +4697,13 @@
           "Boolean conditions: lazy fields captures and partial primitives",
           "Boolean conditions: condition failure follows preceding IO",
           "Boolean conditions: selected branch failure follows preceding IO"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1,
+          1
         ]
       }
     },
@@ -4487,6 +4734,12 @@
           "environment slots: repeated native action preserves captures and laziness",
           "environment slots: captured thunk boundary 28",
           "environment slots: captured thunk boundary 29"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1
         ]
       }
     },
@@ -4515,6 +4768,10 @@
         "labels": [
           "strict constructor fields: checked lowering uses the pointer proof",
           "strict constructor fields: lazy, partial, mixed and recursive values"
+        ],
+        "row_counts": [
+          1,
+          1
         ]
       }
     },
@@ -4540,6 +4797,9 @@
         "fixtures": 1,
         "labels": [
           "numeric: types reject invalid numeric and array programs"
+        ],
+        "row_counts": [
+          0
         ]
       }
     },
@@ -4582,6 +4842,23 @@
           "native numeric region: empty native array",
           "native numeric region: multiplication wraps and division retains signed Int64 rules",
           "native scalar arguments: recursive permutations bound specialization"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
         ]
       }
     },
@@ -4610,6 +4887,9 @@
         "fixtures": 1,
         "labels": [
           "numeric: non-finite target literal rejected by both backends"
+        ],
+        "row_counts": [
+          3
         ]
       }
     },
@@ -4683,6 +4963,54 @@
           "numeric failure: curried floating arguments are ordered",
           "numeric: multiplication and signed quotient boundaries",
           "numeric: direct and curried formatting force the same arguments"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          2
         ]
       }
     },
@@ -4712,6 +5040,12 @@
           "numeric: n-body benchmark initialization and integration",
           "numeric: spectral-norm benchmark small and odd matrices",
           "numeric: fannkuch-redux benchmark checksum and flips"
+        ],
+        "row_counts": [
+          2,
+          3,
+          4,
+          4
         ]
       }
     },
@@ -4737,6 +5071,9 @@
         "fixtures": 1,
         "labels": [
           "bytes: nominal types reject invalid operations"
+        ],
+        "row_counts": [
+          0
         ]
       }
     },
@@ -4769,6 +5106,12 @@
           "bytes: bulk copy preserves offsets, empty ranges and forward overlap",
           "bytes: native stores check bounds before byte range",
           "numeric region: integer-to-Double conversion preserves rounding"
+        ],
+        "row_counts": [
+          1,
+          6,
+          8,
+          1
         ]
       }
     },
@@ -4797,6 +5140,9 @@
         "fixtures": 1,
         "labels": [
           "bytes: forged surrogate is rejected before encoding by both backends"
+        ],
+        "row_counts": [
+          1
         ]
       }
     },
@@ -4824,6 +5170,9 @@
         "fixtures": 1,
         "labels": [
           "bytes: write failures stop continuation and preserve raw output"
+        ],
+        "row_counts": [
+          1
         ]
       }
     },
@@ -4873,6 +5222,31 @@
           "byte failure: offset checked before count",
           "byte failure: write demands value",
           "bytes: bulk copy fallback retains bounds failures"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          4
         ]
       }
     },
@@ -4900,6 +5274,10 @@
         "labels": [
           "bytes: fasta empty, single-base and upstream fixture",
           "bytes: mandelbrot packed pixels, partial rows and upstream fixture"
+        ],
+        "row_counts": [
+          3,
+          6
         ]
       }
     },
@@ -4925,6 +5303,9 @@
         "fixtures": 1,
         "labels": [
           "table: nominal types and IO signatures are checked"
+        ],
+        "row_counts": [
+          0
         ]
       }
     },
@@ -4957,6 +5338,14 @@
           "byte input: buffer boundaries preserve mixed reads and retained lines",
           "byte input: discarded action does not consume input",
           "byte input: invalid UTF-8 still fails for text input"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          3,
+          1,
+          1
         ]
       }
     },
@@ -4986,6 +5375,11 @@
           "table: native counting loop grows and updates collision-prone keys",
           "native IO: nested collections preserve caller values and prior results",
           "table fusion: snapshots, large signed keys and promotion across updates"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1
         ]
       }
     },
@@ -5019,6 +5413,15 @@
           "table: unused actions do not demand failing operands",
           "table: small keys retain GMP values through collection and promotion",
           "table: demanded operands fail after preceding effects"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          3
         ]
       }
     },
@@ -5047,6 +5450,11 @@
           "DNA: reverse-complement ambiguity codes, records and growing buffers",
           "DNA: both upstream fixtures",
           "DNA: k-nucleotide short inputs, ties, mixed case and record termination"
+        ],
+        "row_counts": [
+          7,
+          2,
+          3
         ]
       }
     },
@@ -5102,6 +5510,37 @@
           "modules runtime: cyclic empty imports carry defining-module instances",
           "modules runtime: self import is a namespace edge",
           "modules runtime: multi-file example"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
         ]
       }
     },
@@ -5132,6 +5571,9 @@
         "fixtures": 1,
         "labels": [
           "modules runtime: CLI imports and output paths"
+        ],
+        "row_counts": [
+          3
         ]
       }
     },
@@ -5195,6 +5637,45 @@
           "crate runtime: nominal global cannot capture local binder",
           "crate runtime: imported entry binding",
           "crate runtime: crate local and dictionary fresh names avoid user globals"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
         ]
       }
     },
@@ -5259,6 +5740,45 @@
           "crate CLI: nominal global cannot capture local binder",
           "crate CLI: imported entry binding",
           "crate CLI: crate local and dictionary fresh names avoid user globals"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
         ]
       }
     },
@@ -5289,6 +5809,9 @@
         "fixtures": 1,
         "labels": [
           "crate runtime: source-free metadata and semantic invalidation"
+        ],
+        "row_counts": [
+          3
         ]
       }
     },
@@ -5314,6 +5837,9 @@
         "fixtures": 1,
         "labels": [
           "bootstrap primitives: signatures reject mismatched types"
+        ],
+        "row_counts": [
+          0
         ]
       }
     },
@@ -5383,6 +5909,51 @@
           "bootstrap primitives: file errors retain effect order",
           "bootstrap primitives: cached Unicode offsets survive collection",
           "bootstrap primitives: collection preserves suspended pure work and cyclic data"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          15,
+          1,
+          1,
+          1,
+          1,
+          4,
+          1,
+          4,
+          1,
+          1,
+          3,
+          1,
+          1,
+          2,
+          1,
+          1,
+          4,
+          1,
+          1
         ]
       }
     },
@@ -5413,6 +5984,12 @@
           "ST runtime: bounded-tail-state-worker",
           "ST runtime: bounded-mixed-tail-state-worker",
           "ST runtime: single-use-action-alias"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1
         ]
       }
     },
@@ -5488,6 +6065,57 @@
           "ST runtime: deferred-state-poison",
           "ST runtime: branch-laziness",
           "ST runtime: sequence-in-state"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
         ]
       }
     },
@@ -5525,6 +6153,19 @@
           "higher-order specialization: constructor-callback",
           "higher-order specialization: lazy-constructor-callback",
           "higher-order specialization: escaping-original-worker"
+        ],
+        "row_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
         ]
       }
     },

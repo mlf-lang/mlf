@@ -139,7 +139,7 @@ run args = do
        putStrLn "36 supplementary checks; 0 failures"
      else return ()
      Coverage.finish "figure12"
-    else exitWith code
+    else do { Coverage.flush; exitWith code }
 
 observe aliases selected result = case result of
  Runner.Result entry (Right ()) ->

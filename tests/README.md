@@ -273,6 +273,17 @@ Some Backends families exercise compiler/type/rejection contracts without
 runtime rows. They require nonempty completed-family evidence; the full backend
 matrix still requires all 593 rows on both backends.
 
+Backends checks each selected case's runtime row count against its reviewed
+catalog entry. The reverse-complement and k-nucleotide input tables compile
+and round-trip their fixed source once per table. Their ten input pairs retain
+ten separate interpreter and LLVM comparisons, with two source preparations.
+
+Coverage, family, and matrix journals publish ordinary JSONL on completion
+and on a recoverable suite failure. After an abrupt interruption, use
+`Tests.ReportJournal.recover reportPath` to read the committed prefix. Keep
+the report, its `.previous.jsonl` sibling, and its `.journal/` directory
+together. Larger runs store alternating snapshots of bounded row blocks.
+
 Package integration and distribution have separate execution units: source
 integration retains 51 reviewed IDs and distribution retains 28. Integration
 also runs the target-dependency/scheduler fixture and 22 native build-runner
