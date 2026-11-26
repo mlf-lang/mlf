@@ -300,6 +300,10 @@ def qualified_contract(root, source_root=None):
     expected = live_git.inventory(BOUNDARY_TYPED, paths | auxiliary_roles)
     fixture_drivers = {'tools/shared/test_artifact_binary.py', 'tools/shared/test_artifact_binary_modular.py'}
     expected.update(live_git.inventory(INVENTORY_CLEANUP, fixture_drivers))
+    # ReportJournal has no blob in the historical boundary tree. Authenticate
+    # its introduction separately and carry its bytes only on the forward path.
+    added_modules = {**BOUNDARY_MODULES, 'Tests.ReportJournal': 'tests/Tests/ReportJournal.hs'}
+    successor_paths = paths | auxiliary_roles | set(added_modules.values())
     for commit, tree, parent in (
         (COLD_BUILD_FIX, COLD_BUILD_FIX_TREE, '6f58cd514f8ad9becd97b3f60ff95e26b083fef0'),
         (FINAL_FILE_SOLVE, FINAL_FILE_SOLVE_TREE, '34e970a1fc60a626e1507f37fd361a3c6007ee40'),
@@ -318,11 +322,19 @@ def qualified_contract(root, source_root=None):
         # changed no projected blobs; this commit changes only the modular test.
         ('1297b5cf57aec9c7725e8e21a7d44710b06b523e', '889deef2e37678723546b23d5c55af2116757d4e',
          '088358c9497c9ac4587e1a60b85c0ab18fabf146'),
+        ('4bcb0000a6a97f53761f53baeb6b946e4037a457', '6d84f5331a8f7dbdbc7705acab901e9e7f3cfa24',
+         '1297b5cf57aec9c7725e8e21a7d44710b06b523e'),
+        ('79f2c6bf7e1edc0efc4f96ffd416bd9a8607457f', 'b581c6c61ed1f56638220c8e1ecdb0e1fda2d7c6',
+         '0dbc3abdf3247a543f37e4709594effc6633d98e'),
+        ('e925c19fc25958d8c08010013dcf2ae55349ceef', '680ffcac8a2dc844bfa9065e53a63bae993d4607',
+         '79f2c6bf7e1edc0efc4f96ffd416bd9a8607457f'),
+        ('7268d047c3426cbbf06b287334ca91fe54286673', 'c0f809a3c320c2318bd22c92b98610060c1c9e08',
+         'e925c19fc25958d8c08010013dcf2ae55349ceef'),
     ):
         live_git.commit(commit, tree=tree, parents=[parent])
         live_git.run('merge-base', '--is-ancestor', commit, 'HEAD')
         fixes = set(live_git.run('diff', '--name-only', parent, commit).decode().splitlines())
-        expected.update(live_git.inventory(commit, fixes & (paths | auxiliary_roles)))
+        expected.update(live_git.inventory(commit, fixes & successor_paths))
     if source_root == root:
         auxiliary = {p: proof.read(source_root, p) for p in auxiliary_roles}
         proof.require(all(proof.oid(raw) == expected[p] for p, raw in auxiliary.items()),
@@ -350,7 +362,7 @@ def qualified_contract(root, source_root=None):
                                   'boundary additions')
             earlier = {p: self._older_bytes(additions[p], p) for p in predecessor.added_paths}
             current = edge.advance(predecessor.advance_tree_bytes(parent, earlier))
-            current.update({p: additions[p] for p in BOUNDARY_MODULES.values()})
+            current.update({p: additions[p] for p in added_modules.values()})
             proof.require(self.project_tree_bytes(current) == parent, 'boundary source round trip')
             return current
 
@@ -358,15 +370,15 @@ def qualified_contract(root, source_root=None):
     files = contract.value['current_files']
     manifest = proof.strict_json(current['shared-sources.json'])
     registered = {item['module']: item['path'] for item in manifest['modules']}
-    for module, path in BOUNDARY_MODULES.items():
+    for module, path in added_modules.items():
         proof.require(registered.get(module) == path and path not in files, 'new module registration: ' + module)
         raw = proof.read(source_root, path)
         proof.require(proof.oid(raw) == expected[path], 'new module contents: ' + module)
         files[path] = proof.sha(raw)
         contract.value['module_paths'][module] = path
         contract.value['current_registry'][module] = files[path]
-    contract.added_paths = sorted(set(contract.added_paths) | set(BOUNDARY_MODULES.values()))
-    contract.added_modules = {**contract.added_modules, **BOUNDARY_MODULES}
+    contract.added_paths = sorted(set(contract.added_paths) | set(added_modules.values()))
+    contract.added_modules = {**contract.added_modules, **added_modules}
     contract.directory = HERE
     contract.manifest_sha256 = proof.sha(proof.read(root, Path(__file__).relative_to(root).as_posix()))
     contract.metadata_paths = (*contract.metadata_paths, Path(__file__).name)
