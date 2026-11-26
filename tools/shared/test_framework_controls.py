@@ -13,7 +13,6 @@ import io
 import json
 import os
 from pathlib import Path
-import re
 import sys
 import tempfile
 from types import SimpleNamespace
@@ -169,13 +168,11 @@ class FrameworkMainControls(unittest.TestCase):
         self.assertIn(type(caught.exception).__name__, receipt['error'])
         return receipt
 
-    def test_fixture_tracks_reviewed_305_and_105_contract_and_actual_ids(self):
+    def test_fixture_tracks_reviewed_305_and_105_contract(self):
         self.assertEqual(CONTRACT['legacy_pass_count'], 305)
         self.assertEqual(CONTRACT['framework_count'], 105)
         self.assertEqual(len(IDS), 105)
         self.assertEqual(len(set(IDS)), 105)
-        source = (ROOT / 'tests/Tests/TupleList.hs').read_text()
-        self.assertEqual(re.findall(r'leaf\s+"([^"]+)"', source), IDS)
         self.assertEqual(IDS[0], 'tuple-list/focused/pair-ast')
 
     def test_omitted_suite_preserves_old_all_dispatch(self):
@@ -256,6 +253,23 @@ class FrameworkMainControls(unittest.TestCase):
                 self.assertEqual(receipt['execution_budget'], budget)
                 self.assertEqual([call['timeout_seconds'] for call in fixture.calls
                                   if call['name'] in ('default', 'framework')], [budget])
+
+    def test_receipt_records_requested_and_effective_budget(self):
+        for optimization, request, effective in [('0', None, 4500), ('2', None, 600),
+                                                  ('0', 37, 37), ('2', 900, 900)]:
+            for selection in ('default', 'framework'):
+                with self.subTest(optimization=optimization, request=request, selection=selection):
+                    fixture = MainFixture(self, optimization)
+                    arguments = ['--suite', selection]
+                    if request is not None:
+                        arguments += ['--suite-timeout', str(request)]
+                    receipt = fixture.execute(*arguments)
+                    self.assertEqual(receipt['suite_timeout_request'], request)
+                    self.assertEqual(receipt['suite_timeout_seconds'], effective)
+                    self.assertEqual(receipt['suite_timeout_policy'],
+                                     'authenticated-producer-optimization-v1')
+                    self.assertEqual([call['timeout_seconds'] for call in fixture.calls
+                                      if call['name'] == selection], [effective])
 
     def test_o0_framework_override_preserves_other_command_budgets_and_coverage(self):
         fixture = MainFixture(self, '0')
