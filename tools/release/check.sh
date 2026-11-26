@@ -94,6 +94,7 @@ run release-tuple-list-migration
 run release-tuple-list-migration-controls
 run release-migration-inventory-controls
 run release-core-leaf-migration
+run release-core-registry-controls
 run release-reconciliation-inventory
 run release-reconciliation-inventory-controls
 run release-history-workflows

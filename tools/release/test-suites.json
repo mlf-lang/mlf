@@ -491,7 +491,18 @@
       "release/unit-evidence/receipt/failed-scheduler",
       "release/unit-evidence/receipt/repeated-key",
       "release/unit-evidence/receipt/over-parallel",
-      "release/unit-evidence/rehashed-inventory"
+      "release/unit-evidence/rehashed-inventory",
+      "release/unit-evidence/registry-formatting",
+      "release/unit-evidence/missing-registry-discovery",
+      "release/unit-evidence/changed-registry-discovery",
+      "release/unit-evidence/changed-registry-contract",
+      "release/unit-evidence/missing-semantic-case-report",
+      "release/unit-evidence/rehashed-registry/id",
+      "release/unit-evidence/rehashed-registry/name",
+      "release/unit-evidence/rehashed-registry/family",
+      "release/unit-evidence/rehashed-registry/duplicate",
+      "release/unit-evidence/rehashed-registry/missing",
+      "release/unit-evidence/rehashed-registry/total"
     ]
   },
   "release-async-bootstrap": {
@@ -1045,6 +1056,17 @@
     "ids": [
       "release/source-audit/core-leaf-migration"
     ]
+  },
+  "release-core-registry-controls": {
+    "kind": "unittest",
+    "command": [
+      "python3",
+      "-B",
+      "tools/testing/test_core_registry_contract.py"
+    ],
+    "prefix": "release-core-registry-controls/",
+    "allow_skip": false,
+    "exact": true
   },
   "release-reconciliation-inventory": {
     "kind": "exit",
