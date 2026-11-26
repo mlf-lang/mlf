@@ -130,6 +130,10 @@ module Tests.ReportJournal (begin, append, recover, contents, publish, flush) wh
       writeFile (path ++ ".previous.jsonl") current;
       writeFile path text
     } else do {
+      root <- canonicalPath (path ++ ".journal");
+      current <- J.read (root ++ "/current.json");
+      O.require (eqString (O.parent work) root && O.starts "run-" (O.base work) &&
+                 J.equal current (J.str (O.base work))) "report journal generation changed";
       writeFile (work ++ "/publish.jsonl") text;
       O.move (work ++ "/publish.jsonl") path;
       writeFile (path ++ ".journal/current.json") "null\n";

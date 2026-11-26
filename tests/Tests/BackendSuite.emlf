@@ -159,4 +159,7 @@ runRegistry backends args options selection plan = do
     Nothing -> return ()
     Just names -> do { S.mapM_ (Selection.passed "backends") names; Selection.finish "backends" }
    putStrLn (showInt (S.length selected) ++ " shared IO/prelude/backend fixtures; 0 failures")
-  else do { B.flushRows; Selection.flush; exitWith code }
+  else do
+   B.flushRows
+   case selection of { Nothing -> return (); Just _ -> Selection.flush }
+   exitWith code
