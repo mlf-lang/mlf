@@ -26,19 +26,23 @@ class BenchmarkTransition(original.BenchmarkTransition):
         current = {p: successor.read(ROOT, p) for p in contract.value['current_files']}
         historic = contract.project_tree_bytes(current)
         additions = {p: current[p] for p in contract.added_paths}
-        path = contract.value['module_paths']['Bootstrap.Graph.ScopeIndex']
-        self.assertNotIn(path, historic)
         self.assertEqual(contract.advance_tree_bytes(historic, additions), current)
-        for inventory, check in ((current, contract.project_tree_bytes),
-                                 (additions, lambda data: contract.advance_tree_bytes(historic, data))):
-            with self.subTest(direction=check.__name__):
-                altered = dict(inventory)
-                altered[path] += b'\\n'
-                with self.assertRaises(ValueError):
-                    check(altered)
-                del altered[path]
-                with self.assertRaises(ValueError):
-                    check(altered)
+        registry = {row['module'] for row in json.loads(historic['shared-sources.json'])['modules']}
+        for module in ('Bootstrap.Graph.ScopeIndex', 'Bootstrap.NameEncoding'):
+            path = contract.value['module_paths'][module]
+            self.assertIn(path, additions)
+            self.assertNotIn(path, historic)
+            self.assertNotIn(module, registry)
+            for inventory, check in ((current, contract.project_tree_bytes),
+                                     (additions, lambda data: contract.advance_tree_bytes(historic, data))):
+                with self.subTest(module=module, direction=check.__name__):
+                    altered = dict(inventory)
+                    altered[path] += b'\\n'
+                    with self.assertRaises(ValueError):
+                        check(altered)
+                    del altered[path]
+                    with self.assertRaises(ValueError):
+                        check(altered)
 
     def test_phase2_intset_must_not_be_stale_or_altered(self):
         old = successor.parse_intset(self.opened.git, self.intset)

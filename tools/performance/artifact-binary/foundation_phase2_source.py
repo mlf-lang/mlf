@@ -300,9 +300,14 @@ def qualified_contract(root, source_root=None):
     expected = live_git.inventory(BOUNDARY_TYPED, paths | auxiliary_roles)
     fixture_drivers = {'tools/shared/test_artifact_binary.py', 'tools/shared/test_artifact_binary_modular.py'}
     expected.update(live_git.inventory(INVENTORY_CLEANUP, fixture_drivers))
-    # ReportJournal has no blob in the historical boundary tree. Authenticate
-    # its introduction separately and carry its bytes only on the forward path.
-    added_modules = {**BOUNDARY_MODULES, 'Tests.ReportJournal': 'tests/Tests/ReportJournal.hs'}
+    # New modules have no historical blob. Authenticate their introductions
+    # and carry their bytes only on the forward path.
+    name_encoding = 'libraries/mlf-foundation/Bootstrap/NameEncoding.hs'
+    added_modules = {
+        **BOUNDARY_MODULES,
+        'Tests.ReportJournal': 'tests/Tests/ReportJournal.hs',
+        'Bootstrap.NameEncoding': name_encoding,
+    }
     successor_paths = paths | auxiliary_roles | set(added_modules.values())
     for commit, tree, parent in (
         (COLD_BUILD_FIX, COLD_BUILD_FIX_TREE, '6f58cd514f8ad9becd97b3f60ff95e26b083fef0'),
@@ -335,6 +340,34 @@ def qualified_contract(root, source_root=None):
         live_git.run('merge-base', '--is-ancestor', commit, 'HEAD')
         fixes = set(live_git.run('diff', '--name-only', parent, commit).decode().splitlines())
         expected.update(live_git.inventory(commit, fixes & successor_paths))
+    # Authenticate each reviewed post-migration input by its Git role. The
+    # extracted codec is new; the old codec implementation remains in the
+    # archived Separate.hs, so no archived oracle gets the new module.
+    core_registry = {'tests/Tests/CompilerTests.hs', 'tests/Tests/Coverage.hs'}
+    for commit, tree, parent, roles in (
+        ('3554856ffd2faa161e5b8839b1a1fcd76f7f074c', 'e4a1da2266bbfa5cac602c0d591ffcc3dff519d7',
+         '509ef4fdbbdc77d92bf40624a82982d5cfce52bb', {
+             'libraries/mlf-crates/Bootstrap/Separate.hs',
+             'libraries/mlf-developer-tools/Package/Benchmark.hs',
+             'libraries/mlf-foundation/mlf-package.json',
+             'mlf-shared.cabal', 'shared-sources.json', name_encoding,
+         }),
+        ('3ffb3b3969f0d7034df2fdd28e2fb039b7ffbafc', 'b7ca5d8492573e649aaf3177fba6b9e2bc0b6450',
+         '3554856ffd2faa161e5b8839b1a1fcd76f7f074c', core_registry),
+        ('7d44288472bfd6f81008d5bcb0891bdf5cdb2e02', '1c81a57b500b61fae45f94866304be307b7489b8',
+         '9962926e62364994da14a2c975ad1179701946b4', core_registry),
+        ('dea251a5a48ec07d6a2acdc1e9310c431a5abcb3', 'a27c00a09d95009659834507f64d8a390a1615b7',
+         '3831d31f4028e597594961a5cfe711778fdf7b28', {'bootstrap/MLF/BuiltinPreludeData.hs'}),
+        ('f64f1298ad5b3f7d1c1fe73113e0ff75868879bc', 'd3aba0016432d9e647504a6337a79bd0163c146f',
+         'dea251a5a48ec07d6a2acdc1e9310c431a5abcb3', {
+             'mlf.lock', 'testing/tools/mlf.lock', 'tests/mlf.lock', 'tests/shared/mlf.lock',
+         }),
+    ):
+        live_git.commit(commit, tree=tree, parents=[parent])
+        live_git.run('merge-base', '--is-ancestor', commit, 'HEAD')
+        roles_changed = set(live_git.run('diff', '--name-only', parent, commit).decode().splitlines())
+        proof.require(roles_changed & successor_paths == roles, 'exact post-migration source roles: ' + commit)
+        expected.update(live_git.inventory(commit, roles))
     # Accept only the reviewed test-only correction, not an arbitrary new auxiliary blob.
     storage_fixture = 'tools/shared/test_artifact_binary_modular.py'
     storage_parent = '088358c9497c9ac4587e1a60b85c0ab18fabf146'
