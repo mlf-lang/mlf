@@ -34,6 +34,7 @@ module Tests.ReportJournal (begin, append, recover, contents, publish, flush) wh
     setEnv (name ++ "_PARTS") work;
     return work
   };
+  blockSize :: Int;
   blockSize = 16;
   part work block slot =
     work ++ ("/block-" ++ (showInt block ++ ("-" ++ (showInt slot ++ ".jsonl"))));
