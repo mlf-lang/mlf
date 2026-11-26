@@ -157,9 +157,12 @@ schemaChecks catalog = do
  empty <- A.right (\message -> message) (J.parse "{\"kind\":\"coverage\",\"executions\":[],\"aliases\":{},\"metrics\":{}}")
  rejected (C.validate (changeFamily "core/hm-oracle" (J.set "evidence" empty) catalog))
  rejected (C.validate (changeEvidence "backends/strict-wrappers" (J.set "rows" (J.num 3)) catalog))
+ S.mapM_ (\counts -> rejected (C.validate (changeEvidence "backends/strict-wrappers" (J.set "row_counts" counts) catalog)))
+  ((:) J.Null ((:) (J.Array []) ((:) (J.Array (S.map J.num ((:) (0 - 1) ((:) 1 ((:) 1 ((:) 3 [])))))) ((:) (J.stringArray (O.words "1 1 1 1")) []))))
+ rejected (C.validate (changeEvidence "backends/strict-wrappers" (remove "row_counts") catalog))
  -- Keep each family's labels/count consistent so this reaches the independent
  -- aggregate fixture guard, rather than failing the per-family schema check.
- let extraFixture = changeEvidence "backends/strict-wrappers" (\entry -> J.set "fixtures" (J.num 5) (J.set "labels" (J.stringArray (S.snoc (J.getStrings "labels" entry) "unreviewed backend fixture")) entry)) catalog
+ let extraFixture = changeEvidence "backends/strict-wrappers" (\entry -> J.set "fixtures" (J.num 5) (J.set "row_counts" (J.Array (S.snoc (J.values (J.get "row_counts" entry)) (J.num 0))) (J.set "labels" (J.stringArray (S.snoc (J.getStrings "labels" entry) "unreviewed backend fixture")) entry))) catalog
  A.assert (case C.validate extraFixture of { Left error -> eqString error "backend family partition changed"; Right _ -> False }) "backend fixture total accepted an unreviewed action"
  -- Preserve aggregate counts while forging a duplicate fixture label across families.
  let backendLabel = S.head (J.getStrings "labels" (J.get "evidence" (C.family catalog "backends/strict-wrappers")))
@@ -168,6 +171,31 @@ schemaChecks catalog = do
  rejected (C.validate (changeFamily "port/foundation" (J.set "fixture" (J.str "forged")) catalog))
  rejected (C.validate (changeEvidence "port/foundation" (J.set "rows" (J.num 2)) catalog))
  rejected (C.validate (changeEvidence "self-host/complete" (J.set "rows" (J.num 1)) catalog))
+
+matrixRowChecks = do
+ -- The fixture count, total rows and permitted labels all stay correct in the
+ -- A,A,C,D mutation. Only the independent per-fixture multiplicities detect B.
+ family <- A.right (\message -> message) (J.parse "{\"evidence\":{\"rows\":4,\"labels\":[\"A\",\"B\",\"C\",\"D\"],\"row_counts\":[1,1,1,1]}}")
+ let entries = (:) family []
+ let rows names = S.mapIndexed (\index name -> J.Object ((:) ((,) "label" (J.str name)) ((:) ((,) "index" (J.num index)) ((:) ((,) "backends" (J.stringArray (O.words "interpreter llvm"))) [])))) names
+ let correct = rows (O.words "A B C D")
+ A.right (\message -> message) (C.validateMatrixRows false entries correct)
+ rejected (C.validateMatrixRows false entries (rows (O.words "A A C D")))
+ rejected (C.validateMatrixRows false entries (rows (O.words "A B C outside")))
+ rejected (C.validateMatrixRows false entries (S.tail correct))
+ rejected (C.validateMatrixRows false entries (S.reverse correct))
+ rejected (C.validateMatrixRows false entries ((:) (J.set "index" (J.num 1) (S.head correct)) (S.tail correct)))
+ rejected (C.validateMatrixRows false entries ((:) (J.set "backends" (J.stringArray ((:) "llvm" [])) (S.head correct)) (S.tail correct)))
+ repeated <- A.right (\message -> message) (J.parse "{\"evidence\":{\"rows\":4,\"labels\":[\"A\",\"B\",\"component\"],\"row_counts\":[1,3,0]}}")
+ A.right (\message -> message) (C.validateMatrixRows false ((:) repeated []) (rows (O.words "A B B B")))
+ rejected (C.validateMatrixRows false ((:) repeated []) (rows (O.words "A B B component")))
+ component <- A.right (\message -> message) (J.parse "{\"evidence\":{\"rows\":0,\"labels\":[\"component\"],\"row_counts\":[0]}}")
+ A.right (\message -> message) (C.validateMatrixRows false ((:) component []) [])
+ rejected (C.validateMatrixRows false ((:) component []) (rows ((:) "component" [])))
+ port <- A.right (\message -> message) (J.parse "{\"fixture\":\"Probe\",\"evidence\":{\"rows\":1}}")
+ let portRow = J.set "backends" (J.stringArray ((:) "llvm" [])) (S.head (rows ((:) "MLF compiler port: Probe" [])))
+ A.right (\message -> message) (C.validateMatrixRows true ((:) port []) ((:) portRow []))
+ rejected (C.validateMatrixRows true ((:) port []) ((:) (J.set "label" (J.str "MLF compiler port: other") portRow) []))
 
 inventoryChecks catalog inventory = do
  A.right (\message -> message) (C.validateInventory catalog inventory)
@@ -235,6 +263,7 @@ checks = do
  batchChecks catalog
  corePartitionChecks catalog
  schemaChecks catalog
+ matrixRowChecks
  inventoryChecks catalog inventory
  -- Keep the original flat selection contract as a regression alongside the
  -- richer family/projection protocol checks in FamilySelectionChecks.

@@ -144,6 +144,15 @@ library bytes, compiler/environment identities and ordered flags. Group reports
 identify each reused artifact and its checksums. The two new cache regressions
 exercise source resolution, cross-group reuse, invalidation, corruption repair
 and traced runtime behavior with small programs; every selected matrix still runs.
+`compiler-tests backend-prepare` prepares only these two drivers and records
+`scope: preparation`; it cannot qualify a backend campaign. CI exports the
+artifacts named in its completed, hashed build report with
+`tools/testing/driver_cache.py`, then saves the snapshot before the matrix runs.
+Import validates artifact stamps and bytes, and ordinary build-key validation
+still decides reuse. Missing or damaged entries are rebuilt. The full backend
+invocation runs independently, including after a failed preparation attempt.
+The matrix also reuses the checked traced runtime object already prepared for
+RuntimeDriver, while Port retains its own runtime preparation.
 Self-host selects the candidate artifact from its actual package build report,
 checks that report's source snapshot and retains a copy. Equal native binary
 hashes elsewhere in the shared store do not identify the producing LLVM input.
