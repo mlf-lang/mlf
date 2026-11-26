@@ -67,7 +67,7 @@ runnerPackageChecks = do
  withoutHeaders <- H.right (B.packageRequirements ((:) (V.remove "pkg_config_headers" first) []))
  H.assert (case withoutHeaders of { (:) ((,,) _ _ headers) [] -> S.null headers; _ -> false }) "absent header map is not empty"
  let wrongVersion = J.set "pkg_config_versions" (J.Object ((:) ((,) "example" (J.str "2.0")) [])) second
- H.assert (S.isLeft (B.packageRequirements ((:) first ((:) wrongVersion []))) && S.isLeft (B.packageRequirements ((:) (V.remove "pkg_config_versions" first) [])))) "missing or conflicting package pin accepted"
+ H.assert (S.isLeft (B.packageRequirements ((:) first ((:) wrongVersion []))) && S.isLeft (B.packageRequirements ((:) (V.remove "pkg_config_versions" first) []))) "missing or conflicting package pin accepted"
  S.mapM_ (\field -> S.mapM_ (\wrong -> H.assert (S.isLeft (B.packageRequirements ((:) (J.set field wrong first) []))) ("malformed optional map accepted: " ++ field))
    ((:) J.Null ((:) (J.str "wrong") ((:) (J.Array []) ((:) (J.Boolean false) ((:) (J.num 0) [])))))) (O.words "pkg_config pkg_config_versions pkg_config_headers")
  S.mapM_ (\source -> do { malformed <- H.right (J.parse source); H.assert (S.isLeft (B.packageRequirements ((:) malformed []))) "malformed package map entry accepted" })
