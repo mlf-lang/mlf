@@ -9,8 +9,6 @@ from default_stdlib import configuration
 from test_direct import CommandRunner, authenticate_build, sha
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'libraries/mlf-crates/Bootstrap/Separate.hs'
-CODEC = ROOT / 'libraries/mlf-foundation/Bootstrap/NameEncoding.hs'
 HOST = ROOT / 'tools/shared/fixtures/OwnerEncodingControls.hs'
 
 
@@ -45,7 +43,12 @@ def main():
         producer = authenticate_build(receipt, build / 'bin')
         native = configuration(args.clang)
         record['native_configuration'] = native
-        inputs = [receipt, SOURCE, CODEC, HOST, Path(__file__).resolve(),
+        manifest_path = ROOT / 'shared-sources.json'
+        manifest = json.loads(manifest_path.read_text())
+        modules = ['Bootstrap.Separate', 'Bootstrap.NameEncoding']
+        sources = [Path(producer['shared_inputs'][name]['path']) for name in modules]
+        include_args = [arg for path in manifest['source_roots'] for arg in ['-i', ROOT / path]]
+        inputs = [receipt, manifest_path, *sources, HOST, Path(__file__).resolve(),
                   ROOT / 'tools/shared/test_direct.py', ROOT / 'tools/shared/default_stdlib.py',
                   ROOT / 'runtime/mlf_runtime.c', *sorted((ROOT / 'runtime').glob('*.h')),
                   Path(native['clang']), Path(sys.executable).resolve(), build / 'host.o', build / 'supervisor.o']
@@ -85,13 +88,13 @@ module Main where {
   }
 }
 ''')
-        emitted = runner.run('emit-native', [build / 'bin/emlf', '-i', ROOT / 'libraries/mlf-foundation',
+        emitted = runner.run('emit-native', [build / 'bin/emlf', *include_args,
                              '--emit-llvm-gc', fixture], timeout=240)
         llvm = output / 'program.ll'; llvm.write_bytes(emitted.stdout)
         runtime = output / 'runtime.o'
         runner.run('runtime', [native['clang'], '-O2', '-std=c11', *native['runtime_flags'],
                    '-I' + str(ROOT / 'runtime'), '-c', ROOT / 'runtime/mlf_runtime.c', '-o', runtime], timeout=120)
-        lanes = {'interpreter': [build / 'bin/emlf', '-i', ROOT / 'libraries/mlf-foundation', '--run', fixture, '--']}
+        lanes = {'interpreter': [build / 'bin/emlf', *include_args, '--run', fixture, '--']}
         for optimization in ['0', '2']:
             binary = output / ('native-O' + optimization)
             runner.run('native-link-O' + optimization, [native['clang'], '-O' + optimization,
