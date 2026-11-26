@@ -2202,6 +2202,54 @@
       }
     },
     {
+      "id": "harness/runner-modes-preserve-limits-and-reject-invalid-options",
+      "unit": "harness",
+      "name": "runner modes preserve limits and reject invalid options",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": ["fixed", "fault-injected"],
+      "oracles": ["fixed-expected", "contract"],
+      "purposes": ["regression", "conformance", "robustness"],
+      "evidence": {
+        "kind": "coverage",
+        "executions": ["test_runner_modes_preserve_limits_and_reject_invalid_options"],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/runner-optional-package-maps-preserve-dependency-pins",
+      "unit": "harness",
+      "name": "runner optional package maps preserve dependency pins",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": ["fixed", "fault-injected"],
+      "oracles": ["fixed-expected", "contract"],
+      "purposes": ["regression", "conformance", "robustness"],
+      "evidence": {
+        "kind": "coverage",
+        "executions": ["test_runner_optional_package_maps_preserve_dependency_pins"],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/runner-reports-distinguish-correctness-from-performance",
+      "unit": "harness",
+      "name": "runner reports distinguish correctness from performance",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": ["fixed", "fault-injected"],
+      "oracles": ["fixed-expected", "contract"],
+      "purposes": ["regression", "conformance", "robustness"],
+      "evidence": {
+        "kind": "coverage",
+        "executions": ["test_runner_reports_distinguish_correctness_from_performance"],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
       "id": "harness/performance-limits-apply-to-every-workload-and-include-boundary",
       "unit": "harness",
       "name": "performance limits apply to every workload and include boundary",
