@@ -965,6 +965,16 @@ tick = Parser (\s -> if ltInt s 1 then Stop else Next s (subInt s 1));
                 + 'else ioBind (printInt (selectedScore i)) (\\_ -> printAll (addInt i 1));\n'
                 + 'main :: IO ();\nmain = ioBind (getArg 0) (\\text -> if eqString text "--all" '
                 + 'then printAll 0 else printInt (entry (readInt text)))\n}\n')
+    elif family == 'ground_evidence_telescope':
+        parameters = [f'p{i}' for i in range(2*n)]
+        binders = [f'a{i}' for i in range(n)]
+        def witness(args):
+            return ' '.join(['Witness', *args])
+        declarations = (f'data {witness(parameters)} = WitnessValue Int;\n'
+                        'class Score a where { score :: a -> Int };\n'
+                        f'instance Score ({witness(binders + binders)}) where '
+                        '{ score (WitnessValue value) = addInt value 1 };\n')
+        expression = f'score (WitnessValue x :: {witness(["Int"] * (2*n))})'
     elif family == 'scoped_ground_method_calls':
         declarations = ('data Token = Token Int;\n'
                         'class Score a where { score :: a -> Int };\n'
@@ -1135,6 +1145,8 @@ run x (More (Job worker) rest) = let { saved = worker x (addInt x 1) } in
 
 def expected(family, n, x):
     """Closed-form specifications; no compiled results or generated helpers used."""
+    if family == 'ground_evidence_telescope':
+        return (x + 1 + 2**63) % 2**64 - 2**63
     if family == 'demand_forwarding_chain':
         return (2*x + 2**63) % 2**64 - 2**63
     if family == 'independent_wide_recursive_groups':

@@ -98,6 +98,29 @@ module Bootstrap.X.Type where {
                     (substitute a replacement (substitute b (XVar fresh) body))
              else XForall b (substitute a replacement bound) (substitute a replacement body)
     };
+  freeIn :: XTyVar -> XType -> Bool;
+  freeIn a ty = let { occurs = freeIn a } in case ty of {
+    XVar b -> equalTyVar a b;
+    XBot -> False;
+    XBotKind _ -> False;
+    XArrow x y -> occurs x || occurs y;
+    XCon _ args -> L.any occurs args;
+    XApply f x -> occurs f || occurs x;
+    XForall b bound body -> occurs bound || (L.not (equalTyVar a b) && occurs body)
+  };
+  -- With a closed argument, no binder can capture part of the replacement.
+  -- If a variable is free under a bottom-bound prefix it must occur in its
+  -- tail, and none of the prefix binders can shadow it.
+  substituteBound :: XTyVar -> XType -> XType -> XType;
+  substituteBound a bound ty = case (,) ty bound of {
+    (,) (XForall _ XBot _) (XCon _ []) -> let {
+      replaceTail source = case source of {
+        XForall b XBot body -> XForall b XBot (replaceTail body);
+        _ -> substitute a bound source
+      }
+    } in if freeIn a ty then replaceTail ty else ty;
+    _ -> substitute a bound ty
+  };
   alphaEq :: XType -> XType -> Bool;
   alphaEq a b = alphaIn M.empty M.empty 0 a b;
   alphaIn :: Map XTyVar Int -> Map XTyVar Int -> Int -> XType -> XType -> Bool;

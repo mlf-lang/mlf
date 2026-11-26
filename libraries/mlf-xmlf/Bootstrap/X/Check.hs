@@ -149,7 +149,7 @@ module Bootstrap.X.Check where {
         };
       XElim ->
         case source of {
-          XForall a bound body -> Right (T.substitute a bound body);
+          XForall a bound body -> Right (T.substituteBound a bound body);
           _ -> Left "Inst-Elim requires a forall source"
         };
       XIntro a -> introduce ds env a XBot source;

@@ -1713,6 +1713,23 @@ module MLF.Tests.SharedFrontend where {
     compare "repeated ground instantiation" same repeated recursiveInt;
     compare "same binder identity with a different scheme" alwaysBool (use recursiveInt) (XArrow recursiveInt recursiveBool);
     compare "same binder with another type argument" same (use recursiveBool) (XArrow recursiveBool recursiveBool);
+    let { b = XTyVar 42; outer = XForall a XBot; inner = XForall b XBot };
+    compare "ground substitution through a dependent inner bound"
+      (outer (inner (XForall a t (XArrow t (XVar b))))) (use recursiveInt)
+      (inner (XForall a recursiveInt (XArrow t (XVar b))));
+    compare "a shadowing bottom binder retains its occurrences"
+      (outer (inner (outer (XArrow t (XVar b))))) (use recursiveInt)
+      (inner (outer (XArrow t (XVar b))));
+    let { raw = XApply (XCon "Wrap" []) recursiveInt;
+      ds = Data.withKinds [(,) "Wrap" (KArrow Star Star)] };
+    check "an unused quantifier preserves the original application in its body"
+      (case Check.checkComputationIn ds M.empty XElim (XForall a recursiveInt (inner raw)) of {
+        Right (XForall _ XBot (XApply (XCon name []) _)) -> eqString name "Wrap"; _ -> False
+      });
+    let { open = XEnv (M.singleton b XBot) (M.singleton x (outer (inner (XArrow t (XVar b)))));
+      expected = XForall a XBot (XArrow (XVar b) t) };
+    recursiveCheckedType "open type argument avoids capture" expected
+      (Check.inferIn Data.emptyDataEnv open (use (XVar b)));
     check "ground instantiation on a monomorphic variable still fails"
       (case Check.inferIn Data.emptyDataEnv (scope recursiveInt) (use recursiveInt) of {
         Left reason -> eqString reason "Inst-Inner requires a forall source"; Right _ -> False
