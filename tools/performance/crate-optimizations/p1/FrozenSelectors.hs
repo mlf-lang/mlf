@@ -9,8 +9,8 @@ module FrozenSelectors where {
   import Bootstrap.Types;
   import Bootstrap.Std;
   import Bootstrap.Module (ModuleSpace(..), Role(..), Entity(..), Interface(..));
-  import qualified Bootstrap.Map as M;
-  import qualified Bootstrap.Set as Set;
+  import qualified FrozenSelectorMap as M;
+  import qualified FrozenSelectorSet as Set;
   import qualified Bootstrap.Primitive as P;
   import qualified Bootstrap.Lexer as Lexer;
   owner (Entity name _ _) = name;

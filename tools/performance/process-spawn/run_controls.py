@@ -5,7 +5,6 @@ import argparse
 import ast
 import json
 import os
-import platform
 import shutil
 import subprocess
 import sys
@@ -19,15 +18,25 @@ def require(value,message):
     if not value:raise RuntimeError(message)
 
 
-def validate_change(base,root):
-    text=(root/'runtime/mlf_system.h').read_text()
-    includes='#include <crt_externs.h>\n#include <spawn.h>\n'
-    start='#if defined(__APPLE__)\n    pid_t pid = -1;\n'
-    end='#else\n    pid_t pid = fork();\n#endif\n'
-    require(text.count(includes)==text.count(start)==text.count(end)==1,'one isolated Darwin spawn block')
-    left=text.index(start);right=text.index(end,left)+len(end)
-    projected=(text[:left]+'    pid_t pid = fork();\n'+text[right:]).replace(includes,'')
-    require(projected==(base/'runtime/mlf_system.h').read_text(),'original process parsing, fork, wait, timeout and cleanup text preserved')
+def cwd_capability(stdout):
+    """Read the compiled SDK/runtime probe, never infer features from a source hash."""
+    require(stdout in (b'spawn-cwd\n', b'fork-cwd-fallback\n'),
+            'complete CWD capability response required')
+    return stdout == b'spawn-cwd\n'
+
+
+def validate_eligibility(stdout,cwd_supported):
+    """Require the independently counted spawn/fallback and descriptor outcomes."""
+    value=ast.literal_eval(stdout.decode('utf-8'))
+    require(type(value) is tuple and len(value)==3,'eligibility result tuple required')
+    before,after,counters=value
+    expected=([30,29,1,30,30,21,9,1] if cwd_supported else
+              [29,28,2,30,30,20,9,0])
+    require(type(before) is int and type(after) is int and before==after and before>0
+            and type(counters) is list and all(type(n) is int for n in counters)
+            and counters==expected,
+            'actual GHC spawn, fallback, process groups, inherited environment and descriptor ownership')
+    return {'fds_before':before,'fds_after':after,'counters':counters}
 
 
 def main():
@@ -47,9 +56,8 @@ def main():
     H=types.ModuleType('retained_helper');H.__file__=str(hp);exec(compile(hp.read_bytes(),str(hp),'exec'),H.__dict__)
     before=H.authenticate(old,base)
     candidate=H.authenticate(a.producer.resolve(),ROOT) if a.producer else None
-    validate_change(base,ROOT)
     record={'complete':False,'ordinary_candidate_authenticated':candidate is not None,'performance_measured':False,
-            'exact_reverse_projection':True,'commands':[],'faults':[],'real':[]}
+            'commands':[],'faults':[],'real':[]}
     limits={'address_space_per_process_bytes':6*1024**3,'disk_free_floor_bytes':5*1024**3,
             'host_available_floor_bytes':3*1024**3,'max_work_bytes':2*1024**3,
             'process_tree_rss_bytes':5*1024**3,'wall_seconds':120}
@@ -73,18 +81,15 @@ def main():
     def expected(code=7,message=''):
         value=message.encode();return f'{int(bool(message))} {0 if message else code} {len(value)} {value.hex()}\n'.encode()
     cc=before['cc']['path'];fixtures=ROOT/'tools/performance/process-readiness/fixtures'
-    # The POSIX chdir file action is available from the macOS 26 SDK and runtime.
-    definitions=subprocess.check_output([cc,'-dM','-E','-include','spawn.h','-'],input=b'')
-    cwd_sdk=b'#define __MAC_26_0 ' in definitions
-    cwd_supported=cwd_sdk and int(platform.mac_ver()[0].split('.')[0])>=26
-    source_contract=H.module(HERE/'source_contract.py','exact_spawn_headers')
-    cwd_header=H.sha(ROOT/'runtime/mlf_system.h')==source_contract.CWD_SHA
     pins={str(x):H.sha(x) for x in [Path(__file__),HERE/'SpawnFaults.c',HERE/'SpawnUnavailable.c',hp,
         ROOT/'runtime/mlf_system.h',base/'runtime/mlf_system.h',fixtures/'Probe.c',
         ROOT/'tools/performance/process-readiness/darwin/Faults.c',
-        HERE/'SpawnHooks.c',HERE/'Eligibility.hs',HERE/'ChildState.c',HERE/'source_contract.py']}
+        HERE/'SpawnHooks.c',HERE/'Eligibility.hs',HERE/'ChildState.c',HERE/'CwdCapability.c']}
     record['inputs']=pins;save()
     with H.SerialLock(ROOT/'.mlf-build'):
+        run('build-cwd-capability',[cc,'-O2','-std=c11',HERE/'CwdCapability.c','-o',out/'cwd-capability'])
+        cwd_supported=cwd_capability(run('cwd-capability',[out/'cwd-capability']))
+        record['cwd_spawn_supported']=cwd_supported;save()
         for side,source,producer in [('base',base,old),('candidate',ROOT,a.producer)]:
             run('host-'+side,[cc,'-O2','-std=c11','-I'+str(source/'runtime'),'-c',source/'host/ghc/cbits/host.c','-o',out/(side+'.o')])
             if producer:require(H.sha(out/(side+'.o'))==H.sha(producer/'host.o'),'ordinary host object identity '+side)
@@ -104,7 +109,7 @@ def main():
             cases.append((name,name,'immediate',None,b'',spec('/usr/bin/true'),expected(),prefix+ready+'wait,close'))
         for name,scope,prefix in [('supervised','4242','init,spawn,destroy,'),('stale-scope','4241',spawn),('invalid-scope','bad',spawn)]:
             cases.append((name,'ok','immediate',scope,b'',spec('/usr/bin/true'),expected(),prefix+ready+'wait,close'))
-        if cwd_header and cwd_supported:
+        if cwd_supported:
             start='init,group,flags,'
             for mode,tail in [
                     ('ok','actions-init,chdir,spawn,actions-destroy,destroy,'),
@@ -114,9 +119,8 @@ def main():
                 cases.append(('cwd-'+mode,mode,'immediate',None,b'.',spec('/usr/bin/true'),
                               expected(),start+tail+ready+'wait,close'))
         else:
-            prefix='init,group,flags,destroy,' if cwd_header else ''
             cases.append(('cwd-fallback','ok','immediate',None,b'.',spec('/usr/bin/true'),
-                          expected(),prefix+'fork,'+ready+'wait,close'))
+                          expected(),'init,group,flags,destroy,fork,'+ready+'wait,close'))
         for name,first,wire in [('relative-cwd',b'.',spec('./true')),('stdin',b'',spec('/usr/bin/true',stdin='/unused')),
             ('stdout',b'',spec('/usr/bin/true',stdout='/unused')),('stderr',b'',spec('/usr/bin/true',stderr='/unused'))]:
             cases.append(('ineligible-'+name,'ok','immediate',None,first,wire,expected(),'fork,'+ready+'wait,close'))
@@ -166,7 +170,7 @@ def main():
         sys.argv=[str(path),'--baseline-root',str(base),'--baseline-producer',str(old),'--producer',str(a.producer.resolve()),
             '--output',str(out/'retained'),'--gc-prefix',str(a.gc_prefix),'--gmp-prefix',str(a.gmp_prefix)]
         with H.SerialLock(ROOT/'.mlf-build'):
-            legacy.main(validate_change=validate_change,extra_fault_flags=['-Dposix_spawnp=mlf_spawn_unavailable'],
+            legacy.main(extra_fault_flags=['-Dposix_spawnp=mlf_spawn_unavailable'],
                 extra_fault_sources=[HERE/'SpawnUnavailable.c'],extra_pins=[Path(__file__),HERE/'SpawnUnavailable.c'])
         record['retained']=H.load(out/'retained/receipt.json')
         require(record['retained']['complete'],'entire retained inventory')
@@ -186,16 +190,8 @@ def main():
                 .replace(str(producer/'host.o'),str(out/'spawn-hooks-host.o')).replace(str(producer/'bin/emlf'),str(out/'eligibility')) for x in argv]
             argv.insert(argv.index('-o'),str(out/'spawn-hooks.o'))
             run('build-eligibility',argv);H.check_pins(object_pins)
-            fds_before,fds_after,counters=ast.literal_eval(run('eligibility-result',[out/'eligibility',out/'child-state']).decode())
-            expected_counts=[29,28,2,29,29,20,9,0]
-            if cwd_header:
-                if cwd_supported:
-                    expected_counts=[30,29,1,30,30,21,9,1]
-                else:
-                    expected_counts=[29,28,2,30,30,20,9,0]
-            require(fds_before==fds_after and fds_before>0 and counters==expected_counts,
-                'actual GHC spawn, fallback, process groups, inherited environment and descriptor ownership')
-            record['eligibility']={'fds_before':fds_before,'fds_after':fds_after,'counters':counters};save()
+            record['eligibility']=validate_eligibility(
+                run('eligibility-result',[out/'eligibility',out/'child-state']),cwd_supported);save()
     H.check_pins(pins)
     require(H.authenticate(old,base)==before,'baseline remains authenticated')
     if candidate:require(H.authenticate(a.producer.resolve(),ROOT)==candidate,'candidate remains authenticated')

@@ -37,9 +37,6 @@ fi
 run() { python3 -B tools/testing/run.py "$@"; }
 run release-metadata
 run release-metadata-diff
-# Fetch only closed pinned source objects when needed. The historical test
-# suites independently check the selected objects after preparation.
-python3 -B tools/testing/prepare_history_refs.py
 run benchmark-provenance
 run release-setup-macos
 run release-package-publishing
@@ -85,15 +82,5 @@ run release-timed-async-bootstrap
 run release-async-change-scope
 run python-testing-manifest-snapshot
 run release-manifest-snapshot
-run release-history-refs
-run release-composed-history-refs
-run release-pr43-history
-# Dated Tuple/list migration and inventory audits remain explicitly runnable;
-# current language behavior is checked by framework-direct and tuple-list-native.
-run release-core-leaf-migration
 run release-core-registry-controls
-run release-reconciliation-inventory
-run release-reconciliation-inventory-controls
-run release-history-workflows
-run release-framework-recovery
 printf 'Release metadata and shell syntax passed for %s.\n' "$(cat VERSION)"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Independent controls for slot supplies, rank views and integer state stores."""
 from pathlib import Path
-import argparse, hashlib, json, sys, types, subprocess, traceback
+import argparse, hashlib, json, sys, types, traceback
 
 ROOT = Path(__file__).resolve().parents[3]
 HERE = Path(__file__).resolve().parent
@@ -12,10 +12,8 @@ PREFIX = 'patricia-design/'
 TYPECHECK = 'all shared source typecheck'
 OPTIMIZATIONS = [('O0', ['-O0']), ('O2', ['-O2']), ('O2-narrow', ['-O2', '-DMLF_TEST_NARROW_INT_TABLE'])]
 LABELS = [TYPECHECK, *[label for label, _ in OPTIMIZATIONS]]
-HISTORICAL_BASE = 'fc300bc9fdc389b585cbef0630fc8915d53e89c5'
-HISTORICAL_TREE = '386f0b41ab5f9b39fca273f3040f51d73df924a1'
-MAP_PATH = 'libraries/mlf-foundation/Bootstrap/Map.hs'
-SET_PATH = 'libraries/mlf-foundation/Bootstrap/Set.hs'
+DESIGN_DIRECTORY = HERE/'oracles/design'
+DESIGN_ORACLES = {'FrozenDesignIdentityInventory.hs': 'f2e4aefd62ad3039b9a9bfe9c2e131df670f013719a16980d75bf4c0a5605d05', 'FrozenDesignMap.hs': 'd48fab73e6a276190ed63641c7c4ef85ffc0ba05ef10f3fc9868e81eccab8741', 'FrozenDesignSet.hs': '5c221618fe54e5bf53afe5f366988d252ffe8561b1e7722dc666e237de936df1'}
 
 
 def require(value, message):
@@ -27,48 +25,14 @@ def digest(raw):
     return hashlib.sha256(raw).hexdigest()
 
 
-def reversible(raw, replacements):
-    changed = raw
-    for old, new in replacements:
-        require(changed.count(old) == 1 and new not in changed, 'unique oracle adaptation')
-        changed = changed.replace(old, new)
-    restored = changed
-    for old, new in reversed(replacements):
-        require(restored.count(new) == 1, 'unique inverse oracle adaptation')
-        restored = restored.replace(new, old)
-    require(restored == raw, 'exact inverse oracle adaptation')
-    return changed
-
-
-def isolated_sources(old_map, old_set, collector, inventory):
-    require(set(inventory['dependencies']) == {MAP_PATH, SET_PATH}, 'exact frozen dependency inventory')
-    for path, raw in ((MAP_PATH, old_map), (SET_PATH, old_set)):
-        require(digest(raw) == inventory['dependencies'][path], 'frozen dependency bytes: ' + path)
-    require(digest(collector) == inventory['frozen_sha256'], 'frozen identity inventory')
-    start, end = b'  typeIdentities ::', b'}\n'
-    require(collector.count(start) == 1 and collector.endswith(end), 'collector body delimiters')
-    body = collector[collector.index(start):collector.rindex(end)]
-    require(digest(body) == inventory['body_sha256'], 'unchanged identity collector bodies')
-    result = {
-        'FrozenDesignMap.hs': reversible(old_map, [(b'module Bootstrap.Map where {', b'module FrozenDesignMap where {')]),
-        'FrozenDesignSet.hs': reversible(old_set, [
-            (b'module Bootstrap.Set where {', b'module FrozenDesignSet where {'),
-            (b'import qualified Bootstrap.Map as M;', b'import qualified FrozenDesignMap as M;')]),
-        'FrozenDesignIdentityInventory.hs': reversible(collector, [
-            (b'module FrozenIdentityInventory where {', b'module FrozenDesignIdentityInventory where {'),
-            (b'import qualified Bootstrap.Set as Set;', b'import qualified FrozenDesignSet as Set;')]),
-    }
-    adapted = result['FrozenDesignIdentityInventory.hs']
-    require(adapted[adapted.index(start):adapted.rindex(end)] == body, 'adapted collector body unchanged')
-    return result
-
-
-def historical_dependencies(root, output=subprocess.check_output):
-    git = ['git', '--no-replace-objects', '-C', str(root)]
-    tree = output([*git, 'rev-parse', HISTORICAL_BASE + '^{tree}'], timeout=30).decode().strip()
-    require(tree == HISTORICAL_TREE, 'fixed historical dependency tree')
-    return tuple(output([*git, 'show', HISTORICAL_BASE + ':' + path], timeout=30)
-                 for path in (MAP_PATH, SET_PATH))
+def load_design_oracles(directory=DESIGN_DIRECTORY):
+    """Read the independently retained, already compile-ready references."""
+    sources = {}
+    for name, expected in DESIGN_ORACLES.items():
+        raw = (directory/name).read_bytes()
+        require(digest(raw) == expected, 'frozen design oracle changed: ' + name)
+        sources[name] = raw
+    return sources
 
 
 def run_stage(record, save, stage, action):
@@ -115,27 +79,20 @@ def qualify(a, out, record, save):
     oracle = H.load(controls/'oracle.json')
     raw = (controls/'FrozenClassDemand.hs').read_bytes()
     H.require(H.sha(controls/'FrozenClassDemand.hs') == oracle['frozen_sha256'], 'frozen oracle bytes')
-    restored = raw.replace(b'module FrozenClassDemand where {', b'module Bootstrap.ClassDemand where {')
-    H.require(hashlib.sha256(restored).hexdigest() == oracle['source_sha256'], 'module-only oracle adaptation')
-    inventory=oracle['identity_inventory']
-    raw=(controls/'FrozenIdentityInventory.hs').read_bytes()
-    H.require(hashlib.sha256(raw).hexdigest()==inventory['frozen_sha256'],'frozen identity inventory')
-    body=raw[raw.index(b'  typeIdentities ::'):raw.rindex(b'}\n')]
-    H.require(hashlib.sha256(body).hexdigest()==inventory['body_sha256'],'unchanged identity collector bodies')
-    stage('historical-dependencies')
-    old_map, old_set = historical_dependencies(ROOT)
-    stage('isolate-frozen-dependencies')
-    generated = isolated_sources(old_map, old_set, raw, inventory)
+    stage('load-independent-dependencies')
+    generated = load_design_oracles()
     isolated = out/'frozen-dependencies'; isolated.mkdir()
     for name, source in generated.items():
         (isolated/name).write_bytes(source)
-    record['historical_dependencies'] = dict(commit=HISTORICAL_BASE, tree=HISTORICAL_TREE,
-        original_sha256={MAP_PATH: digest(old_map), SET_PATH: digest(old_set),
-                         'FrozenIdentityInventory.hs': digest(raw)},
-        generated_sha256={name: digest(source) for name, source in generated.items()},
-        adaptation='unique module/import replacements with exact inverse bytes; collector bodies unchanged',
-        shared_base='Types (including Map/Set data constructors), Std, Primitive, X.Syntax and host/runtime remain current; historical Map/Set algorithms are isolated')
+    record['independent_dependencies'] = dict(
+        fixture_sha256=DESIGN_ORACLES,
+        shared_base='Types (including Map/Set data constructors), Std, Primitive, X.Syntax and host/runtime remain current; reference Map/Set algorithms are isolated')
     save()
+    direct_path=a.reference_source.resolve()/'tools/shared/test_direct.py'
+    direct=H.module(direct_path,'design_control_authentication')
+    def authenticate():
+        producer=a.reference_producer.resolve()
+        return direct.authenticate_build(producer/'receipt.json',producer/'bin',root=a.reference_source.resolve())
     stage('builtin-identity')
     identity_helper = ROOT/'tools/shared/builtin_prelude_identity.py'
     identity_module = H.module(identity_helper, 'design_builtin_identity')
@@ -146,7 +103,7 @@ def qualify(a, out, record, save):
     manifest = H.load(ROOT/'shared-sources.json')
     inputs = [ROOT/x['path'] for x in manifest['modules']]
     inputs += list((ROOT/'host/ghc').rglob('*.hs')) + list(controls.iterdir())
-    inputs += [Path(__file__), hp, identity_helper, ROOT/'shared-sources.json', ROOT/'tools/testing/receipt_selection.py', *isolated.iterdir()]
+    inputs += [Path(__file__), hp, direct_path, identity_helper, ROOT/'shared-sources.json', ROOT/'tools/testing/receipt_selection.py', *isolated.iterdir(), *[DESIGN_DIRECTORY/name for name in DESIGN_ORACLES]]
     pins = {str(f):H.sha(f) for f in inputs if f.is_file()}
     limits = dict(address_space_per_process_bytes=6*1024**3, disk_free_floor_bytes=5*1024**3,
         host_available_floor_bytes=3*1024**3, process_tree_rss_bytes=5*1024**3,
@@ -159,7 +116,7 @@ def qualify(a, out, record, save):
         stage('qualification-lock')
         with H.SerialLock(ROOT/'.mlf-build'):
             stage('authenticate-producer')
-            auth = H.authenticate(a.reference_producer.resolve(), a.reference_source.resolve())
+            auth = authenticate()
             for rel in ['host/ghc/cbits/host.c','runtime/mlf_process_supervisor.c']:
                 H.require(H.sha(ROOT/rel)==H.sha(a.reference_source/rel),'borrowed C object source '+rel)
             if TYPECHECK in record['planned_checks']:
@@ -188,7 +145,7 @@ def qualify(a, out, record, save):
                 H.require(not (out/(label+'-run/stderr')).read_bytes(),'no control stderr')
                 record['checks'].append(label);save()
             H.check_pins(pins)
-            H.authenticate(a.reference_producer.resolve(),a.reference_source.resolve())
+            H.require(authenticate()==auth,'ordinary producer unchanged')
             record['complete']=True;record['stage']='complete';save()
     except BaseException as error:
         record['error']=repr(error);save();raise

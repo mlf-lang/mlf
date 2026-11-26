@@ -9,9 +9,11 @@
       "source_sha256": "03938b24a01727e6a655c57399fd111d47b0c8befb8b4533d74fc5ad0d9b02a7"
     },
     "SourceInference": {
-      "frozen_sha256": "e233ec0405345d7e1c67c254a03c82d5675647805114afd49d60c294f55ba2d3",
+      "frozen_sha256": "59286a064c91028ce6dc3996aab356868185e9f1cf790944baf783041f3532fc",
       "path": "libraries/mlf-crates/Bootstrap/SourceInference.hs",
-      "source_sha256": "3cbcf934a1390a578916534cc12e9cb9f424b30faf8f9c7a58d5c6ed3700c75e"
+      "source_sha256": "3cbcf934a1390a578916534cc12e9cb9f424b30faf8f9c7a58d5c6ed3700c75e",
+      "file": "FullyFrozenSourceInference.hs",
+      "adaptation": "Compile-ready module name and FrozenClasses import; original algorithm bodies unchanged."
     }
   }
 }

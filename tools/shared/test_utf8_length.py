@@ -17,12 +17,12 @@ FIXTURES = ROOT / 'tools/shared/fixtures/utf8-length'
 
 
 
-def main():
+def main(argv=None, *, runner_factory=CommandRunner, authenticate=authenticate_build):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-receipt', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--clang', default='clang')
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     receipt = args.build_receipt.resolve(strict=True)
     build, output = receipt.parent, args.output.resolve()
     if output == ROOT or ROOT.is_relative_to(output):
@@ -41,10 +41,10 @@ def main():
     def artifact(path):
         record['artifacts'][str(path)] = sha(path)
 
-    runner = CommandRunner(ROOT, output, record, save)
+    runner = runner_factory(ROOT, output, record, save)
     save()
     try:
-        producer = authenticate_build(receipt, build / 'bin')
+        producer = authenticate(receipt, build / 'bin')
         native = configuration(args.clang)
         record['native_configuration'] = native
         record['producer_sha256'] = sha(receipt)
@@ -143,7 +143,7 @@ def main():
                 record['demand_counts'][lane] += 1
         for path, digest in {**record['inputs'], **record['artifacts']}.items():
             if sha(path) != digest: raise ValueError('input or artifact changed: ' + path)
-        authenticate_build(receipt, build / 'bin')
+        authenticate(receipt, build / 'bin')
         record['complete'] = True
         print('PASS UTF-8 length: ' + json.dumps(record['vector_counts'], sort_keys=True) +
               '; 3 demand checks per backend; 12 direct runtime cases')

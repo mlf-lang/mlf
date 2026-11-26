@@ -39,10 +39,10 @@ the old-to-P2 fingerprint boundary remain frozen; their hashes are not simply
 replaced with current source hashes.
 
 * P1 now uses exact historical Map and Set implementations under test-only
-  module names. Only the frozen selector's collection imports are adapted;
+  module names. The reference selector imports those modules directly;
   nominal datatypes stay shared. Its 154,072 selector controls remain, with
   6,162 additional independent list-expectation collection controls. See
-  [the dependency audit and demand limits](p1/DEPENDENCY-AUDIT.md).
+  [the reference fixtures and runtime scope](p1/README.md).
 * P2/P3 verify an explicit source-compatibility projection before admitting
   current dependencies. Historical Separate sources and fingerprint-region
   checks remain in force. P2 also runs separately authored controls for the

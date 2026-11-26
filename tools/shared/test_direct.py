@@ -325,7 +325,7 @@ class CommandRunner:
             self.save()
 
 
-def main():
+def main(*, runner_factory=CommandRunner):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--bin-dir', type=Path, required=True)
     parser.add_argument('--build-receipt', type=Path)
@@ -383,11 +383,13 @@ def main():
                    ROOT / 'tools/shared/fixtures/MetadataReceiptControls.hs',
                    ROOT / 'tools/shared/test_candidate_selection.py',
                    ROOT / 'tools/shared/fixtures/CandidateSelectionControls.hs',
+                   ROOT / 'tools/shared/fixtures/CandidateSelection.hs',
+                   ROOT / 'tools/shared/run_direct.py', ROOT / 'tools/shared/direct_managed.py',
                    ROOT / 'tests/indexvec/OrderedMapControls.hs',
                    ROOT / 'tools/shared/fixtures/OrderedMap.hs',
                    Path(compiler), Path(sys.executable).resolve()]
         receipt['inputs'] = {str(path): sha(path) for path in inputs}
-        runner = CommandRunner(ROOT, output, receipt, save)
+        runner = runner_factory(ROOT, output, receipt, save)
         process_helper, task_helper = output / 'process-fixture', output / 'task-fixture'
         for name, source, destination in [('process', 'tests/async-process/fixture.c', process_helper),
                                            ('task', 'tests/async-task/fixture.c', task_helper)]:

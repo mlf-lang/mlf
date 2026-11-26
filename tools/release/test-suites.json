@@ -709,7 +709,6 @@
     "ids": [
       "release/ci/concurrency",
       "release/ci/required-checks",
-      "release/ci/history",
       "release/ci/hosted-guest",
       "release/ci/resource-and-output-bounds",
       "release/ci/async-platforms",
@@ -804,17 +803,6 @@
     "allow_skip": true,
     "exact": true
   },
-  "release-performance-a1-current": {
-    "kind": "unittest",
-    "command": [
-      "python3",
-      "-B",
-      "tools/performance/a1-private-index/test_phase2_current.py"
-    ],
-    "prefix": "release-performance-a1-current/",
-    "allow_skip": true,
-    "exact": true
-  },
   "release-performance-local-transaction": {
     "kind": "unittest",
     "command": [
@@ -823,17 +811,6 @@
       "tools/performance/c4-local-transaction/test_controls.py"
     ],
     "prefix": "release-performance-local-transaction/",
-    "allow_skip": true,
-    "exact": true
-  },
-  "release-performance-historical-metadata": {
-    "kind": "unittest",
-    "command": [
-      "python3",
-      "-B",
-      "tools/performance/patricia/test_historical_metadata.py"
-    ],
-    "prefix": "release-performance-historical-metadata/",
     "allow_skip": true,
     "exact": true
   },
@@ -936,94 +913,6 @@
     "allow_skip": true,
     "exact": true
   },
-  "release-history-refs": {
-    "kind": "unittest",
-    "command": [
-      "python3",
-      "-B",
-      "tools/testing/test_history_refs.py"
-    ],
-    "prefix": "release-history-refs/",
-    "allow_skip": true,
-    "exact": true
-  },
-  "release-composed-history-refs": {
-    "kind": "unittest",
-    "command": [
-      "python3",
-      "-B",
-      "tools/testing/test_composed_history_refs.py"
-    ],
-    "prefix": "release-composed-history-refs/",
-    "allow_skip": true,
-    "exact": true
-  },
-  "release-pr43-history": {
-    "kind": "unittest",
-    "command": [
-      "python3",
-      "-B",
-      "tools/testing/test_prepare_pr43_history.py"
-    ],
-    "prefix": "release-pr43-history/",
-    "allow_skip": true,
-    "exact": true
-  },
-  "release-tuple-list-migration-controls": {
-    "kind": "unittest",
-    "command": [
-      "python3",
-      "-B",
-      "tools/testing/test_tuple_list_migration.py"
-    ],
-    "prefix": "release-tuple-list-migration-controls/",
-    "allow_skip": true,
-    "exact": true
-  },
-  "release-migration-inventory-controls": {
-    "kind": "unittest",
-    "command": [
-      "python3",
-      "-B",
-      "tools/testing/test_migration_inventory.py"
-    ],
-    "prefix": "release-migration-inventory-controls/",
-    "allow_skip": true,
-    "exact": true
-  },
-  "release-reconciliation-inventory-controls": {
-    "kind": "unittest",
-    "command": [
-      "python3",
-      "-B",
-      "tools/testing/test_reconciliation_inventory.py"
-    ],
-    "prefix": "release-reconciliation-inventory-controls/",
-    "allow_skip": true,
-    "exact": true
-  },
-  "release-history-workflows": {
-    "kind": "unittest",
-    "command": [
-      "python3",
-      "-B",
-      "tools/testing/test_history_workflows.py"
-    ],
-    "prefix": "release-history-workflows/",
-    "allow_skip": true,
-    "exact": true
-  },
-  "release-framework-recovery": {
-    "kind": "unittest",
-    "command": [
-      "python3",
-      "-B",
-      "tools/testing/test_framework_recovery.py"
-    ],
-    "prefix": "release-framework-recovery/",
-    "allow_skip": true,
-    "exact": true
-  },
   "release-manifest-snapshot": {
     "kind": "exit",
     "command": [
@@ -1033,28 +922,6 @@
     ],
     "ids": [
       "release/source-audit/manifest-snapshot"
-    ]
-  },
-  "release-tuple-list-migration": {
-    "kind": "exit",
-    "command": [
-      "python3",
-      "-B",
-      "tools/testing/check_tuple_list_migration.py"
-    ],
-    "ids": [
-      "release/source-audit/tuple-list-migration"
-    ]
-  },
-  "release-core-leaf-migration": {
-    "kind": "exit",
-    "command": [
-      "python3",
-      "-B",
-      "tools/testing/check_core_leaf_migration.py"
-    ],
-    "ids": [
-      "release/source-audit/core-leaf-migration"
     ]
   },
   "release-core-registry-controls": {
@@ -1067,17 +934,6 @@
     "prefix": "release-core-registry-controls/",
     "allow_skip": false,
     "exact": true
-  },
-  "release-reconciliation-inventory": {
-    "kind": "exit",
-    "command": [
-      "python3",
-      "-B",
-      "tools/testing/check_reconciliation_inventory.py"
-    ],
-    "ids": [
-      "release/source-audit/reconciliation-inventory"
-    ]
   },
   "release-tuple-list-qualification": {
     "kind": "events",

@@ -76,7 +76,7 @@ def async_case(original, runner, receipt, args, label, binaries):
         runner.run(label, [fixture, 'assert-gone', work / 'panic.pid'])
 
 
-def run(original, label):
+def run(original, label, *, runner_factory=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--bin-dir', type=Path, required=True)
     parser.add_argument('--build-receipt', type=Path)
@@ -111,11 +111,11 @@ def run(original, label):
                                'optimization': producer['optimization']}
         receipt['orchestrator'] = original.identified(sys.executable)
         inputs = [Path(__file__).resolve(), Path(original.__file__).resolve(), MANIFEST,
-                  MANIFEST.parent / 'receipt_selection.py', HERE / 'test_direct_candidate_successor.py',
+                  MANIFEST.parent / 'receipt_selection.py', HERE / 'run_direct.py', HERE / 'direct_managed.py',
                   ROOT / 'shared-sources.json', build_receipt,
                   Path(sys.executable).resolve()]
         receipt['inputs'] = {str(path): original.sha(path) for path in inputs}
-        runner = original.CommandRunner(ROOT, output, receipt, save)
+        runner = (runner_factory or original.CommandRunner)(ROOT, output, receipt, save)
 
         if label in (*ASYNC_TASK_CASES, *ASYNC_PROCESS_CASES):
             async_case(original, runner, receipt, args, label, binaries)

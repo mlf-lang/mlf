@@ -89,19 +89,25 @@ supported Linux hosts, not Darwin. No resource protection was disabled or raised
 
 ## Validation and reproducibility
 
-- `run_controls.py`: complete frozen old host owner versus current owner, plus
-  an independent Prelude character-list oracle. Both O0 and O2 pass 94 Unicode
-  fixtures, every scalar, slices around 256-scalar boundaries, supplementary
-  characters, combining sequences, empty inputs and exact bounds errors.
-- `test_contract.py`: exact full-owner inverse to Git, full forward transition,
-  corrupted manifests and changes outside the String regions fail closed.
-- `host-delta.json` adds a pinned host-only transition to the existing source
-  admission chain; no old semantic oracle or source contract is removed.
+- `run_controls.py` compiles the ordinary `LegacyBase.hs` reference and the
+  current `MLF.Host.Base` module directly, alongside an independent Prelude
+  character-list oracle. Both owners use the requested O0/O2 policy, even when
+  the authenticated compiler producer was built at O0. The 94 fixtures cover
+  every scalar, slices around 256-scalar boundaries, supplementary characters,
+  combining sequences, empty inputs and exact bounds errors.
+- `LegacyBase.hs` contains the full old owner from
+  `9dfcd6625775819568eaaa5065f8dd1431df52f8`, with its module header renamed once.
+  It is a directly compilable fixture; running the controls requires no old Git
+  object, source inversion or current-source hash whitelist. The runner records
+  and rechecks the inputs actually used and preserves producer authentication.
+- The historical full-owner transition checker and migration metadata were
+  retired. Their original code and records remain available at
+  `496dcae024cae1a93096d9bdb9d6b93e57359dc0`.
 - `check_native.py`: exercises each generated compiler on datatype/polymorphic
   Unicode source, interpreter execution, LLVM emission, ordinary Clang O2
   execution and a type error. Its results and the complete integration gate
   inventory are recorded in `results.json`.
-- CI retains the focused Unicode controls, contract tests and raw evidence.
+- CI retains the focused Unicode controls and real execution receipts.
 
 Raw local evidence is under `.mlf-build/llvm-memory-20261102/`: the unsuccessful
 old `stage-probe`, successful `compact-stage-probe`, `controls-o0`, `controls-o2`,
@@ -113,10 +119,9 @@ qualifiers retain `performance_samples: 0` because they are qualifications,
 while the enclosing frozen plan explicitly designates their four ordinary wall
 observations as this descriptive endpoint comparison.
 
-Reproduce focused checks against an authenticated ordinary O2 producer:
+Reproduce focused checks against an authenticated ordinary GHC producer:
 
 ```sh
-python3 -B tools/performance/llvm-memory/test_contract.py
 python3 -B tools/performance/llvm-memory/run_controls.py \
   --producer .mlf-build/shared-ghc --optimization 2 \
   --output .mlf-build/llvm-memory-fresh-controls

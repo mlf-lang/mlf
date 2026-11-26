@@ -4,7 +4,7 @@ Baseline `720dd649627fbf8b19c7447493a4fdf6fd05eb39`. The suites below are implem
 
 ## TupleList
 
-The default `tuple-list` executable currently runs the 105 IDs previously exposed through `--framework`. The ordered public IDs are in `tools/testing/tuple-list-active-contract.json`; the direct gate derives its counts from this inventory. This file contains no historical source hashes or migration counts. The recorded 305 old observations live separately in `tools/testing/tuple-list-migration-contract.json`. They map to the cutover's 105 IDs because the grouped arity ID represents 201 observations. It covers three parser assertions for each arity from 2 to 64 and independent type and target checks after compilation at arities 2, 3, 15, 16, 63 and 64 under both syntax profiles. The parser-provenance, scope, erasure, independent target, negative-phase and diagnostic controls retain their original inputs and assertions.
+The default `tuple-list` executable currently runs the 105 IDs previously exposed through `--framework`. The ordered public IDs are in `tools/testing/tuple-list-active-contract.json`; the direct gate derives its counts from this inventory. This file contains no historical source hashes or migration counts. The recorded 305 old observations and their migration contract are archived in Git at `496dcae024cae1a93096d9bdb9d6b93e57359dc0`; see the [retirement and historical reproduction guide](../testing-history-retirement.md). They map to the cutover's 105 IDs because the grouped arity ID represents 201 observations. It covers three parser assertions for each arity from 2 to 64 and independent type and target checks after compilation at arities 2, 3, 15, 16, 63 and 64 under both syntax profiles. The parser-provenance, scope, erasure, independent target, negative-phase and diagnostic controls retain their original inputs and assertions.
 
 The seven `*-runtime` IDs retain their own runtime results. Each preceding type ID and its runtime ID share one lazy compilation result for the identical source. Full registry execution should make seven compilation calls for these fourteen cases, compared with fourteen in the old opt-in registry and seven in the legacy default. Exact selection should force only its own fixture. The main module uses the shared options by default and accepts `--framework` and `--framework-list` as compatibility aliases. Its successful no-argument text retains `Tuple/list focused checks passed.`. Setting `MLF_TUPLE_LIST_REPORT` on that invocation also writes the JSON Lines report. The legacy module is recoverable at the pinned baseline. Routine CI can collect default text and the report in the same hosted `-O0` invocation instead of executing default and registry suites separately. The self-built release qualification path and independently specified interpreter/LLVM fixture retain distinct purposes.
 
@@ -22,16 +22,12 @@ MLF_TUPLE_LIST_REPORT="$PWD/.mlf-build/phase2/tuple-list.jsonl" "$bin/tuple-list
 bash tools/release/test-tuple-list.sh "$bin/emlf" "$PWD/.mlf-build/phase2/tuple-native"
 ```
 
-`framework-direct` runs current framework, registry, CLI and producer checks.
-It does not run `tuple-static` or read Git history. The release metadata wrapper
-also omits the Tuple/list migration and dated inventory audits. Those remain
-available explicitly when a historical migration needs review:
-
-```sh
-python3 -B tools/testing/run.py release-tuple-list-migration
-python3 -B tools/testing/run.py release-tuple-list-migration-controls
-python3 -B tools/testing/run.py release-migration-inventory-controls
-```
+`framework-direct` runs current framework, registry, CLI and producer checks
+through [the maintained direct gate](../../tools/shared/test_framework_direct.py)
+and [active ID contract](../../tools/testing/tuple-list-active-contract.json).
+The Tuple/list migration and dated inventory audits have been removed from the
+current tree and registries. Review them in the archived checkout described in
+the [retirement guide](../testing-history-retirement.md).
 
 Adding current cases updates only the active ID inventory and actual tests; it
 does not rewrite the cutover or the 305-observation historical record. The Python
@@ -71,9 +67,16 @@ done
   --compiler "$MLF_COMPILER" --manager "$MLF_PACKAGE_MANAGER" --build-dir "$PWD/.mlf-build/phase2/core-focused"
 "$bin/compiler-tests" unit --compiler "$MLF_COMPILER" --manager "$MLF_PACKAGE_MANAGER" \
   --build-dir "$PWD/.mlf-build/phase2/unit"
-python3 -B tools/testing/check_core_leaf_migration.py
+python3 -B tools/testing/run.py release-core-registry-controls
 bash tools/release/verify-unit-evidence.sh .mlf-build/phase2/unit
 ```
+
+The current [Core descriptor contract](../../tests/golden/core-registry-contract.json)
+is checked against the [current catalog](../../tests/test-catalog.json) by
+`release-core-registry-controls`. Executable discovery and actual case reports
+are checked by `Tests.CompilerTests` and `verify-unit-evidence.sh`. The retired
+source-transcription audit is available only in the historical checkout; it is
+not a prerequisite for these checks.
 
 For baseline exact selection, first provide `--work-dir "$PWD/.mlf-build/phase2/core-process" --host-tool "$PWD/.mlf-build/phase2/host-support"` after `--framework`, with `host-support` built by `clang -O2 -std=c11 -Wall -Wextra -Werror tests/native/host_support.c -o .mlf-build/phase2/host-support`. Interrupt a full candidate run after observing its first start event and check the absence of a complete summary. In a disposable checkout, change the `prefix` substring expectation and run `core-language --families core/substring-adapter`. Require failure and observable later substring cases. Compare package build receipts and child launch counts for the full and focused commands, and time setup and run phases separately. Requalify the same aggregate with the source-bound self-built release tools after the hosted comparison. Validate the older v1 partial coverage contracts and check isolation startup cost on each required POSIX platform.
 

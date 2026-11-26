@@ -49,18 +49,18 @@ checks; actual public-export rejection tests continue to compile against the
 ordinary production interfaces.
 
 Historical adapters, `legacy-controls-pins.json`, and source migration manifests
-remain available for reproducing the old reports from commit
-`171717ad5bd025ee977d4ca9fd8f93abcbc68612`. Routine controls no longer run their
-source projections or reversible diff ledgers. In particular, the historical
-validation projection and P2 writer bridge tests are replaced in the current
-route by the actual validation and binary-writer executions below.
+have been retired from the current tree. Their exact sources and old reports
+remain available in Git at `496dcae024cae1a93096d9bdb9d6b93e57359dc0` (including
+the earlier `171717ad5bd025ee977d4ca9fd8f93abcbc68612` preparation). Routine
+controls use the direct fixtures and the actual validation and binary-writer
+executions below. They do not replay source projections or inverse diff ledgers.
 
 Map maintenance uses the existing `map-policy` framework entry. That suite
 checks contents, balance, cached counts, demand/error order, and the intentional
 step-21 shape difference from the old Map. The obsolete integrated `map-balance`
 group required the entire current 400-step trace to keep the historical tree
-shape; it has been retired rather than weakening its old assertion. Its
-original sources remain in `tools/performance/map-balance/` for historical use.
+shape and has been retired. Its original runner and source-migration proof
+can be inspected in Git at `496dcae024cae1a93096d9bdb9d6b93e57359dc0`.
 
 All retained finite rows remain, including oversized literals which wrap under
 Int64 and can duplicate other rows. This does not claim the former arbitrary
@@ -131,21 +131,25 @@ remain required. Separate fresh/fresh, warm-cache and audited-rebuild checks
 require complete open-artifact byte equality; three actual corrupted artifacts
 exercise the native admission/audit and independent comparison boundaries.
 
-The independent reader/schema triple is unchanged from pinned Git commit
-`8c4556416023ac727e3fb2294070358a3dae8d9e` and loaded into an isolated directory
-before execution. Each file has its original literal SHA256; tests reject a
-changed tree, changed file and checkout-module substitution. This finite C4
-corpus's own artifacts and linked terms use the old primitive domain: codes
-132 and 133 are explicitly rejected there. The actual builtin dependency
-interface declares both new primitives, so its separate validator applies only
-the authenticated reader's exact one-anchor 131-to-133 bound extension and
-requires the specified Prelude owner and `freezeSTArray`/`stToIO` spelling.
-It retains every dependency byte and content hash; code 134, wrong owners and
-wrong spellings are rejected. This is metadata qualification, not execution
-qualification of those new primitives. All production source pins and the
-three frozen C4 inputs remain unchanged. Across the earlier intentional numeric
-ABI change, old P3 whole-artifact bytes are not an oracle for current output;
-its frozen semantic algorithms remain in the suites above.
+`file_cases.py` executes the authored file cases through an ordinary function
+with explicit selection. `controls/files/FileControls.hs` and
+`fixtures/file-cases.json` contain the directly compiled test and its handwritten
+expectations. Each receipt records the maintained runner/control bytes used in
+that run; no historical Python function extraction or current-source hash
+allowlist is involved.
+
+The independent reader/schema fixtures live in `oracles/file-format`. They were
+extracted once from `8c4556416023ac727e3fb2294070358a3dae8d9e`; normal runs load
+them directly and work without Git history. The typed reader has one explicit
+`primitive_max` parameter: own artifacts and linked terms keep the original
+0..131 domain, while dependency declarations use 0..136. The dependency entry
+point also checks the exact Prelude identities of codes 132..136, their reverse
+name-to-code association and per-container uniqueness. Unknown codes, changed
+owners/names, malformed structures and noncanonical/trailing bytes remain
+errors. There is no intermediate 133-source adapter or inverse text proof.
+Fixture hashes protect only these fixed independent reference inputs. The
+origin and the small interface change are documented in
+[`oracles/file-format/README.md`](oracles/file-format/README.md).
 
 ## Performance
 
@@ -179,7 +183,10 @@ Run `run_design_controls.py --reference-producer PRODUCER --reference-source SOU
 --output FRESH_DIRECTORY` before the ordinary installation build. It checks all
 shared modules, O0/O2, the narrower-host fallback, 150 frozen planner cases and
 529 frozen identity-inventory cases, plus signed rank/select and demand probes.
-The original oracle bodies and their source hashes are in `design-controls`.
+The planner oracle is in `design-controls`; the directly compiled frozen
+Map, Set and identity collector are in `oracles/design`. Their established
+preparation was materialized once, so no historical tree or inverse-source
+check is required at runtime.
 The runner rejects a stale canonical builtin source identity before compiling;
 the normal installation subsequently verifies exact fresh regeneration. These
 controls also run in the existing bounded Int64/Patricia CI step.
@@ -192,8 +199,9 @@ The [2026-10-31 design qualification](index-design-results.json) passed the
 retained controls, twelve installed direct commands, and the fresh 711/0
 compiler task with independent raw-byte equality. The three compiled paths
 also exercise 35 explicit rank-view checks, including lazy payloads. The
-unchanged Int64 source-admission manifest is followed by a separately pinned
-`index-design-migration.json`; it is not rewritten to admit this refactor.
+historical source-admission and `index-design-migration.json` proofs are
+archived in Git at `496dcae024cae1a93096d9bdb9d6b93e57359dc0`; they are not
+current qualification gates. The retained result file records that dated run.
 
 The fixed ABBA/BAAB screen has eight ordinary legs. Geometric wall times were
 47.598 seconds for the previous installed compiler and 47.641 seconds for this

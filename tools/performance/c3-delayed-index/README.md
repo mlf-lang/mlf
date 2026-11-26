@@ -83,8 +83,10 @@ the independent raw-byte comparison. These are diagnostic source-path counts,
 not ordinary allocated-byte measurements, exclusive CPU shares or a percentage
 of time saved.
 
-O0 and O2 controls compare the full frozen baseline owner with the complete
-candidate, using only reversible module/export-header adaptation. All 28
+O0 and O2 controls compare the full frozen baseline owner in
+`oracles/LegacySession.hs` with the complete candidate. The fixture was prepared
+once with a module/export-header change; only the current candidate still
+needs the private header view at runtime. All 28
 retained authored/renamed C4 fixtures and 35 offset variants are retained:
 63 exact graph/index/scope traces, exact success/error outcomes, legacy failure
 Store epochs, repeated instantiations, reflexive equalities, old expansion
@@ -94,15 +96,12 @@ and survivor Name demand, and unused Name/Kind/alias laziness. These finite
 controls supplement the full retained oracle; they do not prove all partial
 values equivalent.
 
-The source-admission layer records the one-owner C3 transition after the
-inherited canonical-carry layer for e123603d. Historical manifests and semantic
-oracles remain intact. A fixed, reversible two-block
-inverse recovers the entire previous owner for source-ownership proofs only;
-runtime candidates are never projected. All 128 current shared source hashes
-and corruption/partial-transition rejection are checked. CrateSession is
-outside the canonical builtin preparation closure, so no builtin regeneration
-is needed. The source lock snapshot is refreshed and the actual locked plan
-is part of integration qualification.
+The historical source-admission ledger and inverse transition proofs are
+archived in Git at `496dcae024cae1a93096d9bdb9d6b93e57359dc0`. Current controls
+copy the fixed independent owner directly and validate current borrowed inputs
+against the actual producer receipt. Ordinary runs need no migration ledger or
+historical commit fetch. [`oracles/README.md`](oracles/README.md) records the
+fixture origin and the one-time preparation.
 
 All 14 scheduled integration checks passed: retained P1–P3, graph/transaction,
 Map balance, validation boundary, builtin, nine parsed-file cases through both
@@ -131,8 +130,8 @@ python3 -B tools/performance/c3-delayed-index/run_controls.py \
 ```
 
 Select O0 with `--optimization 0` and a different fresh output directory.
-CI keeps the O2 source copies, receipts, stdout and stderr; the frozen oracle
-requires full Git history. Raw experiment plans, timing legs, authentication,
+CI keeps the O2 source copies, receipts, stdout and stderr. The fixed oracle is
+included in this checkout, so full Git history is unnecessary. Raw experiment plans, timing legs, authentication,
 controls and diagnostic sources are under `.mlf-build/c3-delayed-index-20261101/`.
 
 Preparation failures are retained: the first O0 control build rejected a

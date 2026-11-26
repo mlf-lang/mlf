@@ -12,8 +12,8 @@ local variable names, display labels, comments and YAML layout do not.
 | Framework budget policy | AST call locations, local names and keyword spelling | Import the policy normally; execute the gate and inspect dispatched timeouts and its terminal receipt. |
 | Guest framework controls | Search fixture source for particular imports and bindings | Execute the gate with bounded command fixtures; verify positive and negative results, prerequisites, publication and input integrity. Language semantics remain covered by the real compiler gate. |
 | CI workflows | Exact YAML fragments, step display names and whole shell blocks | Parse YAML, inspect job dependencies and conditions, execute relevant shell blocks with recording tools, and inject failures. |
-| Tuple/list migration | Hash current sources, mix historical metadata into the active inventory, and run cutover replay before current controls | Compare independent public IDs with actual executable discovery and case reports. Keep the cutover audit explicitly runnable with its own frozen inventory. |
-| Core migration | Search current dispatch source and compare every string literal with an older module | Preserve those checks on the immutable cutover; validate current public ID/name/family descriptors and case reports separately. |
+| Tuple/list migration | Hash current sources, mix historical metadata into the active inventory, and run cutover replay before current controls | Compare independent public IDs with actual executable discovery and case reports. Archive the cutover audit in its recorded Git tree. |
+| Core migration | Search current dispatch source and compare every string literal with an older module | Validate current public ID/name/family descriptors and case reports; retain the old transcription proof in Git. |
 | Benchmark runner | Search its source for option branches, mode fields and counts of optional-map helpers | Exercise the same option, dependency and report operations used by the real runner with independent inputs and expected values. |
 | Installation relocation | Mark plain text executable and check whether a moved file exists | Launch the installed commands after relocation from a different working directory and compare their results. |
 | Compact names | Slice production source between private function names | Import the production codec module; retain independent Unicode/boundary vectors and host, interpreter and native checks. |
@@ -23,9 +23,10 @@ local variable names, display labels, comments and YAML layout do not.
 
 ## Routine qualification does not extend source history
 
-The source-successor chain in `tools/performance/artifact-binary/` records a
-dated migration audit. It is no longer an admission condition for the routine
-Patricia controls or the default benchmark-provenance gate. Adding a module,
+The retired source-successor chain from `tools/performance/artifact-binary/`
+is archived at `496dcae024cae1a93096d9bdb9d6b93e57359dc0`. See the
+[retirement guide](../testing-history-retirement.md) for its scope and the
+maintained runner and fixture entry points. Adding a module,
 renaming a private helper, or changing source layout must not require appending
 another commit/tree/parent triple or repinning the chain implementation.
 
@@ -42,13 +43,13 @@ The distinctions are concrete:
 - `python-patricia-adapters` exercises the actual runtime preparation entry
   points. It no longer transplants historical Python assertions into a new
   source-successor object.
-- The C4/F1 control suites retain their fixture, result-parser, process and
+- The maintained C4/F1 controls retain actual result-parser, process and
   receipt checks. Their checks requiring today's Map/host source to be the
   endpoint of a historical chain have been removed.
-- `llvm-memory/test_contract.py` now audits only its immutable UTF-8 migration
-  fixture. It does not enumerate or freeze today's 205-file bridge inventory,
-  and it is not a pre-build CI gate. `llvm-unicode-memory` retains the actual
-  current-host, frozen-host and independent Unicode-oracle executions.
+- The immutable UTF-8 migration audit and its `source_contract.py` chain are
+  retired. `llvm-unicode-memory` directly compiles current `MLF.Host.Base`,
+  the ordinary `LegacyBase.hs` reference and independent Unicode controls at
+  O0/O2, with this run's input identities and no Git-history dependency.
 - Figure12 reference data comes from `720dd649627fbf8b19c7447493a4fdf6fd05eb39`.
   Its cases, signatures, expected types and repairs were compared with the
   old decoder at `171717ad` before removing that decoder. Native Figure12 tests
@@ -95,33 +96,27 @@ retains the historical comparison and independently checks current contents,
 balance, cached counts and demand behavior. This cleanup does not change Map
 implementation or update old expected shapes to match candidate output.
 
-### Replaying the dated source audit
+### Inspecting the dated source audit
 
-The old source-transition scripts and their manifests are retained as historical
-material. They are not promises that arbitrary future source trees can be
-projected back to the old implementation. Run the complete original audit in
-its recorded checkout rather than adding source successors to make it accept
-today's code:
+The old source-transition scripts, manifests and historical preparation tools
+have left the current tree and registries. Their complete retirement snapshot
+is `496dcae024cae1a93096d9bdb9d6b93e57359dc0`. Follow the
+[historical reproduction instructions](../testing-history-retirement.md#inspect-or-reproduce-an-old-record)
+when reviewing one of those records, using that campaign's recorded revision,
+toolchain and inputs.
 
-```sh
-git worktree add --detach ../mlf-source-audit-171717ad 171717ad5bd025ee977d4ca9fd8f93abcbc68612
-cd ../mlf-source-audit-171717ad
-python3 -B tools/testing/prepare_history_refs.py
-python3 -B tools/testing/run.py benchmark-provenance
-python3 -B tools/testing/run.py release-performance-a1-current
-python3 -B tools/testing/run.py python-patricia-adapters
-```
-
-The recorded checkout owns those commands' historical inventory and semantics.
-This optional replay is separate from current compiler qualification. The
-explicit Tuple/list migration audit, Core and other historical-oracle consumers
-can still require Git history; this change does not claim that all routine
-tests work in a shallow checkout.
+Current execution uses the [direct runner](../../tools/shared/run_direct.py),
+[Map policy fixtures](../../tools/performance/map-policy/README.md), and
+[Patricia controls and oracles](../../tools/performance/patricia/README.md).
+These paths do not prepare or authenticate old PR objects.
 
 ### Follow-up acceptance
 
-This table is the lightweight tracking record for this cleanup. A passed
-preparation or policy check is not a claim that native compiler execution ran.
+This table records the earlier de-brittling follow-up, including audits that
+have since been retired. Current retirement validation is recorded in the
+[retirement guide](../testing-history-retirement.md#validation-of-this-retirement).
+A passed preparation or policy check is not a claim that native compiler
+execution ran.
 
 | Outcome | Evidence | State |
 | --- | --- | --- |
@@ -154,12 +149,11 @@ No compiler runtime or performance speedup is claimed by this harness cleanup.
 
 ## Historical evidence stays historical
 
-The Tuple/list and Core migration audits retain their frozen baseline,
-transcription checks, source hashes, independent oracle comparisons and negative
-controls. The completed framework cutover is recorded at
-`08d7d608c13e89cabad0c81bc494072dafc7c86a`. These audits read that Git object,
-not a similarly named file in the working tree. They do not certify present-day
-test execution.
+The retired Tuple/list and Core migration audits, frozen baselines,
+transcription checks and negative controls are preserved in Git at
+`496dcae024cae1a93096d9bdb9d6b93e57359dc0`. The completed framework cutover is
+recorded at `08d7d608c13e89cabad0c81bc494072dafc7c86a`. Those historical records
+do not certify present-day test execution.
 
 The active Tuple/list contract currently has 105 ordered IDs. It contains no
 source hashes or hard-coded count: the direct gate derives counts from those
@@ -167,19 +161,20 @@ independent IDs and checks the actual binary's discovery, default output, JSON
 case rows, terminal summary, exact selection and error paths. Renaming a private
 registration helper therefore has no effect on the identity contract.
 
-`tuple-list-migration-contract.json` preserves the old cutover metadata and
-305 historical observations. `framework-direct` no longer selects `tuple-static`,
-and `tools/release/check.sh` no longer runs the Tuple/list migration, migration
-controls or dated migration-inventory controls. These remain registered for
-explicit historical review. Current gate controls run without the audit files
-or `.git`, and accept an independently supplied new case without changing any
-historical count.
+The old cutover metadata and 305 historical observations are available only in
+the archived migration contract. `framework-direct` checks the
+[active Tuple/list contract](../../tools/testing/tuple-list-active-contract.json);
+the old migration and inventory audits are no longer registered. Current gate
+controls run without the audit files or `.git`, and accept an independently
+supplied new case without changing any historical count.
 
 Core has 746 ordinary actions and 13 substring-adapter observations. Its
 independent descriptor contract includes the semantic ID, display name and
 family for each observation. Checking a current implementation's legacy labels
-alone would miss a semantic ID rename. The native unit gate checks discovery
-and executed cases against these descriptors.
+alone would miss a semantic ID rename. `release-core-registry-controls` checks
+the [descriptor contract](../../tests/golden/core-registry-contract.json) against
+the current catalog without historical rename rules. The native unit gate
+checks discovery and executed cases against these descriptors.
 
 Every actual qualification continues to authenticate the producer, source
 inputs and retained artifacts. Moving a historical source proof away from

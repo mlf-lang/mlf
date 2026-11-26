@@ -44,13 +44,12 @@ checks all published implementation pins. `--source-checkout` identifies the
 repository holding those commits, not an alternate source overlay.
 
 This fixed-ref experiment is **not the integrated-HEAD correctness gate**.
-To check the current checkout, build its maintained O2 producer and run
-`check_integrated.py --producer /absolute/producer --output /absolute/fresh/checks`.
-The latter prepares one tiny fresh builtin fixture and uses the explicit
-[current representation compatibility gate](current/README.md) before running
-the unchanged independent finite A1 controls. It does not benchmark, select a
-historical ref, regenerate expectations, or establish a speedup. The P1–P3 controls have their own current-producer runner in
-`../crate-optimizations/`.
+Current finite A1/graph, validation and builtin checks run through
+`../patricia/run_integrated.py` with an authenticated current producer. P1–P3
+controls also have their current-producer runner in `../crate-optimizations/`.
+The former `check_integrated.py`/`run_current_controls.py` source-migration
+chain is archived in Git; see the
+[retirement note](../../../docs/testing-history-retirement.md).
 
 ```sh
 python3 -B tools/performance/a1-private-index/reproduce.py \

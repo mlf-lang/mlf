@@ -1,4 +1,4 @@
-"""Pure authenticated UTF8 batching contract. Does not execute any workload.
+"""UTF8 batch output contract. Does not execute any workload.
 
 Batch observations are NOT fresh-process equivalence. The integrator must run
 forward and reverse interpreter batches, host batches, and the three ORIGINAL
@@ -8,14 +8,9 @@ controls unchanged. Physical execution receipts and logical projections differ.
 import hashlib
 import re
 
-FIXTURE_BLOB = 'dcef64296a26296b720d0ffa00016d808f7cee1e'
-FIXTURE_PATH = 'tools/shared/fixtures/utf8-length/Length.hs'
 BEGIN = 812340001
 END = 812340002
 LIMIT = (1 << 63) - 1
-HEADER = b'  main = do {\n'
-PARAMETERIZED = b'  runCase getArg = do {\n'
-SUFFIX = b'  }\n}\n'
 FORWARD = tuple(range(6)) + tuple(range(10, 29))
 REVERSE = tuple(reversed(FORWARD))
 SCOPE = ('Ordered batch observations, not original per-vector fresh-process '
@@ -29,14 +24,6 @@ def require(value, message):
 
 def digest(raw):
     return hashlib.sha256(raw).hexdigest()
-
-
-def authenticate(raw):
-    require(type(raw) is bytes, 'fixture must be bytes')
-    actual = hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest()
-    require(actual == FIXTURE_BLOB, 'original fixture pin')
-    require(raw.count(HEADER) == 1 and raw.endswith(SUFFIX), 'unique fixture boundary')
-    return digest(raw)
 
 
 def vectors():
@@ -55,44 +42,6 @@ def vectors():
 def order_for(direction):
     require(direction in ('forward', 'reverse'), 'batch direction')
     return FORWARD if direction == 'forward' else REVERSE
-
-
-def addition(direction):
-    cases = vectors()
-    lines = [';\n  main = do {\n']
-    for position,index in enumerate(order_for(direction)):
-        args = cases[index]['arguments']
-        # All arguments are fixed ASCII words/decimal numbers, no escaping needed.
-        for arg in args:
-            require(re.fullmatch(r'[a-z]+|[0-9]+', arg) is not None, 'argument literal')
-        getter = 'panic "UTF8 batch getArg out of range"'
-        for n,arg in reversed(list(enumerate(args))):
-            getter = 'if eqInt index %d then ioReturn "%s" else (%s)' % (n,arg,getter)
-        lines += ['    printInt %d; printInt %d;\n' % (BEGIN,index),
-                  '    runCase (\\index -> %s);\n' % getter,
-                  '    printInt %d%s\n' % (END, ';' if position+1 < len(FORWARD) else '')]
-    lines.append('  }\n')
-    return ''.join(lines).encode('ascii')
-
-
-def generate(original, direction):
-    authenticate(original)
-    # Retain the complete original body and emit; only parameterize one binder.
-    base = original.replace(HEADER, PARAMETERIZED, 1)
-    generated = base[:-2] + addition(direction) + b'}\n'
-    require(restore(generated, direction) == original, 'inverse mismatch')
-    return generated
-
-
-def restore(generated, direction):
-    require(type(generated) is bytes, 'generated fixture must be bytes')
-    tail = addition(direction) + b'}\n'
-    require(generated.endswith(tail) and generated.count(PARAMETERIZED) == 1,
-            'unique generated boundary')
-    base = generated[:-len(tail)] + b'}\n'
-    original = base.replace(PARAMETERIZED, HEADER, 1)
-    authenticate(original)
-    return original
 
 
 def canonical_number(raw):
@@ -218,60 +167,3 @@ def aggregate(physical_commands, logical_vectors, original_host_outputs):
     return dict(batch_complete=True, physical_command_count=4, logical_projection_count=100,
                 original_interpreter_vectors=25, scope=SCOPE,
                 original_fresh_demand_gate_complete=False, whole_utf8_complete=False)
-
-# Explicit successor to the retained expanded v1 generator. The v1 generator
-# and all of its historical shape tests remain available, not silently rewritten.
-LOOP_PARAMETERIZED = (b'  runCase :: (Int -> IO String) -> IO ();\n'
-                      b'  runCase getArg = do {\n')
-
-def loop_addition(direction):
-    cases = vectors()
-    entries = []
-    for index in order_for(direction):
-        args = cases[index]['arguments']
-        for arg in args:
-            require(re.fullmatch(r'[a-z]+|[0-9]+', arg) is not None, 'argument literal')
-        entries.append('(,) %d [%s]' % (index, ', '.join('"%s"' % arg for arg in args)))
-    template = ''';\n  batchArgument :: [] String -> Int -> IO String;
-  batchArgument args index =
-    if ltInt index 0 then panic "UTF8 batch getArg out of range"
-    else case args of {
-      [] -> panic "UTF8 batch getArg out of range";
-      (:) value rest ->
-        if eqInt index 0 then ioReturn value
-        else batchArgument rest (subInt index 1)
-    };
-  batchLoop :: [] ((,) Int ([] String)) -> IO ();
-  batchLoop entries = case entries of {
-    [] -> ioReturn ();
-    (:) ((,) index args) rest -> do {
-      printInt %d;
-      printInt index;
-      runCase (batchArgument args);
-      printInt %d;
-      batchLoop rest
-    }
-  };
-  batchCases :: [] ((,) Int ([] String));
-  batchCases = [%s];
-  main :: IO ();
-  main = batchLoop batchCases
-'''
-    return (template % (BEGIN, END, ', '.join(entries))).encode('ascii')
-
-def generate_loop(original, direction):
-    authenticate(original)
-    base = original.replace(HEADER, LOOP_PARAMETERIZED, 1)
-    generated = base[:-2] + loop_addition(direction) + b'}\n'
-    require(restore_loop(generated, direction) == original, 'loop inverse mismatch')
-    return generated
-
-def restore_loop(generated, direction):
-    require(type(generated) is bytes, 'generated loop fixture must be bytes')
-    tail = loop_addition(direction) + b'}\n'
-    require(generated.endswith(tail) and generated.count(LOOP_PARAMETERIZED) == 1,
-            'unique loop generated boundary')
-    base = generated[:-len(tail)] + b'}\n'
-    original = base.replace(LOOP_PARAMETERIZED, HEADER, 1)
-    authenticate(original)
-    return original

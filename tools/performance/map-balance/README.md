@@ -4,21 +4,18 @@
 
 This removes one multiplication from the old balanced and left-heavy paths and adds a comparison to the right-heavy path. It adds no representation, cache or fallback. The ordinary benchmark and integration evidence are described in [the performance report](../../../docs/performance/map-balance-20261030.md).
 
-## GHC controls
+## Current Map controls
 
-Run against an ordinary GHC 9.14.1 `-O2` producer built from this exact checkout:
+Use the maintained [Map policy runner](../map-policy/README.md). It compiles
+ordinary control and independent reference modules at O0 and O2, checks Map
+content, balance, cached counts, the recorded mutation trace and demand/error
+order, and verifies this run's inputs remain unchanged.
 
-```sh
-python3 -B tools/performance/map-balance/run_controls.py \
-  --producer /absolute/path/to/producer \
-  --output /absolute/path/to/new/controls
-```
-
-The runner authenticates the complete producer and copies its ordinary objects. It compiles only the independent fixtures and test Main, then verifies that the dependency objects did not change. The original frozen A1 Map is authenticated through its unchanged historical runner and fixture hash. `BaselineMap.hs` is the complete Map at `823f3060`, with only its module declaration renamed; reversing that rename must reproduce SHA-256 `1fdf24d3b3874c76d246f098ee9361a7f93e7eb01f741e064347452976cdaf0a`.
-
-The suite compares 24,649 unfiltered pairs of raw trees against the original frozen balance implementation, 400 mixed mutation steps against the qualified pre-change physical tree, and 30 handwritten demand/error-order probes. It covers negative, huge and inconsistent cached counts, both rotations, double rotations, partially defined fields and lazy stored values. Finite tests supplement the branch proof; they do not prove every possible partial-value observation.
-
-The complete pre-change snapshot is needed for mutation traces because an earlier `unionWith` optimization already changed physical tree construction relative to the older A1 snapshot. The older oracle remains intact and is still used for direct balance and demand comparisons. No candidate helper computes an expected result.
+The former GHC `run_controls.py` admitted current sources through the old A1
+source-migration chain. It is archived at
+`496dcae024cae1a93096d9bdb9d6b93e57359dc0`; use that tree when reproducing its
+historical report. The current Map policy fixtures preserve the independently
+specified raw-tree and demand cases without that preparation machinery.
 
 ## Native controls
 

@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""Bounded Python source-proof controls only. No Git, GHC or target executions.
-MAP_POLICY_SOURCE chooses physical selected files; every byte must match the
-Foundation pins, so neither local HEAD nor this environment variable authorizes drift.
-"""
+"""Current-run snapshots, semantic output protocol, and failure propagation controls."""
 import os
 import hashlib
+import json
 from pathlib import Path
 import sys
 import tempfile
@@ -14,120 +12,152 @@ from unittest import mock
 import prepare_map_policy as P
 import run_controls as R
 
-CONTEXT = (P.CURRENT_COMMIT, P.CURRENT_TREE, P.HISTORICAL_COMMIT, P.HISTORICAL_TREE)
-
-
-class AdapterTests(unittest.TestCase):
+class SnapshotTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        root = Path(os.environ['MAP_POLICY_SOURCE'])
-        cls.current = {name: P.read_regular(root, name) for name in P.CURRENT_BLOBS}
-        cls.historical = (Path(__file__).parent / 'fixtures/fc300-Map.hs').read_bytes()
-        P.authenticate_inputs(cls.current, cls.historical, CONTEXT)
+        cls.root = Path(os.environ.get('MAP_POLICY_SOURCE', P.ROOT))
+        cls.current = P.read_inputs(cls.root)
+        cls.fixtures = P.read_fixtures()
 
-    def test_complete_inverse_and_distinct_candidate_imports(self):
-        generated = P.prepare_bytes(self.current, self.historical, CONTEXT)
-        P.verify_generated(generated, self.current, self.historical, CONTEXT)
-        self.assertEqual(set(generated), {'RetainedBalanceControls.hs', 'HistoricalBalanceControls.hs',
-                                         'HistoricalMap.hs', 'FrozenMap.hs', 'BaselineMap.hs'})
-        retained = generated['RetainedBalanceControls.hs']
-        historical = generated['HistoricalBalanceControls.hs']
-        self.assertIn(b'import qualified Bootstrap.Map as C\n', retained)
-        self.assertIn(b'import qualified HistoricalMap as C\n', historical)
-        self.assertNotIn(b'import qualified Bootstrap.Map as C\n', historical)
-        self.assertEqual(generated['FrozenMap.hs'], self.current[P.FROZEN])
-        self.assertEqual(generated['BaselineMap.hs'], self.current[P.BASELINE])
-        for name, old in [('RetainedBalanceControls', False), ('HistoricalBalanceControls', True)]:
-            self.assertEqual(P.invert_unique(generated[name + '.hs'], P.changes(name, old)), self.current[P.BALANCE])
-        self.assertEqual(generated['HistoricalMap.hs'].replace(b'module HistoricalMap where {',
-                                                               b'module Bootstrap.Map where {'), self.historical)
+    def prepare(self, parent, name='prepared', inputs=None, fixtures=None):
+        output = Path(parent) / name
+        receipt = P.prepare(output, self.current if inputs is None else inputs,
+                            self.fixtures if fixtures is None else fixtures)
+        return output, receipt
 
-    def test_wrong_current_or_historical_commit_and_tree(self):
-        for index in range(4):
-            wrong = list(CONTEXT); wrong[index] = '0' * 40
-            with self.subTest(index=index), self.assertRaises(ValueError):
-                P.prepare_bytes(self.current, self.historical, wrong)
+    def test_fresh_source_edits_are_accepted_and_identified(self):
+        original = P.input_identity(self.current)
+        with tempfile.TemporaryDirectory() as directory:
+            for index, path in enumerate(self.current):
+                changed = dict(self.current)
+                changed[path] += b'\n'
+                with self.subTest(path=path):
+                    output, receipt = self.prepare(directory, str(index), inputs=changed)
+                    self.assertEqual((output / 'source' / path).read_bytes(), changed[path])
+                    self.assertNotEqual(receipt['current_inputs'][path], original[path])
+                    P.verify_snapshot(output, receipt)
+                    with self.assertRaisesRegex(ValueError, 'changed during run'):
+                        P.verify_identity(changed, original)
 
-    def test_each_selected_current_file_rejects_even_one_byte_change(self):
-        for path in P.CURRENT_BLOBS:
-            wrong = dict(self.current); wrong[path] += b' '
-            with self.subTest(path=path), self.assertRaises(ValueError):
-                P.prepare_bytes(wrong, self.historical, CONTEXT)
+    def test_fresh_control_edits_are_accepted_and_identified(self):
+        original = P.input_identity(self.fixtures)
+        with tempfile.TemporaryDirectory() as directory:
+            for index, path in enumerate(self.fixtures):
+                changed = dict(self.fixtures)
+                changed[path] += b'\n'
+                with self.subTest(path=path):
+                    output, receipt = self.prepare(directory, str(index), fixtures=changed)
+                    self.assertEqual((output / path).read_bytes(), changed[path])
+                    self.assertNotEqual(receipt['fixture_inputs'][path], original[path])
+                    with self.assertRaisesRegex(ValueError, 'changed during run'):
+                        P.verify_identity(changed, original)
 
-    def test_wrong_historical_and_swapped_endpoints(self):
-        for raw in (self.historical + b' ', self.current[P.MAP], b''):
-            with self.subTest(raw_length=len(raw)), self.assertRaises(ValueError):
-                P.prepare_bytes(self.current, raw, CONTEXT)
-        wrong = dict(self.current); wrong[P.MAP] = self.historical
-        with self.assertRaises(ValueError):
-            P.prepare_bytes(wrong, self.historical, CONTEXT)
+    def test_each_changed_or_missing_snapshot_file_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output, receipt = self.prepare(directory)
+            originals = {'source/' + path: raw for path, raw in self.current.items()}
+            originals.update(self.fixtures)
+            for relative, raw in originals.items():
+                path = output / relative
+                for mutation in ('changed', 'missing'):
+                    with self.subTest(path=relative, mutation=mutation):
+                        if mutation == 'changed':
+                            path.write_bytes(raw + b'\n')
+                        else:
+                            path.unlink()
+                        with self.assertRaises((ValueError, FileNotFoundError)):
+                            P.verify_snapshot(output, receipt)
+                        path.write_bytes(raw)
+            for relative in ('source/unbound.hs', 'Unexpected.hs'):
+                path = output / relative
+                path.write_text('module Unexpected where\n')
+                with self.subTest(path=relative), self.assertRaisesRegex(ValueError, 'inventory changed'):
+                    P.verify_snapshot(output, receipt)
+                path.unlink()
 
-    def test_missing_and_extra_inputs_are_refused(self):
-        for mutation in ('missing', 'extra'):
-            wrong = dict(self.current)
-            if mutation == 'missing':
-                wrong.pop('runtime/mlf_windows.h')
-            else:
-                wrong['unexpected.hs'] = b'other'
-            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
-                P.prepare_bytes(wrong, self.historical, CONTEXT)
+    def test_old_receipt_rejects_new_inventory(self):
+        expected = P.input_identity(self.current)
+        missing = dict(self.current)
+        missing.pop(P.MAP)
+        extra = dict(self.current, **{'unexpected.hs': b'module Unexpected where\n'})
+        for value in (missing, extra):
+            with self.assertRaisesRegex(ValueError, 'changed during run'):
+                P.verify_identity(value, expected)
 
-    def test_transitive_project_include_closure_is_explicit(self):
+    def test_preparation_works_in_a_source_copy_without_git_history(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / 'checkout'
+            for name, raw in self.current.items():
+                path = source / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(raw)
+            output = Path(directory) / 'prepared'
+            with mock.patch.object(sys, 'argv', ['prepare_map_policy.py', '--source', str(source), '--output', str(output)]):
+                P.main()
+            receipt = json.loads((output / 'preparation.json').read_text())
+            self.assertEqual(receipt['current_inputs'], P.input_identity(self.current))
+            P.verify_snapshot(output, receipt)
+
+    def test_import_closure_follows_new_local_module(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory)
+            for name, raw in self.current.items():
+                path = source / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(raw)
+            module = source / 'libraries/mlf-foundation/Bootstrap/MapSupport.hs'
+            module.write_text('module Bootstrap.MapSupport where\n')
+            path = source / P.MAP
+            path.write_bytes(path.read_bytes().replace(b'import MLF.Primitive;',
+                b'import MLF.Primitive; import qualified Bootstrap.MapSupport as Support;'))
+            self.assertIn(module.relative_to(source).as_posix(), P.read_inputs(source))
+            module.unlink()
+            with self.assertRaisesRegex(ValueError, 'missing/ambiguous local module'):
+                P.read_inputs(source)
+
+    def test_transitive_project_include_closure(self):
         graph = P.project_include_graph(self.current)
-        self.assertEqual(len(graph), 11)
         self.assertIn('runtime/mlf_process_supervisor_posix.h', graph['runtime/mlf_process_supervisor.c'])
         self.assertIn('runtime/mlf_system_windows.h', graph['runtime/mlf_system.h'])
-        self.assertIn('runtime/mlf_windows_path.h', graph['runtime/mlf_windows.h'])
-        missing = dict(self.current); missing.pop('runtime/mlf_process_supervisor_posix.h')
+        missing = dict(self.current)
+        missing.pop('runtime/mlf_process_supervisor_posix.h')
         with self.assertRaisesRegex(ValueError, 'unbound transitive'):
             P.project_include_graph(missing)
-        mutated = dict(self.current)
-        mutated['host/ghc/cbits/host.c'] += b'\n#include "unbound.h"\n'
+        changed = dict(self.current)
+        changed['host/ghc/cbits/host.c'] += b'\n#include "additional.h"\n'
         with self.assertRaisesRegex(ValueError, 'unbound transitive'):
-            P.project_include_graph(mutated)
+            P.project_include_graph(changed)
+        changed['runtime/additional.h'] = b'#include "mlf_process_supervisor.h"\n'
+        self.assertIn('runtime/additional.h', P.project_include_graph(changed))
 
-    def test_generated_extra_omission_header_body_or_oracle_changes_refused(self):
-        original = P.prepare_bytes(self.current, self.historical, CONTEXT)
-        variants = []
-        extra = dict(original); extra['other.hs'] = b'other'; variants.append(extra)
-        missing = dict(original); missing.pop('FrozenMap.hs'); variants.append(missing)
-        for path in original:
-            wrong = dict(original); wrong[path] += b' '; variants.append(wrong)
-        wrong = dict(original)
-        wrong['HistoricalBalanceControls.hs'] = wrong['HistoricalBalanceControls.hs'].replace(
-            b'import qualified HistoricalMap as C', b'import qualified Bootstrap.Map as C')
-        variants.append(wrong)
-        for index, value in enumerate(variants):
-            with self.subTest(index=index), self.assertRaises(ValueError):
-                P.verify_generated(value, self.current, self.historical, CONTEXT)
+    def test_incomplete_controls_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for name in self.fixtures:
+                missing = dict(self.fixtures)
+                missing.pop(name)
+                with self.subTest(name=name), self.assertRaisesRegex(ValueError, 'complete Map control inventory'):
+                    self.prepare(directory, fixtures=missing)
 
-    def test_unique_edits_missing_duplicate_collision_refused(self):
-        for raw in (b'absent', b'old old', b'old new'):
-            with self.subTest(raw=raw), self.assertRaises(ValueError):
-                P.apply_unique(raw, [(b'old', b'new')])
-        old = self.current[P.BALANCE].replace(b'module Main where\n', b'module Other where\n')
-        with self.assertRaises(ValueError):
-            P.apply_unique(old, P.changes('RetainedBalanceControls'))
-        with self.assertRaises(ValueError):
-            P.changes('HistoricalBalanceControls', False)
+    def test_sources_cannot_escape_or_follow_symlinks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'data.hs').write_bytes(b'module Data where\n')
+            (root / 'link.hs').symlink_to(root / 'data.hs')
+            for path in ('../data.hs', str(root / 'data.hs'), 'link.hs', ''):
+                with self.subTest(path=path), self.assertRaises(ValueError):
+                    P.read_regular(root, path)
+            with self.assertRaises(ValueError):
+                P.input_identity({'../outside.hs': b'invalid'})
 
-    def test_physical_git_reader_requests_only_fixed_tree_and_map(self):
-        calls = []
-        outputs = iter([(P.HISTORICAL_TREE + '\n').encode(), self.historical])
-        def output(argv, timeout):
-            self.assertEqual(timeout, 30)
-            calls.append(argv)
-            return next(outputs)
-        self.assertEqual(P.historical_from_git('/fixture', output), self.historical)
-        prefix = ['git', '--no-replace-objects', '-C', '/fixture']
-        self.assertEqual(calls, [
-            prefix + ['rev-parse', P.HISTORICAL_COMMIT + '^{tree}'],
-            prefix + ['show', P.HISTORICAL_COMMIT + ':' + P.MAP]])
-        with self.assertRaises(ValueError):
-            P.historical_from_git('/fixture', lambda *a, **kw: b'wrong-tree\n')
-        outputs = iter([(P.HISTORICAL_TREE + '\n').encode(), self.current[P.MAP]])
-        with self.assertRaises(ValueError):
-            P.historical_from_git('/fixture', lambda *a, **kw: next(outputs))
+    def test_source_loader_accepts_current_helper_and_records_its_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'helper.py'
+            for value in (1, 2):
+                raw = ('value = ' + str(value) + '\n').encode()
+                path.write_bytes(raw)
+                module, identity = R.source_module(path, 'map_policy_helper')
+                self.assertEqual(module.value, value)
+                self.assertEqual(identity, hashlib.sha256(raw).hexdigest())
 
 
 class SuccessInventoryTests(unittest.TestCase):

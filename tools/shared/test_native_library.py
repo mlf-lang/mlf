@@ -16,7 +16,9 @@ import sys
 from build import DEMAND_FLAGS, EXHAUSTIVENESS_FLAGS, PACKAGES
 from test_direct import CommandRunner, authenticate_build, sha
 from test_native_string_index import local_c_closure, resolve_tool
-from header_validation_adapter import prepare as prepare_header_validation
+from header_validation_adapter import (input_paths as header_validation_inputs,
+                                       prepare as prepare_header_validation,
+                                       verify_prepared as verify_header_validation)
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools/testing'))
@@ -128,6 +130,7 @@ def main():
               'commands': []}
     objects, inputs, artifacts = {}, {}, {}
     authenticated = False
+    header_preparation = None
 
     def save():
         temporary = output / 'receipt.json.new'
@@ -152,6 +155,9 @@ def main():
         for path, digest in {**inputs, **artifacts}.items():
             if sha(path) != digest:
                 raise ValueError('native test input or artifact changed: ' + path)
+        if header_preparation is not None:
+            directory, evidence = header_preparation
+            verify_header_validation(ROOT, directory, evidence, expected_inputs=inputs)
 
     runner = CommandRunner(ROOT, output, record, save)
     save()
@@ -170,8 +176,7 @@ def main():
                  FIXTURES / 'NativePrivateConstructors.hs',
                  FIXTURES / 'MaterializeImportsTests.hs',
                  FIXTURES / 'PartialMaterializeImportsTests.hs',
-                 FIXTURES / 'HeaderValidationTests.hs',
-                 FIXTURES / 'HeaderNamingOracle.hs', ROOT / 'tools/shared/header_validation_adapter.py',
+                 *header_validation_inputs(ROOT).values(), ROOT / 'tools/shared/header_validation_adapter.py',
                  FIXTURES / 'SplitBuiltinControls.hs',
                  FIXTURES / 'native_library_runtime.c', ROOT / 'host/ghc/cbits/host.c',
                  ROOT / 'runtime/mlf_process_supervisor.c', clang, pkg_config, archive,
@@ -207,7 +212,9 @@ def main():
         header_dir = output
         if headers_selected:
             header_dir, header_evidence = prepare_header_validation(ROOT, output)
-            record['header_adaptation'] = header_evidence
+            verify_header_validation(ROOT, header_dir, header_evidence, expected_inputs=inputs)
+            header_preparation = (header_dir, header_evidence)
+            record['header_preparation'] = header_evidence
             save()
             artifacts.update({str(p): sha(p) for p in header_dir.iterdir() if p.is_file()})
             for module in ['HistoricalHeaderNames', 'HeaderNamingOracle']:
@@ -289,7 +296,7 @@ def main():
             record['header_qualification'] = {
                 'complete': selection is None,
                 'lanes': list(record['header_lanes_passed']),
-                'adaptation_sha256': artifacts[str(header_dir / 'adaptation.json')],
+                'preparation_sha256': artifacts[str(header_dir / 'preparation.json')],
                 'scope': 'historical formatter component and current production naming; all original non-naming assertions',
             }
             save()

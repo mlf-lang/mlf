@@ -14,70 +14,14 @@ import shutil
 import subprocess
 import sys
 import time
-import types
+import importlib.util
 
 HERE = Path(__file__).resolve().parent
-COMPARISON_CONTRACT = HERE.parents[1] / 'integer-compare/source_contract.py'
-COMPARISON_CONTRACT_SHA = '912676a53b8059b334018f186290490f7675e8f79eab8315c03c2fc401adef8a'
 
 
 def sha(path):
     with Path(path).open('rb') as stream:
         return hashlib.file_digest(stream, 'sha256').hexdigest()
-
-
-def replace_once(contents, old, new):
-    if contents.count(old) != 1:
-        raise ValueError('oracle adaptation must replace exactly one occurrence: ' + old.decode())
-    return contents.replace(old, new)
-
-
-def authenticate_oracle(source, here=HERE):
-    """Check literal fixtures and narrowly adapted independent dependencies."""
-    manifest_path = here / 'oracle-manifest.json'
-    oracle = json.loads(manifest_path.read_text())
-    original = (here / 'FrozenSelectors.hs').read_bytes()
-    if hashlib.sha256(original).hexdigest() != oracle['oracle_sha256']:
-        raise ValueError('frozen oracle changed')
-    if sha(here / 'original-selector-excerpts.txt') != oracle['excerpt_sha256']:
-        raise ValueError('frozen original excerpts changed')
-    if sha(COMPARISON_CONTRACT) != COMPARISON_CONTRACT_SHA:
-        raise ValueError('reviewed host-comparison source contract changed')
-    comparison = types.ModuleType('integer_comparison_source_contract')
-    exec(compile(COMPARISON_CONTRACT.read_bytes(), str(COMPARISON_CONTRACT), 'exec'), comparison.__dict__)
-    for path, digest in oracle['shared_dependency_pins'].items():
-        raw = (source / path).read_bytes()
-        if path == comparison.OWNER:
-            raw = comparison.historical(raw)
-        if hashlib.sha256(raw).hexdigest() != digest:
-            raise ValueError('oracle dependency changed; independent re-audit required: ' + path)
-    layer = oracle['collection_dependency_reaudit']
-    for path, digest in layer['candidate_dependency_pins'].items():
-        if sha(source / path) != digest:
-            raise ValueError('reviewed collection dependency changed; independent re-audit required: ' + path)
-    adaptations = {
-        'FrozenSelectorMap.hs': [(b'module Bootstrap.Map where {', b'module FrozenSelectorMap where {')],
-        'FrozenSelectorSet.hs': [(b'module Bootstrap.Set where {', b'module FrozenSelectorSet where {'),
-                                 (b'import qualified Bootstrap.Map as M;', b'import qualified FrozenSelectorMap as M;')],
-    }
-    if (len(layer['frozen_modules']) != len(adaptations) or
-            {item['file'] for item in layer['frozen_modules']} != set(adaptations)):
-        raise ValueError('frozen collection module inventory changed')
-    for item in layer['frozen_modules']:
-        contents = (here / item['file']).read_bytes()
-        if hashlib.sha256(contents).hexdigest() != item['oracle_sha256']:
-            raise ValueError('frozen collection oracle changed: ' + item['file'])
-        for old, new in reversed(adaptations[item['file']]):
-            contents = replace_once(contents, new, old)
-        if hashlib.sha256(contents).hexdigest() != item['baseline_sha256']:
-            raise ValueError('frozen collection body differs from historical baseline: ' + item['file'])
-    adapted = replace_once(original, b'import qualified Bootstrap.Map as M;',
-                            b'import qualified FrozenSelectorMap as M;')
-    adapted = replace_once(adapted, b'import qualified Bootstrap.Set as Set;',
-                            b'import qualified FrozenSelectorSet as Set;')
-    if hashlib.sha256(adapted).hexdigest() != layer['adapted_selector_sha256']:
-        raise ValueError('import-only selector adaptation changed')
-    return oracle, adapted
 
 
 def main():
@@ -105,23 +49,15 @@ def main():
     save()
     try:
         direct_path = source / 'tools/shared/test_direct.py'
-        direct = types.ModuleType('selector_test_direct_authentication')
-        direct.__file__ = str(direct_path)
-        exec(compile(direct_path.read_bytes(), str(direct_path), 'exec'), direct.__dict__)
+        spec = importlib.util.spec_from_file_location('selector_test_direct_authentication', direct_path)
+        direct = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(direct)
         producer = direct.authenticate_build(receipt_path, producer_dir / 'bin', root=source)
-        if producer['optimization'] != '2':
-            raise ValueError('this acceptance harness requires the candidate O2 producer')
-        manifest_path = HERE / 'oracle-manifest.json'
-        oracle, adapted_selectors = authenticate_oracle(source)
-        oracle_sources = output / 'oracle-sources'
-        oracle_sources.mkdir()
-        adapted_selector_path = oracle_sources / 'FrozenSelectors.hs'
-        adapted_selector_path.write_bytes(adapted_selectors)
+        reference_sources = [HERE / name for name in
+                             ('FrozenSelectors.hs', 'FrozenSelectorMap.hs', 'FrozenSelectorSet.hs')]
         inputs = {str(path): sha(path) for path in
-                  [Path(__file__), HERE / 'SelectorDifferential.hs', HERE / 'FrozenSelectors.hs',
-                   HERE / 'original-selector-excerpts.txt', HERE / 'FrozenSelectorMap.hs',
-                   HERE / 'FrozenSelectorSet.hs', manifest_path, receipt_path, direct_path,
-                   adapted_selector_path, COMPARISON_CONTRACT]}
+                  [Path(__file__), HERE / 'SelectorDifferential.hs', *reference_sources,
+                   receipt_path, direct_path]}
         shutil.copy2(__file__, output / 'runner-used.py')
         # GHC one-shot home-module lookup uses the requested interface output
         # directory. Populate that directory from the authenticated producer,
@@ -153,11 +89,8 @@ def main():
         record.update(producer_receipt_sha256=sha(receipt_path), source_root=str(source),
                       producer_directory=str(producer_dir), inputs=inputs,
                       expected_checks=154072, expected_collection_checks=6162,
-                      oracle_shared_dependencies=oracle['shared_dependency_pins'],
-                      current_host_comparison_sha256=sha(source / 'host/ghc/MLF/Host/Base.hs'),
-                      host_comparison_historical_source_restored=True,
-                      oracle_collection_dependency_layer=oracle['collection_dependency_reaudit'],
-                      selector_adaptation='Map/Set imports only; original literal fixture unchanged',
+                      reference_sources={str(path): sha(path) for path in reference_sources},
+                      reference_scope='independent selector and Map/Set fixtures compiled directly',
                       copied_dependency_files=copied_dependencies,
                       producer_main_objects_excluded=True,
                       compiler_sources_on_search_path=False)
@@ -201,13 +134,13 @@ def main():
             flags += ['-package', package]
         ghc = producer['ghc']['path']
         import_flags = ['-i', '-i'+str(objects)]
-        # One-shot compilation: only copied, pinned .hi files are searchable. No
+        # One-shot compilation: only authenticated copies of .hi files are searchable. No
         # implementation source root is on the module search path.
         for module in ['FrozenSelectorMap', 'FrozenSelectorSet']:
             run('compile-'+module, [ghc, '-c', *flags, *import_flags, '-odir', objects, '-hidir', objects,
                                     HERE / (module + '.hs')])
         run('compile-oracle', [ghc, '-c', *flags, *import_flags, '-odir', objects, '-hidir', objects,
-                               adapted_selector_path])
+                               HERE / 'FrozenSelectors.hs'])
         run('compile-harness', [ghc, '-c', *flags, *import_flags, '-odir', objects, '-hidir', objects,
                                 '-o', objects / 'SelectorDifferential.o',
                                 '-ohi', objects / 'Main.hi', HERE / 'SelectorDifferential.hs'])

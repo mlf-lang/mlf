@@ -26,14 +26,12 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ inputs.source }}
-          fetch-depth: 0
+          fetch-depth: 2
       - name: Install workflow test parser
         run: |
           python3 -m venv "$RUNNER_TEMP/workflow-tests"
           "$RUNNER_TEMP/workflow-tests/bin/python" -m pip install --disable-pip-version-check -r tools/testing/requirements.txt
           echo "$RUNNER_TEMP/workflow-tests/bin" >> "$GITHUB_PATH"
-      - name: Prepare reviewed historical source objects
-        run: python3 -B tools/testing/prepare_history_refs.py
       - name: Bind every candidate and artifact to this exact workflow commit
         id: source
         env:
@@ -378,14 +376,12 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ needs.metadata.outputs.source }}
-          fetch-depth: 0
+          fetch-depth: 2
       - name: Install workflow test parser
         run: |
           python3 -m venv "$RUNNER_TEMP/workflow-tests"
           "$RUNNER_TEMP/workflow-tests/bin/python" -m pip install --disable-pip-version-check -r tools/testing/requirements.txt
           echo "$RUNNER_TEMP/workflow-tests/bin" >> "$GITHUB_PATH"
-      - name: Prepare reviewed historical source objects
-        run: python3 -B tools/testing/prepare_history_refs.py
       - name: Native linking dependencies
         env:
           PLATFORM: macos-arm64
@@ -439,14 +435,12 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ needs.metadata.outputs.source }}
-          fetch-depth: 0
+          fetch-depth: 2
       - name: Install workflow test parser
         run: |
           python3 -m venv "$RUNNER_TEMP/workflow-tests"
           "$RUNNER_TEMP/workflow-tests/bin/python" -m pip install --disable-pip-version-check -r tools/testing/requirements.txt
           echo "$RUNNER_TEMP/workflow-tests/bin" >> "$GITHUB_PATH"
-      - name: Prepare reviewed historical source objects
-        run: python3 -B tools/testing/prepare_history_refs.py
       - name: Native linking dependencies
         env:
           PLATFORM: linux-x64

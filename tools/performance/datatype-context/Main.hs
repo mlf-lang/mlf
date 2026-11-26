@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 import FrozenSourceKey (upgradeV6)
+import NamedQueryControls (checkRejections)
 import Prelude
 import Control.Exception (SomeException, evaluate, try, displayException)
 import Control.Monad (forM_, unless, foldM)
@@ -53,7 +54,10 @@ prepared body = S.PreparedGroup [("root",T.Nothing,body)] [("root",T.Nothing,bod
   [("value",False)]
 
 main = do
-  count<-newIORef (0::Int)
+  rejected<-checkRejections F.encodeExpression (F.expressionKey F.inlineScopeKey)
+    (F.canonicalExpression M.empty 0 M.empty 0)
+    F.encodePattern (F.canonicalPattern M.empty M.empty 0)
+  count<-newIORef rejected
   let check label ok=do
         unless ok (fail label)
         modifyIORef' count (+1)

@@ -53,3 +53,16 @@ Run the independent controls with a qualified ordinary O2 producer and a fresh o
 python3 -B tools/performance/sparse-contracts/run_controls.py \
   --producer "$PRODUCER" --source "$PRODUCER_SOURCE" --output "$FRESH_OUTPUT"
 ```
+
+## Direct reference fixtures
+
+The normal controls compile `FullyFrozenSourceInference.hs`, `FrozenClasses.hs`
+and the named `FrozenCrateQuery.hs` reference directly. The first is the exact
+prepared source that the former runner produced from `FrozenSourceInference`:
+only the module name and Classes import differ from that original fixture.
+`oracle.json` retains the original provenance and the compile-ready file digest.
+Current controls are ordinary source files with per-run identity checks.
+The optional historical checkout comparison and inverse module proofs have
+been retired; use commit `496dcae024cae1a93096d9bdb9d6b93e57359dc0` to reproduce
+the original source-audit procedure. Named query adaptation checks constructors,
+and the controls execute the unsupported-form rejection paths themselves.

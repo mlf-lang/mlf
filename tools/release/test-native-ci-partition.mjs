@@ -98,13 +98,11 @@ function verifyPartition(value) {
       event_name !== 'workflow_dispatch' || !windows_runtime_only);
   }
   const producer=command(value,'--bootstrap-only');
-  const preparation=command(value,'tools/testing/prepare_history_refs.py');
   const install=command(value,'tools/release/cleanup-ghc-install.py');
   const regeneration=command(value,'tools/shared/generate_builtin_evidence.py');
   assert.ok(producer.id);
   enclosingSeconds(value,regeneration);
   const checkout=actionStep(entry,'actions/checkout');
-  assert.equal(String(checkout.with['fetch-depth']),'0');
   assert.equal(checkout.if,undefined);
   assert.ok(entry.steps.indexOf(actionStep(entry,'./.github/actions/linux-ghc-bindist')) < entry.steps.indexOf(install));
   assert.ok(entry.steps.indexOf(producer) < entry.steps.indexOf(regeneration));
@@ -131,7 +129,7 @@ function verifyPartition(value) {
   assert.ok(positive(option(regenerationCalls[0].argv,'--timeout'),'Generator timeout') < regenerationBudget,
     'Generation must finish before its watchdog');
   const routine=['tools/release/test-suite-build-receipts.py','tools/release/source-smoke.sh',
-    'tools/shared/test_direct_candidate_successor.py','tools/shared/test_figure12_direct.py','tools/release/test-tuple-list.sh'];
+    'tools/shared/run_direct.py','tools/shared/test_figure12_direct.py','tools/release/test-tuple-list.sh'];
   const optimized=['tools/performance/patricia/run_integrated.py --suite p123','tools/performance/patricia/run_integrated.py --suite graph',
     'tools/performance/patricia/run_integrated.py --suite validation','tools/performance/patricia/run_integrated.py --suite builtin',
     'tools/performance/patricia/run_fingerprint.py','tools/performance/map-policy/run_controls.py',
@@ -163,7 +161,6 @@ function verifyPartition(value) {
     const calls=argvCalls(step);
     for (const flags of [['-B'],['-O','-B']]) assert.equal(calls.filter(call=>JSON.stringify(call.argv)===JSON.stringify(['python3',...flags,script])).length,1);
     for (const leg of legs) assert.equal(selected(step,{matrix:leg}),String(leg.optimization)==='2');
-    assert.ok(entry.steps.indexOf(preparation) < entry.steps.indexOf(step));
     assert.ok(entry.steps.indexOf(step) < entry.steps.indexOf(install));
   }
   const metadata=job(value,'metadata');
@@ -203,37 +200,29 @@ function verifyPartition(value) {
 }
 
 const directExpected = [
-
-    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-B', 'tools/shared/test_crc_successor_entry.py']},
-    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-O', '-B', 'tools/shared/test_crc_successor_entry.py']},
-    {candidateEvidence: '', utf8Evidence: '', evidence: '.mlf-build/crc-supervisor-controls/normal',
-      argv: ['-B', 'tools/shared/test_crc_process_supervisor.py']},
-    {candidateEvidence: '', utf8Evidence: '', evidence: '.mlf-build/crc-supervisor-controls/optimized',
-      argv: ['-O', '-B', 'tools/shared/test_crc_process_supervisor.py']},
-    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-B', 'tools/shared/test_utf8_batch_contract.py']},
-    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-O', '-B', 'tools/shared/test_utf8_batch_contract.py']},
-    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-B', 'tools/shared/test_utf8_batch_worker.py']},
-    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-O', '-B', 'tools/shared/test_utf8_batch_worker.py']},
-    {candidateEvidence: '', utf8Evidence: '.mlf-build/utf8-supervisor-controls/normal', evidence: '', argv: ['-B', 'tools/shared/test_direct_bounded_entry.py']},
-    {candidateEvidence: '', utf8Evidence: '.mlf-build/utf8-supervisor-controls/optimized', evidence: '', argv: ['-O', '-B', 'tools/shared/test_direct_bounded_entry.py']},
-    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-B', 'tools/shared/test_candidate_batch_contract.py']},
-    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-O', '-B', 'tools/shared/test_candidate_batch_contract.py']},
-    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-B', 'tools/shared/test_candidate_batch_worker.py']},
-    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-O', '-B', 'tools/shared/test_candidate_batch_worker.py']},
-    {candidateEvidence: '.mlf-build/candidate-supervisor-controls/normal', utf8Evidence: '', evidence: '', argv: ['-B', 'tools/shared/test_direct_candidate_entry.py']},
-    {candidateEvidence: '.mlf-build/candidate-supervisor-controls/optimized', utf8Evidence: '', evidence: '', argv: ['-O', '-B', 'tools/shared/test_direct_candidate_entry.py']},
-    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-B', 'tools/shared/test_direct_candidate_successor.py',
-      '--bin-dir', '.mlf-build/shared-ghc/bin',
-      '--build-receipt', '.mlf-build/shared-ghc/receipt.json',
-      '--output', '.mlf-build/direct-host-tests']},
-].map(({argv,evidence,utf8Evidence,candidateEvidence})=>({argv:['python3',...argv],MLF_CRC_TEST_EVIDENCE:evidence,
-  MLF_UTF8_TEST_EVIDENCE:utf8Evidence,MLF_CANDIDATE_TEST_EVIDENCE:candidateEvidence}));
+  ...['normal', 'optimized'].map(mode => ({
+    argv: ['python3', ...(mode === 'optimized' ? ['-O'] : []), '-B', 'tools/shared/test_crc_process_supervisor.py'],
+    MLF_CRC_TEST_EVIDENCE: '.mlf-build/crc-supervisor-controls/' + mode, MLF_DIRECT_TEST_EVIDENCE: ''
+  })),
+  ...['utf8_batch_contract', 'utf8_batch_worker', 'candidate_batch_contract', 'candidate_batch_worker']
+    .flatMap(name => [[], ['-O']].map(flags => ({
+      argv: ['python3', ...flags, '-B', 'tools/shared/test_' + name + '.py'],
+      MLF_CRC_TEST_EVIDENCE: '', MLF_DIRECT_TEST_EVIDENCE: ''
+    }))),
+  ...['normal', 'optimized'].map(mode => ({
+    argv: ['python3', ...(mode === 'optimized' ? ['-O'] : []), '-B', 'tools/shared/test_direct_managed.py'],
+    MLF_CRC_TEST_EVIDENCE: '', MLF_DIRECT_TEST_EVIDENCE: '.mlf-build/direct-supervisor-controls/' + mode
+  })),
+  {argv: ['python3', '-B', 'tools/shared/run_direct.py', '--bin-dir', '.mlf-build/shared-ghc/bin',
+    '--build-receipt', '.mlf-build/shared-ghc/receipt.json', '--output', '.mlf-build/direct-host-tests'],
+    MLF_CRC_TEST_EVIDENCE: '', MLF_DIRECT_TEST_EVIDENCE: ''}
+];
 function verifyDirect(value) {
-  const step=command(value,'tools/shared/test_direct_candidate_successor.py');
-  const options={variables:['MLF_CRC_TEST_EVIDENCE','MLF_UTF8_TEST_EVIDENCE','MLF_CANDIDATE_TEST_EVIDENCE']};
+  const step=command(value,'tools/shared/run_direct.py');
+  const options={variables:['MLF_CRC_TEST_EVIDENCE','MLF_DIRECT_TEST_EVIDENCE']};
   const calls=argvCalls(step,{},options);
   assert.deepEqual(sorted(calls),sorted(directExpected));
-  assert.deepEqual(calls.at(-1),directExpected.at(-1),'The composite successor follows its pure controls');
+  assert.deepEqual(calls.at(-1),directExpected.at(-1),'The direct runner follows its process and batch controls');
   requireFailurePropagation(step.run,options,calls);
 }
 function verifyGuarded(value) {
@@ -274,35 +263,15 @@ function verifyGuarded(value) {
   requireFailurePropagation(map.run,options,calls);
 }
 function verifyHeader(value) {
-  inFixture(root=>{
-    fs.mkdirSync(path.join(root,'.mlf-build'));
-    const step=command(value,'tools/shared/test_header_validation_adapter.py');
-    const variables=['HEADER_FIXTURE','HEADER_ORACLE','HEADER_HISTORY_SOURCE'];
-    const options={cwd:root,variables,stubs:String.raw`
-mkdir() { /bin/mkdir "$@"; }
-git() { record git "$@" || return; printf 'frozen-header-oracle\n'; }
-python3() {
-  local original
-  IFS= read -r original < "$HEADER_HISTORY_SOURCE"
-  [ "$original" = frozen-header-oracle ]
-  record python3 "$@"
-}
-`};
-    const calls=argvCalls(step,{},options);
-    assert.equal(calls.length,4);
-    assert.deepEqual(calls[0].argv,['git','--no-replace-objects','cat-file','blob','dd5b4630a80803c19afdb219dba2dc4bffc3ea1b']);
-    const environments={HEADER_FIXTURE:root+'/tools/shared/fixtures/native/HeaderValidationTests.hs',
-      HEADER_ORACLE:root+'/tools/shared/fixtures/native/HeaderNamingOracle.hs',
-      HEADER_HISTORY_SOURCE:root+'/.mlf-build/header-adapter-controls/history.hs'};
-    const pure=[['-B'],['-O','-B']].map(flags=>({argv:['python3',...flags,'tools/shared/test_header_validation_adapter.py'],...environments}));
-    assert.deepEqual(sorted(calls.slice(1,3)),sorted(pure));
-    assert.deepEqual(calls[3],{argv:['python3','tools/shared/test_native_library.py','--build-receipt','.mlf-build/shared-ghc/receipt.json',
-      '--output','.mlf-build/native-library','--clang','clang','--gc-prefix','.mlf-build/io-action-gc'],...environments});
-    for (const call of calls) {
-      fs.rmSync(path.join(root,'.mlf-build/header-adapter-controls'),{recursive:true,force:true});
-      requireFailurePropagation(step.run,options,[call]);
-    }
-  });
+  const step=command(value,'tools/shared/test_header_validation_adapter.py');
+  const calls=argvCalls(step);
+  assert.equal(calls.length,3);
+  const pure=[['-B'],['-O','-B']].map(flags=>({argv:['python3',...flags,'tools/shared/test_header_validation_adapter.py']}));
+  assert.deepEqual(sorted(calls.slice(0,2)),sorted(pure));
+  assert.deepEqual(calls[2],{argv:['python3','tools/shared/test_native_library.py',
+    '--build-receipt','.mlf-build/shared-ghc/receipt.json',
+    '--output','.mlf-build/native-library','--clang','clang','--gc-prefix','.mlf-build/io-action-gc']});
+  requireFailurePropagation(step.run,{},calls);
 }
 function verifyInstall(value) {
   inFixture(root=>{
@@ -485,7 +454,7 @@ const cases=[
     }
     // Independent pure checks may run in either order before the campaign.
     const lines=direct.run.split('\n');
-    const pure=lines.map((line,index)=>line.includes('tools/testing/run.py python-shared-crc-successor-entry')?index:-1).filter(index=>index>=0);
+    const pure=lines.map((line,index)=>line.includes('tools/testing/run.py python-shared-direct-managed')?index:-1).filter(index=>index>=0);
     [lines[pure[0]],lines[pure[1]]]=[lines[pure[1]],lines[pure[0]]];direct.run=lines.join('\n');
     verify(changed);
   }],
@@ -512,7 +481,7 @@ const cases=[
   ['mutation/nonblocking%20failures',()=>mutate(workflow,value=>native(value)['continue-on-error']=true)],
   ['mutation/skipped-campaign',()=>mutate(workflow,value=>findAdapter(value,'direct-candidate').if=false)],
   ['mutation/swallowed-failure',()=>{
-    const value=projected(workflow),needle='tools/shared/test_direct_candidate_successor.py';
+    const value=projected(workflow),needle='tools/shared/run_direct.py';
     const step=command(value,needle);
     step.run=step.run.replace(/\\\n\s*/g,' ');
     const line=step.run.split('\n').find(line=>line.includes(needle));

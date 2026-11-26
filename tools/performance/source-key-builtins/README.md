@@ -7,6 +7,18 @@ with the ordered `Data.builtinDeclarations` and extends its maps with the user
 declarations. The empty environment derives its constructor and datatype maps
 from the same list. Source v7 reads the very same value.
 
+## Frozen query oracle interface
+
+`frozen_query.py` retains the fixed named-only `FrozenCrateQuery` inputs used
+by the datatype-context and sparse-contract controls. It reads only the
+`SExpr` and `SPattern` constructor interface from the maintained
+`Bootstrap.Types` source. Comments, formatting and unrelated type declarations
+do not select a new hash whitelist entry. Recognized indexed/dictionary forms
+receive explicit rejection branches in every frozen traversal; unknown or
+incompatible constructor signatures fail preparation. The old named algorithm
+and its independent output expectations remain unchanged. Only the fixed
+oracle file has an integrity digest.
+
 ## Wire contract
 
 The first of the nine length-framed key fields now represents the exact builtin

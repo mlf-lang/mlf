@@ -460,11 +460,10 @@ class FrontendTimeoutSelection(unittest.TestCase):
             argv = ['test_direct.py', '--bin-dir', str(root / 'bin'),
                     '--build-receipt', str(receipt), '--output', str(root / 'output'), *extra]
             with patch.object(sys, 'argv', argv), \
-                    patch.object(direct, 'CommandRunner', RecordingRunner), \
                     patch.object(direct, 'authenticate_build', return_value={'producer_host': 'GHC', 'optimization': optimization}), \
                     patch.object(direct.shutil, 'which', return_value=sys.executable), \
                     patch.object(direct, 'sha', return_value='0' * 64):
-                direct.main()
+                direct.main(runner_factory=RecordingRunner)
             return {name: options['timeout'] for name, _, options in calls
                     if name.startswith('shared-frontend-')}
 

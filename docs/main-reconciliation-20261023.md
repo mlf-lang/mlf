@@ -1,5 +1,11 @@
 # Main reconciliation after the staged framework checkpoint
 
+> Historical record (2026-10-23). The text below retains the original claims
+> and commands. Removed inventories, migration audits and evidence linked here
+> remain available in Git at `496dcae024cae1a93096d9bdb9d6b93e57359dc0`.
+> See [the retirement guide](testing-history-retirement.md) and
+> [current tests](../tests/README.md) for maintained entry points.
+
 This merges main `cb4c56c3744653c76648e609c06a71afad1ae2d4` **into** the draft
 integration branch. It does not merge or publish the PR into main. First parent
 is `bea6c93980e47946afc22ee99be0d571ed544489`; the common ancestor remains

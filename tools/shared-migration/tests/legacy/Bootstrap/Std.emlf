@@ -1,3 +1,0 @@
-module Bootstrap.Std where
-negate : Int -> Int
-negate value = 0 - value

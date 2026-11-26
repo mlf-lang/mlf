@@ -127,18 +127,6 @@ check('required-checks', () => {
   assert.throws(() => verifyDependencyArtifact(changed));
 });
 
-check('history', () => {
-  for (const workflow of [ci,qualify,release,readWorkflow('recover-release')]) {
-    for (const entry of Object.values(workflow.jobs)) {
-      if (steps(entry).some(step => /tools\/release\/check\.sh|tools\/shared\/test_framework_direct\.py/.test(projectAdapterCommands(step.run || '')))) {
-        const checkout = actionSteps(entry,'actions/checkout').find(step => !step.with?.path);
-        assert.equal(String(checkout?.with?.['fetch-depth']), '0');
-      }
-    }
-  }
-  // test_history_workflows.py executes actual preparation ordering, including
-  // recovery sources that predate the helper and failure propagation.
-});
 check('hosted-guest', () => {
   const native = job(ci,'native');
   const upload = actionStep(native,'actions/upload-artifact');

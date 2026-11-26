@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Source-bound Map maintenance successor; no copied producer objects.
+"""Compile current Map controls and independent reference fixtures from source.
 The public receipt requires an owned-tree supervisor's successful terminal
 receipt. Forced SIGKILL of that supervisor remains outside its guarantee.
 """
@@ -23,10 +23,6 @@ sys.path.insert(0, str(ROOT / 'tools/testing'))
 from receipt_selection import select
 
 OPTIMIZATIONS = (0, 2)
-PREPARE_SHA = 'fc6191e1cc7d7024cbc580836917e6efb9be86e64989e89b3eef4da720b8bf41'
-FIXTURE_SHA = '30ccc1caeaec7de404a00c4432ebb92c1a5b52167291f060da08552d79522d72'
-DIRECT_BLOB = 'a46bd66949e81c5761dff3446201640837ec8f68'
-SUPERVISOR_BLOB = '620e88b557139a6b19ca63097decaa9148bdd819'
 WORK_SECONDS = 1200
 CLEANUP_SECONDS = 10
 HISTORICAL_LINE = 'Balance controls: 24649 raw-shape pairs; 400 mutation steps; 30 independent demand/order cases passed'
@@ -56,12 +52,6 @@ DEMAND_VALUES = [
     'Right True', 'Right True', 'Left "combine"', 'Left "cmp"', 'Left "left-value"',
     'Left "right-value"', 'Right True', 'Left "cmp"',
 ]
-EXPECTED_MODULES = {
-    'Bootstrap/Map', 'Bootstrap/Types', 'Bootstrap/Std', 'Bootstrap/IndexVec',
-    'MLF/Primitive', 'MLF/Host/Base', 'MLF/Host/IO', 'MLF/Host/Async',
-    'HistoricalMap', 'FrozenMap', 'BaselineMap', 'RetainedBalanceControls',
-    'HistoricalBalanceControls', 'CurrentMapPolicyControls', 'Main',
-}
 
 def require(value, message):
     if not value:
@@ -70,19 +60,14 @@ def require(value, message):
 def sha(raw):
     return hashlib.sha256(raw).hexdigest()
 
-def blob(raw):
-    return hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest()
-
 def save(path, value):
     temporary = path.with_suffix('.tmp')
     temporary.write_text(json.dumps(value, indent=2) + '\n')
     temporary.replace(path)
 
-def source_module(path, name, expected_sha=None, expected_blob=None):
+def source_module(path, name):
     require(not path.is_symlink() and path.is_file(), 'regular module source')
     raw = path.read_bytes()
-    require((expected_sha is None or sha(raw) == expected_sha) and
-            (expected_blob is None or blob(raw) == expected_blob), 'module source identity: ' + str(path))
     module = types.ModuleType(name)
     module.__file__ = str(path)
     exec(compile(raw, str(path), 'exec'), module.__dict__)
@@ -150,7 +135,7 @@ def worker(a):
     optimizations = OPTIMIZATIONS if chosen is None else (chosen,)
     source, producer, out = a.source.resolve(), a.producer.resolve(), a.output.resolve()
     record = {'complete': False, 'stage': 'authenticate', 'commands': [], 'lanes': [],
-              'scope': 'fresh 15-module shared-GHC qualification; historical Map algorithms on current Int64/host base; not native/full-producer qualification',
+              'scope': 'fresh shared-GHC Map controls; reference algorithms on current Int64/host base; not native/full-producer qualification',
               'performance_measured': False, 'copied_producer_objects': False}
     def persist():
         save(out / 'worker-receipt.json', record)
@@ -191,68 +176,26 @@ def worker(a):
     record['subprocess_environment_policy'] = 'Inherited environment with explicit GHC/Git/thread bounds and removed compiler/library/Python injection search overrides; not hermetic OS execution'
     try:
         persist()
-        direct, direct_sha = source_module(source / 'tools/shared/test_direct.py', 'map_direct_auth', expected_blob=DIRECT_BLOB)
+        direct, direct_sha = source_module(source / 'tools/shared/test_direct.py', 'map_direct_auth')
         auth = direct.authenticate_build(producer / 'receipt.json', producer / 'bin', root=source)
-        require(auth['optimization'] == '2', 'ordinary current O2 producer authentication required')
-        preparation, prepare_sha = source_module(HERE / 'prepare_map_policy.py', 'map_preparation', expected_sha=PREPARE_SHA)
-        current_fixture = (HERE / 'CurrentMapPolicyControls.hs').read_bytes()
-        require(sha(current_fixture) == FIXTURE_SHA, 'reviewed current policy fixture')
+        # Only the producer's verified toolchain is reused. Both Map lanes
+        # compile fresh sources, so the producer may itself be O0 or O2.
+        record['producer_optimization'] = auth['optimization']
+        preparation, prepare_sha = source_module(HERE / 'prepare_map_policy.py', 'map_preparation')
         record['driver_inputs'] = {str(Path(__file__)): sha(Path(__file__).read_bytes()),
                                   str(HERE / 'prepare_map_policy.py'): prepare_sha,
-                                  str(HERE / 'CurrentMapPolicyControls.hs'): FIXTURE_SHA,
+                                  str(ROOT / 'tools/testing/check_manifest_snapshot.py'):
+                                      sha((ROOT / 'tools/testing/check_manifest_snapshot.py').read_bytes()),
                                   str(source / 'tools/shared/test_direct.py'): direct_sha}
         record['producer_receipt_sha256'] = direct.sha(producer / 'receipt.json')
         record['authenticated_manifest_sha256'] = auth['manifest_sha256']
-        # The receipt need not assert a Git commit. Record the observed checkout
-        # separately, not as an invented field in the producer's attestation.
-        run('checkout-head', ['git', '--no-replace-objects', '-C', source, 'rev-parse', 'HEAD'], 15)
-        record['observed_checkout_head'] = log('checkout-head', 'stdout').read_text().strip()
-        record['source_basis_commit'] = preparation.CURRENT_COMMIT
-        record['source_basis_tree'] = preparation.CURRENT_TREE
         prepared = out / 'prepared'
-        record['stage'] = 'prepare-source-bound-copies'; persist()
-        selected = {path: preparation.read_regular(source, path) for path in preparation.CURRENT_BLOBS}
-        git_calls = []
-        def git_output(argv, timeout):
-            name = 'historical-git-' + str(len(git_calls))
-            git_calls.append(name)
-            run(name, argv, timeout)
-            return log(name, 'stdout').read_bytes()
-        historical = preparation.historical_from_git(source, git_output)
-        context = (preparation.CURRENT_COMMIT, preparation.CURRENT_TREE,
-                   preparation.HISTORICAL_COMMIT, preparation.HISTORICAL_TREE)
-        generated = preparation.prepare_bytes(selected, historical, context)
-        preparation.verify_generated(generated, selected, historical, context)
-        prepared.mkdir(exist_ok=False)
-        for name, raw in generated.items():
-            (prepared / name).write_bytes(raw)
-        for path, raw in selected.items():
-            destination = prepared / 'source' / path
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_bytes(raw)
-            require(destination.read_bytes() == raw, 'source copy identity')
-        originals = prepared / 'originals'; originals.mkdir()
-        for path in preparation.ORACLE_SHA:
-            (originals / Path(path).name).write_bytes(selected[path])
-            require((originals / Path(path).name).read_bytes() == selected[path], 'retained original copy')
-        (originals / 'fc300-Map.hs').write_bytes(historical)
-        require((originals / 'fc300-Map.hs').read_bytes() == historical, 'physical historical copy')
-        preparation.verify_generated({name: (prepared / name).read_bytes() for name in generated},
-                                     selected, historical, context)
-        prep = {'prepared': True, 'qualification_complete': False,
-                'source_basis_commit': preparation.CURRENT_COMMIT, 'source_basis_tree': preparation.CURRENT_TREE,
-                'historical_commit': preparation.HISTORICAL_COMMIT, 'historical_tree': preparation.HISTORICAL_TREE,
-                'current_inputs': {path: {'git_blob': preparation.CURRENT_BLOBS[path], 'sha256': sha(raw)}
-                                   for path, raw in selected.items()},
-                'generated_sha256': {name: sha(raw) for name, raw in generated.items()},
-                'original_oracle_sha256': preparation.ORACLE_SHA,
-                'historical_map_sha256': sha(historical), 'historical_map_git_blob': preparation.HISTORICAL_MAP_BLOB,
-                'project_include_graph': preparation.project_include_graph(selected),
-                'scope': 'exact 22-input source basis, not a current full Git tree or reconstructed historical runtime'}
-        save(prepared / 'preparation.json', prep)
+        record['stage'] = 'prepare-source-snapshot'; persist()
+        selected = preparation.read_inputs(source)
+        fixtures = preparation.read_fixtures()
+        prep = preparation.prepare(prepared, selected, fixtures)
         record['preparation'] = prep
-        (prepared / 'CurrentMapPolicyControls.hs').write_bytes(current_fixture)
-        (prepared / 'Main.hs').write_text('module Main where\nimport qualified CurrentMapPolicyControls as C\nmain :: IO ()\nmain = C.main\n')
+        expected_modules = set(prep['source_modules']) | {Path(name).stem for name in fixtures}
         frozen = {str(path): sha(path.read_bytes()) for path in prepared.rglob('*') if path.is_file()}
         for name in ('c', 'o0', 'o2'):
             (out / name).mkdir(exist_ok=False)
@@ -272,8 +215,8 @@ def worker(a):
                                      for name in ('host', 'supervisor')}
         flags = ['--make', '-j1', '-fforce-recomp', '-XHaskell2010', '-fpedantic-bottoms', '-fno-state-hack',
                  '-package-env', '-', '-clear-package-db', '-global-package-db', '-no-user-package-db',
-                 '-hide-all-packages', '-rtsopts=ignoreAll', '-i', '-i' + str(prepared),
-                 '-i' + str(root / 'libraries/mlf-foundation'), '-i' + str(root / 'host/ghc')]
+                 '-hide-all-packages', '-rtsopts=ignoreAll', '-i', '-i' + str(prepared)]
+        flags += ['-i' + str(root / include) for include in sorted(set(prep['source_modules'].values()))]
         for package in ('base', 'array', 'bytestring', 'text', 'containers', 'directory'):
             flags += ['-package', package]
         ldd = Path(shutil.which('ldd') or '').resolve()
@@ -286,8 +229,8 @@ def worker(a):
                 '-hidir', lane, '-stubdir', lane, out / 'c/host.o', out / 'c/supervisor.o', '-o', binary,
                 prepared / 'Main.hs'], 240)
             modules = {str(path.relative_to(lane))[:-3] for path in lane.rglob('*.hi')}
-            require(modules == EXPECTED_MODULES and all((lane / (name + '.o')).is_file() for name in modules),
-                    'exact 15 fresh home modules and objects')
+            require(modules == expected_modules and all((lane / (name + '.o')).is_file() for name in modules),
+                    'complete fresh home modules and objects for prepared source closure')
             run('runtime-o' + str(opt), [ldd, binary], 15)
             runtime = {}
             for line in log('runtime-o' + str(opt), 'stdout').read_text().splitlines():
@@ -325,6 +268,9 @@ def worker(a):
             persist()
         for path, digest in frozen.items():
             require(direct.sha(Path(path)) == digest, 'prepared input changed')
+        preparation.verify_snapshot(prepared, prep)
+        preparation.verify_identity(preparation.read_inputs(source), prep['current_inputs'])
+        preparation.verify_identity(preparation.read_fixtures(), prep['fixture_inputs'])
         for path, digest in record['driver_inputs'].items():
             require(direct.sha(Path(path)) == digest, 'driver changed during qualification')
         for path, digest in record['fresh_C_objects'].items():
@@ -367,7 +313,7 @@ def main():
               'forced_supervisor_SIGKILL_contained': False}
     try:
         supervisor, digest = source_module(source / 'tools/shared/crc_process_supervisor.py',
-                                          'map_owned_tree_supervisor', expected_blob=SUPERVISOR_BLOB)
+                                          'map_owned_tree_supervisor')
         record['supervisor_source_sha256'] = digest
         runner_path = Path(__file__).resolve()
         runner_sha = sha(runner_path.read_bytes())
@@ -375,7 +321,7 @@ def main():
         record['work_seconds'] = WORK_SECONDS; record['cleanup_seconds'] = CLEANUP_SECONDS
         save(out / 'receipt.json', record)
         # No CLI bypass mode. The supervised child executes exactly these
-        # pinned bytes as a module, then calls the internal worker function.
+        # captured bytes as a module, then calls the internal worker function.
         bootstrap = worker_bootstrap()
         status = supervisor.supervise([sys.executable, '-B', '-c', bootstrap, str(runner_path), runner_sha,
             str(source), str(producer), str(out)], out / 'supervision.json', WORK_SECONDS, CLEANUP_SECONDS)
@@ -385,12 +331,12 @@ def main():
             record['worker'] = json.loads((out / 'worker-receipt.json').read_text())
         validate_supervision(status, guard)
         require(record.get('worker', {}).get('complete') is True, 'complete qualified worker receipt required')
-        record['cleanup_proof_scope'] = 'Pinned supervisor cleanup_complete is set only after waitpid ECHILD; its schema has no separate ECHILD boolean.'
+        record['cleanup_proof_scope'] = 'Supervisor cleanup_complete is set only after waitpid ECHILD; its schema has no separate ECHILD boolean.'
         require(sha((source / 'tools/shared/crc_process_supervisor.py').read_bytes()) == digest, 'supervisor source drift')
         require(sha(runner_path.read_bytes()) == runner_sha, 'public runner source drift')
         record['stage'] = 'complete'; record['complete'] = True
         opt_labels = '/'.join('O' + str(lane['optimization']) for lane in record['worker']['lanes'])
-        print(f'PASS source-bound Map maintenance successor: {opt_labels}; complete historical 24649/400/30; current content/invariants and 25 demand observations; exact step21 shape difference retained', flush=True)
+        print(f'PASS Map policy controls: {opt_labels}; reference 24649/400/30; current content/invariants and 25 demand observations; exact step21 shape difference retained', flush=True)
     except BaseException as error:
         record.update(complete=False, error=repr(error), traceback=traceback.format_exc())
         raise

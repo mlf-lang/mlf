@@ -1,6 +1,6 @@
 module Main where
 import Prelude
-import qualified CandidateBase as C
+import qualified MLF.Host.Base as C
 import qualified LegacyBase as F
 import Control.Exception(SomeException,try,evaluate,displayException)
 import Control.Monad(forM_,unless)

@@ -9,7 +9,6 @@ import argparse
 import hashlib
 from pathlib import Path
 import shutil
-import subprocess
 import sys
 import types
 
@@ -67,9 +66,8 @@ def main():
                 oracle = args.baseline_source.resolve() / MODULE
                 frozen = oracle.read_bytes()
             else:
-                frozen = subprocess.check_output(['git', 'show', BASELINE_REVISION + ':' + MODULE], cwd=ROOT)
-                oracle = dest / 'frozen-Optimize.hs'
-                oracle.write_bytes(frozen)
+                oracle = HERE / 'oracles/Optimize.hs'
+                frozen = oracle.read_bytes()
             H.require(hashlib.sha256(frozen).hexdigest() == BASELINE_SHA256, 'exact pinned independent baseline oracle required')
             originals = {'LegacyOptimize': oracle, 'CandidateOptimize': ROOT / MODULE}
             transformed = []

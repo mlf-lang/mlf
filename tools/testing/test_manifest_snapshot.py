@@ -6,7 +6,7 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
-from check_manifest_snapshot import snapshot, strict_object
+from check_manifest_snapshot import snapshot, source_imports, strict_object
 
 
 class SnapshotControls(unittest.TestCase):
@@ -147,6 +147,18 @@ class SnapshotControls(unittest.TestCase):
     def test_primed_identifier_is_not_import_keyword(self):
         (self.root / 'Main.emlf').write_text("module Main where\nimport' = 1\nmain = import'\n")
         self.save()
+
+    def test_host_foreign_import_is_not_a_module_dependency(self):
+        source = ('module Host where\nimport MLF.Host.Base\n'
+                  'foreign import ccall safe "mlf_ghc_host" host :: IO ()\n'
+                  'foreign {- FFI declaration -}\nimport ccall unsafe "getProgArgv" args :: IO ()\n'
+                  'import qualified Data.Text as Text\n')
+        self.assertEqual(source_imports(source), ['MLF.Host.Base', 'Data.Text'])
+
+    def test_foreign_identifier_does_not_hide_malformed_module_import(self):
+        for prefix in ('notforeign ', "foreign' ", 'foreign unrelated\n', 'foreign; '):
+            with self.subTest(prefix=prefix), self.assertRaisesRegex(ValueError, 'malformed source import'):
+                source_imports(prefix + 'import qualified;')
 
     def test_unterminated_lexical_regions_fail_closed(self):
         for fragment in ['{- unfinished', 'text = "unfinished']:

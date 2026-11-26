@@ -1,5 +1,11 @@
 # Test-framework implementation checkpoint
 
+> Historical record (2026-10-23). The text below retains the original claims
+> and commands. Removed inventories, migration audits and evidence linked here
+> remain available in Git at `496dcae024cae1a93096d9bdb9d6b93e57359dc0`.
+> See [the retirement guide](testing-history-retirement.md) and
+> [current tests](../tests/README.md) for maintained entry points.
+
 This is a staged, **unqualified implementation checkpoint**, not completion of
 P0–P7. The frozen integration baseline is
 `8a3e69b165765931c3ff762379a78db9659b2cd8`; the implementation branch started at

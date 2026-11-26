@@ -7,13 +7,21 @@ status/type/error expectations and the ordinary byte-comparison body stay unchan
 The Session branch uses the explicit open-format content and same-format gates.
 """
 from pathlib import Path
-import argparse,ast,hashlib,json,os,shutil,sys,types
+import argparse,importlib.util,shutil,sys
+import file_cases as Files
 import run_open_file_controls as OpenFiles
 ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT/'tools/testing'))
 from receipt_selection import inventory_json, select
 
 PREFIX = 'patricia-file-controls/'
+
+
+def authenticate(H, producer, source):
+ """Authenticate a normal correctness producer at either optimization level."""
+ producer, source = Path(producer).resolve(), Path(source).resolve()
+ direct = H.module(source/'tools/shared/test_direct.py', 'file_controls_authentication')
+ return direct.authenticate_build(producer/'receipt.json', producer/'bin', root=source)
 
 def main():
  p=argparse.ArgumentParser(description=__doc__)
@@ -22,27 +30,20 @@ def main():
  for arg in ['reference-source','reference-producer','producer','builtin-prefix','output']:p.add_argument('--'+arg,type=Path,required=not listing)
  p.add_argument('--source',type=Path,default=ROOT)
  a=p.parse_args()
- c4=ROOT/'tools/performance/c4-local-transaction'
- fixture_cases=c4/'fixtures/file-cases.json'
- authored=json.loads(fixture_cases.read_text())
- labels=[row['name'] for row in authored['cases']]
- if len(labels) != len(set(labels)) or len(labels) != authored['case_count'] or len(labels) != 9:
-  p.error('expected nine distinct authored file cases')
+ fixture_cases=Files.FIXTURE
+ labels=[row['name'] for row in Files.load_cases()]
  exact=select(PREFIX,labels)
  planned=[exact] if exact is not None else labels
  if a.framework_list:
   print(inventory_json(PREFIX,planned))
   return
  out=a.output.resolve();out.mkdir(parents=True,exist_ok=False)
- hp=ROOT/'tools/performance/a1-private-index/helper.py';H=types.ModuleType('unchanged_guard');H.__file__=str(hp);exec(compile(hp.read_bytes(),str(hp),'exec'),H.__dict__)
- driver=c4/'run_controls.py';tree=ast.parse(driver.read_text());function=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='run_files')
- if exact is not None:
-  loops=[node for node in function.body if isinstance(node,ast.For) and isinstance(node.target,ast.Name) and node.target.id=='case']
-  H.require(len(loops)==1 and ast.unparse(loops[0].iter)=="authored['cases']", 'one frozen file-case loop')
-  loops[0].iter=ast.parse("(case for case in authored['cases'] if case['name'] == selected_file)",mode='eval').body
- context={'HERE':c4,'C':types.SimpleNamespace(sha_bytes=lambda b:hashlib.sha256(b).hexdigest()),'pack':lambda xs:''.join(str(len(x))+':'+x for x in xs),'os':os,'json':json,'Path':Path,'selected_file':exact}
- exec(compile(ast.fix_missing_locations(ast.Module(body=[function],type_ignores=[])),str(driver),'exec'),context)
- fixture=c4/'controls/FileControls.hs';source=fixture.read_text();inputs={str(x.resolve()):H.sha(x) for x in [Path(__file__),hp,driver,fixture,fixture_cases,ROOT/'tools/testing/receipt_selection.py']}
+ hp=ROOT/'tools/performance/a1-private-index/helper.py'
+ spec=importlib.util.spec_from_file_location('file_control_guard',hp)
+ H=importlib.util.module_from_spec(spec);spec.loader.exec_module(H)
+ fixture=Path(__file__).with_name('controls')/'files/FileControls.hs'
+ source=fixture.read_text()
+ inputs={str(x.resolve()):H.sha(x) for x in [Path(__file__),hp,Path(Files.__file__),fixture,fixture_cases,ROOT/'tools/testing/receipt_selection.py']}
  for suffix in ['.mlfci','.mlfco']:q=Path(str(a.builtin_prefix.resolve())+suffix);inputs[str(q)]=H.sha(q)
  record={'complete':False,'scope':'nine unchanged C4 file cases; Int64 baseline Crate versus candidate Crate and CrateSession; full diagnostics, handwritten types, fresh groups; unchanged ordinary raw-byte gate and explicit open boundary','whole_P3_bytes_equal_claim':False,'inputs':inputs,'routes':{},'checks':[],'planned_checks':planned}
  limits={'address_space_per_process_bytes':6*1024**3,'disk_free_floor_bytes':5*1024**3,'host_available_floor_bytes':3*1024**3,'max_work_bytes':2*1024**3,'process_tree_rss_bytes':5*1024**3,'wall_seconds':600}
@@ -60,7 +61,7 @@ def main():
   with H.SerialLock(ROOT/'.mlf-build'):
    binaries={};auths={};roots={};producers={}
    for side,producer,root,session in [('reference',a.reference_producer,a.reference_source,False),('crate',a.producer,a.source,False),('session',a.producer,a.source,True)]:
-    producer=producer.resolve();root=root.resolve();auth=H.authenticate(producer,root);auths[side]=auth;roots[side]=root;producers[side]=producer
+    producer=producer.resolve();root=root.resolve();auth=authenticate(H,producer,root);auths[side]=auth;roots[side]=root;producers[side]=producer
     folder=out/side;folder.mkdir();OpenFiles.verify_producer_objects(H,producer,auth)
     OpenFiles.verify_c_support(H,out,root,producer,auth,folder,inputs,record,save,limits)
     objects=folder/'objects';shutil.copytree(producer/'objects',objects);original=H.file_pins(objects)
@@ -80,12 +81,12 @@ def main():
     folder=out/('compare-'+route);folder.mkdir();rows={'file_cases':[]};record['routes'][route]=rows
     def run(name,argv,cwd):
      log=folder/name;H.Runner(out,limits).run(argv,cwd,log);return (log/'stdout').read_bytes(),(log/'stderr').read_bytes()
-    context['run_files'](H,run,save,rows,inputs,folder,str(a.builtin_prefix.resolve()),binaries['reference'],binaries[route])
+    Files.run_files(H,run,save,rows,inputs,folder,str(a.builtin_prefix.resolve()),binaries['reference'],binaries[route],selected=exact)
     H.require([row['name'] for row in rows['file_cases']]==planned,'all planned ordinary cases completed')
    OpenFiles.run_session_files(H,out,record,inputs,binaries,producers['session'],roots['session'],auths['session'],str(a.builtin_prefix.resolve()),save,limits,selected=exact)
    H.check_pins(inputs)
    for side in auths:
-    H.require(H.authenticate(producers[side],roots[side])==auths[side],'producer unchanged '+side)
+    H.require(authenticate(H,producers[side],roots[side])==auths[side],'producer unchanged '+side)
     OpenFiles.verify_producer_objects(H,producers[side],auths[side])
    record['complete']=True;save()
  except BaseException as error:record['error']=repr(error);save();raise

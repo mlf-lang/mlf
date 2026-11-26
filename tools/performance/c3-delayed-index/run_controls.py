@@ -5,7 +5,6 @@ import argparse
 import hashlib
 import re
 import shutil
-import subprocess
 import sys
 import types
 
@@ -13,7 +12,7 @@ ROOT=Path(__file__).resolve().parents[3]
 HERE=Path(__file__).resolve().parent
 OWNER='libraries/mlf-crates/Bootstrap/CrateSession.hs'
 BASELINE='e123603d00f6f64e20e4d771836e49ddd808320f'
-BASELINE_SHA='18abedc7f96452392ed3401f1ae607233ec13e2a5ba24bd1c0cba344820c382f'
+ORACLE_SHA='93f8d5f686c05a8e2b56ef279c53a0ef0351af6f1ac7207746ee04623358fc66'
 EXPECTED=('PASS 63 physical graph/index/scope traces and legacy failure epochs\n'
           'PASS retained expansion descriptors and exact full component selection\n'
           'PASS repeated instances, reflexive equalities and literal fresh survivors\n'
@@ -52,13 +51,17 @@ def main():
     record=dict(complete=False,performance_samples=0,optimization=a.optimization,
                 baseline_ref=BASELINE,commands=[])
     save=lambda:H.save(out/'receipt.json',record)
+    direct_path=a.producer_source.resolve()/'tools/shared/test_direct.py'
+    direct=H.module(direct_path,'c3_control_authentication')
+    def authenticate():
+        return direct.authenticate_build(producer/'receipt.json',producer/'bin',root=a.producer_source.resolve())
     save()
     limits=dict(address_space_per_process_bytes=6*1024**3,disk_free_floor_bytes=5*1024**3,
                 host_available_floor_bytes=3*1024**3,max_work_bytes=3*1024**3,
                 process_tree_rss_bytes=5*1024**3,wall_seconds=600)
     try:
         with H.SerialLock(ROOT/'.mlf-build'):
-            auth=H.authenticate(producer,a.producer_source)
+            auth=authenticate()
             manifest=H.load(ROOT/'shared-sources.json')
             for row in manifest['modules']:
                 if row['path']!=OWNER:
@@ -66,17 +69,18 @@ def main():
                               'unchanged borrowed dependency '+row['module'])
             A=H.module(HERE.parent/'patricia/adapt_oracles.py','retained_abi_adapter')
             src=out/'source';control_inputs=A.prepare(ROOT,src)
-            frozen=subprocess.check_output(['git','show',BASELINE+':'+OWNER],cwd=ROOT)
-            H.require(hashlib.sha256(frozen).hexdigest()==BASELINE_SHA,'frozen full private-owner oracle')
-            for name,raw in [('LegacySession',frozen),('CandidateSession',(ROOT/OWNER).read_bytes())]:
-                changed=A.private_module_view(raw,name)
-                (src/(name+'.hs')).write_bytes(changed)
+            frozen_path=HERE/'oracles/LegacySession.hs'
+            frozen=frozen_path.read_bytes()
+            H.require(hashlib.sha256(frozen).hexdigest()==ORACLE_SHA,'frozen full private-owner oracle')
+            (src/'LegacySession.hs').write_bytes(frozen)
+            changed=A.private_module_view((ROOT/OWNER).read_bytes(),'CandidateSession')
+            (src/'CandidateSession.hs').write_bytes(changed)
             shutil.copy2(HERE/'Main.hs',src/'Main.hs')
             for source,name in EXTRA_SOURCES:
                 changed=A.private_module_view(source.read_bytes(),name,owner='Main')
                 (src/(name+'.hs')).write_bytes(changed)
             pins=H.file_pins(src)
-            pins.update({str(f):H.sha(f) for f in [Path(__file__),hp,HERE/'Main.hs',ROOT/OWNER,
+            pins.update({str(f):H.sha(f) for f in [Path(__file__),hp,direct_path,HERE/'Main.hs',frozen_path,ROOT/OWNER,
                 HERE.parent/'patricia/adapt_oracles.py',HERE.parent/'patricia/runtime_sources.py',
                 HERE.parent/'patricia/frozen_oracles.py',
                 producer/'receipt.json',producer/'host.o',producer/'supervisor.o']})
@@ -123,7 +127,7 @@ def main():
             H.require(not(out/'run/stderr').read_bytes(),'empty control stderr')
             record['checks_log_sha256'] = H.sha(out / 'run/stdout')
             H.check_pins(pins)
-            H.require(H.authenticate(producer,a.producer_source)==auth,'ordinary producer unchanged')
+            H.require(authenticate()==auth,'ordinary producer unchanged')
             record.update(complete=True,executable_sha256=H.sha(binary));save()
             print(expected.decode(),end='',flush=True)
     except BaseException as error:

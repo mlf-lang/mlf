@@ -1,239 +1,193 @@
 #!/usr/bin/env python3
-"""Prepare an exact limited-source Map qualification, never a full producer.
-Historical Map comes from physical fc300 Git bytes, not restore_path. Current
-selected bytes are bound to an immutable Foundation revision, not local HEAD.
+"""Snapshot the current Map source closure and directly compilable controls.
+
+Input digests identify this run. They are not an allowlist of approved source
+revisions: a source edit is accepted by a fresh preparation and rejected if it
+happens after that preparation. Reference algorithms live in ordinary fixtures;
+preparing or running the controls never needs old Git objects.
 """
 import argparse
 import hashlib
 import json
-import re
 from pathlib import Path
+import re
 import stat
-import subprocess
+import sys
 
-CURRENT_COMMIT = '9345d58b2b1675fbe0fcf899b5dc3d2f229e1acf'
-CURRENT_TREE = 'aa17813b861d6a574d0d4e72686c3656b4769a48'
-HISTORICAL_COMMIT = 'fc300bc9fdc389b585cbef0630fc8915d53e89c5'
-HISTORICAL_TREE = '386f0b41ab5f9b39fca273f3040f51d73df924a1'
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[2]
+sys.path.insert(0, str(ROOT / 'tools/testing'))
+from check_manifest_snapshot import source_imports
+
 MAP = 'libraries/mlf-foundation/Bootstrap/Map.hs'
-BALANCE = 'tools/performance/map-balance/BalanceControls.hs'
-BASELINE = 'tools/performance/map-balance/BaselineMap.hs'
-FROZEN = 'tools/performance/a1-private-index/controls/FrozenMap.hs'
-CURRENT_MAP_SHA = '2133abfa3038097d353e66745a5af0789190c82739218ef28f9d054e74de2f06'
-HISTORICAL_MAP_SHA = '1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0'
-HISTORICAL_MAP_BLOB = '7a96f912d4a5bbd7e8291c0df4042bd56a9c8c65'
-ORACLE_SHA = {
-    BALANCE: 'badfdff0f04a5612d8ffc4ba496feb6344ab9c5da5f7a750cb82e8eca586fb80',
-    FROZEN: '0cdeb2b572f38a59e82e5a91d3c47b118b5dc0928292a66849115e1679d18e31',
-    BASELINE: 'fca037e0cd1719142ff7bc825aa811359d9f84b9030d774713ffa5046d1bf7e7',
-}
-# Git blobs from CURRENT_COMMIT, the reviewed Foundation source basis.
-CURRENT_BLOBS = {
-    "runtime/mlf_process_supervisor_posix.h": "4ab02a329811f04172ffed9413cb2f8165bce060",
-    "runtime/mlf_windows_path.h": "d93a6d2c98da5d0e976b2eb746cb0e2fc1c9412d",
-    "runtime/mlf_system_windows.h": "da1d174365ef245ad701949058f1c060552eb1b1",
-    "libraries/mlf-foundation/Bootstrap/Map.hs": "68d84e3727155ae46158c0145808a6785248cea1",
-    "libraries/mlf-foundation/Bootstrap/Types.hs": "bd768135ea44674637e5db4573d97e781af4dcf6",
-    "libraries/mlf-foundation/Bootstrap/Std.hs": "beb4d699b87ebbc17292c2252309855f1df79952",
-    "libraries/mlf-foundation/Bootstrap/IndexVec.hs": "33a339e71ad7dede8c866a1903bf85bad1034d13",
-    "host/ghc/MLF/Primitive.hs": "b767e0953822f9e2561bcfff06f965c229e3d59c",
-    "host/ghc/MLF/Host/Base.hs": "a473c657207182e30587147eb7c26986a629fc6a",
-    "host/ghc/MLF/Host/IO.hs": "0fbed615ec34c9f175951baadb220e469d3b33d5",
-    "host/ghc/MLF/Host/Async.hs": "601bb2e08f7be500646d9cae520b068c83640686",
-    "host/ghc/cbits/host.c": "0c5880eadb1c94d8fe2431e645f0317e52a401f7",
-    "runtime/mlf_process_supervisor.c": "7efde0ab6d2d5542f30c44422bf90f95885918e3",
-    "runtime/mlf_build_runner_hash.h": "d40e996576990551ca32e6f1cea75a4bde49828a",
-    "runtime/mlf_byte_file.h": "b07a62af37d6dff4211070897246e29ec9e8f0a2",
-    "runtime/mlf_process_binding.h": "0c685af2677aa71a47471eb3978bb94742b523c6",
-    "runtime/mlf_process_supervisor.h": "dd5b4300c178423497727e0de9f6bc56beeadf59",
-    "runtime/mlf_system.h": "f00637e1f7154844cbca9aa9ce5021f61e6107df",
-    "runtime/mlf_windows.h": "3b35be83f13ee4d31a879a801e94250538e2a61a",
-    "tools/performance/map-balance/BalanceControls.hs": "f5f96a00e424f89f6b082c943d139d17d4ce367d",
-    "tools/performance/map-balance/BaselineMap.hs": "9767ba8ffc25380fd86b1bb5862a189d7d2f2c40",
-    "tools/performance/a1-private-index/controls/FrozenMap.hs": "f2ffc43de3672417b08ea749dd58786978e751fc"
-}
+C_SOURCES = ('host/ghc/cbits/host.c', 'runtime/mlf_process_supervisor.c')
+FIXTURES = ('RetainedBalanceControls.hs', 'HistoricalBalanceControls.hs',
+            'HistoricalMap.hs', 'FrozenMap.hs', 'BaselineMap.hs')
+CONTROLS = ('CurrentMapPolicyControls.hs', 'Main.hs')
 MAX_BYTES = 1024 * 1024
-NUMERIC_LINES = tuple(line.encode() for line in [
-    "data Shape = Empty | Node Integer Integer Integer Shape Shape deriving (Eq,Show)",
-    "shape :: T.Map Integer Integer -> Shape",
-    "cmp :: Integer -> Integer -> Integer",
-    "leaf :: Integer -> T.Map Integer Integer",
-    "mk :: Integer -> Int -> Integer -> T.Map Integer Integer",
-    "      let k=toInteger ((i*37) `mod` 97-48); v=toInteger i",
-    "type Tree=T.Map Integer Integer",
-    "type Balance=Integer -> Integer -> Tree -> Tree -> Tree",
-    "node :: Integer -> Integer -> Tree -> Tree -> Tree"
-])
-EXPECTED_STDOUT = b'Balance controls: 24649 raw-shape pairs; 400 mutation steps; 30 independent demand/order cases passed\n'
+
 
 def require(value, message):
     if not value:
         raise ValueError(message)
 
+
 def sha(raw):
     return hashlib.sha256(raw).hexdigest()
 
-def blob(raw):
-    return hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest()
 
 def read_regular(root, relative):
+    require(isinstance(relative, str) and relative and not Path(relative).is_absolute(),
+            'relative source path required')
     path = Path(root)
     for part in Path(relative).parts:
         require(part not in ('..', '.', '/') and part, 'relative source path')
         path = path / part
         require(not path.is_symlink(), 'symlink source forbidden: ' + relative)
     info = path.stat()
-    require(stat.S_ISREG(info.st_mode) and info.st_size <= MAX_BYTES, 'bounded regular source: ' + relative)
+    require(stat.S_ISREG(info.st_mode) and info.st_size <= MAX_BYTES,
+            'bounded regular source: ' + relative)
     raw = path.read_bytes()
     require(len(raw) <= MAX_BYTES, 'source changed size: ' + relative)
     return raw
 
-def validate_context(current_commit, current_tree, historical_commit, historical_tree):
-    require((current_commit, current_tree) == (CURRENT_COMMIT, CURRENT_TREE), 'exact remote current source context')
-    require((historical_commit, historical_tree) == (HISTORICAL_COMMIT, HISTORICAL_TREE), 'exact physical historical source context')
 
-def authenticate_inputs(current, historical_map, context):
-    validate_context(*context)
-    require(type(current) is dict and set(current) == set(CURRENT_BLOBS), 'exact limited input inventory')
-    for path, raw in current.items():
-        require(type(raw) is bytes and len(raw) <= MAX_BYTES and blob(raw) == CURRENT_BLOBS[path], 'remote current blob: ' + path)
-    for path, expected in ORACLE_SHA.items():
-        require(sha(current[path]) == expected, 'entire retained oracle: ' + path)
-    require(sha(current[MAP]) == CURRENT_MAP_SHA, 'current Map endpoint')
-    require(type(historical_map) is bytes and len(historical_map) <= MAX_BYTES and
-            sha(historical_map) == HISTORICAL_MAP_SHA and blob(historical_map) == HISTORICAL_MAP_BLOB,
-            'physical fc300 Map endpoint')
-    project_include_graph(current)
+def project_includes(raw):
+    result = []
+    for name in re.findall(rb'^\s*#\s*include\s*"([^"]+)"', raw, re.M):
+        require(b'/' not in name and b'\\' not in name, 'bare project include required')
+        result.append('runtime/' + name.decode('ascii'))
+    return result
 
-def project_include_graph(current):
-    pending = ['host/ghc/cbits/host.c', 'runtime/mlf_process_supervisor.c']
+
+def project_include_graph(inputs):
+    pending = list(C_SOURCES)
     graph = {}
     while pending:
         path = pending.pop()
         if path in graph:
             continue
-        edges = []
-        for name in re.findall(rb'^\s*#\s*include\s*"([^"]+)"', current[path], re.M):
-            require(b'/' not in name and b'\\' not in name, 'fixed bare project include')
-            target = 'runtime/' + name.decode('ascii')
-            require(target in current, 'unbound transitive project include: ' + target)
-            edges.append(target)
-            pending.append(target)
-        graph[path] = edges
-    require(set(graph) == {p for p in current if p.endswith(('.c', '.h'))},
+        require(path in inputs, 'unbound transitive project include: ' + path)
+        graph[path] = project_includes(inputs[path])
+        pending.extend(graph[path])
+    require(set(graph) == {p for p in inputs if p.endswith(('.c', '.h'))},
             'exact conservative project C/header closure')
     return graph
 
-def changes(module, historical=False):
-    require(module in ('RetainedBalanceControls', 'HistoricalBalanceControls'), 'fixed control module')
-    require(historical == (module == 'HistoricalBalanceControls'), 'fixed module and candidate pairing')
-    result = [(b'module Main where\n', ('module ' + module + ' where\n').encode()),
-              (b'import Prelude\n', b'import Data.Int (Int64)\nimport Prelude\n')]
-    for old in NUMERIC_LINES:
-        new = old.replace(b'toInteger', b'fromIntegral').replace(b'Integer', b'Int64')
-        result.append((old + b'\n', new + b'\n'))
-    if historical:
-        result.append((b'import qualified Bootstrap.Map as C\n', b'import qualified HistoricalMap as C\n'))
-    return result
 
-def apply_unique(raw, edits):
-    changed = raw
-    for old, new in edits:
-        require(old != new and changed.count(old) == 1 and new not in changed, 'unique declared adaptation')
-        changed = changed.replace(old, new)
-    require(invert_unique(changed, edits) == raw, 'complete adaptation inverse')
-    return changed
+def read_inputs(source):
+    """Follow local imports and quoted C includes, including CPP alternatives."""
+    source = Path(source)
+    pending = [MAP, *C_SOURCES]
+    inputs = {}
+    while pending:
+        path = pending.pop()
+        if path in inputs:
+            continue
+        raw = read_regular(source, path)
+        inputs[path] = raw
+        if path.endswith(('.c', '.h')):
+            pending.extend(project_includes(raw))
+        else:
+            for module in source_imports(raw.decode('utf-8')):
+                if not module.startswith(('Bootstrap.', 'MLF.')):
+                    continue  # GHC packages are authenticated by the producer.
+                rel = module.replace('.', '/') + '.hs'
+                matches = [source / 'host/ghc' / rel] if module.startswith('MLF.') else list(
+                    source.glob('libraries/*/' + rel))
+                matches = [match for match in matches if match.is_file()]
+                require(len(matches) == 1, 'missing/ambiguous local module: ' + module)
+                pending.append(matches[0].relative_to(source).as_posix())
+    project_include_graph(inputs)
+    return inputs
 
-def invert_unique(changed, edits):
-    raw = changed
-    for old, new in reversed(edits):
-        # An inserted import intentionally contains the original import. Only
-        # replacement uniqueness is required; full restored bytes are pinned.
-        require(raw.count(new) == 1, 'unique inverse adaptation')
-        raw = raw.replace(new, old)
-    return raw
 
-def prepare_bytes(current, historical_map, context):
-    authenticate_inputs(current, historical_map, context)
-    retained = current[BALANCE]
-    return {
-        'RetainedBalanceControls.hs': apply_unique(retained, changes('RetainedBalanceControls')),
-        'HistoricalBalanceControls.hs': apply_unique(retained, changes('HistoricalBalanceControls', True)),
-        'HistoricalMap.hs': apply_unique(historical_map, [(b'module Bootstrap.Map where {', b'module HistoricalMap where {')]),
-        'FrozenMap.hs': current[FROZEN],
-        'BaselineMap.hs': current[BASELINE],
+def read_fixtures():
+    return {**{name: read_regular(HERE / 'fixtures', name) for name in FIXTURES},
+            **{name: read_regular(HERE, name) for name in CONTROLS}}
+
+
+def input_identity(inputs):
+    require(type(inputs) is dict and inputs, 'nonempty source inventory required')
+    for name, raw in inputs.items():
+        require(type(name) is str and type(raw) is bytes and len(raw) <= MAX_BYTES,
+                'bounded source bytes required')
+        require(name and not Path(name).is_absolute() and '..' not in Path(name).parts,
+                'relative source path required')
+    return {name: {'sha256': sha(raw), 'bytes': len(raw)} for name, raw in sorted(inputs.items())}
+
+
+def verify_identity(inputs, expected):
+    require(input_identity(inputs) == expected, 'input inventory or bytes changed during run')
+
+
+def source_module_paths(inputs):
+    """Home-module object paths and owning include roots for this snapshot."""
+    modules = {}
+    for path in inputs:
+        if not path.endswith('.hs'):
+            continue
+        parts = Path(path).parts
+        if parts[:2] == ('host', 'ghc'):
+            include = 'host/ghc'
+        else:
+            require(len(parts) > 2 and parts[0] == 'libraries', 'local Haskell source owner')
+            include = '/'.join(parts[:2])
+        name = Path(path).relative_to(include).as_posix()[:-3]
+        require(name not in modules, 'duplicate home module: ' + name)
+        modules[name] = include
+    return modules
+
+
+def prepare(output, inputs, fixtures):
+    """Copy inputs once, retaining their actual run identity for later checks."""
+    require(set(fixtures) == set(FIXTURES + CONTROLS), 'complete Map control inventory')
+    require(MAP in inputs, 'current Map source required')
+    output = Path(output)
+    manifest = {
+        'prepared': True, 'qualification_complete': False,
+        'scope': 'current Map source closure and independent algorithm/control fixtures',
+        'current_inputs': input_identity(inputs),
+        'fixture_inputs': input_identity(fixtures),
+        'project_include_graph': project_include_graph(inputs),
+        'source_modules': source_module_paths(inputs),
+        'shared_base': 'Reference Map algorithms use current Types/Std/IndexVec and GHC host modules.',
     }
+    output.mkdir(parents=True, exist_ok=False)
+    for relative, raw in {**{'source/' + name: raw for name, raw in inputs.items()}, **fixtures}.items():
+        destination = output / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(raw)
+    verify_snapshot(output, manifest)
+    (output / 'preparation.json').write_text(json.dumps(manifest, indent=2) + '\n')
+    return manifest
 
-def verify_generated(generated, current, historical_map, context):
-    require(type(generated) is dict and generated == prepare_bytes(current, historical_map, context),
-            'exact generated inventory and bytes; no extra adaptation')
-    for name, historical in [('RetainedBalanceControls', False), ('HistoricalBalanceControls', True)]:
-        restored = invert_unique(generated[name + '.hs'], changes(name, historical))
-        require(restored == current[BALANCE] and sha(restored) == ORACLE_SHA[BALANCE], 'complete original control restored')
-    restored = invert_unique(generated['HistoricalMap.hs'], [(b'module Bootstrap.Map where {', b'module HistoricalMap where {')])
-    require(restored == historical_map and sha(restored) == HISTORICAL_MAP_SHA, 'physical historical Map restored')
 
-def historical_from_git(repository, output=subprocess.check_output):
-    prefix = ['git', '--no-replace-objects', '-C', str(repository)]
-    actual_tree = output([*prefix, 'rev-parse', HISTORICAL_COMMIT + '^{tree}'], timeout=30).decode().strip()
-    require(actual_tree == HISTORICAL_TREE, 'fixed historical Git tree')
-    raw = output([*prefix, 'show', HISTORICAL_COMMIT + ':' + MAP], timeout=30)
-    require(len(raw) <= MAX_BYTES and sha(raw) == HISTORICAL_MAP_SHA and blob(raw) == HISTORICAL_MAP_BLOB,
-            'actual historical Git Map blob')
-    return raw
+def verify_snapshot(output, manifest):
+    output = Path(output)
+    source = output / 'source'
+    actual_sources = {path.relative_to(source).as_posix() for path in source.rglob('*') if path.is_file()}
+    require(actual_sources == set(manifest['current_inputs']), 'prepared source inventory changed')
+    verify_identity({name: read_regular(source, name) for name in actual_sources}, manifest['current_inputs'])
+    actual_fixtures = {path.name for path in output.iterdir() if path.name != 'source' and path.name != 'preparation.json'}
+    require(actual_fixtures == set(manifest['fixture_inputs']), 'prepared control inventory changed')
+    verify_identity({name: read_regular(output, name) for name in actual_fixtures}, manifest['fixture_inputs'])
+
 
 def main():
-    p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--source', type=Path, required=True)
-    p.add_argument('--output', type=Path, required=True)
-    p.add_argument('--current-commit', required=True)
-    p.add_argument('--current-tree', required=True)
-    a = p.parse_args()
-    context = (a.current_commit, a.current_tree, HISTORICAL_COMMIT, HISTORICAL_TREE)
-    validate_context(*context)
-    current = {path: read_regular(a.source, path) for path in CURRENT_BLOBS}
-    historical = historical_from_git(a.source)
-    generated = prepare_bytes(current, historical, context)
-    verify_generated(generated, current, historical, context)
-    out = a.output.resolve()
-    source = a.source.resolve()
-    require(not out.exists() and out != source and not source.is_relative_to(out) and not out.is_relative_to(source),
-            'fresh output separate from source tree and ancestors')
-    out.mkdir(parents=True, exist_ok=False)
-    for name, raw in generated.items():
-        (out / name).write_bytes(raw)
-        require((out / name).read_bytes() == raw, 'generated write verification')
-    for path, raw in current.items():
-        target = out / 'source' / path
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(raw)
-        require(target.read_bytes() == raw, 'source snapshot write verification')
-    original = out / 'originals'
-    original.mkdir()
-    for path in ORACLE_SHA:
-        (original / Path(path).name).write_bytes(current[path])
-        require((original / Path(path).name).read_bytes() == current[path], 'original write verification')
-    (original / 'fc300-Map.hs').write_bytes(historical)
-    require((original / 'fc300-Map.hs').read_bytes() == historical, 'historical write verification')
-    ledger = {
-        'prepared': True, 'qualification_complete': False, 'performance_measured': False,
-        'scope': '8-module current source closure plus 2 FFI C sources and 9 project headers; not full producer authentication',
-        'current_commit': CURRENT_COMMIT, 'current_tree': CURRENT_TREE,
-        'historical_commit': HISTORICAL_COMMIT, 'historical_tree': HISTORICAL_TREE,
-        'current_inputs': {path: {'git_blob': CURRENT_BLOBS[path], 'sha256': sha(raw)} for path, raw in current.items()},
-        'historical_map': {'path': MAP, 'git_blob': HISTORICAL_MAP_BLOB, 'sha256': sha(historical)},
-        'generated_sha256': {name: sha(raw) for name, raw in generated.items()},
-        'original_oracle_sha256': ORACLE_SHA, 'historical_expected_stdout': EXPECTED_STDOUT.decode(),
-        'adaptation': 'exact unique numeric lines, Data.Int import, module headers and historical candidate import; entire-byte inverse verified',
-        'shared_base': 'Both Map policies share exact current Types/Std/IndexVec and four host modules; not a full historical runtime.',
-        'ffi': {'sources': ['host/ghc/cbits/host.c', 'runtime/mlf_process_supervisor.c'], 'include': '-Iruntime'},
-        'project_include_graph': project_include_graph(current),
-        'platform_scope': 'Planned Linux execution. Conservative project-header closure also retains conditional Windows inputs; conditions remain exact pinned source, not rewritten.',
-        'external_include_requirements': ['GHC MachDeps.h from Host/IO.hs CPP; authenticate with actual toolchain', 'system angle-bracket C headers and linked libraries require execution-time toolchain evidence'],
-        'toolchain_and_system_dependencies_authenticated': False,
-        'adapter_sha256': sha(Path(__file__).read_bytes()),
-    }
-    (out / 'preparation.json').write_text(json.dumps(ledger, indent=2) + '\n')
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--source', type=Path, default=ROOT)
+    parser.add_argument('--output', type=Path, required=True)
+    args = parser.parse_args()
+    source, output = args.source.resolve(), args.output.resolve()
+    require(not output.exists() and not source.is_relative_to(output) and
+            (not output.is_relative_to(source) or output.is_relative_to(source / '.mlf-build')),
+            'fresh output outside source inputs, or dedicated .mlf-build area')
+    inputs, fixtures = read_inputs(source), read_fixtures()
+    manifest = prepare(output, inputs, fixtures)
+    verify_identity(read_inputs(source), manifest['current_inputs'])
+    verify_identity(read_fixtures(), manifest['fixture_inputs'])
+
 
 if __name__ == '__main__':
     main()

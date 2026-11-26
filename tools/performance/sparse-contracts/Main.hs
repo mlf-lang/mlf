@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 import FrozenSourceKey (upgradeV6)
+import NamedQueryControls (checkRejections)
 import Prelude
 import Control.Exception (SomeException, evaluate, try, displayException)
 import Control.Monad (forM_, unless, foldM)
@@ -9,7 +10,7 @@ import qualified Bootstrap.Dependency as Dependency
 import qualified Bootstrap.CrateQuery as Q
 import qualified FrozenCrateQuery as FQ
 import qualified Bootstrap.SourceInference as S
-import qualified FrozenSourceInference as FS
+import qualified FullyFrozenSourceInference as FS
 import qualified Bootstrap.InferenceUnit as I
 import qualified Bootstrap.Types as T
 import qualified Bootstrap.Map as M
@@ -44,7 +45,10 @@ int = T.XCon "Int" []
 boolean = T.XCon "Bool" []
 
 main = do
-  n<-newIORef (0::Int)
+  rejected<-checkRejections FQ.encodeExpression (FQ.expressionKey FQ.inlineScopeKey)
+    (FQ.canonicalExpression M.empty 0 M.empty 0)
+    FQ.encodePattern (FQ.canonicalPattern M.empty M.empty 0)
+  n<-newIORef rejected
   let check label ok = unless ok (fail label) >> modifyIORef' n (+1)
       env=mapOf [("z",contract int ["Eq"] False),("a",contract boolean ["Show","Eq"] True),
                  ("α😀\NULx",contract int [] False),("unused",contract int [] True)]

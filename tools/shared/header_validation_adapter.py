@@ -1,138 +1,97 @@
-"""Strict, reversible two-lane HeaderValidationTests adaptation.
-Historical lane qualifies only four historical formatter bodies against current
-shared foundational modules, never a complete historical compiler.
+"""Copy independently authored header controls and record this run's inputs.
+
+The historical lane covers four reference naming functions using current shared
+foundational modules. The current lane exercises production naming against its
+independent oracle. Both are ordinary Haskell fixtures; no Git history or source
+transformation is needed to prepare them.
 """
 from pathlib import Path
 import hashlib
 import json
-import subprocess
+import stat
 
-FIXTURE_BLOB = 'aa411949945d62c17a21c1191abd93fa7c5fd8ea'
-HISTORICAL_BLOB = 'dd5b4630a80803c19afdb219dba2dc4bffc3ea1b'
-START = b'  definitionName ::'
-END = b'  startsWith'
-HEADER = b'''{-# LANGUAGE NoImplicitPrelude, OverloadedStrings #-}
-module HistoricalHeaderNames where {
-  import MLF.Primitive;
-  import Bootstrap.Types;
-  import Bootstrap.Std;
-  import qualified Bootstrap.Module as Modules;
-  import qualified Bootstrap.Separate as Separate;
-'''
-FOOTER = b'}\n'
-IMPORT = b'import qualified Bootstrap.CrateArtifact as A\n'
-HISTORY_EDITS = [
-    (IMPORT, IMPORT + b'import qualified HistoricalHeaderNames as H\nimport qualified HeaderNamingOracle as N\n'),
-    (b'A.definitionName identity e', b'H.definitionName identity e'),
-    (b'A.definitionNameEncoded (S.encoded identity) e',
-     b'H.definitionNameEncoded (S.encoded identity) e'),
-    (b' putStrLn "PASS header duplicate errors, entity identity, Unicode naming and forged primitive rejection"',
-     b' N.historicalControls\n putStrLn "PASS header duplicate errors, entity identity, Unicode naming and forged primitive rejection"'),
-]
-CURRENT_EDITS = [
-    (IMPORT, IMPORT + b'import qualified HeaderNamingOracle as N\n'),
-    (b'let expected=oldName identity e', b'let expected=N.currentName identity e'),
-    (b'A.definitionNameEncoded (S.encoded identity) e',
-     b'A.definitionNameEncoded (N.encoded identity) e'),
-    (b' putStrLn "PASS header duplicate errors, entity identity, Unicode naming and forged primitive rejection"',
-     b' N.controls\n putStrLn "PASS header duplicate errors, entity identity, Unicode naming and forged primitive rejection"'),
-]
+FIXTURE_DIRECTORY = Path('tools/shared/fixtures/native')
+FIXTURE_FILES = {
+    'HistoricalHeaderNames.hs': 'header-validation/HistoricalHeaderNames.hs',
+    'HeaderNamingOracle.hs': 'HeaderNamingOracle.hs',
+    'HeaderValidationHistorical.hs': 'header-validation/HeaderValidationHistorical.hs',
+    'HeaderValidationCurrent.hs': 'header-validation/HeaderValidationCurrent.hs',
+}
+MAX_BYTES = 1024 * 1024
+
 
 def require(ok, message):
     if not ok:
         raise ValueError(message)
 
-def blob_id(data):
-    return hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
 
-def authenticate(data, expected):
-    require(isinstance(data, bytes) and blob_id(data) == expected, 'source blob identity')
-    return data
+def sha(raw):
+    return hashlib.sha256(raw).hexdigest()
 
-def replace_once(data, old, new):
-    require(data.count(old) == 1, 'unique adaptation boundary')
-    return data.replace(old, new, 1)
 
-def transform(data, edits):
-    for old, new in edits:
-        data = replace_once(data, old, new)
-    return data
+def input_paths(root):
+    root = Path(root).resolve()
+    return {name: root / FIXTURE_DIRECTORY / relative for name, relative in FIXTURE_FILES.items()}
 
-def adapt_fixture(raw, lane):
-    authenticate(raw, FIXTURE_BLOB)
-    require(lane in ('historical', 'current'), 'unknown lane')
-    edits = HISTORY_EDITS if lane == 'historical' else CURRENT_EDITS
-    result = transform(raw, edits)
-    require(transform(result, [(b,a) for a,b in reversed(edits)]) == raw,
-            'fixture inverse')
-    return result
 
-def restore_fixture(generated, lane):
-    require(lane in ('historical', 'current'), 'unknown lane')
-    edits = HISTORY_EDITS if lane == 'historical' else CURRENT_EDITS
-    raw = transform(generated, [(b,a) for a,b in reversed(edits)])
-    authenticate(raw, FIXTURE_BLOB)
-    require(adapt_fixture(raw, lane) == generated, 'fixture regeneration')
+def read_regular(root, path):
+    root, path = Path(root).resolve(), Path(path)
+    relative = path.relative_to(root)
+    current = root
+    for part in relative.parts:
+        require(part not in ('.', '..'), 'relative fixture path required')
+        current = current / part
+        require(not current.is_symlink(), 'fixture symlink forbidden: ' + str(path))
+    info = current.stat()
+    require(stat.S_ISREG(info.st_mode) and info.st_size <= MAX_BYTES,
+            'bounded regular fixture required: ' + str(path))
+    raw = current.read_bytes()
+    require(len(raw) <= MAX_BYTES, 'fixture changed size: ' + str(path))
     return raw
 
-def historical_module(raw):
-    authenticate(raw, HISTORICAL_BLOB)
-    require(raw.count(START) == 1 and raw.count(END) == 1, 'historical boundaries')
-    begin, end = raw.index(START), raw.index(END)
-    require(begin < end, 'historical range')
-    body = raw[begin:end]
-    require(body.count(b' :: ') == 4, 'four complete formatter functions')
-    generated = HEADER + body + FOOTER
-    require(generated[len(HEADER):-len(FOOTER)] == body, 'historical inverse')
-    require(raw[:begin] + generated[len(HEADER):-len(FOOTER)] + raw[end:] == raw,
-            'historical full-source inverse')
-    return generated, body
 
-def fixed_history(root):
-    result = subprocess.run(['git', '--no-replace-objects', 'cat-file', 'blob', HISTORICAL_BLOB],
-                            cwd=root, capture_output=True, check=True, timeout=30)
-    require(not result.stderr, 'historical Git diagnostic')
-    return authenticate(result.stdout, HISTORICAL_BLOB)
+def verify_prepared(root, destination, evidence, expected_inputs=None):
+    """Reject source, snapshot or receipt drift, including stale caller inputs."""
+    root, destination = Path(root).resolve(), Path(destination).resolve()
+    paths = input_paths(root)
+    require(type(evidence) is dict and set(evidence.get('generated', {})) == set(paths),
+            'complete prepared header source inventory required')
+    actual_inputs = {str(path): sha(read_regular(root, path)) for path in paths.values()}
+    require(evidence.get('inputs') == actual_inputs, 'header fixture inputs changed during run')
+    if expected_inputs is not None:
+        require(all(expected_inputs.get(path) == digest for path, digest in actual_inputs.items()),
+                'header preparation differs from bound build inputs')
+    require({path.name for path in destination.glob('*.hs')} == set(paths),
+            'prepared header source inventory changed')
+    for name, path in paths.items():
+        raw = read_regular(destination, destination / name)
+        require(sha(raw) == evidence['generated'][name] == actual_inputs[str(path)],
+                'prepared header source changed: ' + name)
+    metadata = read_regular(destination, destination / 'preparation.json')
+    require(json.loads(metadata) == evidence, 'header preparation receipt changed')
 
-def prepare(root, output, raw_history=None):
-    root, output = Path(root), Path(output)
-    fixture = root / 'tools/shared/fixtures/native/HeaderValidationTests.hs'
-    oracle = root / 'tools/shared/fixtures/native/HeaderNamingOracle.hs'
-    raw = fixture.read_bytes()
-    old = fixed_history(root) if raw_history is None else raw_history
-    generated, body = historical_module(old)
+
+def prepare(root, output):
+    root, output = Path(root).resolve(), Path(output).resolve()
+    paths = input_paths(root)
+    files = {name: read_regular(root, path) for name, path in paths.items()}
     destination = output / 'header-validation'
     destination.mkdir(exist_ok=False)
-    files = {
-        'HistoricalHeaderNames.hs': generated,
-        'HeaderNamingOracle.hs': oracle.read_bytes(),
-        'HeaderValidationHistorical.hs': adapt_fixture(raw, 'historical'),
-        'HeaderValidationCurrent.hs': adapt_fixture(raw, 'current'),
-    }
-    files['historical-formatter.raw'] = body
-    files['HeaderValidationTests.original.hs'] = raw
-    observed = {}
-    for name, value in files.items():
+    for name, raw in files.items():
         path = destination / name
-        path.write_bytes(value)
-        observed[name] = path.read_bytes()
-        require(observed[name] == value, 'written artifact readback: ' + name)
-    for lane, name in [('historical','HeaderValidationHistorical.hs'), ('current','HeaderValidationCurrent.hs')]:
-        require(restore_fixture(observed[name], lane) == raw, 'written fixture inverse')
-    require(observed['HistoricalHeaderNames.hs'][len(HEADER):-len(FOOTER)] ==
-            observed['historical-formatter.raw'], 'written historical body inverse')
+        path.write_bytes(raw)
+        require(path.read_bytes() == raw, 'written fixture readback: ' + name)
     evidence = {
-        'format': 1, 'fixture_git_blob': FIXTURE_BLOB,
-        'historical_source_git_blob': HISTORICAL_BLOB,
-        'historical_scope': 'four original formatter bodies; current shared foundational modules',
+        'format': 2,
+        'inputs': {str(paths[name]): sha(raw) for name, raw in files.items()},
+        'generated': {name: sha(raw) for name, raw in files.items()},
+        'historical_scope': 'four reference formatter functions; current shared foundational modules',
         'historical_complete_compiler_qualified': False,
-        'historical_body_sha256': hashlib.sha256(body).hexdigest(),
-        'generated': {name: hashlib.sha256(value).hexdigest() for name,value in files.items()},
-        'fixture_inverse_verified': True, 'historical_inverse_verified': True,
         'qualification_executed': False,
     }
-    evidence_bytes = (json.dumps(evidence, indent=2)+'\n').encode()
-    evidence_path = destination / 'adaptation.json'
+    evidence_bytes = (json.dumps(evidence, indent=2) + '\n').encode()
+    evidence_path = destination / 'preparation.json'
     evidence_path.write_bytes(evidence_bytes)
-    require(evidence_path.read_bytes() == evidence_bytes, 'adaptation evidence readback')
+    require(evidence_path.read_bytes() == evidence_bytes, 'preparation receipt readback')
+    verify_prepared(root, destination, evidence)
     return destination, evidence

@@ -3,6 +3,10 @@
 For suite migration, CI deduplication and timing comparisons, follow the
 [test migration roadmap](../docs/test-migration-roadmap.md).
 
+Historical source and release certification has been retired from current
+qualification. See [retirement and archival reproduction](../docs/testing-history-retirement.md)
+for the preserved behavior checks and the Git snapshot of the old audits.
+
 The root `tuple-list` test target checks tuple/list sugar through the checkout
 frontend: fixed ASTs and types, malformed syntax, current and frozen target
 checking, serialized-target round trips, module scope and lazy interpretation.
@@ -67,21 +71,18 @@ required fallbacks, existing conditional/layout compatibility, diagnostics, and
 independently checked target round trips. The inventory additions are transcribed
 from the authored assertions in `Tests.Guards`, without changing existing oracles.
 
-The ordinary-recursion amendment migrates four signature-required rejection
-identities to their reviewed acceptance controls and adds three graph/qualified
-module/crate leaves: 739 - 4 + 7 = 742. All 735 unaffected identities retain
-their family and order. The static migration guard compares this explicit delta
-with the registry, catalog and golden inventory; discovery is not a claim that
-all 746 actions have executed.
+The current [Core descriptor contract](golden/core-registry-contract.json)
+records the public IDs, labels, families and discovery order, independently of
+the compiler's emitted inventory. Metadata checks compare it directly with the
+current catalog. The campaign runner and retained-evidence verifier compare
+real discovery and execution reports with that contract. Adding a case requires
+updating these current public expectations, without replaying old migrations.
+Discovery alone does not establish that an action executed.
 
-The canonical-source cutover adds a separately reviewed 742 → 746 amendment:
-eight explicit label migrations and four upstream do/surface controls. It retains
-the original recursion migration and all unlisted family/label ordering. Canonical
-Unit, String equality and MonadFail changes have explicit oracles; unsigned
-same-name functions and divergent loops are type-only positive controls, not
-runtime fixtures. The static guard preserves the old helper and partition source
-pins and projects only reviewed canonical tokens plus two intended annotation
-strings. See the focused recursion README for scope and validation limits.
+Canonical Unit, String equality and MonadFail behavior have explicit oracles;
+unsigned same-name functions and divergent loops are type-only positive
+controls, not runtime fixtures. See the focused recursion README for scope
+and validation limits.
 
 The shared test library contains helper, transport, collection-wrapper and
 independent-checker modules, plus `Tests.Coverage`, `Tests.TestDrivers`,

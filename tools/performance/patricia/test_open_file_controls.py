@@ -169,13 +169,6 @@ class PlumbingControls(unittest.TestCase):
             with self.subTest(raw=raw), self.assertRaises(ValueError):
                 A.unpack(raw)
 
-    def test_frozen_driver_fixture_and_independent_oracle_inputs(self):
-        c4 = Path(A.__file__).resolve().parent.parent / 'c4-local-transaction'
-        self.assertEqual(sha(c4 / 'run_controls.py'), A.C4_DRIVER_SHA)
-        for relative, expected in A.FROZEN_INPUTS.items():
-            self.assertEqual(sha(c4 / relative), expected)
-        for relative, expected in A.Comparison.ORACLE_PINS.items():
-            self.assertEqual(sha(A.Comparison.ORACLE_DIRECTORY / relative), expected)
 
 
 if __name__ == '__main__':

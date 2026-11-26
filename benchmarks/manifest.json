@@ -112,9 +112,7 @@
     "libraries/mlf-foundation/Bootstrap/IntSet.hs": "35c5338f7373cd2f58252e688936d822f408d17a30d298576666fbd2473c5b30",
     "libraries/mlf-foundation/Bootstrap/Map.hs": "2133abfa3038097d353e66745a5af0789190c82739218ef28f9d054e74de2f06",
     "libraries/mlf-foundation/Bootstrap/IntTree.hs": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49",
-    "libraries/mlf-foundation/Bootstrap/IntRank.hs": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725",
-    "benchmarks/history/artifact-binary-parent-manifest.json": "c5da11d57bbe021ec0e4f5b906929128df04542402c9bd01d77386658adff70f",
-    "benchmarks/history/artifact-binary-parent-Types.hs.txt": "9eb67b3a3e7f3591f051a8627bb466209a3be39436d58f48db8efc89f936fbac"
+    "libraries/mlf-foundation/Bootstrap/IntRank.hs": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
   },
   "workloads": [
     {

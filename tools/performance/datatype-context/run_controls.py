@@ -13,8 +13,6 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--producer',type=Path,required=True)
     p.add_argument('--source',type=Path,default=ROOT)
-    p.add_argument('--oracle-source',type=Path,
-        help='optionally verify the frozen encoder against its complete historical checkout')
     p.add_argument('--output',type=Path,required=True)
     a=p.parse_args()
     options = ('0', '2')
@@ -23,16 +21,17 @@ def main():
     out=a.output.resolve();out.mkdir(parents=True,exist_ok=False)
     hp=ROOT/'tools/performance/a1-private-index/helper.py'
     H=types.ModuleType('guard');H.__file__=str(hp);exec(compile(hp.read_bytes(),str(hp),'exec'),H.__dict__)
+    direct_path=a.source.resolve()/'tools/shared/test_direct.py'
+    direct=H.module(direct_path,'query_control_authentication')
+    def authenticate():
+        producer=a.producer.resolve()
+        return direct.authenticate_build(producer/'receipt.json',producer/'bin',root=a.source.resolve())
     H.require(H.sha(HERE/'oracle.json')==ORACLE_MANIFEST_SHA,'fixed c1b802bd oracle identity')
     oracle=H.load(HERE/'oracle.json');raw=(HERE/'FrozenCrateQuery.hs').read_bytes()
     H.require(hashlib.sha256(raw).hexdigest()==oracle['frozen_sha256'],'frozen full old encoder')
-    old=raw.replace(b'module FrozenCrateQuery where {',b'module Bootstrap.CrateQuery where {',1)
-    H.require(hashlib.sha256(old).hexdigest()==oracle['source_sha256'],'module-only oracle adaptation')
-    if a.oracle_source:
-        H.require(old==(a.oracle_source/oracle['source']).read_bytes(),'independent frozen baseline source')
     manifest=H.load(ROOT/'shared-sources.json')
     files=[ROOT/x['path'] for x in manifest['modules']]+list((ROOT/'host/ghc').rglob('*.hs'))
-    files+=list(HERE.glob('*.hs'))+[HERE/'oracle.json',Path(__file__),hp]
+    files+=list(HERE.glob('*.hs'))+[HERE/'oracle.json',Path(__file__),hp,direct_path]
     bridge=HERE.parent/'source-key-builtins/FrozenSourceKey.hs'
     adapter=bridge.with_name('frozen_query.py')
     adapted_dir=out/'historical-oracle'
@@ -40,7 +39,7 @@ def main():
     adapted=H.module(adapter,'frozen_query').prepare_frozen_query(HERE/'FrozenCrateQuery.hs',adapted_dir,
         expected_sha256=oracle['frozen_sha256'],
         types_source=ROOT/'libraries/mlf-foundation/Bootstrap/Types.hs')
-    pins={str(f):H.sha(f) for f in [*files,bridge,adapter,adapted]}
+    pins={str(f):H.sha(f) for f in [*files,bridge,bridge.with_name('NamedQueryControls.hs'),adapter,adapted]}
     limits=dict(address_space_per_process_bytes=6*1024**3,disk_free_floor_bytes=5*1024**3,
         host_available_floor_bytes=3*1024**3,process_tree_rss_bytes=5*1024**3,max_work_bytes=2*1024**3,wall_seconds=600)
     record=dict(complete=False,performance_samples=0,inputs=pins,oracle=oracle,checks=[])
@@ -48,7 +47,7 @@ def main():
     save()
     try:
         with H.SerialLock(ROOT/'.mlf-build'):
-            auth=H.authenticate(a.producer,a.source)
+            auth=authenticate()
             record['ordinary_object_producer']=auth;save()
             for rel in ['host/ghc/cbits/host.c','runtime/mlf_process_supervisor.c']:
                 H.require(H.sha(ROOT/rel)==H.sha(a.source/rel),'unchanged borrowed C object input')
@@ -65,7 +64,7 @@ def main():
                 H.require(stdout.startswith('PASS datatype context reuse: ') and not (out/(label+'-run/stderr')).read_bytes(),'complete independent control matrix')
                 record['checks'].append({'optimization':opt,'stdout':stdout});save()
                 print(stdout.strip(),flush=True)
-            H.check_pins(pins);H.require(H.authenticate(a.producer,a.source)==auth,'unchanged ordinary object producer')
+            H.check_pins(pins);H.require(authenticate()==auth,'unchanged ordinary object producer')
             record['complete']=True;save()
     except BaseException as e:
         record['error']=repr(e);save();raise

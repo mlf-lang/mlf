@@ -14,8 +14,6 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--producer',type=Path,required=True)
     p.add_argument('--source',type=Path,default=ROOT)
-    p.add_argument('--oracle-source',type=Path,
-        help='optionally verify the frozen encoder against its complete historical checkout')
     p.add_argument('--output',type=Path,required=True)
     a=p.parse_args()
     options = ('0', '2')
@@ -27,10 +25,6 @@ def main():
     H.require(H.sha(ORACLE/'oracle.json')==ORACLE_MANIFEST_SHA,'fixed c1b802bd oracle identity')
     oracle=H.load(ORACLE/'oracle.json');raw=(ORACLE/'FrozenCrateQuery.hs').read_bytes()
     H.require(hashlib.sha256(raw).hexdigest()==oracle['frozen_sha256'],'frozen full old encoder')
-    old=raw.replace(b'module FrozenCrateQuery where {',b'module Bootstrap.CrateQuery where {',1)
-    H.require(hashlib.sha256(old).hexdigest()==oracle['source_sha256'],'module-only oracle adaptation')
-    if a.oracle_source:
-        H.require(old==(a.oracle_source/oracle['source']).read_bytes(),'independent frozen baseline source')
     manifest=H.load(ROOT/'shared-sources.json')
     files=[ROOT/x['path'] for x in manifest['modules']]+list((ROOT/'host/ghc').rglob('*.hs'))
     files+=list(HERE.glob('*.hs'))+[ORACLE/'FrozenCrateQuery.hs',ORACLE/'oracle.json',Path(__file__),hp]

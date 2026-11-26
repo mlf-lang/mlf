@@ -77,9 +77,9 @@ the observed valid intervals/deltas, not ordinary exclusive CPU, physical
 allocation or a time breakdown. Earlier C3's discarded-publication saving is
 an inherited invariant, not a second gain from this patch.
 
-O0 and O2 controls compile the local owners separately against authenticated O2
-dependencies. They retain the entire previous C3 Main, with a pinned, reversible
-module-header rename: all 63 physical graph/index/scope traces, exact errors and
+O0 and O2 controls compile the local owners separately against authenticated
+ordinary dependencies. They retain the entire maintained C3 Main, with a
+module-header view recorded in the current run: all 63 physical graph/index/scope traces, exact errors and
 failure Store epochs, repeated instantiations, expansion descriptors, full
 selection and eight partial-value/demand observations. The new wrapper compares
 the complete frozen accepted-C3 owner with the complete candidate. The original
@@ -94,12 +94,12 @@ reuse; an opaque-payload probe verifies that the merge itself inspects only IDs.
 These finite observations do not prove all partial values equivalent or measure
 ordinary physical allocations.
 
-The source-admission chain adds exactly one owner and preserves the other 127
-shared identities. A fixed one-block inverse recovers the complete accepted C3
-owner for historical source proofs only; runtime candidates remain complete.
-All prior manifests and semantic oracles remain intact. No builtin regeneration
-is needed because the complete canonical preparation closure is unchanged.
-The source lock is refreshed and actual locked-plan qualification is retained.
+The historical source-admission chain and inverse owner proofs are archived in
+Git at `496dcae024cae1a93096d9bdb9d6b93e57359dc0`. Current runs use the independent
+`oracles/LegacySession.hs` fixture directly and authenticate borrowed inputs
+against the actual producer receipt. The fixture preserves the complete
+accepted-C3 owner; [`oracles/README.md`](oracles/README.md) records its source and
+the one-time header adaptation.
 
 All 14 scheduled integration checks passed: retained P1–P3, graph/transaction,
 Map balance, validation boundary, builtin, parsed-file comparisons through both
@@ -119,8 +119,9 @@ python3 -B tools/performance/c3-survivors/run_controls.py \
   --optimization 2 --output .mlf-build/c3-survivors-20261101/ci-controls
 ```
 
-Use a different fresh directory for `--optimization 0`. Full Git history is
-required. CI retains the O2 source copies, receipts and logs. Raw plans,
+Use a different fresh directory for `--optimization 0`. The fixed reference is
+included in the checkout; Git history is not required. CI retains the O2 source
+copies, receipts and logs. Raw plans,
 ordinary samples, diagnostics, source archives and authentication are under
 `.mlf-build/c3-survivors-20261101/`.
 

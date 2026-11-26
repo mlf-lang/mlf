@@ -137,13 +137,7 @@ def main():
                     record['builtin_witness_pins']={str(builtin)+suffix:H.sha(str(builtin)+suffix) for suffix in ['.explicit-legacy.mlfci','.explicit-legacy.mlfco','.binary-negative-version','.binary-negative-crc','.binary-negative-pairing']}
                 if module=='BoundaryControls':H.require(stdout==b'PASS validation reuse: 20 authored programs, raw solver states, skeleton demand, 3 raw rejections, 4 partial-value orders\n','retained validation reuse boundary inventory')
                 if module=='PublicControls':record['public']=C.public_result(stdout,stderr)
-                if module=='C4TransactionControls':
-                    summary=json.loads(stdout.decode().splitlines()[-1]);expected=dict(C.TRANSACTION)
-                    del expected['oracle_boundary_checks'];del expected['old_public_physical_oracle_weakened']
-                    expected.update(old_BST_representation_preserved=False,Patricia_representation_independently_checked=True,oracle_boundary_suite='PatriciaOracleControls')
-                    C.exact_fields(summary,expected)
-                    H.require(sum(s.startswith('PASS ') for s in stdout.decode().splitlines())==9,'nine retained transaction groups')
-                    record['transaction']=summary
+                if module=='C4TransactionControls':record['transaction']=C.transaction_result(stdout,stderr)
                 if module=='SessionTests':H.require(stdout==expectations['session_stdout'].encode(),'all original session cases')
                 if module=='AdmissionTests':H.require(stdout==expectations['admission_stdout'].encode(),'all original admission cases')
                 if module=='HeteroinputControls':

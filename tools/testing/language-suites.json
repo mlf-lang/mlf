@@ -29,7 +29,7 @@
     "command": [
       "python3",
       "-B",
-      "tools/shared/test_direct_candidate_successor.py"
+      "tools/shared/run_direct.py"
     ],
     "kind": "receipt",
     "prefix": "direct-candidate/",

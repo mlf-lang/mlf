@@ -8,12 +8,12 @@ registered private owner and index store.
 
 ## Historical versus current source
 
-The commands below describe the frozen historical runner. Current integrated
-checks use `check_integrated.py` and its separate `run_current_controls.py`
-[representation compatibility contract](current/README.md). The current path
-retains these exact authored controls while authenticating the reviewed 126-module
-source inventory and checking the actual builtin against its committed canonical
-structural literal. It does not replace these historical source or builtin pins.
+The commands below describe the frozen historical experiment. Current integrated
+checks use the [Patricia runners](../patricia/README.md) and directly compilable
+fixtures, with input and producer identities captured for each execution. The
+former A1 current-source adapters and their source-migration proofs have been
+retired; see the [retirement record](../../../docs/testing-history-retirement.md)
+for the archival revision.
 
 ## Run locally
 

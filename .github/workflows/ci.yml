@@ -37,7 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # Compare the submitted PR with its current merge base.
       - name: Install workflow test parser
         run: |
           python3 -m venv "$RUNNER_TEMP/workflow-tests"
@@ -106,9 +106,7 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          fetch-depth: 0 # The framework oracle reads frozen Git fixtures.
-      - name: Prepare reviewed historical source objects
-        run: python3 -B tools/testing/prepare_history_refs.py
+          fetch-depth: 2 # Keep the first parent for current compiler comparisons.
       - name: Check modular artifact source inputs before compiling
         if: matrix.optimization == '2'
         run: |
@@ -247,6 +245,8 @@ jobs:
           python3 -B tools/testing/run.py python-patricia-open-file-comparison --python-optimization
           python3 -B tools/testing/run.py python-patricia-open-file-controls
           python3 -B tools/testing/run.py python-patricia-open-file-controls --python-optimization
+          python3 -B tools/testing/run.py python-patricia-file-cases
+          python3 -B tools/testing/run.py python-patricia-file-cases --python-optimization
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-builtin-guard python3 -B tools/testing/run.py --inherit-process-group patricia-integrated -- --suite builtin --producer .mlf-build/shared-ghc --output .mlf-build/patricia-builtin-controls
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-files-guard python3 -B tools/testing/run.py --inherit-process-group patricia-file-controls -- --reference-source "$PWD" --reference-producer .mlf-build/shared-ghc --producer .mlf-build/shared-ghc --builtin-prefix .mlf-build/patricia-builtin-controls/builtin --output .mlf-build/patricia-file-controls
       - name: Execute the actual shared suite-receipt helpers
@@ -263,22 +263,18 @@ jobs:
         if: matrix.suite == 'routine'
         run: |
           set -euo pipefail
-          python3 -B tools/testing/run.py python-shared-crc-successor-entry
-          python3 -B tools/testing/run.py python-shared-crc-successor-entry --python-optimization
           MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal python3 -B tools/testing/run.py python-shared-crc-process-supervisor
           MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/optimized python3 -B tools/testing/run.py python-shared-crc-process-supervisor --python-optimization
           python3 -B tools/testing/run.py python-shared-utf8-batch-contract
           python3 -B tools/testing/run.py python-shared-utf8-batch-contract --python-optimization
           python3 -B tools/testing/run.py python-shared-utf8-batch-worker
           python3 -B tools/testing/run.py python-shared-utf8-batch-worker --python-optimization
-          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/testing/run.py python-shared-direct-bounded-entry
-          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/optimized python3 -B tools/testing/run.py python-shared-direct-bounded-entry --python-optimization
           python3 -B tools/testing/run.py python-shared-candidate-batch-contract
           python3 -B tools/testing/run.py python-shared-candidate-batch-contract --python-optimization
           python3 -B tools/testing/run.py python-shared-candidate-batch-worker
           python3 -B tools/testing/run.py python-shared-candidate-batch-worker --python-optimization
-          MLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/normal python3 -B tools/testing/run.py python-shared-direct-candidate-entry
-          MLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/optimized python3 -B tools/testing/run.py python-shared-direct-candidate-entry --python-optimization
+          MLF_DIRECT_TEST_EVIDENCE=.mlf-build/direct-supervisor-controls/normal python3 -B tools/testing/run.py python-shared-direct-managed
+          MLF_DIRECT_TEST_EVIDENCE=.mlf-build/direct-supervisor-controls/optimized python3 -B tools/testing/run.py python-shared-direct-managed --python-optimization
           python3 -B tools/testing/run.py direct-candidate -- --bin-dir .mlf-build/shared-ghc/bin \
             --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/direct-host-tests
       - name: Qualify hosted TupleList and framework contracts
@@ -381,11 +377,6 @@ jobs:
         if: matrix.optimization == '2'
         run: |
           set -euo pipefail
-          mkdir .mlf-build/header-adapter-controls
-          git --no-replace-objects cat-file blob dd5b4630a80803c19afdb219dba2dc4bffc3ea1b > .mlf-build/header-adapter-controls/history.hs
-          export HEADER_FIXTURE="$PWD/tools/shared/fixtures/native/HeaderValidationTests.hs"
-          export HEADER_ORACLE="$PWD/tools/shared/fixtures/native/HeaderNamingOracle.hs"
-          export HEADER_HISTORY_SOURCE="$PWD/.mlf-build/header-adapter-controls/history.hs"
           python3 -B tools/testing/run.py python-shared-header-validation-adapter
           python3 -B tools/testing/run.py python-shared-header-validation-adapter --python-optimization
           python3 -B tools/testing/run.py native-library -- --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/native-library --clang clang --gc-prefix .mlf-build/io-action-gc
@@ -558,9 +549,7 @@ jobs:
             .mlf-build/direct-host-tests/utf8-length/**/stderr
             .mlf-build/direct-host-tests/utf8-length-supervisor.json
             .mlf-build/crc-supervisor-controls/
-            .mlf-build/utf8-supervisor-controls/
-            .mlf-build/candidate-supervisor-controls/
-            .mlf-build/header-adapter-controls/
+            .mlf-build/direct-supervisor-controls/
             .mlf-build/direct-host-tests/candidate-selection/
             .mlf-build/framework-direct/*.json*
             .mlf-build/framework-direct/*.stdout

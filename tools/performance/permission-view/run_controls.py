@@ -4,7 +4,6 @@ from pathlib import Path
 import argparse
 import hashlib
 import shutil
-import subprocess
 import sys
 import types
 
@@ -57,7 +56,8 @@ def main():
     try:
         with H.SerialLock(ROOT/'.mlf-build'):
             auth = H.authenticate(producer, a.producer_source)
-            frozen = subprocess.check_output(['git', 'show', BASELINE+':'+MODULE], cwd=ROOT)
+            oracle = HERE / 'oracles/Graph.hs'
+            frozen = oracle.read_bytes()
             H.require(hashlib.sha256(frozen).hexdigest() == BASELINE_SHA, 'frozen full Graph oracle')
             sources = {}
             for name, raw in [('LegacyGraph', frozen), ('CandidateGraph', (ROOT/MODULE).read_bytes())]:
@@ -72,7 +72,7 @@ def main():
             original_objects = H.file_pins(objects)
             H.require(all(H.sha(producer/Path(path).relative_to(out)) == digest
                           for path, digest in original_objects.items()), 'unchanged borrowed producer objects')
-            pins = {str(path): H.sha(path) for path in [hp, Path(__file__), HERE/'Main.hs', ROOT/MODULE,
+            pins = {str(path): H.sha(path) for path in [hp, Path(__file__), HERE/'Main.hs', ROOT/MODULE, oracle,
                     producer/'receipt.json', producer/'host.o', producer/'supervisor.o', *sources.values()]}
             record.update(inputs=pins, authentication=auth, borrowed_objects=original_objects)
             save()

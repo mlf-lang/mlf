@@ -470,16 +470,6 @@
       "--framework-list"
     ]
   },
-  "python-artifact-binary-adapter-successor": {
-    "command": [
-      "python3",
-      "-B",
-      "tools/performance/artifact-binary/test_adapter_successor.py"
-    ],
-    "kind": "unittest",
-    "prefix": "python-artifact-binary-adapter-successor/",
-    "exact": true
-  },
   "python-c3-delayed-index-private-owner-headers": {
     "command": [
       "python3",
@@ -510,16 +500,6 @@
     "prefix": "python-full-compiler-contract/",
     "exact": true
   },
-  "python-llvm-memory-contract": {
-    "command": [
-      "python3",
-      "-B",
-      "tools/performance/llvm-memory/test_contract.py"
-    ],
-    "kind": "unittest",
-    "prefix": "python-llvm-memory-contract/",
-    "exact": true
-  },
   "python-map-policy-prepare-map-policy": {
     "command": [
       "python3",
@@ -548,6 +528,16 @@
     ],
     "kind": "unittest",
     "prefix": "python-patricia-design-controls/",
+    "exact": true
+  },
+  "python-patricia-file-cases": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/patricia/test_file_cases.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-patricia-file-cases/",
     "exact": true
   },
   "python-patricia-fingerprint-core": {
@@ -588,6 +578,16 @@
     ],
     "kind": "unittest",
     "prefix": "python-patricia-open-file-controls/",
+    "exact": true
+  },
+  "python-process-spawn-runtime-protocol": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/process-spawn/test_runtime_protocol.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-process-spawn-runtime-protocol/",
     "exact": true
   },
   "python-release-ghc-install-cleanup": {
@@ -640,16 +640,6 @@
     "prefix": "python-shared-crc-process-supervisor/",
     "exact": true
   },
-  "python-shared-crc-successor-entry": {
-    "command": [
-      "python3",
-      "-B",
-      "tools/shared/test_crc_successor_entry.py"
-    ],
-    "kind": "unittest",
-    "prefix": "python-shared-crc-successor-entry/",
-    "exact": true
-  },
   "python-shared-darwin-toolchain": {
     "command": [
       "python3",
@@ -660,25 +650,14 @@
     "prefix": "python-shared-darwin-toolchain/",
     "exact": true
   },
-  "python-shared-direct-bounded-entry": {
+  "python-shared-direct-managed": {
     "command": [
       "python3",
       "-B",
-      "tools/shared/test_direct_bounded_entry.py"
+      "tools/shared/test_direct_managed.py"
     ],
     "kind": "unittest",
-    "prefix": "python-shared-direct-bounded-entry/",
-    "exact": true,
-    "allow_skip": true
-  },
-  "python-shared-direct-candidate-entry": {
-    "command": [
-      "python3",
-      "-B",
-      "tools/shared/test_direct_candidate_entry.py"
-    ],
-    "kind": "unittest",
-    "prefix": "python-shared-direct-candidate-entry/",
+    "prefix": "python-shared-direct-managed/",
     "exact": true,
     "allow_skip": true
   },
