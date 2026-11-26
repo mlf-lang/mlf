@@ -1954,57 +1954,49 @@ module Bootstrap.CrateArtifact where {
   loadGraph = loadGraphProfiled Nothing;
   loadGraphProfiled profile = loadGraphReading profile (readInterfaceProfiled profile);
   loadGraphRetaining retained = loadGraphReading Nothing (readInterfaceRetaining Nothing retained);
-  loadGraphReading profile reader trail done paths = Host.phaseIO profile "validate_ms" (
-    case paths of {
-      [] -> ioReturn (Right done);
-      (:) requested rest ->
-        do {
-          present <- fileExists requested;
-          if not present
-          then ioReturn (Left ("crate metadata does not exist: " ++ requested))
+  data LoadedInterfaces = LoadedInterfaces (Set String) (Map String CrateInterface)
+    ([] ((,) String CrateInterface));
+  loadGraphReading profile reader trail done paths = Host.phaseIO profile "validate_ms" (let {
+    initial = LoadedInterfaces (Set.fromList compareString (map fst done))
+      (interfaceMap (map snd done)) [];
+    visit active ancestors loaded@(LoadedInterfaces seen interfaces _) pending = case pending of {
+      [] -> ioReturn (Right loaded);
+      (:) requested rest -> do {
+        present <- fileExists requested;
+        if not present then ioReturn (Left ("crate metadata does not exist: " ++ requested))
+        else do {
+          path <- canonicalPath requested;
+          if Set.member compareString path active then
+            ioReturn (Left ("cyclic crate metadata paths: " ++ intercalate " -> " (reverse ((:) path ancestors))))
+          else if Set.member compareString path seen then visit active ancestors loaded rest
           else do {
-                 path <- canonicalPath requested;
-                 if elem eqString path trail
-                 then ioReturn
-                        (Left
-                           ("cyclic crate metadata paths: " ++
-                            intercalate " -> " (snoc trail path)))
-                 else if any (\p -> eqString path (fst p)) done
-                      then loadGraphReading profile reader trail done rest
-                      else do {
-                             read <- reader path;
-                             case read of {
-                               Left e -> ioReturn (Left e);
-                               Right iface ->
-                                 if any (\p -> eqString (crateId (snd p)) (crateId iface)) done
-                                 then ioReturn
-                                        (Left
-                                           ("duplicate crate identity from different metadata paths: " ++
-                                            crateId iface))
-                                 else do {
-                                        children <-
-                                          loadGraphReading profile reader (snoc trail path) done
-                                            (map dependencyPath (crateDependencies iface));
-                                        case bindEither children
-                                               (\xs ->
-                                                  do {
-                                                    validateDependencies (interfaceMap (map snd xs))
-                                                      iface;
-                                                    validateExportBoundary
-                                                      (interfaceMap (map snd xs))
-                                                      iface;
-                                                    Right xs
-                                                  }) of {
-                                          Left e -> ioReturn (Left e);
-                                          Right xs ->
-                                            loadGraphReading profile reader trail (snoc xs ((,) path iface)) rest
-                                        }
-                                      }
-                             }
-                           }
-               }
+            read <- reader path;
+            case read of {
+              Left e -> ioReturn (Left e);
+              Right iface -> if M.member compareString (crateId iface) interfaces then
+                ioReturn (Left ("duplicate crate identity from different metadata paths: " ++ crateId iface))
+              else do {
+                children <- visit (Set.insert compareString path active) ((:) path ancestors) loaded
+                  (map dependencyPath (crateDependencies iface));
+                case bindEither children (\(LoadedInterfaces completed dependencies rows) -> do {
+                  validateDependencies dependencies iface;
+                  validateExportBoundary dependencies iface;
+                  Right (LoadedInterfaces (Set.insert compareString path completed)
+                    (M.insert compareString (crateId iface) iface dependencies) ((:) ((,) path iface) rows))
+                }) of {
+                  Left e -> ioReturn (Left e);
+                  Right next -> visit active ancestors next rest
+                }
+              }
+            }
+          }
         }
-    });
+      }
+    }
+  } in do {
+    result <- visit (Set.fromList compareString trail) (reverse trail) initial paths;
+    ioReturn (mapEither (\(LoadedInterfaces _ _ rows) -> append done (reverse rows)) result)
+  });
   loadInterfaces = loadInterfacesProfiled Nothing;
   loadInterfacesProfiled profile paths = loadGraphProfiled profile [] [] paths;
   linkCheckedFile = linkCheckedFileProfiled Nothing;
@@ -2013,23 +2005,25 @@ module Bootstrap.CrateArtifact where {
       loaded <- loadInterfacesProfiled profile ((:) path []);
       case loaded of {
         Left e -> ioReturn (Left e);
-        Right interfaces ->
-          do {
-            objects <-
-              mapM (\((,) metadata iface) ->
-                readObjectWithInterfacesProfiled profile (map snd interfaces) (objectPath metadata) iface) interfaces;
-            case sequenceEither objects of {
-              Left message -> ioReturn (Left message);
-              Right os -> case reverse interfaces of {
-                [] -> ioReturn (Left "no root crate metadata");
-                (:) ((,) _ root) _ -> if any envelopeMarked os
-                  then Host.phaseValue profile "link_ms" (Host.phaseEither (\value -> seq value ()))
-                    (linkCheckedObjects os (crateId root))
-                  else linkCheckedObjectsV1Profiled profile finishLinkedState
-                    (FragmentState 0 M.empty [] [] Set.empty) [] os (crateId root)
-              }
-            }
-          }
+        Right interfaces -> linkCheckedInterfacesProfiled profile interfaces
+      }
+    };
+  linkCheckedInterfacesProfiled profile interfaces =
+    do {
+      let { available = map snd interfaces };
+      objects <-
+        mapM (\((,) metadata iface) ->
+          readObjectWithInterfacesProfiled profile available (objectPath metadata) iface) interfaces;
+      case sequenceEither objects of {
+        Left message -> ioReturn (Left message);
+        Right os -> case reverse interfaces of {
+          [] -> ioReturn (Left "no root crate metadata");
+          (:) ((,) _ root) _ -> if any envelopeMarked os
+            then Host.phaseValue profile "link_ms" (Host.phaseEither (\value -> seq value ()))
+              (linkCheckedObjects os (crateId root))
+            else linkCheckedObjectsV1Profiled profile finishLinkedState
+              (FragmentState 0 M.empty [] [] Set.empty) [] os (crateId root)
+        }
       }
     };
   linkFile path =

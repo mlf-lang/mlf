@@ -651,8 +651,7 @@ module Bootstrap.Crate where {
                      case object of {
                        Left _ -> False;
                        Right prior ->
-                         eqString (Artifact.encodeInterface expected)
-                           (Artifact.encodeInterface (Artifact.objectInterface prior))
+                         Artifact.sameAdmittedInterface expected (Artifact.objectInterface prior)
                      }
                  };
                  result <-

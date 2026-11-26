@@ -101,8 +101,10 @@ def main():
             entries = []
             if libraries and endpoint != 'crate-plan-v1':
                 raise ValueError('cold dependency families require crate-plan-v1')
-            compiled = []
+            compiled = {}
             for index, lib in enumerate(libraries):
+                if 'imports' in lib:
+                    imports = [compiled[name] for name in lib['imports']] or [setup['builtin']+'.mlfci']
                 dependency = dependency_folder(out, libraries, index)
                 dependency.mkdir()
                 dep_query = dependency/'queries'
@@ -111,11 +113,11 @@ def main():
                 dep_spec.write_text(pack(['MLF-CRATE-1','compiler-shapes/'+case['id']+'/'+dependency.name,'',
                     'false',pack([pack([lib['module'],lib['source']])]),pack(imports),
                     str(dep_query),setup['builtin']]))
-                compiled.append(str(dependency/'unit.mlfci'))
-                imports = compiled[-1:]
+                compiled[lib['module']] = str(dependency/'unit.mlfci')
+                imports = [compiled[lib['module']]]
                 entries.append(pack([str(dep_spec),str(dependency/'unit')]))
             if compiled:
-                imports = compiled
+                imports = list(compiled.values())
             if endpoint == 'crate-plan-v1':
                 (out/'build.plan').write_text(pack(['MLF-CRATE-PLAN-1',pack(entries)]))
             spec.write_text(pack(['MLF-CRATE-1','compiler-shapes/'+case['id'],'Main','false',

@@ -16,7 +16,7 @@ comparison against its older append implementation is labeled separately.
 |---|---|---|
 | 1 | `LLVM.Analysis.captureIndexed` | Retain upstream caller-dependent propagation and set-valued summaries; compare with an independent whole-table fixed point. |
 | 2 | `LLVM.Analysis.letBodyDemands` and Codegen | Retain upstream lexical let-spine summaries; check each cached suffix and demand barrier. |
-| 3 | `ArtifactStorage.sameBytes` | Use exact bulk byte equality through GHC, interpreter and native runtime implementations. Metadata files are still reread before reuse. |
+| 3 | `ArtifactStorage.sameBytes` | Use exact bulk byte equality through GHC, interpreter and native runtime implementations. Across crate jobs, reread each file and compare its current bytes with the published snapshot. |
 | 4 | `Parser.operatorReferenceSpan` | Record token endpoints for infix and parenthesized operator references, including qualified and split tokens. |
 | 5 | `Surface.normalizeRow` | Retain upstream cons/reverse construction; check complete patterns, RHS rewriting and Fresh state. |
 | 6 | `Elaborate.boundsAtIndexedUsing` | Share structural postorder ranks within a solved context when strict descendants have unique incoming type edges; keep root-local DFS for shared DAGs. |
@@ -78,6 +78,13 @@ owners across the safe foreign call; native code follows the same IO ordering.
 No hash or digest can substitute for exact equality. As with other mutable-array
 operations, callers synchronize concurrent writes when they require a stable
 snapshot; retained metadata arrays are private immutable snapshots.
+
+The graph loader indexes canonical paths and admitted crate identities as it
+walks dependencies in postorder. Within one ordinary link it passes the admitted
+graph directly to object checking. Between jobs, a dependency can be replaced
+at the same path, even with a file of the same length. Reuse therefore checks
+the bytes read from the current file. For larger regular files the reader uses
+the open file's observed length to size its buffer and still reads through EOF.
 
 Generated LLVM requires `mlf_require_byte_array_equal_abi`, preventing linkage
 against a runtime without the new primitive. The builtin Prelude was generated

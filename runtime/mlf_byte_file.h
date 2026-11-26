@@ -3,6 +3,22 @@
  * Empty diagnostic is success. Failures discard partial reads. */
 #ifndef MLF_BYTE_FILE_H
 #define MLF_BYTE_FILE_H
+/* Once a file outgrows the small buffer, its observed length can save the
+ * intervening reallocations. The stream and byte limit still determine EOF. */
+static size_t mlf_byte_file_capacity(FILE *file, size_t minimum, size_t limit) {
+#if defined(_WIN32)
+    struct _stat64 st;
+    if (_fstat64(_fileno(file), &st) || (st.st_mode & _S_IFMT) != _S_IFREG)
+        return minimum;
+#else
+    struct stat st;
+    if (fstat(fileno(file), &st) || !S_ISREG(st.st_mode))
+        return minimum;
+#endif
+    if (st.st_size <= 0 || (uint64_t)st.st_size > limit || (uint64_t)st.st_size <= minimum)
+        return minimum;
+    return (size_t)st.st_size;
+}
 static const char *mlf_byte_file_read(const char *path, size_t path_length,
                                     int64_t limit, unsigned char **output, size_t *length) {
     *output = NULL; *length = 0;
@@ -23,9 +39,15 @@ static const char *mlf_byte_file_read(const char *path, size_t path_length,
             size_t remaining = (size_t)limit - cap;
             size_t growth = cap ? cap : 1;
             if (growth > remaining) growth = remaining;
-            unsigned char *larger = realloc(buffer, cap + growth);
+            size_t next_cap = cap + growth;
+            size_t requested = cap == 4096 ? mlf_byte_file_capacity(file, next_cap, (size_t)limit) : next_cap;
+            unsigned char *larger = realloc(buffer, requested);
+            if (!larger && requested != next_cap) {
+                requested = next_cap;
+                larger = realloc(buffer, requested);
+            }
             if (!larger) { error = "out of memory"; break; }
-            buffer = larger; cap += growth; buffer[used++] = (unsigned char)next;
+            buffer = larger; cap = requested; buffer[used++] = (unsigned char)next;
         }
         size_t n = fread(buffer + used, 1, cap - used, file);
         used += n;

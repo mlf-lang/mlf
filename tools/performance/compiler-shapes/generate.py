@@ -975,6 +975,13 @@ tick = Parser (\s -> if ltInt s 1 then Stop else Next s (subInt s 1));
                         f'instance Score ({witness(binders + binders)}) where '
                         '{ score (WitnessValue value) = addInt value 1 };\n')
         expression = f'score (WitnessValue x :: {witness(["Int"] * (2*n))})'
+    elif family == 'metadata_import_fanout':
+        if n == 0:
+            return HEADER + 'entry :: Int -> Int;\nentry x = x;\n' + MAIN
+        imports = 'import Seed;\n' + ''.join(f'import Branch{i};\n' for i in range(1,n+1))
+        terms = ['seed x'] + [f'branch{i} x' for i in range(1,n+1)]
+        total = balanced(terms, lambda a,b: f'addInt ({a}) ({b})')
+        return HEADER + imports + f'entry :: Int -> Int;\nentry x = {total};\n' + MAIN
     elif family == 'scoped_ground_method_calls':
         declarations = ('data Token = Token Int;\n'
                         'class Score a where { score :: a -> Int };\n'
@@ -1145,6 +1152,9 @@ run x (More (Job worker) rest) = let { saved = worker x (addInt x 1) } in
 
 def expected(family, n, x):
     """Closed-form specifications; no compiled results or generated helpers used."""
+    if family == 'metadata_import_fanout':
+        result = (n+1)*(x+1) + n*(n+1)//2 if n else x
+        return (result + 2**63) % 2**64 - 2**63
     if family == 'ground_evidence_telescope':
         return (x + 1 + 2**63) % 2**64 - 2**63
     if family == 'demand_forwarding_chain':
@@ -1510,18 +1520,32 @@ def generate_cells(out, cells, baseline_family=None):
             case.update(dependency={'source':str(library.resolve()),
                          'module':'PacketLibrary','sha256':hashlib.sha256(library.read_bytes()).hexdigest()},
                         route='PacketLibrary and Main both start from source')
+        libraries = []
         if source_family in ('retained_curried_dependencies','retained_curried_job_list'):
             library = (cold_curried_job_list(n) if source_family == 'retained_curried_job_list'
                        else cold_curried_library(n))
-            sources = [('CurryLibrary', library), ('CurryFacade', cold_curried_facade())]
+            libraries = [('CurryLibrary', library, None), ('CurryFacade', cold_curried_facade(), None)]
+            case['route'] = 'CurryLibrary, CurryFacade and Main all start from source'
+        elif source_family == 'metadata_import_fanout' and n:
+            seed = HEADER.replace('module Main (main)', 'module Seed')
+            libraries = [('Seed', seed + 'seed :: Int -> Int;\nseed x = addInt x 1\n}\n', [])]
+            for i in range(1,n+1):
+                module = f'Branch{i}'
+                header = HEADER.replace('module Main (main)', 'module '+module)
+                contents = header + f'import Seed;\nbranch{i} :: Int -> Int;\nbranch{i} x = addInt (seed x) {i}\n}}\n'
+                libraries.append((module, contents, ['Seed']))
+            case['route'] = 'Main imports every branch and their shared Seed crate from source'
+        if libraries:
             dependencies = []
-            for module, contents in sources:
+            for module, contents, imports in libraries:
                 dep = directory/(module+'.hs')
                 dep.write_text(contents)
-                dependencies.append({'source':str(dep.resolve()),'module':module,
-                                     'sha256':hashlib.sha256(dep.read_bytes()).hexdigest()})
-            case.update(dependencies=dependencies,
-                        route='CurryLibrary, CurryFacade and Main all start from source')
+                row = {'source':str(dep.resolve()),'module':module,
+                       'sha256':hashlib.sha256(dep.read_bytes()).hexdigest()}
+                if imports is not None:
+                    row['imports'] = imports
+                dependencies.append(row)
+            case['dependencies'] = dependencies
         if source_family != family:
             case['matched_baseline_for'] = source_family
         cases.append(case)

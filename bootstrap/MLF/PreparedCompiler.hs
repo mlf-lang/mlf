@@ -364,11 +364,11 @@ module MLF.PreparedCompiler
       Right interfaces -> case interfaces of {
         (:) ((,) metadata iface) rest ->
           if not (eqString (Artifact.crateId iface) Artifact.builtinCrateIdentity)
-          then Artifact.linkCheckedFileProfiled profile path
+          then Artifact.linkCheckedInterfacesProfiled profile interfaces
           else do {
             witnessResult <- Host.phaseValue profile "prelude_check_ms" (Host.phaseEither (\w -> seq w ())) prepared;
             case witnessResult of {
-            Left _ -> Artifact.linkCheckedFileProfiled profile path;
+            Left _ -> Artifact.linkCheckedInterfacesProfiled profile interfaces;
             Right witness -> do {
               images <- Host.phaseIO profile "image_decode_ms" compilerPreludeImages;
               exact <- Host.phaseIO profile "validate_ms" (case images of {
@@ -396,7 +396,7 @@ module MLF.PreparedCompiler
             }
             }
           };
-        [] -> Artifact.linkCheckedFileProfiled profile path
+        [] -> Artifact.linkCheckedInterfacesProfiled profile interfaces
       }
     }
   };
