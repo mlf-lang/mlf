@@ -364,6 +364,29 @@ module Tests.CompilerTests where {
                (J.set "case_report_sha256" (J.str digest)
                   (J.set "framework_case_ids" (J.stringArray actual) J.empty)))
     };
+  coreRegistryDiscovery :: TestContext -> String -> String -> IO J.Json;
+  coreRegistryDiscovery c target binary =
+    do {
+      let {
+        contractPath = root c ++ "/tests/golden/core-registry-contract.json";
+        path = output c ++ ("/" ++ (target ++ ".inventory.json"));
+        families = if eqString target "core" then CorePartitions.familyNames
+                   else CorePartitions.forTarget target
+      };
+      contract <- J.read contractPath;
+      capture c ((:) binary (O.words "--list --format json")) path;
+      text <- readFile path;
+      case Coverage.validateRegistryDiscovery contract families text of {
+        Left message -> O.fatal (target ++ (": " ++ message));
+        Right _ -> return ()
+      };
+      digest <- fileDigest path;
+      contractDigest <- fileDigest contractPath;
+      return (J.set "path" (J.str path)
+        (J.set "sha256" (J.str digest)
+          (J.set "contract_path" (J.str contractPath)
+            (J.set "contract_sha256" (J.str contractDigest) J.empty))))
+    };
   suiteArgsEvidence :: TestContext ->
                        String ->
                        [] String -> [] String -> Maybe J.Json -> Maybe ([] String) -> IO ();
@@ -380,6 +403,8 @@ module Tests.CompilerTests where {
       let {
         unit = if shard then "core" else target
       };
+      registry <- if eqString unit "core" then coreRegistryDiscovery c target binary
+                  else return J.empty;
       let {
         structural =
           (shard ||
@@ -425,7 +450,21 @@ module Tests.CompilerTests where {
       else unsetEnv "MLF_TEST_CASE_REPORT";
       capture c ((:) binary command) log;
       unsetEnv "MLF_TEST_CASE_REPORT";
-      cases <- if structural then caseReport casePath else ioReturn J.empty;
+      observedCases <- if structural then caseReport casePath else ioReturn J.empty;
+      cases <- if eqString unit "core" then do {
+        contract <- J.read (J.getText "contract_path" "" registry);
+        text <- readFile casePath;
+        case Coverage.validateRegistryCases contract expectedFamilies text of {
+          Left message -> O.fatal (target ++ (": " ++ message));
+          Right _ -> return ()
+        };
+        currentContract <- fileDigest (J.getText "contract_path" "" registry);
+        currentInventory <- fileDigest (J.getText "path" "" registry);
+        O.require (eqString currentContract (J.getText "contract_sha256" "" registry) &&
+                   eqString currentInventory (J.getText "sha256" "" registry))
+          "Core registry inventory changed during execution";
+        return (J.set "registry_inventory" registry observedCases)
+      } else return observedCases;
       currentBinaryHash <- fileDigest binary;
       O.require (eqString binaryHash currentBinaryHash)
         (target ++ ": test executable changed during validation");

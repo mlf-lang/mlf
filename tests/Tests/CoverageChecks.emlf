@@ -11,14 +11,72 @@ import qualified Tests.Coverage as C
 -- supplies this validator's expected inventory or its successful report.
 inventoryText = "{\"schema_version\":1,\"suites\":{\"probe\":{\"executions\":[\"first\",\"second\"],\"aliases\":{\"repeated\":\"first\"},\"metrics\":{\"oracle-executed\":3}}}}"
 reportText = "{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"start\",\"scope\":\"full\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"case\",\"id\":\"first\",\"status\":\"passed\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"case\",\"id\":\"second\",\"status\":\"passed\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"alias\",\"id\":\"repeated\",\"canonical\":\"first\",\"status\":\"passed\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"metric\",\"name\":\"oracle-executed\",\"value\":3}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"summary\",\"complete\":true,\"executions\":2,\"aliases\":1,\"metrics\":1}\n"
+-- Literal public descriptors and reports, independent of Core registration.
+registryContractText = "{\"schema_version\":1,\"cases\":[{\"id\":\"alpha/one\",\"name\":\"first case\",\"family\":\"alpha\"},{\"id\":\"alpha/two\",\"name\":\"second case\",\"family\":\"alpha\"},{\"id\":\"beta/three\",\"name\":\"third case\",\"family\":\"beta\"}]}"
+registryDiscoveryText = "{\"schema_version\":1,\"event\":\"inventory\",\"scope\":\"full\",\"total\":3,\"selected\":3,\"cases\":[{\"id\":\"alpha/one\",\"name\":\"first case\",\"tags\":[\"family:alpha\",\"unrelated\"]},{\"id\":\"alpha/two\",\"name\":\"second case\",\"tags\":[\"family:alpha\"]},{\"id\":\"beta/three\",\"name\":\"third case\",\"tags\":[\"family:beta\"]}]}"
+registryReportText = "{\"schema_version\":1,\"event\":\"start\",\"total\":3,\"selected\":3,\"scope\":\"full\",\"ids\":[\"alpha/one\",\"alpha/two\",\"beta/three\"]}\n{\"schema_version\":1,\"event\":\"case\",\"id\":\"alpha/one\",\"name\":\"first case\",\"tags\":[\"family:alpha\",\"unrelated\"],\"status\":\"passed\"}\n{\"schema_version\":1,\"event\":\"case\",\"id\":\"alpha/two\",\"name\":\"second case\",\"tags\":[\"family:alpha\"],\"status\":\"passed\"}\n{\"schema_version\":1,\"event\":\"case\",\"id\":\"beta/three\",\"name\":\"third case\",\"tags\":[\"family:beta\"],\"status\":\"passed\"}\n{\"schema_version\":1,\"event\":\"summary\",\"total\":3,\"selected\":3,\"executed\":3,\"passed\":3,\"failed\":0,\"scope\":\"full\",\"complete\":true}\n"
+registryPartialText = "{\"schema_version\":1,\"event\":\"start\",\"total\":3,\"selected\":2,\"scope\":\"partial\",\"ids\":[\"alpha/one\",\"alpha/two\"]}\n{\"schema_version\":1,\"event\":\"case\",\"id\":\"alpha/one\",\"name\":\"first case\",\"tags\":[\"family:alpha\",\"unrelated\"],\"status\":\"passed\"}\n{\"schema_version\":1,\"event\":\"case\",\"id\":\"alpha/two\",\"name\":\"second case\",\"tags\":[\"family:alpha\"],\"status\":\"passed\"}\n{\"schema_version\":1,\"event\":\"summary\",\"total\":3,\"selected\":2,\"executed\":2,\"passed\":2,\"failed\":0,\"scope\":\"partial\",\"complete\":true}\n"
+
 render rows = S.intercalate "\n" (S.map J.render rows) ++ "\n"
 change index f rows = S.map (\((,) i row) -> if i == index then f row else row) (S.zip (S.range 0 (S.length rows - 1)) rows)
 without index rows = S.map S.snd (S.filter (\((,) i _) -> i /= index) (S.zip (S.range 0 (S.length rows - 1)) rows))
 rejected inventory text = case C.validate inventory "probe" text of
  Left _ -> return ()
  Right _ -> A.fail "damaged structural coverage evidence was accepted"
+registryRejected : forall a. Either String a -> A.Test ()
+registryRejected result = case result of
+ Left _ -> return ()
+ Right _ -> A.fail "changed semantic registry evidence was accepted"
+registryChecks : A.Test ()
+registryChecks = do
+ contract <- A.right (\message -> message) (J.parse registryContractText)
+ discovery <- A.right (\message -> message) (J.parse registryDiscoveryText)
+ rows <- A.right (\message -> message) (C.parse registryReportText)
+ partial <- A.right (\message -> message) (C.parse registryPartialText)
+ let families = (:) "alpha" ((:) "beta" [])
+ A.right (\message -> message) (C.validateRegistryDiscovery contract families registryDiscoveryText)
+ A.right (\message -> message) (C.validateRegistryCases contract families registryReportText)
+ A.right (\message -> message) (C.validateRegistryCases contract ((:) "alpha" []) registryPartialText)
+ -- Unknown metadata and unrelated tag order do not redefine ID/name/family.
+ let harmless row = J.set "elapsed" (J.num 7) (J.set "tags" (J.stringArray ((:) "new-tag" ((:) "family:alpha" []))) row)
+ A.right (\message -> message) (C.validateRegistryCases contract families (render (change 1 harmless rows)))
+ let descriptors = J.values (J.get "cases" discovery)
+ let altered f = J.render (J.set "cases" (J.Array (change 0 f descriptors)) discovery)
+ S.mapM_ (\f -> do
+   registryRejected (C.validateRegistryDiscovery contract families (altered f))
+   registryRejected (C.validateRegistryCases contract families (render (change 1 f rows))))
+  ((:) (J.set "id" (J.str "alpha/renamed"))
+  ((:) (J.set "id" (J.str "alpha/two"))
+  ((:) (J.set "name" (J.str "wrong label"))
+  ((:) (J.set "tags" (J.stringArray ((:) "family:beta" [])))
+  ((:) (J.set "tags" (J.stringArray ((:) "family:alpha" ((:) "family:beta" []))))
+  ((:) (J.set "tags" J.Null)
+  ((:) (J.set "id" (J.num 1))
+  ((:) (\_ -> J.Null) []))))))))
+ registryRejected (C.validateRegistryDiscovery contract families (J.render (J.set "cases" (J.Array (S.tail descriptors)) discovery)))
+ registryRejected (C.validateRegistryDiscovery contract families (J.render (J.set "cases" (J.Array (S.reverse descriptors)) discovery)))
+ registryRejected (C.validateRegistryDiscovery contract families (J.render (J.set "selected" (J.num 2) discovery)))
+ registryRejected (C.validateRegistryDiscovery contract families (J.render (J.set "scope" (J.str "partial") discovery)))
+ -- A self-consistent shorter/reordered plan cannot replace the reviewed one.
+ registryRejected (C.validateRegistryCases contract families registryPartialText)
+ registryRejected (C.validateRegistryCases contract families (render (without 1 rows)))
+ registryRejected (C.validateRegistryCases contract families (render (change 0 (J.set "ids" (J.stringArray ((:) "alpha/one" ((:) "beta/three" ((:) "alpha/two" []))))) rows)))
+ registryRejected (C.validateRegistryCases contract families (render (change 2 (J.set "status" (J.str "failed")) rows)))
+ registryRejected (C.validateRegistryCases contract families (render (change 4 (J.set "complete" (J.Boolean false)) rows)))
+ registryRejected (C.validateRegistryCases contract families (render (change 4 (J.set "passed" (J.num 2)) rows)))
+ registryRejected (C.validateRegistryCases contract families (render (S.init rows)))
+ registryRejected (C.validateRegistryCases contract families (registryReportText ++ "truncated {\n"))
+ registryRejected (C.validateRegistryCases contract ((:) "absent" []) registryReportText)
+ registryRejected (C.validateRegistryCases contract ((:) "alpha" ((:) "alpha" [])) registryPartialText)
+ registryRejected (C.validateRegistryCases contract [] registryReportText)
+ registryRejected (C.validateRegistryCases J.Null families registryReportText)
+ registryRejected (C.validateRegistryCases (J.set "cases" J.Null contract) families registryReportText)
+ let expected = J.values (J.get "cases" contract)
+ registryRejected (C.validateRegistryCases (J.set "cases" (J.Array (change 0 (J.set "id" (J.str "alpha/two")) expected)) contract) families registryReportText)
+ registryRejected (C.validateRegistryCases (J.set "cases" (J.Array (change 0 (J.set "family" (J.num 1)) expected)) contract) families registryReportText)
 checks : A.Test ()
 checks = do
+ registryChecks
  callbacks <- A.liftIO (newIntArray 1 0)
  completed <- A.liftIO (C.count (\value -> do { before <- readIntArray callbacks 0; writeIntArray callbacks 0 (before + value) }) ((:) 2 ((:) 4 ((:) 8 []))) 0)
  observed <- A.liftIO (readIntArray callbacks 0)

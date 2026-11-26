@@ -21,6 +21,15 @@ ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "8a3e69b165765931c3ff762379a78db9659b2cd8"
 PHASE_1_PARENT = "720dd649627fbf8b19c7447493a4fdf6fd05eb39"
 FRAMEWORK_CUTOVER = "08d7d608c13e89cabad0c81bc494072dafc7c86a"
+CASE_CONTRACT = "tests/golden/core-registry-contract.json"
+# Named independently from the counted, frozen substring observations. The
+# runtime emits these IDs; neither its source nor its output supplies the oracle.
+SUBSTRING_IDS = (
+    "empty-in-empty", "empty-in-nonempty", "nonempty-in-empty",
+    "needle-longer-than-text", "prefix", "interior", "suffix",
+    "overlapping-prefix-match", "overlapping-prefix-miss", "unicode-match",
+    "unicode-order-miss", "nul-match", "nul-miss",
+)
 
 
 @functools.lru_cache(maxsize=None)
@@ -429,6 +438,18 @@ def expected_bindings():
     return reviewed_cutover_bindings(reviewed_recursion_bindings(catalog_bindings(json.loads(frozen("tests/test-catalog.json")))))
 
 
+def verify_case_contract(contract, expected):
+    cases = [{"id": "core/substring-adapter/" + name, "name": "substring " + name,
+              "family": "core/substring-adapter"} for name in SUBSTRING_IDS]
+    cases += [{"id": identity, "name": label, "family": family}
+              for family, rows in expected.items() for label, identity in rows]
+    require(len(cases) == len({row["id"] for row in cases}) == 759,
+            "frozen semantic case inventory changed")
+    require(isinstance(contract, dict) and type(contract.get("schema_version")) is int and
+            contract == {"schema_version": 1, "cases": cases},
+            "Core semantic case contract differs from the independent reviewed inventory")
+
+
 def verify_catalog(catalog, expected):
     require(list(catalog_bindings(catalog).items()) == list(expected.items()),
             "live Core catalog family/label/semantic-ID ownership changed")
@@ -713,6 +734,7 @@ def main():
     require(canonical_source(lexical_control) == lexical_expected,
             "canonical projection changed strings, comments, characters or unrelated names")
     expected = expected_bindings()
+    verify_case_contract(json.loads(source_text(CASE_CONTRACT)), expected)
     verify_recorded_cutover(expected)
     registry = pre_cutover("tests/Tests/CoreRegistry.emlf")
     runner = pre_cutover("tests/Tests/CoreRunner.emlf")
@@ -875,7 +897,9 @@ def main():
                       "default_campaign": "framework", "historical_default_campaign": "legacy",
                       "current_source_verified": False,
                       "current_behavior_gates": ["tests/Tests/TestFramework.emlf",
+                                                 "tests/Tests/CompilerTests.hs",
                                                  "tools/release/verify-unit-evidence.sh"],
+                      "semantic_case_contract": CASE_CONTRACT,
                       "qualification_eligible": False,
                       "compilation_verified": False, "semantic_execution_verified": False}, indent=2))
 
