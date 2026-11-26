@@ -20,8 +20,24 @@ integrating the split libraries and parallel-build changes are recorded in the
 `smoke`, `full`, `stress` and `release` remain
 execution-profile concepts; this workflow owns its actual CI selections.
 
-The `CI` workflow runs on every pull request, merge queue group and push to
-`main`. Its stable aggregate check is **PR gate**. It requires all of:
+The [CI workflow](../.github/workflows/ci.yml) runs on pull requests, merge
+queue groups and pushes to `main`. Its stable aggregate check is **PR gate**.
+
+## Skipping pull request CI
+
+Maintainers can apply `ci:skip` to a pull request. The gate then requires
+all six prerequisite jobs to report `skipped` and records the skip in the
+run summary. A green gate on that run confirms the skip, **not** that any
+test passed. The formatter and the path-filtered macOS PR checks also honor
+the label. This takes precedence over `ci:async-parity`: the async job does
+not run at all, including its policy selector.
+
+Remove `ci:skip` to trigger a new run under the normal policy. The label does
+not affect merge queue groups, pushes to `main`, or manual runs.
+
+## Normal PR gate
+
+Without the PR skip label, the gate requires all of:
 
 - **Release metadata**: version/manifest consistency, shell syntax, benchmark
   provenance, smoke-receipt failure regressions and checksum-pinned actionlint
@@ -49,7 +65,7 @@ use Linux or Windows, so the smaller macOS runner pool cannot queue the merge
 gate. Main pushes and non-Windows-only manual runs additionally execute the
 runner, native async and complete async-language gates on macOS; every selected
 matrix entry must pass.
-Failed, cancelled or skipped prerequisites cannot produce a passing gate.
+Failed, cancelled or skipped prerequisites cannot pass the normal gate.
 There are no path filters on the required workflow or lightweight native
 checks. The async-language job itself always participates in the six-job gate;
 only its expensive steps can be omitted after a successful explicit policy decision.
@@ -170,7 +186,7 @@ Explicit manual `CI` dispatch with `full_validation=true` or `self_host=true`
 (and without `windows_runtime_only`) retains the complete graph with
 `build_packages=false`. No automatic restoration or A/B run is scheduled.
 It runs independently of the narrower PR gate, using read-only repository and
-Actions permissions. Pull requests and merge queue groups keep the six checks
+Actions permissions. Normal PR runs and merge queue groups keep the six checks
 above, including the policy-aware async-language gate (always bootstrapped for
 merge queues; pull requests run its heavy steps only with explicit opt-in).
 Manual `CI` with `full_validation=true` exercises this exact complete graph on a

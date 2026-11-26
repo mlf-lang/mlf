@@ -112,8 +112,8 @@ new inference query.
 
 See the [crate migration ledger](docs/crate-migration.md) for accepted measurements
 and the [validation record](docs/crate-validation.json) for all six native groups,
-fresh self-hosting and the exact source/tool configuration. The [earlier bootstrap memory report](tools/profile/results/2026-10-19-bootstrap-memory/README.md)
-describes the previous per-module pipeline; its results are historical.
+fresh self-hosting and the exact source/tool configuration. For the previous
+per-module pipeline, see the [historical bootstrap memory summary](tools/profile/RESULTS.md).
 
 Run all six native test groups, or select groups for development:
 
@@ -164,9 +164,10 @@ sharing; the numbers have no type-theoretic significance.
 
 ## Compiler written in MLF
 
-[`bootstrap/Main.emlf`](bootstrap/Main.emlf) implements the compiler in MLF,
-including modules, classes, graph inference, checked elaboration, the xMLF
-checker, interpreter, and LLVM backend. The native package manager rebuilds it
+The [compiler entry point](bootstrap/MLF/Entry/Emlf.hs) dispatches CLI commands.
+The [compiler libraries](libraries/) implement modules, classes, graph inference,
+checked elaboration, the xMLF checker, interpreter, and LLVM backend.
+The native package manager rebuilds the compiler
 using an existing MLF compiler and checks self-hosting through a fresh LLVM
 fixed point. The independent checking modules and reference algorithms execute
 as MLF programs; frozen Haskell-seed expectations remain parity oracle data.
@@ -193,8 +194,10 @@ packaging remains release-only. The historical [performance report](benchmarks/R
 covers nine workloads and does not prove that the complete ten-workload gate
 passes. Failed correctness or performance checks remain failures.
 
-The Haskell compiler, Cabal project, and old Haskell/Python test and build
-harnesses have been removed. Native MLF is the supported build and test path.
+Native MLF and GHC build the same compiler sources. The native build and test
+commands above need no GHC or Cabal. For the GHC-hosted build, see the
+[developer commands](CONTRIBUTING.md#developer-commands) or run
+`python3 tools/dev.py build-host --help`.
 Pinned C/Rust/Haskell benchmark sources, the independent Snake baseline,
 golden oracle data, and archived measurements remain available. Compiler-level
 classification measurements, which compile identical generated sources with GHC
@@ -817,9 +820,9 @@ case structure while removing declarations and type arguments.
 
 ## Standard prelude
 
-Every compiler entry point imports a small standard prelude from
-[`Bootstrap.Prelude`](libraries/mlf-frontend/Bootstrap/Prelude.emlf). It supplies this class, its `IO` instance,
-and an instance for local state, `Monad (ST s)`:
+For legacy `.emlf` programs, [`Bootstrap.Prelude`](libraries/mlf-frontend/Bootstrap/Prelude.hs)
+defines the implicit `Monad` class and its instances for `IO` and local state
+(`Monad (ST s)`):
 
 ```haskell
 class Monad (m : * -> *) where {

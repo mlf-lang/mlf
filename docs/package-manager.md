@@ -68,9 +68,11 @@ selection. Otherwise it uses `bdw-gc.pc` on `PKG_CONFIG_PATH`.
 The one-time bootstrap script still needs `MLF_GC_PREFIX` or `bdw-gc.pc`.
 `--compiler`, `--gc-prefix`, `--runtime`,
 `--clang`, and `--pkg-config` can select explicit tools. Global options precede
-the command. The build needs neither GHC nor Cabal; it compiles
-`bootstrap/Main.emlf` and `package/Main.emlf` against the ten library packages
-under `libraries/`. The one-time shell bootstrap compiles and links the manager
+the command. The build needs neither GHC nor Cabal.
+The [root manifest](../mlf-package.json) maps `emlf` to
+[`MLF.Entry.Emlf`](../bootstrap/MLF/Entry/Emlf.hs) and `mlfpkg` to
+[`MLF.Entry.Mlfpkg`](../package/MLF/Entry/Mlfpkg.hs).
+The one-time shell bootstrap compiles and links the manager
 and its `mlf-build-runner` helper; it has no manifest or dependency logic. Its seed must support
 the host IO primitives listed below. Rerun the bootstrap script after changing
 manager sources, or select the newly built `.mlf-build/bin/mlfpkg` through
@@ -118,15 +120,17 @@ The compiler libraries retain the `Bootstrap.*` module names across
 `Package.*` modules live in `mlf-package-core` and `mlf-developer-tools`.
 Each library declares its direct dependencies and contains its own sources.
 The root `emlf` target explicitly selects compiler libraries, so it can finish
-without building developer tooling. `mlfpkg` selects the package and developer
-libraries. Old `bootstrap/mlf-package.json` and `package/mlf-package.json`
+without building developer tooling. The `mlfpkg` target directly depends on
+`mlf-foundation` and `mlf-package-core`. Old `bootstrap/mlf-package.json`
+and `package/mlf-package.json`
 manifests have been replaced. Rebuild the manager using the current bootstrap
 script before building this layout with an older installed manager.
 
 Compiler tests are written in MLF under `tests/` and built as the local
 `mlf-tests` package. The root's private `compiler-tests` executable uses
-`tests/CompilerTestsMain.emlf` and `Tests.CompilerTests` to coordinate the six
-compiler campaigns. The package manager provides generic build, cache and
+[`MLF.Entry.CompilerTests`](../tests/MLF/Entry/CompilerTests.hs), which calls
+`Tests.CompilerTests` to coordinate the six compiler campaigns. The package
+manager provides generic build, cache and
 command execution; it does not import the compiler campaign. Root test commands
 pass the selected compiler and package manager explicitly, and the campaign
 records and rechecks both binaries plus its own runner identity. GHC, Cabal, and

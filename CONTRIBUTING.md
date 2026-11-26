@@ -54,10 +54,8 @@ compilations and application runs.
 
 ## Skipping pull request CI
 
-Maintainers can apply the `ci:skip` label to skip automated test jobs on a
-pull request. The required PR gate records the skip. Remove the label to
-trigger the checks again. Pushes to `main` and manual runs follow their usual
-CI settings.
+See [Skipping pull request CI](docs/ci.md#skipping-pull-request-ci) for the
+`ci:skip` label and how to interpret the resulting **PR gate**.
 
 ## Where changes belong
 
