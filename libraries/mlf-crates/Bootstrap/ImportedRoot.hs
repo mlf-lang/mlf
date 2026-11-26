@@ -274,14 +274,15 @@ module Bootstrap.ImportedRoot
     ImportedEvidence key name actual -> verify key name actual
   };
   finishUsing = finishUsingChecked Checked.check;
-  finishUsingChecked check generateInputs signatures ((,) program names) = case program of {
+  finishUsingChecked = finishUsingSolver C.solvePrepared;
+  finishUsingSolver solveConstraints check generateInputs signatures ((,) program names) = case program of {
     SClassProgram _ _ _ _ -> Left (CompileError Inference "class translation did not produce a core program");
     SProgram declarations _ -> do {
       generated <- Core.atPhase Inference (generateInputs program);
       let { constraints = case generated of { (,,) value _ _ -> value };
             imports = case generated of { (,,) _ value _ -> value };
             kinds = case generated of { (,,) _ _ value -> value } };
-      solved <- Core.atPhase Inference (C.solvePrepared constraints);
+      solved <- Core.atPhase Inference (solveConstraints constraints);
       let { graph = Solver.solverGraph solved; types = E.prepareValidatedSolvedTypes solved };
       -- Check each declaration, including unused parameters, against the exact
       -- authenticated target contract after solving. Poly is intentionally the
@@ -344,7 +345,7 @@ module Bootstrap.ImportedRoot
   finishFileImportsUsing compact known memo ((,) slots signatures) lowered = do {
     let { check = case known of { Nothing -> Checked.check; Just env -> Open.checkClosedIn env } };
     result <- mapLeft Core.prettyError
-      (finishUsingChecked check (generateUsing compact known memo False slots signatures) signatures lowered);
+      (finishUsingSolver C.solveFileConstraints check (generateUsing compact known memo False slots signatures) signatures lowered);
     let { parts = case Checked.term (checkedWrapper result) of {
       XWithData ds body -> (,) ds body; body -> (,) [] body
     } };

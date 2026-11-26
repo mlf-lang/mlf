@@ -342,7 +342,7 @@ module Bootstrap.Constraint where {
   generateAndSolveFileProgram :: SProgram -> Either String ((,) Constraints Solver);
   generateAndSolveFileProgram program = do {
     constraints <- generateUncheckedProgramWith (SharedEnvironments IM.empty) program;
-    solved <- solvePrepared constraints;
+    solved <- solveFileConstraints constraints;
     Right ((,) constraints solved)
   };
   generateUncheckedProgramWith memo program =
@@ -2167,9 +2167,11 @@ module Bootstrap.Constraint where {
   -- finishNormalized checks the whole graph and indexes before this
   -- validity-preserving transformation, then shares the finished indexes.
   solvePrepared :: Constraints -> Either String Solver;
-  solvePrepared constraints =
+  solvePrepared = solveConstraintsUsing Solver.solveGenerated;
+  solveFileConstraints = solveConstraintsUsing Solver.solveFileGraph;
+  solveConstraintsUsing solveGraph constraints =
     do {
-      solved <- Solver.solveGenerated (initialGraph constraints) (equalities constraints) (solveSteps constraints);
+      solved <- solveGraph (initialGraph constraints) (equalities constraints) (solveSteps constraints);
       Solver.finishNormalized solved
     };
   eraseEvidence evidence typed = case IM.lookup (generalization typed) evidence of {

@@ -4181,15 +4181,18 @@ reviewBoundaryChecks = do
   check "free spine head and shadowed operands" [7,9,9] (map X.nameId (Traversal.freeNames tree))
   check "binder and operand occurrence order" [7,7,9,7,7,9,7] (map X.nameId (Traversal.names tree))
   let name = "@mlf.worker.7"
-      policy = H.unpack . Policy.attributes False False name
+      policy = H.unpack . Policy.attributes False False False name
       small = Policy.empty name
       tailCall = Policy.markTail (iterate (Policy.pointerCall "@mlf_closure") small !! 3)
   check "worker threshold below 64" "" (policy (iterate Policy.instruction small !! 63))
   check "worker threshold at 64" " noinline optnone" (policy (iterate Policy.instruction small !! 64))
   check "allocating musttail" " noinline optnone" (policy tailCall)
   check "explicit loop" "" (policy (Policy.markLoop tailCall))
+  let largePolicy = H.unpack . Policy.attributes True False False name
+  check "ordinary boxed helpers in large modules retain their bodies" " noinline optnone" (largePolicy small)
+  check "a recursive worker in the same module stays optimizable" "" (largePolicy (Policy.markTail small))
   check "boxed worker calls keep the closure out of the optimizer" " noinline optnone"
-    (H.unpack (Policy.attributes False False "@mlf.code.x" (Policy.pointerCall name small)))
+    (H.unpack (Policy.attributes False False False "@mlf.code.x" (Policy.pointerCall name small)))
 
 -- The copied arrow shares a surviving grandchild. Its name is demanded by
 -- expansion, while a disconnected generalization can carry an unevaluated name.

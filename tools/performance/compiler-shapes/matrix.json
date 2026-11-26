@@ -87,6 +87,7 @@
     "local_dictionary_branch_fanout": {"label": "Local dictionary branch fan-out", "default": false, "work": "n inferred local helpers each use the previous helper in two branches, with two overloaded string literals at the base"},
     "checked_constructor_dispatch": {"label": "Checked constructor dispatch", "default": false, "work": "n functions each inspect a product and the always-boxed two-constructor result of a runtime callback"},
     "signed_constructor_cases": {"label": "Signed polymorphic constructor cases", "default": false, "work": "n explicitly quantified declarations inspect a recursive datatype and pass the selected field to their predecessor"},
+    "recursive_checker_alternatives": {"label": "Mutually recursive type checker", "default": false, "work": "one signed inference group with monadic checking across constructor alternatives"},
     "recursive_worker_callbacks": {"label": "Recursive worker callbacks", "default": false, "work": "captured callbacks each invoke a recursive worker and escape through a boxed job"},
     "baseline": {"label": "Minimal IO baseline", "default": false, "work": "a program that only reads argv and prints it"}
   },

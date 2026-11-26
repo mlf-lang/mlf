@@ -78,6 +78,35 @@ def program(family, n):
     """Generate one shared module with a runtime input at its IO entry."""
     if family == 'baseline':
         declarations, expression = '', 'x'
+    elif family == 'recursive_checker_alternatives' and n:
+        constructors = ''.join(f' | Form{i} Term Term' for i in range(n))
+        arms = ';\n'.join(
+            f'  Form{i} left right -> do {{ value <- infer left; check value right; return (addInt value {i+1}) }}'
+            for i in range(n))
+        def select(lo, hi):
+            if lo == hi:
+                return f'Form{lo}'
+            mid = (lo + hi + 1) // 2
+            return f'(if ltInt x {mid} then {select(lo, mid-1)} else {select(mid, hi)})'
+        declarations = f"""data Term = Lit Int | Reject{constructors};
+data Check a = Failed | OK a;
+instance Functor Check where {{ fmap f v = case v of {{ Failed -> Failed; OK x -> OK (f x) }} }};
+instance Applicative Check where {{ pure = OK; (<*>) f v = case f of {{ Failed -> Failed; OK g -> fmap g v }} }};
+instance Monad Check where {{ (>>=) v k = case v of {{ Failed -> Failed; OK x -> k x }} }};
+infer :: Term -> Check Int;
+infer term = case term of {{
+  Lit v -> OK v;
+  Reject -> Failed;
+{arms}
+}};
+check :: Int -> Term -> Check ();
+check wanted term = do {{ actual <- infer term; if eqInt actual wanted then OK () else Failed }};
+choose x = {select(0, n-1)};
+"""
+        expression = ('case infer (choose x (Lit x) (if ltInt x 0 then Reject else Lit x)) of '
+                      '{ Failed -> 0; OK value -> value }')
+    elif family == 'recursive_checker_alternatives':
+        declarations, expression = '', 'x'
     elif family == 'recursive_worker_callbacks':
         declarations = """data Job = Job (Int -> Int);
 runJob (Job callback) value = callback value;
@@ -1054,6 +1083,10 @@ def expected(family, n, x):
         return (2*x + 2**63) % 2**64 - 2**63
     if family == 'independent_wide_recursive_groups':
         return (n*(16*x + 120) + n*(n-1)//2 + 2**63) % 2**64 - 2**63
+    if family == 'recursive_checker_alternatives':
+        if not n:
+            return x
+        return 0 if x < 0 else x + min(x, n - 1) + 1
     if family == 'recursive_worker_callbacks':
         return n * (x + n) if n else x
     if family == 'module_string_literals':
@@ -1333,6 +1366,8 @@ def generate(out, sizes=None, families=None, baseline_family=None):
         inputs = [-1,0,n+3] if family == 'recursive_ring' else [-1,0,7]
         if family == 'module_string_literals':
             inputs = list(dict.fromkeys([-1, 0, 1, 2, 3, 4, n//2, n-1, n+1]))
+        elif family == 'recursive_checker_alternatives':
+            inputs = list(dict.fromkeys([-1, 0, n // 2, n - 1, n + 1]))
         elif family == 'wide_case':
             inputs = [-1, n//2, n, '--all']
         elif family == 'visible_instance_inventory':

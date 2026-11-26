@@ -614,7 +614,7 @@ module Bootstrap.LLVM.Codegen where {
              };
              state <- get;
              let { keepWorker = wrapsCapturedFunction state names (A.functionBody f) ||
-                     (M.size (functions state) > 128 &&
+                     (largeWorkerModule state &&
                        hasBranchTailTransfer state name (L.length names) (A.functionBody f)) };
              definitionBodyWithPolicy keepWorker "ptr" symbol (L.map pointer registers)
                (finishWorker (L.length names) scope (A.functionBody f));

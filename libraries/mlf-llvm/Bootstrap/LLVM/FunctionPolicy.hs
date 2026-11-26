@@ -25,8 +25,8 @@ module Bootstrap.LLVM.FunctionPolicy where {
   workerBodyPolicy (Facts _ _ loop tailCall recursive allocations) =
     if loop then OptimizableWorker else if tailCall && allocations >= 3 then LazyTailWorker
     else if recursive || tailCall then OptimizableWorker else OrdinaryWorker;
-  attributes :: Bool -> Bool -> String -> Facts -> String;
-  attributes keepWorker collectingWorker name facts =
+  attributes :: Bool -> Bool -> Bool -> String -> Facts -> String;
+  attributes largeModule keepWorker collectingWorker name facts =
           if (startsWith "@mlf.numeric." name &&
               (L.not (startsWith "@mlf.numeric.entry." name) && L.not collectingWorker))
           then " alwaysinline"
@@ -37,7 +37,9 @@ module Bootstrap.LLVM.FunctionPolicy where {
           } in case workerBodyPolicy facts of {
             OptimizableWorker -> if boundary then " noinline" else "";
             LazyTailWorker -> " noinline optnone";
-            OrdinaryWorker -> if boundary then " noinline optnone" else ""
+            -- Large link units can contain thousands of ordinary boxed helpers.
+            -- Keep their emitted bodies while leaving recursive bodies optimizable.
+            OrdinaryWorker -> if largeModule || boundary then " noinline optnone" else ""
           } else "";
   startsWith :: String -> String -> Bool;
   startsWith prefix value =

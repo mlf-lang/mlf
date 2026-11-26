@@ -107,6 +107,7 @@ module Bootstrap.LLVM.Build where {
     Output f0 f1 f2 f3 f4 (ConstructorLayout value M.empty) f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22;
   functions :: Output -> Map XName A.WorkerFunction;
   functions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) = case f6 of { FunctionScope fs _ _ -> fs };
+  largeWorkerModule state = M.size (functions state) > 128;
   withFunctions :: Map XName A.WorkerFunction -> Output -> Output;
   withFunctions value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) =
     case f6 of { FunctionScope _ names _ ->
@@ -410,7 +411,7 @@ module Bootstrap.LLVM.Build where {
           L.any (\n -> eqString (showInt (O.nameId n)) (symbolIdentity name)) (S.toList collectors)
       };
       let {
-        attributes = Policy.attributes keepWorker collectingWorker name facts;
+        attributes = Policy.attributes (largeWorkerModule saved) keepWorker collectingWorker name facts;
         -- An optnone closure must execute even a pure worker that never returns.
         -- LLVM lowers sideeffect without a runtime call, while retaining the
         -- observable transfer during interprocedural optimization and codegen.
