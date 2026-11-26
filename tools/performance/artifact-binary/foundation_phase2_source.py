@@ -108,6 +108,8 @@ BOUNDARY_TYPED = '682ccd4cdd2190e22d0fb0d4dc3ab058e72c7b7a'
 BOUNDARY_TYPED_TREE = 'a3a63abcbaf49969832d45addc2b448ec4aff84a'
 INVENTORY_CLEANUP = '0e64b4e02dda60106e959f7782b6a17fce1e3cef'
 INVENTORY_CLEANUP_TREE = 'b5b806d87cd89ea31bb48cbeb56913827da7be36'
+COLD_BUILD_FIX = '9784029c3f4b00bddfe5637e018a944367fe30ca'
+COLD_BUILD_FIX_TREE = '5abd8e165375eb5fb6a712bfda674202cba23b24'
 BOUNDARY_MODULES = {
     'Bootstrap.Graph.ScopeIndex': 'libraries/mlf-inference/Bootstrap/Graph/ScopeIndex.hs',
     'Bootstrap.GroundProofEdit': 'libraries/mlf-crates/Bootstrap/GroundProofEdit.hs',
@@ -296,6 +298,10 @@ def qualified_contract(root, source_root=None):
     expected = live_git.inventory(BOUNDARY_TYPED, paths | auxiliary_roles)
     fixture_drivers = {'tools/shared/test_artifact_binary.py', 'tools/shared/test_artifact_binary_modular.py'}
     expected.update(live_git.inventory(INVENTORY_CLEANUP, fixture_drivers))
+    live_git.commit(COLD_BUILD_FIX, tree=COLD_BUILD_FIX_TREE, parents=['6f58cd514f8ad9becd97b3f60ff95e26b083fef0'])
+    live_git.run('merge-base', '--is-ancestor', COLD_BUILD_FIX, 'HEAD')
+    fixes = set(live_git.run('diff', '--name-only', COLD_BUILD_FIX + '^', COLD_BUILD_FIX).decode().splitlines())
+    expected.update(live_git.inventory(COLD_BUILD_FIX, fixes & (paths | auxiliary_roles)))
     if source_root == root:
         auxiliary = {p: proof.read(source_root, p) for p in auxiliary_roles}
         proof.require(all(proof.oid(raw) == expected[p] for p, raw in auxiliary.items()),
