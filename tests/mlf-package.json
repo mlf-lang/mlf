@@ -50,6 +50,7 @@
       "Tests.Coverage": "Tests/Coverage.hs",
       "Tests.TestDrivers": "Tests/TestDrivers.hs",
       "Tests.TestSources": "Tests/TestSources.hs",
+      "Tests.ReportJournal": "Tests/ReportJournal.hs",
       "Tests.Selection": "Tests/Selection.hs",
       "Tests.CorePartitions": "Tests/CorePartitions.hs",
       "Tests.BuildReceipts": "shared/Tests/BuildReceipts.hs"

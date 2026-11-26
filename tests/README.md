@@ -144,6 +144,15 @@ library bytes, compiler/environment identities and ordered flags. Group reports
 identify each reused artifact and its checksums. The two new cache regressions
 exercise source resolution, cross-group reuse, invalidation, corruption repair
 and traced runtime behavior with small programs; every selected matrix still runs.
+`compiler-tests backend-prepare` prepares only these two drivers and records
+`scope: preparation`; it cannot qualify a backend campaign. CI exports the
+artifacts named in its completed, hashed build report with
+`tools/testing/driver_cache.py`, then saves the snapshot before the matrix runs.
+Import validates artifact stamps and bytes, and ordinary build-key validation
+still decides reuse. Missing or damaged entries are rebuilt. The full backend
+invocation runs independently, including after a failed preparation attempt.
+The matrix also reuses the checked traced runtime object already prepared for
+RuntimeDriver, while Port retains its own runtime preparation.
 Self-host selects the candidate artifact from its actual package build report,
 checks that report's source snapshot and retains a copy. Equal native binary
 hashes elsewhere in the shared store do not identify the producing LLVM input.
@@ -272,6 +281,17 @@ names. Full Port still requires all 25 fixtures and rejects a partial manifest.
 Some Backends families exercise compiler/type/rejection contracts without
 runtime rows. They require nonempty completed-family evidence; the full backend
 matrix still requires all 593 rows on both backends.
+
+Backends checks each selected case's runtime row count against its reviewed
+catalog entry. The reverse-complement and k-nucleotide input tables compile
+and round-trip their fixed source once per table. Their ten input pairs retain
+ten separate interpreter and LLVM comparisons, with two source preparations.
+
+Coverage, family, and matrix journals publish ordinary JSONL on completion
+and on a recoverable suite failure. After an abrupt interruption, use
+`Tests.ReportJournal.recover reportPath` to read the committed prefix. Keep
+the report, its `.previous.jsonl` sibling, and its `.journal/` directory
+together. Larger runs store alternating snapshots of bounded row blocks.
 
 Package integration and distribution have separate execution units: source
 integration retains 51 reviewed IDs and distribution retains 28. Integration

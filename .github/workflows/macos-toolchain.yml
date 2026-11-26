@@ -11,12 +11,15 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: macos-toolchain-${{ github.ref }}
+  # Label notifications outside this workflow’s policy must not cancel real checks.
+  group: macos-toolchain-${{ (!github.event.label || github.event.label.name == 'ci:skip') && github.ref || github.run_id }}
   cancel-in-progress: true
 jobs:
   provenance:
-    name: GHC and LLVM toolchain provenance (macos-26)
-    if: github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')
+    name: GHC and LLVM toolchain provenance (macos-26)${{ github.event.label && github.event.label.name != 'ci:skip' && ' (unrelated label)' || '' }}
+    if: >-
+      (!github.event.label || github.event.label.name == 'ci:skip') &&
+      (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip'))
     runs-on: macos-26
     timeout-minutes: 120
     steps:

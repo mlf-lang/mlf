@@ -714,6 +714,11 @@
       "role": "implementation"
     },
     {
+      "module": "Tests.ReportJournal",
+      "path": "tests/Tests/ReportJournal.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Tests.Selection",
       "path": "tests/Tests/Selection.hs",
       "role": "implementation"

@@ -105,13 +105,13 @@ def main():
     families=args.family or matrix['families']
     if 'baseline' not in families and fit_growth.include_baseline(families,sizes,matrix['baseline'] and not args.pilot):
         families=['baseline', *families]
-    cells = G.coordinates(sizes, families)
+    cells = G.coordinates(sizes, families, args.baseline_family)
+    if not cells or len(cells) != len(set(cells)):
+        parser.error('shape coordinates must be nonempty and distinct')
     if args.framework_list:
         framework.list_cases(cells, args.pilot)
         return
     cells, selected = framework.select(cells, args.pilot, exclude=args.framework_child)
-    if not cells or len(cells) != len(set(cells)):
-        parser.error('shape coordinates must be nonempty and distinct')
     ids = selected if framework.active() and not args.framework_child else []
     if ids:
         framework.events.plan(ids)
@@ -132,15 +132,13 @@ def main():
     selection = compiler_reference.select_revision(source, generated) if not args.pilot else None
     if args.sweep_reference and selection != json.loads(args.sweep_reference):
         raise ValueError('candidate revision or baseline changed during sweep')
-    reference = compiler_reference.prepare(setup, selection, auth['ghc']['path'],
-                                           out/'reference-setup') if selection else None
     repeats=1 if args.pilot else args.repeats
     H.require(repeats>=1,'positive repeats')
-    sizes = list(dict.fromkeys(size for _, size in cells if size))
-    families = list(dict.fromkeys(family for family, _ in cells))
-    cases=G.generate(out/'sources',sizes=sizes,families=families,baseline_family=args.baseline_family)
+    cases = G.generate_cells(out/'sources', cells, args.baseline_family)
     H.require(args.endpoint=='crate-plan-v1' or not any(worker.dependencies(c) for c in cases),
               'the cold dependency family requires crate-plan-v1')
+    reference = compiler_reference.prepare(setup, selection, auth['ghc']['path'],
+                                           out/'reference-setup') if selection else None
     seed=data['seed']; rng=random.Random(seed); order=list(cases);rng.shuffle(order)
     schedule=[]
     for index,case in enumerate(order):

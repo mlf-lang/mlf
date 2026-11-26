@@ -1011,7 +1011,9 @@ module Tests.CompilerTests where {
              O.mkdir directory;
              if (expectedRows == 0)
              then ioReturn ()
-             else compileRuntime c flags True ("matrix-" ++ (abi ++ "/runtime.o"));
+             else if portFixtures
+                  then compileRuntime c flags True ("matrix-" ++ (abi ++ "/runtime.o"))
+                  else O.copy (output c ++ "/runtime-traced.o") (directory ++ "/runtime.o");
              let {
                log = (output c ++ ("/" ++ (abi ++ ".log")))
              };
@@ -1097,31 +1099,10 @@ module Tests.CompilerTests where {
                           Left error -> O.fatal error;
                           Right value -> return value
                         };
-                      let {
-                        labels =
-                          if portFixtures
-                          then S.map (\name -> ("MLF compiler port: " ++ name))
-                                 (Catalog.fixtures expectedEntries)
-                          else Catalog.combine "labels" expectedEntries
+                      case Catalog.validateMatrixRows portFixtures expectedEntries actual of {
+                        Left message -> O.fatal message;
+                        Right _ -> return ()
                       };
-                      O.require
-                        ((S.length actual == expectedRows) &&
-                         S.all
-                           (\entry ->
-                              (Catalog.keys (O.words "label index backends") entry &&
-                               (Catalog.nonemptyString (J.get "label" entry) &&
-                                (Catalog.natural (J.get "index" entry) &&
-                                 J.equal (J.get "backends" entry) (J.stringArray backendNames)))))
-                           actual)
-                        "matrix row report differs from the reviewed selection";
-                      O.require
-                        (S.all (\entry -> S.elem eqString (J.getText "label" "" entry) labels)
-                           actual)
-                        "matrix executed a fixture outside the selected families";
-                      if portFixtures
-                      then O.require (Catalog.sameSet (S.map (J.getText "label" "") actual) labels)
-                             "port matrix omitted a selected fixture"
-                      else return ();
                       digest <- fileDigest path;
                       return
                         (J.set "row_report" (J.str path)
@@ -2501,7 +2482,7 @@ module Tests.CompilerTests where {
                      O.require
                        (S.elem eqString group
                           (O.words
-                             "unit packages self-host parity backends port pr-smoke select port-prepare-StateTypes port-prepare-SolverReuse port-prepare-InferenceConformance port-prepare-other"))
+                             "unit packages self-host parity backends backend-prepare port pr-smoke select port-prepare-StateTypes port-prepare-SolverReuse port-prepare-InferenceConformance port-prepare-other"))
                        "unknown compiler test group";
                      let {
                        hasSelection = Catalog.hasSelection settings
@@ -2518,7 +2499,7 @@ module Tests.CompilerTests where {
                               Right value -> return value
                             }
                        else return
-                              (if eqString group "pr-smoke"
+                              (if S.elem eqString group (O.words "pr-smoke backend-prepare")
                                then []
                                else Catalog.forCampaign catalog group);
                      profile <- getEnv "MLF_TEST_RUNTIME_PROFILE";
@@ -2593,7 +2574,7 @@ module Tests.CompilerTests where {
                            then "partial"
                            else if eqString group "pr-smoke"
                                 then "smoke"
-                                else if O.starts "port-prepare-" group
+                                else if eqString group "backend-prepare" || O.starts "port-prepare-" group
                                      then "preparation"
                                      else "full"));
                      record c "test_catalog"
@@ -2608,7 +2589,9 @@ module Tests.CompilerTests where {
                      path <- getEnv "PATH";
                      windows <- O.isWindows;
                      setEnv "PATH" (O.parent compiler ++ ((if windows then ";" else ":") ++ path));
-                     if eqString group "select"
+                     if eqString group "backend-prepare"
+                     then do { _ <- prepareDrivers c False; return () }
+                     else if eqString group "select"
                      then selectedUnits c selected
                      else if eqString group "self-host"
                           then selfHost c

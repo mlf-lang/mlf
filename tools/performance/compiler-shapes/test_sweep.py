@@ -15,6 +15,16 @@ from test_contract import edit, write_cohort
 
 
 class SweepTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.source = Path(cls.enterClassContext(tempfile.TemporaryDirectory())).resolve()
+        git = sweep.provenance.git
+        git(cls.source, 'init', '--quiet')
+        for label in ('baseline', 'candidate'):
+            git(cls.source, '-c', 'user.name=Sweep fixture', '-c', 'user.email=fixture@example.invalid',
+                '-c', 'commit.gpgsign=false', 'commit', '--allow-empty', '--quiet', '-m', label)
+        cls.commit = git(cls.source, 'rev-parse', 'HEAD').decode().strip()
+
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
@@ -23,11 +33,11 @@ class SweepTests(unittest.TestCase):
                                       producer=None, repeats=3, endpoint='crate-fused-v1', prune_build_products=False,
                                       family=['flat_functions', 'mono_calls'], size=[8, 32],
                                       cohort_output_gib=None)
-        self.args.setup.write_text(json.dumps({'complete': True, 'endpoint': self.args.endpoint}))
+        self.args.setup.write_text(json.dumps({'complete': True, 'endpoint': self.args.endpoint,
+                                               'source': str(self.source)}))
         self.seen = []
         self.fail = {}
         self.changed_inputs = set()
-        self.commit = sweep.provenance.git(sweep.bench.ROOT, 'rev-parse', 'HEAD').decode().strip()
 
     def recorder(self, argv, cwd):
         def option(name):
@@ -45,8 +55,7 @@ class SweepTests(unittest.TestCase):
         plan = sweep.analyze.load(folder / 'plan.json')
         receipt = sweep.analyze.load(folder / 'receipt.json')
         plan['source']['commit'] = self.commit
-        plan['inputs'] = {plan['cases'][0]['source']: 'source',
-                          '/compiler': 'changed' if folder.name in self.changed_inputs else 'fixed'}
+        plan['inputs']['/compiler'] = 'changed' if folder.name in self.changed_inputs else 'fixed'
         (folder / 'plan.json').write_text(json.dumps(plan))
         receipt['plan_sha256'] = sweep.analyze.sha(folder / 'plan.json')
         for run in receipt['runs']:
@@ -219,6 +228,28 @@ class SweepTests(unittest.TestCase):
         self.assertEqual(rows[-1]['status'], 'failed')
         self.assertIn('inputs changed', rows[-1]['reason'])
         self.assertEqual(rows[-1]['mlf_seconds'], '')
+
+    def test_multisize_cold_dependencies_verify_per_case_and_share_the_compiler(self):
+        self.args.family = ['retained_packet_dependency', 'retained_curried_job_list']
+        self.args.endpoint = 'crate-plan-v1'
+        self.args.setup.write_text(json.dumps({'complete': True, 'endpoint': self.args.endpoint,
+                                               'source': str(self.source)}))
+        with mock.patch.object(sweep.command_runner, 'run_recorder', side_effect=self.recorder):
+            sweep.run(self.args)
+        self.assertEqual([row['status'] for row in self.rows()], ['passed'] * 4)
+        for family, count in zip(self.args.family, [1, 2]):
+            folder = self.root / 'cohorts' / (family + '-32')
+            plan = sweep.analyze.load(folder / 'plan.json')
+            libraries = sweep.worker.dependencies(plan['cases'][0])
+            self.assertEqual(len(libraries), count)
+            for library in libraries:
+                path = Path(library['source'])
+                original = path.read_bytes()
+                path.write_bytes(original + b'changed')
+                with self.subTest(module=library['module']), self.assertRaisesRegex(
+                        ValueError, 'unchanged pinned dependency source'):
+                    sweep.analyze.analyze(folder)
+                path.write_bytes(original)
 
     def test_interruption_does_not_start_next_family_or_reuse_partial_evidence(self):
         with mock.patch.object(sweep.bench, 'resolve', return_value=({'repeats': 3}, self.args.family, [8], False)), \

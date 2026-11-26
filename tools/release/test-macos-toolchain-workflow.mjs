@@ -8,6 +8,67 @@ import { spawnSync } from 'node:child_process';
 const workflowSource = fs.readFileSync('.github/workflows/macos-toolchain.yml', 'utf8');
 const workflow = projectAdapterCommands(workflowSource);
 const clangLibraryProof = String.raw`.toolchain.files | keys | any(test("/libclang-cpp(\\.[0-9]+)*\\.dylib$"))`;
+const runScript = (text, name) => {
+  const steps = text.split(/^      - /m).filter(step => step.startsWith(`name: ${name}\n`));
+  assert.equal(steps.length, 1, `One ${name} step is required`);
+  const script = steps[0].match(/^        run: \|\n([\s\S]*)$/m)?.[1];
+  assert.ok(script, `An explicit run block is required for ${name}`);
+  return script.replace(/^          /gm, '');
+};
+const requireCalls = (script, stubs, calls, failureCalls) => {
+  // Execute only shell routing: record calls without downloading, extracting or
+  // compiling anything. A separate descriptor preserves pipeline call order.
+  for (const failure of [null, ...failureCalls]) {
+    const result = spawnSync('/bin/bash', ['--noprofile', '--norc', '-euo', 'pipefail', '-c',
+      String.raw`exec 3>&1
+record() {
+  printf '%s\0' "$#" "$@" >&3
+  if [ "$(printf '%s\037' "$@")" = "$MLF_WORKFLOW_FAIL_ARGUMENTS" ]; then return 73; fi
+}
+` + stubs + '\n' + script], {
+      encoding: 'utf8', timeout: 5000,
+      env: {PATH: '/nonexistent', RUNNER_TEMP: '/workflow-test',
+        MLF_WORKFLOW_FAIL_ARGUMENTS: failure === null ? '' : calls[failure].join('\x1f') + '\x1f'},
+    });
+    const message = failure === null
+      ? 'Required provenance commands must execute in order with their actual arguments'
+      : 'Provenance command failures must stop the script before later calls';
+    const expected = failure === null ? calls : calls.slice(0, failure + 1);
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, failure === null ? 0 : 73, message + '\n' + result.stderr);
+    assert.equal(result.stderr, '');
+    assert.equal(result.stdout, expected.flatMap(argv => [String(argv.length), ...argv]).join('\0') + '\0', message);
+  }
+};
+const verifyProvenanceCommands = text => {
+  requireCalls(runScript(text, 'Install pinned official GHC 9.14.1'), String.raw`
+curl() { record curl "$@"; }
+shasum() {
+  local input='' line
+  while IFS= read -r line; do input="$input$line"$'\n'; done
+  record shasum "$@" "$input"
+}
+tar() { record tar "$@"; exit 0; }
+`, [
+    ['curl', '-fsSL', 'https://downloads.haskell.org/~ghc/9.14.1/ghc-9.14.1-aarch64-apple-darwin.tar.xz',
+      '-o', '/workflow-test/ghc-9.14.1.tar.xz'],
+    ['shasum', '-a', '256', '-c', '-',
+      '841591f152085be605616682779341847d24fd56bd6d22ca61bb37ee32b50681  /workflow-test/ghc-9.14.1.tar.xz\n'],
+    ['tar', '-xJf', '/workflow-test/ghc-9.14.1.tar.xz', '-C', '/workflow-test'],
+  ], [1]);
+  requireCalls(runScript(text, 'Build and authenticate actual GHC-origin async tools'), String.raw`
+python3() { record python3 "$@"; }
+jq() { record jq "$@"; }
+`, [
+    ['python3', '-B', 'tools/shared/prepare_async_ghc.py', '--build-dir', '.mlf-build/async-ghc',
+      '--clang', 'clang', '--optimization', '2'],
+    ['jq', '-e', '.complete == true and .producer_host == "GHC" and .typecheck_only == false and .optimization == "2"',
+      '.mlf-build/async-ghc/receipt.json'],
+    ['jq', '-e', clangLibraryProof, '.mlf-build/async-ghc/receipt.json'],
+    ['jq', '-e', '.complete == true and .producer_host == "GHC" and .runner_protocol_version == 1',
+      '.mlf-build/async-ghc/async-tools.json'],
+  ], [0, 1, 2, 3]);
+};
 const verify = text => {
   assert.match(text, /^  pull_request:\n    paths:\n/m);
   for (const path of ['.github/workflows/macos-toolchain.yml', 'tools/shared/build.py',
@@ -19,14 +80,10 @@ const verify = text => {
   assert.match(text, /^    timeout-minutes: 120$/m);
   assert.ok(text.includes('test "$(uname -m)" = arm64'));
   assert.ok(text.includes('brew install llvm@19 gmp pkg-config bdw-gc jq'));
-  assert.ok(text.includes('841591f152085be605616682779341847d24fd56bd6d22ca61bb37ee32b50681 "$archive" | shasum -a 256 -c -'));
   for (const flags of ['-B', '-O -B']) {
     assert.ok(text.includes(`python3 ${flags} tools/shared/test_darwin_toolchain.py`));
     assert.ok(text.includes(`python3 ${flags} tools/shared/test_prepare_async_ghc.py`));
   }
-  assert.ok(text.includes('python3 -B tools/shared/prepare_async_ghc.py --build-dir .mlf-build/async-ghc --clang clang --optimization 2\n'));
-  assert.ok(text.includes(clangLibraryProof));
-  assert.ok(text.includes('.runner_protocol_version == 1'));
   assert.ok(text.includes('        if: always()\n'));
   assert.equal((text.match(/^        if:/gm) || []).length, 1, 'Only artifact upload may be conditional within the job');
   for (const path of ['macos-toolchain/', 'async-ghc/async-tools.json', 'async-ghc/receipt.json',
@@ -34,6 +91,7 @@ const verify = text => {
     assert.ok(text.includes('            .mlf-build/' + path + '\n'));
   }
   assert.doesNotMatch(text, /self_host|self-host|full_validation|continue-on-error|pull_request_target|secrets\.|set \+e|\|\| true/);
+  verifyProvenanceCommands(text);
 };
 const suite = 'release-macos-toolchain-workflow';
 const prefix = 'release/macos-toolchain-workflow/';
@@ -58,6 +116,24 @@ cases.push(
   ['run-condition', () => assert.throws(() => verify(workflow.replace('        run: |', '        if: false\n        run: |')))],
   ['shell-failure', () => assert.throws(() => verify(workflow.replace('set -euo pipefail', 'set +e')))],
 );
+for (const [label, disable, failure] of [
+  ['commented-provenance-command', line => line.replace(/^          /, '          # '),
+    /Required provenance commands must execute in order/],
+  ['conditional-provenance-command', line => `          if false; then\n${line}\n          fi`,
+    /Required provenance commands must execute in order/],
+  ['swallowed-provenance-failure', line => line + ' || :',
+    /Provenance command failures must stop/],
+]) {
+  cases.push([label, () => {
+    const commands = workflow.split('\n').filter(line => line.startsWith('          ') &&
+      (line.includes(' | shasum ') || line.includes('python3 -B tools/shared/prepare_async_ghc.py') ||
+       line.trim().startsWith('jq -e ')));
+    assert.equal(commands.length, 5, 'The checksum, build and three receipt commands are covered');
+    for (const command of commands) {
+      assert.throws(() => verify(workflow.replace(command, disable(command))), failure);
+    }
+  }]);
+}
 // The receipt hashes resolved files, which may have a versioned physical name.
 for (const basename of ['libclang-cpp.dylib', 'libclang-cpp.19.dylib', 'libclang-cpp.19.1.7.dylib',
   'libclang-cpp.dylib.extra', 'libclang-cpp.fake.dylib', 'libclang-cpp.so', 'not-libclang-cpp.dylib']) {

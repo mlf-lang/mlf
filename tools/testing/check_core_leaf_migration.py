@@ -708,59 +708,24 @@ def main():
     verify(registry, runner, original, expected)
     verify_catalog(catalog, expected)
     verify_inventory(inventory, expected)
-    graph_row = '  (:) ((,) "' + RECURSION_GRAPH_LABEL + '" "' + binding("core/graph-expansion", RECURSION_GRAPH_LABEL)[1] + '") (\n'
-    old_graph_row = '  (:) ((,) "expansion resets scheme flag and binding" "core/graph-expansion/expansion-resets-scheme-flag-and-binding") (\n'
-    require(registry.count(graph_row) == 1 and registry.count(old_graph_row) == 1,
-            "recursive graph row mutation preimage changed")
-    family_a = registry.index(' (:) ((,) "core/graph-expansion" (\n')
-    family_b = registry.index(' (:) ((,) "core/graph-validation" (\n')
-    family_end = registry.index('\n (:) ((,) ', family_b + 1) + 1
-    swapped_families = registry[:family_a] + registry[family_b:family_end] + registry[family_a:family_b] + registry[family_end:]
-    require(actual_bindings(swapped_families) == actual_bindings(registry),
-            "family-order mutant changed row ownership instead of only order")
+    # verify authenticates whole source files before inspecting their structure.
+    # Exercise that boundary once per file, retaining length so the byte checks
+    # themselves must reject. Catalog and historical transformation controls below
+    # still exercise their independently reviewed data and policy branches.
     mutations = {
-        "legacy_actions_unreachable": (registry, runner.replace("let all = S.append substrings entries", "let all = substrings", 1)),
-        "substring_cases_unreachable": (registry, runner.replace("let all = S.append substrings entries", "let all = entries", 1)),
-        "unknown_semantic_id": (registry.replace('core/optimizer-uses/optimizer-free-use-indices-agree-with-independent-scoped-scans', 'core/unknown', 1), runner),
-        "original_label_changed": (registry.replace('optimizer free-use indices agree with independent scoped scans', 'changed label', 1), runner),
-        "runtime_binding_check_removed": (registry.replace('S.eqList eqString (S.map S.fst actions) (S.map S.fst expected)', 'true', 1), runner),
-        "qualification_boundary_removed": (registry.replace('(:) "qualification:ineligible"', '(:) "qualified"', 1), runner),
-        "substring_oracle_changed": (registry, runner.replace('(,,) "ab" "abc" true', '(,,) "ab" "abc" false', 1)),
-        "single_child_guard_removed": (registry, runner.replace('Runner.listing options || exact && S.length selected == 1', 'true', 1)),
-        "default_switched": (registry, runner.replace('_ -> legacyMain target complete families args names cases', '_ -> framework target complete families args', 1)),
-        "parent_evidence_isolation_removed": (registry, runner.replace('setEnv "MLF_TEST_COVERAGE_REPORT" (directory ++ "/legacy-coverage.jsonl")', 'return ()', 1)),
-        "recursive_leaf_dropped": (registry.replace(graph_row, "", 1), runner),
-        "recursive_leaf_wrong_owner": (registry.replace(graph_row, "", 1).replace(' (:) ((,) "core/modules" (\n', ' (:) ((,) "core/modules" (\n' + graph_row, 1), runner),
-        "recursive_leaf_order_changed": (registry.replace(graph_row + old_graph_row, old_graph_row + graph_row, 1), runner),
-        "retired_identity_resurrected": (registry.replace("core/readability/recursion-unsigned-local-group", "core/readability/readability-rejection-local-recursion-needs-a-signature", 1), runner),
-        "family_order_changed": (swapped_families, runner),
+        "registry_bytes_changed": (
+            registry.replace("module Tests.CoreRegistry", "module Tests.CoreRegistrX", 1), runner,
+            "current registry differs from pinned source plus reviewed ordered amendments"),
+        "runner_bytes_changed": (
+            registry, runner.replace("module Tests.CoreRunner", "module Tests.CoreRunneX", 1),
+            "current Core runner differs from pinned canonical transcription"),
     }
-    # Each new migration has its own active counterexample; old identities
-    # cannot return, and every added leaf remains ordered and correctly owned.
-    def registry_row(family, label):
-        return '  (:) ((,) ' + json.dumps(label) + ' ' + json.dumps(binding(family, label)[1]) + ') (\n'
-    for index, (family, old, new) in enumerate(CUTOVER_RENAMES):
-        row = registry_row(family, new)
-        require(registry.count(row) == 1, "cutover rename mutation preimage changed")
-        mutations["cutover_retired_identity_" + str(index)] = (
-            registry.replace(row, registry_row(family, old), 1), runner)
-    for index, (family, label, before) in enumerate(CUTOVER_ADDITIONS):
-        row = registry_row(family, label)
-        require(registry.count(row) == 1, "cutover addition mutation preimage changed")
-        rows = expected[family]
-        following = registry_row(family, rows[rows.index(binding(family, label)) + 1][0])
-        require(row + following in registry, "cutover addition order preimage changed")
-        mutations["cutover_leaf_dropped_" + str(index)] = (registry.replace(row, "", 1), runner)
-        mutations["cutover_leaf_order_" + str(index)] = (
-            registry.replace(row + following, following + row, 1), runner)
-        wrong = ' (:) ((,) "core/inference-and-annotations" (\n'
-        mutations["cutover_leaf_owner_" + str(index)] = (
-            registry.replace(row, "", 1).replace(wrong, wrong + row, 1), runner)
-    for name, (mutated_registry, mutated_runner) in mutations.items():
+    for name, (mutated_registry, mutated_runner, message) in mutations.items():
         require((mutated_registry, mutated_runner) != (registry, runner), f"inactive mutation {name}")
         try:
             verify(mutated_registry, mutated_runner, original, expected)
-        except ValueError:
+        except ValueError as error:
+            require(str(error) == message, f"source identity control failed for the wrong reason: {name}")
             continue
         raise ValueError(f"failed to reject {name}")
     catalog_mutations = {}

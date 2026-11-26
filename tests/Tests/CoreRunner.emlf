@@ -13,6 +13,7 @@ import qualified Tests.CorePartitions as P
 import qualified Tests.CoreRegistry as Registry
 import qualified Test.Assert as A
 import qualified Test.Case as C
+import qualified Test.CaseSelection as Planned
 import qualified Test.Runner as Runner
 import qualified Test.Process as Process
 import qualified Test.Outcome as Outcome
@@ -48,9 +49,7 @@ frameworkCases : String -> Bool -> [] ((,) String ([] ((,) String Registry.Actio
 frameworkCases target complete families = do
  entries <- Registry.register target complete families
  let substrings = if S.elem eqString substringFamily (S.map S.fst families) then substringCases target complete else []
- let all = S.append substrings entries
- Runner.validate all
- Right all
+ Right (S.append substrings entries)
 
 inFamily : String -> C.Case -> Bool
 inFamily family entry = S.elem eqString ("family:" ++ family) (C.tags entry)
@@ -78,12 +77,12 @@ extract settings args remaining = case remaining of
  (:) flag [] -> Right ((,) settings (S.reverse ((:) flag args)))
  [] -> Right ((,) settings (S.reverse args))
 
-plan : Bool -> [] String -> [] C.Case -> [] String -> Either String ((,,) Runner.Options ([] C.Case) Bool)
+plan : Bool -> [] String -> [] C.Case -> [] String -> Either String ((,,) Runner.Options Planned.CaseSelection Bool)
 plan complete names entries args = case args of
  (:) "--families" _ -> do
   (,) _ selectedFamilies <- Selection.choose names args
   options <- Runner.parse []
-  let selected = S.filter (\entry -> S.any (\family -> inFamily family entry) selectedFamilies) entries
+  selected <- Planned.matching (\entry -> S.any (\family -> inFamily family entry) selectedFamilies) entries
   Right ((,,) options selected false)
  (:) "--from" ((:) prefix []) -> do
   Process.ensure complete "--from is supported by the complete core entry only"
@@ -92,17 +91,19 @@ plan complete names entries args = case args of
   let actions = S.filter (\entry -> S.not (inFamily substringFamily entry)) entries
   let remaining = S.dropWhile (\entry -> S.not (O.starts prefix (C.name entry))) actions
   Process.ensure (S.not (S.null remaining)) ("unknown test prefix: " ++ prefix)
-  Right ((,,) options (S.append substrings remaining) false)
+  selected <- Planned.project entries (S.append substrings remaining)
+  Right ((,,) options selected false)
  _ -> do
-  (,) options selected <- Runner.plan args entries
+  (,) options selected <- Runner.executionPlan args entries
   Right ((,,) options selected (complete && S.null (Runner.selectors options)))
 
 -- The older exact child route still supports read-only discovery. The case
 -- worker owns a fresh report and coverage destination set by the supervisor.
 frameworkChild : [] C.Case -> [] String -> IO ()
 frameworkChild entries args = do
- (,) options selected <- case Runner.plan args entries of { Left error -> O.fatal error; Right value -> return value }
- if Runner.listing options then finishCode (Runner.runOptions options entries selected) else do
+ (,) options planned <- case Runner.executionPlan args entries of { Left error -> O.fatal error; Right value -> return value }
+ if Runner.listing options then finishCode (Runner.runSelected (\_ -> return ()) options planned) else do
+  let selected = Planned.cases planned
   reportMode options
   let exact = S.any (\selector -> case selector of { Runner.Exact _ -> true; _ -> false }) (Runner.selectors options)
   O.require (exact && S.length selected == 1) "core framework child requires --list or one --exact leaf ID"
@@ -111,11 +112,11 @@ frameworkChild entries args = do
   setEnv "MLF_TEST_COVERAGE_REPORT" (directory ++ "/legacy-coverage.jsonl")
   unsetEnv "MLF_TEST_FAMILY_REPORT"
   Coverage.begin "core" false
-  code <- Runner.runOptionsObserved observe options entries selected
+  code <- Runner.runSelected observe options planned
   if code == 0 then do
    if inFamily substringFamily (S.head selected) then Coverage.metric "core" "substring-executed" 1 else return ()
    Coverage.finish "core"
-  else exitWith code
+  else do { Coverage.flush; exitWith code }
 
 observe : Runner.Result -> IO ()
 observe (Runner.Result entry result) = case result of
@@ -172,12 +173,11 @@ isolatedCase (Settings _ _ bound) self cwd helper runDir inventory total entry =
   writeFile (directory ++ "/outcome.json") (J.render result ++ "\n")
   case outcome of
    Outcome.Pass -> return (Right ())
-   Outcome.Cancelled _ -> exitWith 130
+   Outcome.Cancelled _ -> do { Coverage.flush; exitWith 130 }
    _ -> return (Left (A.Failure (Outcome.status outcome ++ ": " ++ Outcome.message outcome ++ "; evidence: " ++ directory) Nothing))))
 
 prepareProcesses : Settings -> String -> Int -> [] C.Case -> IO ([] C.Case)
-prepareProcesses settings target total selected =
- if S.not (S.any Registry.isIsolated selected) then return selected else case settings of
+prepareProcesses settings target total selected = case settings of
   Settings requestedWork requestedHelper _ -> do
    workspace <- O.envDefault "MLF_TEST_WORK" ".mlf-build/test-framework"
    let work = if eqString requestedWork "" then workspace ++ "/core-process/" ++ target else requestedWork
@@ -195,10 +195,11 @@ prepareProcesses settings target total selected =
    inventory <- J.read "tests/golden/unit-inventory.json"
    return (S.map (\entry -> if Registry.isIsolated entry then isolatedCase settings self cwd helper runDir inventory total entry else entry) selected)
 
-runSelected : String -> Settings -> [] String -> [] C.Case -> Runner.Options -> [] C.Case -> Bool -> IO ()
-runSelected target settings names entries requested selected full = do
+runSelected : String -> Settings -> [] String -> [] C.Case -> Runner.Options -> Planned.CaseSelection -> Bool -> IO ()
+runSelected target settings names entries requested planned full = do
+ let selected = Planned.cases planned
  options <- reportDestination requested
- if Runner.listing options then finishCode (Runner.runOptions options entries selected) else do
+ if Runner.listing options then finishCode (Runner.runSelected (\_ -> return ()) options planned) else do
   let completedFamilies = S.filter (\family ->
        let all = S.filter (inFamily family) entries in
        S.not (S.null all) && S.length (S.filter (inFamily family) selected) == S.length all) names
@@ -216,15 +217,20 @@ runSelected target settings names entries requested selected full = do
    fresh <- Process.newRun (".mlf-build/test-framework/core-fixtures/" ++ target)
    setEnv "MLF_TEST_WORK" fresh
   else return ()
-  runnable <- prepareProcesses settings target (S.length entries) selected
-  code <- Runner.runOptionsObserved observe options entries runnable
+  code <- if S.any Registry.isIsolated selected then do
+   runnable <- prepareProcesses settings target (Planned.total planned) selected
+   Runner.runOptionsObserved observe options entries runnable
+  else Runner.runSelected observe options planned
   if code == 0 then do
    let substrings = S.filter (inFamily substringFamily) selected
    if S.null substrings then return () else Coverage.metric "core" "substring-executed" (S.length substrings)
    S.mapM_ (Selection.passed "core") completedFamilies
    Coverage.finish "core"
    if reportsFamilies then Selection.finish "core" else return ()
-  else exitWith code
+  else do
+   Coverage.flush
+   if reportsFamilies then Selection.flush else return ()
+   exitWith code
 
 reportDestination : Runner.Options -> IO Runner.Options
 reportDestination options = case options of
@@ -242,7 +248,9 @@ main target complete count families = do
  let actions = S.concatMap S.snd families
  O.require (S.eqList eqString names expected && Selection.validIds names && S.length actions == count) "core compilation registry changed"
  entries <- case frameworkCases target complete families of { Left error -> O.fatal error; Right value -> return value }
- if Selection.listing args then putStr (S.unlines names) else case args of
+ if Selection.listing args then do
+  case Runner.validate entries of { Left error -> O.fatal error; Right () -> putStr (S.unlines names) }
+ else case args of
   (:) "--framework-child" rest -> frameworkChild entries rest
   (:) "--framework-list" rest -> dispatch target complete names entries ((:) "--list" rest)
   (:) "--framework" rest -> dispatch target complete names entries rest

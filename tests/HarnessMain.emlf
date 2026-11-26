@@ -160,7 +160,8 @@ runSelected options selected full = do
  evidence <- if S.any (\name -> S.elem eqString name releaseFamilies) selected then J.read "tests/golden/release-evidence.json" else return J.empty
  let cases = registry manifest evidence
  let entries = S.filter (\entry -> S.elem eqString (Case.id entry) selected) cases
- finish (Runner.runOptionsObserved (recordFamily selected) configured cases entries)
+ code <- Runner.runOptionsObserved (recordFamily selected) configured cases entries
+ if code /= 0 then do { Coverage.flush; Selection.flush; exitWith code } else return ()
  if full then putStrLn "Native benchmark/bootstrap/release harness tests passed" else putStrLn (showInt (S.length selected) ++ " harness families; 0 failures")
  Coverage.finish "harness"
  Selection.finish "harness"

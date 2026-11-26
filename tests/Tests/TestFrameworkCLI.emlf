@@ -4,6 +4,7 @@ import qualified Bootstrap.Std as S
 import qualified Package.OS as O
 import qualified Package.Json as J
 import qualified Tests.Basic as H
+import qualified Tests.ReportJournal as Journal
 
 rows text = S.mapM (\line -> H.right (J.parse line)) (S.filter (\line -> stringLength line > 0) (O.lines text))
 check directory binary name args expected = do
@@ -19,11 +20,42 @@ summary records count failures scope = do
   J.equal (J.get "passed" value) (J.num (count - failures)) && eqString (J.getText "scope" "" value) scope) "CLI summary differs from executed cases"
  let executed = S.filter (\row -> eqString (J.getText "event" "" row) "case") records
  H.assert (S.length executed == count && S.eqList eqString (J.getStrings "ids" (S.head records)) (S.map (J.getText "id" "") executed)) "CLI selected IDs and results differ"
+journalCheck directory = do
+ let name = "MLF_TEST_FRAMEWORK_PROBE_REPORT"
+ let path = directory ++ "/journal.jsonl"
+ let lines = S.map (\i -> showInt i ++ "\n") (S.range 0 12)
+ setEnv name path
+ Journal.begin name path "start\n"
+ S.mapM_ (Journal.append name path) lines
+ inline <- readFile path
+ let expected = "start\n" ++ S.concatStrings lines
+ H.assert (eqString inline ("start\n" ++ S.concatStrings (S.take 8 lines))) "journal rewrote its frozen prefix"
+ recovered <- Journal.recover path
+ H.assert (eqString recovered expected) "interrupted journal lost committed rows"
+ parts <- getEnv (name ++ "_PARTS")
+ writeFile (parts ++ "/block-0-1.jsonl") "truncated"
+ prefix <- Journal.recover path
+ H.assert (eqString prefix expected) "journal accepted an incomplete final row"
+ Journal.flush name
+ failed <- readFile path
+ H.assert (eqString failed expected) "failed journal did not publish its exact prefix"
+ Journal.begin name path "new start\n"
+ second <- Journal.recover path
+ H.assert (eqString second "new start\n") "new journal reused a previous generation"
+ Journal.append name path "one\n"
+ Journal.append name path "two\n"
+ writeFile (path ++ ".previous.jsonl") "new start\none\ntwo\n"
+ writeFile path "unfinished"
+ prior <- Journal.recover path
+ H.assert (eqString prior "new start\none\ntwo\n") "torn inline write lost the committed prefix"
+ unsetEnv name
+
 main work unions = do
  O.mkdir work
  setEnv "MLF_TEST_WORK" work
  self <- getExecutablePath
  H.withScratch (\directory -> do
+  journalCheck directory
   let report = directory ++ "/report.jsonl"
   text <- check directory unions "unions" (O.words "--format json") 0
   records <- rows text

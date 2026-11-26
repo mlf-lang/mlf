@@ -171,5 +171,5 @@ executeFixtures args = do
     H.assert (eqString hash after) "prepared port manifest changed during execution"
     S.mapM_ (Selection.passed "port") identities
     putStrLn (showInt (S.length selected) ++ " MLF port fixtures; 0 failures")
-   else exitWith code)
+   else do { B.flushRows; Selection.flush; exitWith code })
   Selection.finish "port"

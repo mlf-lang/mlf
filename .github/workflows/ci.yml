@@ -23,12 +23,15 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # Label notifications outside this workflow’s policy must not cancel real checks.
+  group: ci-${{ github.workflow }}-${{ (!github.event.label || github.event.label.name == 'ci:skip' || github.event.label.name == 'ci:async-parity') && github.ref || github.run_id }}
   cancel-in-progress: true
 jobs:
   metadata:
-    name: Release metadata
-    if: github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')
+    name: Release metadata${{ github.event.label && github.event.label.name != 'ci:skip' && github.event.label.name != 'ci:async-parity' && ' (unrelated label)' || '' }}
+    if: >-
+      (!github.event.label || github.event.label.name == 'ci:skip' || github.event.label.name == 'ci:async-parity') &&
+      (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip'))
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -40,6 +43,8 @@ jobs:
         run: |
           python3 -B tools/testing/run.py python-release-ghc-install-cleanup
           python3 -B tools/testing/run.py python-release-ghc-install-cleanup --python-optimization
+      - name: Test backend driver cache verification and recovery
+        run: python3 -B tools/testing/run.py python-testing-driver-cache
       - name: Test builtin generation evidence boundaries
         run: |
           python3 -B tools/testing/run.py python-shared-generate-builtin-evidence
@@ -78,8 +83,9 @@ jobs:
           path: .mlf-build/test-framework/
   native:
     # Preserve the required-check job ID, but label the producer honestly.
-    name: Shared compiler source smoke (GHC O${{ matrix.optimization }}, ${{ matrix.suite }})
+    name: Shared compiler source smoke (GHC O${{ matrix.optimization }}, ${{ matrix.suite }})${{ github.event.label && github.event.label.name != 'ci:skip' && github.event.label.name != 'ci:async-parity' && ' (unrelated label)' || '' }}
     if: >-
+      (!github.event.label || github.event.label.name == 'ci:skip' || github.event.label.name == 'ci:async-parity') &&
       (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')) &&
       (github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only)
     runs-on: ubuntu-24.04
@@ -98,14 +104,20 @@ jobs:
           fetch-depth: 0 # The framework oracle reads frozen Git fixtures.
       - name: Prepare reviewed historical source objects
         run: python3 -B tools/testing/prepare_history_refs.py
+      - name: Check source and codec contracts before compiling
+        if: matrix.optimization == '2'
+        run: |
+          python3 -B tools/testing/run.py python-shared-artifact-binary-modular
+          python3 -B tools/testing/run.py python-shared-artifact-binary-modular --python-optimization
+          python3 -B tools/testing/run.py python-llvm-memory-contract
+          python3 -B tools/testing/run.py python-llvm-memory-contract --python-optimization
+      - uses: ./.github/actions/linux-ghc-bindist
       - name: Install pinned direct-host GHC 9.14.1
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y build-essential clang libgc-dev libgmp-dev libnuma-dev libncurses-dev pkg-config xz-utils
           archive="$RUNNER_TEMP/ghc-9.14.1.tar.xz"
-          curl -fsSL https://downloads.haskell.org/~ghc/9.14.1/ghc-9.14.1-x86_64-deb12-linux.tar.xz -o "$archive"
-          printf '%s  %s\n' 60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841 "$archive" | sha256sum -c -
           tar -xJf "$archive" -C "$RUNNER_TEMP"
           (cd "$RUNNER_TEMP/ghc-9.14.1-x86_64-unknown-linux" && ./configure --prefix="$RUNNER_TEMP/ghc" && make install)
           test "$("$RUNNER_TEMP/ghc/bin/ghc" --numeric-version)" = 9.14.1
@@ -168,6 +180,12 @@ jobs:
             --family captured_closures --family wide_product --family rank2_arguments \
             --family irregular_literal_table --family nested_poly_types --family rank2_callbacks --family decoder_pipeline
           cat .mlf-build/compiler-shapes-smoke/results/pr-size-8/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Check inferred constructor writers with both compilers
+        if: matrix.suite == 'optimizer'
+        run: |
+          python3 -B tools/testing/run.py compiler-shapes-correctness --exact compiler-shapes/correctness/inferred_constructor_writers-8 -- \
+            --setup .mlf-build/compiler-shapes-smoke/setup/setup.json --output .mlf-build/compiler-shapes-writer-smoke \
+            --family inferred_constructor_writers --size 8
       - name: Check Int64 arithmetic and Patricia boundaries
         if: matrix.optimization == '2'
         run: |
@@ -304,6 +322,9 @@ jobs:
           MLF_PACKAGE_MANAGER="$toolset/mlfpkg" MLF_BUILD_RUNNER="$toolset/mlf-build-runner" "$toolset/mlfpkg" \
             --manifest testing/tools/mlf-package.json --compiler "$toolset/emlf" --runtime "$PWD/runtime/mlf_runtime.c" \
             --build-dir "$PWD/.mlf-build/compiler-tests/lifecycle" --cache-dir "$PWD/.mlf-build/cache" --locked test --target lifecycle
+      - name: Prepare and cache verified hosted backend drivers
+        if: ${{ !cancelled() && steps.native_lifecycle.outcome == 'success' && matrix.suite == 'routine' }}
+        uses: ./.github/actions/prepare-backend-drivers
       - name: Exercise hosted backend matrix
         if: ${{ !cancelled() && steps.native_lifecycle.outcome == 'success' && matrix.suite == 'routine' }}
         run: |
@@ -342,8 +363,6 @@ jobs:
       - name: Check compact Unicode indexing against frozen host and independent scalar oracle
         if: matrix.optimization == '2'
         run: |
-          python3 -B tools/testing/run.py python-llvm-memory-contract
-          python3 -B tools/testing/run.py python-llvm-memory-contract --python-optimization
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 .mlf-build/llvm-memory-guard python3 -B tools/testing/run.py --inherit-process-group llvm-unicode-memory -- --producer .mlf-build/shared-ghc --optimization 2 --output .mlf-build/llvm-memory-20261102/ci-controls
       - name: Check lazy IO action specialization with native execution
         if: matrix.optimization == '2'
@@ -364,8 +383,6 @@ jobs:
         run: |
           set -euo pipefail
           test -f "$PWD/.mlf-build/io-action-gc/lib/libgc.a"
-          python3 -B tools/testing/run.py python-shared-artifact-binary-modular
-          python3 -B tools/testing/run.py python-shared-artifact-binary-modular --python-optimization
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 640 --disk-free-mib 4096 .mlf-build/artifact-binary-guard python3 -B tools/testing/run.py --inherit-process-group artifact-binary-native -- --source-root "$PWD" --build-receipt .mlf-build/shared-ghc/receipt.json --clang clang --gc-prefix "$PWD/.mlf-build/io-action-gc" --partial-write-sink /dev/full --output .mlf-build/artifact-binary-guard/results
       - name: Check fixed native library boundaries and lazy exports
         if: matrix.optimization == '2'
@@ -463,6 +480,7 @@ jobs:
             .mlf-build/owned-source-context/**/stdout
             .mlf-build/owned-source-context/**/stderr
             .mlf-build/owned-source-context/**/*.hs
+            .mlf-build/compiler-shapes-writer-smoke/receipt.json
             .mlf-build/compiler-shapes-smoke/setup/setup.json
             .mlf-build/compiler-shapes-smoke/setup/*.json
             .mlf-build/compiler-shapes-smoke/cohorts/**/*.json
@@ -615,8 +633,9 @@ jobs:
             .mlf-build/guest-state-laws/**/*.stdout
             .mlf-build/guest-state-laws/**/*.stderr
   build-runner:
-    name: Native build runner (${{ matrix.os }})
+    name: Native build runner (${{ matrix.os }})${{ github.event.label && github.event.label.name != 'ci:skip' && github.event.label.name != 'ci:async-parity' && ' (unrelated label)' || '' }}
     if: >-
+      (!github.event.label || github.event.label.name == 'ci:skip' || github.event.label.name == 'ci:async-parity') &&
       (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')) &&
       (github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only)
     strategy:
@@ -644,8 +663,9 @@ jobs:
             .mlf-build/build-runner-ci/evidence/**/*.plan
             .mlf-build/build-runner-ci/evidence/**/*.result
   async-runtime:
-    name: Native async completions (${{ matrix.os }})
+    name: Native async completions (${{ matrix.os }})${{ github.event.label && github.event.label.name != 'ci:skip' && github.event.label.name != 'ci:async-parity' && ' (unrelated label)' || '' }}
     if: >-
+      (!github.event.label || github.event.label.name == 'ci:skip' || github.event.label.name == 'ci:async-parity') &&
       (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')) &&
       (github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only)
     strategy:
@@ -679,8 +699,9 @@ jobs:
             .mlf-build/async-native-ci/binaries.sha256
             .mlf-build/test-framework/
   async-language:
-    name: Async interpreter and native parity (${{ matrix.os }})
+    name: Async interpreter and native parity (${{ matrix.os }})${{ github.event.label && github.event.label.name != 'ci:skip' && github.event.label.name != 'ci:async-parity' && ' (unrelated label)' || '' }}
     if: >-
+      (!github.event.label || github.event.label.name == 'ci:skip' || github.event.label.name == 'ci:async-parity') &&
       (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')) &&
       (github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only)
     strategy:
@@ -709,23 +730,22 @@ jobs:
             echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
           fi
           echo 'GC_FREE_SPACE_DIVISOR=8' >> "$GITHUB_ENV"
+      - uses: ./.github/actions/linux-ghc-bindist
+        if: steps.scope.outputs.required != 'false' && runner.os == 'Linux'
       - name: Install pinned GHC 9.14.1 for ordinary async parity
         if: steps.scope.outputs.required != 'false'
         run: |
           set -euo pipefail
           archive="$RUNNER_TEMP/ghc-9.14.1.tar.xz"
           if [ "$RUNNER_OS" = Linux ]; then
-            distribution=ghc-9.14.1-x86_64-deb12-linux
             staging=ghc-9.14.1-x86_64-unknown-linux
-            digest=60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841
           else
             test "$(uname -m)" = arm64
             distribution=ghc-9.14.1-aarch64-apple-darwin
             staging=$distribution
-            digest=841591f152085be605616682779341847d24fd56bd6d22ca61bb37ee32b50681
+            curl -fsSL "https://downloads.haskell.org/~ghc/9.14.1/$distribution.tar.xz" -o "$archive"
+            printf '%s  %s\n' 841591f152085be605616682779341847d24fd56bd6d22ca61bb37ee32b50681 "$archive" | shasum -a 256 -c -
           fi
-          curl -fsSL "https://downloads.haskell.org/~ghc/9.14.1/$distribution.tar.xz" -o "$archive"
-          printf '%s  %s\n' "$digest" "$archive" | shasum -a 256 -c -
           tar -xJf "$archive" -C "$RUNNER_TEMP"
           (cd "$RUNNER_TEMP/$staging" && ./configure --prefix="$RUNNER_TEMP/ghc" && make install)
           test "$("$RUNNER_TEMP/ghc/bin/ghc" --numeric-version)" = 9.14.1
@@ -801,8 +821,10 @@ jobs:
             .mlf-build/async-package-parity/**/*.status
             .mlf-build/async-package-parity/**/*.timed-out
   windows-runtime:
-    name: Native Windows runtime
-    if: github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')
+    name: Native Windows runtime${{ github.event.label && github.event.label.name != 'ci:skip' && github.event.label.name != 'ci:async-parity' && ' (unrelated label)' || '' }}
+    if: >-
+      (!github.event.label || github.event.label.name == 'ci:skip' || github.event.label.name == 'ci:async-parity') &&
+      (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip'))
     runs-on: windows-2025
     timeout-minutes: 20
     defaults:
@@ -829,8 +851,8 @@ jobs:
             .mlf-build/windows-runtime/build-runner/**/*.result
   pr-gate:
     # A skipped manual job must not satisfy the required check on the same SHA.
-    name: ${{ github.event_name == 'workflow_dispatch' && 'Manual CI summary' || 'PR gate' }}
-    if: always() && github.event_name != 'workflow_dispatch'
+    name: ${{ github.event_name == 'workflow_dispatch' && 'Manual CI summary' || (github.event.label && github.event.label.name != 'ci:skip' && github.event.label.name != 'ci:async-parity') && 'Unrelated PR label' || 'PR gate' }}
+    if: always() && github.event_name != 'workflow_dispatch' && (!github.event.label || github.event.label.name == 'ci:skip' || github.event.label.name == 'ci:async-parity')
     # The native dependency covers the hosted routine and optimizer profiles.
     needs: [metadata, native, windows-runtime, build-runner, async-runtime, async-language]
     runs-on: ubuntu-24.04

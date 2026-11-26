@@ -1,0 +1,39 @@
+name: Prepare the hosted backend drivers
+description: Warm the verified MLF cache for the full backend matrix
+runs:
+  using: composite
+  steps:
+    - id: restore
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      continue-on-error: true
+      with:
+        # github.sha is the exact checkout, including the base of a PR test merge.
+        key: backend-drivers-v1-ubuntu-24.04-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+        path: .mlf-build/driver-cache
+    - name: Import verified cache entries
+      if: steps.restore.outputs.cache-hit == 'true'
+      continue-on-error: true
+      shell: bash
+      run: python3 -B tools/testing/driver_cache.py import --snapshot .mlf-build/driver-cache --cache .mlf-build/cache
+    - name: Build the drivers from the authenticated producer
+      shell: bash
+      run: |
+        set -euo pipefail
+        . tools/release/native-environment.sh
+        toolset="$PWD/.mlf-build/shared-ghc/bin"
+        export MLF_BUILD_RUNNER="$toolset/mlf-build-runner"
+        "$toolset/compiler-tests" backend-prepare --manager "$toolset/mlfpkg" --compiler "$toolset/emlf" \
+          --build-dir "$PWD/.mlf-build/compiler-tests/backend-prepare" --cache-dir "$PWD/.mlf-build/cache"
+    - name: Export only the driver artifacts in the preparation report
+      id: snapshot
+      if: steps.restore.outputs.cache-hit != 'true'
+      continue-on-error: true
+      shell: bash
+      run: python3 -B tools/testing/driver_cache.py export --report .mlf-build/compiler-tests/backend-prepare/verification.json --output .mlf-build/driver-cache
+    - name: Save the snapshot before running the backend matrix
+      if: steps.snapshot.outcome == 'success' && steps.restore.outputs.cache-primary-key != ''
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      continue-on-error: true
+      with:
+        key: ${{ steps.restore.outputs.cache-primary-key }}
+        path: .mlf-build/driver-cache

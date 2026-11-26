@@ -79,7 +79,10 @@ checks = do
  ok (J.equal (J.get "executed" summary) (J.num 3) && J.equal (J.get "passed" summary) (J.num 1) &&
   J.equal (J.get "failed" summary) (J.num 2) && J.getBool "complete" false summary && eqString (J.getText "scope" "" summary) "partial")
 
- let original = (,) "legacy label" (return ())
+ legacyCalls <- A.liftIO (newIntArray 1 0)
+ let original = (,) "legacy label" (do
+       calls <- readIntArray legacyCalls 0
+       writeIntArray legacyCalls 0 (calls + 1))
  let adapted = C.fromIO "legacy/case" ((:) "legacy" []) original
  let classified = C.classified ((:) "standard-library" []) (O.words "property-based differential") adapted
  let described = C.described "runtime-library" "component" ((:) "exhaustive" []) ((:) "independent-reference" []) ((:) "regression" []) classified
@@ -95,15 +98,19 @@ checks = do
  let failing = C.classified ((:) "test-infrastructure" []) ((:) "fault-injection" []) (C.test "retained/action" "retained action" [] (A.fail "retained failure"))
  retained <- A.liftIO (A.run (C.action failing))
  case retained of { Left error -> ok (eqString (A.message error) "retained failure"); Right _ -> failed "classification changed an action" }
- let legacy = C.toLegacy adapted
+ let legacy = C.toLegacy described
  let label = S.fst legacy
  let action = S.snd legacy
  ok (eqString label "legacy label" && S.eqList eqString (C.tags adapted) ((:) "legacy" []))
+ before <- A.liftIO (readIntArray legacyCalls 0)
+ if before == 0 then return () else failed "legacy adaptation executed the action early"
  A.liftIO action
+ after <- A.liftIO (readIntArray legacyCalls 0)
+ if after == 1 then return () else failed "legacy adaptation did not execute the action exactly once"
  -- Reviewed separately from the migrated registry: dropping/renaming this case
  -- must not redefine the expected inventory or the existing Core label.
  ok (S.eqList eqString (S.map C.id Unions.cases) ((:) "int-set/union-sorted-list" []))
- ok (S.eqList eqString (S.map S.fst Unions.suite) ((:) "size-biased set unions agree with independent sorted lists" []))
+ ok (S.eqList eqString (S.map (\entry -> S.fst (C.toLegacy entry)) Unions.cases) ((:) "size-biased set unions agree with independent sorted lists" []))
  A.liftIO (putStrLn "Test framework contracts passed")
 
 -- These fault controls compare independent inputs and outcomes for the receipt evaluator.

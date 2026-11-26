@@ -113,7 +113,9 @@ const validate = text => {
     assert.ok(job(text, 'metadata').includes('python3 ' + flags + ' tools/shared/test_generate_builtin_evidence.py\n'),
       'Keep normal and optimized generation refusal controls');
   }
-  const toolchain = commandStep('https://downloads.haskell.org/~ghc/9.14.1/');
+  const toolchain = commandStep('make install)');
+  assert.ok(steps.indexOf(commandStep('uses: ./.github/actions/linux-ghc-bindist')) < steps.indexOf(toolchain),
+    'Restore or fetch the verified official archive before installation');
   assert.doesNotMatch(toolchain, /^        if:/m, 'Every producer has its own verified toolchain');
   assert.ok(toolchain.includes('python3 -B tools/release/cleanup-ghc-install.py --receipt .mlf-build/ghc-install-cleanup.json\n'),
     'Each shard verifies and removes only its pinned install inputs');
@@ -203,8 +205,15 @@ const validate = text => {
   const binary = commandStep('tools/shared/test_artifact_binary.py');
   assert.match(binary, /^        if: matrix.optimization == '2'$/m);
   assert.match(binary, /set -euo pipefail/);
-  assert.ok(binary.includes('python3 -B tools/shared/test_artifact_binary_modular.py\n'));
-  assert.ok(binary.includes('python3 -O -B tools/shared/test_artifact_binary_modular.py\n'));
+  for (const script of ['tools/shared/test_artifact_binary_modular.py', 'tools/performance/llvm-memory/test_contract.py']) {
+    for (const flags of ['-B', '-O -B']) {
+      const quick = commandStep('python3 ' + flags + ' ' + script + '\n');
+      assert.equal(selected(quick, legs[0]), false);
+      assert.equal(selected(quick, legs[1]), true);
+      assert.ok(steps.indexOf(commandStep('tools/testing/prepare_history_refs.py')) < steps.indexOf(quick));
+      assert.ok(steps.indexOf(quick) < steps.indexOf(toolchain), 'Cheap contracts run before GHC installation');
+    }
+  }
   assert.match(binary, /resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 640 --disk-free-mib 4096 \.mlf-build\/artifact-binary-guard python3 -B tools\/shared\/test_artifact_binary.py --source-root "\$PWD" --build-receipt \.mlf-build\/shared-ghc\/receipt.json --clang clang --gc-prefix "\$PWD\/\.mlf-build\/io-action-gc" --partial-write-sink \/dev\/full --output \.mlf-build\/artifact-binary-guard\/results\n/);
   const gcPreparation = commandStep('cp "$archive" "$prefix/lib/libgc.a"');
   assert.ok(steps.indexOf(gcPreparation) < steps.indexOf(binary), 'GC preparation precedes binary native build');
@@ -350,7 +359,7 @@ const validate = text => {
   const artifactNames = legs.map(leg => artifact.replaceAll('${{ matrix.optimization }}', leg.optimization).replaceAll('${{ matrix.suite }}', leg.suite));
   assert.equal(new Set(artifactNames).size, legs.length, 'Matrix evidence artifacts must not collide');
   const gate = job(text, 'pr-gate');
-  assert.match(gate, /^    if: always\(\) && github.event_name != 'workflow_dispatch'$/m);
+  assert.match(gate, /^    if: always\(\) && github.event_name != 'workflow_dispatch' && /m);
   assert.match(gate, /^    needs: \[metadata, native, windows-runtime, build-runner, async-runtime, async-language\]$/m,
     'The aggregate must depend on the entire native matrix, not a selected shard');
   assert.match(gate, /jq -e 'length == 6 and all\(\.\[\]; \.result == "success"\)'/,

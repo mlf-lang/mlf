@@ -17,6 +17,24 @@ status, ordered IO events, remaining input, and diagnostic. The adjacent raw
 stdout, stderr, trace, and supervisor files retain byte and process evidence.
 The original literal or independent assertions still decide the result.
 
+Each Backends family in `tests/test-catalog.json` records an expected
+`row_counts` array in its fixture-label order. Zero means the fixture
+checks a compiler or language contract without a differential execution.
+The counts for surviving labels come from the 575-row compact-GC report in
+`docs/compact-only-execution-times.json`. The 28 added or renamed labels
+each execute one row in the current fixture sources. They cover one IO case,
+four prelude cases, one surface case, eight guard cases, three numeric
+specializations, nine numeric runtime cases, and two primitive failures.
+Removing ten retired labels and adding these rows gives 593.
+
+Family, coverage, and matrix journals keep the first eight appended rows in
+the ordinary JSONL file. Larger runs group further rows in 16-row blocks in a sibling
+`<report>.journal/run-*` directory, named by `current.json`. Completed
+runs publish one JSONL file. After abrupt interruption, call
+`Tests.ReportJournal.recover` with the report path to read the complete
+prefix. Each block has two alternating snapshots so a torn write leaves the
+last completed snapshot available.
+
 The default, `--families`, and `--from` paths now use one registry, and
 `--list`, `--exact`, `--format`, and `--report` use the common runner.
 The parent maintains its family and matrix receipts alongside the case

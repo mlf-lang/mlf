@@ -8,6 +8,7 @@ frozen schedule stays balanced.
 import copy
 import hashlib
 import json
+import os
 import random
 import re
 import subprocess
@@ -39,14 +40,9 @@ def write_cohort(root, label='screen', family='flat_functions', size=8, repeats=
                  endpoint='crate-bootstrap-v1', host='test-host'):
     folder = Path(root) / label
     folder.mkdir(parents=True)
-    source = folder / 'source'
-    source.mkdir()
-    program = source / 'Main.hs'
-    program.write_text('entry x = x\n')
-    case = {'id': family + '-' + str(size), 'family': family, 'size': size,
-            'source': str(program.resolve()), 'source_sha256': digest(program),
-            'source_bytes': program.stat().st_size, 'inputs': [-1, 0, 7],
-            'expected_stdout': ['-1\n', '0\n', '7\n']}
+    case, = generate.generate(folder / 'source', sizes=[size], families=[family])
+    pins = {case['source']: digest(case['source'])}
+    pins.update({lib['source']: digest(lib['source']) for lib in worker.dependencies(case)})
     schedule = []
     for index in range(repeats):
         for lane in ['ghc', 'mlf']:
@@ -62,19 +58,19 @@ def write_cohort(root, label='screen', family='flat_functions', size=8, repeats=
                           'clang': {'path': '/clang', 'version': 'clang test'},
                           'producer': {'path': '/producer', 'receipt_sha256': 'a' * 64, 'emlf_sha256': 'b' * 64},
                           'builtin': {'/builtin.mlfci': 'c' * 64, '/builtin.mlfco': 'd' * 64}},
-            'host': {'platform': host, 'machine': 'test-mcu'}, 'cases': [case], 'schedule': schedule}
+            'host': {'platform': host, 'machine': 'test-mcu'}, 'cases': [case], 'schedule': schedule, 'inputs': pins}
     (folder / 'plan.json').write_text(json.dumps(plan, indent=2) + '\n')
     runs = []
     for item in schedule:
         times = mlf_seconds if item['lane'] == 'mlf' else ghc_seconds
         wall = times[item['position'] // 2 if item['position'] // 2 < len(times) else 0]
         stages = [{'name': name, 'wall_seconds': wall / 3, 'user_seconds': wall / 4,
-                   'system_seconds': wall / 20} for name in (worker.mlf_stage_names(endpoint) if endpoint in ['crate-bootstrap-v1','crate-fused-v1'] else STAGES)] if item['lane'] == 'mlf' else []
+                   'system_seconds': wall / 20} for name in worker.mlf_stage_names(endpoint)] if item['lane'] == 'mlf' else []
         runs.append({'case': case['id'], 'position': item['position'], 'lane': item['lane'], 'complete': True,
                      'output_correct': True, 'fresh': 1 if item['lane'] == 'mlf' else None,
                      'reused': 0 if item['lane'] == 'mlf' else None, 'max_group_members': 1,
                      'raw_compared_with_first_mlf_leg': item['lane'] == 'mlf' and item['position'] > 1,
-                     'executable_sha256': 'e' * 64, 'oracle_inputs': [-1, 0, 7],
+                     'executable_sha256': 'e' * 64, 'oracle_inputs': case['inputs'],
                      'stages': {'complete': True, 'stages': stages},
                      'command': {'complete': True, 'timed_target_leg': True, 'exit_code': 0, 'reason': None,
                                  'wall_seconds': wall, 'child_user_seconds': wall / 4,
@@ -180,6 +176,50 @@ class CompilerReferenceTests(unittest.TestCase):
         self.git('merge', '--no-ff', '-qm', 'merge', 'feature')
         self.assertEqual(runner.compiler_reference.select_revision(self.repo)['commit'], self.first)
 
+    def test_exact_matched_baseline_generates_the_advertised_coordinate(self):
+        family = 'retained_curried_job_list'
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        setup = root / 'setup.json'
+        setup.write_text(json.dumps({'complete': True, 'source': str(self.repo), 'producer': str(root),
+                                     'endpoint': 'crate-plan-v1'}))
+        args = ['--family', 'baseline', '--family', family, '--size', '8', '--baseline-family', family]
+        expected = generate.generate(root / 'full', [8], ['baseline', family], family)
+        helper = runner.command_runner.load_helper()
+        events = root / 'events.jsonl'
+        events.touch()
+        for case in expected:
+            exact = 'compiler-shapes/comparison/' + case['id']
+            output = root / case['id']
+            env = {'MLF_TEST_SUITE': 'compiler-shapes', 'MLF_TEST_EXACT': exact, 'MLF_TEST_EVENTS': str(events)}
+            with self.subTest(exact=exact), mock.patch.dict(os.environ, env):
+                listing = subprocess.check_output([sys.executable, '-B', HERE / 'bench.py',
+                                                   '--framework-list', 'run', *args], text=True)
+                self.assertEqual(json.loads(listing), [exact])
+                argv = ['run.py', '--setup', str(setup), '--output', str(output), '--endpoint', 'crate-plan-v1', *args]
+                # Stop at the compiler build boundary, after the real request has generated its sources.
+                with mock.patch.object(sys, 'argv', argv), \
+                     mock.patch.object(runner.command_runner, 'load_helper', return_value=helper), \
+                     mock.patch.object(helper, 'authenticate', return_value={'ghc': {'path': '/ghc'}}), \
+                     mock.patch.object(runner.compiler_reference, 'fixed_setup_pins', return_value={}), \
+                     mock.patch.object(runner.compiler_reference, 'prepare', side_effect=InterruptedError), \
+                     self.assertRaises(InterruptedError):
+                    runner.main()
+                selected, = analyze.load(output / 'sources/cases.json')
+                for key in ('id', 'inputs', 'expected_stdout', 'source_sha256', 'matched_baseline_for'):
+                    self.assertEqual(selected.get(key), case.get(key), key)
+                self.assertEqual([(lib['module'], digest(lib['source'])) for lib in worker.dependencies(selected)],
+                                 [(lib['module'], lib['sha256']) for lib in worker.dependencies(case)])
+                self.assertEqual(json.loads(events.read_text().splitlines()[-1])['plan'], [exact])
+
+    def test_invalid_matched_baseline_fails_before_setup(self):
+        family = 'retained_curried_job_list'
+        output = self.repo / 'output'
+        argv = ['run.py', '--setup', 'missing.json', '--output', str(output),
+                '--family', family, '--size', '8', '--baseline-family', family]
+        with mock.patch.object(sys, 'argv', argv), self.assertRaisesRegex(ValueError, 'matched baseline'):
+            runner.main()
+        self.assertFalse(output.exists())
+
     def test_reference_growth_keeps_both_controls_in_the_recorded_round(self):
         sizes = [0, 8, 32, 64]
         rows = []
@@ -225,7 +265,7 @@ class ReferenceDependencyIsolationTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
+        self.root = Path(temporary.name).resolve()
         self.clang = self.root / 'clang'
         self.executable(self.clang, '''
 import pathlib, sys
@@ -1225,46 +1265,44 @@ class ScheduleTests(unittest.TestCase):
             for stage in ('source_sha256', 'expected_stdout'):
                 self.assertEqual(baseline[stage] == positive[stage], stage == 'source_sha256')
 
+    def matched_cases(self, family):
+        directory = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        zero, positive = generate.generate(directory / 'shape', [8], ['baseline', family], family)
+        self.assertEqual(zero['matched_baseline_for'], family)
+        return zero, positive
+
     def test_bounded_optional_writer_controls(self):
         family = 'bounded_optional_writers'
-        with tempfile.TemporaryDirectory() as directory:
-            zero, positive = generate.generate(Path(directory)/'shape', [8], ['baseline', family], family)
-            self.assertEqual(zero['matched_baseline_for'], family)
-            self.assertEqual(zero['expected_stdout'], ['0\n']*5)
-            self.assertEqual(positive['expected_stdout'], ['108\n', '84\n', '91\n', '99\n', '235\n'])
-            for case in (zero, positive):
-                self.assertIn('formatOptional encode item', Path(case['source']).read_text())
-            self.assertEqual(Path(positive['source']).read_text().count('formatOptional showInt'), 8)
+        zero, positive = self.matched_cases(family)
+        self.assertEqual(zero['expected_stdout'], ['0\n']*5)
+        self.assertEqual(positive['expected_stdout'], ['108\n', '84\n', '91\n', '99\n', '235\n'])
+        for case in (zero, positive):
+            self.assertIn('formatOptional encode item', Path(case['source']).read_text())
+        self.assertEqual(Path(positive['source']).read_text().count('formatOptional showInt'), 8)
 
     def test_inferred_constructor_writers_controls(self):
         family = 'inferred_constructor_writers'
-        with tempfile.TemporaryDirectory() as directory:
-            zero, positive = generate.generate(Path(directory)/'shape', [8], ['baseline', family], family)
-            self.assertEqual(zero['matched_baseline_for'], family)
-            self.assertEqual(zero['expected_stdout'], ['0\n']*5)
-            self.assertEqual(positive['expected_stdout'], ['44\n', '-20\n', '-36\n', '136\n', '640\n'])
-            self.assertEqual(Path(positive['source']).read_text().count(' query = case query of'), 8)
-            self.assertIn('writeAll query writers', Path(zero['source']).read_text())
+        zero, positive = self.matched_cases(family)
+        self.assertEqual(zero['expected_stdout'], ['0\n']*5)
+        self.assertEqual(positive['expected_stdout'], ['44\n', '-20\n', '-36\n', '136\n', '640\n'])
+        self.assertEqual(Path(positive['source']).read_text().count(' query = case query of'), 8)
+        self.assertIn('writeAll query writers', Path(zero['source']).read_text())
 
     def test_mixed_recursive_decoder_controls(self):
         family = 'mixed_recursive_decoder'
-        with tempfile.TemporaryDirectory() as directory:
-            zero, positive = generate.generate(Path(directory)/'shape', [8], ['baseline', family], family)
-            self.assertEqual(zero['matched_baseline_for'], family)
-            self.assertEqual(zero['expected_stdout'], ['7\n', '7\n', '-37\n', '-37\n', '-37\n'])
-            self.assertEqual(positive['expected_stdout'], ['7\n', '14\n', '46\n', '91\n', '-37\n'])
-            self.assertEqual(Path(positive['source']).read_text().count('payload -> schedule '), 8)
-            for case in (positive, zero):
-                self.assertIn('schedule value rest = scan', Path(case['source']).read_text())
+        zero, positive = self.matched_cases(family)
+        self.assertEqual(zero['expected_stdout'], ['7\n', '7\n', '-37\n', '-37\n', '-37\n'])
+        self.assertEqual(positive['expected_stdout'], ['7\n', '14\n', '46\n', '91\n', '-37\n'])
+        self.assertEqual(Path(positive['source']).read_text().count('payload -> schedule '), 8)
+        for case in (positive, zero):
+            self.assertIn('schedule value rest = scan', Path(case['source']).read_text())
 
     def test_signed_decoder_selector_controls(self):
         family = 'signed_decoder_selectors'
-        with tempfile.TemporaryDirectory() as directory:
-            zero, positive = generate.generate(Path(directory)/'shape', [8], ['baseline', family], family)
-            self.assertEqual(zero['matched_baseline_for'], family)
-            self.assertEqual(zero['expected_stdout'], ['-99\n'] * 5)
-            self.assertEqual(positive['expected_stdout'], ['-99\n', '-11\n', '37\n', '85\n', '-99\n'])
-            self.assertEqual(Path(positive['source']).read_text().count('a <- readPiece left'), 8)
+        zero, positive = self.matched_cases(family)
+        self.assertEqual(zero['expected_stdout'], ['-99\n'] * 5)
+        self.assertEqual(positive['expected_stdout'], ['-99\n', '-11\n', '37\n', '85\n', '-99\n'])
+        self.assertEqual(Path(positive['source']).read_text().count('a <- readPiece left'), 8)
 
     def test_production_endpoint_keeps_ordinary_crate_stages(self):
         args = (Path('/bin/emlf'), Path('/spec'), Path('/out'))
@@ -1529,7 +1567,8 @@ class AnalyzerTests(unittest.TestCase):
 
     def test_rejects_changed_source(self):
         folder = write_cohort(self.root)
-        (folder / 'source' / 'Main.hs').write_text('entry x = x + 1\n')
+        case, = analyze.load(folder / 'plan.json')['cases']
+        Path(case['source']).write_text('entry x = x + 1\n')
         with self.assertRaisesRegex(ValueError, 'unchanged shared source'):
             analyze.analyze(folder)
 

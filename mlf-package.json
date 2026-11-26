@@ -100,6 +100,7 @@
         "Tests.TestDrivers": "tests/Tests/TestDrivers.hs",
         "Tests.TestSources": "tests/Tests/TestSources.hs",
         "Tests.Catalog": "tests/Tests/Catalog.hs",
+        "Tests.ReportJournal": "tests/Tests/ReportJournal.hs",
         "Tests.Selection": "tests/Tests/Selection.hs",
         "Tests.BuildReceipts": "tests/shared/Tests/BuildReceipts.hs"
       },

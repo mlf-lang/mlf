@@ -300,6 +300,10 @@ def qualified_contract(root, source_root=None):
     expected = live_git.inventory(BOUNDARY_TYPED, paths | auxiliary_roles)
     fixture_drivers = {'tools/shared/test_artifact_binary.py', 'tools/shared/test_artifact_binary_modular.py'}
     expected.update(live_git.inventory(INVENTORY_CLEANUP, fixture_drivers))
+    # ReportJournal has no blob in the historical boundary tree. Authenticate
+    # its introduction separately and carry its bytes only on the forward path.
+    added_modules = {**BOUNDARY_MODULES, 'Tests.ReportJournal': 'tests/Tests/ReportJournal.hs'}
+    successor_paths = paths | auxiliary_roles | set(added_modules.values())
     for commit, tree, parent in (
         (COLD_BUILD_FIX, COLD_BUILD_FIX_TREE, '6f58cd514f8ad9becd97b3f60ff95e26b083fef0'),
         (FINAL_FILE_SOLVE, FINAL_FILE_SOLVE_TREE, '34e970a1fc60a626e1507f37fd361a3c6007ee40'),
@@ -311,11 +315,58 @@ def qualified_contract(root, source_root=None):
          'ad51ebc26925bcd573d7e36e4346f202e4f9d5e6'),
         ('9815b98bf1129cec811e8c709cbe866a3ef2a451', '937ffe114e8f9ad886d50c8abf7f0954843e705e',
          '79861cc7378ed2e0fc11efd5f16e22b948eb8edd'),
+        # Observable legacy adapter actions update only the auxiliary tests lock.
+        ('57f7ea72fccc0b40583de06e1edd58f6483fa0ed', '548c6477f9cde884b9ea5f121dba6e82ff299ebb',
+         '94e086c15c40aaf220c764f0e723cc3cfe627587'),
+        ('29f3f65dbbd698cc2dc42f4cd48b71946bed6bf5', '6d84f5331a8f7dbdbc7705acab901e9e7f3cfa24',
+         '1297b5cf57aec9c7725e8e21a7d44710b06b523e'),
+        ('3bcaf739d81c1b5da31909d4d476c93503af6f00', 'b581c6c61ed1f56638220c8e1ecdb0e1fda2d7c6',
+         '9fc220709e602aa4b9955f973d0857804b5674d5'),
+        ('db502c6689090f89ae62c063d51961b9198fd4b9', '680ffcac8a2dc844bfa9065e53a63bae993d4607',
+         '3bcaf739d81c1b5da31909d4d476c93503af6f00'),
+        ('d9325dc5172da15e771301fb704e9c35340065fc', 'c0f809a3c320c2318bd22c92b98610060c1c9e08',
+         'db502c6689090f89ae62c063d51961b9198fd4b9'),
+        ('8373f80bd0081a944343ca0404e4f124a9724a64', 'bf8d53633c135771bedd2aae9e60168f19d70c72',
+         '8bc1ccabaa66ef4e0d0969fa443e7b8078e5f58e'),
+        ('ef0cee3b71ac259c3154c99bf02cf0909eb0bf43', 'b04bbff5fd56c0bc20573cead9418f30e25f5169',
+         '372bdb4ef0b1c5516ead2a5579247ee6ed1ea425'),
     ):
         live_git.commit(commit, tree=tree, parents=[parent])
         live_git.run('merge-base', '--is-ancestor', commit, 'HEAD')
         fixes = set(live_git.run('diff', '--name-only', parent, commit).decode().splitlines())
-        expected.update(live_git.inventory(commit, fixes & (paths | auxiliary_roles)))
+        expected.update(live_git.inventory(commit, fixes & successor_paths))
+    # Accept only the reviewed test-only correction, not an arbitrary new auxiliary blob.
+    storage_fixture = 'tools/shared/test_artifact_binary_modular.py'
+    storage_parent = '088358c9497c9ac4587e1a60b85c0ab18fabf146'
+    storage_review = '1297b5cf57aec9c7725e8e21a7d44710b06b523e'
+    live_git.commit(storage_review, tree='889deef2e37678723546b23d5c55af2116757d4e',
+                    parents=[storage_parent])
+    live_git.run('merge-base', '--is-ancestor', storage_review, 'HEAD')
+    storage_changes = set(live_git.run(
+        'diff', '--name-only', storage_parent, storage_review).decode().splitlines())
+    proof.require(storage_changes == {storage_fixture} and storage_fixture in auxiliary_roles,
+                  'exact reduced binary storage fixture control')
+    expected.update(live_git.inventory(storage_review, {storage_fixture}))
+    # The optimization commit was built on the earlier PR55 snapshot.
+    # Authenticate its changed inputs and the exact reconciled merge inputs.
+    base = '94e086c15c40aaf220c764f0e723cc3cfe627587'
+    optimized = '45261f4033db8760cbfbb40b597d1b7a920070cd'
+    pr55 = '08d7d608c13e89cabad0c81bc494072dafc7c86a'
+    live_git.commit(optimized, tree='e032adb67989c9791b312e67bcbd6e346058dcc6',
+                    parents=['2c16cd5e439ab2e55775a790de57ff6de950290f'])
+    live_git.commit(pr55, tree='253147359257a2e83e4aab55944419171aebb0f2')
+    for commit in (optimized, pr55):
+        live_git.run('merge-base', '--is-ancestor', base, commit)
+        live_git.run('merge-base', '--is-ancestor', commit, 'HEAD')
+    optimized_paths = set(live_git.run('diff', '--name-only', base, optimized).decode().splitlines())
+    expected.update(live_git.inventory(optimized, optimized_paths & successor_paths))
+    expected.update({
+        'mlf.lock': '267b37a3bf7fae22cdd90f613613807bc464f3fe',
+        'shared-sources.json': '3a4b820397f8777573961558242d3c2b27e49516',
+        'tests/mlf.lock': '833362b1b699f020a61e29428c809d865f75abf4',
+        'tools/performance/compiler-shapes/generate.py': '1d79f99f7a4ebe917699cf003174166a8d65839e',
+        'tools/shared/test_artifact_binary_modular.py': '0ee8c0e6ad0b349620c8e9d2b844c81399bff5e9',
+    })
     if source_root == root:
         auxiliary = {p: proof.read(source_root, p) for p in auxiliary_roles}
         proof.require(all(proof.oid(raw) == expected[p] for p, raw in auxiliary.items()),
@@ -343,7 +394,7 @@ def qualified_contract(root, source_root=None):
                                   'boundary additions')
             earlier = {p: self._older_bytes(additions[p], p) for p in predecessor.added_paths}
             current = edge.advance(predecessor.advance_tree_bytes(parent, earlier))
-            current.update({p: additions[p] for p in BOUNDARY_MODULES.values()})
+            current.update({p: additions[p] for p in added_modules.values()})
             proof.require(self.project_tree_bytes(current) == parent, 'boundary source round trip')
             return current
 
@@ -351,15 +402,15 @@ def qualified_contract(root, source_root=None):
     files = contract.value['current_files']
     manifest = proof.strict_json(current['shared-sources.json'])
     registered = {item['module']: item['path'] for item in manifest['modules']}
-    for module, path in BOUNDARY_MODULES.items():
+    for module, path in added_modules.items():
         proof.require(registered.get(module) == path and path not in files, 'new module registration: ' + module)
         raw = proof.read(source_root, path)
         proof.require(proof.oid(raw) == expected[path], 'new module contents: ' + module)
         files[path] = proof.sha(raw)
         contract.value['module_paths'][module] = path
         contract.value['current_registry'][module] = files[path]
-    contract.added_paths = sorted(set(contract.added_paths) | set(BOUNDARY_MODULES.values()))
-    contract.added_modules = {**contract.added_modules, **BOUNDARY_MODULES}
+    contract.added_paths = sorted(set(contract.added_paths) | set(added_modules.values()))
+    contract.added_modules = {**contract.added_modules, **added_modules}
     contract.directory = HERE
     contract.manifest_sha256 = proof.sha(proof.read(root, Path(__file__).relative_to(root).as_posix()))
     contract.metadata_paths = (*contract.metadata_paths, Path(__file__).name)

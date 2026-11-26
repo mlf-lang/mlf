@@ -1,7 +1,7 @@
 module Tests.Backends
  (Backends, Entry(..), Event(..), Input(..), Observation(..), RuntimeError(..),
   withBackends, inventoryContext, withExecutionTimeout, withInterpreterTimeout, inCase, inRegisteredCase,
-  auditBackends, auditSelectedBackends, auditNativeBackends, execute,
+  flushRows, auditBackends, auditSelectedBackends, auditNativeBackends, execute,
   executeWithArguments, executeSerialized, executeNativeSerialized, executeGeneratedLLVM, serializeTerm, capture, outcome, events, remaining,
   output, outputBytes, stderrOutput, assertCase, failCase, rightCase, rejectCase, recoverCase, reportArgs) where
 import Bootstrap.Types
@@ -11,6 +11,7 @@ import qualified Bootstrap.Map as M
 import qualified Bootstrap.IntSet as IS
 import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Pretty as Pretty
+import qualified Tests.ReportJournal as Journal
 import qualified Tests.Helpers as H
 import qualified Tests.Bytes as Bytes
 import qualified Package.OS as O
@@ -105,11 +106,14 @@ withBackends action = do
   emitterPresent <- if eqString emitter "" then ioReturn false else fileExists emitter
   emitterHash <- if emitterPresent then fileDigest emitter else ioReturn ""
   writeFile (dir ++ "/emitter.sha256") emitterHash
-  writeFile (dir ++ "/rows.jsonl") ""
+  setEnv rowReport (dir ++ "/rows.jsonl")
+  Journal.begin rowReport (dir ++ "/rows.jsonl") ""
   writeFile (dir ++ "/current-label") "<unlabelled>"
   writeFile (dir ++ "/current-id") "<unregistered>"
   count <- newIntArray 2 0
-  value <- action (Backends dir count 60 candidate candidate)
+  value <- catchIOError (action (Backends dir count 60 candidate candidate))
+    (\error -> do { flushRows; ioError error })
+  flushRows
   if emitterPresent then do
     after <- fileDigest emitter
     H.assert (eqString after emitterHash) "backend emitter changed during the matrix"
@@ -121,6 +125,10 @@ inRegisteredCase context identity label action = do
   writeFile (directory context ++ "/current-id") identity
   writeIntArray (serial context) 1 0
   action
+rowReport : String
+rowReport = "MLF_TEST_BACKEND_ROWS"
+flushRows : IO ()
+flushRows = Journal.flush rowReport
 auditBackends context = auditMatrix false context (O.words "interpreter llvm")
 -- Explicit family selections can consist entirely of source/type assertions.
 -- A reviewed zero-row selection still checks that no execution rows occurred.
@@ -128,11 +136,13 @@ auditSelectedBackends context = auditMatrix true context (O.words "interpreter l
 auditNativeBackends context = auditMatrix false context ((:) "llvm" [])
 auditMatrix allowEmpty context expected = do
   count <- readIntArray (serial context) 0
+  flushRows
   text <- readFile (directory context ++ "/rows.jsonl")
   rows <- S.mapM (\line -> H.right (J.parse line)) (O.nonempty (H.lines text))
   H.assert ((allowEmpty || count > 0) && count >= 0 && S.length rows == count) "missing backend executions"
   H.assert (S.all (\row -> J.equal (J.get "backends" row) (J.stringArray expected)) rows) "incomplete backend row"
-  H.assert (S.length (S.nubBy eqInt (S.map ((\row -> readInt (case J.get "index" row of { J.Number text -> text; _ -> "-1" }))) rows)) == count) "duplicate backend row"
+  H.assert (S.all (\((,) index row) -> J.equal (J.get "index" row) (J.num index))
+             (S.zip (S.range 0 (count - 1)) rows)) "backend row indices are missing or out of order"
   putStrLn ("Backend matrix: " ++ showInt count ++ " rows x " ++ showInt (S.length expected) ++ " backends; no missing executions")
   ioReturn count
 capture context term inputs = do
@@ -168,9 +178,8 @@ beginExecution context source = do
   ioReturn ((,,) index coordinate hash)
 recordExecution context index backends = do
   label <- readFile (directory context ++ "/current-label")
-  log <- readFile (directory context ++ "/rows.jsonl")
   let row = J.Object ((:) ((,) "label" (J.str label)) ((:) ((,) "index" (J.num index)) ((:) ((,) "backends" (J.stringArray backends)) [])))
-  writeFile (directory context ++ "/rows.jsonl") (log ++ J.render row ++ "\n")
+  Journal.append rowReport (directory context ++ "/rows.jsonl") (J.render row ++ "\n")
 executeSerializedWithArguments context arguments entry input source = do
   (,,) index coordinate hash <- beginExecution context source
   let path = stem context index

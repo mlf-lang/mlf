@@ -50,7 +50,6 @@ assert.deepEqual(publishing('', 'a'.repeat(40)), {group:`platform-release-${'a'.
 assert.notEqual(publishing('', 'a'.repeat(40)).group, publishing('', 'b'.repeat(40)).group);
 pass();
 begin('required-checks');
-assert.match(ci,/concurrency:\n  group: ci-\$\{\{ github.workflow \}\}-\$\{\{ github.ref \}\}\n  cancel-in-progress: true/);
 assert.doesNotMatch(qualify,/^\s*concurrency:/m, 'The reusable workflow must not collide with its caller');
 assert.match(qualify,/MLF_TEST_BUILD_JOBS: '1'/);
 assert.equal((qualify.match(/build-jobs: '1'/g) || []).length, 7, 'All qualification consumers remain serial');
@@ -64,24 +63,62 @@ assert.match(ci,/length == 6 and all/);
 const workflowJob = (workflow, name) => workflow.match(new RegExp(`^  ${name}:\\n[\\s\\S]*?(?=^  [a-z][a-z-]*:\\n|(?![\\s\\S]))`, 'm'))?.[0];
 const ciJob = name => workflowJob(ci, name);
 const runPrTests = "github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')";
-const normalDispatch = "github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only";
-for (const name of ['metadata', 'windows-runtime']) {
-  assert.ok(ciJob(name).includes(`    if: ${runPrTests}\n`), name);
-}
-for (const name of ['native', 'build-runner', 'async-runtime', 'async-language']) {
-  assert.ok(ciJob(name).includes(`    if: >-\n      (${runPrTests}) &&\n      (${normalDispatch})\n`), name);
-}
-for (const [name, jobName] of [
-  ['ci', 'metadata'],
-  ['formatter-compatibility', 'formatter-compatibility'],
-  ['macos-toolchain', 'provenance'],
-  ['macos-dependencies', 'producer'],
+// Evaluate the workflow expressions for real PR event shapes, including labels added
+// and removed from the same SHA while the original required checks are still active.
+const evaluateRoute = (expression, github) => Function('github', 'inputs', 'contains', 'always',
+  'return (' + expression.replaceAll('github.event.pull_request.labels.*.name',
+    'github.event.pull_request.labels.map(label => label.name)') + ');')(
+    github, {}, (values, name) => values.includes(name), () => true);
+const routingCondition = job => {
+  const expr = job.match(/^    if: >-\n((?:      [^\n]+\n)+)/m);
+  return expr ? expr[1].trim() : job.match(/^    if: (.+)$/m)?.[1];
+};
+const render = (template, github) => template.replace(/\$\{\{ (.*?) \}\}/g,
+  (_, expr) => expr.startsWith('matrix.') ? 'fixture' : String(evaluateRoute(expr, github)));
+for (const [name, jobs] of [
+  ['ci', ['metadata', 'native', 'build-runner', 'async-runtime', 'async-language', 'windows-runtime']],
+  ['formatter-compatibility', ['formatter-compatibility']],
+  ['macos-toolchain', ['provenance']],
+  ['macos-dependencies', ['producer']],
 ]) {
   const workflow = read(name);
-  assert.match(workflow, /^  pull_request:\n[\s\S]*?^    types: \[opened, synchronize, reopened, labeled, unlabeled\]$/m,
-    `Reevaluate PR labels in ${name}`);
-  assert.match(workflow, /^concurrency:\n  group: [^\n]+\n  cancel-in-progress: true$/m);
-  assert.ok(workflowJob(workflow, jobName).includes(`    if: ${runPrTests}\n`), jobName);
+  assert.match(workflow, /^  pull_request:\n[\s\S]*?^    types: \[opened, synchronize, reopened, labeled, unlabeled\]$/m);
+  assert.match(workflow, /^  cancel-in-progress: true$/m);
+  const group = workflow.match(/^concurrency:\n(?:  #.*\n)*  group: (.+)$/m)[1];
+  const event = (action, changed, labels, id=1) => ({
+    event_name: 'pull_request', workflow: name, ref: 'refs/pull/55/merge', run_id: id,
+    event: {action, ...(changed && {label:{name:changed}}), pull_request:{labels:labels.map(name => ({name}))}},
+  });
+  const revision = event('synchronize', null, []);
+  const active = render(group, revision);
+  const contexts = [
+    [revision, true, true], [event('opened', null, []), true, true],
+    [{...revision, event_name:'push', event:{}}, true, true],
+    [{...revision, event_name:'merge_group', event:{}}, true, true],
+    [event('labeled', 'ci:skip', ['ci:skip']), true, false],
+    [event('unlabeled', 'ci:skip', []), true, true],
+    [event('labeled', 'ci:async-parity', ['ci:async-parity']), name === 'ci', name === 'ci'],
+    [event('unlabeled', 'ci:async-parity', []), name === 'ci', name === 'ci'],
+    [event('labeled', 'documentation', ['documentation']), false, false],
+    [event('unlabeled', 'documentation', ['ci:async-parity']), false, false],
+    [event('unlabeled', 'documentation', ['ci:skip']), false, false],
+  ];
+  for (const [github, relevant, runsTests] of contexts) {
+    assert.equal(render(group, github) === active, relevant, name + ' cancellation group');
+    for (const id of jobs) {
+      const job = workflowJob(workflow, id);
+      assert.equal(evaluateRoute(routingCondition(job), github), runsTests, name + '/' + id);
+      const title = job.match(/^    name: (.+)$/m)[1];
+      assert.equal(render(title, github) === render(title, revision), relevant, id + ' check name');
+    }
+    if (name === 'ci') {
+      const gate = ciJob('pr-gate');
+      assert.equal(evaluateRoute(routingCondition(gate), github), relevant);
+      assert.equal(render(gate.match(/^    name: (.+)$/m)[1], github) === 'PR gate', relevant);
+    }
+  }
+  assert.notEqual(render(group, event('labeled', 'docs', ['docs'], 11)),
+    render(group, event('unlabeled', 'docs', [], 12)));
 }
 const dependencyWorkflow = fs.readFileSync('.github/workflows/macos-dependencies.yml', 'utf8');
 const requireDependencyArtifact = workflow => {
@@ -178,26 +215,14 @@ const verifyFiniteGate = workflow => {
       assert.ok(workflow.includes(`            .mlf-build/${root}-controls/**/*.${suffix}\n`));
     }
   }
-};
-// C4's full retained graph/transaction controls now run in the explicit ABI
-// adapter's graph suite inside this finite gate. Preserve its evidence too.
-const c4Gate = finiteGate;
-const verifyC4Gate = workflow => {
-  assert.ok(workflow.includes(c4Gate), 'Exact O2 C4 graph gate with unchanged resource bounds');
+  // C4's retained graph/transaction controls share this gate; keep their
+  // additional source and extensionless diagnostic artifacts as well.
   for (const artifact of [
-    '.mlf-build/a1-integrated-guard/',
-    '.mlf-build/a1-integrated-controls/**/*.json',
     '.mlf-build/a1-integrated-controls/**/stdout',
     '.mlf-build/a1-integrated-controls/**/stderr',
     '.mlf-build/a1-integrated-controls/**/*.hs',
   ]) assert.ok(workflow.includes('            ' + artifact + '\n'), 'C4 failure/evidence preservation: ' + artifact);
 };
-verifyC4Gate(ciJob('native'));
-assert.throws(() => verifyC4Gate(ciJob('native').replace(c4Gate, '')));
-assert.throws(() => verifyC4Gate(ciJob('native').replace(c4Gate, c4Gate.replace("if: matrix.optimization == '2'", 'if: false'))));
-assert.throws(() => verifyC4Gate(ciJob('native').replace(c4Gate, c4Gate.replace('--rss-mib 5120', '--rss-mib 99999'))));
-assert.throws(() => verifyC4Gate(ciJob('native').replace(c4Gate, c4Gate.replace('set -euo pipefail', 'set +e'))));
-assert.throws(() => verifyC4Gate(ciJob('native').replace('.mlf-build/a1-integrated-controls/**/stderr', 'discarded')));
 const verifyNumericEvidence = workflow => {
   for (const root of ['patricia-*', 'int64-*', 'llp64-*']) {
     for (const suffix of ['**/*.json', '**/stdout', '**/stderr', '**/*.hs']) {
@@ -212,7 +237,9 @@ assert.throws(() => verifyNumericEvidence(ciJob('native').replace('.mlf-build/ll
 verifyFiniteGate(ciJob('native'));
 assert.throws(() => verifyFiniteGate(ciJob('native').replace(finiteGate, '')));
 assert.throws(() => verifyFiniteGate(ciJob('native').replace(finiteGate, finiteGate.replace("if: matrix.optimization == '2'", 'if: false'))));
+assert.throws(() => verifyFiniteGate(ciJob('native').replace(finiteGate, finiteGate.replace('--rss-mib 5120', '--rss-mib 99999'))));
 assert.throws(() => verifyFiniteGate(ciJob('native').replace(finiteGate, finiteGate.replace('set -euo pipefail', 'set +e'))));
+assert.throws(() => verifyFiniteGate(ciJob('native').replace('.mlf-build/a1-integrated-controls/**/stderr', 'discarded')));
 assert.throws(() => verifyFiniteGate(ciJob('native').replace('.mlf-build/a1-integrated-controls/**/*.json', 'discarded')));
 assert.throws(() => verifyFiniteGate(ciJob('native').replace('.mlf-build/f1-integrated-controls/**/*.json', 'discarded')));
 assert.match(ciJob('native'), /f1-integrated-controls\/\*\*\/source\/Probe\.dump-\*/);
@@ -235,7 +262,7 @@ assert.match(ci,/pull_request:\n    types: \[opened, synchronize, reopened, labe
 assert.match(fs.readFileSync('tools/release/async-change-scope.py','utf8'), /OPT_IN_LABEL = "ci:async-parity"/);
 assert.match(asyncJob,/id: scope\n        run: python3 tools\/release\/async-change-scope.py/);
 assert.match(asyncJob,/\.mlf-build\/async-change-scope\/decision.json/);
-assert.equal((asyncJob.match(/if: steps.scope.outputs.required != 'false'/g) || []).length, 6);
+assert.match(asyncJob, /uses: \.\/\.github\/actions\/linux-ghc-bindist\n        if: steps.scope.outputs.required != 'false' && runner\.os == 'Linux'/);
 for (const name of ['GHC-origin bootstrap and native parity dependencies', 'Install pinned GHC 9.14.1 for ordinary async parity', 'Test GHC async preparation controls', 'Build and authenticate GHC-origin async tools', 'Qualify typed completions and structured process tasks', 'Qualify checked async package interfaces and cache replay']) {
   assert.ok(asyncJob.includes(`- name: ${name}\n        if: steps.scope.outputs.required != 'false'\n`));
 }

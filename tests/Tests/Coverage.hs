@@ -8,6 +8,7 @@ module Tests.Coverage where {
   import qualified Bootstrap.Std as S;
   import qualified Package.Json as J;
   import qualified Package.OS as O;
+  import qualified Tests.ReportJournal as Journal;
   -- Execution evidence never reads the reviewed inventory. The parent validates
   -- the completed report against that separate file and the child's exit status.
   fields values = J.Object values;
@@ -21,22 +22,20 @@ module Tests.Coverage where {
       path <- getEnv "MLF_TEST_COVERAGE_REPORT";
       if eqString path ""
       then return ()
-      else do {
-             previous <- readFile path;
-             writeFile path (previous ++ (J.render (event suite kind values) ++ "\n"))
-           }
+      else Journal.append "MLF_TEST_COVERAGE_REPORT" path (J.render (event suite kind values) ++ "\n")
     };
   begin suite full =
     do {
       path <- getEnv "MLF_TEST_COVERAGE_REPORT";
       if eqString path ""
       then return ()
-      else writeFile path
+      else Journal.begin "MLF_TEST_COVERAGE_REPORT" path
              (J.render
                 (event suite "start"
                    ((:) (pair "scope" (J.str (if full then "full" else "partial"))) [])) ++
               "\n")
     };
+  flush = Journal.flush "MLF_TEST_COVERAGE_REPORT";
   passed suite identity =
     append suite "case"
       ((:) (pair "id" (J.str identity)) ((:) (pair "status" (J.str "passed")) []));
@@ -54,18 +53,19 @@ module Tests.Coverage where {
       if eqString path ""
       then return ()
       else do {
-             text <- readFile path;
+             text <- Journal.contents "MLF_TEST_COVERAGE_REPORT" path;
              rows <-
                case parse text of {
                  Left error -> O.fatal error;
                  Right rows -> return rows
                };
-             append suite "summary"
+             let { summary = event suite "summary"
                ((:) (pair "complete" (J.Boolean True))
                   ((:) (pair "executions" (J.num (S.length (S.filter (kind "case") rows))))
                      ((:) (pair "aliases" (J.num (S.length (S.filter (kind "alias") rows))))
                         ((:) (pair "metrics" (J.num (S.length (S.filter (kind "metric") rows))))
-                           []))))
+                           [])))) };
+             Journal.publish "MLF_TEST_COVERAGE_REPORT" path (text ++ (J.render summary ++ "\n"))
            }
     };
   -- Count completed callback invocations, not the length of the planned inputs.
