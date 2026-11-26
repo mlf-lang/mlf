@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {projectAdapterCommands} from './workflow-test-adapters.mjs';
 import {releaseTestCase, releaseTestEvent} from './test-events.mjs';
-import {readWorkflow, job, steps, commandStep, actionStep, paths, list, selected,
+import {parseWorkflow, readWorkflow, job, steps, commandStep, actionStep, paths, list, selected,
   render, clone, reformatted} from './workflow-model.mjs';
 import {shellCalls, successfulCalls, requireFailurePropagation} from './workflow-shell.mjs';
 
@@ -385,6 +385,40 @@ function verifyEvidence(value) {
   for (const suffix of ['json','stdout','stderr','ll','xmlf']) expected.push('.mlf-build/io-action-sharing/**/*.'+suffix);
   for (const required of expected) assert.ok(paths(upload).includes(required),'Preserve evidence: '+required);
 }
+const qualificationAction = () => parseWorkflow(fs.readFileSync('.github/actions/posix-qualification/action.yml','utf8'));
+const collectionStep = value => commandStep(value.runs,'tools/release/time-stage.sh evidence');
+function verifyQualificationEvidence(value) {
+  const step=collectionStep(value);
+  const timer=fs.readFileSync('tools/release/time-stage.sh');
+  inFixture(root=>{
+    const put=(relative,content)=>{
+      const target=path.join(root,relative);
+      fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,content);
+      return target;
+    };
+    fs.chmodSync(put('tools/release/time-stage.sh',timer),0o755);
+    const files={'verification.json':'{"complete":true}\n','suite-build/bin/core-language':'retained executable\n'};
+    for(const shard of ['core-crates','core-language','core-solver','core-modules']) {
+      for(const suffix of ['inventory.json','cases.jsonl','coverage.jsonl','families.jsonl']) {
+        files[shard+'.'+suffix]=JSON.stringify({shard,evidence:suffix})+'\n';
+      }
+    }
+    for(const [name,content] of Object.entries(files)) put('.mlf-build/compiler-tests/unit/'+name,content);
+    put('.mlf-build/compiler-tests/unit/intermediate.o','discard object\n');
+    put('.mlf-build/compiler-tests/unit/scratch.hs','discard source\n');
+    const result=spawnSync('/bin/bash',['--noprofile','--norc','-e','-o','pipefail','-c',step.run],{
+      cwd:root,encoding:'utf8',timeout:10000,env:{PATH:process.env.PATH,TEST_GROUP:'unit'},
+    });
+    assert.equal(result.error,undefined);assert.equal(result.status,0,result.stderr);
+    const destination=path.join(root,'.mlf-build/release-evidence/compiler-tests/unit');
+    for(const [name,content] of Object.entries(files)) {
+      const retained=path.join(destination,name);
+      assert.ok(fs.existsSync(retained),'Retain qualification evidence: '+name);
+      assert.equal(fs.readFileSync(retained,'utf8'),content,'Preserve evidence bytes: '+name);
+    }
+    for(const name of ['intermediate.o','scratch.hs']) assert.ok(!fs.existsSync(path.join(destination,name)));
+  });
+}
 function verifyAggregate(value) {
   const gate=job(value,'pr-gate');
   const names=['metadata','native','windows-runtime','build-runner','async-runtime','async-language'];
@@ -420,6 +454,12 @@ const findAdapter=(value,adapter)=>{
 const suite='release-native-ci-partition', prefix='release/native-ci-partition/';
 const cases=[
   ['schedule',()=>verify(workflow)],
+  ['qualification-evidence-transport',()=>verifyQualificationEvidence(qualificationAction())],
+  ['mutation/qualification-discovery-deleted',()=>{
+    const value=qualificationAction();
+    collectionStep(value).run+="\nfind .mlf-build/release-evidence -name '*.inventory.json' -delete\n";
+    assert.throws(()=>verifyQualificationEvidence(value),/Retain qualification evidence:/);
+  }],
   ['equivalent-yaml-and-display-names',()=>verify(reformatted(workflow))],
   ['equivalent-shell-locals',()=>{
     const changed=clone(workflow);
