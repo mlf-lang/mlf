@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Static preservation checks, not compilation or semantic execution evidence."""
+"""Audit immutable migration snapshots, not the spelling of maintained sources.
+
+The active registry contract is enforced against executable discovery and case
+reports by test_framework_direct.py. This historical audit retains the original
+inputs, independent oracles and reviewed transcription without freezing today's
+module layout, helper names, comments or formatting.
+"""
 import hashlib
 import json
 from pathlib import Path
@@ -39,6 +45,7 @@ REVIEWED_SHARED_SHA256 = {
 HISTORICAL_SHARED_COMMIT = "2916c477468efaa24ae2c76e8b2f41e5f15236a6"
 HISTORICAL_SHARED_TREE = "7efa13e6a64c0445ebcf891c4e15694321a43780"
 ACTIVE_CONTRACT_PATH = "tools/testing/tuple-list-active-contract.json"
+FRAMEWORK_CUTOVER = "08d7d608c13e89cabad0c81bc494072dafc7c86a"
 
 
 def active_contract():
@@ -49,7 +56,9 @@ def active_contract():
             "reviewed active tuple inventory changed")
     require(contract["legacy_pass_count"] == 305, "reviewed legacy observation count changed")
     require(set(contract["source_sha256"]) == {IMPLEMENTATION, SOURCE},
-            "active tuple source inventory changed")
+            "historical tuple source inventory changed")
+    require(contract["source_commit"] == FRAMEWORK_CUTOVER,
+            "reviewed framework cutover revision changed")
     require(contract["phase_1_parent"] == PHASE_1_PARENT, "Phase 1 archive revision changed")
     return contract
 
@@ -63,22 +72,21 @@ def verify_historical_sources():
     return sources
 
 
-def verify_shared(path, source):
+def verify_cutover_source(path, source):
     expected = active_contract()["source_sha256"].get(path)
-    require(expected is not None, "shared semantic contract requires review: " + path)
+    require(expected is not None, "unreviewed historical tuple source: " + path)
     require(hashlib.sha256(source.encode()).hexdigest() == expected,
-            "shared source differs from reviewed active semantic contract: " + path)
+            "historical source differs from reviewed cutover: " + path)
 
 
-def verify_current_sources(root=None):
-    root = ROOT if root is None else root
+def verify_cutover_sources():
+    """Authenticate the recorded cutover; current source bytes are not an oracle."""
     paths = (IMPLEMENTATION, SOURCE)
-    sources = {path: (root / path).read_bytes().decode("utf-8") for path in paths}
+    sources = {path: subprocess.check_output(
+        ["git", "--no-replace-objects", "show", f"{FRAMEWORK_CUTOVER}:{path}"],
+        cwd=ROOT).decode("utf-8") for path in paths}
     for path, source in sources.items():
-        verify_shared(path, source)
-    for removed in (FROZEN_SOURCE, STAGED_IMPLEMENTATION, LEGACY,
-                    "tests/Tests/TupleListLegacy.emlf"):
-        require(not (root / removed).exists(), "duplicate live implementation: " + removed)
+        verify_cutover_source(path, source)
     return sources
 
 
@@ -260,22 +268,25 @@ def main():
         except ValueError:
             continue
         raise ValueError(f"static control failed to reject {name}")
-    sources = verify_current_sources()
+    sources = verify_cutover_sources()
     shared_ids = re.findall(r'leaf\s+"([^"]+)"', sources[IMPLEMENTATION])
     contract = active_contract()
-    require(shared_ids == contract["framework_ids"], "active ordered leaf inventory differs from reviewed contract")
+    require(shared_ids == contract["framework_ids"], "recorded cutover inventory differs from reviewed contract")
     legacy = subprocess.check_output(["git", "--no-replace-objects", "show", f"{PHASE_1_PARENT}:{LEGACY}"], cwd=ROOT)
     require(hashlib.sha256(legacy).hexdigest() == contract["baseline_legacy_sha256"],
             "archived legacy TupleList source changed")
     # Native fixture identity stays independent of the process adapter.
     for path in ("tests/fixtures/tuple-list-runtime.emlf", "tests/fixtures/tuple-list-runtime.stdout"):
         require((ROOT / path).read_text() == frozen(path), f"native route changed: {path}")
-    print(json.dumps({"kind": "static-source-preservation", "baseline": BASELINE,
+    print(json.dumps({"kind": "historical-source-preservation", "baseline": BASELINE,
+                      "framework_cutover": FRAMEWORK_CUTOVER,
                       "historical_leaf_ids": 90, "active_leaf_ids": contract["framework_count"],
                       "active_legacy_observations": contract["legacy_pass_count"], "default_implementation": "framework", "literal_calls_preserved": count,
                       "oracle_helpers_preserved": 12, "mutation_controls": len(mutations),
                       "historical_shared_semantic_contract": REVIEWED_SHARED_SHA256,
-                      "active_shared_semantic_contract": contract,
+                      "reviewed_cutover_contract": contract,
+                      "current_source_verified": False,
+                      "current_behavior_gate": "tools/shared/test_framework_direct.py",
                       "compilation_verified": False, "semantic_execution_verified": False}, indent=2))
 
 

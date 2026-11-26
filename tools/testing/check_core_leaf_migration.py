@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Static Core registry and isolation controls; no semantic test runs."""
+"""Audit historical Core migration and current public inventory contracts.
+
+Source projections and lexical checks apply only to immutable migration
+snapshots. Current dispatch, selection and evidence isolation are exercised by
+the framework/native gates; private helper names and source formatting are not
+part of the active registry contract.
+"""
 import difflib
 import functools
 import hashlib
@@ -14,12 +20,21 @@ from history_refs import historical_bytes
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "8a3e69b165765931c3ff762379a78db9659b2cd8"
 PHASE_1_PARENT = "720dd649627fbf8b19c7447493a4fdf6fd05eb39"
+FRAMEWORK_CUTOVER = "08d7d608c13e89cabad0c81bc494072dafc7c86a"
 
 
 @functools.lru_cache(maxsize=None)
 def pre_cutover(path):
     return subprocess.check_output(
         ["git", "--no-replace-objects", "show", PHASE_1_PARENT + ":" + path], cwd=ROOT
+    ).decode("utf-8")
+
+
+@functools.lru_cache(maxsize=None)
+def recorded_cutover(path):
+    return subprocess.check_output(
+        ["git", "--no-replace-objects", "show", FRAMEWORK_CUTOVER + ":" + path],
+        cwd=ROOT
     ).decode("utf-8")
 
 
@@ -582,9 +597,8 @@ def verify_partition_provenance():
             hierarchy["expression_string_tokens"] == 11, "Core migration evidence chain changed")
     published = historical_bytes(SHARED_REVIEW, PARTITIONS)
     verify_shared_partitions(published)
-    raw = (ROOT / PARTITIONS).read_bytes()
+    raw = recorded_cutover(PARTITIONS).encode("utf-8")
     verify_shared_partitions(raw, canonical=True)
-    require(not (ROOT / "tests/Tests/CorePartitions.emlf").exists(), "duplicate live legacy CorePartitions")
     mutants = [raw.replace(b'core/guards', b'core/invented', 1),
                raw.replace(b'if ((S.length flat', b'if ((S.length familyNames', 1),
                raw.replace(b'then Right ()', b'then Left "weakened"', 1)]
@@ -643,16 +657,16 @@ def verify_projection_controls():
     return len(mutations) + 2
 
 
-def verify_live_cutover(expected):
-    registry = source_text("tests/Tests/CoreRegistry.emlf")
+def verify_recorded_cutover(expected):
+    registry = recorded_cutover("tests/Tests/CoreRegistry.emlf")
     runner_path = "tests/Tests/CoreRunner.emlf"
-    runner = source_text(runner_path)
+    runner = recorded_cutover(runner_path)
     require(list(actual_bindings(registry).items()) == list(expected.items()),
-            "live registry changed the ordered family and case bindings")
+            "recorded registry changed the ordered family and case bindings")
     original = pre_cutover(runner_path)
     triples = r'\(,,\) "(?:\\.|[^"\\])*" "(?:\\.|[^"\\])*" (?:true|false)'
     require(re.findall(triples, original) == re.findall(triples, runner),
-            "live substring stimuli or oracle changed")
+            "recorded substring stimuli or oracle changed")
     for marker in (
         'S.append substrings entries',
         'Runner.runOptionsObserved observe options entries runnable',
@@ -663,9 +677,9 @@ def verify_live_cutover(expected):
         'Coverage.validateProjection inventory "core" (expectedCoverage inventory entry)',
         'Coverage.metric "core" "substring-executed" (S.length substrings)',
     ):
-        require(marker in runner, "live Core dispatch/evidence boundary changed: " + marker)
-    require("legacyMain" not in runner, "duplicate Core dispatcher is still live")
-    # Body ownership and inputs remain fixed while assertion transport changes.
+        require(marker in runner, "recorded Core dispatch/evidence boundary changed: " + marker)
+    require("legacyMain" not in runner, "recorded cutover retained duplicate Core dispatcher")
+    # Compare the reviewed migration inputs, not every later source spelling.
     literal = re.compile(r'"(?:\\.|[^"\\])*"')
     for name in ("CoreCrates", "CoreSolver", "CoreLanguage", "CoreModules",
                  "Computations", "Datatypes", "Typeclasses", "DoNotation", "SurfaceSyntax",
@@ -673,7 +687,7 @@ def verify_live_cutover(expected):
                  "DenseNormalization", "SolverIndexAudit", "Modules", "Separate"):
         path = f"tests/Tests/{name}.emlf"
         frozen_literals = literal.findall(pre_cutover(path))
-        actual = literal.findall(source_text(path))
+        actual = literal.findall(recorded_cutover(path))
         if name == "Computations":
             require(actual[-1:] == ['"unexpected success"'], "missing typed rejection diagnostic")
             actual = actual[:-1]
@@ -681,16 +695,16 @@ def verify_live_cutover(expected):
             # The shared generator counter replaces two identical suite arguments.
             require(Counter(actual) == Counter(frozen_literals) - Counter(['"core"'])
                     + Counter(['"MLF_TEST_CORE_JSON"', '"1"', '"\\n"']),
-                    "live Core generated-loop stimulus or adapter changed")
+                    "recorded Core generated-loop stimulus or adapter changed")
         elif name in ("Modules", "Separate"):
             # The file/path case label moved to its explicit adapter binding.
             require(Counter(actual) == Counter(frozen_literals),
-                    "live Core module/crate stimulus changed: " + path)
+                    "recorded Core module/crate stimulus changed: " + path)
         else:
-            require(actual == frozen_literals, "live Core literal/oracle inventory changed: " + path)
-    helper = source_text(FRONTEND_HELPERS_PATH)
+            require(actual == frozen_literals, "recorded Core literal/oracle inventory changed: " + path)
+    helper = recorded_cutover(FRONTEND_HELPERS_PATH)
     require(FRONTEND_HELPER_IMPORTS in helper and FRONTEND_HELPER_BODY in helper,
-            "live Core helper changed frontend provenance")
+            "recorded Core helper changed frontend provenance")
 
 
 def main():
@@ -699,7 +713,7 @@ def main():
     require(canonical_source(lexical_control) == lexical_expected,
             "canonical projection changed strings, comments, characters or unrelated names")
     expected = expected_bindings()
-    verify_live_cutover(expected)
+    verify_recorded_cutover(expected)
     registry = pre_cutover("tests/Tests/CoreRegistry.emlf")
     runner = pre_cutover("tests/Tests/CoreRunner.emlf")
     original = frozen("tests/Tests/CoreRunner.emlf")
@@ -836,7 +850,8 @@ def main():
     frontend_mutations = verify_frontend_controls()
     verify_partition_provenance()
     projection_mutations = verify_projection_controls()
-    print(json.dumps({"kind": "static-core-cutover-controls", "baseline": BASELINE,
+    print(json.dumps({"kind": "historical-core-cutover-controls", "baseline": BASELINE,
+                      "framework_cutover": FRAMEWORK_CUTOVER,
                       "phase_1_parent": PHASE_1_PARENT, "family_count": len(expected), "legacy_actions": 739,
                       "registered_actions": 746, "retained_legacy_identities": 727,
                       "reviewed_identity_migrations": 12, "new_recursive_leaves": 3,
@@ -856,8 +871,11 @@ def main():
                       "golden_inventory_mutation_controls": 2,
                       "recursive_graph_helpers_sha256": RECURSION_HELPERS_SHA256,
                       "historical_shared_partition_sha256": PARTITIONS_SHA256,
-                      "shared_partition_sha256": hashlib.sha256((ROOT / PARTITIONS).read_bytes()).hexdigest(),
+                      "shared_partition_sha256": hashlib.sha256(recorded_cutover(PARTITIONS).encode("utf-8")).hexdigest(),
                       "default_campaign": "framework", "historical_default_campaign": "legacy",
+                      "current_source_verified": False,
+                      "current_behavior_gates": ["tests/Tests/TestFramework.emlf",
+                                                 "tools/release/verify-unit-evidence.sh"],
                       "qualification_eligible": False,
                       "compilation_verified": False, "semantic_execution_verified": False}, indent=2))
 

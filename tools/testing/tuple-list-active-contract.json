@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
-  "scope": "Reviewed active Haskell-semantics tuple/list contract; not execution evidence. Historical90 ledger is unchanged.",
+  "scope": "Independent active tuple/list IDs and counts, checked against executable discovery and case reports. Source hashes authenticate only the recorded migration cutover; maintained source formatting and layout may change. Historical90 ledger is unchanged.",
+  "source_commit": "08d7d608c13e89cabad0c81bc494072dafc7c86a",
   "framework_count": 105,
   "legacy_pass_count": 305,
   "framework_ids": [

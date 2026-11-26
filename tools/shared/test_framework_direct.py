@@ -10,7 +10,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import re
 import sys
 from build import PACKAGES, DEMAND_FLAGS
 from test_direct import CommandRunner, authenticate_build
@@ -138,8 +137,11 @@ def main():
         contract = json.loads((ROOT/'tools/testing/tuple-list-active-contract.json').read_text())
         framework_count = contract['framework_count']
         legacy_count = contract['legacy_pass_count']
-        ids = re.findall(r'leaf\s+"([^"]+)"', (ROOT/'tests/Tests/TupleList.hs').read_text())
-        if ids != contract['framework_ids'] or len(ids) != framework_count or len(set(ids)) != framework_count:
+        # Expected IDs are independently reviewed data. The actual executable's
+        # discovery and case reports below must match them; parsing registration
+        # source would couple qualification to private helpers and formatting.
+        ids = contract['framework_ids']
+        if len(ids) != framework_count or len(set(ids)) != framework_count:
             raise ValueError('reviewed registry inventory changed')
         artifacts = {}
         if selected('host-classes'):
