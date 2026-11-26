@@ -328,6 +328,8 @@ def qualified_contract(root, source_root=None):
          'e925c19fc25958d8c08010013dcf2ae55349ceef'),
         ('15bc2289cfeff27ba8281439b014ff2b27cf2d92', 'bf8d53633c135771bedd2aae9e60168f19d70c72',
          '7c6493c777adf85af05a942213a76fb2fad43343'),
+        ('e0d134eab049746a95224b83bf894d98fe75fa82', 'b04bbff5fd56c0bc20573cead9418f30e25f5169',
+         '75849d6064a5fea3ea79b9f58f2afe5859533d8d'),
     ):
         live_git.commit(commit, tree=tree, parents=[parent])
         live_git.run('merge-base', '--is-ancestor', commit, 'HEAD')
