@@ -43,6 +43,8 @@ jobs:
         run: |
           python3 -B tools/testing/run.py python-release-ghc-install-cleanup
           python3 -B tools/testing/run.py python-release-ghc-install-cleanup --python-optimization
+      - name: Test backend driver cache verification and recovery
+        run: python3 -B tools/testing/run.py python-testing-driver-cache
       - name: Test builtin generation evidence boundaries
         run: |
           python3 -B tools/testing/run.py python-shared-generate-builtin-evidence
@@ -320,6 +322,9 @@ jobs:
           MLF_PACKAGE_MANAGER="$toolset/mlfpkg" MLF_BUILD_RUNNER="$toolset/mlf-build-runner" "$toolset/mlfpkg" \
             --manifest testing/tools/mlf-package.json --compiler "$toolset/emlf" --runtime "$PWD/runtime/mlf_runtime.c" \
             --build-dir "$PWD/.mlf-build/compiler-tests/lifecycle" --cache-dir "$PWD/.mlf-build/cache" --locked test --target lifecycle
+      - name: Prepare and cache verified hosted backend drivers
+        if: ${{ !cancelled() && steps.native_lifecycle.outcome == 'success' && matrix.suite == 'routine' }}
+        uses: ./.github/actions/prepare-backend-drivers
       - name: Exercise hosted backend matrix
         if: ${{ !cancelled() && steps.native_lifecycle.outcome == 'success' && matrix.suite == 'routine' }}
         run: |
