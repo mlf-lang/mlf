@@ -22,7 +22,7 @@ CASE_PREFIX = 'framework-direct/'
 
 
 def selected_cases(selection, exact=None):
-    names = ['tuple-static', 'host-classes']
+    names = ['host-classes']
     if selection != 'controls':
         names.append('tuple-registry')
     if selection != 'default':
@@ -123,26 +123,24 @@ def main():
                 if not path.is_relative_to(producer_dir) or digest(path) != sha:
                     raise ValueError('producer object changed: '+name)
         check_objects()
-        inputs = [Path(__file__), ROOT/'tools/shared/FrameworkDirect.hs', ROOT/'tools/shared/test_direct.py',
-                  ROOT/'tools/shared/build.py', ROOT/'tools/testing/check_tuple_list_migration.py',
+        inputs = [ROOT/'tools/shared/test_framework_direct.py', ROOT/'tools/shared/FrameworkDirect.hs', ROOT/'tools/shared/test_direct.py',
+                  ROOT/'tools/shared/build.py',
                   ROOT/'tools/testing/tuple-list-active-contract.json',
                   ROOT/'tests/Tests/TupleList.hs', ROOT/'tools/testing/events.py',
                   ROOT/'tests/MLF/Entry/TupleList.hs']
         hashes = {str(p.resolve().relative_to(ROOT)):digest(p) for p in inputs}
         record.update(producer_receipt_sha256=digest(receipt), inputs=hashes, object_inputs=objects,
                       optimization=producer['optimization'])
-        if selected('tuple-static'):
-            with observed('tuple-static', record):
-                run('static-oracle-contract', [sys.executable, ROOT/'tools/testing/check_tuple_list_migration.py'])
         contract = json.loads((ROOT/'tools/testing/tuple-list-active-contract.json').read_text())
-        framework_count = contract['framework_count']
-        legacy_count = contract['legacy_pass_count']
         # Expected IDs are independently reviewed data. The actual executable's
         # discovery and case reports below must match them; parsing registration
         # source would couple qualification to private helpers and formatting.
         ids = contract['framework_ids']
-        if len(ids) != framework_count or len(set(ids)) != framework_count:
-            raise ValueError('reviewed registry inventory changed')
+        if (contract.get('schema_version') != 1 or not isinstance(ids, list) or not ids
+                or any(not isinstance(identity, str) or not identity.startswith('tuple-list/') for identity in ids)
+                or len(set(ids)) != len(ids)):
+            raise ValueError('invalid tuple/list registry contract')
+        framework_count = len(ids)
         artifacts = {}
         if selected('host-classes'):
             with observed('host-classes', record):
@@ -220,7 +218,7 @@ def main():
         else:
             authenticate_receipt()
         checks = framework_count if selected('tuple-registry') else 0
-        record.update(complete=True, registry_checks=checks, legacy_observations=legacy_count,
+        record.update(complete=True, registry_checks=checks,
                       default_checks=checks if args.suite != 'framework' else 0,
                       framework_checks=checks if args.suite == 'framework' else 0,
                       discovery_only=selected('tuple-cli'), exact_selection=selected('tuple-cli'),

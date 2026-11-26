@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Python-only controls for the direct framework gate; no GHC/native campaign.
 
-Exercise the real main and real reviewed source contract. Only command execution
+Exercise the real main and independent public case inventory. Only command execution
 and producer authentication are faked. Fixtures and expected dispatch are authored
 here, not obtained from the gate's selection or timeout helpers. Real process-tree
 cleanup/authentication controls live in test_provenance.py.
@@ -13,6 +13,7 @@ import io
 import json
 import os
 from pathlib import Path
+import shutil
 import sys
 import tempfile
 from types import SimpleNamespace
@@ -25,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_PATH = ROOT / 'tools/testing/tuple-list-active-contract.json'
 CONTRACT = json.loads(CONTRACT_PATH.read_text())
 IDS = CONTRACT['framework_ids']
-COMMON = ['static-oracle-contract', 'compile-harness', 'c-host', 'c-supervisor',
+COMMON = ['compile-harness', 'c-host', 'c-supervisor',
           'link-harness', 'class-demand-IO-controls']
 FRAMEWORK = ['discovery', 'exact-selection', 'reject-unknown',
              'reject-empty', 'reject-absent', 'report-write-failure']
@@ -44,27 +45,27 @@ def json_lines(rows):
     return b''.join((json.dumps(row) + '\n').encode() for row in rows)
 
 
-def successful_rows(ids, scope):
+def successful_rows(ids, scope, total=None):
     count = len(ids)
     return [dict(schema_version=1, event='start', ids=list(ids))] + [
         dict(schema_version=1, event='case', id=case_id, status='passed')
         for case_id in ids
-    ] + [dict(schema_version=1, event='summary', total=105, selected=count,
+    ] + [dict(schema_version=1, event='summary', total=len(IDS) if total is None else total, selected=count,
               executed=count, passed=count, failed=0, scope=scope, complete=True)]
 
 
-def successful_outputs():
+def successful_outputs(ids=IDS):
     return {
         'class-demand-IO-controls': json_lines([
             dict(schema_version=1, event='inventory', total=2, selected=2,
                  cases=[{'id': 'probe/fail'}, {'id': 'probe/after'}])
         ]) + HARNESS_MARKER,
         'default': b''.join(b'PASS ' + identity.encode() + b'  description\n'
-                            for identity in IDS) + b'Tuple/list focused checks passed.\n',
-        'discovery': json_lines([dict(schema_version=1, event='inventory', total=105,
-                                     selected=105, cases=[{'id': name} for name in IDS])]),
-        'framework': json_lines(successful_rows(IDS, 'full')),
-        'exact-selection': json_lines(successful_rows(IDS[:1], 'partial')),
+                            for identity in ids) + b'Tuple/list focused checks passed.\n',
+        'discovery': json_lines([dict(schema_version=1, event='inventory', total=len(ids),
+                                     selected=len(ids), cases=[{'id': name} for name in ids])]),
+        'framework': json_lines(successful_rows(ids, 'full', len(ids))),
+        'exact-selection': json_lines(successful_rows(ids[:1], 'partial', len(ids))),
     }
 
 
@@ -74,6 +75,7 @@ class MainFixture:
         temporary = tempfile.TemporaryDirectory(prefix='mlf-framework-control-')
         test.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name).resolve()
+        self.source_root = ROOT
         self.producer_dir = self.root / 'producer'
         self.output = self.root / 'result'
         (self.producer_dir / 'objects').mkdir(parents=True)
@@ -95,6 +97,18 @@ class MainFixture:
         self.auth_error_at = None
         self.on_final_auth = None
 
+    def use_source_archive(self):
+        """Only current gate inputs: no Git objects or historical audit files."""
+        self.source_root = self.root / 'source'
+        for relative in ['tools/shared/test_framework_direct.py', 'tools/shared/FrameworkDirect.hs',
+                         'tools/shared/test_direct.py', 'tools/shared/build.py',
+                         'tools/testing/tuple-list-active-contract.json', 'tools/testing/events.py',
+                         'tests/Tests/TupleList.hs', 'tests/MLF/Entry/TupleList.hs']:
+            target = self.source_root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / relative, target)
+        return self.source_root / 'tools/testing/tuple-list-active-contract.json'
+
     def authenticate(self, receipt, binaries):
         self.events.append('authenticate')
         self.auth_calls.append((receipt, binaries))
@@ -105,7 +119,7 @@ class MainFixture:
         return copy.deepcopy(self.producer)
 
     def runner(self, root, output, record, save):
-        assert root == ROOT and output == self.output
+        assert root == self.source_root and output == self.output
 
         def run(label, command, *, status=0, timeout=120, overrides=None):
             command = list(map(str, command))
@@ -139,6 +153,7 @@ class MainFixture:
         argv = ['test_framework_direct.py', '--build-receipt', str(self.build_receipt),
                 '--output', str(self.output), *arguments]
         with patch.dict(os.environ), patch.object(sys, 'argv', argv), \
+                patch.object(gate, 'ROOT', self.source_root), \
                 patch.object(gate, 'CommandRunner', side_effect=self.runner), \
                 patch.object(gate, 'authenticate_build', side_effect=self.authenticate), \
                 contextlib.redirect_stderr(io.StringIO()):
@@ -168,14 +183,29 @@ class FrameworkMainControls(unittest.TestCase):
         self.assertIn(type(caught.exception).__name__, receipt['error'])
         return receipt
 
-    def test_fixture_tracks_reviewed_305_and_105_contract(self):
-        self.assertEqual(CONTRACT['legacy_pass_count'], 305)
-        self.assertEqual(CONTRACT['framework_count'], 105)
-        self.assertEqual(len(IDS), 105)
-        self.assertEqual(len(set(IDS)), 105)
-        self.assertEqual(IDS[0], 'tuple-list/focused/pair-ast')
+    def test_current_registry_runs_without_history_and_accepts_added_cases(self):
+        for ids in (IDS, IDS + ['tuple-list/focused/additional-regression']):
+            with self.subTest(cases=len(ids)):
+                fixture = MainFixture(self)
+                contract = fixture.use_source_archive()
+                contract.write_text(json.dumps({'schema_version': 1, 'framework_ids': ids}))
+                fixture.outputs = successful_outputs(ids)
+                receipt = fixture.execute()
+                self.assertTrue(receipt['complete'])
+                self.assertEqual(receipt['registry_checks'], len(ids))
+                self.assertEqual([call['name'] for call in fixture.calls], EXPECTED_DISPATCH['all'])
+                self.assertNotIn('legacy_observations', receipt)
 
-    def test_omitted_suite_preserves_old_all_dispatch(self):
+    def test_empty_duplicate_or_invalid_registry_contract_is_rejected(self):
+        for ids in ([], [IDS[0], IDS[0]], ['unrelated/case'], [None]):
+            with self.subTest(ids=ids):
+                fixture = MainFixture(self)
+                contract = fixture.use_source_archive()
+                contract.write_text(json.dumps({'schema_version': 1, 'framework_ids': ids}))
+                self.assert_failed(fixture, message='invalid tuple/list registry contract')
+                self.assertEqual(fixture.calls, [])
+
+    def test_omitted_suite_executes_current_controls_and_registry(self):
         fixture = MainFixture(self)
         receipt = fixture.execute()
         self.assertEqual([call['name'] for call in fixture.calls], EXPECTED_DISPATCH['all'])
@@ -183,16 +213,14 @@ class FrameworkMainControls(unittest.TestCase):
         self.assertEqual(calls['default']['argv'], [str(fixture.producer_dir / 'bin/tuple-list')])
         self.assertEqual(calls['default']['overrides'],
                          {'MLF_TUPLE_LIST_REPORT': str(fixture.output / 'framework-report.jsonl')})
-        self.assertEqual(calls['static-oracle-contract']['argv'],
-                         [sys.executable, str(ROOT / 'tools/testing/check_tuple_list_migration.py')])
         self.assertEqual(calls['class-demand-IO-controls']['argv'], [str(fixture.output / 'framework-direct')])
         self.assertEqual(receipt['selected_suites'], ['default', 'framework'])
-        self.assertEqual((receipt['default_checks'], receipt['framework_checks']), (105, 0))
+        self.assertEqual((receipt['default_checks'], receipt['framework_checks']), (len(IDS), 0))
         self.assertEqual(receipt['coverage_scope'], 'full')
 
     def test_aliases_and_controls_share_one_registry_execution(self):
         heavy = {}
-        for selection, counts in [('all', (105, 0)), ('default', (105, 0)), ('framework', (0, 105)), ('controls', (0, 0))]:
+        for selection, counts in [('all', (len(IDS), 0)), ('default', (len(IDS), 0)), ('framework', (0, len(IDS))), ('controls', (0, 0))]:
             with self.subTest(selection=selection):
                 fixture = MainFixture(self)
                 receipt = fixture.execute('--suite', selection)
@@ -203,7 +231,6 @@ class FrameworkMainControls(unittest.TestCase):
                 self.assertFalse(receipt['full_native_unit'])
                 self.assertEqual((receipt['default_checks'], receipt['framework_checks']), counts)
                 self.assertEqual(receipt['registry_checks'], sum(counts))
-                self.assertEqual(receipt['legacy_observations'], 305)
                 self.assertEqual(receipt['selected_suites'], ['default', 'framework'] if selection == 'all' else [selection])
                 self.assertEqual(receipt['coverage_scope'], 'full' if selection == 'all' else 'partition')
                 self.assertTrue(receipt['standard_class_demand_IO_controls'])
@@ -276,7 +303,7 @@ class FrameworkMainControls(unittest.TestCase):
         receipt = fixture.execute('--suite', 'framework', '--suite-timeout', '5400')
         self.assertEqual(receipt['execution_budget'], 5400)
         self.assertEqual(receipt['selected_suites'], ['framework'])
-        self.assertEqual((receipt['default_checks'], receipt['framework_checks']), (0, 105))
+        self.assertEqual((receipt['default_checks'], receipt['framework_checks']), (0, len(IDS)))
         self.assertEqual(fixture.events, ['authenticate', *EXPECTED_DISPATCH['framework'], 'authenticate'])
         self.assertEqual({call['name']: call['timeout_seconds'] for call in fixture.calls},
                          {label: 5400 if label == 'framework' else 120 for label in EXPECTED_DISPATCH['framework']})
@@ -297,7 +324,7 @@ class FrameworkMainControls(unittest.TestCase):
         receipt = fixture.execute('--suite', 'default', '--suite-timeout', '5400')
         self.assertEqual(receipt['execution_budget'], 5400)
         self.assertEqual(receipt['selected_suites'], ['default'])
-        self.assertEqual((receipt['default_checks'], receipt['framework_checks']), (105, 0))
+        self.assertEqual((receipt['default_checks'], receipt['framework_checks']), (len(IDS), 0))
         self.assertEqual(fixture.events, ['authenticate', *EXPECTED_DISPATCH['default'], 'authenticate'])
         self.assertEqual({call['name']: call['timeout_seconds'] for call in fixture.calls},
                          {label: 5400 if label == 'default' else 120 for label in EXPECTED_DISPATCH['default']})
@@ -401,7 +428,7 @@ class FrameworkMainControls(unittest.TestCase):
     def test_discovery_missing_reordered_or_changed_ids_rejected(self):
         mutations = [lambda rows: rows[0]['cases'].pop(), lambda rows: rows[0]['cases'].reverse(),
                      lambda rows: rows[0]['cases'][0].update(id='unexpected/case'),
-                     lambda rows: rows[0].update(selected=104), lambda rows: rows[0].update(schema_version=2)]
+                     lambda rows: rows[0].update(selected=(len(IDS) - 1)), lambda rows: rows[0].update(schema_version=2)]
         for mutation in mutations:
             fixture = MainFixture(self)
             fixture.replace_rows('discovery', mutation)
@@ -426,8 +453,8 @@ class FrameworkMainControls(unittest.TestCase):
             self.assert_failed(fixture, '--suite', 'framework')
 
     def test_full_summary_cannot_claim_partial_or_incomplete_coverage(self):
-        for mutation in ({'complete': False}, {'scope': 'partial'}, {'executed': 104},
-                         {'passed': 104}, {'failed': 1}, {'selected': 104}, {'total': 104}):
+        for mutation in ({'complete': False}, {'scope': 'partial'}, {'executed': (len(IDS) - 1)},
+                         {'passed': (len(IDS) - 1)}, {'failed': 1}, {'selected': (len(IDS) - 1)}, {'total': (len(IDS) - 1)}):
             with self.subTest(mutation=mutation):
                 fixture = MainFixture(self)
                 fixture.replace_rows('framework', lambda rows: rows[-1].update(mutation))
@@ -449,7 +476,7 @@ class FrameworkMainControls(unittest.TestCase):
         mutations = [lambda rows: rows[0].update(ids=[IDS[1]]), lambda rows: rows[1].update(id=IDS[1]),
                      lambda rows: rows[1].update(status='failed'), lambda rows: rows[1].update(schema_version=2),
                      lambda rows: rows[-1].update(scope='full'), lambda rows: rows[-1].update(complete=False),
-                     lambda rows: rows[-1].update(executed=105), lambda rows: rows[-1].update(total=1)]
+                     lambda rows: rows[-1].update(executed=len(IDS)), lambda rows: rows[-1].update(total=1)]
         for mutation in mutations:
             fixture = MainFixture(self)
             fixture.replace_rows('exact-selection', mutation)

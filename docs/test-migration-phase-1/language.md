@@ -34,6 +34,13 @@ python3 -B tools/testing/run.py figure12-direct --report "$P2/figure12-direct.js
 python3 -B tools/shared/test_figure12_data.py
 ```
 
+The direct GHC runner reads `tests/golden/figure12-reference.json`, extracted
+from the independent pre-migration baseline above. Its expectations no longer
+depend on the source spelling of the native suite or helper modules. The direct
+receipt records the reference's origin and actual file digest along with the
+authenticated producer and objects. The native `figure12` target continues to
+execute the maintained suite.
+
 Run the baseline `figure12` binary and baseline `python3 -B tools/shared/test_figure12_direct.py --build-receipt "$HOST/receipt.json" --output "$P2/figure12-direct"` in its own checkout, with the same producer flags. In a disposable candidate checkout, change the expected A2 principal type in `tests/Tests/Figure12Suite.emlf`, rebuild `figure12`, and run `"$P2/suites/bin/figure12" --exact figure12/type/A2-principal --format json --report "$P2/figure12-wrong-type.jsonl"`. Confirm the A2 failure and nonzero status, then restore the intended expectation. Compare list IDs, actual result/alias records, two phase-specific protected failures, full 36 supplementary actions and both target oracles. Measure actual child launches from the hosted receipt's `commands` arrays and compare elapsed campaign time separately from fixture compilation and linking. Verify that native shared actions evaluate the identical compilation once per canonical label in a full process.
 
 ## Parity corpus

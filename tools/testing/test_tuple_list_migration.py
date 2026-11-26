@@ -17,7 +17,7 @@ class SharedTupleMigrationControls(unittest.TestCase):
 
     def test_reviewed_cutover_sources_remain_authenticated(self):
         self.assertEqual(set(self.sources), {audit.SOURCE, audit.IMPLEMENTATION})
-        self.assertEqual(audit.active_contract()["source_commit"], audit.FRAMEWORK_CUTOVER)
+        self.assertEqual(audit.migration_contract()["source_commit"], audit.FRAMEWORK_CUTOVER)
 
     def test_corrupted_historical_source_is_rejected(self):
         for path, source in self.sources.items():
@@ -38,9 +38,13 @@ class SharedTupleMigrationControls(unittest.TestCase):
             root = Path(directory) / "checkout"
             subprocess.run(["git", "clone", "--quiet", "--shared", "--no-checkout",
                             str(audit.ROOT), str(root)], check=True)
-            contract = root / audit.ACTIVE_CONTRACT_PATH
+            contract = root / audit.MIGRATION_CONTRACT_PATH
             contract.parent.mkdir(parents=True)
-            contract.write_text((audit.ROOT / audit.ACTIVE_CONTRACT_PATH).read_text())
+            contract.write_text((audit.ROOT / audit.MIGRATION_CONTRACT_PATH).read_text())
+            # New current cases do not change the recorded migration inventory.
+            (contract.parent / 'tuple-list-active-contract.json').write_text(json.dumps({
+                'schema_version': 1, 'framework_ids': ['tuple-list/focused/new-regression'],
+            }))
             for path, source in self.sources.items():
                 target = root / path
                 target.parent.mkdir(parents=True, exist_ok=True)
@@ -50,7 +54,7 @@ class SharedTupleMigrationControls(unittest.TestCase):
                 self.assertEqual(audit.verify_cutover_sources(), self.sources)
 
     def test_missing_duplicate_or_recounted_contract_ids_are_rejected(self):
-        original = audit.active_contract()
+        original = audit.migration_contract()
         for mutation in ("missing", "duplicate", "recounted"):
             contract = json.loads(json.dumps(original))
             if mutation == "duplicate":
@@ -61,12 +65,12 @@ class SharedTupleMigrationControls(unittest.TestCase):
                     contract["framework_count"] -= 1
             with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
-                path = root / audit.ACTIVE_CONTRACT_PATH
+                path = root / audit.MIGRATION_CONTRACT_PATH
                 path.parent.mkdir(parents=True)
                 path.write_text(json.dumps(contract))
                 with patch.object(audit, "ROOT", root), self.assertRaisesRegex(
-                        ValueError, "reviewed active tuple inventory changed"):
-                    audit.active_contract()
+                        ValueError, "recorded tuple cutover inventory changed"):
+                    audit.migration_contract()
 
 
 if __name__ == '__main__':

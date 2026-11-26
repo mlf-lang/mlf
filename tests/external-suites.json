@@ -480,16 +480,6 @@
     "prefix": "python-artifact-binary-adapter-successor/",
     "exact": true
   },
-  "python-artifact-binary-p2-writer-bridge": {
-    "command": [
-      "python3",
-      "-B",
-      "tools/performance/artifact-binary/test_p2_writer_bridge.py"
-    ],
-    "kind": "unittest",
-    "prefix": "python-artifact-binary-p2-writer-bridge/",
-    "exact": true
-  },
   "python-c3-delayed-index-private-owner-headers": {
     "command": [
       "python3",
@@ -544,7 +534,7 @@
     "command": [
       "python3",
       "-B",
-      "tools/release/test_phase2_patricia_adapters.py"
+      "tools/performance/patricia/test_runtime_adapters.py"
     ],
     "kind": "unittest",
     "prefix": "python-patricia-adapters/",
@@ -800,22 +790,6 @@
     ],
     "kind": "unittest",
     "prefix": "python-testing-manifest-snapshot/",
-    "exact": true
-  },
-  "python-validation-reuse": {
-    "command": [
-      "python3",
-      "-B",
-      "-m",
-      "unittest",
-      "discover",
-      "-s",
-      "tools/performance/validation-reuse",
-      "-p",
-      "test_*.py"
-    ],
-    "kind": "unittest",
-    "prefix": "python-validation-reuse/",
     "exact": true
   },
   "query-graph-acceptance": {

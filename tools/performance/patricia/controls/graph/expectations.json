@@ -1,0 +1,175 @@
+{
+  "origin": "Authored A1 stdout/privacy cases and C4 matrix, with the existing Int64 coordinate and label adaptations; no candidate execution used to obtain expectations.",
+  "session_stdout": "PASS session handwritten copies aliases field graph and delayed P1\nPASS session 28 finite full-state traces and unchanged public route\nPASS session failed P0 and P1 probes preserve fallback epochs\nPASS session captured frontier bucket and old-parent rewrite\nPASS session empty versus selected and final original audits\nPASS session detached final Solver supports independent witnesses\n{\"complete\":true,\"groups\":6,\"trace_cases\":28,\"candidate_output_used_for_expectations\":false,\"private_raw_faults_test_copy_only\":true}\n",
+  "admission_stdout": "PASS admission handwritten topology aliases scopes paging and identities\nPASS admission literal rejection and first-error ordering\nPASS admission finite fresh-counter demand probes\nPASS admission test-only children-before-binder demand\n",
+  "negative_cases": [
+    {
+      "name": "OpenSession",
+      "module": "OpenSession",
+      "source": "tools/performance/a1-private-index/controls/negative/OpenSession.hs",
+      "required_error_fragments": [
+        "does not export",
+        "openSession"
+      ],
+      "expected_error_count": 1,
+      "expected_exit_code": 1,
+      "category": "production export privacy; no missing dependency or unrelated error accepted"
+    },
+    {
+      "name": "SolvePrepared",
+      "module": "SolvePrepared",
+      "source": "tools/performance/a1-private-index/controls/negative/SolvePrepared.hs",
+      "required_error_fragments": [
+        "does not export",
+        "solvePrepared"
+      ],
+      "expected_error_count": 1,
+      "expected_exit_code": 1,
+      "category": "production export privacy; no missing dependency or unrelated error accepted"
+    },
+    {
+      "name": "SessionConstructor",
+      "module": "SessionConstructor",
+      "source": "tools/performance/a1-private-index/controls/negative/SessionConstructor.hs",
+      "required_error_fragments": [
+        "does not export",
+        "Session"
+      ],
+      "expected_error_count": 1,
+      "expected_exit_code": 1,
+      "category": "production export privacy; no missing dependency or unrelated error accepted"
+    },
+    {
+      "name": "RawSolverRebind",
+      "module": "RawSolverRebind",
+      "source": "tools/performance/a1-private-index/controls/negative/RawSolverRebind.hs",
+      "required_error_fragments": [
+        "Couldn't match",
+        "Solver",
+        "String"
+      ],
+      "expected_error_count": 1,
+      "expected_exit_code": 1,
+      "category": "raw Solver cannot enter sealed file factory; authenticated interfaces only"
+    }
+  ],
+  "authored_matrix_fixtures": [
+    {
+      "label": "mutable-old-bottom/fresh-survivor",
+      "admitted": true,
+      "success": true
+    },
+    {
+      "label": "shared-fresh/old-merge",
+      "admitted": true,
+      "success": true
+    },
+    {
+      "label": "fixed-frontier/then-mutation",
+      "admitted": true,
+      "success": true
+    },
+    {
+      "label": "ordinary-type-destination/rejection",
+      "admitted": true,
+      "success": false
+    },
+    {
+      "label": "rigid-old-bottom/rejection",
+      "admitted": true,
+      "success": false
+    },
+    {
+      "label": "protected-old-bottom/rejection",
+      "admitted": true,
+      "success": false
+    },
+    {
+      "label": "kind-mismatch/rejection",
+      "admitted": false,
+      "success": false
+    },
+    {
+      "label": "sharing-cycle/rejection",
+      "admitted": true,
+      "success": false
+    },
+    {
+      "label": "nonzero-dense-offset",
+      "admitted": true,
+      "success": true
+    },
+    {
+      "label": "negative-Integer-identities",
+      "admitted": true,
+      "success": true
+    },
+    {
+      "label": "wide-signed-Int64-identities",
+      "admitted": true,
+      "success": true
+    },
+    {
+      "label": "canonical-alias-target",
+      "admitted": true,
+      "success": true
+    },
+    {
+      "label": "nonadmitted-congruent-success",
+      "admitted": false,
+      "success": true
+    },
+    {
+      "label": "nonadmitted-payload-then-mutation",
+      "admitted": false,
+      "success": true
+    },
+    {
+      "label": "nonadmitted-bottom-target",
+      "admitted": false,
+      "success": true
+    },
+    {
+      "label": "nonadmitted-frontier-identity",
+      "admitted": false,
+      "success": true
+    },
+    {
+      "label": "TyApp-kind-correct-mutation",
+      "admitted": true,
+      "success": true
+    },
+    {
+      "label": "unchanged-surviving-grandchild",
+      "admitted": true,
+      "success": true
+    }
+  ],
+  "matrix": {
+    "base_fixtures": 18,
+    "permutations": [
+      "reverse",
+      "rotate-one",
+      "odd-even",
+      "outside-in"
+    ],
+    "coordinates": [
+      [
+        "dense",
+        0,
+        1
+      ],
+      [
+        "sparse",
+        -9001,
+        100003
+      ],
+      [
+        "huge-negative",
+        "-1152921504606846976",
+        7
+      ]
+    ],
+    "cases": 216
+  }
+}

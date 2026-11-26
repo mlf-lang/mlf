@@ -29,10 +29,6 @@ FROZEN = {
     'Tests.hs': 'e7352052eb25fa2855ac5741577e328d461d481a21aea203bcb230f53f784f6a',
     'Probe.hs': 'a715135903662d82e16431be6796c60789ae6a87fb178757083124f4e92fe271',
 }
-HOST = {
-    'host/ghc/MLF/Host/Base.hs': 'b9663c40059791bfb99e9f302d4eab94452379653db3e951ee02c8ff45933de3',
-    'host/ghc/MLF/Primitive.hs': '2ec6ab90201feb449a9a9accbfa9d34661e03216e54cb3c52ffbfe2d15f7353b',
-}
 STDOUT_SHA256 = '57cafef22ad1cb66e4e90a1e67510c744cea3d6f16f90b937520414d37504773'
 
 
@@ -197,17 +193,6 @@ class FrozenInputs(unittest.TestCase):
         self.assertEqual(digest(self.inventory['expected_stdout'].encode()), STDOUT_SHA256)
         self.assertEqual(self.inventory['expected_stderr'], '')
         self.assertFalse(self.inventory['candidate_output_used_for_expectations'])
-
-    def test_only_reviewed_host_patch_is_under_test(self):
-        expected = HOST
-        if (ROOT / 'libraries/mlf-foundation/Bootstrap/IntTree.hs').exists():
-            path = ROOT / 'tools/performance/patricia/source_migration.py'
-            migration = types.ModuleType('explicit_numeric_migration')
-            migration.__file__ = str(path)
-            exec(compile(path.read_bytes(), str(path), 'exec'), migration.__dict__)
-            expected = migration.host_sources(HOST)
-        for path, wanted in expected.items():
-            self.assertEqual(RUNNER.sha(ROOT / path), wanted, path)
 
     def test_oracle_uses_unbounded_prelude_arithmetic_not_candidate_arithmetic(self):
         text = (HERE / 'controls/Oracle.hs').read_text()

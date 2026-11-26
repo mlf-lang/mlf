@@ -1,19 +1,38 @@
 #!/usr/bin/env python3
-"""Retain F1 O0/O2 bodies and inventories with explicit Int64 type adaptation.
+"""Run maintained Int64 fingerprint controls and inspect current compiler Core.
 
-The legacy build inventory, both optimization levels and exact expected stdout
-remain. Guarded command transport replaces its subprocess wrapper; direct
-Int64 Core replaces the retired Integer-narrowing rule proof. Original files
-are never rewritten.
+The independent arithmetic oracle, finite inputs and expected output are ordinary
+test files. Qualification executes explicit O0, O2 and Separate stages; it does
+not rewrite or execute a historical Python driver.
 """
 from pathlib import Path
-import argparse, ast, json, re, types, sys
-from legacy_controls import prepare
-from run_integrated import ROOT, HERE, LIMITS
+import argparse
+import importlib.util
+import re
+import shutil
+import sys
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[2]
+sys.path.insert(0, str(ROOT / 'tools/testing'))
 from receipt_selection import inventory_json, select
 
 PREFIX = 'patricia-fingerprint/'
 LABELS = ['current-O0','current-O2','actual-separate']
+CONTROLS = HERE / 'controls/fingerprint'
+CONTROL_FILES = ('Oracle.hs', 'Probe.hs', 'Tests.hs')
+RULES = ('mlf/fingerprintIntStep/65599', 'mlf/fingerprintIntStep/131')
+PACKAGES = ('base', 'array', 'bytestring', 'text', 'containers', 'directory')
+LIMITS = {'address_space_per_process_bytes': 6 * 1024**3,
+          'disk_free_floor_bytes': 5 * 1024**3,
+          'host_available_floor_bytes': 3 * 1024**3,
+          'max_work_bytes': 3 * 1024**3,
+          'process_tree_rss_bytes': 5 * 1024**3, 'wall_seconds': 1200}
+
+
+def require(condition, message):
+    if not condition:
+        raise ValueError(message)
 
 def machine_worker(text, name, worker=True):
     # GHC may retain a $w worker and forwarding wrapper, or inline the same
@@ -65,96 +84,216 @@ def verify_separate_int64(text, counts):
     machine_worker(text,'fingerprintStateChars',worker=False)
 
 
-def qualify_selection(owner, require):
-    """Bind receipt IDs at the authenticated frozen driver's verdict boundaries."""
-    record = [node for node in owner.body if isinstance(node,ast.Assign)
-              and any(isinstance(target,ast.Name) and target.id=='record' for target in node.targets)]
-    trials = [node for node in owner.body if isinstance(node,ast.Try) and isinstance(node.body[0],ast.For)]
-    require(len(record)==len(trials)==1,'unique frozen F1 result and qualification stages')
-    owner.body[owner.body.index(record[0])+1:owner.body.index(record[0])+1] = ast.parse(
-        "record.update(planned_checks=planned, checks=[])").body
-    trial = trials[0]
-    probe = trial.body[0]
-    require(ast.unparse(probe.body[0])=="label = 'current-O' + opt"
-            and ast.unparse(probe.body[-1])=='save()','exact F1 paired probe boundaries')
-    probe.body[1:1] = ast.parse('if label not in planned: continue').body
-    probe.body[-1:-1] = ast.parse("record['checks'].append(label)").body
-    end = [i for i,node in enumerate(trial.body) if isinstance(node,ast.Expr)
-           and isinstance(node.value,ast.Call) and any(isinstance(arg,ast.Constant)
-               and arg.value=='qualified producer objects changed' for arg in node.value.args)]
-    require(len(end)==1 and end[0]>1 and ast.unparse(trial.body[1])=="actual = out / 'actual-source'",
-            'exact F1 actual-source stage boundaries')
-    body = trial.body[1:end[0]]
-    require(isinstance(body[-1],ast.Assign) and ast.unparse(body[-1].targets[0])=="record['actual_source']",
-            'actual-source verdict before immutable input checks')
-    block = ast.parse("if 'actual-separate' in planned: pass").body[0]
-    block.body = body + ast.parse("record['checks'].append('actual-separate')\nsave()").body
-    trial.body[1:end[0]] = [block]
-    owner.body[-1:-1] = ast.parse(
-        "if len(planned) == 1:\n    print('PASS selected F1 qualification: ' + planned[0])\n    return").body
+def tree_hashes(H, root):
+    paths = sorted(root.rglob('*'))
+    require(not any(path.is_symlink() for path in paths), 'symlink in input/output inventory')
+    return {str(path.relative_to(root)): H.sha(path) for path in paths if path.is_file()}
+
+
+def rule_counts(path):
+    text = path.read_text() if path.exists() else ''
+    return {name: text.count('Rule: ' + name + '\n') for name in RULES}
+
+
+def verify_resolution(text, expected):
+    rows = re.findall(r'^\[\s*\d+ of\s*\d+\]\s+Compiling\s+(\S+)\s+\(\s*(.+?),', text, re.M)
+    require(len(rows) == len(expected) and len({name for name, _ in rows}) == len(rows),
+            'unexpected/duplicate compiled module inventory')
+    require({name: str(Path(path).resolve()) for name, path in rows} ==
+            {name: str(Path(path).resolve()) for name, path in expected.items()},
+            'compiler resolved a different control/production source')
+
+
+def run_probe(H, source, controls, out, build, host_hashes, expectations, opt, run):
+    label = 'current-O' + opt
+    folder = out / label
+    snap, objects = folder / 'source', folder / 'objects'
+    objects.mkdir(parents=True)
+    snap.mkdir()
+    shutil.copytree(source / 'host/ghc', snap / 'host/ghc')
+    require(tree_hashes(H, snap / 'host/ghc') == host_hashes, 'host snapshot differs')
+    for name in CONTROL_FILES:
+        shutil.copyfile(controls / name, snap / name)
+        require(H.sha(snap / name) == H.sha(controls / name), 'control snapshot differs')
+    (snap / 'Main.hs').write_text('{-# OPTIONS_GHC -O0 #-}\nmodule Main where\n'
+                                 'import qualified Tests\nmain :: IO ()\nmain = Tests.main\n')
+    snapshot_inputs = tree_hashes(H, snap)
+    cobjects = []
+    for name, relative in [('host', 'host/ghc/cbits/host.c'),
+                           ('supervisor', 'runtime/mlf_process_supervisor.c')]:
+        obj = folder / (name + '.o')
+        run(label + '-c-' + name, [build['cc']['path'], '-O2', '-std=c11',
+            '-I' + str(source / 'runtime'), '-c', source / relative, '-o', obj])
+        cobjects.append(obj)
+    command = [build['ghc']['path'], '--make', '-j1', '-O' + opt,
+        '-fpedantic-bottoms', '-fno-state-hack', '-rtsopts=ignoreAll',
+        '-package-env', '-', '-clear-package-db', '-global-package-db',
+        '-no-user-package-db', '-hide-all-packages', '-i',
+        '-i' + str(snap / 'host/ghc'), '-i' + str(snap),
+        '-odir', objects, '-hidir', objects, '-dcore-lint',
+        '-ddump-rule-rewrites', '-ddump-simpl', '-ddump-to-file']
+    for package in PACKAGES:
+        command.extend(['-package', package])
+    command.extend([snap / 'Main.hs', *cobjects, '-o', folder / 'controls'])
+    stdout, stderr = run(label + '-build', command, snap)
+    expected = {name: snap / 'host/ghc' / (name.replace('.', '/') + '.hs')
+                for name in ('MLF.Host.Base', 'MLF.Host.Async', 'MLF.Host.IO', 'MLF.Primitive')}
+    expected.update({name: snap / (name + '.hs') for name in ('Oracle', 'Probe', 'Tests', 'Main')})
+    verify_resolution((stdout + stderr).decode(), expected)
+    stdout, stderr = run(label + '-run', [folder / 'controls'], snap)
+    require(stdout == expectations['expected_stdout'].encode() and
+            stderr == expectations['expected_stderr'].encode(),
+            label + ' exact finite-control output mismatch')
+    counts = rule_counts(snap / 'Probe.dump-rule-rewrites')
+    verify_no_retired_rules(counts, opt)
+    if opt == '2':
+        verify_int64_core((snap / 'Probe.dump-simpl').read_text())
+    require(all(H.sha(snap / path) == digest for path, digest in snapshot_inputs.items()),
+            'control/host snapshot input changed')
+    return {'optimization': opt, 'complete': True, 'actual_rule_firings': counts,
+            'executable_sha256': H.sha(folder / 'controls'),
+            'resolved_modules': {name: {'path': str(path), 'sha256': H.sha(path)}
+                                 for name, path in expected.items()},
+            'dump_hashes': {str(path.relative_to(out)): H.sha(path)
+                            for path in snap.glob('Probe.dump-*')}}
+
+
+def run_separate(H, source, producer, out, build, object_hashes, run):
+    # Compile the actual production source using a copy of its complete object
+    # closure. Only Separate may change; ordinary producer objects stay untouched.
+    actual = out / 'actual-source'
+    objects = actual / 'objects'
+    shutil.copytree(producer / 'objects', objects)
+    require(tree_hashes(H, objects) == object_hashes, 'copied producer objects differ')
+    for suffix in ('.hi', '.o'):
+        (objects / ('Bootstrap/Separate' + suffix)).unlink()
+    flags = [str(objects) if value == str(producer / 'objects') else value
+             for value in build['flags']]
+    command = [build['ghc']['path'], '--make', '-no-link', '-j1', *flags,
+        '-dcore-lint', '-ddump-rule-rewrites', '-ddump-simpl', '-ddump-to-file',
+        '-ddump-file-prefix', str(actual / 'Separate'),
+        source / 'libraries/mlf-crates/Bootstrap/Separate.hs']
+    stdout, stderr = run('actual-separate', command)
+    verify_resolution((stdout + stderr).decode(),
+                      {'Bootstrap.Separate': source / 'libraries/mlf-crates/Bootstrap/Separate.hs'})
+    counts = rule_counts(actual / 'Separate.dump-rule-rewrites')
+    verify_separate_int64((actual / 'Separate.dump-simpl').read_text(), counts)
+    actual_hashes = tree_hashes(H, objects)
+    require(set(actual_hashes) == set(object_hashes), 'actual proof object inventory changed')
+    require(all(actual_hashes[path] == digest for path, digest in object_hashes.items()
+                if path not in ('Bootstrap/Separate.hi', 'Bootstrap/Separate.o')),
+            'actual proof rewrote an unrelated copied object')
+    return {'only_Separate_recompiled': True, 'actual_literal_rule_firings': counts,
+            'dump_hashes': {str(path.relative_to(out)): H.sha(path)
+                            for path in actual.glob('Separate.dump-*')}}
+
+
+def qualify(H, source, producer, out, planned, controls=CONTROLS, driver_inputs=None):
+    source, producer, out = source.resolve(), producer.resolve(strict=True), out.resolve()
+    require(planned and planned == [label for label in LABELS if label in planned],
+            'unknown, duplicate or reordered fingerprint stages')
+    require(not out.exists() and not out.is_relative_to(producer) and
+            not producer.is_relative_to(out) and not source.is_relative_to(out),
+            'fresh output separate from producer/source required')
+    build = H.authenticate(producer, source)
+    expectations_path = controls / 'expectations.json'
+    expectations = H.load(expectations_path)
+    require(expectations.get('schema_version') == 1 and
+            all(isinstance(expectations.get(key), str)
+                for key in ('expected_stdout', 'expected_stderr')),
+            'independent fingerprint output expectations required')
+    inputs = dict(driver_inputs or {})
+    inputs.update({str(path): H.sha(path) for path in
+                   [expectations_path, *(controls / name for name in CONTROL_FILES),
+                    producer / 'receipt.json']})
+    for item in build['host_inputs'].values():
+        inputs[item['path']] = item['sha256']
+    host_hashes = tree_hashes(H, source / 'host/ghc')
+    object_hashes = tree_hashes(H, producer / 'objects')
+    require(object_hashes and
+            {'objects/' + path: digest for path, digest in object_hashes.items()} ==
+            build.get('object_inputs'), 'producer objects differ from authenticated receipt')
+    checks = out / 'checks'
+    checks.mkdir(parents=True)
+    record = {'format': 'int64-fingerprint-controls-v2', 'complete': False,
+              'performance_measured': False, 'native_bootstrap_executed': False,
+              'planned_checks': list(planned), 'checks': [], 'commands': [], 'runs': [],
+              'producer_receipt_sha256': H.sha(producer / 'receipt.json'),
+              'inputs': inputs, 'host_source_hashes': host_hashes,
+              'producer_object_hashes': object_hashes, 'expectations': expectations}
+
+    def save():
+        H.save(checks / 'receipt.json', record)
+
+    def run(label, command, cwd=source):
+        item = {'label': label, 'argv': list(map(str, command)), 'cwd': str(cwd)}
+        record['commands'].append(item)
+        save()
+        log = checks / 'guarded' / label
+        result = H.Runner(checks, LIMITS).run(command, cwd, log)
+        stdout, stderr = (log / 'stdout').read_bytes(), (log / 'stderr').read_bytes()
+        (checks / (label + '.stdout')).write_bytes(stdout)
+        (checks / (label + '.stderr')).write_bytes(stderr)
+        item.update(result)
+        save()
+        return stdout, stderr
+
+    save()
+    try:
+        for opt in ('0', '2'):
+            label = 'current-O' + opt
+            if label in planned:
+                record['runs'].append(run_probe(H, source, controls, checks, build,
+                                                host_hashes, expectations, opt, run))
+                record['checks'].append(label)
+                save()
+        if 'actual-separate' in planned:
+            record['actual_source'] = run_separate(H, source, producer, checks, build,
+                                                   object_hashes, run)
+            record['checks'].append('actual-separate')
+            save()
+        require(tree_hashes(H, producer / 'objects') == object_hashes,
+                'qualified producer objects changed')
+        require(tree_hashes(H, source / 'host/ghc') == host_hashes, 'host source inventory changed')
+        H.check_pins(inputs)
+        require(H.authenticate(producer, source) == build, 'current producer identity changed')
+        require(record['checks'] == planned, 'complete planned F1 gate')
+        record.update(complete=True, immutable_inputs_verified_after=True,
+                      producer_outputs_immutable=True)
+    except BaseException as error:
+        record['error'] = str(error)
+        raise
+    finally:
+        save()
+    H.save(out / 'receipt.json', record)
+    return record
 
 
 def main():
-    p=argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__)
     listing = '--framework-list' in sys.argv[1:]
-    p.add_argument('--framework-list', action='store_true')
-    p.add_argument('--producer',type=Path,required=not listing);p.add_argument('--source',type=Path,default=ROOT);p.add_argument('--output',type=Path,required=not listing)
-    a=p.parse_args()
+    parser.add_argument('--framework-list', action='store_true')
+    parser.add_argument('--producer', type=Path, required=not listing)
+    parser.add_argument('--source', type=Path, default=ROOT)
+    parser.add_argument('--output', type=Path, required=not listing)
+    args = parser.parse_args()
     exact = select(PREFIX, LABELS)
     planned = [exact] if exact is not None else LABELS
-    if a.framework_list:
+    if args.framework_list:
         print(inventory_json(PREFIX, planned))
         return
-    out=a.output.resolve();out.mkdir(parents=True,exist_ok=False)
-    helper=ROOT/'tools/performance/a1-private-index/helper.py';H=types.ModuleType('guard');H.__file__=str(helper);exec(compile(helper.read_bytes(),str(helper),'exec'),H.__dict__)
-    frozen=ROOT/'tools/performance/fingerprint-fusion';legacy=frozen/'run_controls.py'
-    H.require(H.sha(legacy)=='2355ada62d4149d40a5789104ff5ebf5d82d96d3bb8126530baf083fcdaf7fd1','fixed original F1 driver')
-    H.require(H.sha(frozen/'controls/CONTROL-INVENTORY.json')=='5bb87dd71402423fb5a05a9c1df8fdce1f932fb385f5092740668914d2108957','fixed F1 control inventory')
-    driver_inputs={str(p):H.sha(p) for p in [Path(__file__),HERE/'legacy_controls.py',HERE/'legacy-controls-pins.json',HERE/'run_integrated.py',helper,legacy,frozen/'controls/CONTROL-INVENTORY.json',ROOT/'tools/testing/receipt_selection.py']}
-    controls=out/'adapter/controls';prepare(ROOT,controls,'fingerprint')
-    # Module/filename adaptation is undone for the unchanged legacy driver.
-    adapted=controls/'FingerprintTests.hs';text=adapted.read_text().replace('module FingerprintTests (main) where','module Tests (main) where')
-    (controls/'Tests.hs').write_text(text)
-    inventory=H.load(frozen/'controls/CONTROL-INVENTORY.json')
-    original_inventory=H.sha(frozen/'controls/CONTROL-INVENTORY.json')
-    for name,digest in inventory['source_files'].items():H.require(H.sha(frozen/'controls'/name)==digest,'fixed original F1 oracle/control '+name)
-    inventory['source_files']={name:H.sha(controls/name) for name in inventory['source_files']}
-    inventory['Int64_migration']={'original_inventory_sha256':original_inventory,'extra_signed_pairs':30,
-        'old_large_literal_cases_retained_with_Int64_wrap':True,'noncanonical_divergence_seed':-1,
-        'old_arbitrary_Integer_semantics_claimed':False}
-    H.save(controls/'CONTROL-INVENTORY.json',inventory)
-    control_inputs=H.file_pins(controls)
-    tree=ast.parse(legacy.read_text());owner=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='main')
-    old=next(n for n in owner.body if isinstance(n,ast.FunctionDef) and n.name=='run')
-    replacement=ast.parse('''def run(label,command,cwd=ROOT):
-    result=H.Runner(out,LIMITS).run(command,cwd,out/'guarded'/label)
-    so=(out/'guarded'/label/'stdout').read_bytes();se=(out/'guarded'/label/'stderr').read_bytes()
-    (out/(label+'.stdout')).write_bytes(so);(out/(label+'.stderr')).write_bytes(se)
-    record['commands'].append({'label':label,**result});save()
-    return so,se
-''').body[0]
-    owner.body[owner.body.index(old)]=replacement
-    # This old mechanism is intentionally retired: all language Int arithmetic
-    # is already Int64. Replace only its one old rule-count assertion.
-    sites=[n for n in ast.walk(owner) if isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id=='require' and any(isinstance(x,ast.Constant) and x.value=='actual Separate lost literal rules' for x in n.args)]
-    H.require(len(sites)==1,'one obsolete actual-source F1 assertion')
-    check=ast.parse("verify_separate_int64((actual/'Separate.dump-simpl').read_text(), counts)",mode='eval').body
-    sites[0].func=check.func;sites[0].args=check.args;sites[0].keywords=[]
-    qualify_selection(owner, H.require)
-    ast.fix_missing_locations(tree)
-    context={'__file__':str(legacy),'__name__':'guarded_f1_legacy','H':H,'LIMITS':LIMITS,'verify_separate_int64':verify_separate_int64,'planned':planned}
-    exec(compile(tree,str(legacy),'exec'),context)
-    context.update(ROOT=a.source.resolve(),HERE=out/'adapter',verify_unmatched_core=verify_int64_core,verify_probe_counts=verify_no_retired_rules)
-    sys.argv=[str(legacy),'--producer',str(a.producer.resolve()),'--output',str(out/'checks')]
-    with H.SerialLock(ROOT/'.mlf-build'):context['main']()
-    H.check_pins(driver_inputs);H.check_pins(control_inputs)
-    receipt=H.load(out/'checks/receipt.json')
-    H.require(receipt['complete'] and receipt['checks']==planned,'complete planned F1 gate')
-    H.save(out/'receipt.json',{'complete':True,'checks':receipt['checks'],'planned_checks':planned,'legacy_driver_sha256':H.sha(legacy),'driver_inputs':driver_inputs,'control_inputs':control_inputs,
-        'legacy_AST_delta':'guarded command transport; obsolete F1 rule-count assertion replaced by direct Int64 worker proof; explicit case dispatch and receipt milestones',
-        'original_inventory_sha256':original_inventory,'adapter_sha256':H.sha(Path(__file__)),
-        'qualified_checks_receipt_sha256':H.sha(out/'checks/receipt.json'),
-        'all_original_test_rows_retained':exact is None,'additional_Int64_pairs_per_optimization':30,
-        'retired_Integer_narrowing_rules_absent':True,'direct_Int64_workers_verified':'current-O2' in planned or 'actual-separate' in planned,
-        'unbounded_values_wrap_and_may_duplicate':True,'ordinary_production_objects_unchanged':True})
-if __name__=='__main__':main()
+    helper = ROOT / 'tools/performance/a1-private-index/helper.py'
+    spec = importlib.util.spec_from_file_location('fingerprint_guard', helper)
+    guard = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(guard)
+    paths = [Path(__file__), helper, ROOT / 'tools/testing/receipt_selection.py',
+             args.source.resolve() / 'tools/shared/test_direct.py']
+    driver_inputs = {str(path): guard.sha(path) for path in paths}
+    with guard.SerialLock(ROOT / '.mlf-build'):
+        qualify(guard, args.source, args.producer, args.output, planned,
+                driver_inputs=driver_inputs)
+    print('PASS Int64 fingerprint qualification: ' + ', '.join(planned) + '; no speed claim')
+
+
+if __name__ == '__main__':
+    main()

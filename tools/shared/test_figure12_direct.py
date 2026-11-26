@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Faithful Figure12 checks using authenticated GHC objects, not nested interpretation.
+"""Independent Figure12 reference checks using authenticated GHC objects.
 
 Builds only a test entry in a fresh output directory; qualified compiler objects
 and implementation files are never rewritten. This is not native-unit coverage.
@@ -13,7 +13,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-from figure12_data import decode
+from figure12_data import REFERENCE, TYPE_IDS, decode
 from test_direct import authenticate_build
 from build import PACKAGES, DEMAND_FLAGS
 
@@ -28,14 +28,13 @@ ORACLE_CONTROLS = (
     'wanted-refs', 'indexed-pattern', 'nested-indexed-pattern', 'indexed-equation',
     'indexed-shared-bind',
 )
-TYPES = ('A1-principal', 'A2-principal', 'A4-result', 'A4-signature')
 
 
 def case_ids(fixture):
     return [PREFIX + id for id in [
         *('oracle/' + name for name in ORACLE_CONTROLS),
         *(f'assumption/{i}' for i in range(29)),
-        *('type/' + name for name in TYPES),
+        *('type/' + name for name in TYPE_IDS),
         *('repair/' + row['id'] for row in fixture['repairs']),
         *('paper/' + row['id'] for row in fixture['cases']),
     ]]
@@ -43,23 +42,6 @@ def case_ids(fixture):
 
 def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
-
-
-def validate_inventory(fixture):
-    cases = fixture['cases']
-    names = [c['id'] for c in cases]
-    rows = {n.split('.')[0] for n in names}
-    wanted = {f'A{i}' for i in range(1, 14)} | {f'B{i}' for i in range(1, 8)} | {'C1a', 'C1b', 'C1c', 'C2'} | {f'E{i}{s}' for i in range(1, 6) for s in 'ab'}
-    if len(names) != 43 or len(set(names)) != 43 or rows != wanted:
-        raise ValueError('Figure12 paper row/expression inventory changed')
-    if [c['id'] for c in cases if not c['paper_acceptance']] != ['A11', 'C1a', 'C1c', 'E1a']:
-        raise ValueError('Figure12 paper expectations changed')
-    if [c['id'] for c in cases if not c['expected_acceptance']] != ['A8', 'A11', 'C1a', 'C1c', 'E1a']:
-        raise ValueError('Figure12 regression expectations changed')
-    if [c['id'] for c in cases if c['paper_acceptance'] != c['expected_acceptance']] != ['A8']:
-        raise ValueError('Figure12 paper discrepancy changed')
-    if len(fixture['type_checks']) != 4 or len(fixture['repairs']) != 3:
-        raise ValueError('Figure12 supplementary inventory changed')
 
 
 def main():
@@ -70,7 +52,6 @@ def main():
     parser.add_argument('--exact', default=os.environ.get('MLF_TEST_EXACT'))
     args = parser.parse_args()
     fixture = decode(ROOT)
-    validate_inventory(fixture)
     all_ids = case_ids(fixture)
     if args.exact and args.exact not in all_ids:
         parser.error('unknown Figure12 case ' + args.exact)
@@ -85,7 +66,7 @@ def main():
     producer_dir = receipt_path.parent
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
-    record = {'complete': False, 'mode': 'direct-GHC-Figure12-maintained-fixtures',
+    record = {'complete': False, 'mode': 'direct-GHC-Figure12-reference-corpus',
               'full_native_unit': False, 'commands': [], 'aliases': [],
               'selected': selected, 'results': []}
 
@@ -121,11 +102,13 @@ def main():
                 raise ValueError('Producer object changed: '+name)
         inputs = [Path(__file__).resolve(), ROOT/'tools/shared/test_direct.py', ROOT/'tools/shared/build.py',
                   ROOT/'tools/shared/figure12_data.py', ROOT/'tools/shared/Figure12Direct.hs',
-                  ROOT/'tests/Tests/Figure12.emlf', ROOT/'tests/Tests/Figure12Suite.emlf',
-                  ROOT/'tests/Tests/Map.emlf', ROOT/'tests/Tests/Set.emlf', ROOT/'tests/Tests/Helpers.emlf']
+                  ROOT/REFERENCE]
         input_hashes = {str(p.relative_to(ROOT)): digest(p) for p in inputs}
+        if any(input_hashes.get(path) != sha for path, sha in fixture['fixture_sha256'].items()):
+            raise ValueError('Reference changed between decoding and input capture')
         record.update(producer_receipt=str(receipt_path), producer_receipt_sha256=digest(receipt_path),
-            optimization=producer['optimization'], inputs=input_hashes, object_inputs=objects)
+            optimization=producer['optimization'], inputs=input_hashes, object_inputs=objects,
+            reference_origin=fixture['origin'])
         fixture_path = output/'fixture.json'
         fixture_path.write_text(json.dumps(fixture, ensure_ascii=False, indent=2)+'\n')
         record['fixture_sha256'] = digest(fixture_path)

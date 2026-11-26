@@ -58,9 +58,7 @@ run python-shared-darwin-toolchain --python-optimization
 run release-generated-string-pool
 run release-prepared-verification
 run release-performance-a1-platform
-run release-performance-a1-current
 run release-performance-local-transaction
-run release-performance-historical-metadata
 run release-performance-fingerprint-fusion
 run release-performance-inference-controls
 run release-io-action-controls
@@ -90,9 +88,8 @@ run release-manifest-snapshot
 run release-history-refs
 run release-composed-history-refs
 run release-pr43-history
-run release-tuple-list-migration
-run release-tuple-list-migration-controls
-run release-migration-inventory-controls
+# Dated Tuple/list migration and inventory audits remain explicitly runnable;
+# current language behavior is checked by framework-direct and tuple-list-native.
 run release-core-leaf-migration
 run release-core-registry-controls
 run release-reconciliation-inventory

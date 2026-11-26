@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "expected_stdout": "PASS fingerprint 675 boundary pairs x 6 public Probe routes\nPASS fingerprint 2500 deterministic pairs x 6 public Probe routes\nPASS fingerprint signed rem and literal cross-rule nonmatching constants\nPASS fingerprint 270 checksum streams every prefix and host Char code boundaries\nPASS fingerprint 60 exact HostError priority and noncanonical fallback probes\nPASS fingerprint 18 partial applications lazy until second operand\nPASS fingerprint 224 ordinary signed divisions and 40 exact zero-divisor demand probes\nPASS TIMEOUT fingerprint 12 state-divergence before code-panic observations\nPASS TIMEOUT fingerprint 12 state-panic wins before code-divergence observations\nPASS TIMEOUT fingerprint 12 canonical-state code-divergence observations\nPASS TIMEOUT fingerprint 12 noncanonical-state code-divergence observations\nPASS fingerprint finite independent controls complete; no universal equivalence or speed claim\n",
+  "expected_stderr": "",
+  "origin": "Independent F1 control authoring; existing Int64 adaptation captured once from 171717ad, not candidate output.",
+  "integer_domain": "signed Int64; historical oversized literal rows wrap and may duplicate",
+  "additional_signed_pairs": 30,
+  "noncanonical_divergence_seed": -1
+}

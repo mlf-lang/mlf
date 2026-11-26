@@ -18,18 +18,53 @@ The tests do not describe the old BST shape contract as unchanged.
 kind-routing controls include malformed five-node prefix trees which would
 have passed a sorted-leaf check while routing lookups incorrectly.
 
-`run_integrated.py` authenticates an ordinary O2 producer and copies its
-objects. Only test modules are compiled; pre-existing production objects must
-remain byte-identical. Select `p123`, `map-balance`, `graph`, or `validation`.
-`--source` identifies an installed producer's owned source snapshot. It is not
-a way to skip source authentication.
+`run_integrated.py` authenticates an ordinary producer and copies its objects.
+Only test modules are compiled; existing production objects must remain
+byte-identical. Select `p123`, `graph`, `validation`, or `builtin`.
+`--source` identifies the producer's authenticated source snapshot, including
+its current private session implementation. Test controls come from this
+checkout and are recorded separately in the receipt.
 
-Original oracle files and manifests are retained. `legacy-controls-pins.json`
-anchors the additional original finite controls to `3b566893`. Test-only
-adaptations save a byte-exact reversible diff. Host control annotations change
-from `Integer` to `Int64`; string fixtures remain literal. All original rows
-remain, including oversized literals, which now wrap and can duplicate other
-rows. This does not claim the old arbitrary-precision contract.
+The maintained Haskell controls are direct sources in `controls/`. They already
+express the current Int64 ABI and Patricia representation; the runner copies
+and compiles them without rewriting types, import lists, labels, or assertion
+bodies. Unchanged controls in other performance directories are reused in
+place. Ordinary control edits require no fixed SHA update. Receipts record
+all control inputs before execution and verify them again afterwards.
+
+Independent old algorithms live in `oracles/` or their existing frozen source
+locations. Their small fixture hash inventory protects those reference bytes;
+it does not qualify current compiler source or reconstruct a historical commit
+chain. [The oracle notes](oracles/README.md) identify their origins and scope.
+The direct sources were compared once with the previous preparation's final
+Haskell output: graph, P1/P2/P3, and validation match, with only an extra final
+blank line removed from two maintained controls.
+That conversion check is not a recurring CI gate.
+
+Private graph checks still need a test-only view of the current
+`Bootstrap.CrateSession`. The small header lexer changes its module name and
+removes the export restriction, preserving every body byte. Export order,
+comments, and whitespace are accepted. The same helper serves the retained C3
+checks; actual public-export rejection tests continue to compile against the
+ordinary production interfaces.
+
+Historical adapters, `legacy-controls-pins.json`, and source migration manifests
+remain available for reproducing the old reports from commit
+`171717ad5bd025ee977d4ca9fd8f93abcbc68612`. Routine controls no longer run their
+source projections or reversible diff ledgers. In particular, the historical
+validation projection and P2 writer bridge tests are replaced in the current
+route by the actual validation and binary-writer executions below.
+
+Map maintenance uses the existing `map-policy` framework entry. That suite
+checks contents, balance, cached counts, demand/error order, and the intentional
+step-21 shape difference from the old Map. The obsolete integrated `map-balance`
+group required the entire current 400-step trace to keep the historical tree
+shape; it has been retired rather than weakening its old assertion. Its
+original sources remain in `tools/performance/map-balance/` for historical use.
+
+All retained finite rows remain, including oversized literals which wrap under
+Int64 and can duplicate other rows. This does not claim the former arbitrary
+precision arithmetic contract.
 
 For graph controls, `OracleTypes.hs` bridges finite, total container spines to
 the old frozen Graph/Solver/Constraint algorithms. Its representation checks
@@ -44,9 +79,11 @@ back into the historical label.
 The C4 transaction boundary now checks independent Patricia invariants instead
 of the nine historical BST representation probes. All remaining transaction,
 public trace, demand, first-error, rollback and private-export cases remain.
-The validation-reuse baseline is reconstructed from its pinned original
-source contract after inversely replacing exactly three collection type
-signatures. Its algorithm body remains unchanged.
+The validation-reuse suite compiles the independent fixed `V1FrozenSession`
+reference beside the current `V1SessionUnderTest`. It retains the 20 authored
+programs, raw solver and skeleton-demand probes, three raw rejections, four
+partial-value orders, and three private-export rejections. Its reference is no
+longer reconstructed from the candidate source.
 
 The P3 gate exposed an Int64 boundary bug: composing an encoding with a large
 positive seed can differ from the original recurrence because multiplication
@@ -54,16 +91,22 @@ wraps before the first remainder. `appendDatatypeEncoding` now admits only
 canonical residues to composition. The gate keeps all 922 old checks and adds
 seven full-width seed checks.
 
-`run_fingerprint.py` retains the frozen F1 control bodies, both O0/O2 host
-builds, exact expected output and actual Separate proof.
-Command transport uses the existing resource guard. The obsolete Integer-to-Int64
-narrowing RULES are intentionally retired. Both Probe and actual Separate
-workers must now contain direct Int64 arithmetic, with zero retired-rule firings. Type-only
-copies use independent `Data.Int.Int64` arithmetic; 30 full-width pairs are
-added per optimization level. An old 2^1024 noncanonical divergence seed is
-explicitly replaced with -1, since the old value wraps to zero. The unmatched
-Core obligation now requires signed Int64 primitive operations and no fusion,
-rather than the obsolete arbitrary-Integer operations.
+The P2 suite executes both the retained pure/fingerprint and old text-writer
+cases and the current `BinaryP2WriterControls`; it also retains the separate
+native-compatibility checks. The fixed text writer is only an independent
+reference for those old cases and explicitly refuses binary-envelope objects.
+Current binary IO is exercised through the actual public writer and readers.
+
+`run_fingerprint.py` directly compiles `controls/fingerprint/Oracle.hs`,
+`Probe.hs`, and `Tests.hs`, with authored stdout/stderr expectations beside
+them. Its explicit Python runners preserve both O0/O2 host builds and the
+actual Separate proof without editing a historical Python driver's AST or
+rewriting Haskell source at runtime. Both Probe and actual Separate workers
+must contain direct Int64 arithmetic, with zero retired Integer-narrowing-rule
+firings. The independent `Data.Int.Int64` oracle and 30 full-width pairs per
+optimization level remain. The noncanonical divergence seed is -1 because the
+old 2^1024 value wraps to zero; unmatched Core must use signed Int64 primitive
+operations without the fusion call.
 
 `run_file_controls.py` retains all nine authored file cases and their frozen
 handwritten status/type/error expectations. The ordinary `Crate` route keeps

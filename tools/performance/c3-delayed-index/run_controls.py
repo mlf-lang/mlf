@@ -18,34 +18,10 @@ EXPECTED=('PASS 63 physical graph/index/scope traces and legacy failure epochs\n
           'PASS retained expansion descriptors and exact full component selection\n'
           'PASS repeated instances, reflexive equalities and literal fresh survivors\n'
           'PASS 8 demand, first-exception and unused-payload observations\n').encode()
-# Reviewed extensions may add an independent Main and reversible helper copies.
+# Extensions may add an independent Main and named views of maintained controls.
 # The default CLI, frozen owner and complete expected inventory stay unchanged.
 EXTRA_SOURCES=[]
 EXTRA_PINS=[]
-
-
-LEGACY_OWNER_HEADER=b'module Bootstrap.CrateSession (compileSpecFile) where {'
-
-
-def adapt_private_owner(raw,name,live_header):
-    """Rename only the exact role-specific owner header, retaining every body byte."""
-    if type(raw) is not bytes or type(live_header) is not bytes:
-        raise RuntimeError('private-owner headers require bytes')
-    if name not in ('LegacySession','CandidateSession'):
-        raise RuntimeError('unknown private-owner role')
-    old=LEGACY_OWNER_HEADER if name=='LegacySession' else live_header
-    new=('module '+name+' where {').encode()
-    # The live literal comes from the authenticated Patricia adapter, after prepare().
-    # Anchor it as a complete declaration, not a substring in a comment or export list.
-    declarations=re.findall(rb'(?m)^[ \t]*module\s+([A-Z][\w.]*)\b',raw)
-    if (not old or raw.count(old)!=1 or new in raw
-            or declarations!=[b'Bootstrap.CrateSession']
-            or not re.search(rb'(?m)^'+re.escape(old)+rb'$',raw)):
-        raise RuntimeError('unique private-owner header')
-    changed=raw.replace(old,new,1)
-    if changed.count(new)!=1 or changed.replace(new,old,1)!=raw:
-        raise RuntimeError('module/export-header-only adaptation')
-    return changed
 
 
 sys.path.insert(0, str(ROOT / 'tools/testing'))
@@ -88,35 +64,25 @@ def main():
                 if row['path']!=OWNER:
                     H.require(H.sha(ROOT/row['path'])==auth['shared_inputs'][row['module']]['sha256'],
                               'unchanged borrowed dependency '+row['module'])
-            c4=ROOT/'tools/performance/c4-local-transaction'
-            C=H.module(c4/'contracts.py','retained_contracts')
-            cm=H.load(c4/'manifest.json');C.verify_oracles(c4,cm,None)
-            for name,digest in cm['pins'].items():
-                if name.startswith(('controls/','entrypoints/')):
-                    H.require(H.sha(c4/name)==digest,'retained C4 fixture/control '+name)
             A=H.module(HERE.parent/'patricia/adapt_oracles.py','retained_abi_adapter')
-            src=out/'source';A.prepare(ROOT,src)
-            shutil.copy2(HERE.parent/'patricia/OracleTypes.hs',src/'OracleTypes.hs')
+            src=out/'source';control_inputs=A.prepare(ROOT,src)
             frozen=subprocess.check_output(['git','show',BASELINE+':'+OWNER],cwd=ROOT)
             H.require(hashlib.sha256(frozen).hexdigest()==BASELINE_SHA,'frozen full private-owner oracle')
             for name,raw in [('LegacySession',frozen),('CandidateSession',(ROOT/OWNER).read_bytes())]:
-                changed=adapt_private_owner(raw,name,A.LIVE_SESSION_HEADER.encode())
+                changed=A.private_module_view(raw,name)
                 (src/(name+'.hs')).write_bytes(changed)
             shutil.copy2(HERE/'Main.hs',src/'Main.hs')
-            for source,name,before,after in EXTRA_SOURCES:
-                raw=source.read_bytes()
-                H.require(raw.count(before)==1 and after not in raw,'unique extension header')
-                changed=raw.replace(before,after)
-                H.require(changed.replace(after,before)==raw,'header-only extension inverse')
-                (src/name).write_bytes(changed)
+            for source,name in EXTRA_SOURCES:
+                changed=A.private_module_view(source.read_bytes(),name,owner='Main')
+                (src/(name+'.hs')).write_bytes(changed)
             pins=H.file_pins(src)
             pins.update({str(f):H.sha(f) for f in [Path(__file__),hp,HERE/'Main.hs',ROOT/OWNER,
-                HERE.parent/'patricia/adapt_oracles.py',HERE.parent/'patricia/OracleTypes.hs',
+                HERE.parent/'patricia/adapt_oracles.py',HERE.parent/'patricia/runtime_sources.py',
+                HERE.parent/'patricia/frozen_oracles.py',
                 producer/'receipt.json',producer/'host.o',producer/'supervisor.o']})
             pins.update({str(f):H.sha(f) for f in EXTRA_PINS})
             pins.update({str(row[0]):H.sha(row[0]) for row in EXTRA_SOURCES})
-            ledger=H.load(src/'adaptations.json')
-            pins.update({row['source']:row['source_sha256'] for row in ledger['changes']})
+            pins.update(control_inputs)
             objects=out/'objects';shutil.copytree(producer/'objects',objects)
             for suffix in ['.o','.hi']:(objects/('Main'+suffix)).unlink(missing_ok=True)
             original_objects=H.file_pins(objects)

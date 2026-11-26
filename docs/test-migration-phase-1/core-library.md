@@ -4,7 +4,7 @@ Baseline `720dd649627fbf8b19c7447493a4fdf6fd05eb39`. The suites below are implem
 
 ## TupleList
 
-The default `tuple-list` executable runs the same 105 IDs previously exposed through `--framework`. The ordered mapping is in `tools/testing/tuple-list-active-contract.json`. The 305 old observations map to these IDs because the grouped arity ID represents 201 observations. It covers three parser assertions for each arity from 2 to 64 and independent type and target checks after compilation at arities 2, 3, 15, 16, 63 and 64 under both syntax profiles. The parser-provenance, scope, erasure, independent target, negative-phase and diagnostic controls retain their original inputs and assertions.
+The default `tuple-list` executable currently runs the 105 IDs previously exposed through `--framework`. The ordered public IDs are in `tools/testing/tuple-list-active-contract.json`; the direct gate derives its counts from this inventory. This file contains no historical source hashes or migration counts. The recorded 305 old observations live separately in `tools/testing/tuple-list-migration-contract.json`. They map to the cutover's 105 IDs because the grouped arity ID represents 201 observations. It covers three parser assertions for each arity from 2 to 64 and independent type and target checks after compilation at arities 2, 3, 15, 16, 63 and 64 under both syntax profiles. The parser-provenance, scope, erasure, independent target, negative-phase and diagnostic controls retain their original inputs and assertions.
 
 The seven `*-runtime` IDs retain their own runtime results. Each preceding type ID and its runtime ID share one lazy compilation result for the identical source. Full registry execution should make seven compilation calls for these fourteen cases, compared with fourteen in the old opt-in registry and seven in the legacy default. Exact selection should force only its own fixture. The main module uses the shared options by default and accepts `--framework` and `--framework-list` as compatibility aliases. Its successful no-argument text retains `Tuple/list focused checks passed.`. Setting `MLF_TUPLE_LIST_REPORT` on that invocation also writes the JSON Lines report. The legacy module is recoverable at the pinned baseline. Routine CI can collect default text and the report in the same hosted `-O0` invocation instead of executing default and registry suites separately. The self-built release qualification path and independently specified interpreter/LLVM fixture retain distinct purposes.
 
@@ -20,9 +20,24 @@ MLF_TUPLE_LIST_REPORT="$PWD/.mlf-build/phase2/tuple-list.jsonl" "$bin/tuple-list
 "$bin/tuple-list" --framework --exact tuple-list/focused/tuple-projection-runtime --format json
 "$bin/tuple-list" --framework --exact tuple-list/focused/tuple-arities-2-through-64 --format json
 bash tools/release/test-tuple-list.sh "$bin/emlf" "$PWD/.mlf-build/phase2/tuple-native"
-python3 -B tools/testing/check_tuple_list_migration.py
-python3 -B tools/testing/test_tuple_list_migration.py
 ```
+
+`framework-direct` runs current framework, registry, CLI and producer checks.
+It does not run `tuple-static` or read Git history. The release metadata wrapper
+also omits the Tuple/list migration and dated inventory audits. Those remain
+available explicitly when a historical migration needs review:
+
+```sh
+python3 -B tools/testing/run.py release-tuple-list-migration
+python3 -B tools/testing/run.py release-tuple-list-migration-controls
+python3 -B tools/testing/run.py release-migration-inventory-controls
+```
+
+Adding current cases updates only the active ID inventory and actual tests; it
+does not rewrite the cutover or the 305-observation historical record. The Python
+gate controls exercise this separation in a source archive without `.git` or
+the historical audit files. Actual language semantics still require the compiled
+suite above.
 
 In a disposable candidate checkout, change the expected type for the projection leaf from `int` to `bool`, change the runtime result from `42` to `41`, then change a grouped arity AST expectation. Run the same exact selection after each separate mutation and require a failed case with its own ID. Restore each mutation before proceeding. Use a counter at `compileRuntime` and time the grouped parsing and compilation blocks separately in equivalent temporary instrumented builds. After provisioning an authenticated source-matching self-built candidate in the standard release layout, run `MLF_CI_SHARED_CANDIDATE=1 bash tools/release/qualify-tuple-list.sh`. Verify the marker, producer hashes, interpreter/LLVM outputs and release receipt in the same run.
 

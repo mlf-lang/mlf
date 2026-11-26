@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Audit immutable migration snapshots, not the spelling of maintained sources.
 
-The active registry contract is enforced against executable discovery and case
+Run this audit explicitly when reviewing the recorded migration. The independent
+active registry contract is enforced against executable discovery and case
 reports by test_framework_direct.py. This historical audit retains the original
 inputs, independent oracles and reviewed transcription without freezing today's
 module layout, helper names, comments or formatting.
@@ -44,16 +45,16 @@ REVIEWED_SHARED_SHA256 = {
 # after the authorized history transport changed author/committer commit IDs.
 HISTORICAL_SHARED_COMMIT = "2916c477468efaa24ae2c76e8b2f41e5f15236a6"
 HISTORICAL_SHARED_TREE = "7efa13e6a64c0445ebcf891c4e15694321a43780"
-ACTIVE_CONTRACT_PATH = "tools/testing/tuple-list-active-contract.json"
+MIGRATION_CONTRACT_PATH = "tools/testing/tuple-list-migration-contract.json"
 FRAMEWORK_CUTOVER = "08d7d608c13e89cabad0c81bc494072dafc7c86a"
 
 
-def active_contract():
-    contract = json.loads((ROOT / ACTIVE_CONTRACT_PATH).read_text())
-    require(contract.get("schema_version") == 1, "unknown active tuple contract schema")
+def migration_contract():
+    contract = json.loads((ROOT / MIGRATION_CONTRACT_PATH).read_text())
+    require(contract.get("schema_version") == 1, "unknown tuple migration contract schema")
     ids = contract["framework_ids"]
     require(len(ids) == len(set(ids)) == contract["framework_count"] == 105,
-            "reviewed active tuple inventory changed")
+            "recorded tuple cutover inventory changed")
     require(contract["legacy_pass_count"] == 305, "reviewed legacy observation count changed")
     require(set(contract["source_sha256"]) == {IMPLEMENTATION, SOURCE},
             "historical tuple source inventory changed")
@@ -73,7 +74,7 @@ def verify_historical_sources():
 
 
 def verify_cutover_source(path, source):
-    expected = active_contract()["source_sha256"].get(path)
+    expected = migration_contract()["source_sha256"].get(path)
     require(expected is not None, "unreviewed historical tuple source: " + path)
     require(hashlib.sha256(source.encode()).hexdigest() == expected,
             "historical source differs from reviewed cutover: " + path)
@@ -270,7 +271,7 @@ def main():
         raise ValueError(f"static control failed to reject {name}")
     sources = verify_cutover_sources()
     shared_ids = re.findall(r'leaf\s+"([^"]+)"', sources[IMPLEMENTATION])
-    contract = active_contract()
+    contract = migration_contract()
     require(shared_ids == contract["framework_ids"], "recorded cutover inventory differs from reviewed contract")
     legacy = subprocess.check_output(["git", "--no-replace-objects", "show", f"{PHASE_1_PARENT}:{LEGACY}"], cwd=ROOT)
     require(hashlib.sha256(legacy).hexdigest() == contract["baseline_legacy_sha256"],

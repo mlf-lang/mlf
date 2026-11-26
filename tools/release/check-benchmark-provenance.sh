@@ -66,16 +66,9 @@ if selected pinned-inputs; then
   sha256 -c "$work/SHA256SUMS" >/dev/null
   pass
 fi
-check transition python3 -B tools/release/check_benchmark_phase2_successor.py
-check transition-controls python3 -B tools/testing/run.py benchmark-transition-controls
-# Authenticate current reconciliation bytes separately from unchanged historical
-# suites. Sequential physical replays preserve each original source contract.
-check reconciliation/ordinary python3 -B tools/testing/run.py benchmark-reconciliation
-check reconciliation/optimized python3 -B tools/testing/run.py benchmark-reconciliation --python-optimization
-check predecessor/declid python3 -B tools/testing/run.py benchmark-predecessor-declid
-check predecessor/declid-optimized python3 -B tools/testing/run.py benchmark-predecessor-declid --python-optimization
-check predecessor/main python3 -B tools/testing/run.py benchmark-predecessor-main
-check predecessor/main-optimized python3 -B tools/testing/run.py benchmark-predecessor-main --python-optimization
+# Dated source-transition and predecessor replays belong to their recorded
+# checkout. This gate checks the actual benchmark inputs and patch results;
+# it does not require the compiler to reproduce a historical source tree.
 jq -r '.workloads[].provenance[] | select(.original_source != .build_source) | [.original_source,.build_source] | @tsv' "$manifest" > "$work/adaptations.tsv"
 
 count=0

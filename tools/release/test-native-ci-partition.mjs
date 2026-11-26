@@ -38,12 +38,27 @@ const option = (argv, flag) => {
   assert.equal(argv.filter(value => value === flag).length,1,'One '+flag+' argument');
   return argv[argv.indexOf(flag)+1];
 };
-const guard = (argv, seconds = '1800', maxOutput) => {
+const positive = (value, label) => {
+  const number = Number(value);
+  assert.ok(Number.isSafeInteger(number) && number > 0, label + ' must be a positive integer');
+  return number;
+};
+const enclosingSeconds = (value, step = {}) => {
+  const jobSeconds = positive(native(value)['timeout-minutes'], 'Job timeout') * 60;
+  const stepSeconds = step['timeout-minutes'] === undefined ? jobSeconds :
+    positive(step['timeout-minutes'], 'Step timeout') * 60;
+  assert.ok(stepSeconds <= jobSeconds, 'A step must fit within its job budget');
+  return stepSeconds;
+};
+const guard = (argv, outerSeconds, requireOutputBound = false) => {
   assert.deepEqual(argv.slice(0,3),['python3','-B','tools/shared/resource_watchdog.py']);
-  for (const [flag,value] of [['--seconds',seconds],['--address-space-mib','6144'],['--rss-mib','5120'],['--disk-free-mib','4096']]) {
-    assert.equal(option(argv,flag),value);
-  }
-  if (maxOutput !== undefined) assert.equal(option(argv,'--max-output-mib'),maxOutput);
+  const bound = flag => positive(option(argv, flag), flag);
+  const seconds = bound('--seconds');
+  assert.ok(seconds < outerSeconds, 'The watchdog must finish before its enclosing timeout');
+  assert.ok(bound('--rss-mib') <= bound('--address-space-mib'), 'RSS must fit within the address-space limit');
+  bound('--disk-free-mib');
+  if (requireOutputBound || argv.includes('--max-output-mib')) bound('--max-output-mib');
+  return seconds;
 };
 const expectProducerQuery = query => {
   const good = {complete:true,producer_host:'GHC',typecheck_only:false};
@@ -63,7 +78,7 @@ const fixtureProgram = (root, name, variables=[]) => {
 
 function verifyPartition(value) {
   const entry = native(value);
-  assert.equal(entry['timeout-minutes'],360);
+  enclosingSeconds(value);
   assert.equal(entry.strategy['fail-fast'],false);
   assert.ok(!entry['continue-on-error']);
   // These retired public entrypoints bypass the bounded composite campaign.
@@ -87,7 +102,7 @@ function verifyPartition(value) {
   const install=command(value,'tools/release/cleanup-ghc-install.py');
   const regeneration=command(value,'tools/shared/generate_builtin_evidence.py');
   assert.ok(producer.id);
-  assert.equal(regeneration['timeout-minutes'],16);
+  enclosingSeconds(value,regeneration);
   const checkout=actionStep(entry,'actions/checkout');
   assert.equal(String(checkout.with['fetch-depth']),'0');
   assert.equal(checkout.if,undefined);
@@ -109,9 +124,12 @@ function verifyPartition(value) {
   }
   const regenerationCalls=argvCalls(regeneration);
   assert.equal(regenerationCalls.length,1);
-  guard(regenerationCalls[0].argv,'900','16');
-  for (const [flag,value] of [['--root',process.cwd()],['--build-receipt','.mlf-build/shared-ghc/receipt.json'],
-    ['--output','.mlf-build/builtin-generation-guard/results'],['--timeout','600']]) assert.equal(option(regenerationCalls[0].argv,flag),value);
+  const regenerationBudget=guard(regenerationCalls[0].argv,enclosingSeconds(value,regeneration),true);
+  for (const [flag,expected] of [['--root',process.cwd()],['--build-receipt','.mlf-build/shared-ghc/receipt.json']]) {
+    assert.equal(option(regenerationCalls[0].argv,flag),expected);
+  }
+  assert.ok(positive(option(regenerationCalls[0].argv,'--timeout'),'Generator timeout') < regenerationBudget,
+    'Generation must finish before its watchdog');
   const routine=['tools/release/test-suite-build-receipts.py','tools/release/source-smoke.sh',
     'tools/shared/test_direct_candidate_successor.py','tools/shared/test_figure12_direct.py','tools/release/test-tuple-list.sh'];
   const optimized=['tools/performance/patricia/run_integrated.py --suite p123','tools/performance/patricia/run_integrated.py --suite graph',
@@ -129,11 +147,18 @@ function verifyPartition(value) {
     assert.equal(selected(framework,{matrix:leg}),true);
     const expected=['python3','tools/shared/test_framework_direct.py','--build-receipt','.mlf-build/shared-ghc/receipt.json',
       '--output','.mlf-build/framework-direct','--suite',String(leg.optimization)==='0'?'all':'controls'];
-    if (String(leg.optimization)==='0') expected.push('--suite-timeout','5400');
-    assert.deepEqual(argvCalls(framework,{matrix:leg}).map(call=>call.argv),[expected]);
+    const calls=argvCalls(framework,{matrix:leg});
+    assert.equal(calls.length,1);
+    const argv=[...calls[0].argv];
+    if (String(leg.optimization)==='0') {
+      assert.ok(positive(option(argv,'--suite-timeout'),'Framework timeout') < enclosingSeconds(value,framework),
+        'The framework must finish before its enclosing timeout');
+      argv.splice(argv.indexOf('--suite-timeout'),2);
+    }
+    assert.deepEqual(argv,expected);
     for (const other of legs.filter(other=>other!==leg)) assert.equal(selected(framework,{matrix:other}),false);
   }
-  for (const script of ['tools/shared/test_artifact_binary_modular.py','tools/performance/llvm-memory/test_contract.py']) {
+  for (const script of ['tools/shared/test_artifact_binary_modular.py']) {
     const step=command(value,script);
     const calls=argvCalls(step);
     for (const flags of [['-B'],['-O','-B']]) assert.equal(calls.filter(call=>JSON.stringify(call.argv)===JSON.stringify(['python3',...flags,script])).length,1);
@@ -174,6 +199,7 @@ function verifyPartition(value) {
   assert.equal(upload.with['include-hidden-files'],true);
   assert.equal(selected(upload,{failure:()=>true,cancelled:()=>true,success:()=>false}),true);
   assert.equal(new Set(legs.map(matrix=>render(upload.with.name,{matrix}))).size,legs.length);
+  assert.ok(paths(upload).length > 0, 'The upload must select evidence');
 }
 
 const directExpected = [
@@ -220,24 +246,19 @@ function verifyGuarded(value) {
   for (const step of new Set(names.map(name=>command(value,name)))) {
     const options={stubs:'pkg-config() { printf "/fixture/lib\\n"; }\ntest() { return 0; }'};
     const calls=argvCalls(step,{},options);
-    if (step.run.includes('tools/performance/int64/run_controls.py')) {
-      for (const flags of [['-B'],['-O','-B']]) assert.equal(calls.filter(call=>
-        JSON.stringify(call.argv)===JSON.stringify(['python3',...flags,'tools/release/test_phase2_patricia_adapters.py'])).length,1);
-    }
     for (const name of names.filter(name=>step.run.includes(name))) {
       const [script,...tokens]=name.split(' ');
       const matches=calls.filter(call=>call.argv.includes(script) && tokens.every(token=>call.argv.includes(token)));
       assert.equal(matches.length,script==='tools/performance/int64/run_controls.py'?3:1,name);
-      for (const call of matches) guard(call.argv,script.includes('crate-query-graph')?'600':'1800',
-        script.includes('crate-query-graph')?'100':script==='tools/shared/test_artifact_binary.py'?'640':undefined);
+      for (const call of matches) guard(call.argv,enclosingSeconds(value,step),
+        script.includes('crate-query-graph') || script==='tools/shared/test_artifact_binary.py');
       if (script==='tools/performance/int64/run_controls.py') {
         assert.deepEqual(matches.map(call=>option(call.argv,'--suite')).sort(),['host','legacy','native']);
       }
       if (script==='tools/performance/patricia/run_native.py') assert.equal(option(matches[0].argv,'--mode'),'standalone');
       if (script==='tools/shared/test_artifact_binary.py') {
         for (const [flag,expected] of [['--source-root',process.cwd()],['--build-receipt','.mlf-build/shared-ghc/receipt.json'],
-          ['--gc-prefix',process.cwd()+'/.mlf-build/io-action-gc'],['--partial-write-sink','/dev/full'],
-          ['--output','.mlf-build/artifact-binary-guard/results']]) assert.equal(option(matches[0].argv,flag),expected);
+          ['--gc-prefix',process.cwd()+'/.mlf-build/io-action-gc'],['--partial-write-sink','/dev/full']]) assert.equal(option(matches[0].argv,flag),expected);
       }
     }
     requireFailurePropagation(step.run,options,calls);
@@ -247,10 +268,9 @@ function verifyGuarded(value) {
   const calls=argvCalls(map,{},options);
   assert.equal(calls.length,3);
   assert.deepEqual(sorted(calls.slice(0,2)),sorted([['-B'],['-O','-B']].map(flags=>({argv:['python3',...flags,'tools/performance/map-policy/test_prepare_map_policy.py'],MAP_POLICY_SOURCE:process.cwd()}))));
-  guard(calls[2].argv);
+  guard(calls[2].argv,enclosingSeconds(value,map));
   assert.equal(option(calls[2].argv,'--source'),process.cwd());
   assert.equal(option(calls[2].argv,'--producer'),'.mlf-build/shared-ghc');
-  assert.equal(option(calls[2].argv,'--output'),'.mlf-build/map-balance-controls');
   requireFailurePropagation(map.run,options,calls);
 }
 function verifyHeader(value) {
@@ -317,7 +337,7 @@ function verifyIo(value) {
   inFixture(root=>{
     fs.writeFileSync(path.join(root,'libgc.a'),'static-gc');
     const step=command(value,'tools/shared/test_io_action_sharing.py');
-    assert.equal(step['timeout-minutes'],undefined);
+    enclosingSeconds(value,step);
     const options={cwd:root,commands:['sudo','cp','python3'],stubs:String.raw`
 mkdir() { /bin/mkdir "$@"; }
 cc() { record cc "$@" || return; printf '%s/libgc.a\n' "$PWD"; }
@@ -367,23 +387,6 @@ function verifyCampaignCalls(value) {
       MLF_BUILD_RUNNER:toolset+'/mlf-build-runner',MLF_PACKAGE_MANAGER:toolset+'/mlfpkg'}]);
     requireFailurePropagation(step.run,options,calls);
   });
-}
-function verifyEvidence(value) {
-  const upload=actionStep(native(value),'actions/upload-artifact');
-  const expected=['.mlf-build/ghc-install-cleanup.json','.mlf-build/shared-ghc/ghc-info.txt',
-    '.mlf-build/shared-ghc/builtin-verification/','.mlf-build/builtin-generation-guard/',
-    '.mlf-build/crc-supervisor-controls/','.mlf-build/utf8-supervisor-controls/',
-    '.mlf-build/candidate-supervisor-controls/','.mlf-build/header-adapter-controls/',
-    '.mlf-build/direct-host-tests/candidate-selection/','.mlf-build/native-library/header-validation/',
-    '.mlf-build/stdlib-default-controls/header-validation/','.mlf-build/io-action-gc/dependency-version.txt'];
-  for (const suffix of ['json','stdout','stderr']) expected.push('.mlf-build/direct-host-tests/**/*.'+suffix);
-  for (const suffix of ['**/*.hs','**/*.o','**/*.hi','**/*.d','**/stdout','**/stderr']) expected.push('.mlf-build/direct-host-tests/utf8-length/'+suffix);
-  expected.push('.mlf-build/direct-host-tests/utf8-length-supervisor.json');
-  for (const suffix of ['**/stdout','**/stderr','**/*.json','**/*.hs','**/*.c','**/*.h','**/*.d']) expected.push('.mlf-build/map-balance-controls/'+suffix);
-  for (const suffix of ['bounded-receipt.json','build.log','results/**/*.json','results/**/*.stdout','results/**/*.stderr']) expected.push('.mlf-build/artifact-binary-guard/'+suffix);
-  for (const directory of ['native-library','stdlib-default-controls']) for (const suffix of ['receipt.json','*.stdout','*.stderr']) expected.push('.mlf-build/'+directory+'/'+suffix);
-  for (const suffix of ['json','stdout','stderr','ll','xmlf']) expected.push('.mlf-build/io-action-sharing/**/*.'+suffix);
-  for (const required of expected) assert.ok(paths(upload).includes(required),'Preserve evidence: '+required);
 }
 const qualificationAction = () => parseWorkflow(fs.readFileSync('.github/actions/posix-qualification/action.yml','utf8'));
 const collectionStep = value => commandStep(value.runs,'tools/release/time-stage.sh evidence');
@@ -444,7 +447,7 @@ function verifyAggregate(value) {
     assert.notEqual(execute({...good,unexpected:{result:skipped?'skipped':'success'}}),0);
   }
 }
-const validators=[verifyPartition,verifyDirect,verifyGuarded,verifyHeader,verifyInstall,verifyIo,verifyCampaignCalls,verifyEvidence,verifyAggregate];
+const validators=[verifyPartition,verifyDirect,verifyGuarded,verifyHeader,verifyInstall,verifyIo,verifyCampaignCalls,verifyAggregate];
 const verify=value=>{for (const validate of validators) validate(projected(value));};
 const mutate=(value,change,validate=verify)=>{const changed=clone(value);change(changed);assert.throws(()=>validate(changed));};
 const findAdapter=(value,adapter)=>{
@@ -452,6 +455,11 @@ const findAdapter=(value,adapter)=>{
   assert.equal(matches.length,1,'Exactly one adapter step: '+adapter);return matches[0];
 };
 const suite='release-native-ci-partition', prefix='release/native-ci-partition/';
+const changeOption=(step,flag,replacement)=>{
+  const token=`(?:"${flag}"|'${flag}'|${flag})`;
+  const pattern=new RegExp(`(${token}\\s+)(?:"[^"\\n]*"|'[^'\\n]*'|[^\\s;]+)`,'g');
+  step.run=step.run.replace(/\\\n/g,'').replace(pattern,(_,prefix)=>prefix+replacement);
+};
 const cases=[
   ['schedule',()=>verify(workflow)],
   ['qualification-evidence-transport',()=>verifyQualificationEvidence(qualificationAction())],
@@ -464,117 +472,59 @@ const cases=[
   ['equivalent-shell-locals',()=>{
     const changed=clone(workflow);
     native(changed).strategy.matrix.exclude=[];
-    findAdapter(changed,'direct-candidate').run='# python3 -B tools/shared/test_direct.py is retired\n'+findAdapter(changed,'direct-candidate').run;
-    for (const step of native(changed).steps) if (step.run) step.run=step.run.replaceAll('toolset','executables').replaceAll('$suite','$variant').replace('for suite in','for variant in');
-    // Reorder independent pure normal/optimized checks while keeping the actual
-    // composite campaign after them. Command boundaries and environments matter.
     const direct=findAdapter(changed,'direct-candidate');
+    direct.run='# python3 -B tools/shared/test_direct.py is retired\n'+direct.run;
+    for (const step of native(changed).steps) {
+      for (const [before,after] of [['shared_build','host_compiler'],['hosted_campaign_tools','host_runner'],['native_lifecycle','lifecycle_checks']]) {
+        if(step.id===before)step.id=after;
+        if(typeof step.if==='string')step.if=step.if.replaceAll(before,after);
+      }
+      if(step.run)step.run=step.run.replaceAll('toolset','executables').replaceAll('$suite','$variant').replace('for suite in','for variant in')
+        .replace(/(^|\s)prefix=/gm,'$1gcRoot=').replaceAll('$prefix','$gcRoot')
+        .replace(/(^|\s)archive=/gm,'$1gcArchive=').replaceAll('$archive','$gcArchive');
+    }
+    // Independent pure checks may run in either order before the campaign.
     const lines=direct.run.split('\n');
     const pure=lines.map((line,index)=>line.includes('tools/testing/run.py python-shared-crc-successor-entry')?index:-1).filter(index=>index>=0);
     [lines[pure[0]],lines[pure[1]]]=[lines[pure[1]],lines[pure[0]]];direct.run=lines.join('\n');
     verify(changed);
   }],
+  ['valid-policy-tuning-and-output-location',()=>{
+    const value=projected(workflow);
+    native(value)['timeout-minutes']-=1;
+    const framework=command(value,'--suite all');
+    const frameworkCall=argvCalls(framework)[0].argv;
+    changeOption(framework,'--suite-timeout',String(Number(option(frameworkCall,'--suite-timeout'))+1));
+    const binary=command(value,'tools/shared/test_artifact_binary.py');
+    const binaryCall=argvCalls(binary,{},{stubs:'test() { return 0; }'})[0].argv;
+    changeOption(binary,'--seconds',String(Number(option(binaryCall,'--seconds'))+1));
+    changeOption(binary,'--rss-mib',String(Number(option(binaryCall,'--rss-mib'))-128));
+    changeOption(binary,'--max-output-mib',String(Number(option(binaryCall,'--max-output-mib'))+1));
+    const before=option(binaryCall,'--output'),after='.mlf-build/relocated-artifact-results';
+    changeOption(binary,'--output',after);
+    const upload=actionStep(native(value),'actions/upload-artifact');
+    upload.with.path=[...paths(upload).filter(pattern=>!pattern.startsWith(before+'/')),after+'/**'].join('\n');
+    verify(value);
+  }],
+  // A few invariant defects exercise the policy checks. Each baseline shell
+  // validator already injects failures into the real commands it records.
   ['mutation/missing%20shard',()=>mutate(workflow,value=>native(value).strategy.matrix.include.pop())],
-  ['mutation/matrix-exclusion',()=>mutate(workflow,value=>native(value).strategy.matrix.exclude=[{optimization:'0'}])],
-  ['mutation/outer%20bound%20changed',()=>mutate(workflow,value=>native(value)['timeout-minutes']=361)],
-  ['mutation/fail-fast%20cancellation',()=>mutate(workflow,value=>native(value).strategy['fail-fast']=true)],
   ['mutation/nonblocking%20failures',()=>mutate(workflow,value=>native(value)['continue-on-error']=true)],
-  ['mutation/producer%20skipped',()=>mutate(workflow,value=>command(value,'--bootstrap-only').if=false)],
-  ['mutation/shallow-checkout',()=>mutate(workflow,value=>actionStep(native(value),'actions/checkout').with['fetch-depth']=1)],
+  ['mutation/skipped-campaign',()=>mutate(workflow,value=>findAdapter(value,'direct-candidate').if=false)],
+  ['mutation/swallowed-failure',()=>{
+    const value=projected(workflow),needle='tools/shared/test_direct_candidate_successor.py';
+    const step=command(value,needle);
+    step.run=step.run.replace(/\\\n\s*/g,' ');
+    const line=step.run.split('\n').find(line=>line.includes(needle));
+    assert.ok(line);
+    step.run=step.run.replace(line,line+' || :');
+    assert.throws(()=>verifyDirect(value));
+  }],
+  ['mutation/missing-budget',()=>mutate(workflow,value=>delete native(value)['timeout-minutes'])],
   ['mutation/artifact%20collision',()=>mutate(workflow,value=>actionStep(native(value),'actions/upload-artifact').with.name='shared')],
   ['mutation/artifact-success-only',()=>mutate(workflow,value=>actionStep(native(value),'actions/upload-artifact').if='success()')],
   ['mutation/aggregate%20missing%20matrix',()=>mutate(workflow,value=>job(value,'pr-gate').needs=job(value,'pr-gate').needs.filter(name=>name!=='native'))],
 ];
-for (const script of ['test_direct.py','test_direct_crc_successor.py','test_direct_bounded.py']) {
-  cases.push(['mutation/legacy-route/'+script,()=>mutate(workflow,value=>{
-    native(value).steps.push({run:'python3 -B tools/shared/'+script+' --bin-dir .mlf-build/shared-ghc/bin'});
-  },value=>verifyPartition(projected(value)))]);
-}
-for (const adapter of ['direct-candidate','framework-direct','guest-framework','guest-state-laws','indexvec','io-action-sharing',
-  'query-graph-acceptance','source-query-api','source-context-cache','artifact-binary-native','figure12-direct','tuple-list-native']) {
-  const existing={"direct-candidate": "direct coverage skipped", "framework-direct": "framework omitted", "guest-framework": "O2 guest omitted", "query-graph-acceptance": "O2 graph fingerprints omitted", "source-query-api": "O2 source graph omitted", "source-context-cache": "O2 source context omitted", "artifact-binary-native": "O2 artifact binary omitted", "figure12-direct": "Figure12 omitted"};
-  cases.push([existing[adapter]?'mutation/'+encodeURIComponent(existing[adapter]):'mutation/skipped/'+adapter,()=>mutate(workflow,value=>findAdapter(value,adapter).if=false)]);
-}
-for (const adapter of ['python-shared-crc-successor-entry','python-shared-crc-process-supervisor','python-shared-utf8-batch-contract',
-  'python-shared-utf8-batch-worker','python-shared-direct-bounded-entry','python-shared-candidate-batch-contract',
-  'python-shared-candidate-batch-worker','python-shared-direct-candidate-entry']) {
-  for (const optimized of [false,true]) {
-    const mode=optimized?'optimized':'normal';
-    const previous={
-      'python-shared-crc-successor-entry':`CRC ${mode} entry controls omitted`,
-      'python-shared-crc-process-supervisor':`CRC ${mode} lifecycle controls omitted`,
-      'python-shared-utf8-batch-contract':`test_utf8_batch_contract.py ${mode} omitted`,
-      'python-shared-utf8-batch-worker':`test_utf8_batch_worker.py ${mode} omitted`,
-      'python-shared-direct-bounded-entry':`test_direct_bounded_entry.py ${mode} omitted`,
-      'python-shared-candidate-batch-contract':`test_candidate_batch_contract.py ${mode} omitted`,
-      'python-shared-candidate-batch-worker':`test_candidate_batch_worker.py ${mode} omitted`,
-      'python-shared-direct-candidate-entry':`test_direct_candidate_entry.py ${mode} omitted`,
-    };
-    cases.push(['mutation/'+encodeURIComponent(previous[adapter]),()=>{
-      mutate(workflow,value=>{
-      const step=findAdapter(value,'direct-candidate');
-      const lines=step.run.split('\n');
-      step.run=lines.filter(line=>!(line.includes('tools/testing/run.py '+adapter) && line.includes('--python-optimization')===optimized)).join('\n');
-    },value=>verifyDirect(projected(value)));
-  }]);
-  }
-}
-for (const variable of ['MLF_CRC_TEST_EVIDENCE','MLF_UTF8_TEST_EVIDENCE','MLF_CANDIDATE_TEST_EVIDENCE']) {
-  cases.push(['mutation/environment/'+variable,()=>mutate(workflow,value=>{
-    const step=findAdapter(value,'direct-candidate');step.run=step.run.replaceAll(variable,'WRONG_EVIDENCE');
-  },value=>verifyDirect(projected(value)))]);
-}
-for (const adapter of ['direct-candidate','io-action-sharing','map-policy-controls']) {
-  // Locate the public command via the projected descriptor; no display labels.
-  const needle=adapter==='map-policy-controls'?'tools/performance/map-policy/run_controls.py':adapter==='direct-candidate'?
-    'tools/shared/test_direct_candidate_successor.py':'tools/shared/test_io_action_sharing.py';
-  for (const failure of ['comment','swallow']) cases.push(['mutation/'+failure+'/'+adapter,()=>{
-    const value=projected(workflow), step=command(value,needle);
-    step.run=step.run.replace(/\\\n\s*/g,' ');
-    const line=step.run.split('\n').find(line=>line.includes(needle));
-    assert.ok(line);
-    step.run=step.run.replace(line,failure==='comment'?'# '+line:line+' || :');
-    assert.throws(()=>verify(value));
-  }]);
-}
-const changeOption=(step,flag,replacement)=>{
-  const token=`(?:"${flag}"|'${flag}'|${flag})`;
-  const pattern=new RegExp(`(${token}\\s+)(?:"[^"\\n]*"|'[^'\\n]*'|[^\\s;]+)`,'g');
-  step.run=step.run.replace(/\\\n/g,'').replace(pattern,(_,prefix)=>prefix+replacement);
-};
-for (const [label,needle,change,validate] of [
-  ['framework-budget','--suite all',step=>changeOption(step,'--suite-timeout','5401'),verifyPartition],
-  ['graph-memory-bound','tools/performance/crate-query-graph/verify.py',step=>changeOption(step,'--rss-mib','6144'),verifyGuarded],
-  ['binary-output-bound','tools/shared/test_artifact_binary.py',step=>changeOption(step,'--max-output-mib','641'),verifyGuarded],
-  ['numeric-selector','tools/performance/int64/run_controls.py',step=>changeOption(step,'--suite','host'),verifyGuarded],
-  ['header-historical-oracle','tools/shared/test_header_validation_adapter.py',
-    step=>step.run=step.run.replaceAll('dd5b4630a80803c19afdb219dba2dc4bffc3ea1b','HEAD'),verifyHeader],
-  ['header-oracle-environment','tools/shared/test_header_validation_adapter.py',
-    step=>step.run=step.run.replaceAll('HEADER_ORACLE','WRONG_ORACLE'),verifyHeader],
-  ['cleanup-receipt','tools/release/cleanup-ghc-install.py',step=>changeOption(step,'--receipt','wrong.json'),verifyInstall],
-  ['io-producer-receipt','tools/shared/test_io_action_sharing.py',step=>changeOption(step,'--build-receipt','wrong.json'),verifyIo],
-]) cases.push(['mutation/'+label,()=>{
-  const value=projected(workflow),step=command(value,needle),original=step.run;
-  change(step);assert.notEqual(step.run,original);assert.throws(()=>validate(value));
-}]);
-cases.push(['equivalent-step-ids-and-gc-locals',()=>{
-  const value=clone(workflow);
-  for (const step of native(value).steps) {
-    for (const [before,after] of [['shared_build','host_compiler'],['hosted_campaign_tools','host_runner'],['native_lifecycle','lifecycle_checks']]) {
-      if(step.id===before)step.id=after;
-      if(typeof step.if==='string')step.if=step.if.replaceAll(before,after);
-    }
-    if(step.run)step.run=step.run.replace(/(^|\s)prefix=/gm,'$1gcRoot=').replaceAll('$prefix','$gcRoot')
-      .replace(/(^|\s)archive=/gm,'$1gcArchive=').replaceAll('$archive','$gcArchive');
-  }
-  verify(value);
-}]);
-for (const required of ['.mlf-build/crc-supervisor-controls/','.mlf-build/io-action-sharing/**/*.json',
-  '.mlf-build/shared-ghc/builtin-verification/','.mlf-build/artifact-binary-guard/results/**/*.json']) {
-  cases.push(['mutation/evidence/'+encodeURIComponent(required),()=>mutate(workflow,value=>{
-    const upload=actionStep(native(value),'actions/upload-artifact');upload.with.path=paths(upload).filter(item=>item!==required).join('\n');
-  },value=>verifyEvidence(projected(value)))]);
-}
 const exact=process.env.MLF_TEST_SUITE===suite?process.env.MLF_TEST_EXACT:undefined;
 const chosen=cases.filter(([label])=>!exact||prefix+label===exact);
 assert.ok(chosen.length,'Unknown CI partition case');

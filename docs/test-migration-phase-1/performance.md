@@ -11,7 +11,8 @@ Baseline `720dd649627fbf8b19c7447493a4fdf6fd05eb39`. Implemented, unverified.
 | Fresh-runtime application timing and separate native packaging gate | `benchmark-game/performance/<workload>` retains both threshold dimensions, fresh samples, default-input checks and tool identities. Release still requires all ten workloads, seven samples and the 3× compile and 2× runtime limits | `application-benchmarks` for local selection and `benchmark-game` for the qualified macOS arm64 release route |
 | Installed default-driver application benchmark | `benchmark-installed/{correctness,performance}/<workload>` retains the tool and installation receipts, five measured pairs, and the excluded correctness warmup | `application-benchmarks-installed` |
 | Shape contract, sweep, cancellation, data-shape, rank-shape, and growth regressions | Existing Python unittest identities under the six shape control suites. Source-defined and inherited test inventories are discovered by unittest in Phase 2 | `tools/dev.py check-tools` for its existing platform-specific subset, with `compiler-shapes-fit-growth` also available directly |
-| Benchmark verifier, provenance and transition controls | 27 gate controls, manifest and pin checks, one case per patch reconstruction, current transition and reconciliation unittest identities, and the frozen predecessor unittest identities (6 for DeclId and 33 for main per Python mode). The provenance shell still owns setup and cleanup | `benchmark-gate-controls`, `benchmark-provenance`, `benchmark-transition-controls`, `benchmark-reconciliation`, and `benchmark-predecessor-{declid,main}` |
+| Benchmark verifier and current input provenance | Gate controls, manifest and pin checks, and one case per actual patch reconstruction. The provenance shell owns setup and cleanup | `benchmark-gate-controls` and `benchmark-provenance` |
+| Dated source-transition and reconciliation evidence | Original transition and predecessor inventories, replayed only in their recorded source checkout; excluded from routine current-source admission | See [historical replay](test-debrittling.md#replaying-the-dated-source-audit) for `benchmark-transition-controls`, `benchmark-reconciliation`, and `benchmark-predecessor-{declid,main}` |
 
 Harness still owns the independent benchmark-oracle and native process controls
 defined in `Tests.BenchmarkSuite`. Splitting correctness and timing evidence
@@ -151,16 +152,28 @@ needed for that case.
 | --- | --- | --- |
 | `patricia-design` | Whole shared-source typecheck and the O0, O2 and narrow-O2 independent controls | One compilation and check, or the shared-source typecheck |
 | `patricia-file-controls` | Nine C4 fixtures through ordinary Crate and CrateSession. Both routes must finish for the shared case verdict | One original fixture across all its existing routes, including the native negative controls when selecting their original first case |
-| `patricia-fingerprint` | Frozen current O0, current O2 and actual Separate proofs | One original stage. Unchanged oracle and artifact checks remain in the selected stage |
+| `patricia-fingerprint` | Directly compiled O0/O2 controls and actual Separate Core checks | One stage, with its independent oracle and artifact checks |
 | `patricia-focused` | Six O0/O2 container, compiler and kind-routing controls and full compiler-source typecheck | One original compilation and execution, or the typecheck |
-| `patricia-integrated` | Twenty invocations across `p123`, `map-balance`, `graph`, `validation` and `builtin`, including negative lookup checks | One original module or one expected compile rejection within its existing variant |
+| `patricia-integrated` | Nineteen invocations across `p123`, `graph`, `validation` and `builtin`, including negative lookup checks | One module or one expected compile rejection within its existing variant |
 | `patricia-native` | GHC positive and rejected-payload checks plus eight semantic batches and a rejected-payload check per LLVM mode | One original GHC or LLVM invocation. Standalone runtime compilation occurs only when selected |
 | `int64-controls` | O0 and O2 host controls, 178 native direct/curried/UBSan observations, 46 interpreted-and-native legacy rows, program parity, compiler and existing checks | One existing process case or parity row, with oracle generation only when that case consumes it |
 | `llp64-controls` | Shared Windows-width probe and four LLVM host adapter checks. The optional reference-runtime comparison gets its own ID when requested | One shared width, ordinary/UBSan execution or reference-runtime equivalence case |
 
-Full profiles have the same execution count. Focused runs avoid unrelated
-compiler invocations and native workers. Compare observed build and run
-command files under the focused and full output directories in Phase 2.
+Focused runs avoid unrelated compiler invocations and native workers. The old
+integrated `map-balance` variant has been retired: its 400-step historical tree
+shape equivalence is already known to be false at step 21. The existing `map-policy`
+entry remains responsible for the historical witness, current contents, balance,
+cached counts and demand checks; CI continues to run it.
+
+Patricia runtime preparation now copies directly compilable controls and fixed
+reference algorithms. It does not rewrite old Haskell bodies or replay source
+successors. Fingerprint qualification uses explicit stage functions rather than
+rewriting a historical Python runner's AST. The obsolete `python-validation-reuse`
+and `python-artifact-binary-p2-writer-bridge` source-projection suites are no longer
+current registry entries. Actual validation and binary writer coverage remains in
+the integrated suites, with preparation covered by `python-patricia-adapters`.
+See [test de-brittling](test-debrittling.md) for the current versus historical
+boundaries.
 Historical source transformations, focused partial receipts, unchanged
 case IDs, and nonzero exits for rejected infrastructure should be checked
 through these commands. None has been executed in Phase 1.

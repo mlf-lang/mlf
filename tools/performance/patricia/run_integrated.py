@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Retained finite regressions across the explicitly reviewed Int64/Patricia ABI."""
 from pathlib import Path
-import argparse, difflib, hashlib, json, shutil, sys, types, struct, zlib
+import argparse, json, shutil, sys, types, struct, zlib
 from legacy_controls import prepare
 ROOT=Path(__file__).resolve().parents[3]
 HERE=Path(__file__).resolve().parent
+GRAPH_EXPECTATIONS=HERE/'controls/graph/expectations.json'
 sys.path.insert(0, str(ROOT/'tools/testing'))
 from receipt_selection import inventory_json, select
 
@@ -14,7 +15,6 @@ GRAPH_MODULES = ('PatriciaOracleControls', 'PublicControls', 'C4TransactionContr
 VALIDATION_NEGATIVES = ('solveGenerated', 'prepareValidatedGraph', 'solvePreparedGraph')
 SUITES = {
     'p123': ('P1Controls', 'P2Controls', 'NativeCompatibilityControls', 'P3Controls'),
-    'map-balance': ('BalanceControls',),
     'graph': GRAPH_MODULES,
     'validation': ('BoundaryControls', *['private-'+name for name in VALIDATION_NEGATIVES]),
     'builtin': ('BinaryBuiltinControls',),
@@ -22,180 +22,6 @@ SUITES = {
 LIMITS={'address_space_per_process_bytes':6*1024**3,'disk_free_floor_bytes':5*1024**3,
         'host_available_floor_bytes':3*1024**3,'max_work_bytes':3*1024**3,
         'process_tree_rss_bytes':5*1024**3,'wall_seconds':1200}
-
-SCOPE_BRIDGE = '''
-auditLiveScopeState :: String -> T.Solver -> IO ()
-auditLiveScopeState label value@(T.Solver graph _ _ _) = do
-  checked <- right (label ++ " raw live index audit") (S.finish value)
-  assert (label ++ " live finish preserves physical graph") (sameGraphPhysical graph checked)
-
--- The private openSession fixture hook imports its indexes verbatim. Adapt
--- only the input scope prefix of an independently audited historical state.
--- The live result must still pass its original raw audit after the operation.
-compactHistoricalScopeInput :: T.Solver -> Maybe T.Solver
-compactHistoricalScopeInput value@(T.Solver graph parents bindings (T.ScopeIndex intervals frozenJumps)) =
-  case (FS.finish value, S.indexScopes graph) of
-    (T.Right checked, T.ScopeIndex liveIntervals liveJumps)
-      | sameGraphPhysical graph checked &&
-        sameMapPhysical (==) intervals liveIntervals &&
-        length liveJumps <= length frozenJumps &&
-        and (zipWith (sameMapPhysical (==)) liveJumps frozenJumps) ->
-          let compact = T.Solver graph parents bindings (T.ScopeIndex intervals (take (length liveJumps) frozenJumps))
-          in case S.finish compact of
-            T.Right admitted | sameGraphPhysical graph admitted -> Just compact
-            _ -> Nothing
-    _ -> Nothing
-
-liveScopeInput :: T.Solver -> T.Solver
-liveScopeInput value = case compactHistoricalScopeInput value of
-  Just admitted -> admitted
-  Nothing -> errorWithoutStackTrace "historical session input is not a valid live scope prefix"
-
--- Live indexes retain only the levels required by the scope depth.
--- Audit the raw state and use the frozen solver solely for the omitted tail.
-withFrozenScopeTail :: String -> T.Solver -> IO T.Solver
-withFrozenScopeTail label value@(T.Solver graph parents bindings (T.ScopeIndex intervals jumps)) =
-  case FS.finish value of
-    T.Right _ -> pure value
-    T.Left _ -> do
-      auditLiveScopeState label value
-      frozen <- right (label ++ " independent frozen scope reconstruction") (FS.prepare graph)
-      case frozen of
-        T.Solver _ _ _ (T.ScopeIndex frozenIntervals frozenJumps) -> do
-          assert (label ++ " exact frozen intervals") (sameMapPhysical (==) intervals frozenIntervals)
-          assert (label ++ " exact retained frozen jump prefix")
-            (length jumps < length frozenJumps && and (zipWith (sameMapPhysical (==)) jumps frozenJumps))
-          pure (T.Solver graph parents bindings (T.ScopeIndex intervals (jumps ++ drop (length jumps) frozenJumps)))
-
-frozenScopeComparison :: String -> T.Solver -> T.Solver -> IO (T.Solver, T.Solver)
-frozenScopeComparison label old@(T.Solver _ _ _ a) new@(T.Solver _ _ _ b)
-  | sameScopesPhysical a b = pure (old,new)
-  | otherwise = do
-      old' <- withFrozenScopeTail (label ++ " reference") old
-      new' <- withFrozenScopeTail (label ++ " actual") new
-      pure (old',new')
-
-'''
-
-
-def adapt_compact_scope_checks(H, directory):
-    """Extend test projections while retaining the prior staged and original bytes."""
-    ledger_path = directory / 'adaptations.json'
-    ledger = H.load(ledger_path)
-    session_header = 'checkSolver :: String -> Bool -> T.Solver -> T.Solver -> IO ()\n'
-    transaction_edits = {
-        'checkTransactional label old new = do\n':
-            'checkTransactional label rawOld rawNew = do\n'
-            '  O.auditLiveScopeState label rawNew\n'
-            '  old <- O.withFrozenScopeTail (label ++ " reference") rawOld\n'
-            '  new <- O.withFrozenScopeTail (label ++ " actual") rawNew\n'
-            '  checkHistoricalInputTransaction label old new\n\n'
-            '-- Low-level operations on an explicitly frozen input preserve that scope index.\n'
-            'checkHistoricalInputTransaction :: String -> T.Solver -> T.Solver -> IO ()\n'
-            'checkHistoricalInputTransaction label old new = do\n',
-        'checkTransactionalOutcome label expected actual = case (expected,actual) of\n':
-            'checkTransactionalOutcome = checkOutcomeWith checkTransactional\n\n'
-            'checkHistoricalInputOutcome :: String -> T.Either B.String T.Solver -> T.Either B.String T.Solver -> IO ()\n'
-            'checkHistoricalInputOutcome = checkOutcomeWith checkHistoricalInputTransaction\n\n'
-            'checkOutcomeWith :: (String -> T.Solver -> T.Solver -> IO ()) -> String -> T.Either B.String T.Solver -> T.Either B.String T.Solver -> IO ()\n'
-            'checkOutcomeWith compareSolvers label expected actual = case (expected,actual) of\n',
-        '(T.Right a,T.Right b) -> checkTransactional label a b':
-            '(T.Right a,T.Right b) -> compareSolvers label a b',
-    }
-    edits = {
-        'SessionOracle.hs': {
-            session_header: SCOPE_BRIDGE + session_header,
-            'checkSolver label physical old new=do\n':
-                'checkSolver label physical rawOld rawNew=do\n'
-                '  if physical then pure () else auditLiveScopeState label rawNew\n'
-                '  (old,new)<-frozenScopeComparison label rawOld rawNew\n',
-            '    _<-right (label++" frozen final index audit") (FS.finish new)\n':
-                '    forAudit<-withFrozenScopeTail label new\n'
-                '    _<-right (label++" frozen final index audit") (FS.finish forAudit)\n',
-        },
-        'SessionTests.hs': {
-            ' s<-N.openSession old\n':
-                ' s<-N.openSession(liveScopeInput old)\n',
-            ' initial<-right "literal prepare"(FS.prepare bottom)\n':
-                ' initial<-right "literal prepare"(FS.prepare bottom)\n'
-                ' checkScopeInputBridge initial\n',
-            '       s<-N.openSession initial\n       expansion<-':
-                '       s<-N.openSession(liveScopeInput initial)\n       expansion<-',
-            '       s<-N.openSession initial\n       probe<-':
-                '       s<-N.openSession(liveScopeInput initial)\n       probe<-',
-            '       s<-N.openSession before\n       expansion<-':
-                '       s<-N.openSession(liveScopeInput before)\n       expansion<-',
-            '       s<-N.openSession before\n       expanded<-':
-                '       s<-N.openSession(liveScopeInput before)\n       expanded<-',
-            '     answer=P.runST $ do\n      s<-N.openSession forged\n':
-                '     compactForged=T.Solver(S.graph forged)(S.structuralParents forged)(S.bindingChildren forged)(S.scopeIndex(liveScopeInput good))\n'
-                '     answer=P.runST $ do\n      s<-N.openSession compactForged\n',
-            ' let final=P.runST $ do s<-N.openSession forged;N.finishNormalized s\n':
-                ' let final=P.runST $ do s<-N.openSession compactForged;N.finishNormalized s\n',
-            'literalControls :: IO ()\n':
-                'checkScopeInputBridge :: T.Solver -> IO ()\n'
-                'checkScopeInputBridge original@(T.Solver graph parents bindings (T.ScopeIndex intervals jumps))=do\n'
-                ' assert "literal historical scope tail is not valid live input"(case S.finish original of T.Left _->True;T.Right _->False)\n'
-                ' forM_ [IM.insert 0 (0,0) intervals,IM.insert 999 (0,0) intervals] $ \\invalid->\n'
-                '  assert "scope input bridge refuses invalid intervals"(case compactHistoricalScopeInput(T.Solver graph parents bindings (T.ScopeIndex invalid jumps)) of Nothing->True;Just _->False)\n'
-                '\n'
-                'literalControls :: IO ()\n',
-        },
-        'AdmissionTests.hs': {
-            '    O.assert (label ++ "/hand scope jumps") (map O.mapEntries actualJumps == jumps)\n':
-                '    let T.ScopeIndex frozenIntervals frozenJumps = S.scopeIndex old\n'
-                '    O.assert (label ++ "/hand full frozen scope intervals") (O.mapEntries frozenIntervals == intervals)\n'
-                '    O.assert (label ++ "/hand scope jumps") (map O.mapEntries frozenJumps == jumps)\n'
-                '    -- The authored scope forests all have depth at most one. Their\n'
-                '    -- first authored map is the complete live prefix, independently\n'
-                '    -- of how many maps either run returns; actual was raw-audited above.\n'
-                '    O.assert (label ++ "/hand live compact scope jumps") (map O.mapEntries actualJumps == take 1 jumps)\n'
-                '    if length jumps > 1 then do\n'
-                '      let wider = T.Solver actualGraph actualParents actualBinders (T.ScopeIndex actualIntervals frozenJumps)\n'
-                '      O.assert (label ++ "/raw live audit rejects a redundant scope tail")\n'
-                '        (case S.finish wider of\n'
-                '          T.Left message -> B.unpack message == "incremental graph index disagrees with the graph"\n'
-                '          T.Right _ -> False)\n'
-                '    else pure ()\n',
-        },
-        'TransactionOracle.hs': transaction_edits,
-        'C4TransactionOracle.hs': transaction_edits,
-        'C4TransactionControls.hs': {
-            'checkTransactionalOutcome "canonical/filter/missing equation first error"':
-                'checkHistoricalInputOutcome "canonical/filter/missing equation first error"',
-            'checkTransactionalOutcome "direct complete Graph history restoration"':
-                'checkHistoricalInputOutcome "direct complete Graph history restoration"',
-            'checkTransactionalOutcome "restore inverse escaped alias exact rejection"':
-                'checkHistoricalInputOutcome "restore inverse escaped alias exact rejection"',
-        },
-    }
-    adapted = set()
-    for entry in ledger['changes']:
-        path = Path(entry['adapted'])
-        if path.name not in edits:
-            continue
-        H.require(path == directory / path.name and path.name not in adapted, 'unique scope projection ' + path.name)
-        H.require(H.sha(path) == entry['adapted_sha256'], 'exact prior scope projection ' + path.name)
-        original = Path(entry['source'])
-        H.require(H.sha(original) == entry['source_sha256'], 'unchanged frozen scope control ' + path.name)
-        before = path.read_text()
-        after = before
-        for old, new in edits[path.name].items():
-            H.require(after.count(old) == 1, 'exact scope bridge anchor ' + path.name)
-            after = after.replace(old, new, 1)
-        raw = original.read_text()
-        for basis, suffix in ((raw, '.ndiff'), (before, '.scope.ndiff')):
-            delta = list(difflib.ndiff(basis.splitlines(keepends=True), after.splitlines(keepends=True)))
-            H.require(''.join(difflib.restore(delta, 1)) == basis and
-                      ''.join(difflib.restore(delta, 2)) == after, 'reversible scope projection ' + path.name)
-            (directory / (path.name + suffix)).write_text(''.join(delta))
-        entry['scope_bridge_preimage_sha256'] = entry['adapted_sha256']
-        path.write_text(after)
-        entry['adapted_sha256'] = H.sha(path)
-        adapted.add(path.name)
-    H.require(adapted == set(edits), 'complete scope projection inventory')
-    H.save(ledger_path, ledger)
-
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
@@ -210,7 +36,7 @@ def main():
     for suite in ([a.suite] if a.suite else SUITES):
         labels.extend(SUITES[suite])
         if suite == 'graph':
-            inventory = json.loads((ROOT/'tools/performance/a1-private-index/controls/manifest.json').read_text())
+            inventory = json.loads(GRAPH_EXPECTATIONS.read_text())
             labels.extend('private-'+row['name'] for row in inventory['negative_cases'])
     exact = select(PREFIX, labels)
     planned = [exact] if exact is not None else labels
@@ -226,92 +52,27 @@ def main():
     record={'complete':False,'suite':a.suite,'performance_measured':False,
             'ABI_migration':'Haskell Int64 arithmetic; Patricia public collection representation',
             'historical_unbounded_or_BST_contract_claimed':False,'checks':[],'planned_checks':planned,
-            'driver_inputs':{str(p):H.sha(p) for p in [Path(__file__),HERE/'adapt_oracles.py',HERE/'legacy_controls.py',HERE/'legacy-controls-pins.json',hp,ROOT/'tools/performance/c4-local-transaction/contracts.py',ROOT/'tools/testing/receipt_selection.py']}}
+            'driver_inputs':{str(p):H.sha(p) for p in [Path(__file__),HERE/'adapt_oracles.py',HERE/'legacy_controls.py',HERE/'frozen_oracles.py',HERE/'runtime_sources.py',hp,ROOT/'tools/performance/c4-local-transaction/contracts.py',ROOT/'tools/testing/receipt_selection.py']}}
     save=lambda:H.save(out/'receipt.json',record)
     save()
     try:
         with H.SerialLock(ROOT/'.mlf-build'):
             auth=H.authenticate(producer,source)
-            M=H.module(HERE/'source_migration.py','binary_source_migration')
-            binary=M.binary_contract(source)
-            binary.require_registry({name:row['sha256'] for name,row in auth['shared_inputs'].items()},'current')
-            binary.live_registry(source);binary.live_host_inventory(source)
-            for path in [HERE/'source_migration.py',
-                         *[binary.directory / name for name in binary.metadata_paths]]:
-                record['driver_inputs'][str(path)]=H.sha(path)
             record['producer_receipt_sha256']=H.sha(producer/'receipt.json')
             if a.suite in ['graph','validation']:
                 A=H.module(HERE/'adapt_oracles.py','adapter')
                 C=H.module(ROOT/'tools/performance/c4-local-transaction/contracts.py','contracts')
-                c4=ROOT/'tools/performance/c4-local-transaction'
-                H.require(H.sha(c4/'manifest.json')=='11aa01a0e00a964c8a97f1f1f4b04490e80dd1691f355de8e226942085808bb4','fixed C4 oracle manifest')
-                manifest=H.load(c4/'manifest.json');C.verify_oracles(c4,manifest,None)
-                for name,digest in manifest['pins'].items():
-                    if name.startswith(('controls/','entrypoints/')):H.require(H.sha(c4/name)==digest,'frozen C4 control '+name)
-                old=ROOT/'tools/performance/a1-private-index/controls'
-                H.require(H.sha(old/'manifest.json')=='646d48bbf94d41e9b29aca5f357a35f1b078e60c7b12ad51441fdaab970d5029','fixed A1 oracle manifest')
-                a1=H.load(old/'manifest.json')
-                for name,digest in a1['files'].items():H.require(H.sha(old/name)==digest,'frozen A1 control '+name)
-                A.prepare(source,out/'source')
-                adapt_compact_scope_checks(H, out/'source')
-                for name in ['OracleTypes.hs','PatriciaOracleControls.hs']:
-                    current_control = HERE / name
-                    record['driver_inputs'][str(current_control)] = H.sha(current_control)
-                    shutil.copy2(current_control, out/'source'/name)
+                expectations=H.load(GRAPH_EXPECTATIONS)
+                record['driver_inputs'][str(GRAPH_EXPECTATIONS)]=H.sha(GRAPH_EXPECTATIONS)
+                record['control_inputs']=A.prepare(ROOT,out/'source',source_root=source)
                 modules=GRAPH_MODULES
                 if a.suite=='validation':
-                    V=H.module(ROOT/'tools/performance/validation-reuse/source_contract.py','validation_contract')
-                    raw=(source/V.OWNER).read_bytes()
-                    # Source-proof inverse only; V1SessionUnderTest keeps raw binary source.
-                    collection_source=A.project_binary_owner(raw, source)
-                    if b'Source.prepareGroupOwned' in collection_source:
-                        sparse_path=ROOT/'tools/performance/sparse-contracts/source_contract.py'
-                        for path in [sparse_path,sparse_path.with_name('session-delta.json')]:
-                            record['driver_inputs'][str(path)]=H.sha(path)
-                        collection_source=A.without_sparse_contracts(collection_source)
-                        record['sparse_contracts_driver_projection']='Exact combined sparse and owned session delta inverted for source proof; runtime candidate remains unprojected.'
-                    if b'runSourceGroupsWithOwnedContracts' in collection_source:
-                        contract_path=ROOT/'tools/performance/contract-context/source_contract.py'
-                        for path in [contract_path,contract_path.with_name('session-delta.json')]:
-                            record['driver_inputs'][str(path)]=H.sha(path)
-                        Q=H.module(contract_path,'contract_context_contract')
-                        collection_source=Q.restore_previous_owner(collection_source)
-                    if b'runSourceGroupsWithContext' in collection_source:
-                        datatype_contract=ROOT/'tools/performance/datatype-context/source_contract.py'
-                        for path in [datatype_contract,datatype_contract.with_name('session-delta.json')]:
-                            record['driver_inputs'][str(path)]=H.sha(path)
-                        Q=H.module(datatype_contract,'datatype_context_contract')
-                        collection_source=Q.restore_previous_owner(collection_source)
-                        record['datatype_context_driver_projection']='Exact four reviewed driver edits inverted for the retained source proof; runtime candidate remains unprojected.'
-                    rank_view=b'Rank.MapIndex Node' in raw
-                    collection_source=A.without_rank_view(collection_source) if rank_view else collection_source
-                    H.require(collection_source.count(b'IntMapTree Node')==3,'three collection representation type signatures')
-                    historical=collection_source.replace(b'IntMapTree Node',b'Map Int Node')
-                    previous=V.restore_previous_owner(historical).replace(b'Map Int Node',b'IntMapTree Node')
-                    if rank_view:previous=A.with_rank_view(previous)
-                    constraint = (source/V.CONSTRAINT).read_bytes()
-                    prior = binary.restore_path(constraint, V.CONSTRAINT)
-                    H.require(hashlib.sha256(prior).hexdigest()==V.CONSTRAINT_SHA,'exact historical generated constraint owner')
-                    record['validation_constraint']={'live_sha256':hashlib.sha256(constraint).hexdigest(),
-                        'projected_historical_sha256':V.CONSTRAINT_SHA}
-                    for name,data in [('V1FrozenSession',previous),('V1SessionUnderTest',raw)]:
-                        old_header=(A.LIVE_SESSION_HEADER.encode() if name=='V1SessionUnderTest' else
-                                    b'module Bootstrap.CrateSession (compileSpecFile) where {')
-                        new_header=('module '+name+' where {').encode()
-                        H.require(data.count(old_header)==1,'one private session header')
-                        changed=data.replace(old_header,new_header)
-                        H.require(changed.replace(new_header,old_header)==data,'private export-only inverse')
-                        (out/'source'/(name+'.hs')).write_bytes(changed)
-                    control=ROOT/'tools/performance/validation-reuse/BoundaryControls.hs'
-                    pins=H.load(HERE/'legacy-controls-pins.json')['files']
-                    H.require(H.sha(control)==pins[str(control.relative_to(ROOT))],'frozen boundary cases')
-                    (out/'source'/'BoundaryControls.hs').write_text(control.read_text().replace('module Main where','module BoundaryControls where'))
+                    record['control_inputs'].update(A.prepare_validation(ROOT,out/'source',source_root=source))
+                    record['validation_reference']='fixed pre-optimization oracle; current session authenticated by producer receipt'
                     modules=['BoundaryControls']
             elif a.suite=='builtin':
                 (out/'source').mkdir()
                 control=ROOT/'tools/performance/a1-private-index/current/CurrentBuiltinControls.hs'
-                pins=H.load(HERE/'legacy-controls-pins.json')['files']
-                H.require(H.sha(control)==pins[str(control.relative_to(ROOT))],'original builtin malformed controls')
                 shutil.copy2(control,out/'source'/control.name)
                 binary_control=ROOT/'tools/performance/artifact-binary/BinaryBuiltinControls.hs'
                 record['driver_inputs'][str(binary_control)]=H.sha(binary_control)
@@ -337,16 +98,11 @@ def main():
                     H.require(crc==fields[17],'independent binary builtin CRC '+suffix)
                     record['binary_builtin_wire'][suffix]={'schema':schema,'bytes':len(raw),'crc32':crc,'sha256':H.sha(str(builtin)+suffix)}
                 modules=['BinaryBuiltinControls']
-            else:modules,_=prepare(ROOT,out/'source',a.suite)
+            else:
+                modules,record['control_inputs']=prepare(ROOT,out/'source',a.suite)
             objects=out/'objects';shutil.copytree(producer/'objects',objects)
             original=H.file_pins(objects);record['control_sources']=H.file_pins(out/'source')
-            ledger=out/'source/adaptations.json'
-            if ledger.exists():
-                record['original_control_inputs']={row['source']:row['source_sha256'] for row in H.load(ledger)['changes']}
-                H.check_pins(record['original_control_inputs'])
-                if a.suite in ['graph','validation']:
-                    for path,digest in record['original_control_inputs'].items():
-                        H.require(H.sha(ROOT/Path(path).relative_to(source))==digest,'copied control/source matches reviewed checkout')
+            H.check_pins(record.get('control_inputs',{}))
             flags=[]
             for token in auth['flags']:
                 flags.append(str(objects) if token==str(producer/'objects') else token)
@@ -380,7 +136,6 @@ def main():
                     record['builtin_controls']={'legacy_frozen_rejections':7,'binary_rejections':5,'original_default_files_remain_binary':True}
                     record['builtin_witness_pins']={str(builtin)+suffix:H.sha(str(builtin)+suffix) for suffix in ['.explicit-legacy.mlfci','.explicit-legacy.mlfco','.binary-negative-version','.binary-negative-crc','.binary-negative-pairing']}
                 if module=='BoundaryControls':H.require(stdout==b'PASS validation reuse: 20 authored programs, raw solver states, skeleton demand, 3 raw rejections, 4 partial-value orders\n','retained validation reuse boundary inventory')
-                if module=='BalanceControls':H.require(stdout==b'Balance controls: 24649 raw-shape pairs; 400 mutation steps; 30 independent demand/order cases passed\n','complete Map balance inventory')
                 if module=='PublicControls':record['public']=C.public_result(stdout,stderr)
                 if module=='C4TransactionControls':
                     summary=json.loads(stdout.decode().splitlines()[-1]);expected=dict(C.TRANSACTION)
@@ -389,21 +144,17 @@ def main():
                     C.exact_fields(summary,expected)
                     H.require(sum(s.startswith('PASS ') for s in stdout.decode().splitlines())==9,'nine retained transaction groups')
                     record['transaction']=summary
-                if module=='SessionTests':H.require(stdout==a1['expected_stdout'].encode(),'all original session cases')
-                if module=='AdmissionTests':H.require(stdout==a1['admission_expected_stdout'].encode(),'all original admission cases')
+                if module=='SessionTests':H.require(stdout==expectations['session_stdout'].encode(),'all original session cases')
+                if module=='AdmissionTests':H.require(stdout==expectations['admission_stdout'].encode(),'all original admission cases')
                 if module=='HeteroinputControls':
-                    migrated=json.loads(json.dumps(manifest))
-                    for fixture in migrated['authored_matrix_fixtures']:
-                        fixture['label']=fixture['label'].replace('beyond-machine-Integer-identities','wide-signed-Int64-identities')
-                    migrated['matrix']['coordinates'][2][1]=str(-(2**60))
-                    record['heteroinput']=C.heteroinput_result(stdout,stderr,migrated)
-                    record['heteroinput_coordinate_migration']={'old':str(-(10**40)),'new':str(-(2**60)),'stride':7,'all_216_cases_retained':True}
+                    record['heteroinput']=C.heteroinput_result(stdout,stderr,expectations)
 
                 record['checks'].append(module);save()
             if a.suite in ['graph','validation']:
                 negatives=[]
                 if a.suite=='graph':
-                    negatives=[(row['name'],old/row['source'],row['required_error_fragments'],row['expected_error_count']) for row in a1['negative_cases']]
+                    negatives=[(row['name'],ROOT/row['source'],row['required_error_fragments'],row['expected_error_count']) for row in expectations['negative_cases']]
+                    record['control_inputs'].update({str(path):H.sha(path) for _,path,_,_ in negatives})
                 else:
                     for name in VALIDATION_NEGATIVES:
                         if 'private-'+name not in planned:
@@ -420,7 +171,7 @@ def main():
                     record['checks'].append('private-'+name)
             changed=[p for p,digest in original.items() if Path(p).name not in ['Main.o','Main.hi'] and H.sha(p)!=digest]
             H.require(not changed,'ordinary production objects unchanged: '+str(changed))
-            H.check_pins(record['driver_inputs']);H.check_pins(record.get('original_control_inputs',{}));H.check_pins(record.get('builtin_pins',{}));H.check_pins(record.get('builtin_witness_pins',{}))
+            H.check_pins(record['driver_inputs']);H.check_pins(record.get('control_inputs',{}));H.check_pins(record.get('builtin_pins',{}));H.check_pins(record.get('builtin_witness_pins',{}))
             H.check_pins(record['control_sources']);H.require(H.authenticate(producer,source)==auth,'producer unchanged')
             record.update(complete=True,ordinary_production_objects_unchanged=True);save()
     except BaseException as e:record['error']=repr(e);save();raise

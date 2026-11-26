@@ -60,27 +60,14 @@ candidate initial actions = P.runST $ do
           snapshot<-C.freezeSession next
           go next (snapshot:saved) rest
 
--- The live scope index stops at the deepest scope. The frozen audit expects
--- the additional jump levels based on the total scope count.
-withFrozenScopeTail :: String -> T.Solver -> IO T.Solver
-withFrozenScopeTail label live@(T.Solver graph parents bindings (T.ScopeIndex intervals jumps)) = do
-  _ <- O.right (label++" live index audit") (S.finish live)
-  frozen <- O.right (label++" frozen scope reconstruction") (FS.prepare graph)
-  case frozen of
-    T.Solver _ _ _ (T.ScopeIndex frozenIntervals frozenJumps) -> do
-      O.assert (label++" exact frozen intervals") (O.sameMapPhysical (==) intervals frozenIntervals)
-      O.assert (label++" exact frozen jump prefix")
-        (length jumps <= length frozenJumps && and (zipWith (O.sameMapPhysical (==)) jumps frozenJumps))
-      let extended = T.ScopeIndex intervals (jumps ++ drop (length jumps) frozenJumps)
-      pure (T.Solver graph parents bindings extended)
-
 compareTrace label (Trace old a failedOld) (Trace new b failedNew)=do
   O.assert (label++" snapshot count") (length old==length new)
   forM_ (zip old new) $ \(x,y)->do
     O.checkSolver (label++" full physical graph/index/scope snapshot") True x y
-    frozenOld <- withFrozenScopeTail (label++" legacy snapshot") x
-    frozenNew <- withFrozenScopeTail (label++" candidate snapshot") y
-    O.checkSolver (label++" independent reverse-edge and frozen validation") False frozenOld frozenNew
+    O.auditLiveScopeState (label++" legacy snapshot") x
+    frozenOld <- O.withFrozenScopeTail (label++" legacy snapshot") x
+    _ <- O.right (label++" independent legacy scope audit") (FS.finish frozenOld)
+    O.checkSolver (label++" independent reverse-edge and frozen validation") False x y
   O.checkOutcome (label++" exact outcome/first error") True a b
   case (failedOld,failedNew) of
     (Nothing,Nothing)->pure()

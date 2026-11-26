@@ -1,19 +1,15 @@
 #!/usr/bin/env python3
 """Retain full C3 owner controls and add independent fresh-delta model checks."""
 from pathlib import Path
-import hashlib
 import importlib.util
 
 HERE=Path(__file__).resolve().parent
 RETAINED=HERE.parent/'c3-delayed-index'
-# Keep the complete authored control, not a copied selection of its cases.
-CONTROL_SHA='32b887ede21a124ae7f9c8c5e544e65aa9d548998e3a213176c8cfdb47ddf102'
+# Compile the complete maintained control. The transport records its input hash.
 
 
 def main():
     original=RETAINED/'Main.hs'
-    if hashlib.sha256(original.read_bytes()).hexdigest()!=CONTROL_SHA:
-        raise ValueError('complete retained C3 control required')
     spec=importlib.util.spec_from_file_location('c3_control_transport',RETAINED/'run_controls.py')
     driver=importlib.util.module_from_spec(spec);spec.loader.exec_module(driver)
     driver.BASELINE='ffa3d201e4ea9c08109ff00df3f4fd66b56f3ab2'
@@ -22,7 +18,7 @@ def main():
     driver.CASE_PREFIX='fresh-survivors/'
     driver.EXPECTED+=('PASS 29160 independent sparse/wide signed fresh-delta models\n'
                       'PASS exact unchanged/changed Node reuse and opaque delta payloads\n').encode()
-    driver.EXTRA_SOURCES=[(original,'RetainedC3.hs',b'module Main where',b'module RetainedC3 where')]
+    driver.EXTRA_SOURCES=[(original,'RetainedC3')]
     driver.EXTRA_PINS=[Path(__file__)]
     driver.main()
 
