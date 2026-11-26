@@ -816,6 +816,19 @@ work tree = case tree of {{
 }};
 '''
         expression = 'case core (Branch (Leaf x) x) of { Done a -> a }'
+    elif family == 'quotient_let_chain':
+        declarations = ''
+        expression = 'addInt x q' + str(n)
+        for i in reversed(range(1, n + 1)):
+            expression = f'let {{ q{i} = quotInt q{i-1} q{i-1} }} in {expression}'
+        expression = f'let {{ q0 = if eqInt x 0 then 1 else x }} in {expression}'
+    elif family == 'wide_equation_rows':
+        params = ' '.join(f'p{i}' for i in range(n))
+        declarations = (f"pick :: {'Int -> ' * n}Bool -> Int;\n"
+                        f'pick {params} True = p0;\n'
+                        f'pick {params} False = p{n-1};\n')
+        args = ' '.join(f'(addInt x {i})' for i in range(n))
+        expression = f'pick {args} (ltInt x 0)'
     elif family in ('shared_callback_let_chain', 'queued_callback_let_chain'):
         bindings = []
         previous = 'x'
@@ -1285,6 +1298,10 @@ def expected(family, n, x):
         if x < 0 or x >= n:
             return -99
         return -11 if x == 0 else (x + 2) * (x + 1) + 2 * x - 1
+    if family == 'quotient_let_chain':
+        return x + 1
+    if family == 'wide_equation_rows':
+        return x if x < 0 else x + n - 1
     if family == 'shared_callback_let_chain':
         computed = max(0, min(n, x+1))
         magnitude = abs(x) * pow(abs(x+2), computed, 251) * pow(abs(x+1), n-computed, 251) % 251

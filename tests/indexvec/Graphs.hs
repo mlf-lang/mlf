@@ -2351,6 +2351,34 @@ lambdaCaptureChecks = do
   check "deep lambda captures only the external name" [99999]
     (case chain of T.XEAbs n b -> ids (Analysis.lambdaNeeded M.empty table n b); _ -> [])
 
+letEntryChecks = do
+  let name i = T.XName i "same"
+      var = T.XEVar . name
+      prim p args = foldl T.XEApp (T.XEPrimitive p) args
+      bind i = T.XELet (name i)
+      pair a b = prim T.PAddInt [a,b]
+      divide a b = prim T.PQuotInt [a,b]
+      worker = Analysis.WorkerFunction [name 7] (var 7) [name 2] S.empty
+        (Analysis.EntryDemand [name 2,name 7] False)
+      workers = M.singleton (name 99) worker
+      rhs = [var 1,var 2,pair (var 4) (var 1),divide (var 1) (var 3),
+             T.XEApp (var 99) (var 1),T.XEAbs (name 1) (var 1)]
+      ends = [pair (var 1) (pair (var 2) (var 4)),pair (var 2) (var 1),
+              T.XEApp (var 99) (var 1),T.XEApp (var 11) (var 2),
+              T.XECase (var 1) [T.XErasedAlternative (T.XDefaultPattern (T.Just (name 2))) (var 2)],
+              T.XECase (var 2) [],T.XELetRec [(name 1,var 1)] (var 1)]
+      prefix d = (map Optimize.nameId (Analysis.demandNames d), Analysis.demandComplete d)
+      verify term (Analysis.LetDemands entry rest) = do
+        check "lexical let summary preserves first-force order and barriers"
+          (prefix (Analysis.entryDemand workers M.empty term)) (prefix entry)
+        case (term,rest) of
+          (T.XELet _ _ body,T.Just next) -> verify body next
+          (T.XELet _ _ _,_) -> fail "missing lexical let suffix"
+          (_,T.Nothing) -> pure ()
+          _ -> fail "unexpected lexical let suffix"
+  forM_ [bind 1 a (bind inner b end) | a <- rhs, b <- rhs, inner <- [1,2,99], end <- ends] $
+    \term -> verify term (Analysis.letBodyDemands workers term)
+
 recursiveArgumentChecks = do
   env <- case Data.validateDeclarations [] of
     T.Right ok -> pure ok
@@ -3029,6 +3057,15 @@ loweringChecks = do
     check "surface-core admission" eligible (Surface.surfaceCore e)
     check "surface lowering agrees with the fresh-name traversal" (result (ordinary e))
       (result (Surface.lowerExpressionWithData env e))
+
+  let patterns = [T.SAsPattern "first" (T.SIntPattern 7), T.SLazyPattern bind]
+      row = Surface.MatchRow patterns (T.SVar "result") 3
+  case Fresh.runFresh [] (Surface.normalizeRow env [T.SVar "left",T.SVar "right"] row) of
+    T.Right (Surface.MatchRow [T.SIntPattern 7,T.SDefaultPattern T.Nothing] body 3) ->
+      check "row binders keep their column values and left-to-right wrapping order"
+        (result (T.Right (T.SLet "x" (T.SVar "right")
+          (T.SLet "first" (T.SVar "left") (T.SVar "result"))))) (result (T.Right body))
+    _ -> fail "row normalization changed the pattern columns"
 
 lexicalRunChecks = do
   let cursor (Lexer.Cursor i l c) = (i,l,c)
@@ -4344,6 +4381,7 @@ main = do
   continuationPipelineChecks
   singleActionChecks
   lambdaCaptureChecks
+  letEntryChecks
   constructorSubstitutionChecks
   openGeometryChecks
   factoredCallChecks

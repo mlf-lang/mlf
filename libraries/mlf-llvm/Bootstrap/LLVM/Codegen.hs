@@ -433,13 +433,12 @@ module Bootstrap.LLVM.Codegen where {
     result ("insertvalue " ++ (resultType ++ (" " ++ (first ++ (", ptr " ++ (payload ++ ", 1"))))))
   };
   evaluateResult :: Map XName CGBinding -> XErased -> Build String;
-  evaluateResult scope expression = case expression of {
+  evaluateResult = evaluateResultWithDemands Nothing;
+  evaluateResultWithDemands demands scope expression = case expression of {
     XELet n rhs body -> do {
       fs <- gets functions;
       if M.member O.compareName n fs then evaluateResult scope body else do {
-        strict <- letDemanded scope n body;
-        value <- if strict then evaluate scope rhs else thunk scope rhs;
-        evaluateResult (M.insert O.compareName n (CGBinding value strict) scope) body
+        emitDemandedLet demands fs scope n rhs body evaluateResultWithDemands
       }
     };
     XECase subject alternatives -> evaluateCaseTyped resultType evaluateResult scope subject alternatives;
@@ -769,20 +768,21 @@ module Bootstrap.LLVM.Codegen where {
   -- never addresses in the caller's frame. Only equal all-pointer ABIs qualify.
   -- Keep specialized entry selection, operand demand order and outlining rules.
   finishOrdinary :: Int -> Map XName CGBinding -> XErased -> Build ();
-  finishOrdinary arity scope expression = do {
+  finishOrdinary arity = finishOrdinaryWithDemands arity Nothing;
+  finishOrdinaryWithDemands arity demands scope expression = do {
     prior <- gets emittedCount;
     if O.remainingSize 128 expression < 0 && prior >= 4097 then do {
       value <- evaluate scope expression;
       emit ("  ret ptr " ++ value)
-    } else finishOrdinaryBody arity scope expression
+    } else finishOrdinaryBody arity demands scope expression
   };
   finishOrdinaryValue :: Map XName CGBinding -> XErased -> Build ();
   finishOrdinaryValue scope expression = do {
     value <- evaluateBody scope expression;
     emit ("  ret ptr " ++ value)
   };
-  finishOrdinaryBody :: Int -> Map XName CGBinding -> XErased -> Build ();
-  finishOrdinaryBody arity scope expression = case expression of {
+  finishOrdinaryBody :: Int -> Maybe A.LetDemands -> Map XName CGBinding -> XErased -> Build ();
+  finishOrdinaryBody arity demands scope expression = case expression of {
     XELet n rhs body -> do {
       fs <- gets functions;
       if M.member O.compareName n fs then finishOrdinary arity scope body else do {
@@ -793,9 +793,7 @@ module Bootstrap.LLVM.Codegen where {
             emit ("  ret ptr " ++ value)
           };
           Nothing -> do {
-            strict <- letDemanded scope n body;
-            value <- if strict then evaluate scope rhs else thunk scope rhs;
-            finishOrdinary arity (M.insert O.compareName n (CGBinding value strict) scope) body
+            emitDemandedLet demands fs scope n rhs body (finishOrdinaryWithDemands arity)
           }
         }
       }
@@ -1277,15 +1275,18 @@ module Bootstrap.LLVM.Codegen where {
       else if readyName scope known first then nextDemandIs scope known binder rest
       else False
   };
-  letDemanded :: Map XName CGBinding -> XName -> XErased -> Build Bool;
-  letDemanded scope binder body = do {
-    fs <- gets functions;
+  emitDemandedLet :: forall a. Maybe A.LetDemands -> Map XName A.WorkerFunction ->
+    Map XName CGBinding -> XName -> XErased -> XErased ->
+    (Maybe A.LetDemands -> Map XName CGBinding -> XErased -> Build a) -> Build a;
+  emitDemandedLet pending fs scope binder rhs body continue = let {
+    demands = case pending of { Just saved -> saved; Nothing -> A.letBodyDemands fs body }
+  } in case demands of { A.LetDemands entry rest -> do {
     known <- gets forcedValues;
-    -- Entry prefixes already stop at semantic barriers. Skip only earlier
-    -- forces that have succeeded on this dominating path; missing bindings
-    -- and facts from sibling branches cannot justify advancing the demand.
-    cgPure (nextDemandIs scope known binder (A.demandNames (A.entryDemand fs M.empty body)))
-  };
+    -- Skip only earlier forces that succeeded on this dominating path.
+    let { strict = nextDemandIs scope known binder (A.demandNames entry) };
+    value <- if strict then evaluate scope rhs else thunk scope rhs;
+    continue rest (M.insert O.compareName binder (CGBinding value strict) scope) body
+  } };
   thunk :: Map XName CGBinding -> XErased -> Build String;
   thunk scope expression =
     case expression of {
@@ -1327,7 +1328,8 @@ module Bootstrap.LLVM.Codegen where {
   -- the helper, and capture values so demand order and escaping closures stay
   -- unchanged. Both the expression and instruction scans are bounded.
   evaluate = evaluateSkippingCases 0;
-  evaluateSkippingCases skipped scope expression = do {
+  evaluateSkippingCases skipped = evaluateWithDemands skipped Nothing;
+  evaluateWithDemands skipped demands scope expression = do {
     prior <- gets emittedCount;
     if O.remainingSize 128 expression < 0 && prior >= 4097 then do {
       fs <- gets functions;
@@ -1335,18 +1337,18 @@ module Bootstrap.LLVM.Codegen where {
       -- Loading an oversized environment could itself cross the instruction
       -- budget and re-outline the same expression indefinitely. Descend in the
       -- current function until the required capture set is small enough.
-      if L.length names > 1024 then evaluateBodySkippingCases skipped scope expression else do {
+      if L.length names > 1024 then evaluateBodySkippingCases skipped demands scope expression else do {
         -- The size guard also rules out callback interning. Keep the declined
         -- prefix when the ordinary instruction budget outlines this branch.
-        code <- callbackFreshWith (evaluateSkippingCases skipped) False names Nothing expression;
+        code <- callbackFreshWith (evaluateWithDemands skipped demands) False names Nothing expression;
         env <- environment scope names;
         call code (args2 (pointer env) "ptr null")
       }
-    } else evaluateBodySkippingCases skipped scope expression
+    } else evaluateBodySkippingCases skipped demands scope expression
   };
   evaluateBody :: Map XName CGBinding -> XErased -> Build String;
-  evaluateBody = evaluateBodySkippingCases 0;
-  evaluateBodySkippingCases skipped scope expression =
+  evaluateBody = evaluateBodySkippingCases 0 Nothing;
+  evaluateBodySkippingCases skipped demands scope expression =
     case expression of {
       XEVar n ->
         do {
@@ -1400,9 +1402,7 @@ module Bootstrap.LLVM.Codegen where {
             case recipePlan n plans of {
               Just info -> evaluateDeferredProducer info scope;
               Nothing -> do {
-                strict <- letDemanded scope n body;
-                value <- if strict then evaluate scope rhs else thunk scope rhs;
-                evaluate (M.insert O.compareName n (CGBinding value strict) scope) body
+                emitDemandedLet demands fs scope n rhs body (evaluateWithDemands 0)
               }
             }
           }
@@ -1817,17 +1817,18 @@ module Bootstrap.LLVM.Codegen where {
   -- Ordinary worker and let demands still produce the action description before
   -- execution. Bind results stay lazy, including results returned by helpers.
   executeST :: String -> Map XName CGBinding -> XErased -> Build String;
-  executeST fuel scope expression =
+  executeST fuel = executeSTWithDemands fuel Nothing;
+  executeSTWithDemands fuel demands scope expression =
     case expression of {
       XELet n rhs body ->
         case body of {
           XEApp (XEApp (XEPrimitive PSTBind) (XEVar use)) next ->
             if (O.eqName n use && L.not (S.member O.compareName n (O.free next)))
             then executeST fuel scope (XEApp (XEApp (XEPrimitive PSTBind) rhs) next)
-            else executeSTLet fuel scope n rhs body;
+            else executeSTLet fuel demands scope n rhs body;
           XEVar use ->
-            if O.eqName n use then executeST fuel scope rhs else executeSTLet fuel scope n rhs body;
-          _ -> executeSTLet fuel scope n rhs body
+            if O.eqName n use then executeST fuel scope rhs else executeSTLet fuel demands scope n rhs body;
+          _ -> executeSTLet fuel demands scope n rhs body
         };
       XELetRec bindings body ->
         do {
@@ -1999,22 +2000,19 @@ module Bootstrap.LLVM.Codegen where {
     };
   -- Single-use action aliases remain in the execution context above; ordinary
   -- values retain the same demand and sharing rules as ordinary code generation.
-  executeSTLet :: String -> Map XName CGBinding -> XName -> XErased -> XErased -> Build String;
-  executeSTLet fuel scope n rhs body =
+  executeSTLet :: String -> Maybe A.LetDemands -> Map XName CGBinding -> XName -> XErased -> XErased -> Build String;
+  executeSTLet fuel demands scope n rhs body =
     do {
       fs <- gets functions;
       if M.member O.compareName n fs
       then executeST fuel scope body
-      else do {
-             strict <- letDemanded scope n body;
-             value <- if strict then evaluate scope rhs else thunk scope rhs;
-             executeST fuel (M.insert O.compareName n (CGBinding value strict) scope) body
-           }
+      else emitDemandedLet demands fs scope n rhs body (executeSTWithDemands fuel)
     };
   -- Tail transfers preserve the current frame's budget. Only equal worker
   -- signatures use musttail; non-tail calls still consume bounded fuel.
   executeSTTail :: Int -> String -> String -> Map XName CGBinding -> XErased -> Build ();
-  executeSTTail arity tailFuel fuel scope expression =
+  executeSTTail arity tailFuel fuel = executeSTTailWithDemands arity tailFuel fuel Nothing;
+  executeSTTailWithDemands arity tailFuel fuel demands scope expression =
     case expression of {
       XELet n rhs body ->
         case body of {
@@ -2022,12 +2020,12 @@ module Bootstrap.LLVM.Codegen where {
             if (O.eqName n use && L.not (S.member O.compareName n (O.free next)))
             then executeSTTail arity tailFuel fuel scope
                    (XEApp (XEApp (XEPrimitive PSTBind) rhs) next)
-            else executeSTTailLet arity tailFuel fuel scope n rhs body;
+            else executeSTTailLet arity tailFuel fuel demands scope n rhs body;
           XEVar use ->
             if O.eqName n use
             then executeSTTail arity tailFuel fuel scope rhs
-            else executeSTTailLet arity tailFuel fuel scope n rhs body;
-          _ -> executeSTTailLet arity tailFuel fuel scope n rhs body
+            else executeSTTailLet arity tailFuel fuel demands scope n rhs body;
+          _ -> executeSTTailLet arity tailFuel fuel demands scope n rhs body
         };
       XELetRec bindings body ->
         do {
@@ -2081,19 +2079,13 @@ module Bootstrap.LLVM.Codegen where {
     };
   executeSTTailLet :: Int ->
                       String ->
-                      String -> Map XName CGBinding -> XName -> XErased -> XErased -> Build ();
-  executeSTTailLet arity tailFuel fuel scope n rhs body =
+                      String -> Maybe A.LetDemands -> Map XName CGBinding -> XName -> XErased -> XErased -> Build ();
+  executeSTTailLet arity tailFuel fuel demands scope n rhs body =
     do {
       fs <- gets functions;
       if M.member O.compareName n fs
       then executeSTTail arity tailFuel fuel scope body
-      else do {
-             strict <- letDemanded scope n body;
-             value <- if strict then evaluate scope rhs else thunk scope rhs;
-             executeSTTail arity tailFuel fuel
-               (M.insert O.compareName n (CGBinding value strict) scope)
-               body
-           }
+      else emitDemandedLet demands fs scope n rhs body (executeSTTailWithDemands arity tailFuel fuel)
     };
   finishST :: String -> Map XName CGBinding -> XErased -> Build ();
   finishST fuel scope expression =

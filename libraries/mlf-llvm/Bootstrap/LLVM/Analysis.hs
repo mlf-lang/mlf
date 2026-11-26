@@ -234,6 +234,25 @@ module Bootstrap.LLVM.Analysis where {
     if demandComplete first
     then EntryDemand (appendNames (demandNames first) (demandNames next)) (demandComplete next)
     else first;
+  -- Share summaries only along this lexical let spine. Each summary describes
+  -- its body with open names, independent of the emitter's current WHNF facts.
+  data LetDemands = LetDemands EntryDemand (Maybe LetDemands);
+  letBodyDemands :: Map XName WorkerFunction -> XErased -> LetDemands;
+  letBodyDemands fs term = case term of {
+    XELet binder rhs body -> let {
+      rest = letBodyDemands fs body;
+      entry = case rest of { LetDemands demand _ -> demand }
+    } in LetDemands (bindDemand binder (entryDemand fs M.empty rhs) entry) (Just rest);
+    _ -> LetDemands (entryDemand fs M.empty term) Nothing
+  };
+  -- Substitute at the first force. A partial RHS cuts off later forces,
+  -- and appendDemand removes repeated names shared with either neighbor.
+  bindDemand :: XName -> EntryDemand -> EntryDemand -> EntryDemand;
+  bindDemand binder rhs demand = case L.break (O.eqName binder) (demandNames demand) of {
+    (,) before ((:) _ after) ->
+      appendDemand (EntryDemand before True) (appendDemand rhs (EntryDemand after (demandComplete demand)));
+    _ -> demand
+  };
   entryDemand :: Map XName WorkerFunction -> Map XName EntryDemand -> XErased -> EntryDemand;
   entryDemand fs local expression = case expression of {
     XEVar name ->

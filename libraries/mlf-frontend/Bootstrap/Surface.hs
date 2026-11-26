@@ -529,9 +529,9 @@ module Bootstrap.Surface where {
     result <- foldM
       (\((,) done b) ((,) value pattern) -> do {
         normalized <- normalizePattern env value pattern b;
-        case normalized of { (,) p rhs -> freshPure ((,) (append done ((:) p [])) rhs) }
+        case normalized of { (,) p rhs -> freshPure ((,) ((:) p done) rhs) }
       }) ((,) [] body) (zip values patterns);
-    case result of { (,) ps b -> freshPure (MatchRow ps b rowIndex) }
+    case result of { (,) ps b -> freshPure (MatchRow (reverse ps) b rowIndex) }
   };
   normalizePattern :: DataEnv -> SExpr -> SPattern -> SExpr -> Fresh ((,) SPattern SExpr);
   normalizePattern env value pattern body = case pattern of {

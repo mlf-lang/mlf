@@ -60,6 +60,8 @@
     "mixed_parser_recursion": {"label": "Mixed-signature parser recursion", "default": false, "work": "n explicitly typed parser rules alternate with n inferred continuations in one recursive group, composing stateful parser operations at each step"},
     "polymorphic_tree_fold": {"label": "Inferred polymorphic tree folds", "default": false, "work": "one inferred binding with n calls to a polymorphic recursive tree fold through a two-leaf wrapper"},
     "deferred_constructor_spine": {"label": "Deferred constructor spine", "default": false, "work": "n nested constructor demands on a chain built lazily from runtime input, including a one-node-short branch"},
+    "quotient_let_chain": {"label": "Ordered quotient let demands", "default": false, "work": "n sequential lets each divide the preceding value by itself, ending in a runtime sum"},
+    "wide_equation_rows": {"label": "Wide equation rows", "default": false, "work": "two n-argument pattern rows discriminate on the final boolean and return opposite ends"},
     "shared_callback_let_chain": {"label": "Shared callback let chain", "default": false, "work": "n nested shared callbacks capture the preceding value twice and are called with an outer variable or a computed operand"},
     "queued_callback_let_chain": {"label": "Queued callback let chain", "default": false, "work": "n nested callbacks capture the preceding value once and permit delayed substitution into calls"},
     "ground_monadic_dictionary_uses": {"label": "Local helpers in a concrete monad", "default": false, "matched_zero": true, "work": "one concrete first action determines the shared monad of n generated binds and their local helpers"},
