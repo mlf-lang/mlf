@@ -400,7 +400,13 @@ class ModularControls(unittest.TestCase):
         self.bad_fixture(self.fixture.read_text().replace('  import MLF.Primitive;', '  import Missing.Module;'))
 
     def test_fixture_rejects_reduced_scope(self):
-        self.bad_fixture('module Main where {\n import MLF.Primitive;\n main = return ();\n}\n')
+        with tempfile.TemporaryDirectory() as d:
+            fixture = Path(d) / 'Main.hs'
+            fixture.write_text('module Main where {\n import MLF.Primitive;\n main = return ();\n}\n')
+            rows = M.native_source_closure(SOURCE, fixture, self.manifest)
+            self.assertEqual([row['module'] for row in rows], ['Main'])
+            with self.assertRaisesRegex(ValueError, '^native library coverage mismatch$'):
+                M.native_crate_plan(rows, Path(d), SOURCE)
 
     def complete_commands(self):
         return [{'name': name, 'state': 'passed',
