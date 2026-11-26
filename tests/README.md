@@ -622,3 +622,22 @@ read boundaries, binary data and filesystem errors, for both the selected host
 implementation and a forced portable implementation. On macOS the selected
 implementation uses CommonCrypto from the system library; other platforms retain
 the portable SHA-256 implementation.
+
+## Workflow policy controls
+
+The workflow policy controls parse GitHub Actions YAML and execute shell routing
+with recording tools. Install their small, test-only parser dependency before
+running `tools/release/check.sh` or those controls directly:
+
+```sh
+python3 -m venv .mlf-build/workflow-tests
+.mlf-build/workflow-tests/bin/python -m pip install -r tools/testing/requirements.txt
+PATH="$PWD/.mlf-build/workflow-tests/bin:$PATH" tools/release/check.sh
+```
+
+CI installs the pinned dependency in an isolated environment in each metadata or
+packaging job that runs the release checks. Tests never install dependencies or
+access the network themselves. Actionlint continues to check the complete Actions
+schema; behavioral controls check routing, command arguments, failure handling
+and retained evidence. Display names, YAML key order and scalar presentation are
+not assertions.

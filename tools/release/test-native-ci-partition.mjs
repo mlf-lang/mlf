@@ -1,234 +1,183 @@
-// Independently execute the CI partition's actual selectors. This checks workflow
-// coverage, not compiler results; wrapper/provenance controls check the assertions.
+// Execute the workflow's shell routing with private fixtures and recording
+// tools. The policy observes calls, environments and outcomes, not shell text.
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {projectAdapterCommands} from './workflow-test-adapters.mjs';
 import {releaseTestCase, releaseTestEvent} from './test-events.mjs';
+import {readWorkflow, job, steps, commandStep, actionStep, paths, list, selected,
+  render, clone, reformatted} from './workflow-model.mjs';
+import {shellCalls, successfulCalls, requireFailurePropagation} from './workflow-shell.mjs';
 
-const workflowSource = fs.readFileSync('.github/workflows/ci.yml', 'utf8');
-const workflow = projectAdapterCommands(workflowSource);
-const job = (text, name) => {
-  const block = text.match(new RegExp(`^  ${name}:\\n[\\s\\S]*?(?=^  [a-z][a-z-]*:\\n|(?![\\s\\S]))`, 'm'))?.[0];
-  assert.ok(block, `Missing ${name} job`);
-  return block;
-};
-const selected = (step, matrix) => {
-  const expression = step.match(/^        if: (.+)$/m)?.[1];
-  return expression === undefined || Function('matrix', `return (${expression});`)(matrix);
-};
-const frameworkArguments = (step, matrix) => {
-  const run = step.match(/^        run: \|\n([\s\S]*)$/m)?.[1];
-  assert.ok(run, 'The framework step must have an explicit shell command');
-  const script = run.replace(/^          /gm, '')
-    .replaceAll('${{ matrix.optimization }}', matrix.optimization)
-    .replaceAll('${{ matrix.suite }}', matrix.suite);
-  assert.doesNotMatch(script, /\$\{\{/, 'Resolve every framework workflow expression');
-  // Execute the workflow's actual shell dispatch, replacing only Python with an
-  // argv recorder. No compiler, authentication, or long-running suite is invoked.
-  const result = spawnSync('bash', ['-euo', 'pipefail', '-c',
-    `python3() { printf '%s\\0' "$@"; }\n${script}`], {encoding: 'utf8', timeout: 5000});
-  assert.equal(result.status, 0, result.stderr || String(result.error || 'Framework dispatch failed'));
-  assert.equal(result.stderr, '', 'Framework dispatch must not emit diagnostics');
-  assert.ok(result.stdout.endsWith('\0'), 'The framework command must execute');
-  return result.stdout.slice(0, -1).split('\0');
-};
-// Record each direct Python call separately, including its evidence destination.
-// A flattened argv stream would not distinguish split or merged invocations.
-const directArguments = step => {
-  const run = step.match(/^        run: \|\n([\s\S]*)$/m)?.[1];
-  assert.ok(run, 'The direct step must have an explicit shell command');
-  const script = run.replace(/^          /gm, '');
-  assert.doesNotMatch(script, /\$\{\{/, 'Direct arguments must not vary by hidden workflow interpolation');
-  const recorder = "unset MLF_CRC_TEST_EVIDENCE MLF_UTF8_TEST_EVIDENCE MLF_CANDIDATE_TEST_EVIDENCE\npython3() { printf 'CALL\\0%s\\0%s\\0%s\\0%s\\0' \"$#\" \"${MLF_CRC_TEST_EVIDENCE-}\" \"${MLF_UTF8_TEST_EVIDENCE-}\" \"${MLF_CANDIDATE_TEST_EVIDENCE-}\"; printf '%s\\0' \"$@\"; }\n";
-  const result = spawnSync('bash', ['-euo', 'pipefail', '-c', recorder + script],
-    {encoding: 'utf8', timeout: 5000});
-  assert.equal(result.status, 0, result.stderr || String(result.error || 'Direct dispatch failed'));
-  assert.equal(result.stderr, '', 'Direct dispatch must not emit diagnostics');
-  assert.ok(result.stdout.endsWith('\0'), 'The direct commands must execute');
-  const tokens = result.stdout.slice(0, -1).split('\0');
-  const calls = [];
-  for (let index = 0; index < tokens.length;) {
-    assert.equal(tokens[index++], 'CALL', 'Every Python invocation has its own boundary');
-    const argc = tokens[index++];
-    assert.match(argc, /^[1-9][0-9]*$/, 'Canonical decimal argc');
-    const count = Number(argc);
-    assert.ok(Number.isSafeInteger(count) && count > 0 && count <= 64, 'Bounded exact argc');
-    const evidence = tokens[index++];
-    const utf8Evidence = tokens[index++];
-    const candidateEvidence = tokens[index++];
-    assert.ok(index + count <= tokens.length, 'Complete invocation arguments');
-    calls.push({evidence, utf8Evidence, candidateEvidence, argv: tokens.slice(index, index + count)});
-    index += count;
+const workflow = readWorkflow('ci');
+const projected = value => {
+  const copy = clone(value);
+  for (const entry of Object.values(copy.jobs)) for (const step of steps(entry)) {
+    if (step.run) step.run = projectAdapterCommands(step.run);
   }
-  return calls;
+  return copy;
 };
-const validate = text => {
-  const native = job(text, 'native');
-  assert.match(native, /^    timeout-minutes: 360$/m, 'Every shard keeps the 360-minute outer bound');
-  assert.match(native, /^      fail-fast: false$/m, 'One failure must not hide other shard evidence');
-  assert.doesNotMatch(native, /continue-on-error/);
-  assert.match(native, /^      \(github.event_name != 'workflow_dispatch' \|\| !inputs.windows_runtime_only\)$/m,
-    'The dispatch-only flag must leave automatic CI enabled');
-  const matrix = native.match(/^      matrix:\n([\s\S]*?)(?=^    steps:\n)/m)?.[1];
-  assert.ok(matrix, 'An explicit native matrix is required');
-  const rows = [...matrix.matchAll(/^          - optimization: '([02])'\n            suite: (routine|optimizer)\n/gm)];
-  assert.deepEqual(rows.map(row => ({optimization: row[1], suite: row[2]})), [
-    {optimization: '0', suite: 'routine'},
-    {optimization: '2', suite: 'optimizer'},
-  ], 'Exactly one hosted semantic leg and one targeted optimizer leg are required');
-  let remainder = matrix.replace(/^        #.*\n/gm, '').replace(/^        include:\n/m, '');
-  for (const row of rows) remainder = remainder.replace(row[0], '');
-  assert.equal(remainder.trim(), '', 'No hidden matrix axis, exclusion, or extra leg');
-  const legs = rows.map(row => ({optimization: row[1], suite: row[2]}));
-  const steps = native.match(/^      - (?:name:|uses:)[\s\S]*?(?=^      - (?:name:|uses:)|(?![\s\S]))/gm) || [];
-  const commandStep = command => {
-    const matches = steps.filter(step => step.includes(command));
-    assert.equal(matches.length, 1, `Exactly one invocation of ${command}`);
-    return matches[0];
-  };
-  const producer = commandStep('python3 tools/shared/build.py');
-  assert.doesNotMatch(producer, /^        if:/m, 'Every shard builds its own authenticated producer');
-  assert.match(producer, /python3 tools\/shared\/build.py --bootstrap-only --optimization '\$\{\{ matrix.optimization \}\}' --build-dir \.mlf-build\/shared-ghc\n/);
-  assert.match(producer, /jq -e '\.complete == true and \.producer_host == "GHC" and \.typecheck_only == false' \.mlf-build\/shared-ghc\/receipt.json/);
+const native = value => job(value,'native');
+const command = (value, needle) => commandStep(native(value),needle);
+const campaignStep = (value, group) => {
+  const matches=steps(native(value)).filter(step=>/compiler-tests\b/.test(step.run || '') &&
+    new RegExp('\\b'+group+'\\s+--manager\\b').test(step.run || ''));
+  assert.equal(matches.length,1,'Exactly one hosted '+group+' campaign');return matches[0];
+};
+const sorted = calls => calls.map(call => JSON.stringify(call)).sort();
+const argvCalls = (step, context = {}, options = {}) => successfulCalls(render(step.run,context), {shell:step.shell,...options});
+const context = (matrix, outcomes = {}, cancelled = false) => ({matrix, cancelled:()=>cancelled,
+  steps:Object.fromEntries(Object.entries(outcomes).map(([id,outcome]) => [id,{outcome}]))});
+const inFixture = action => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(),'mlf-ci-routing-'));
+  try { return action(root); } finally { fs.rmSync(root,{recursive:true,force:true}); }
+};
+const option = (argv, flag) => {
+  assert.equal(argv.filter(value => value === flag).length,1,'One '+flag+' argument');
+  return argv[argv.indexOf(flag)+1];
+};
+const guard = (argv, seconds = '1800', maxOutput) => {
+  assert.deepEqual(argv.slice(0,3),['python3','-B','tools/shared/resource_watchdog.py']);
+  for (const [flag,value] of [['--seconds',seconds],['--address-space-mib','6144'],['--rss-mib','5120'],['--disk-free-mib','4096']]) {
+    assert.equal(option(argv,flag),value);
+  }
+  if (maxOutput !== undefined) assert.equal(option(argv,'--max-output-mib'),maxOutput);
+};
+const expectProducerQuery = query => {
+  const good = {complete:true,producer_host:'GHC',typecheck_only:false};
+  for (const [change, status] of [[{},0],[{complete:false},1],[{producer_host:'MLF'},1],[{typecheck_only:true},1]]) {
+    const result=spawnSync('jq',['-e',query],{input:JSON.stringify({...good,...change}),encoding:'utf8'});
+    assert.equal(result.status,status,result.stderr);
+  }
+};
+const fixtureProgram = (root, name, variables=[]) => {
+  const filename=path.join(root,'.mlf-build/shared-ghc/bin',name);
+  fs.mkdirSync(path.dirname(filename),{recursive:true});
+  fs.writeFileSync(filename, '#!/bin/bash\nprintf \'%s\\0\' "$(($# + 1))" '+name+' "$@" '+
+    variables.map(variable=>'"${'+variable+'-}"').join(' ')+ ' >&3\n'+
+    'if [ "$(printf \'%s\\037\' '+name+' "$@")" = "$MLF_WORKFLOW_FAIL_ARGUMENTS" ]; then exit 73; fi\n');
+  fs.chmodSync(filename,0o755);
+};
 
-  assert.match(producer, /^        id: shared_build$/m);
-  const regeneration = commandStep('tools/shared/generate_builtin_evidence.py');
-  assert.equal(regeneration.match(/^        if: (.+)$/m)?.[1], "failure() && steps.shared_build.outcome == 'failure' && (matrix.suite == 'routine' || matrix.suite == 'optimizer')",
-    'Only failed builds in one O0 and one O2 leg collect actual generation evidence');
-  assert.match(regeneration, /^        timeout-minutes: 16$/m);
-  const regenerationExpression = regeneration.match(/^        if: (.+)$/m)[1];
-  const regenerationSelected = Function('matrix', 'failure', 'steps', `return (${regenerationExpression});`);
+function verifyPartition(value) {
+  const entry = native(value);
+  assert.equal(entry['timeout-minutes'],360);
+  assert.equal(entry.strategy['fail-fast'],false);
+  assert.ok(!entry['continue-on-error']);
+  // These retired public entrypoints bypass the bounded composite campaign.
+  // Keep this narrow invocation policy; display text and comments are harmless.
+  for (const step of entry.steps) assert.doesNotMatch(step.run || '',
+    /^\s*python3?(?:\s+-[A-Za-z]+)*\s+['"]?tools\/shared\/test_direct(?:_crc_successor|_bounded)?\.py(?:['"]?)(?=\s|$)/m,
+    'The native job must use the maintained composite direct-test entrypoint');
+
+  assert.ok(Object.keys(entry.strategy.matrix).every(key=>['include','exclude'].includes(key)));
+  assert.deepEqual(entry.strategy.matrix.exclude || [],[]);
+  const legs=entry.strategy.matrix.include;
+  assert.equal(legs.length,2);
+  assert.deepEqual(legs.map(leg=>String(leg.optimization)).sort(),['0','2']);
+  for (const leg of legs) assert.equal(typeof leg.suite,'string');
+  for (const event_name of ['pull_request','push','workflow_dispatch']) for (const windows_runtime_only of [false,true]) {
+    assert.equal(selected(entry,{github:{event_name,event:{pull_request:{labels:[]}}},inputs:{windows_runtime_only}}),
+      event_name !== 'workflow_dispatch' || !windows_runtime_only);
+  }
+  const producer=command(value,'--bootstrap-only');
+  const preparation=command(value,'tools/testing/prepare_history_refs.py');
+  const install=command(value,'tools/release/cleanup-ghc-install.py');
+  const regeneration=command(value,'tools/shared/generate_builtin_evidence.py');
+  assert.ok(producer.id);
+  assert.equal(regeneration['timeout-minutes'],16);
+  const checkout=actionStep(entry,'actions/checkout');
+  assert.equal(String(checkout.with['fetch-depth']),'0');
+  assert.equal(checkout.if,undefined);
+  assert.ok(entry.steps.indexOf(actionStep(entry,'./.github/actions/linux-ghc-bindist')) < entry.steps.indexOf(install));
+  assert.ok(entry.steps.indexOf(producer) < entry.steps.indexOf(regeneration));
+  assert.ok(entry.steps.indexOf(regeneration) < entry.steps.indexOf(command(value,'tools/performance/crate-query-graph/verify.py')));
   for (const leg of legs) {
-    for (const failed of [false, true]) for (const outcome of ['success', 'failure', 'skipped']) {
-      assert.equal(regenerationSelected(leg, () => failed, {shared_build: {outcome}}),
-        failed && outcome === 'failure' && (leg.suite === 'routine' || leg.suite === 'optimizer'));
+    assert.equal(selected(producer,{matrix:leg}),true);
+    assert.equal(selected(install,{matrix:leg}),true);
+    const calls=argvCalls(producer,{matrix:leg},{commands:['python3','jq']});
+    assert.equal(calls.length,2);
+    assert.deepEqual(calls[0].argv,['python3','tools/shared/build.py','--bootstrap-only','--optimization',String(leg.optimization),'--build-dir','.mlf-build/shared-ghc']);
+    assert.deepEqual([calls[1].argv[0],calls[1].argv[1],calls[1].argv[3]],['jq','-e','.mlf-build/shared-ghc/receipt.json']);
+    expectProducerQuery(calls[1].argv[2]);
+    requireFailurePropagation(render(producer.run,{matrix:leg}),{commands:['python3','jq']},calls);
+    for (const failed of [false,true]) for (const outcome of ['success','failure','skipped']) {
+      assert.equal(selected(regeneration,{...context(leg,{[producer.id]:outcome}),failure:()=>failed}),failed && outcome==='failure');
     }
   }
-  assert.match(regeneration, /resource_watchdog.py --seconds 900 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 16 --disk-free-mib 4096 \.mlf-build\/builtin-generation-guard python3 -B tools\/shared\/generate_builtin_evidence.py --root "\$PWD" --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/builtin-generation-guard\/results --timeout 600\n/);
-  assert.ok(steps.indexOf(producer) < steps.indexOf(regeneration), 'Generation follows the failed build');
-  assert.ok(steps.indexOf(regeneration) < steps.indexOf(commandStep('tools/performance/crate-query-graph/verify.py')),
-    'Generation does not replace or wrap later qualification gates');
-  for (const flags of ['-B', '-O -B']) {
-    assert.ok(job(text, 'metadata').includes('python3 ' + flags + ' tools/shared/test_generate_builtin_evidence.py\n'),
-      'Keep normal and optimized generation refusal controls');
+  const regenerationCalls=argvCalls(regeneration);
+  assert.equal(regenerationCalls.length,1);
+  guard(regenerationCalls[0].argv,'900','16');
+  for (const [flag,value] of [['--root',process.cwd()],['--build-receipt','.mlf-build/shared-ghc/receipt.json'],
+    ['--output','.mlf-build/builtin-generation-guard/results'],['--timeout','600']]) assert.equal(option(regenerationCalls[0].argv,flag),value);
+  const routine=['tools/release/test-suite-build-receipts.py','tools/release/source-smoke.sh',
+    'tools/shared/test_direct_candidate_successor.py','tools/shared/test_figure12_direct.py','tools/release/test-tuple-list.sh'];
+  const optimized=['tools/performance/patricia/run_integrated.py --suite p123','tools/performance/patricia/run_integrated.py --suite graph',
+    'tools/performance/patricia/run_integrated.py --suite validation','tools/performance/patricia/run_integrated.py --suite builtin',
+    'tools/performance/patricia/run_fingerprint.py','tools/performance/map-policy/run_controls.py',
+    'tools/performance/patricia/run_file_controls.py','tools/performance/patricia/run_controls.py','tools/performance/patricia/run_native.py',
+    'tools/performance/int64/run_llp64.py','tools/performance/int64/run_controls.py','tools/performance/crate-query-graph/verify.py',
+    'tools/performance/crate-query-graph/source_checks.py','tools/shared/test_source_context_cache.py','tools/shared/test_artifact_binary.py',
+    'tools/shared/test_recursive_managed.py','tools/shared/test_guest_framework.py','tools/shared/test_guest_state_laws.py',
+    'tools/shared/test_io_action_sharing.py','tools/shared/test_header_validation_adapter.py'];
+  for (const leg of legs) {
+    for (const name of routine) assert.equal(selected(command(value,name),{matrix:leg}),String(leg.optimization)==='0',name);
+    for (const name of optimized) assert.equal(selected(command(value,name),{matrix:leg}),String(leg.optimization)==='2',name);
+    const framework=command(value,'--output .mlf-build/framework-direct --suite '+(String(leg.optimization)==='0'?'all':'controls'));
+    assert.equal(selected(framework,{matrix:leg}),true);
+    const expected=['python3','tools/shared/test_framework_direct.py','--build-receipt','.mlf-build/shared-ghc/receipt.json',
+      '--output','.mlf-build/framework-direct','--suite',String(leg.optimization)==='0'?'all':'controls'];
+    if (String(leg.optimization)==='0') expected.push('--suite-timeout','5400');
+    assert.deepEqual(argvCalls(framework,{matrix:leg}).map(call=>call.argv),[expected]);
+    for (const other of legs.filter(other=>other!==leg)) assert.equal(selected(framework,{matrix:other}),false);
   }
-  const toolchain = commandStep('make install)');
-  assert.ok(steps.indexOf(commandStep('uses: ./.github/actions/linux-ghc-bindist')) < steps.indexOf(toolchain),
-    'Restore or fetch the verified official archive before installation');
-  assert.doesNotMatch(toolchain, /^        if:/m, 'Every producer has its own verified toolchain');
-  assert.ok(toolchain.includes('python3 -B tools/release/cleanup-ghc-install.py --receipt .mlf-build/ghc-install-cleanup.json\n'),
-    'Each shard verifies and removes only its pinned install inputs');
-  const installedAt = toolchain.indexOf('make install)');
-  const cleanupAt = toolchain.indexOf('python3 -B tools/release/cleanup-ghc-install.py');
-  assert.ok(installedAt >= 0 && cleanupAt >= 0 && installedAt < cleanupAt,
-    'Install-input cleanup follows successful installation');
-  for (const flags of ['-B', '-O -B']) {
-    assert.ok(job(text, 'metadata').includes('python3 ' + flags + ' tools/release/test-ghc-install-cleanup.py\n'),
-      'Keep normal and optimized cleanup refusal controls');
+  for (const script of ['tools/shared/test_artifact_binary_modular.py','tools/performance/llvm-memory/test_contract.py']) {
+    const step=command(value,script);
+    const calls=argvCalls(step);
+    for (const flags of [['-B'],['-O','-B']]) assert.equal(calls.filter(call=>JSON.stringify(call.argv)===JSON.stringify(['python3',...flags,script])).length,1);
+    for (const leg of legs) assert.equal(selected(step,{matrix:leg}),String(leg.optimization)==='2');
+    assert.ok(entry.steps.indexOf(preparation) < entry.steps.indexOf(step));
+    assert.ok(entry.steps.indexOf(step) < entry.steps.indexOf(install));
   }
-  const checkout = commandStep('uses: actions/checkout@');
-  assert.doesNotMatch(checkout, /^        if:/m);
-  assert.match(checkout, /fetch-depth: 0/);
+  const metadata=job(value,'metadata');
+  for (const script of ['tools/shared/test_generate_builtin_evidence.py','tools/release/test-ghc-install-cleanup.py']) {
+    const calls=argvCalls(commandStep(metadata,script));
+    assert.deepEqual(sorted(calls),sorted([['-B'],['-O','-B']].map(flags=>({argv:['python3',...flags,script]}))));
+  }
+  const campaign=command(value,'runtime/mlf_build_runner.c');
+  const parity=campaignStep(value,'parity');
+  const lifecycle=command(value,'--locked test --target lifecycle');
+  const backends=campaignStep(value,'backends');
+  const indexvec=command(value,'tests/indexvec/run.py');
+  assert.ok(campaign.id && lifecycle.id);
+  for (const leg of legs) for (const cancelled of [false,true]) for (const buildState of ['success','failure','skipped']) {
+    for (const toolState of ['success','failure','skipped']) for (const lifecycleState of ['success','failure','skipped']) {
+      const ctx=context(leg,{[producer.id]:buildState,[campaign.id]:toolState,[lifecycle.id]:lifecycleState},cancelled);
+      const routine=String(leg.optimization)==='0' && !cancelled;
+      assert.equal(selected(campaign,ctx),routine && buildState==='success');
+      assert.equal(selected(parity,ctx),routine && toolState==='success');
+      assert.equal(selected(lifecycle,ctx),routine && buildState==='success' && toolState==='success');
+      assert.equal(selected(backends,ctx),routine && lifecycleState==='success');
+      assert.equal(selected(actionStep(entry,'./.github/actions/prepare-backend-drivers'),ctx),routine && lifecycleState==='success');
+      assert.equal(selected(indexvec,ctx),!cancelled && buildState==='success' && String(leg.optimization)==='2');
+    }
+  }
+  assert.ok(entry.steps.indexOf(campaign)<entry.steps.indexOf(parity) && entry.steps.indexOf(parity)<entry.steps.indexOf(lifecycle) && entry.steps.indexOf(lifecycle)<entry.steps.indexOf(backends));
+  assert.ok(entry.steps.indexOf(command(value,'tools/shared/test_figure12_direct.py'))<entry.steps.indexOf(lifecycle));
+  for (const name of optimized) assert.ok(entry.steps.indexOf(command(value,name))<entry.steps.indexOf(indexvec));
+  assert.ok(entry.steps.indexOf(command(value,'--suite controls'))<entry.steps.indexOf(indexvec));
+  assert.ok(entry.steps.indexOf(command(value,'tools/shared/test_io_action_sharing.py'))<entry.steps.indexOf(command(value,'tools/shared/test_artifact_binary.py')));
+  assert.deepEqual(argvCalls(indexvec).map(call=>call.argv),[['python3','-B','tests/indexvec/run.py','--compiler','.mlf-build/shared-ghc/bin/emlf','--output','.mlf-build/indexvec-controls']]);
+  const upload=actionStep(entry,'actions/upload-artifact');
+  assert.equal(upload.with['include-hidden-files'],true);
+  assert.equal(selected(upload,{failure:()=>true,cancelled:()=>true,success:()=>false}),true);
+  assert.equal(new Set(legs.map(matrix=>render(upload.with.name,{matrix}))).size,legs.length);
+}
 
-  const direct = [
-    'tools/release/test-suite-build-receipts.py',
-    'tools/release/source-smoke.sh',
-    'tools/shared/test_direct_candidate_successor.py',
-    'tools/shared/test_figure12_direct.py',
-  ];
-  // The ABI migration retains the frozen semantic algorithms behind explicit
-  // adapters. Check each suite argument, since several now share one driver.
-  const migrated = [
-    'tools/performance/patricia/run_integrated.py --suite p123',
-    'tools/performance/patricia/run_integrated.py --suite graph',
-    'tools/performance/patricia/run_fingerprint.py',
-    'tools/performance/map-policy/run_controls.py',
-    'tools/performance/patricia/run_integrated.py --suite validation',
-    'tools/performance/patricia/run_integrated.py --suite builtin',
-    'tools/performance/patricia/run_file_controls.py',
-    'tools/performance/patricia/run_controls.py',
-    'tools/performance/patricia/run_native.py',
-    'tools/performance/int64/run_llp64.py',
-    'tools/performance/int64/run_controls.py',
-  ];
-  for (const command of migrated) {
-    const lines = commandStep(command).split('\n').filter(line => line.includes(command));
-    assert.equal(lines.length, 1, `One guarded command for ${command}`);
-    assert.match(lines[0], /resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 /);
-  }
-  const mapPolicy = commandStep('tools/performance/map-policy/run_controls.py');
-  assert.match(mapPolicy, /^        if: matrix.optimization == '2'$/m);
-  assert.doesNotMatch(native, /tools\/performance\/patricia\/run_integrated\.py --suite map-balance/,
-    'No obsolete shape-equality route alongside the explicit historical/current successor');
-  const mapTest = 'tools/performance/map-policy/test_prepare_map_policy.py';
-  const mapRun = 'tools/performance/map-policy/run_controls.py';
-  const mapShell = mapPolicy.match(/^        run: \|\n([\s\S]*)$/m)?.[1].replace(/^          /gm, '').trim();
-  assert.equal(mapShell, [
-    'set -euo pipefail',
-    'MAP_POLICY_SOURCE="$PWD" python3 -B ' + mapTest,
-    'MAP_POLICY_SOURCE="$PWD" python3 -O -B ' + mapTest,
-    'python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/map-balance-guard python3 -B ' + mapRun + ' --source "$PWD" --producer .mlf-build/shared-ghc --output .mlf-build/map-balance-controls',
-  ].join('\n'), 'Exact source-bound map step, including both explicit source environments');
-  assert.deepEqual(directArguments(mapPolicy), [
-    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-B', mapTest]},
-    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-O', '-B', mapTest]},
-    {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-B', 'tools/shared/resource_watchdog.py', '--seconds', '1800',
-      '--address-space-mib', '6144', '--rss-mib', '5120', '--disk-free-mib', '4096',
-      '.mlf-build/map-balance-guard', 'python3', '-B', mapRun, '--source', process.cwd(),
-      '--producer', '.mlf-build/shared-ghc', '--output', '.mlf-build/map-balance-controls']},
-  ], 'Exactly the two pure controls and one guarded actual Map successor');
-  const numeric = commandStep('tools/performance/int64/run_controls.py');
-  assert.match(numeric, /for suite in host native legacy; do/);
-  assert.match(numeric, /run_controls.py --suite "\$suite" --producer \.mlf-build\/shared-ghc/);
-  assert.match(commandStep('tools/performance/patricia/run_native.py'), /--mode standalone\n/);
-  const graphChecks = [
-    'tools/performance/crate-query-graph/verify.py',
-    'tools/performance/crate-query-graph/source_checks.py',
-  ];
-  for (const command of graphChecks) {
-    const step = commandStep(command);
-    assert.match(step, /^        if: matrix.optimization == '2'$/m);
-    assert.match(step, /resource_watchdog.py --seconds 600 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 /);
-  }
-  const o2Only = [
-    ...migrated,
-    ...graphChecks,
-    'python3 -B tools/release/test_phase2_patricia_adapters.py',
-    'python3 -O -B tools/release/test_phase2_patricia_adapters.py',
-    'tools/shared/test_source_context_cache.py',
-    'tools/shared/test_artifact_binary.py',
-    'tools/shared/test_recursive_managed.py',
-    'tools/shared/test_guest_framework.py',
-    'tools/shared/test_guest_state_laws.py',
-  ];
-  const binary = commandStep('tools/shared/test_artifact_binary.py');
-  assert.match(binary, /^        if: matrix.optimization == '2'$/m);
-  assert.match(binary, /set -euo pipefail/);
-  for (const script of ['tools/shared/test_artifact_binary_modular.py', 'tools/performance/llvm-memory/test_contract.py']) {
-    for (const flags of ['-B', '-O -B']) {
-      const quick = commandStep('python3 ' + flags + ' ' + script + '\n');
-      assert.equal(selected(quick, legs[0]), false);
-      assert.equal(selected(quick, legs[1]), true);
-      assert.ok(steps.indexOf(commandStep('tools/testing/prepare_history_refs.py')) < steps.indexOf(quick));
-      assert.ok(steps.indexOf(quick) < steps.indexOf(toolchain), 'Cheap contracts run before GHC installation');
-    }
-  }
-  assert.match(binary, /resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 640 --disk-free-mib 4096 \.mlf-build\/artifact-binary-guard python3 -B tools\/shared\/test_artifact_binary.py --source-root "\$PWD" --build-receipt \.mlf-build\/shared-ghc\/receipt.json --clang clang --gc-prefix "\$PWD\/\.mlf-build\/io-action-gc" --partial-write-sink \/dev\/full --output \.mlf-build\/artifact-binary-guard\/results\n/);
-  const gcPreparation = commandStep('cp "$archive" "$prefix/lib/libgc.a"');
-  assert.ok(steps.indexOf(gcPreparation) < steps.indexOf(binary), 'GC preparation precedes binary native build');
-  const framework = commandStep('--output .mlf-build/framework-direct --suite all');
-  const optimizedFramework = commandStep('--output .mlf-build/framework-direct --suite controls');
-  assert.match(framework, /python3 tools\/shared\/test_framework_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/framework-direct --suite all --suite-timeout 5400\n/);
-  assert.match(optimizedFramework, /python3 tools\/shared\/test_framework_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/framework-direct --suite controls\n/);
-  assert.doesNotMatch(native, /--frontend-timeout|--native-timeout/,
-    'Direct per-mode defaults must come from the authenticated producer receipt');
-  assert.doesNotMatch(native.replace(framework, ''), /--suite-timeout/,
-    'Only the framework wrapper may receive the bounded suite override');
-  assert.doesNotMatch(native, /\.mlf-build\/shared-ghc\/bin\/tuple-list\s*[|;]/,
-    'Do not repeat the legacy TupleList run outside the exact wrapper oracle');
-  const crc = commandStep('tools/shared/test_direct_candidate_successor.py');
-  assert.deepEqual(directArguments(crc), [
+const directExpected = [
+
     {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-B', 'tools/shared/test_crc_successor_entry.py']},
     {candidateEvidence: '', utf8Evidence: '', evidence: '', argv: ['-O', '-B', 'tools/shared/test_crc_successor_entry.py']},
     {candidateEvidence: '', utf8Evidence: '', evidence: '.mlf-build/crc-supervisor-controls/normal',
@@ -251,339 +200,347 @@ const validate = text => {
       '--bin-dir', '.mlf-build/shared-ghc/bin',
       '--build-receipt', '.mlf-build/shared-ghc/receipt.json',
       '--output', '.mlf-build/direct-host-tests']},
-  ], 'Exactly seventeen ordered direct calls: four CRC, six UTF8, six candidate controls and the authenticated composite successor');
-  assert.doesNotMatch(native, /^\s*python3(?:\s+-B)?\s+tools\/shared\/test_direct\.py\b/m,
-    'The legacy direct entry must not bypass the bounded successor');
-  // Exact shell plus per-invocation argv checks: comments cannot replace an
-  // execution, and merged/split calls or hidden shell routing cannot pass.
-  const boundedShell = crc.match(/^        run: \|\n([\s\S]*)$/m)?.[1].replace(/^          /gm, '').trim();
-  assert.equal(boundedShell, "set -euo pipefail\npython3 -B tools/shared/test_crc_successor_entry.py\npython3 -O -B tools/shared/test_crc_successor_entry.py\nMLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal python3 -B tools/shared/test_crc_process_supervisor.py\nMLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/optimized python3 -O -B tools/shared/test_crc_process_supervisor.py\npython3 -B tools/shared/test_utf8_batch_contract.py\npython3 -O -B tools/shared/test_utf8_batch_contract.py\npython3 -B tools/shared/test_utf8_batch_worker.py\npython3 -O -B tools/shared/test_utf8_batch_worker.py\nMLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_direct_bounded_entry.py\nMLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_bounded_entry.py\npython3 -B tools/shared/test_candidate_batch_contract.py\npython3 -O -B tools/shared/test_candidate_batch_contract.py\npython3 -B tools/shared/test_candidate_batch_worker.py\npython3 -O -B tools/shared/test_candidate_batch_worker.py\nMLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/normal python3 -B tools/shared/test_direct_candidate_entry.py\nMLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_candidate_entry.py\npython3 -B tools/shared/test_direct_candidate_successor.py --bin-dir .mlf-build/shared-ghc/bin \\\n  --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/direct-host-tests",
-    'Exact bounded direct shell and unchanged budgets');
-  assert.doesNotMatch(native, /^\s*python3(?:\s+-B)?\s+tools\/shared\/test_direct_crc_successor\.py\b/m,
-    'The standalone CRC entry cannot bypass UTF8 batching qualification');
-  const header = commandStep('HEADER_HISTORY_SOURCE=');
-  assert.equal(header.match(/^        if: (.+)$/m)?.[1], "matrix.optimization == '2'", 'Header controls remain O2 only');
-  const headerShell = header.match(/^        run: \|\n([\s\S]*)$/m)?.[1].replace(/^          /gm, '').trim();
-  assert.equal(headerShell, "set -euo pipefail\nmkdir .mlf-build/header-adapter-controls\ngit --no-replace-objects cat-file blob dd5b4630a80803c19afdb219dba2dc4bffc3ea1b > .mlf-build/header-adapter-controls/history.hs\nexport HEADER_FIXTURE=\"$PWD/tools/shared/fixtures/native/HeaderValidationTests.hs\"\nexport HEADER_ORACLE=\"$PWD/tools/shared/fixtures/native/HeaderNamingOracle.hs\"\nexport HEADER_HISTORY_SOURCE=\"$PWD/.mlf-build/header-adapter-controls/history.hs\"\npython3 -B tools/shared/test_header_validation_adapter.py\npython3 -O -B tools/shared/test_header_validation_adapter.py\npython3 tools/shared/test_native_library.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/native-library --clang clang --gc-prefix .mlf-build/io-action-gc", 'Exact fixed-history Header environment, controls and native-library call');
-  assert.doesNotMatch(native, /^\s*python3(?:\s+-B)?\s+tools\/shared\/test_direct_bounded\.py\b/m,
-    'The old bounded entry must not bypass candidate batching');
-  const hostedParity = commandStep('"$toolset/compiler-tests" parity --manager');
-  const hostedBackends = commandStep('"$toolset/compiler-tests" backends --manager');
-  assert.ok(hostedParity.includes('--compiler-receipt "$PWD/.mlf-build/shared-ghc/receipt.json"'));
-  for (const [step, group] of [[hostedParity, 'parity'], [hostedBackends, 'backends']]) {
-    assert.ok(step.includes('--manager "$toolset/mlfpkg" --compiler "$toolset/emlf"'));
-    assert.ok(step.includes('--build-dir "$PWD/.mlf-build/compiler-tests/' + group + '" --cache-dir "$PWD/.mlf-build/cache"'));
-  }
-  const hostedTuple = commandStep('tools/release/test-tuple-list.sh');
-  assert.match(hostedTuple, /\.mlf-build\/shared-ghc/);
-  const lifecycle = commandStep('--locked test --target lifecycle');
-  const campaignTools = commandStep('clang -O2 -std=c11 -Wall -Wextra -Werror runtime/mlf_build_runner.c');
-  assert.match(campaignTools, /^        id: hosted_campaign_tools$/m);
-  assert.match(lifecycle, /^        id: native_lifecycle$/m);
-  assert.equal(campaignTools.match(/^        if: (.+)$/m)?.[1],
-    "${{ !cancelled() && steps.shared_build.outcome == 'success' && matrix.suite == 'routine' }}");
-  assert.equal(hostedParity.match(/^        if: (.+)$/m)?.[1],
-    "${{ !cancelled() && steps.hosted_campaign_tools.outcome == 'success' && matrix.suite == 'routine' }}");
-  assert.equal(lifecycle.match(/^        if: (.+)$/m)?.[1],
-    "${{ !cancelled() && steps.shared_build.outcome == 'success' && steps.hosted_campaign_tools.outcome == 'success' && matrix.suite == 'routine' }}");
-  assert.equal(hostedBackends.match(/^        if: (.+)$/m)?.[1],
-    "${{ !cancelled() && steps.native_lifecycle.outcome == 'success' && matrix.suite == 'routine' }}");
-  assert.ok(steps.indexOf(campaignTools) < steps.indexOf(hostedParity) &&
-    steps.indexOf(hostedParity) < steps.indexOf(lifecycle) && steps.indexOf(lifecycle) < steps.indexOf(hostedBackends),
-    'Hosted parity runs before the native prerequisites used by Backends');
-  const figure12 = commandStep('tools/shared/test_figure12_direct.py');
-  assert.ok(steps.indexOf(figure12) < steps.indexOf(lifecycle),
-    'Hosted Figure12 runs before the native fixture build');
-  const indexvec = commandStep('tests/indexvec/run.py');
-  assert.equal(indexvec.match(/^        if: (.+)$/m)?.[1],
-    "${{ !cancelled() && steps.shared_build.outcome == 'success' && matrix.optimization == '2' }}",
-    'IndexVec runs even after earlier suite failures with an authenticated O2 producer');
-  assert.match(indexvec, /tests\/indexvec\/run.py --compiler \.mlf-build\/shared-ghc\/bin\/emlf --output \.mlf-build\/indexvec-controls\n/);
-  for (const step of [optimizedFramework, ...o2Only.map(commandStep)]) {
-    assert.ok(steps.indexOf(step) < steps.indexOf(indexvec),
-      'The codec timeout must not block independent optimized suites');
-  }
-  for (const leg of legs) {
-    for (const command of [...direct, ...o2Only]) {
-      assert.equal(selected(commandStep(command), leg), direct.includes(command) === (leg.suite === 'routine'),
-        'Coverage selected only with its intended hosted producer: ' + command);
+].map(({argv,evidence,utf8Evidence,candidateEvidence})=>({argv:['python3',...argv],MLF_CRC_TEST_EVIDENCE:evidence,
+  MLF_UTF8_TEST_EVIDENCE:utf8Evidence,MLF_CANDIDATE_TEST_EVIDENCE:candidateEvidence}));
+function verifyDirect(value) {
+  const step=command(value,'tools/shared/test_direct_candidate_successor.py');
+  const options={variables:['MLF_CRC_TEST_EVIDENCE','MLF_UTF8_TEST_EVIDENCE','MLF_CANDIDATE_TEST_EVIDENCE']};
+  const calls=argvCalls(step,{},options);
+  assert.deepEqual(sorted(calls),sorted(directExpected));
+  assert.deepEqual(calls.at(-1),directExpected.at(-1),'The composite successor follows its pure controls');
+  requireFailurePropagation(step.run,options,calls);
+}
+function verifyGuarded(value) {
+  const names=['tools/performance/patricia/run_integrated.py --suite p123','tools/performance/patricia/run_integrated.py --suite graph',
+    'tools/performance/patricia/run_integrated.py --suite validation','tools/performance/patricia/run_integrated.py --suite builtin',
+    'tools/performance/patricia/run_fingerprint.py','tools/performance/patricia/run_file_controls.py',
+    'tools/performance/patricia/run_controls.py','tools/performance/patricia/run_native.py','tools/performance/int64/run_llp64.py',
+    'tools/performance/int64/run_controls.py','tools/performance/crate-query-graph/verify.py','tools/performance/crate-query-graph/source_checks.py',
+    'tools/shared/test_artifact_binary.py'];
+  for (const step of new Set(names.map(name=>command(value,name)))) {
+    const options={stubs:'pkg-config() { printf "/fixture/lib\\n"; }\ntest() { return 0; }'};
+    const calls=argvCalls(step,{},options);
+    if (step.run.includes('tools/performance/int64/run_controls.py')) {
+      for (const flags of [['-B'],['-O','-B']]) assert.equal(calls.filter(call=>
+        JSON.stringify(call.argv)===JSON.stringify(['python3',...flags,'tools/release/test_phase2_patricia_adapters.py'])).length,1);
     }
-    const routine = leg.suite === 'routine';
-    assert.equal(selected(hostedTuple, leg), routine);
-    assert.equal(selected(framework, leg), routine);
-    assert.equal(selected(optimizedFramework, leg), !routine);
-    const expected = ['tools/shared/test_framework_direct.py',
-      '--build-receipt', '.mlf-build/shared-ghc/receipt.json',
-      '--output', '.mlf-build/framework-direct', '--suite', routine ? 'all' : 'controls'];
-    if (routine) expected.push('--suite-timeout', '5400');
-    assert.deepEqual(frameworkArguments(routine ? framework : optimizedFramework, leg), expected);
-  }
-  const upload = commandStep('uses: actions/upload-artifact@');
-  assert.match(upload, /^        if: always\(\)$/m, 'Keep evidence for failed and timed-out shards');
-  for (const suffix of ['**/stdout', '**/stderr', '**/*.json', '**/*.hs', '**/*.c', '**/*.h', '**/*.d']) {
-    assert.ok(upload.includes('            .mlf-build/map-balance-controls/' + suffix + '\n'),
-      'Retain actual Map commands, source closure, dependency and terminal evidence: ' + suffix);
-  }
-  for (const evidence of ['bounded-receipt.json', 'build.log', 'results/**/*.json',
-                          'results/**/*.stdout', 'results/**/*.stderr']) {
-    assert.ok(upload.includes('.mlf-build/artifact-binary-guard/' + evidence),
-      'Keep binary build, target, and independent-oracle evidence: ' + evidence);
-  }
-
-  for (const path of ['.mlf-build/crc-supervisor-controls/', '.mlf-build/direct-host-tests/**/*.json',
-                      '.mlf-build/direct-host-tests/**/*.stdout', '.mlf-build/direct-host-tests/**/*.stderr']) {
-    assert.ok(upload.includes('            ' + path + '\n'), 'Preserve CRC cleanup and original suite evidence: ' + path);
-  }
-  for (const path of [".mlf-build/direct-host-tests/utf8-length/**/*.hs",".mlf-build/direct-host-tests/utf8-length/**/*.o",".mlf-build/direct-host-tests/utf8-length/**/*.hi",".mlf-build/direct-host-tests/utf8-length/**/*.d",".mlf-build/direct-host-tests/utf8-length/**/stdout",".mlf-build/direct-host-tests/utf8-length/**/stderr",".mlf-build/direct-host-tests/utf8-length-supervisor.json"]) {
-    assert.ok(upload.includes('            ' + path + '\n'), 'Preserve selected UTF8 generated and supervisor evidence: ' + path);
-  }
-  assert.ok(upload.includes('            .mlf-build/utf8-supervisor-controls/\n'),
-    'Preserve real UTF8 synthetic lifecycle evidence separately from CRC');
-  for (const path of [".mlf-build/candidate-supervisor-controls/", ".mlf-build/header-adapter-controls/", ".mlf-build/direct-host-tests/candidate-selection/", ".mlf-build/native-library/header-validation/", ".mlf-build/stdlib-default-controls/header-validation/"]) {
-    assert.ok(upload.includes('            ' + path + '\n'), 'Preserve candidate/Header raw evidence: ' + path);
-  }
-  assert.ok(upload.includes('            .mlf-build/ghc-install-cleanup.json\n'),
-    'Retain exact cleanup scope, validation and refusal receipts');
-
-  assert.ok(upload.includes('            .mlf-build/shared-ghc/ghc-info.txt\n'), 'Preserve the compiled toolchain metadata');
-  assert.ok(upload.includes('            .mlf-build/shared-ghc/builtin-verification/\n'), 'Preserve the original failed builtin evidence');
-  assert.ok(upload.includes('            .mlf-build/builtin-generation-guard/\n'), 'Preserve actual generator output and guards');
-  for (const directory of ['native-library', 'stdlib-default-controls']) {
-    for (const evidence of ['receipt.json', '*.stdout', '*.stderr']) {
-      assert.ok(upload.includes('            .mlf-build/' + directory + '/' + evidence + '\n'),
-        'Retain actual native-library command metadata and failure captures: ' + directory + '/' + evidence);
+    for (const name of names.filter(name=>step.run.includes(name))) {
+      const [script,...tokens]=name.split(' ');
+      const matches=calls.filter(call=>call.argv.includes(script) && tokens.every(token=>call.argv.includes(token)));
+      assert.equal(matches.length,script==='tools/performance/int64/run_controls.py'?3:1,name);
+      for (const call of matches) guard(call.argv,script.includes('crate-query-graph')?'600':'1800',
+        script.includes('crate-query-graph')?'100':script==='tools/shared/test_artifact_binary.py'?'640':undefined);
+      if (script==='tools/performance/int64/run_controls.py') {
+        assert.deepEqual(matches.map(call=>option(call.argv,'--suite')).sort(),['host','legacy','native']);
+      }
+      if (script==='tools/performance/patricia/run_native.py') assert.equal(option(matches[0].argv,'--mode'),'standalone');
+      if (script==='tools/shared/test_artifact_binary.py') {
+        for (const [flag,expected] of [['--source-root',process.cwd()],['--build-receipt','.mlf-build/shared-ghc/receipt.json'],
+          ['--gc-prefix',process.cwd()+'/.mlf-build/io-action-gc'],['--partial-write-sink','/dev/full'],
+          ['--output','.mlf-build/artifact-binary-guard/results']]) assert.equal(option(matches[0].argv,flag),expected);
+      }
     }
+    requireFailurePropagation(step.run,options,calls);
   }
-  const artifact = upload.match(/^          name: (.+)$/m)?.[1];
-  assert.ok(artifact);
-  const artifactNames = legs.map(leg => artifact.replaceAll('${{ matrix.optimization }}', leg.optimization).replaceAll('${{ matrix.suite }}', leg.suite));
-  assert.equal(new Set(artifactNames).size, legs.length, 'Matrix evidence artifacts must not collide');
-  const gate = job(text, 'pr-gate');
-  assert.match(gate, /^    if: always\(\) && github.event_name != 'workflow_dispatch' && /m);
-  assert.match(gate, /^    needs: \[metadata, native, windows-runtime, build-runner, async-runtime, async-language\]$/m,
-    'The aggregate must depend on the entire native matrix, not a selected shard');
-  assert.match(gate, /jq -e 'length == 6 and all\(\.\[\]; \.result == "success"\)'/,
-    'Ordinary runs require every required job to succeed');
+  const map=command(value,'tools/performance/map-policy/run_controls.py');
+  const options={variables:['MAP_POLICY_SOURCE']};
+  const calls=argvCalls(map,{},options);
+  assert.equal(calls.length,3);
+  assert.deepEqual(sorted(calls.slice(0,2)),sorted([['-B'],['-O','-B']].map(flags=>({argv:['python3',...flags,'tools/performance/map-policy/test_prepare_map_policy.py'],MAP_POLICY_SOURCE:process.cwd()}))));
+  guard(calls[2].argv);
+  assert.equal(option(calls[2].argv,'--source'),process.cwd());
+  assert.equal(option(calls[2].argv,'--producer'),'.mlf-build/shared-ghc');
+  assert.equal(option(calls[2].argv,'--output'),'.mlf-build/map-balance-controls');
+  requireFailurePropagation(map.run,options,calls);
+}
+function verifyHeader(value) {
+  inFixture(root=>{
+    fs.mkdirSync(path.join(root,'.mlf-build'));
+    const step=command(value,'tools/shared/test_header_validation_adapter.py');
+    const variables=['HEADER_FIXTURE','HEADER_ORACLE','HEADER_HISTORY_SOURCE'];
+    const options={cwd:root,variables,stubs:String.raw`
+mkdir() { /bin/mkdir "$@"; }
+git() { record git "$@" || return; printf 'frozen-header-oracle\n'; }
+python3() {
+  local original
+  IFS= read -r original < "$HEADER_HISTORY_SOURCE"
+  [ "$original" = frozen-header-oracle ]
+  record python3 "$@"
+}
+`};
+    const calls=argvCalls(step,{},options);
+    assert.equal(calls.length,4);
+    assert.deepEqual(calls[0].argv,['git','--no-replace-objects','cat-file','blob','dd5b4630a80803c19afdb219dba2dc4bffc3ea1b']);
+    const environments={HEADER_FIXTURE:root+'/tools/shared/fixtures/native/HeaderValidationTests.hs',
+      HEADER_ORACLE:root+'/tools/shared/fixtures/native/HeaderNamingOracle.hs',
+      HEADER_HISTORY_SOURCE:root+'/.mlf-build/header-adapter-controls/history.hs'};
+    const pure=[['-B'],['-O','-B']].map(flags=>({argv:['python3',...flags,'tools/shared/test_header_validation_adapter.py'],...environments}));
+    assert.deepEqual(sorted(calls.slice(1,3)),sorted(pure));
+    assert.deepEqual(calls[3],{argv:['python3','tools/shared/test_native_library.py','--build-receipt','.mlf-build/shared-ghc/receipt.json',
+      '--output','.mlf-build/native-library','--clang','clang','--gc-prefix','.mlf-build/io-action-gc'],...environments});
+    for (const call of calls) {
+      fs.rmSync(path.join(root,'.mlf-build/header-adapter-controls'),{recursive:true,force:true});
+      requireFailurePropagation(step.run,options,[call]);
+    }
+  });
+}
+function verifyInstall(value) {
+  inFixture(root=>{
+    const unpacked=path.join(root,'ghc-9.14.1-x86_64-unknown-linux');
+    fs.mkdirSync(unpacked,{recursive:true}); fs.mkdirSync(path.join(root,'ghc/bin'),{recursive:true});
+    fs.writeFileSync(path.join(unpacked,'configure'), '#!/bin/bash\nprintf \'%s\\0\' "$(($# + 1))" configure "$@" >&3\n');
+    fs.chmodSync(path.join(unpacked,'configure'),0o755);
+    fs.writeFileSync(path.join(root,'ghc/bin/ghc'),'#!/bin/bash\nprintf \'%s\\0\' "$(($# + 1))" ghc "$@" >&3\nprintf \'%s\\n\' "$FIXTURE_GHC_VERSION"\n');
+    fs.chmodSync(path.join(root,'ghc/bin/ghc'),0o755);
+    const step=command(value,'tools/release/cleanup-ghc-install.py');
+    const options={cwd:root,env:{RUNNER_TEMP:root,GITHUB_PATH:path.join(root,'path'),FIXTURE_GHC_VERSION:'9.14.1'},commands:['sudo','tar','make','python3']};
+    const calls=argvCalls(step,{},options);
+    const installed=calls.findIndex(call=>JSON.stringify(call.argv)===JSON.stringify(['make','install']));
+    const cleanup=calls.findIndex(call=>call.argv.includes('tools/release/cleanup-ghc-install.py'));
+    assert.ok(installed>=0 && cleanup>installed,'Cleanup follows completed installation');
+    const configured=calls.findIndex(call=>call.argv[0]==='configure');
+    assert.ok(configured>=0 && configured<installed);
+    assert.deepEqual(calls[configured].argv,['configure','--prefix='+root+'/ghc']);
+    const version=calls.findIndex(call=>call.argv[0]==='ghc');
+    assert.ok(version>installed && version<cleanup);
+    assert.deepEqual(calls[version].argv,['ghc','--numeric-version']);
+    const wrong=shellCalls(step.run,{...options,env:{...options.env,FIXTURE_GHC_VERSION:'9.12.2'}});
+    assert.notEqual(wrong.status,0);
+    assert.ok(!wrong.calls.some(call=>call.argv.includes('tools/release/cleanup-ghc-install.py')),
+      'A wrong installed version must fail before cleanup');
+
+    assert.deepEqual(calls[cleanup].argv,['python3','-B','tools/release/cleanup-ghc-install.py','--receipt','.mlf-build/ghc-install-cleanup.json']);
+    requireFailurePropagation(step.run,options,[calls[installed],calls[cleanup]]);
+  });
+}
+function verifyIo(value) {
+  inFixture(root=>{
+    fs.writeFileSync(path.join(root,'libgc.a'),'static-gc');
+    const step=command(value,'tools/shared/test_io_action_sharing.py');
+    assert.equal(step['timeout-minutes'],undefined);
+    const options={cwd:root,commands:['sudo','cp','python3'],stubs:String.raw`
+mkdir() { /bin/mkdir "$@"; }
+cc() { record cc "$@" || return; printf '%s/libgc.a\n' "$PWD"; }
+dpkg-query() { record dpkg-query "$@" || return; printf 'libgc-dev pinned-fixture\n'; }
+`};
+    const calls=argvCalls(step,{},options);
+    const prefix=root+'/.mlf-build/io-action-gc';
+    assert.deepEqual(calls.map(call=>call.argv),[
+      ['sudo','apt-get','install','-y','libgc-dev'],
+      ['cp','/usr/include/gc.h',prefix+'/include/gc.h'],
+      ['cp','-R','/usr/include/gc',prefix+'/include/gc'],
+      ['cc','-print-file-name=libgc.a'],
+      ['cp',root+'/libgc.a',prefix+'/lib/libgc.a'],
+      ['dpkg-query','-W','libgc-dev'],
+      ['python3','-B','tools/shared/test_io_action_sharing.py','--build-receipt','.mlf-build/shared-ghc/receipt.json',
+        '--output','.mlf-build/io-action-sharing','--clang','clang','--gc-prefix',prefix],
+    ]);
+    assert.equal(fs.readFileSync(path.join(prefix,'dependency-version.txt'),'utf8'),'libgc-dev pinned-fixture\n');
+    requireFailurePropagation(step.run,options,calls);
+  });
+}
+function verifyCampaignCalls(value) {
+  inFixture(root=>{
+    const variables=['MLF_BUILD_RUNNER','MLF_PACKAGE_MANAGER'];
+    for (const name of ['compiler-tests','mlfpkg']) fixtureProgram(root,name,variables);
+    fs.mkdirSync(path.join(root,'tools/release'),{recursive:true});
+    fs.writeFileSync(path.join(root,'tools/release/native-environment.sh'),'# Environment setup is covered by its own controls.\n');
+    for (const group of ['parity','backends']) {
+      const step=campaignStep(value,group);
+      const options={cwd:root,variables};
+      const calls=argvCalls(step,{},options);
+      const toolset=root+'/.mlf-build/shared-ghc/bin';
+      const argv=['compiler-tests',group,'--manager',toolset+'/mlfpkg','--compiler',toolset+'/emlf',
+        '--build-dir',root+'/.mlf-build/compiler-tests/'+group,'--cache-dir',root+'/.mlf-build/cache'];
+      if (group==='parity') argv.push('--compiler-receipt',root+'/.mlf-build/shared-ghc/receipt.json');
+      assert.deepEqual(calls,[{argv,MLF_BUILD_RUNNER:toolset+'/mlf-build-runner',MLF_PACKAGE_MANAGER:''}]);
+      requireFailurePropagation(step.run,options,calls);
+    }
+    const step=command(value,'--locked test --target lifecycle');
+    const options={cwd:root,variables};
+    const calls=argvCalls(step,{},options);
+    assert.equal(calls.length,1);
+    const toolset=root+'/.mlf-build/shared-ghc/bin';
+    assert.deepEqual(calls,[{argv:['mlfpkg','--manifest','testing/tools/mlf-package.json','--compiler',toolset+'/emlf',
+      '--runtime',root+'/runtime/mlf_runtime.c','--build-dir',root+'/.mlf-build/compiler-tests/lifecycle',
+      '--cache-dir',root+'/.mlf-build/cache','--locked','test','--target','lifecycle'],
+      MLF_BUILD_RUNNER:toolset+'/mlf-build-runner',MLF_PACKAGE_MANAGER:toolset+'/mlfpkg'}]);
+    requireFailurePropagation(step.run,options,calls);
+  });
+}
+function verifyEvidence(value) {
+  const upload=actionStep(native(value),'actions/upload-artifact');
+  const expected=['.mlf-build/ghc-install-cleanup.json','.mlf-build/shared-ghc/ghc-info.txt',
+    '.mlf-build/shared-ghc/builtin-verification/','.mlf-build/builtin-generation-guard/',
+    '.mlf-build/crc-supervisor-controls/','.mlf-build/utf8-supervisor-controls/',
+    '.mlf-build/candidate-supervisor-controls/','.mlf-build/header-adapter-controls/',
+    '.mlf-build/direct-host-tests/candidate-selection/','.mlf-build/native-library/header-validation/',
+    '.mlf-build/stdlib-default-controls/header-validation/','.mlf-build/io-action-gc/dependency-version.txt'];
+  for (const suffix of ['json','stdout','stderr']) expected.push('.mlf-build/direct-host-tests/**/*.'+suffix);
+  for (const suffix of ['**/*.hs','**/*.o','**/*.hi','**/*.d','**/stdout','**/stderr']) expected.push('.mlf-build/direct-host-tests/utf8-length/'+suffix);
+  expected.push('.mlf-build/direct-host-tests/utf8-length-supervisor.json');
+  for (const suffix of ['**/stdout','**/stderr','**/*.json','**/*.hs','**/*.c','**/*.h','**/*.d']) expected.push('.mlf-build/map-balance-controls/'+suffix);
+  for (const suffix of ['bounded-receipt.json','build.log','results/**/*.json','results/**/*.stdout','results/**/*.stderr']) expected.push('.mlf-build/artifact-binary-guard/'+suffix);
+  for (const directory of ['native-library','stdlib-default-controls']) for (const suffix of ['receipt.json','*.stdout','*.stderr']) expected.push('.mlf-build/'+directory+'/'+suffix);
+  for (const suffix of ['json','stdout','stderr','ll','xmlf']) expected.push('.mlf-build/io-action-sharing/**/*.'+suffix);
+  for (const required of expected) assert.ok(paths(upload).includes(required),'Preserve evidence: '+required);
+}
+function verifyAggregate(value) {
+  const gate=job(value,'pr-gate');
+  const names=['metadata','native','windows-runtime','build-runner','async-runtime','async-language'];
+  assert.deepEqual(new Set(list(gate.needs)),new Set(names));
+  for (const skipped of [false,true]) {
+    const github={event_name:'pull_request',event:{pull_request:{labels:skipped?[{name:'ci:skip'}]:[]}}};
+    const candidates=gate.steps.filter(step=>selected(step,{github}));
+    assert.equal(candidates.length,1);
+    const statuses=['success','failure','cancelled','skipped','pending'];
+    const execute=results=>{
+      const result=spawnSync('/bin/bash',['-e','-c',candidates[0].run],{encoding:'utf8',timeout:5000,
+        env:{PATH:process.env.PATH,GITHUB_STEP_SUMMARY:'/dev/null',...Object.fromEntries(
+          Object.entries(candidates[0].env || {}).map(([name,value])=>[name,render(value,{needs:results})]))}});
+      assert.equal(result.error,undefined);
+      return result.status;
+    };
+    const good=Object.fromEntries(names.map(name=>[name,{result:skipped?'skipped':'success'}]));
+    assert.equal(execute(good),0);
+    for (const name of names) for (const status of statuses.filter(status=>status!==(skipped?'skipped':'success'))) {
+      assert.notEqual(execute({...good,[name]:{result:status}}),0,name+' '+status);
+    }
+    const missing={...good};delete missing.native;assert.notEqual(execute(missing),0);
+    assert.notEqual(execute({...good,unexpected:{result:skipped?'skipped':'success'}}),0);
+  }
+}
+const validators=[verifyPartition,verifyDirect,verifyGuarded,verifyHeader,verifyInstall,verifyIo,verifyCampaignCalls,verifyEvidence,verifyAggregate];
+const verify=value=>{for (const validate of validators) validate(projected(value));};
+const mutate=(value,change,validate=verify)=>{const changed=clone(value);change(changed);assert.throws(()=>validate(changed));};
+const findAdapter=(value,adapter)=>{
+  const matches=steps(native(value)).filter(step=>new RegExp('tools/testing/run[.]py (?:--inherit-process-group )?'+adapter+'(?=\\s|$)').test(step.run || '') && (adapter!=='framework-direct' || step.run.includes('--suite all')));
+  assert.equal(matches.length,1,'Exactly one adapter step: '+adapter);return matches[0];
 };
-
-const controls = [
-  ["test_candidate_batch_contract.py normal omitted", "          python3 -B tools/shared/test_candidate_batch_contract.py\n", ""],
-  ["test_candidate_batch_contract.py optimized omitted", "          python3 -O -B tools/shared/test_candidate_batch_contract.py\n", ""],
-  ["test_candidate_batch_worker.py normal omitted", "          python3 -B tools/shared/test_candidate_batch_worker.py\n", ""],
-  ["test_candidate_batch_worker.py optimized omitted", "          python3 -O -B tools/shared/test_candidate_batch_worker.py\n", ""],
-  ["test_direct_candidate_entry.py normal omitted", "          MLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/normal python3 -B tools/shared/test_direct_candidate_entry.py\n", ""],
-  ["test_direct_candidate_entry.py optimized omitted", "          MLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_candidate_entry.py\n", ""],
-  ["candidate/Header evidence missing .mlf-build/candidate-supervisor-controls/", "            .mlf-build/candidate-supervisor-controls/\n", ""],
-  ["candidate/Header evidence missing .mlf-build/header-adapter-controls/", "            .mlf-build/header-adapter-controls/\n", ""],
-  ["candidate/Header evidence missing .mlf-build/direct-host-tests/candidate-selection/", "            .mlf-build/direct-host-tests/candidate-selection/\n", ""],
-  ["candidate/Header evidence missing .mlf-build/native-library/header-validation/", "            .mlf-build/native-library/header-validation/\n", ""],
-  ["candidate/Header evidence missing .mlf-build/stdlib-default-controls/header-validation/", "            .mlf-build/stdlib-default-controls/header-validation/\n", ""],
-  ["candidate env wrong mode", "MLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/optimized", "MLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/normal"],
-  ["candidate env injected CRC", "          python3 -B tools/shared/test_crc_successor_entry.py", "          MLF_CANDIDATE_TEST_EVIDENCE=bad python3 -B tools/shared/test_crc_successor_entry.py"],
-  ["CRC env injected candidate", "          MLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/normal", "          MLF_CRC_TEST_EVIDENCE=bad MLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/normal"],
-  ["candidate route bypass", "python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir", "python3 -B tools/shared/test_direct_bounded.py --bin-dir"],
-  ["Header historical pin changed", "cat-file blob dd5b4630a80803c19afdb219dba2dc4bffc3ea1b", "cat-file blob HEAD"],
-  ["Header fixture env wrong", "export HEADER_FIXTURE=\"$PWD/tools/shared/fixtures/native/HeaderValidationTests.hs\"", "export HEADER_FIXTURE=wrong"],
-  ["Header oracle env wrong", "export HEADER_ORACLE=\"$PWD/tools/shared/fixtures/native/HeaderNamingOracle.hs\"", "export HEADER_ORACLE=wrong"],
-  ["Header history env wrong", "export HEADER_HISTORY_SOURCE=\"$PWD/.mlf-build/header-adapter-controls/history.hs\"", "export HEADER_HISTORY_SOURCE=wrong"],
-  ["Header normal omitted", "          python3 -B tools/shared/test_header_validation_adapter.py\n", ""],
-  ["Header optimized omitted", "          python3 -O -B tools/shared/test_header_validation_adapter.py\n", ""],
-  ["Header actual native omitted", "          python3 tools/shared/test_native_library.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/native-library --clang clang --gc-prefix .mlf-build/io-action-gc\n", ""],
-
-  ["Native failure evidence omitted: .mlf-build/native-library/receipt.json","            .mlf-build/native-library/receipt.json\n",""],
-  ["Native failure evidence omitted: .mlf-build/native-library/*.stdout","            .mlf-build/native-library/*.stdout\n",""],
-  ["Native failure evidence omitted: .mlf-build/native-library/*.stderr","            .mlf-build/native-library/*.stderr\n",""],
-  ["Native failure evidence omitted: .mlf-build/stdlib-default-controls/receipt.json","            .mlf-build/stdlib-default-controls/receipt.json\n",""],
-  ["Native failure evidence omitted: .mlf-build/stdlib-default-controls/*.stdout","            .mlf-build/stdlib-default-controls/*.stdout\n",""],
-  ["Native failure evidence omitted: .mlf-build/stdlib-default-controls/*.stderr","            .mlf-build/stdlib-default-controls/*.stderr\n",""],
-  ["UTF8 synthetic evidence omitted","            .mlf-build/utf8-supervisor-controls/\n",""],
-  ["UTF8 normal evidence env omitted","MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal ",""],
-  ["UTF8 optimized evidence env omitted","MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/optimized ",""],
-  ["UTF8 evidence directories collide","MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/optimized ","MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal "],
-  ["UTF8 evidence wrong variable","MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal ","OTHER_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal "],
-  ["UTF8 evidence replaces CRC variable","MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal ","MLF_UTF8_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal "],
-  ["UTF8 env injected into CRC call","          python3 -B tools/shared/test_crc_successor_entry.py\n","          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_crc_successor_entry.py\n"],
-  ["CRC env injected into UTF8 call","          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_direct_bounded_entry.py","          MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_direct_bounded_entry.py"],
-  ["UTF8 evidence attached to pure worker","          python3 -B tools/shared/test_utf8_batch_worker.py\n","          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_utf8_batch_worker.py\n"],
-  ["UTF8 evidence on wrong call","          python3 -O -B tools/shared/test_utf8_batch_worker.py\n          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_direct_bounded_entry.py\n","          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -O -B tools/shared/test_utf8_batch_worker.py\n          python3 -B tools/shared/test_direct_bounded_entry.py\n"],
-  ["test_utf8_batch_contract.py normal omitted","          python3 -B tools/shared/test_utf8_batch_contract.py\n",""],
-  ["test_utf8_batch_contract.py optimized omitted","          python3 -O -B tools/shared/test_utf8_batch_contract.py\n",""],
-  ["test_utf8_batch_contract.py optimized duplicates normal","          python3 -O -B tools/shared/test_utf8_batch_contract.py\n","          python3 -B tools/shared/test_utf8_batch_contract.py\n"],
-  ["test_utf8_batch_contract.py calls merged","          python3 -B tools/shared/test_utf8_batch_contract.py\n          python3 -O -B tools/shared/test_utf8_batch_contract.py\n","          python3 -B tools/shared/test_utf8_batch_contract.py -O -B tools/shared/test_utf8_batch_contract.py\n"],
-  ["test_utf8_batch_contract.py order reversed","          python3 -B tools/shared/test_utf8_batch_contract.py\n          python3 -O -B tools/shared/test_utf8_batch_contract.py\n","          python3 -O -B tools/shared/test_utf8_batch_contract.py\n          python3 -B tools/shared/test_utf8_batch_contract.py\n"],
-  ["test_utf8_batch_worker.py normal omitted","          python3 -B tools/shared/test_utf8_batch_worker.py\n",""],
-  ["test_utf8_batch_worker.py optimized omitted","          python3 -O -B tools/shared/test_utf8_batch_worker.py\n",""],
-  ["test_utf8_batch_worker.py optimized duplicates normal","          python3 -O -B tools/shared/test_utf8_batch_worker.py\n","          python3 -B tools/shared/test_utf8_batch_worker.py\n"],
-  ["test_utf8_batch_worker.py calls merged","          python3 -B tools/shared/test_utf8_batch_worker.py\n          python3 -O -B tools/shared/test_utf8_batch_worker.py\n","          python3 -B tools/shared/test_utf8_batch_worker.py -O -B tools/shared/test_utf8_batch_worker.py\n"],
-  ["test_utf8_batch_worker.py order reversed","          python3 -B tools/shared/test_utf8_batch_worker.py\n          python3 -O -B tools/shared/test_utf8_batch_worker.py\n","          python3 -O -B tools/shared/test_utf8_batch_worker.py\n          python3 -B tools/shared/test_utf8_batch_worker.py\n"],
-  ["test_direct_bounded_entry.py normal omitted","          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_direct_bounded_entry.py\n",""],
-  ["test_direct_bounded_entry.py optimized omitted","          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_bounded_entry.py\n",""],
-  ["test_direct_bounded_entry.py optimized duplicates normal","          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_bounded_entry.py\n","          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_direct_bounded_entry.py\n"],
-  ["test_direct_bounded_entry.py calls merged","          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_direct_bounded_entry.py\n          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_bounded_entry.py\n","          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_direct_bounded_entry.py -O -B tools/shared/test_direct_bounded_entry.py\n"],
-  ["test_direct_bounded_entry.py order reversed","          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_direct_bounded_entry.py\n          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_bounded_entry.py\n","          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_bounded_entry.py\n          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_direct_bounded_entry.py\n"],
-  ["Bounded successor replaced by standalone CRC","python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir","python3 -B tools/shared/test_direct_crc_successor.py --bin-dir"],
-  ["Bounded direct extra routing token","python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir","python3 -B tools/shared/test_direct_candidate_successor.py --worker --bin-dir"],
-  ["Bounded direct shell route injected","          python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir","          true\n          python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir"],
-  ["Bounded direct mocked by comment","          python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir","          # python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir"],
-  ["UTF8 evidence omitted .mlf-build/direct-host-tests/utf8-length/**/*.hs","            .mlf-build/direct-host-tests/utf8-length/**/*.hs\n",""],
-  ["UTF8 evidence omitted .mlf-build/direct-host-tests/utf8-length/**/*.o","            .mlf-build/direct-host-tests/utf8-length/**/*.o\n",""],
-  ["UTF8 evidence omitted .mlf-build/direct-host-tests/utf8-length/**/*.hi","            .mlf-build/direct-host-tests/utf8-length/**/*.hi\n",""],
-  ["UTF8 evidence omitted .mlf-build/direct-host-tests/utf8-length/**/*.d","            .mlf-build/direct-host-tests/utf8-length/**/*.d\n",""],
-  ["UTF8 evidence omitted .mlf-build/direct-host-tests/utf8-length/**/stdout","            .mlf-build/direct-host-tests/utf8-length/**/stdout\n",""],
-  ["UTF8 evidence omitted .mlf-build/direct-host-tests/utf8-length/**/stderr","            .mlf-build/direct-host-tests/utf8-length/**/stderr\n",""],
-  ["UTF8 evidence omitted .mlf-build/direct-host-tests/utf8-length-supervisor.json","            .mlf-build/direct-host-tests/utf8-length-supervisor.json\n",""],
-  ['Map normal pure controls omitted', '          MAP_POLICY_SOURCE="$PWD" python3 -B tools/performance/map-policy/test_prepare_map_policy.py\n', ''],
-  ['Map optimized pure controls omitted', '          MAP_POLICY_SOURCE="$PWD" python3 -O -B tools/performance/map-policy/test_prepare_map_policy.py\n', ''],
-  ['Map source environment omitted', 'MAP_POLICY_SOURCE="$PWD" python3 -B tools/performance/map-policy/test_prepare_map_policy.py', 'python3 -B tools/performance/map-policy/test_prepare_map_policy.py'],
-  ['Map old shape route restored', 'tools/performance/map-policy/run_controls.py --source "$PWD"', 'tools/performance/patricia/run_integrated.py --suite map-balance'],
-  ['Map source basis argument omitted', 'tools/performance/map-policy/run_controls.py --source "$PWD"', 'tools/performance/map-policy/run_controls.py'],
-  ['Map wrong producer', 'tools/performance/map-policy/run_controls.py --source "$PWD" --producer .mlf-build/shared-ghc', 'tools/performance/map-policy/run_controls.py --source "$PWD" --producer .mlf-build/old-producer'],
-  ['Map wrong output', 'tools/performance/map-policy/run_controls.py --source "$PWD" --producer .mlf-build/shared-ghc --output .mlf-build/map-balance-controls', 'tools/performance/map-policy/run_controls.py --source "$PWD" --producer .mlf-build/shared-ghc --output .mlf-build/other-map'],
-  ['Map duplicate dispatch', '          MAP_POLICY_SOURCE="$PWD" python3 -B tools/performance/map-policy/test_prepare_map_policy.py\n', '          python3 -B tools/performance/map-policy/run_controls.py\n          MAP_POLICY_SOURCE="$PWD" python3 -B tools/performance/map-policy/test_prepare_map_policy.py\n'],
-  ['Map C source evidence omitted', '            .mlf-build/map-balance-controls/**/*.c\n', ''],
-  ['Map project header evidence omitted', '            .mlf-build/map-balance-controls/**/*.h\n', ''],
-  ['Map dependency evidence omitted', '            .mlf-build/map-balance-controls/**/*.d\n', ''],
-  ['Map target stdout evidence omitted', '            .mlf-build/map-balance-controls/**/stdout\n', ''],
-  ['Map target stderr evidence omitted', '            .mlf-build/map-balance-controls/**/stderr\n', ''],
-  ['Map terminal receipt evidence omitted', '            .mlf-build/map-balance-controls/**/*.json\n', ''],
-  ["CRC calls merged without argv token loss","          python3 -B tools/shared/test_crc_successor_entry.py\n          python3 -O -B tools/shared/test_crc_successor_entry.py\n","          python3 -B tools/shared/test_crc_successor_entry.py -O -B tools/shared/test_crc_successor_entry.py\n"],
-  ["CRC call split without argv token loss","          python3 -B tools/shared/test_crc_successor_entry.py\n","          python3 -B\n          python3 tools/shared/test_crc_successor_entry.py\n"],
-  ["CRC evidence environment assigned to wrong call","          python3 -B tools/shared/test_crc_successor_entry.py\n          python3 -O -B tools/shared/test_crc_successor_entry.py\n          MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal python3 -B tools/shared/test_crc_process_supervisor.py\n","          MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal python3 -B tools/shared/test_crc_successor_entry.py\n          python3 -O -B tools/shared/test_crc_successor_entry.py\n          python3 -B tools/shared/test_crc_process_supervisor.py\n"],
-  ["CRC successor replaced by legacy bypass","python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir","python3 -B tools/shared/test_direct.py --bin-dir"],
-  ["CRC successor duplicated","          python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir","          python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir ignored\n          python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir"],
-  ["CRC old route inserted","          python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir","          python3 tools/shared/test_direct.py --bin-dir ignored\n          python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir"],
-  ["CRC normal entry controls omitted","          python3 -B tools/shared/test_crc_successor_entry.py\n",""],
-  ["CRC optimized entry controls omitted","          python3 -O -B tools/shared/test_crc_successor_entry.py\n",""],
-  ["CRC normal lifecycle controls omitted","          MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal python3 -B tools/shared/test_crc_process_supervisor.py\n",""],
-  ["CRC optimized lifecycle controls omitted","          MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/optimized python3 -O -B tools/shared/test_crc_process_supervisor.py\n",""],
-  ["CRC lifecycle optimization dropped","python3 -O -B tools/shared/test_crc_process_supervisor.py","python3 -B tools/shared/test_crc_process_supervisor.py"],
-  ["CRC evidence environment omitted","MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal ",""],
-  ["CRC evidence environment inactive","MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal ","OTHER_EVIDENCE=.mlf-build/crc-supervisor-controls/normal "],
-  ["CRC evidence directories collide","MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/optimized ","MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal "],
-  ["CRC successor producer differs","--build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/direct-host-tests","--build-receipt .mlf-build/wrong/receipt.json --output .mlf-build/direct-host-tests"],
-  ["CRC successor output differs","--output .mlf-build/direct-host-tests","--output .mlf-build/wrong-direct\n"],
-  ["CRC lifecycle evidence omitted","            .mlf-build/crc-supervisor-controls/\n",""],
-  ["CRC suite receipts omitted","            .mlf-build/direct-host-tests/**/*.json\n",""],
-  ["CRC suite stdout omitted","            .mlf-build/direct-host-tests/**/*.stdout\n",""],
-  ["CRC suite stderr omitted","            .mlf-build/direct-host-tests/**/*.stderr\n",""],
-  ['generation compiler metadata omitted', '            .mlf-build/shared-ghc/ghc-info.txt\n', ''],
-  ["producer diagnostic id omitted","        id: shared_build\n",""],
-  ["generation failure condition relaxed","failure() && steps.shared_build.outcome == 'failure' && (matrix.suite == 'routine' || matrix.suite == 'optimizer')","steps.shared_build.outcome == 'failure' && (matrix.suite == 'routine' || matrix.suite == 'optimizer')"],
-  ["generation O0 coverage changed","failure() && steps.shared_build.outcome == 'failure' && (matrix.suite == 'routine' || matrix.suite == 'optimizer')","failure() && steps.shared_build.outcome == 'failure' && (matrix.suite == 'non-routine' || matrix.suite == 'optimizer')"],
-  ["generation O2 omitted","failure() && steps.shared_build.outcome == 'failure' && (matrix.suite == 'routine' || matrix.suite == 'optimizer')","failure() && steps.shared_build.outcome == 'failure' && (matrix.suite == 'routine' || matrix.suite == 'non-optimizer')"],
-  ["generation command omitted","tools/shared/generate_builtin_evidence.py","tools/shared/omitted_builtin_evidence.py"],
-  ["generation resource guard relaxed","--rss-mib 5120 --max-output-mib 16 --disk-free-mib 4096 .mlf-build/builtin-generation-guard","--rss-mib 6144 --max-output-mib 16 --disk-free-mib 4096 .mlf-build/builtin-generation-guard"],
-  ["generation time allowance widened","--timeout 600\n","--timeout 601\n"],
-  ["generation original evidence omitted","            .mlf-build/shared-ghc/builtin-verification/\n",""],
-  ["generation real output omitted","            .mlf-build/builtin-generation-guard/\n",""],
-  ["generation normal refusal controls omitted","          python3 -B tools/shared/test_generate_builtin_evidence.py\n",""],
-  ["generation optimized refusal controls omitted","          python3 -O -B tools/shared/test_generate_builtin_evidence.py\n",""],
-  ['missing shard', "          - optimization: '0'\n            suite: routine\n", ''],
-  ['duplicate shard', '            suite: routine\n', '            suite: optimizer\n'],
-  ['missing O2', "          - optimization: '2'\n", "          - optimization: '0'\n"],
-  ['matrix exclusion', '        include:\n', '        exclude: []\n        include:\n'],
-  ['outer bound changed', '    timeout-minutes: 360\n', '    timeout-minutes: 361\n'],
-  ['fail-fast cancellation', '      fail-fast: false\n', '      fail-fast: true\n'],
-  ['installation omitted before cleanup', '&& make install)', '&& true)'],
-  ['premature install-input cleanup',
-    '          (cd "$RUNNER_TEMP/ghc-9.14.1-x86_64-unknown-linux"',
-    '          python3 -B tools/release/cleanup-ghc-install.py --receipt .mlf-build/ghc-install-cleanup.json\n          (cd "$RUNNER_TEMP/ghc-9.14.1-x86_64-unknown-linux"'],
-  ['install-input cleanup omitted', 'python3 -B tools/release/cleanup-ghc-install.py --receipt', 'python3 -B tools/release/omitted-cleanup.py --receipt'],
-  ['cleanup receipt argument omitted', '--receipt .mlf-build/ghc-install-cleanup.json', '--receipt .mlf-build/omitted-cleanup.json'],
-  ['cleanup evidence omitted', '            .mlf-build/ghc-install-cleanup.json\n', ''],
-  ['normal cleanup controls omitted', '          python3 -B tools/release/test-ghc-install-cleanup.py\n', ''],
-  ['optimized cleanup controls omitted', '          python3 -O -B tools/release/test-ghc-install-cleanup.py\n', ''],
-  ['producer skipped', '      - name: Build exact committed shared sources and direct test runners\n', "      - name: Build exact committed shared sources and direct test runners\n        if: matrix.optimization == '2'\n"],
-  ['producer authentication removed', '.complete == true and .producer_host == "GHC" and .typecheck_only == false', '.complete == true'],
-  ['direct coverage skipped',
-    "      - name: Qualify authenticated direct async and frontend execution\n        if: matrix.suite == 'routine'\n",
-    "      - name: Qualify authenticated direct async and frontend execution\n        if: false\n"],
-  ['framework omitted',
-    "      - name: Qualify hosted TupleList and framework contracts\n        if: matrix.suite == 'routine'\n",
-    "      - name: Qualify hosted TupleList and framework contracts\n        if: false\n"],
-  ['framework repeated in O2', '--suite controls', '--suite all'],
-  ['framework margin omitted', ' --suite-timeout 5400', ''],
-  ['framework cap exceeded', ' --suite-timeout 5400', ' --suite-timeout 5401'],
-  ['framework margin reduced', ' --suite-timeout 5400', ' --suite-timeout 4500'],
-  ['framework runs in both producers',
-    "      - name: Qualify hosted TupleList and framework contracts\n        if: matrix.suite == 'routine'\n",
-    "      - name: Qualify hosted TupleList and framework contracts\n"],
-  ['direct budget override', 'python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir', 'python3 -B tools/shared/test_direct_candidate_successor.py --suite-timeout 5400 --bin-dir'],
-  ['Figure12 omitted', 'python3 tools/shared/test_figure12_direct.py', 'python3 tools/shared/omitted.py'],
-  // Bind selector mutations to the named step, not the first unrelated O2 step.
-  ['O2 guest omitted',
-    "      - name: Check actual MLF mixed-framework source acceptance\n        if: matrix.optimization == '2'\n",
-    "      - name: Check actual MLF mixed-framework source acceptance\n        if: false\n"],
-  ['O2 graph fingerprints omitted',
-    "      - name: Check query graph fingerprints and publication recovery\n        if: matrix.optimization == '2'\n",
-    "      - name: Check query graph fingerprints and publication recovery\n        if: false\n"],
-  ['O2 source graph omitted',
-    "      - name: Check source query graph and lowered fallback\n        if: matrix.optimization == '2'\n",
-    "      - name: Check source query graph and lowered fallback\n        if: false\n"],
-  ['graph fingerprints command omitted', 'tools/performance/crate-query-graph/verify.py', 'tools/performance/crate-query-graph/omitted.py'],
-  ['source graph command omitted', 'tools/performance/crate-query-graph/source_checks.py', 'tools/performance/crate-query-graph/omitted_source.py'],
-  ['graph fingerprint resource guard relaxed', '--rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-ich-guard', '--rss-mib 6144 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-ich-guard'],
-  ['source graph resource guard relaxed', '--rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-graph-guard', '--rss-mib 6144 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-graph-guard'],
-  ['O2 source context omitted',
-    "      - name: Check retained legacy query API contexts and codecs\n        if: matrix.optimization == '2'\n",
-    "      - name: Check retained legacy query API contexts and codecs\n        if: false\n"],
-  ['O2 artifact binary omitted',
-    "      - name: Check binary artifact codecs and real native storage\n        if: matrix.optimization == '2'\n",
-    "      - name: Check binary artifact codecs and real native storage\n        if: false\n"],
-  ['binary output allowance widened', '--max-output-mib 640 --disk-free-mib 4096 .mlf-build/artifact-binary-guard', '--max-output-mib 641 --disk-free-mib 4096 .mlf-build/artifact-binary-guard'],
-  ['binary modular normal controls omitted', '          python3 -B tools/shared/test_artifact_binary_modular.py\n', ''],
-  ['binary modular optimized controls omitted', '          python3 -O -B tools/shared/test_artifact_binary_modular.py\n', ''],
-  ['binary command omitted', 'tools/shared/test_artifact_binary.py', 'tools/shared/omitted_artifact_binary.py'],
-  ['binary producer receipt omitted', '--build-receipt .mlf-build/shared-ghc/receipt.json --clang clang --gc-prefix "$PWD/.mlf-build/io-action-gc"', '--clang clang --gc-prefix "$PWD/.mlf-build/io-action-gc"'],
-  ['binary native sink omitted', '--partial-write-sink /dev/full', ''],
-  ['binary native dependencies omitted', '--gc-prefix "$PWD/.mlf-build/io-action-gc"', ''],
-  ['binary resource guard relaxed', '--rss-mib 5120 --max-output-mib 640 --disk-free-mib 4096 .mlf-build/artifact-binary-guard', '--rss-mib 6144 --max-output-mib 640 --disk-free-mib 4096 .mlf-build/artifact-binary-guard'],
-  ['binary evidence omitted', '            .mlf-build/artifact-binary-guard/results/**/*.json\n', ''],
-  ['Phase 2 Patricia normal omitted', 'python3 -B tools/release/test_phase2_patricia_adapters.py', 'python3 -B tools/performance/patricia/test_adapters.py'],
-  ['Phase 2 Patricia optimized omitted', 'python3 -O -B tools/release/test_phase2_patricia_adapters.py', 'python3 -O -B tools/performance/patricia/test_adapters.py'],
-  ['retained P123 omitted', 'run_integrated.py --suite p123', 'run_integrated.py --suite graph'],
-  ['retained graph omitted', 'run_integrated.py --suite graph', 'run_integrated.py --suite builtin'],
-  ['retained validation omitted', 'run_integrated.py --suite validation', 'run_integrated.py --suite builtin'],
-  ['numeric native suite omitted', 'for suite in host native legacy; do', 'for suite in host legacy; do'],
-  ['numeric selector ignored', '--suite "$suite"', '--suite host'],
-  ['LLP64 controls omitted', 'tools/performance/int64/run_llp64.py', 'tools/performance/int64/omitted.py'],
-  ['collection native route omitted', '--mode standalone\n', '--mode installed\n'],
-  ['resource guard relaxed', '--rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-focused-guard', '--rss-mib 6144 --disk-free-mib 4096 .mlf-build/patricia-focused-guard'],
-  ['artifact collision', 'O${{ matrix.optimization }}-${{ matrix.suite }}\n', 'combined\n'],
-  ['aggregate missing matrix', 'needs: [metadata, native, windows-runtime', 'needs: [metadata, windows-runtime'],
-  ['aggregate accepts skipped', '.result == "success"', '.result != "failure"'],
-  ['PR matrix skipped', "(github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only)", "(github.event_name == 'workflow_dispatch')"],
-  ['nonblocking failures', '    timeout-minutes: 360\n', '    timeout-minutes: 360\n    continue-on-error: true\n'],
-];
-const suite = 'release-native-ci-partition';
-const prefix = 'release/native-ci-partition/';
-const cases = [
-  [prefix + 'schedule', () => {
-    const actual = job(workflowSource, 'native');
-    for (const adapter of ['source-smoke', 'direct-candidate', 'framework-direct', 'release-build-receipts', 'figure12-direct', 'tuple-list-native', 'indexvec', 'python-patricia-adapters']) {
-      assert.match(actual, new RegExp('tools/testing/run[.]py ' + adapter + '\\b'));
-    }
-    validate(workflow);
+const suite='release-native-ci-partition', prefix='release/native-ci-partition/';
+const cases=[
+  ['schedule',()=>verify(workflow)],
+  ['equivalent-yaml-and-display-names',()=>verify(reformatted(workflow))],
+  ['equivalent-shell-locals',()=>{
+    const changed=clone(workflow);
+    native(changed).strategy.matrix.exclude=[];
+    findAdapter(changed,'direct-candidate').run='# python3 -B tools/shared/test_direct.py is retired\n'+findAdapter(changed,'direct-candidate').run;
+    for (const step of native(changed).steps) if (step.run) step.run=step.run.replaceAll('toolset','executables').replaceAll('$suite','$variant').replace('for suite in','for variant in');
+    // Reorder independent pure normal/optimized checks while keeping the actual
+    // composite campaign after them. Command boundaries and environments matter.
+    const direct=findAdapter(changed,'direct-candidate');
+    const lines=direct.run.split('\n');
+    const pure=lines.map((line,index)=>line.includes('tools/testing/run.py python-shared-crc-successor-entry')?index:-1).filter(index=>index>=0);
+    [lines[pure[0]],lines[pure[1]]]=[lines[pure[1]],lines[pure[0]]];direct.run=lines.join('\n');
+    verify(changed);
   }],
-  ...controls.map(([name, before, after]) => [prefix + 'mutation/' + encodeURIComponent(name), () => {
-    assert.ok(workflow.includes(before), `Mutation ${name} must hit the actual workflow`);
-    if (['O2 guest omitted', 'O2 graph fingerprints omitted', 'O2 source graph omitted',
-         'O2 source context omitted', 'O2 artifact binary omitted'].includes(name)) {
-      assert.equal(workflow.split(before).length, 2, `Mutation ${name} must select exactly one named step`);
-    }
-    const mutated = workflow.replace(before, after);
-    assert.notEqual(mutated, workflow, `Mutation ${name} must change the actual workflow`);
-    assert.throws(() => validate(mutated), undefined, `Reject ${name}`);
-  }]),
+  ['mutation/missing%20shard',()=>mutate(workflow,value=>native(value).strategy.matrix.include.pop())],
+  ['mutation/matrix-exclusion',()=>mutate(workflow,value=>native(value).strategy.matrix.exclude=[{optimization:'0'}])],
+  ['mutation/outer%20bound%20changed',()=>mutate(workflow,value=>native(value)['timeout-minutes']=361)],
+  ['mutation/fail-fast%20cancellation',()=>mutate(workflow,value=>native(value).strategy['fail-fast']=true)],
+  ['mutation/nonblocking%20failures',()=>mutate(workflow,value=>native(value)['continue-on-error']=true)],
+  ['mutation/producer%20skipped',()=>mutate(workflow,value=>command(value,'--bootstrap-only').if=false)],
+  ['mutation/shallow-checkout',()=>mutate(workflow,value=>actionStep(native(value),'actions/checkout').with['fetch-depth']=1)],
+  ['mutation/artifact%20collision',()=>mutate(workflow,value=>actionStep(native(value),'actions/upload-artifact').with.name='shared')],
+  ['mutation/artifact-success-only',()=>mutate(workflow,value=>actionStep(native(value),'actions/upload-artifact').if='success()')],
+  ['mutation/aggregate%20missing%20matrix',()=>mutate(workflow,value=>job(value,'pr-gate').needs=job(value,'pr-gate').needs.filter(name=>name!=='native'))],
 ];
-const selection = process.env.MLF_TEST_SUITE === suite ? process.env.MLF_TEST_EXACT : undefined;
-const selectedCases = selection ? cases.filter(([id]) => id === selection) : cases;
-assert.ok(selectedCases.length, 'Unknown CI partition case');
-const plan = selectedCases.map(([id]) => id);
-if (process.argv.includes('--framework-list')) {
-  console.log(JSON.stringify(plan));
-} else {
-  releaseTestEvent(suite, {plan});
-  for (const [id, run] of selectedCases) releaseTestCase(suite, id, run);
-  console.log(`Native O0/O2 CI partition: ${selectedCases.length} checks passed.`);
+for (const script of ['test_direct.py','test_direct_crc_successor.py','test_direct_bounded.py']) {
+  cases.push(['mutation/legacy-route/'+script,()=>mutate(workflow,value=>{
+    native(value).steps.push({run:'python3 -B tools/shared/'+script+' --bin-dir .mlf-build/shared-ghc/bin'});
+  },value=>verifyPartition(projected(value)))]);
+}
+for (const adapter of ['direct-candidate','framework-direct','guest-framework','guest-state-laws','indexvec','io-action-sharing',
+  'query-graph-acceptance','source-query-api','source-context-cache','artifact-binary-native','figure12-direct','tuple-list-native']) {
+  const existing={"direct-candidate": "direct coverage skipped", "framework-direct": "framework omitted", "guest-framework": "O2 guest omitted", "query-graph-acceptance": "O2 graph fingerprints omitted", "source-query-api": "O2 source graph omitted", "source-context-cache": "O2 source context omitted", "artifact-binary-native": "O2 artifact binary omitted", "figure12-direct": "Figure12 omitted"};
+  cases.push([existing[adapter]?'mutation/'+encodeURIComponent(existing[adapter]):'mutation/skipped/'+adapter,()=>mutate(workflow,value=>findAdapter(value,adapter).if=false)]);
+}
+for (const adapter of ['python-shared-crc-successor-entry','python-shared-crc-process-supervisor','python-shared-utf8-batch-contract',
+  'python-shared-utf8-batch-worker','python-shared-direct-bounded-entry','python-shared-candidate-batch-contract',
+  'python-shared-candidate-batch-worker','python-shared-direct-candidate-entry']) {
+  for (const optimized of [false,true]) {
+    const mode=optimized?'optimized':'normal';
+    const previous={
+      'python-shared-crc-successor-entry':`CRC ${mode} entry controls omitted`,
+      'python-shared-crc-process-supervisor':`CRC ${mode} lifecycle controls omitted`,
+      'python-shared-utf8-batch-contract':`test_utf8_batch_contract.py ${mode} omitted`,
+      'python-shared-utf8-batch-worker':`test_utf8_batch_worker.py ${mode} omitted`,
+      'python-shared-direct-bounded-entry':`test_direct_bounded_entry.py ${mode} omitted`,
+      'python-shared-candidate-batch-contract':`test_candidate_batch_contract.py ${mode} omitted`,
+      'python-shared-candidate-batch-worker':`test_candidate_batch_worker.py ${mode} omitted`,
+      'python-shared-direct-candidate-entry':`test_direct_candidate_entry.py ${mode} omitted`,
+    };
+    cases.push(['mutation/'+encodeURIComponent(previous[adapter]),()=>{
+      mutate(workflow,value=>{
+      const step=findAdapter(value,'direct-candidate');
+      const lines=step.run.split('\n');
+      step.run=lines.filter(line=>!(line.includes('tools/testing/run.py '+adapter) && line.includes('--python-optimization')===optimized)).join('\n');
+    },value=>verifyDirect(projected(value)));
+  }]);
+  }
+}
+for (const variable of ['MLF_CRC_TEST_EVIDENCE','MLF_UTF8_TEST_EVIDENCE','MLF_CANDIDATE_TEST_EVIDENCE']) {
+  cases.push(['mutation/environment/'+variable,()=>mutate(workflow,value=>{
+    const step=findAdapter(value,'direct-candidate');step.run=step.run.replaceAll(variable,'WRONG_EVIDENCE');
+  },value=>verifyDirect(projected(value)))]);
+}
+for (const adapter of ['direct-candidate','io-action-sharing','map-policy-controls']) {
+  // Locate the public command via the projected descriptor; no display labels.
+  const needle=adapter==='map-policy-controls'?'tools/performance/map-policy/run_controls.py':adapter==='direct-candidate'?
+    'tools/shared/test_direct_candidate_successor.py':'tools/shared/test_io_action_sharing.py';
+  for (const failure of ['comment','swallow']) cases.push(['mutation/'+failure+'/'+adapter,()=>{
+    const value=projected(workflow), step=command(value,needle);
+    step.run=step.run.replace(/\\\n\s*/g,' ');
+    const line=step.run.split('\n').find(line=>line.includes(needle));
+    assert.ok(line);
+    step.run=step.run.replace(line,failure==='comment'?'# '+line:line+' || :');
+    assert.throws(()=>verify(value));
+  }]);
+}
+const changeOption=(step,flag,replacement)=>{
+  const token=`(?:"${flag}"|'${flag}'|${flag})`;
+  const pattern=new RegExp(`(${token}\\s+)(?:"[^"\\n]*"|'[^'\\n]*'|[^\\s;]+)`,'g');
+  step.run=step.run.replace(/\\\n/g,'').replace(pattern,(_,prefix)=>prefix+replacement);
+};
+for (const [label,needle,change,validate] of [
+  ['framework-budget','--suite all',step=>changeOption(step,'--suite-timeout','5401'),verifyPartition],
+  ['graph-memory-bound','tools/performance/crate-query-graph/verify.py',step=>changeOption(step,'--rss-mib','6144'),verifyGuarded],
+  ['binary-output-bound','tools/shared/test_artifact_binary.py',step=>changeOption(step,'--max-output-mib','641'),verifyGuarded],
+  ['numeric-selector','tools/performance/int64/run_controls.py',step=>changeOption(step,'--suite','host'),verifyGuarded],
+  ['header-historical-oracle','tools/shared/test_header_validation_adapter.py',
+    step=>step.run=step.run.replaceAll('dd5b4630a80803c19afdb219dba2dc4bffc3ea1b','HEAD'),verifyHeader],
+  ['header-oracle-environment','tools/shared/test_header_validation_adapter.py',
+    step=>step.run=step.run.replaceAll('HEADER_ORACLE','WRONG_ORACLE'),verifyHeader],
+  ['cleanup-receipt','tools/release/cleanup-ghc-install.py',step=>changeOption(step,'--receipt','wrong.json'),verifyInstall],
+  ['io-producer-receipt','tools/shared/test_io_action_sharing.py',step=>changeOption(step,'--build-receipt','wrong.json'),verifyIo],
+]) cases.push(['mutation/'+label,()=>{
+  const value=projected(workflow),step=command(value,needle),original=step.run;
+  change(step);assert.notEqual(step.run,original);assert.throws(()=>validate(value));
+}]);
+cases.push(['equivalent-step-ids-and-gc-locals',()=>{
+  const value=clone(workflow);
+  for (const step of native(value).steps) {
+    for (const [before,after] of [['shared_build','host_compiler'],['hosted_campaign_tools','host_runner'],['native_lifecycle','lifecycle_checks']]) {
+      if(step.id===before)step.id=after;
+      if(typeof step.if==='string')step.if=step.if.replaceAll(before,after);
+    }
+    if(step.run)step.run=step.run.replace(/(^|\s)prefix=/gm,'$1gcRoot=').replaceAll('$prefix','$gcRoot')
+      .replace(/(^|\s)archive=/gm,'$1gcArchive=').replaceAll('$archive','$gcArchive');
+  }
+  verify(value);
+}]);
+for (const required of ['.mlf-build/crc-supervisor-controls/','.mlf-build/io-action-sharing/**/*.json',
+  '.mlf-build/shared-ghc/builtin-verification/','.mlf-build/artifact-binary-guard/results/**/*.json']) {
+  cases.push(['mutation/evidence/'+encodeURIComponent(required),()=>mutate(workflow,value=>{
+    const upload=actionStep(native(value),'actions/upload-artifact');upload.with.path=paths(upload).filter(item=>item!==required).join('\n');
+  },value=>verifyEvidence(projected(value)))]);
+}
+const exact=process.env.MLF_TEST_SUITE===suite?process.env.MLF_TEST_EXACT:undefined;
+const chosen=cases.filter(([label])=>!exact||prefix+label===exact);
+assert.ok(chosen.length,'Unknown CI partition case');
+if(process.argv.includes('--framework-list')) console.log(JSON.stringify(chosen.map(([label])=>prefix+label)));
+else {
+  releaseTestEvent(suite,{plan:chosen.map(([label])=>prefix+label)});
+  for(const [label,run] of chosen) releaseTestCase(suite,prefix+label,run);
+  console.log(`Native CI behavioral partition: ${chosen.length} checks passed.`);
 }

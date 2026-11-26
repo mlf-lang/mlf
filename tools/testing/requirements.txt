@@ -1,0 +1,2 @@
+# Test-only workflow parser. No compiler/runtime dependencies are added.
+PyYAML==6.0.3

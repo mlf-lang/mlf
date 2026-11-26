@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Keep full-history preparation before every metadata/SDK validation caller."""
+"""Verify full history and execute preparation routing before its consumers."""
+import copy
 import hashlib
+import json
 from pathlib import Path
-import re
+import subprocess
+import tempfile
 import unittest
 
 import history_refs as history
+from workflow_yaml import load
 
 ROOT = Path(__file__).resolve().parents[2]
-RELEASE_ENTRY = '      - run: tools/release/check.sh'
-RELEASE_PREPARE = 'python3 -B tools/testing/prepare_history_refs.py'
-FIRST_HISTORY_SUITE = 'run benchmark-provenance'
 WRAPPED_BY_RELEASE_CHECK = {('ci', 'metadata')}
 CALLERS = {
     'ci': ('metadata', 'native'),
@@ -18,109 +19,207 @@ CALLERS = {
     'platform-release': ('metadata',),
     'recover-release': ('metadata', 'macos-package'),
 }
-PREPARE = (
-    '      - name: Prepare reviewed historical source objects\n'
-    '        run: python3 -B tools/testing/prepare_history_refs.py\n'
-)
-# Recovery can select a source predating the history audit. Its original
-# check.sh remains authoritative; no missing helper is tolerated by new sources.
-RECOVERY_PREPARE = (
-    '      - name: Prepare reviewed historical source objects when required by the selected source\n'
-    '        run: |\n'
-    '          if test -f tools/testing/prepare_history_refs.py; then\n'
-    '            python3 -B tools/testing/prepare_history_refs.py\n'
-    '          fi\n'
-)
+PREPARE = 'tools/testing/prepare_history_refs.py'
+
+
+def command_step(job, command):
+    matches = [step for step in job['steps'] if command in step.get('run', '')]
+    if len(matches) != 1:
+        raise ValueError('expected one command step: ' + command)
+    return matches[0]
+
+
+def check_run(script, *, release=False, fail=False, present=True):
+    """Run actual shell control flow with a Python stand-in and private files."""
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        (root / 'tools/testing').mkdir(parents=True)
+        if present:
+            (root / PREPARE).touch()
+        if release:
+            # check.sh resolves its root using $0; reproduce that layout.
+            (root / 'tools/release').mkdir()
+        prelude = r'''
+python3() {
+  printf '%s\n' "$*"
+  case " $* " in
+    *' tools/testing/prepare_history_refs.py '*) return "$PREPARE_STATUS" ;;
+    *' tools/testing/run.py benchmark-provenance '*) exit 0 ;;
+  esac
+}
+'''
+        shell = ['/bin/bash', '--noprofile', '--norc']
+        if not release:
+            shell += ['-e']
+        result = subprocess.run([*shell, '-c', prelude + script, str(root / 'tools/release/check.sh')],
+                                cwd=root, env={'PATH': '/usr/bin:/bin', 'PREPARE_STATUS': '73' if fail else '0'},
+                                text=True, capture_output=True, timeout=5)
+        calls = [line.split() for line in result.stdout.splitlines()]
+        expected_prepare = ['-B', PREPARE]
+        if not present:
+            if result.returncode or calls:
+                raise ValueError('old recovery sources must not invoke a missing history helper')
+        elif fail:
+            if result.returncode != 73 or not calls or calls[-1] != expected_prepare:
+                raise ValueError('failed preparation must stop validation')
+        elif release:
+            expected = [['-B', 'tools/testing/run.py', suite]
+                        for suite in ['release-metadata', 'release-metadata-diff']]
+            expected += [expected_prepare, ['-B', 'tools/testing/run.py', 'benchmark-provenance']]
+            if result.returncode or calls != expected:
+                raise ValueError('release wrapper must prepare history before its consumers')
+        elif result.returncode or calls != [expected_prepare]:
+            raise ValueError('history preparation must execute exactly once')
+
+
+def check_release_entry(script):
+    """The metadata job must really invoke, and propagate, its release wrapper."""
+    for status in [0, 73]:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            wrapper = root / 'tools/release/check.sh'
+            wrapper.parent.mkdir(parents=True)
+            wrapper.write_text('#!/bin/bash\nprintf 1 >> "$WRAPPER_TRACE"\nexit "$WRAPPER_STATUS"\n')
+            wrapper.chmod(0o755)
+            trace = root / 'calls'
+            result = subprocess.run(['/bin/bash', '--noprofile', '--norc', '-e', '-c', script],
+                                    cwd=root, env={'PATH': '/usr/bin:/bin', 'WRAPPER_TRACE': str(trace),
+                                                   'WRAPPER_STATUS': str(status)},
+                                    text=True, capture_output=True, timeout=5)
+            if result.returncode != status or not trace.is_file() or trace.read_text() != '1':
+                raise ValueError('metadata must execute its release wrapper and propagate failure')
+
+
+def release_fixture(preparation, *, after=False):
+    # Independent shell fixture: the actual wrapper is executed by the positive
+    # contract. Negative cases need not know its helper names or source layout.
+    metadata = ''.join('python3 -B tools/testing/run.py ' + suite + '\n'
+                       for suite in ['release-metadata', 'release-metadata-diff'])
+    consumer = 'python3 -B tools/testing/run.py benchmark-provenance\n'
+    return 'set -euo pipefail\n' + metadata + (consumer + preparation if after else preparation + '\n' + consumer)
 
 
 def require_callers(workflows, release_check):
-    for workflow, jobs in CALLERS.items():
-        for job in jobs:
-            match = re.search(r'^  ' + re.escape(job) + r':\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)',
-                              workflows[workflow], re.M | re.S)
-            if match is None:
-                raise ValueError('missing history consumer: ' + workflow + '/' + job)
-            body = match[1]
-            steps = re.findall(r'^      - .*?(?=^      - |\Z)', body, re.M | re.S)
-            checkouts = [step for step in steps if step.startswith('      - uses: actions/checkout@')]
-            if not checkouts or len(re.findall(r'^          fetch-depth: 0(?:[ \t]+#[^\n]*)?$', checkouts[0], re.M)) != 1:
-                raise ValueError('consumer requires full source history: ' + job)
-            if (workflow, job) in WRAPPED_BY_RELEASE_CHECK:
-                matching = [step for step in steps if step.rstrip() == RELEASE_ENTRY]
-                if len(matching) != 1 or body.index(checkouts[0]) >= body.index(RELEASE_ENTRY):
-                    raise ValueError('history validation requires the unsuppressed release wrapper: ' + job)
-                lines = release_check.splitlines()
-                if (lines.count(RELEASE_PREPARE) != 1 or FIRST_HISTORY_SUITE not in lines
-                        or 'set -euo pipefail' not in lines
-                        or not (lines.index('set -euo pipefail') < lines.index(RELEASE_PREPARE)
-                                < lines.index(FIRST_HISTORY_SUITE))):
-                    raise ValueError('release wrapper must prepare history before its consumers')
+    for name, consumers in CALLERS.items():
+        for consumer in consumers:
+            job = workflows[name]['jobs'].get(consumer)
+            if job is None:
+                raise ValueError('missing history consumer: ' + name + '/' + consumer)
+            steps = job['steps']
+            checkouts = [step for step in steps if step.get('uses', '').split('@')[0] == 'actions/checkout'
+                         and not step.get('with', {}).get('path')]
+            if len(checkouts) != 1 or str(checkouts[0].get('with', {}).get('fetch-depth')) != '0':
+                raise ValueError('consumer requires full source history: ' + consumer)
+            if checkouts[0].get('if') not in (None, True) or checkouts[0].get('continue-on-error'):
+                raise ValueError('source checkout must not be suppressed')
+            command = ('--bootstrap-only' if name == 'ci' and consumer == 'native' else
+                       'tools/release/check.sh' if consumer == 'metadata' else 'tools/release/package.sh')
+            validation = command_step(job, command)
+            if (name, consumer) in WRAPPED_BY_RELEASE_CHECK:
+                if validation.get('if') not in (None, True) or validation.get('continue-on-error'):
+                    raise ValueError('history validation requires the unsuppressed release wrapper')
+                if steps.index(checkouts[0]) >= steps.index(validation):
+                    raise ValueError('checkout must precede release validation')
+                check_release_entry(validation['run'])
+                check_run(release_check, release=True)
+                check_run(release_check, release=True, fail=True)
                 continue
-            expected = RECOVERY_PREPARE if workflow == 'recover-release' else PREPARE
-            matching = [step for step in steps if step.rstrip() == expected.rstrip()]
-            if len(matching) != 1:
-                raise ValueError('consumer requires exact unsuppressed preparation: ' + job)
-            command = ('tools/shared/build.py' if workflow == 'ci' and job == 'native' else
-                       'tools/release/check.sh' if job == 'metadata' else 'tools/release/package.sh')
-            if command not in body or not (body.index(checkouts[0]) < body.index(expected) < body.index(command)):
-                raise ValueError('history preparation must precede validation: ' + job)
+            preparation = command_step(job, PREPARE)
+            if preparation.get('if') not in (None, True) or preparation.get('continue-on-error'):
+                raise ValueError('history preparation must not be suppressed')
+            if not steps.index(checkouts[0]) < steps.index(preparation) < steps.index(validation):
+                raise ValueError('history preparation must precede validation: ' + consumer)
+            check_run(preparation['run'])
+            check_run(preparation['run'], fail=True)
+            if name == 'recover-release':
+                check_run(preparation['run'], present=False)
 
 
 class HistoryWorkflowControls(unittest.TestCase):
     def setUp(self):
-        self.workflows = {name: (ROOT / '.github/workflows' / (name + '.yml')).read_text()
+        self.workflows = {name: load((ROOT / '.github/workflows' / (name + '.yml')).read_text())
                           for name in CALLERS}
         self.release_check = (ROOT / 'tools/release/check.sh').read_text()
 
     def test_all_validation_and_packaging_consumers_prepare_history(self):
         require_callers(self.workflows, self.release_check)
 
+    def test_yaml_reformat_step_names_and_shell_locals_do_not_change_history(self):
+        changed = copy.deepcopy(self.workflows)
+        for workflow in changed.values():
+            for job in workflow['jobs'].values():
+                for step in job.get('steps', []):
+                    if 'name' in step:
+                        step['name'] = 'A different display name'
+                    if PREPARE in step.get('run', ''):
+                        step['run'] = '# Source presentation is not a contract\n' + step['run']
+        # JSON is also YAML; quoted keys and flow collections are equivalent.
+        changed = {name: load(json.dumps(value, sort_keys=True, indent=4))
+                   for name, value in changed.items()}
+        require_callers(changed, self.release_check.replace(
+            'python3 -B ' + PREPARE, 'history_helper=' + PREPARE + '\npython3 -B "$history_helper"'))
+
     def test_each_missing_or_suppressed_preparation_is_rejected(self):
         for name, jobs in CALLERS.items():
-            explicit_jobs = [job for job in jobs if (name, job) not in WRAPPED_BY_RELEASE_CHECK]
-            expected = RECOVERY_PREPARE if name == 'recover-release' else PREPARE
-            for index, job in enumerate(explicit_jobs):
-                offsets = [match.start() for match in re.finditer(re.escape(expected), self.workflows[name])]
-                self.assertEqual(len(offsets), len(explicit_jobs))
-                offset = offsets[index]
-                for replacement in ('', expected.replace('python3 -B', 'echo python3 -B'),
-                                    expected.replace('        run:', '        if: false\n        run:'),
-                                    expected + '        continue-on-error: true\n'):
-                    with self.subTest(workflow=name, job=job, replacement=replacement):
-                        changed = dict(self.workflows)
-                        changed[name] = changed[name][:offset] + replacement + changed[name][offset + len(expected):]
+            for job in jobs:
+                if (name, job) in WRAPPED_BY_RELEASE_CHECK:
+                    continue
+                for mutation in ['remove', 'comment', 'condition', 'failure']:
+                    with self.subTest(workflow=name, job=job, mutation=mutation):
+                        changed = copy.deepcopy(self.workflows)
+                        owner = changed[name]['jobs'][job]
+                        step = command_step(owner, PREPARE)
+                        if mutation == 'remove':
+                            owner['steps'].remove(step)
+                        elif mutation == 'comment':
+                            step['run'] = '\n'.join('# ' + line for line in step['run'].splitlines())
+                        elif mutation == 'condition':
+                            step['if'] = False
+                        else:
+                            step['continue-on-error'] = True
                         with self.assertRaises(ValueError):
                             require_callers(changed, self.release_check)
 
     def test_release_wrapper_preparation_cannot_be_missing_or_suppressed(self):
-        for replacement in ('', 'echo ' + RELEASE_PREPARE, RELEASE_PREPARE + ' || true'):
-            with self.subTest(replacement=replacement), self.assertRaises(ValueError):
-                require_callers(self.workflows, self.release_check.replace(RELEASE_PREPARE, replacement))
-        removed = dict(self.workflows)
-        removed['ci'] = removed['ci'].replace(RELEASE_ENTRY, RELEASE_ENTRY + '\n        if: false', 1)
+        command = 'python3 -B ' + PREPARE
+        fixture = release_fixture(command)
+        require_callers(self.workflows, fixture)
         with self.assertRaises(ValueError):
-            require_callers(removed, self.release_check)
+            require_callers(self.workflows, fixture.replace('set -euo pipefail', 'set -u -o pipefail'))
+        for replacement in ('', 'echo ' + command, command + ' || true'):
+            with self.subTest(replacement=replacement), self.assertRaises(ValueError):
+                require_callers(self.workflows, release_fixture(replacement))
+        for body in ['# tools/release/check.sh', 'tools/release/check.sh || true']:
+            changed = copy.deepcopy(self.workflows)
+            command_step(changed['ci']['jobs']['metadata'], 'tools/release/check.sh')['run'] = body
+            with self.subTest(wrapper=body), self.assertRaises(ValueError):
+                require_callers(changed, self.release_check)
+        changed = copy.deepcopy(self.workflows)
+        command_step(changed['ci']['jobs']['metadata'], 'tools/release/check.sh')['if'] = False
+        with self.assertRaises(ValueError):
+            require_callers(changed, self.release_check)
 
     def test_each_shallow_source_checkout_is_rejected(self):
         for name, jobs in CALLERS.items():
             for job in jobs:
                 with self.subTest(workflow=name, job=job):
-                    changed = dict(self.workflows)
-                    start = changed[name].index('  ' + job + ':\n')
-                    offset = changed[name].index('          fetch-depth: 0', start)
-                    changed[name] = changed[name][:offset] + changed[name][offset:].replace('fetch-depth: 0', 'fetch-depth: 1', 1)
+                    changed = copy.deepcopy(self.workflows)
+                    checkout = next(step for step in changed[name]['jobs'][job]['steps']
+                                    if step.get('uses', '').startswith('actions/checkout@'))
+                    checkout['with']['fetch-depth'] = 1
                     with self.assertRaises(ValueError):
                         require_callers(changed, self.release_check)
 
     def test_preparation_after_validation_is_rejected(self):
-        moved = self.release_check.replace(RELEASE_PREPARE + '\n', '', 1).replace(
-            FIRST_HISTORY_SUITE, FIRST_HISTORY_SUITE + '\n' + RELEASE_PREPARE, 1)
+        command = 'python3 -B ' + PREPARE
+        moved = release_fixture(command, after=True)
         with self.assertRaises(ValueError):
             require_callers(self.workflows, moved)
-        changed = dict(self.workflows)
-        changed['ci'] = changed['ci'].replace(PREPARE, '', 1).replace(
-            '      - name: Preserve actual builtin generation after freshness failure\n',
-            PREPARE + '      - name: Preserve actual builtin generation after freshness failure\n', 1)
+        changed = copy.deepcopy(self.workflows)
+        steps = changed['ci']['jobs']['native']['steps']
+        step = command_step(changed['ci']['jobs']['native'], PREPARE)
+        steps.remove(step)
+        steps.append(step)
         with self.assertRaises(ValueError):
             require_callers(changed, self.release_check)
 
@@ -134,6 +233,10 @@ class HistoryWorkflowControls(unittest.TestCase):
                 self.assertFalse(history.checked_current(path, current + b'\n# unauthorized delta\n', digest))
                 with self.assertRaisesRegex(ValueError, 'frozen reconciliation input changed'):
                     history.checked_current(path, current, '0' * 64)
+
+    def test_duplicate_yaml_keys_are_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'duplicate workflow key'):
+            load('on: {push: {}}\njobs: {}\njobs: {other: {}}\n')
 
 
 if __name__ == '__main__':

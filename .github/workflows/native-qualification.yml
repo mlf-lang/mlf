@@ -27,6 +27,11 @@ jobs:
         with:
           ref: ${{ inputs.source }}
           fetch-depth: 0
+      - name: Install workflow test parser
+        run: |
+          python3 -m venv "$RUNNER_TEMP/workflow-tests"
+          "$RUNNER_TEMP/workflow-tests/bin/python" -m pip install --disable-pip-version-check -r tools/testing/requirements.txt
+          echo "$RUNNER_TEMP/workflow-tests/bin" >> "$GITHUB_PATH"
       - name: Prepare reviewed historical source objects
         run: python3 -B tools/testing/prepare_history_refs.py
       - name: Bind every candidate and artifact to this exact workflow commit
@@ -374,6 +379,11 @@ jobs:
         with:
           ref: ${{ needs.metadata.outputs.source }}
           fetch-depth: 0
+      - name: Install workflow test parser
+        run: |
+          python3 -m venv "$RUNNER_TEMP/workflow-tests"
+          "$RUNNER_TEMP/workflow-tests/bin/python" -m pip install --disable-pip-version-check -r tools/testing/requirements.txt
+          echo "$RUNNER_TEMP/workflow-tests/bin" >> "$GITHUB_PATH"
       - name: Prepare reviewed historical source objects
         run: python3 -B tools/testing/prepare_history_refs.py
       - name: Native linking dependencies
@@ -430,6 +440,11 @@ jobs:
         with:
           ref: ${{ needs.metadata.outputs.source }}
           fetch-depth: 0
+      - name: Install workflow test parser
+        run: |
+          python3 -m venv "$RUNNER_TEMP/workflow-tests"
+          "$RUNNER_TEMP/workflow-tests/bin/python" -m pip install --disable-pip-version-check -r tools/testing/requirements.txt
+          echo "$RUNNER_TEMP/workflow-tests/bin" >> "$GITHUB_PATH"
       - name: Prepare reviewed historical source objects
         run: python3 -B tools/testing/prepare_history_refs.py
       - name: Native linking dependencies

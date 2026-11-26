@@ -25,6 +25,13 @@ jobs:
         with:
           ref: ${{ inputs.source }}
           fetch-depth: 0
+      - name: Install workflow test parser when required by the selected source
+        run: |
+          if test -f tools/testing/requirements.txt; then
+            python3 -m venv "$RUNNER_TEMP/workflow-tests"
+            "$RUNNER_TEMP/workflow-tests/bin/python" -m pip install --disable-pip-version-check -r tools/testing/requirements.txt
+            echo "$RUNNER_TEMP/workflow-tests/bin" >> "$GITHUB_PATH"
+          fi
       - name: Prepare reviewed historical source objects when required by the selected source
         run: |
           if test -f tools/testing/prepare_history_refs.py; then
@@ -64,6 +71,13 @@ jobs:
         with:
           ref: ${{ needs.metadata.outputs.source }}
           fetch-depth: 0
+      - name: Install workflow test parser when required by the selected source
+        run: |
+          if test -f tools/testing/requirements.txt; then
+            python3 -m venv "$RUNNER_TEMP/workflow-tests"
+            "$RUNNER_TEMP/workflow-tests/bin/python" -m pip install --disable-pip-version-check -r tools/testing/requirements.txt
+            echo "$RUNNER_TEMP/workflow-tests/bin" >> "$GITHUB_PATH"
+          fi
       - name: Prepare reviewed historical source objects when required by the selected source
         run: |
           if test -f tools/testing/prepare_history_refs.py; then
