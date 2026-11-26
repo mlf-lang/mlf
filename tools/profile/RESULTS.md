@@ -33,7 +33,7 @@ All six native groups passed on the same candidate and 426-file source
 snapshot, including an entirely fresh LLVM/binary self-host fixed point and
 both backend layouts. All nine workloads emit byte-identical LLVM in both
 layouts. Primary-log hashes, every matrix row, and unchanged source/tool
-identities were independently audited; raw evidence is retained in the report.
+identities were independently audited.
 
 The [hosted cold bootstrap](https://github.com/mlf-lang/mlf/actions/runs/39169819058)
 also passed on the actual 7 GiB, three-CPU Apple M1 virtual runner: **995.59s**,
@@ -42,9 +42,8 @@ Both LLVM modules and executable hashes exactly match the locally tested
 candidate. This confirms the runner fit; one hosted observation does not prove
 a paired speedup or the cause of the historical hour-long run.
 
-See the [full report and reproducible commands](results/2026-10-19-bootstrap-memory/README.md),
-[all samples and variation](results/2026-10-19-bootstrap-memory/pairs/summary.json),
-and [exact frozen source/tool identities](results/2026-10-19-bootstrap-memory/pairs/context.json).
+The raw report (including its commands), sample data, and frozen source/tool context
+were removed from this repository.
 This stock native module-built compiler has SHA-256
 `d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6`;
 the historical PGO results below retain their original binary/input scope.

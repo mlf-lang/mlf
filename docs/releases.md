@@ -226,9 +226,9 @@ retain the independently pinned v0.3.0 in `.github/seed.env`. Release jobs
 read seed pins and verification/timing tools from the workflow's immutable
 commit, so an older target tag cannot silently select its old seed. The checksum
 file can also cover supplementary validation archives that are not downloaded
-for bootstrapping. The [three-pair seed comparison](../tools/profile/results/2026-10-19-seed/README.md)
-measured a 16.326% lower local median full bootstrap time; hosted timing remains
-a separate measurement.
+for bootstrapping. The [retained summary of the three-pair seed comparison](../tools/profile/README.md#published-release-seed-bootstrap--2026-10-19)
+reports a 16.326% lower local median full bootstrap time. That comparison did not
+measure a hosted speedup.
 
 To diagnose bootstrap time without running tests or another compiler generation,
 dispatch **Native bootstrap timing** (`gh workflow run bootstrap.yml --ref main`).
@@ -251,10 +251,10 @@ dependency boundaries and the final linked xMLF remain mandatory. See
 The earlier per-module compiler was measured in three local cold build pairs: sampled
 aggregate RSS fell from a 9.99 GB median to 3.27 GB (maximum 3.28 GB), while
 median full build time rose from 332.38s to 460.87s. The
-[memory report](../tools/profile/results/2026-10-19-bootstrap-memory/README.md)
-records the tradeoff and the limits of extrapolating to a hosted runner.
-A subsequent cold build on the actual 7 GiB hosted runner passed in 995.59s,
-at 2.73 GB maximum process RSS, reproducing both locally tested binaries exactly.
+[retained bootstrap memory summary](../tools/profile/README.md#bootstrap-memory--2026-10-19)
+describes the tradeoff. A subsequent cold build on the actual 7 GiB hosted
+runner passed in 995.59s, at 2.73 GB maximum process RSS, reproducing both
+locally tested binaries exactly. This was one hosted run, not a paired comparison.
 
 The timing helper defaults `MLF_BOOTSTRAP_MAX_RSS_BYTES` to `5500000000` and
 fails before publishing candidate paths when a measured command exceeds that

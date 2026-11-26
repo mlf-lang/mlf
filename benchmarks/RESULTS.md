@@ -1,11 +1,20 @@
 # Native 3× compilation gate — 2026-10-18
 
+**Current reader note for October 16:** The [final benchmark data](../tools/bench/results/2026-10-16-native-macos-arm64.json)
+are available. The raw files for the earlier unwarmed run and the n-body
+first-launch check are not in this repository. See the
+[October 16 self-compilation report](../tools/profile/RESULTS.md#native-self-compilation-profiling-milestone--2026-10-16).
+
 > Historical evidence notice: Raw files previously stored under
 > `tools/profile/results/` were removed from this branch and its Git history.
 > References to those files below describe historical evidence that is not
 > available in this repository; retained summaries are not independent access
 > to the original raw records.
 
+
+**Current reader note for October 13:** The [Stage 2 native build driver](https://github.com/mlf-lang/mlf/blob/10f1a0f8593a7cbe779d4cb73c4d66bcd01a4576/scripts/compile_native.py)
+matches the driver hash in all three stage reports. Their worktrees had local
+changes, so this verifies the driver file, not the entire checkout.
 
 All nine workloads pass the median 3× C compilation / 2× C runtime gate, with every observed maximum MLF sample also below the limit relative to the corresponding minimum C sample.
 
@@ -23,7 +32,12 @@ Seven samples were collected for each compiler/workload with alternating order, 
 | reverse-complement | 127.317 | 337.822 | 2.653392713 | 195.893 | 293.922 | 1.500421148 | PASS |
 | k-nucleotide | 149.863 | 369.828 | 2.467773900 | 170.390 | 280.410 | 1.645695170 | PASS |
 
-[The raw native report](../tools/profile/results/2026-10-18-compile3/bench-final.json) contains all 189 compilation and 189 runtime samples. [The detailed report](../tools/profile/RESULTS.md) includes ranges, MADs, stage overlap, diagnostic phases, rejected experiments, reproducible commands, source/toolchain hashes and all six native test groups. All 63 final standard LLVM outputs match the starting compiler.
+The removed raw native report contained all 189 compilation and 189 runtime
+samples. The [retained October 18 summary](../tools/profile/RESULTS.md#native-compilation-optimization--2026-10-18)
+includes ranges, MADs, stage overlap, diagnostic phases, rejected experiments,
+reproducible commands and results for all six native test groups. It describes
+the source/toolchain hashes recorded in the original evidence. All 63 final
+standard LLVM outputs match the starting compiler.
 
 Ordinary self-compilation on identical frozen sources measured 257.289 s for the original and 181.955 s for the candidate (-29.280%). This is the separately reported source-to-LLVM boundary.
 

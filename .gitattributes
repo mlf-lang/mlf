@@ -18,3 +18,5 @@ benchmarks/regex-redux/rust/*.rs -whitespace
 benchmarks/regex-redux/haskell/*.hs -whitespace
 # The parity API transition authenticates this reviewed data byte-for-byte.
 tests/golden/parity-source-api.json text eol=lf
+# Preserve the exact historical candidate-selection oracle on all checkouts.
+tools/shared/fixtures/candidate-selection/Classes.hs.txt -text
