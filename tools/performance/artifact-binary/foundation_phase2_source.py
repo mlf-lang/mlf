@@ -320,8 +320,6 @@ def qualified_contract(root, source_root=None):
          '94e086c15c40aaf220c764f0e723cc3cfe627587'),
         # Reduced fixture coverage is checked during crate planning. Its parent
         # changed no projected blobs; this commit changes only the modular test.
-        ('1297b5cf57aec9c7725e8e21a7d44710b06b523e', '889deef2e37678723546b23d5c55af2116757d4e',
-         '088358c9497c9ac4587e1a60b85c0ab18fabf146'),
         ('4bcb0000a6a97f53761f53baeb6b946e4037a457', '6d84f5331a8f7dbdbc7705acab901e9e7f3cfa24',
          '1297b5cf57aec9c7725e8e21a7d44710b06b523e'),
         ('79f2c6bf7e1edc0efc4f96ffd416bd9a8607457f', 'b581c6c61ed1f56638220c8e1ecdb0e1fda2d7c6',
@@ -335,6 +333,18 @@ def qualified_contract(root, source_root=None):
         live_git.run('merge-base', '--is-ancestor', commit, 'HEAD')
         fixes = set(live_git.run('diff', '--name-only', parent, commit).decode().splitlines())
         expected.update(live_git.inventory(commit, fixes & successor_paths))
+    # Accept only the reviewed test-only correction, not an arbitrary new auxiliary blob.
+    storage_fixture = 'tools/shared/test_artifact_binary_modular.py'
+    storage_parent = '088358c9497c9ac4587e1a60b85c0ab18fabf146'
+    storage_review = '1297b5cf57aec9c7725e8e21a7d44710b06b523e'
+    live_git.commit(storage_review, tree='889deef2e37678723546b23d5c55af2116757d4e',
+                    parents=[storage_parent])
+    live_git.run('merge-base', '--is-ancestor', storage_review, 'HEAD')
+    storage_changes = set(live_git.run(
+        'diff', '--name-only', storage_parent, storage_review).decode().splitlines())
+    proof.require(storage_changes == {storage_fixture} and storage_fixture in auxiliary_roles,
+                  'exact reduced binary storage fixture control')
+    expected.update(live_git.inventory(storage_review, {storage_fixture}))
     if source_root == root:
         auxiliary = {p: proof.read(source_root, p) for p in auxiliary_roles}
         proof.require(all(proof.oid(raw) == expected[p] for p, raw in auxiliary.items()),
