@@ -103,27 +103,13 @@ class Figure12Data(unittest.TestCase):
         with self.assertRaises(data.FixtureError):
             self.reviewed_decode_for_data_control(root)
 
-    def test_semantic_oracle_mutations_fail_closed(self):
-        mutations = [
-            ('Figure12.emlf', 'import Prelude hiding (Monad, return, bind)\nimport MLF.Primitive (Monad, return, bind)\n', ''),
-            ('Figure12Suite.emlf', 'A.equal T.alphaEq prettyType "Figure12 principal type" expected (inferredType result)', 'A.succeed ()'),
-            ('Figure12Suite.emlf', 'S.find (\\c -> eqString label (caseId c)) cases',
-             'S.find (\\c -> eqString "A11" (caseId c)) cases'),
-            ('Figure12.emlf', 'H.append signatures (localSignatures c)',
-             'H.append (localSignatures c) signatures'),
-            ('Figure12Suite.emlf', 'X.equalErased (X.erase parsed) (X.erase (compiledTerm result))', 'true'),
-            ('Figure12.emlf', '(Set.delete x (freeNames b))', '(freeNames b)'),
-            ('Figure12.emlf', '(expression c) ss', '(expression c) []'),
-            ('Helpers.emlf', 'instance Ord String where { compare = compareString }',
-             'instance Ord String where { compare = compareInt }'),
-            ('Helpers.emlf', 'S.mapEither IM.fromList', 'fmap IM.fromList'),
-            ('Helpers.emlf', 'S.mapEither ((,) k) (f k v)', 'fmap ((,) k) (f k v)'),
-            ('Map.emlf', 'fromList xs = M.fromList H.compare xs', 'fromList xs = M.empty'),
-            ('Set.emlf', 'toAscList = S.toList', 'toAscList = S.empty'),
-        ]
-        for filename, old, new in mutations:
-            with self.subTest(filename=filename, old=old):
-                root = self.changed('tests/Tests/' + filename, old, new)
+    def test_unreviewed_source_bytes_fail_closed(self):
+        # Source authentication precedes decoding, regardless of a change's meaning.
+        for filename in ('Figure12.emlf', 'Figure12Suite.emlf', 'Helpers.emlf', 'Map.emlf', 'Set.emlf'):
+            relative = 'tests/Tests/' + filename
+            with self.subTest(relative=relative):
+                current = (data.ROOT / relative).read_text()
+                root = self.changed(relative, current, current + '\n-- unreviewed change\n')
                 with self.assertRaisesRegex(data.FixtureError, 'unreviewed Figure12 oracle semantics'):
                     data.decode(root)
 

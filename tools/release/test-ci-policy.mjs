@@ -178,26 +178,14 @@ const verifyFiniteGate = workflow => {
       assert.ok(workflow.includes(`            .mlf-build/${root}-controls/**/*.${suffix}\n`));
     }
   }
-};
-// C4's full retained graph/transaction controls now run in the explicit ABI
-// adapter's graph suite inside this finite gate. Preserve its evidence too.
-const c4Gate = finiteGate;
-const verifyC4Gate = workflow => {
-  assert.ok(workflow.includes(c4Gate), 'Exact O2 C4 graph gate with unchanged resource bounds');
+  // C4's retained graph/transaction controls share this gate; keep their
+  // additional source and extensionless diagnostic artifacts as well.
   for (const artifact of [
-    '.mlf-build/a1-integrated-guard/',
-    '.mlf-build/a1-integrated-controls/**/*.json',
     '.mlf-build/a1-integrated-controls/**/stdout',
     '.mlf-build/a1-integrated-controls/**/stderr',
     '.mlf-build/a1-integrated-controls/**/*.hs',
   ]) assert.ok(workflow.includes('            ' + artifact + '\n'), 'C4 failure/evidence preservation: ' + artifact);
 };
-verifyC4Gate(ciJob('native'));
-assert.throws(() => verifyC4Gate(ciJob('native').replace(c4Gate, '')));
-assert.throws(() => verifyC4Gate(ciJob('native').replace(c4Gate, c4Gate.replace("if: matrix.optimization == '2'", 'if: false'))));
-assert.throws(() => verifyC4Gate(ciJob('native').replace(c4Gate, c4Gate.replace('--rss-mib 5120', '--rss-mib 99999'))));
-assert.throws(() => verifyC4Gate(ciJob('native').replace(c4Gate, c4Gate.replace('set -euo pipefail', 'set +e'))));
-assert.throws(() => verifyC4Gate(ciJob('native').replace('.mlf-build/a1-integrated-controls/**/stderr', 'discarded')));
 const verifyNumericEvidence = workflow => {
   for (const root of ['patricia-*', 'int64-*', 'llp64-*']) {
     for (const suffix of ['**/*.json', '**/stdout', '**/stderr', '**/*.hs']) {
@@ -212,7 +200,9 @@ assert.throws(() => verifyNumericEvidence(ciJob('native').replace('.mlf-build/ll
 verifyFiniteGate(ciJob('native'));
 assert.throws(() => verifyFiniteGate(ciJob('native').replace(finiteGate, '')));
 assert.throws(() => verifyFiniteGate(ciJob('native').replace(finiteGate, finiteGate.replace("if: matrix.optimization == '2'", 'if: false'))));
+assert.throws(() => verifyFiniteGate(ciJob('native').replace(finiteGate, finiteGate.replace('--rss-mib 5120', '--rss-mib 99999'))));
 assert.throws(() => verifyFiniteGate(ciJob('native').replace(finiteGate, finiteGate.replace('set -euo pipefail', 'set +e'))));
+assert.throws(() => verifyFiniteGate(ciJob('native').replace('.mlf-build/a1-integrated-controls/**/stderr', 'discarded')));
 assert.throws(() => verifyFiniteGate(ciJob('native').replace('.mlf-build/a1-integrated-controls/**/*.json', 'discarded')));
 assert.throws(() => verifyFiniteGate(ciJob('native').replace('.mlf-build/f1-integrated-controls/**/*.json', 'discarded')));
 assert.match(ciJob('native'), /f1-integrated-controls\/\*\*\/source\/Probe\.dump-\*/);

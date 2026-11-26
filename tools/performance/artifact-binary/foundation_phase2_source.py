@@ -311,6 +311,9 @@ def qualified_contract(root, source_root=None):
          'ad51ebc26925bcd573d7e36e4346f202e4f9d5e6'),
         ('9815b98bf1129cec811e8c709cbe866a3ef2a451', '937ffe114e8f9ad886d50c8abf7f0954843e705e',
          '79861cc7378ed2e0fc11efd5f16e22b948eb8edd'),
+        # Observable legacy adapter actions update only the auxiliary tests lock.
+        ('57f7ea72fccc0b40583de06e1edd58f6483fa0ed', '548c6477f9cde884b9ea5f121dba6e82ff299ebb',
+         '94e086c15c40aaf220c764f0e723cc3cfe627587'),
     ):
         live_git.commit(commit, tree=tree, parents=[parent])
         live_git.run('merge-base', '--is-ancestor', commit, 'HEAD')

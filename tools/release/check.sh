@@ -25,7 +25,7 @@ if [ "${1:-}" = --metadata-only ]; then
   test -s LICENSE
   release_pass
   release_begin release/metadata/diff
-  git diff --check
+  python3 -B tools/release/check_diff.py
   release_pass
   exit
 fi
@@ -36,6 +36,7 @@ fi
 
 run() { python3 -B tools/testing/run.py "$@"; }
 run release-metadata
+run release-metadata-diff
 # Fetch only closed pinned source objects when needed. The historical test
 # suites independently check the selected objects after preparation.
 python3 -B tools/testing/prepare_history_refs.py
