@@ -12,6 +12,7 @@ import compiler_reference
 import fit_growth
 import framework_results as framework
 import provenance
+import worker
 
 
 def failure_detail(folder, receipt):
@@ -50,7 +51,7 @@ def completed_pairs(runs, with_reference=False):
     return sum(lanes == expected for lanes in pairs.values())
 
 
-def measure(folder, setup, row, args, repeats, reference):
+def measure(folder, setup, row, args, repeats, reference, source_root):
     family, size = row['family'], row['size']
     argv = [sys.executable, '-B', bench.HERE / 'run.py', '--output', folder, '--setup', setup,
             '--cohort', folder.name, '--family', family, '--endpoint', args.endpoint,
@@ -83,7 +84,7 @@ def measure(folder, setup, row, args, repeats, reference):
             or row['completed_pairs'] != repeats or plan['benchmark']['repeats'] != repeats
             or plan['benchmark']['endpoint']['id'] != args.endpoint):
         raise ValueError('analyzed cohort differs from the requested cell')
-    check_shared_inputs(bench.ROOT, folder, plan, reference)
+    check_shared_inputs(source_root, folder, plan, reference)
     metrics = rows[0]
     row.update(status='passed', mlf_seconds=metrics['mlf_wall_median'],
                ghc_seconds=metrics['ghc_wall_median'], mlf_over_ghc=metrics['mlf_over_ghc'],
@@ -99,6 +100,7 @@ def measure(folder, setup, row, args, repeats, reference):
 
 def check_shared_inputs(root, folder, plan, reference):
     sources = {case['source'] for case in plan['cases']}
+    sources.update(lib['source'] for case in plan['cases'] for lib in worker.dependencies(case))
     inputs = {path: digest for path, digest in plan['inputs'].items() if path not in sources}
     if not inputs:
         raise ValueError('missing shared measurement inputs')
@@ -236,7 +238,8 @@ def run(args):
     except BaseException:
         cohorts.rmdir()
         raise
-    args.baseline_selection = compiler_reference.select_revision(setup_record.get('source',bench.ROOT),
+    source_root = Path(setup_record.get('source', bench.ROOT)).resolve()
+    args.baseline_selection = compiler_reference.select_revision(source_root,
         [cohorts,setup.parent,setup_record.get('producer',root/'producer'),root/'summary.md',root/'summary.csv',root/'growth.json'])
     rows = [dict(reference_seconds='',reference_commit='',mlf_over_reference='',reference_peak_rss_bytes=None,
                  mlf_over_reference_peak_rss=None,family=family, size=size, status='pending', completed_pairs=0,
@@ -252,7 +255,7 @@ def run(args):
         save_tables(root, rows, repeats, args.endpoint, selection=args.baseline_selection)
         folder = root / row['evidence']
         try:
-            samples.extend(measure(folder, setup, row, args, repeats, reference))
+            samples.extend(measure(folder, setup, row, args, repeats, reference, source_root))
         except (OSError, ValueError, KeyError, RuntimeError) as exc:
             row.update(status='failed', reason=f'{type(exc).__name__}: {exc}')
         save_tables(root, rows, repeats, args.endpoint, selection=args.baseline_selection)

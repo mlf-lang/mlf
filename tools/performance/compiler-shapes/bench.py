@@ -121,10 +121,12 @@ def framework_list(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('command', nargs='?', choices=('all', 'run', 'sweep'), default='sweep')
     parser.add_argument('--matrix', default='default')
+    parser.add_argument('--baseline-family')
     add_filters(parser)
     args, _setup_options = parser.parse_known_args(argv)
     _, families, sizes, baseline = resolve(args.matrix, args.family, args.size)
-    framework.list_cases(generate.coordinates(sizes, ['baseline', *families] if baseline else families))
+    requested = ['baseline', *families] if baseline else families
+    framework.list_cases(generate.coordinates(sizes, requested, args.baseline_family))
 
 
 def prepare_setup(workdir, endpoint, producer, *, source=None, builtin_prefix=None,

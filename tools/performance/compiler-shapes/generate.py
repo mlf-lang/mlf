@@ -1366,24 +1366,30 @@ def expected_output(family, size, argument):
     return f'{expected(family, size, argument)}\n'
 
 
-def coordinates(sizes=None, families=None):
+def coordinates(sizes=None, families=None, baseline_family=None):
     if sizes is None:
         sizes = REGISTRY['matrices']['default']['sizes']
     selected = REGISTRY['matrices']['default']['families'] if families is None else list(families)
     unknown = [f for f in selected if f != 'baseline' and f not in FAMILIES]
     if unknown:
         raise ValueError('unknown families: ' + ', '.join(unknown))
-    return [(family, n) for family in selected for n in ((0,) if family == 'baseline' else sizes)]
-
-
-def generate(out, sizes=None, families=None, baseline_family=None):
-    out = Path(out); out.mkdir(parents=True, exist_ok=False)
-    cells = coordinates(sizes, families)
+    cells = [(family, n) for family in selected for n in ((0,) if family == 'baseline' else sizes)]
     if baseline_family is not None and (
         not REGISTRY['families'].get(baseline_family, {}).get('matched_zero') or
         {family for family, _ in cells} != {'baseline', baseline_family}
     ):
         raise ValueError('a matched baseline requires the zero cell and exactly its growing family')
+    return cells
+
+
+def generate(out, sizes=None, families=None, baseline_family=None):
+    return generate_cells(out, coordinates(sizes, families, baseline_family), baseline_family)
+
+
+def generate_cells(out, cells, baseline_family=None):
+    """Write the selected coordinates, retaining the full request's zero-size workload."""
+    out = Path(out)
+    out.mkdir(parents=True, exist_ok=False)
     cases = []
     for family, n in cells:
         source_family = baseline_family if family == 'baseline' and baseline_family else family

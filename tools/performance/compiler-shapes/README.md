@@ -420,8 +420,11 @@ the index mapping or closure and must be re-measured, not retroactively filled i
   `recursive_ring`, `wide_case`, `class_instances`, `dependency_diamonds`,
   `state_updates`, `captured_closures`, `wide_product`, `rank2_arguments`,
   `irregular_literal_table`, `nested_poly_types`, `rank2_callbacks` and `decoder_pipeline`.
-  Two rounds per cell give 78 timed compilations in one cohort. CI
-  uploads the available receipts and measurements even if a build fails.
+  Two rounds per cell give 78 timed compilations in one cohort. A separate
+  correctness pilot uses the same setup to build `inferred_constructor_writers`
+  at size 8 once with each compiler. Each executable runs the five oracle inputs,
+  covering the generated `Read`, `Reject` and `Stop` branches. CI uploads the
+  available receipts and measurements even if a build fails.
 - The manual `.github/workflows/compiler-shapes.yml` workflow runs the standard
   sweep. Dispatch inputs can filter families and sizes or set the repeat count.
   The job summary and uploaded CSV show the available results, including failed

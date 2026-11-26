@@ -88,6 +88,10 @@ def analyze(folder):
     rows=[]
     for case in plan['cases']:
         require(sha(case['source'])==case['source_sha256'],'unchanged shared source')
+        for library in worker.dependencies(case):
+            path = library['source']
+            require(sha(path) == library['sha256'] == plan['inputs'].get(path),
+                    f'unchanged pinned dependency source: {path}')
         row={'cohort':plan['benchmark']['cohort'],'endpoint':plan['benchmark']['endpoint']['id'],
              'case':case['id'],'family':case['family'],'size':case['size'],
              'source_bytes':case['source_bytes'],'source_sha256':case['source_sha256']}
