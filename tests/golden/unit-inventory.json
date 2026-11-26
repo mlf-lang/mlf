@@ -1576,6 +1576,22 @@
         }
       },
       "unchanged_expectations": "All prior harness cases, metrics and inventories remain; these controls do not claim measured benchmark acceptance."
+    },
+    {
+      "name": "benchmark runner behavior replaces source spelling assertions",
+      "basis": "Three independently authored native cases exercise the same option, optional dependency, callback-selection and report operations as the real benchmark CLI. Invalid options and malformed dependency maps fail; correctness-only execution cannot dispatch the measured callback or claim timing results.",
+      "added_harness_ids": [
+        "test_runner_modes_preserve_limits_and_reject_invalid_options",
+        "test_runner_optional_package_maps_preserve_dependency_pins",
+        "test_runner_reports_distinguish_correctness_from_performance"
+      ],
+      "required_execution_counts": {
+        "harness": {
+          "before": 69,
+          "after": 72
+        }
+      },
+      "unchanged_expectations": "All existing harness observations, workload source pins, independent output oracles, fixtures, performance limits and metrics remain. This amendment records behavior controls and makes no performance qualification claim."
     }
   ]
 }
