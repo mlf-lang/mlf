@@ -115,22 +115,30 @@ class Figure12Data(unittest.TestCase):
 
     def test_reviewed_transcriptions_reconstruct_old_allowlist(self):
         self.assertEqual(set(data.REVIEWED_SOURCE_TRANSITIONS),
-                         {'tests/Tests/Figure12.emlf', 'tests/Tests/Helpers.emlf'})
+                         {'tests/Tests/Figure12.emlf', 'tests/Tests/Helpers.emlf',
+                          'tests/Tests/Figure12Suite.emlf'})
         for relative, transition in data.REVIEWED_SOURCE_TRANSITIONS.items():
             with self.subTest(relative=relative):
+                reviewed = data.REVIEWED_SEMANTIC_SHA256[relative]
+                expected_preimage = (data.REGISTERED_SUITE_SHA256
+                                     if relative.endswith('/Figure12Suite.emlf') else reviewed)
                 current = (data.ROOT / relative).read_text()
                 previous = current
                 for before, after in reversed(transition['edits']):
                     self.assertEqual(previous.count(after), 1)
                     previous = previous.replace(after, before, 1)
-                self.assertEqual(hashlib.sha256(previous.encode()).hexdigest(),
-                                 data.REVIEWED_SEMANTIC_SHA256[relative])
-                self.assertEqual(transition['preimage_sha256'], data.REVIEWED_SEMANTIC_SHA256[relative])
+                self.assertEqual(hashlib.sha256(previous.encode()).hexdigest(), expected_preimage)
+                self.assertEqual(transition['preimage_sha256'], expected_preimage)
                 self.assertEqual(hashlib.sha256(current.encode()).hexdigest(), transition['postimage_sha256'])
                 self.assertEqual(data.authenticate_semantic_source(
-                    relative, previous.encode(), data.REVIEWED_SEMANTIC_SHA256[relative]), previous)
+                    relative, previous.encode(), reviewed), previous)
                 root = self.changed(relative, current, previous)
-                self.assertEqual(data.decode(root)['cases'], data.decode()['cases'])
+                before, after = data.decode(root), data.decode()
+                before_hashes = before.pop('fixture_sha256')
+                after_hashes = after.pop('fixture_sha256')
+                self.assertEqual({key for key in before_hashes if before_hashes[key] != after_hashes[key]},
+                                 {relative})
+                self.assertEqual(before, after)
 
     def test_partial_or_mutated_transcriptions_fail_closed(self):
         mutations = [
@@ -147,6 +155,8 @@ class Figure12Data(unittest.TestCase):
              'SSignature body annotation -> layoutExpr body'),
             ('Helpers.emlf', 'SourceSpan package owner "" 0 0 0 0', 'SourceSpan "" "" "" 0 0 0 0'),
             ('Helpers.emlf', 'S.map layoutInstance instances', 'instances'),
+            ('Figure12Suite.emlf', 'Coverage.flush; exitWith code', 'Coverage.flush; exitWith 0'),
+            ('Figure12Suite.emlf', 'Coverage.flush; exitWith code', 'Coverage.finish "figure12"; exitWith code'),
         ]
         for filename, old, new in mutations:
             with self.subTest(filename=filename, old=old):
