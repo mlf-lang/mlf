@@ -318,8 +318,6 @@ def qualified_contract(root, source_root=None):
         # Observable legacy adapter actions update only the auxiliary tests lock.
         ('57f7ea72fccc0b40583de06e1edd58f6483fa0ed', '548c6477f9cde884b9ea5f121dba6e82ff299ebb',
          '94e086c15c40aaf220c764f0e723cc3cfe627587'),
-        # Reduced fixture coverage is checked during crate planning. Its parent
-        # changed no projected blobs; this commit changes only the modular test.
         ('4bcb0000a6a97f53761f53baeb6b946e4037a457', '6d84f5331a8f7dbdbc7705acab901e9e7f3cfa24',
          '1297b5cf57aec9c7725e8e21a7d44710b06b523e'),
         ('79f2c6bf7e1edc0efc4f96ffd416bd9a8607457f', 'b581c6c61ed1f56638220c8e1ecdb0e1fda2d7c6',
@@ -328,6 +326,8 @@ def qualified_contract(root, source_root=None):
          '79f2c6bf7e1edc0efc4f96ffd416bd9a8607457f'),
         ('7268d047c3426cbbf06b287334ca91fe54286673', 'c0f809a3c320c2318bd22c92b98610060c1c9e08',
          'e925c19fc25958d8c08010013dcf2ae55349ceef'),
+        ('15bc2289cfeff27ba8281439b014ff2b27cf2d92', 'bf8d53633c135771bedd2aae9e60168f19d70c72',
+         '7c6493c777adf85af05a942213a76fb2fad43343'),
     ):
         live_git.commit(commit, tree=tree, parents=[parent])
         live_git.run('merge-base', '--is-ancestor', commit, 'HEAD')
