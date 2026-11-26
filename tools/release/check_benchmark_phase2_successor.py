@@ -31,7 +31,7 @@ def _load():
 successor = _load()
 foundation = successor.pinned_module(
     ROOT, 'tools/performance/artifact-binary/foundation_phase2_source.py',
-    'ec625f0c958047a827041b67162ab2110fbfa973422ebac6301c1ac1db90b5a5',
+    '41e63d5ab615a783f684cb1aa3a8950e9071a4d75061b22632e8fe2516f94245',
 )
 successor.qualified = foundation.qualified
 

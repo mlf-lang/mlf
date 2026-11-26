@@ -75,7 +75,7 @@ def live_contract(history_root, source_root=None):
     directory = Path(__file__).resolve().parent
     foundation = directory / 'foundation_phase2_source.py'
     if os.path.lexists(foundation):
-        module = pinned_module(foundation, 'ec625f0c958047a827041b67162ab2110fbfa973422ebac6301c1ac1db90b5a5')
+        module = pinned_module(foundation, '41e63d5ab615a783f684cb1aa3a8950e9071a4d75061b22632e8fe2516f94245')
         return module.qualified_contract(Path(history_root).resolve(strict=True).parents[1], source_root).contract
     directory, previous, current = contracts()
     contract = current.successor_type(previous, FINAL_MANIFEST_SHA256,
