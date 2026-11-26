@@ -782,6 +782,16 @@
     "prefix": "python-shared-utf8-batch-worker/",
     "exact": true
   },
+  "python-testing-driver-cache": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/testing/test_driver_cache.py"
+    ],
+    "kind": "unittest",
+    "prefix": "python-testing-driver-cache/",
+    "exact": true
+  },
   "python-testing-manifest-snapshot": {
     "command": [
       "python3",
