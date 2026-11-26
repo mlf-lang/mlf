@@ -231,3 +231,8 @@ uint32_t mlf_ghc_byte_array_crc32(const unsigned char *bytes, size_t length,
                                size_t zero_start, size_t zero_count) {
     return mlf_crc32_zeros(bytes, length, zero_start, zero_count);
 }
+
+int mlf_ghc_byte_array_equal(const unsigned char *left, const unsigned char *right,
+                           size_t length) {
+    return !length || memcmp(left, right, length) == 0;
+}

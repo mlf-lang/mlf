@@ -27,7 +27,7 @@ HELPERS = ('artifact_binary_reference.py', 'artifact_binary_cases.py',
            'artifact_binary_typed.py', 'artifact_binary_integration.py', 'artifact_binary_open.py',
            'artifact_structure_contract.json', 'artifact_binary_golden.json', 'test_query_index.py')
 LEGACY_GHC_FIXTURE = 'tools/shared/fixtures/item4/ArtifactBinary.hs'
-LEGACY_GHC_FIXTURE_SHA = '3ad0cdf7dfc23eda8086b087b36003fc06fc25c4edb8c45bed897daaad1c42a0'
+LEGACY_GHC_FIXTURE_SHA = '19823e847ee9ec6e62c9038f70f6198a77d6def6beacc146b66177b64e8ce96a'
 LEGACY_QUERY_FIXTURE = 'tools/shared/fixtures/item4/QueryIndex.hs'
 LEGACY_QUERY_FIXTURE_SHA = '0327c68c8e1954dd367109eda47e18d26a5152c9595e40dfbfb079df8012919f'
 
@@ -538,8 +538,8 @@ def main():
             record['dependency_parser_controls'] = dependency_parser_controls()
         producer = td.authenticate_build(receipt_path, producer_dir / 'bin', root=source)
         manifest = json.loads(source_manifest.read_text())
-        require(manifest['primitive_abi'] == 'mlf-primitive-137-v12' and
-                manifest['builtin_interface'] == 'mlf-primitive/shared-haskell-v1/17',
+        require(manifest['primitive_abi'] == 'mlf-primitive-138-v13' and
+                manifest['builtin_interface'] == 'mlf-primitive/shared-haskell-v1/18',
                 'this finite suite requires the UTF-8 byte-length primitive ABI')
         objects = producer.get('object_inputs', {})
         require(objects, 'producer object/interface inventory missing')

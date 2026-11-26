@@ -231,7 +231,8 @@ module Bootstrap.BuiltinPreludeLiteral where {
     PSTToIO -> "PSTToIO";
     PByteArrayCRC32 -> "PByteArrayCRC32";
     PPackStringFields -> "PPackStringFields";
-    PStringUtf8Length -> "PStringUtf8Length"
+    PStringUtf8Length -> "PStringUtf8Length";
+    PByteArrayEqual -> "PByteArrayEqual"
   };
   sourceType :: SType -> String;
   sourceType value = case value of {

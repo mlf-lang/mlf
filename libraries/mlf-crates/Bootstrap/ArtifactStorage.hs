@@ -88,18 +88,8 @@ module Bootstrap.ArtifactStorage where {
         }
       }
     };
-  sameBytesFrom :: ByteArray -> ByteArray -> Int -> Int -> IO Bool;
-  sameBytesFrom a b count index =
-    if index == count then ioReturn True else do {
-      x <- readByteArray a index;
-      y <- readByteArray b index;
-      if x == y then sameBytesFrom a b count (index + 1) else ioReturn False
-    };
   sameBytes :: ByteArray -> ByteArray -> IO Bool;
-  sameBytes a b = do {
-    na <- lengthByteArray a; nb <- lengthByteArray b;
-    if na == nb then sameBytesFrom a b na 0 else ioReturn False
-  };
+  sameBytes = byteArrayEqual;
   -- Typed wire decoding preserves all IDs and hints. Production admission is a
   -- separate syntax-domain check; no text roundtrip or alpha normalization.
   -- Every recursive syntax/list edge is an explicit work item.

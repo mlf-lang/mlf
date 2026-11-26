@@ -46,13 +46,25 @@ def dependency_folder(build, libraries, index):
     return build/('dependency' if len(libraries)==1 else f'dependency-{index}')
 
 
+def lane_setup(plan, lane):
+    if lane == 'reference':
+        reference = plan['compiler_reference']
+        if 'fixed_dependencies' not in reference:
+            raise ValueError('reference lane needs its own prepared dependencies; create a fresh cohort')
+        setup = reference['fixed_dependencies']['setup']
+        if not setup['complete'] or setup['producer'] != reference['producer']:
+            raise ValueError('reference dependency setup does not belong to the baseline producer')
+        return setup
+    return plan['setup']
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--plan',type=Path,required=True)
     parser.add_argument('--case',required=True)
     parser.add_argument('--lane',choices=['ghc','mlf','reference','module'],required=True)
     parser.add_argument('--out',type=Path,required=True)
-    args=parser.parse_args(); plan=json.loads(args.plan.read_text()); setup=plan['setup']
+    args=parser.parse_args(); plan=json.loads(args.plan.read_text()); setup=lane_setup(plan,args.lane)
     case=next(c for c in plan['cases'] if c['id']==args.case)
     out=args.out.resolve(); out.mkdir(parents=True,exist_ok=False)
     stages=[]
@@ -80,8 +92,7 @@ def main():
             '-no-user-package-db','-hide-all-packages','-package','base','-package','mlf-shape-primitives',
             '-i',*includes,'-odir',out,'-hidir',out,case['source'],'-o',out/'program'])
     else:
-        producer = plan['compiler_reference']['producer'] if args.lane == 'reference' else setup['producer']
-        emlf=Path(producer)/'bin/emlf'
+        emlf=Path(setup['producer'])/'bin/emlf'
         if args.lane in ('mlf', 'reference'):
             query=out/'queries'; query.mkdir()
             spec=out/'crate.spec'

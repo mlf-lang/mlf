@@ -78,6 +78,42 @@ def program(family, n):
     """Generate one shared module with a runtime input at its IO entry."""
     if family == 'baseline':
         declarations, expression = '', 'x'
+    elif family == 'ordered_worker_demands':
+        if not n:
+            declarations, expression = '', 'x'
+        else:
+            arguments = [f'a{i}' for i in range(1, n+1)]
+            body = arguments[0]
+            for argument in arguments[1:]:
+                body = f'addInt ({body}) {argument}'
+            signature = ' -> '.join(['Int'] * (n+1))
+            declarations = f'sumMany :: {signature};\nsumMany {" ".join(arguments)} = {body};\n'
+            before = ' '.join(f'(addInt x {i})' for i in range(1, n+1))
+            after = ' '.join(f'(subInt x {i})' for i in range(1, n+1))
+            expression = f'if ltInt x 0 then sumMany {before} else sumMany {after}'
+    elif family == 'parenthesized_operator_sites':
+        # Prefix operator references retain exact token spans; later source
+        # suffixes grow with n. Every operand is also observed at runtime.
+        declarations = 'f0 :: Int -> Int;\nf0 x = x;\n'
+        declarations += ''.join(f'f{i} :: Int -> Int;\nf{i} x = (+) (f{i-1} x) 1;\n'
+                                for i in range(1, n + 1))
+        expression = f'f{n} x'
+    elif family == 'wide_pattern_rows':
+        # A wildcard and as-pattern prefix must retain left-to-right Fresh
+        # allocation, while the final Bool column selects between two rows.
+        if not n:
+            declarations, expression = '', 'x'
+        else:
+            patterns = [f'v{i}@_' if i % 2 == 0 else '_' for i in range(n)]
+            values = [f'(addInt x {i+1})' for i in range(n)]
+            observed = [f'mulInt v{i} {i+1}' for i in range(n) if i % 2 == 0]
+            total = balanced(observed, lambda a, b: f'addInt ({a}) ({b})')
+            signature = ' -> '.join(['Int'] * n + ['Bool', 'Int'])
+            prefix = ' '.join(patterns)
+            declarations = (f'row :: {signature};\n'
+                            f'row {prefix} True = {total};\n'
+                            f'row {prefix} False = subInt 0 ({total});\n')
+            expression = f'row {" ".join(values)} (ltInt x 0)'
     elif family == 'recursive_checker_alternatives' and n:
         constructors = ''.join(f' | Form{i} Term Term' for i in range(n))
         arms = ';\n'.join(
@@ -1123,6 +1159,20 @@ def expected(family, n, x):
         return last + 1 + code
     if family == 'baseline':
         return x
+    if family == 'ordered_worker_demands':
+        if not n:
+            return x
+        total = n*x + (1 if x < 0 else -1)*n*(n+1)//2
+        return (total + 2**63) % 2**64 - 2**63
+    if family == 'parenthesized_operator_sites':
+        return (x + n + 2**63) % 2**64 - 2**63
+    if family == 'wide_pattern_rows':
+        if not n:
+            return x
+        # Independently sum the odd 1-based columns, including each weight.
+        total = sum((x + column) * column for column in range(1, n+1, 2))
+        result = total if x < 0 else -total
+        return (result + 2**63) % 2**64 - 2**63
     if family in ('polymorphic_import_spine', 'duplicated_type_arguments'):
         return x
     if family == 'closed_dictionary_result':

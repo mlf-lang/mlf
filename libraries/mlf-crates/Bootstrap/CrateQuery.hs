@@ -43,11 +43,7 @@ module Bootstrap.CrateQuery where {
   boolean :: Bool -> String;
   boolean b = if b then "true" else "false";
   encodeKind :: Kind -> String;
-  encodeKind kind =
-    case kind of {
-      Star -> node "star" [];
-      KArrow a b -> node "kind-arrow" ((:) (encodeKind a) ((:) (encodeKind b) []))
-    };
+  encodeKind kind = renderFields (kindEncoding kind);
   encodeFlag :: Flag -> String;
   encodeFlag flag =
     case flag of {
@@ -55,22 +51,9 @@ module Bootstrap.CrateQuery where {
       Rigid -> "rigid"
     };
   encodeType :: SType -> String;
-  encodeType ty =
-    case ty of {
-      STVar n -> node "variable" ((:) n []);
-      SBottom -> node "bottom" [];
-      SBottomKind k -> node "bottom-kind" ((:) (encodeKind k) []);
-      SArrow a b -> node "arrow" ((:) (encodeType a) ((:) (encodeType b) []));
-      SCon n args -> node "constructor" ((:) n ((:) (list encodeType args) []));
-      STypeApp f a -> node "application" ((:) (encodeType f) ((:) (encodeType a) []));
-      SForall flag n bound body ->
-        node "forall"
-          ((:) (encodeFlag flag) ((:) n ((:) (encodeType bound) ((:) (encodeType body) []))));
-      SQualified predicates body ->
-        node "qualified" ((:) (list encodePredicate predicates) ((:) (encodeType body) []))
-    };
+  encodeType ty = renderFields (sourceTypeEncoding ty);
   encodePredicate :: SPredicate -> String;
-  encodePredicate (SPredicate n args) = node "predicate" ((:) n ((:) (list encodeType args) []));
+  encodePredicate predicate = renderFields (predicateEncoding predicate);
   encodeAnnotation (SAnnotation existential ty) =
     node "annotation" ((:) (Separate.pack existential) ((:) (encodeType ty) []));
   encodeSourceString :: SourceString -> String;
@@ -517,12 +500,40 @@ module Bootstrap.CrateQuery where {
   data FieldEncoding = FieldEncoding Int ([] String -> [] String);
   fieldText value = FieldEncoding (stringLength value) ((:) value);
   frameFields = let {
-    framed (FieldEncoding size chunks) (FieldEncoding n remaining) = let {
-      count = showInt size
-    } in FieldEncoding (stringLength count + 1 + size + n)
-      (\tail -> (:) count ((:) ":" (chunks (remaining tail))))
+    -- Authenticate this field's payload before inspecting the following
+    -- field, matching packStringFields' first-error order on partial input.
+    framed (FieldEncoding size chunks) rest = seq size (case rest of {
+      FieldEncoding n remaining -> let { count = showInt size } in
+        FieldEncoding (stringLength count + 1 + size + n)
+          (\tail -> (:) count ((:) ":" (chunks (remaining tail))))
+    })
   } in foldr framed (FieldEncoding 0 (\tail -> tail));
   frameNode tag fields = frameFields ((:) (fieldText tag) fields);
+  -- Keep source types, predicates and kinds in the same length-carrying
+  -- builder until the outermost field is rendered. Framing still counts
+  -- Unicode scalars and preserves every legacy tag and ordered field.
+  kindEncoding kind = case kind of {
+    Star -> frameNode "star" [];
+    KArrow a b -> frameNode "kind-arrow" [kindEncoding a,kindEncoding b]
+  };
+  sourceTypeEncoding ty = let {
+    text = fieldText;
+    form = frameNode;
+    encoded = sourceTypeEncoding
+  } in case ty of {
+    STVar n -> form "variable" [text n];
+    SBottom -> form "bottom" [];
+    SBottomKind k -> form "bottom-kind" [kindEncoding k];
+    SArrow a b -> form "arrow" [encoded a,encoded b];
+    SCon n args -> form "constructor" [text n,frameFields (map encoded args)];
+    STypeApp f a -> form "application" [encoded f,encoded a];
+    SForall flag n bound body -> form "forall"
+      [text (encodeFlag flag),text n,encoded bound,encoded body];
+    SQualified predicates body -> form "qualified"
+      [frameFields (map predicateEncoding predicates),encoded body]
+  };
+  predicateEncoding (SPredicate n args) = frameNode "predicate"
+    [fieldText n,frameFields (map sourceTypeEncoding args)];
   typeEncoding ty = let {
     text = fieldText;
     form = frameNode;
@@ -530,7 +541,7 @@ module Bootstrap.CrateQuery where {
   } in case ty of {
     XVar (XTyVar n) -> form "variable" [text (showInt n)];
     XBot -> form "bottom" [];
-    XBotKind k -> form "bottom-kind" [text (encodeKind k)];
+    XBotKind k -> form "bottom-kind" [kindEncoding k];
     XArrow a b -> form "arrow" [encoded a,encoded b];
     XCon n args -> form "constructor" [text n,frameFields (map encoded args)];
     XApply a b -> form "application" [encoded a,encoded b];

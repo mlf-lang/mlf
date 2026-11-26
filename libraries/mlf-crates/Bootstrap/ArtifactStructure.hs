@@ -782,7 +782,8 @@ module Bootstrap.ArtifactStructure where {
     PSTToIO -> 133;
     PByteArrayCRC32 -> 134;
     PPackStringFields -> 135;
-    PStringUtf8Length -> 136
+    PStringUtf8Length -> 136;
+    PByteArrayEqual -> 137
   };
   primitiveFromCode :: Int -> Either String Primitive;
   primitiveFromCode code =
@@ -923,6 +924,7 @@ module Bootstrap.ArtifactStructure where {
     else if code == 134 then Right PByteArrayCRC32
     else if code == 135 then Right PPackStringFields
     else if code == 136 then Right PStringUtf8Length
+    else if code == 137 then Right PByteArrayEqual
     else malformed "primitive code";
   toPrimitive :: Primitive -> W.Value;
   toPrimitive value = W.VNode 32 [toInt (primitiveCode value)];

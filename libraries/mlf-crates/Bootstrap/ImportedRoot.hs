@@ -120,6 +120,17 @@ module Bootstrap.ImportedRoot
   -- present in the canonical traversal order have this direct embedding.
   evidenceTemplate datatypes first scheme = let {
     nominalRoot body = case body of { XCon _ _ -> True; XArrow _ _ -> True; _ -> False };
+    -- Compare first occurrences in traversal order. Membership is indexed,
+    -- but order is still authenticated against the entire quantified prefix.
+    canonicalOrder expected seen occurrences = case occurrences of {
+      [] -> null expected;
+      (:) v rest -> if IS.member v seen then canonicalOrder expected seen rest
+        else case expected of {
+          [] -> False;
+          (:) next remaining -> v == next
+            && canonicalOrder remaining (IS.insert v seen) rest
+        }
+    };
     -- Unknown raw type symbols use occurrence arity as a fallback. Only the
     -- authenticated schema can supply one invariant kind for all occurrences.
     kindOf name = case datatypes of { DataEnv _ _ kinds -> M.lookup compareString name kinds };
@@ -153,7 +164,7 @@ module Bootstrap.ImportedRoot
         XBot -> next; XBotKind k -> if K.eqKind k Star then Nothing else next; _ -> Nothing };
       _ -> if not (nominalRoot t) then Nothing else do {
         (,,,) body n kinds seen <- visit names t;
-        if not (eqList eqInt (reverse order) (nubBy eqInt seen)) then Nothing else
+        if not (canonicalOrder (reverse order) IS.empty seen) then Nothing else
           Just ((,,) (foldl (\ty ((,) v b) -> XForall v b ty) body bound) (ordinal+n) kinds)
       }
     }

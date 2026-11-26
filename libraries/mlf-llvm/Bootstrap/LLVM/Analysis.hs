@@ -8,6 +8,7 @@ module Bootstrap.LLVM.Analysis where {
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as S;
+  import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Primitive as P;
   import qualified Bootstrap.X.Syntax as X;
   import qualified Bootstrap.LLVM.Optimize as O;
@@ -192,7 +193,8 @@ module Bootstrap.LLVM.Analysis where {
   workerDemand fs f = let {
     allowed = S.fromList O.compareName (L.append (parameters f) (captures f));
     demand = entryDemand fs M.empty (functionBody f)
-  } in EntryDemand (L.filter (\name -> S.member O.compareName name allowed) (demandNames demand))
+  } in indexedDemand
+       (nameSequence (L.filter (\name -> S.member O.compareName name allowed) (demandNames demand)))
        (demandComplete demand);
   analyze :: XErased -> Map XName WorkerFunction;
   analyze expression = demandFixed (captureFixed (collect expression));
@@ -200,11 +202,53 @@ module Bootstrap.LLVM.Analysis where {
   -- eventual-strictness set. Complete means the expression reaches WHNF after
   -- these forces and certified total operations; otherwise the prefix stops
   -- at a possibly failing operation, branch, or unknown call.
-  data EntryDemand = EntryDemand ([] XName) Bool;
+  -- Concatenation preserves force order without copying the left prefix.
+  -- Lexical aliases share a flattened leaf, so traversing a concatenation
+  -- never expands their summary DAG. Identity sets are demanded only after
+  -- a leaf's names: asking for a prefix must not inspect a later summary.
+  -- Keep the list constructor for callers supplying a summary; its order
+  -- and duplicate entries survive.
+  data DemandSequence = DemandLeaf IntSet ([] XName) |
+    DemandAppend DemandSequence DemandSequence;
+  data EntryDemand = EntryDemand ([] XName) Bool |
+    IndexedDemand DemandSequence ([] XName) Bool;
   demandNames :: EntryDemand -> [] XName;
-  demandNames (EntryDemand names complete) = names;
+  demandNames demand = case demand of {
+    EntryDemand names _ -> names;
+    IndexedDemand _ names _ -> names
+  };
   demandComplete :: EntryDemand -> Bool;
-  demandComplete (EntryDemand names complete) = complete;
+  demandComplete demand = case demand of {
+    EntryDemand _ complete -> complete;
+    IndexedDemand _ _ complete -> complete
+  };
+  nameSequence :: [] XName -> DemandSequence;
+  nameSequence names = DemandLeaf (IS.fromList (L.map O.nameId names)) names;
+  demandSequence :: EntryDemand -> DemandSequence;
+  demandSequence demand = case demand of {
+    EntryDemand names _ -> nameSequence names;
+    IndexedDemand sequence _ _ -> sequence
+  };
+  sharedDemand :: EntryDemand -> EntryDemand;
+  sharedDemand demand = indexedDemand (nameSequence (demandNames demand)) (demandComplete demand);
+  indexedDemand :: DemandSequence -> Bool -> EntryDemand;
+  indexedDemand sequence complete =
+    IndexedDemand sequence (sequenceNames IS.empty [sequence]) complete;
+  sequenceNames :: IntSet -> [] DemandSequence -> [] XName;
+  sequenceNames seen pending = case pending of {
+    [] -> [];
+    (:) sequence rest -> case sequence of {
+      DemandAppend first next -> sequenceNames seen ((:) first ((:) next rest));
+      DemandLeaf identities names -> let {
+        -- Check this whole leaf against the earlier leaves, not against its
+        -- own entries. This is exactly appendNames even for supplied repeats.
+        emit remaining = case remaining of {
+          [] -> sequenceNames (IS.union seen identities) rest;
+          (:) name tail -> if IS.member (O.nameId name) seen then emit tail else (:) name (emit tail)
+        }
+      } in emit names
+    }
+  };
   sameDemand :: EntryDemand -> EntryDemand -> Bool;
   sameDemand a b = sameNames (demandNames a) (demandNames b) &&
     demandComplete a == demandComplete b;
@@ -225,14 +269,26 @@ module Bootstrap.LLVM.Analysis where {
     _ -> False
   };
   barrierAfter :: EntryDemand -> EntryDemand;
-  barrierAfter demand = EntryDemand (demandNames demand) False;
+  barrierAfter demand = case demand of {
+    EntryDemand names _ -> EntryDemand names False;
+    IndexedDemand sequence names _ -> IndexedDemand sequence names False
+  };
   appendNames :: [] XName -> [] XName -> [] XName;
-  appendNames first next = L.append first
-    (L.filter (\name -> L.not (L.elem O.eqName name first)) next);
+  appendNames first next = let { identities = IS.fromList (L.map O.nameId first) } in
+    L.append first (L.filter (\name -> L.not (IS.member (O.nameId name) identities)) next);
   appendDemand :: EntryDemand -> EntryDemand -> EntryDemand;
   appendDemand first next =
     if demandComplete first
-    then EntryDemand (appendNames (demandNames first) (demandNames next)) (demandComplete next)
+    then let { left = demandSequence first; right = demandSequence next } in
+      indexedDemand
+        (case left of {
+          -- Shared closed aliases must collapse without expanding their DAG.
+          -- Inspect only the left sequence, so the first force stays lazy in
+          -- the following summary and in its cached identity set.
+          DemandLeaf _ [] -> right;
+          _ -> DemandAppend left right
+        })
+        (demandComplete next)
     else first;
   -- Share summaries only along this lexical let spine. Each summary describes
   -- its body with open names, independent of the emitter's current WHNF facts.
@@ -271,7 +327,7 @@ module Bootstrap.LLVM.Analysis where {
     XELet name rhs body ->
       -- Lazy shared summaries preserve aliases without reanalyzing a closed
       -- RHS at each use or visiting an unused binding.
-      entryDemand fs (M.insert O.compareName name (entryDemand fs local rhs) local) body;
+      entryDemand fs (M.insert O.compareName name (sharedDemand (entryDemand fs local rhs)) local) body;
     XELetRec bindings body ->
       entryDemand fs
         (L.foldr (\binding rest -> case binding of {
@@ -281,7 +337,7 @@ module Bootstrap.LLVM.Analysis where {
       case optional of {
         Nothing -> entryDemand fs local body;
         Just name -> entryDemand fs
-          (M.insert O.compareName name (entryDemand fs local subject) local) body
+          (M.insert O.compareName name (sharedDemand (entryDemand fs local subject)) local) body
       };
     XECase subject alternatives -> barrierAfter (entryDemand fs local subject);
     XEApp _ _ -> entryApplication fs local expression;

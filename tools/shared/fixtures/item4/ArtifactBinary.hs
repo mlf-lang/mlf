@@ -438,7 +438,8 @@ constructorTests = sequence [
   checkCase "PSTToIO" A.toPrimitive A.fromPrimitive T.PSTToIO (W.VNode 32 [W.VInt 133]),
   checkCase "PByteArrayCRC32" A.toPrimitive A.fromPrimitive T.PByteArrayCRC32 (W.VNode 32 [W.VInt 134]),
   checkCase "PPackStringFields" A.toPrimitive A.fromPrimitive T.PPackStringFields (W.VNode 32 [W.VInt 135]),
-  checkCase "PStringUtf8Length" A.toPrimitive A.fromPrimitive T.PStringUtf8Length (W.VNode 32 [W.VInt 136])
+  checkCase "PStringUtf8Length" A.toPrimitive A.fromPrimitive T.PStringUtf8Length (W.VNode 32 [W.VInt 136]),
+  checkCase "PByteArrayEqual" A.toPrimitive A.fromPrimitive T.PByteArrayEqual (W.VNode 32 [W.VInt 137])
   ]
 
 graphChecks = [
@@ -711,7 +712,8 @@ graphChecks = [
   \g root -> checkGraph "PSTToIO" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 133]),
   \g root -> checkGraph "PByteArrayCRC32" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 134]),
   \g root -> checkGraph "PPackStringFields" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 135]),
-  \g root -> checkGraph "PStringUtf8Length" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 136])
+  \g root -> checkGraph "PStringUtf8Length" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 136]),
+  \g root -> checkGraph "PByteArrayEqual" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 137])
   ]
 
 checkGraph label encode decode graph root expected = do
@@ -751,7 +753,7 @@ semanticEdges directory = do
     need "IEEE exact signed bits; not numeric equality" (P.doubleToBits value == bits && same (A.toDouble value) (W.VBits bits))
     term <- expect "IEEE term decode" (A.fromXTerm (W.VNode 78 [W.VBits bits]))
     case term of T.XDoubleTerm d -> need "IEEE term exact" (P.doubleToBits d == bits); _ -> error "IEEE wrong constructor"
-  forM_ [-1,137,2147483647] $ \code -> do
+  forM_ [-1,138,2147483647] $ \code -> do
     let value=W.VNode 32 [W.VInt code]
     reject "unknown primitive ABI code" (A.fromPrimitive value)
     bytes <- W.encode W.defaultLimits 7 [value] >>= expect "unknown primitive is valid wire"

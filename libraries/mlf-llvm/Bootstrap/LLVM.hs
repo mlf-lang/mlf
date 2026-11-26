@@ -390,9 +390,9 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
     let {
       abi = "mlf_require_haskell_boundary_v4_abi"
     } in
-    (:) ("declare void @" ++ (abi ++ "()\ndeclare void @mlf_require_byte_file_v2_abi()\ndeclare void @mlf_require_freeze_st_array_abi()\ndeclare void @mlf_require_st_to_io_abi()\ndeclare void @mlf_require_byte_array_crc32_abi()"))
+    (:) ("declare void @" ++ (abi ++ "()\ndeclare void @mlf_require_byte_file_v2_abi()\ndeclare void @mlf_require_freeze_st_array_abi()\ndeclare void @mlf_require_st_to_io_abi()\ndeclare void @mlf_require_byte_array_crc32_abi()\ndeclare void @mlf_require_byte_array_equal_abi()"))
       ((:) "define ptr @mlf_entry() {"
-         ((:) ("  call void @" ++ (abi ++ "()\n  call void @mlf_require_byte_file_v2_abi()\n  call void @mlf_require_freeze_st_array_abi()\n  call void @mlf_require_st_to_io_abi()\n  call void @mlf_require_byte_array_crc32_abi()"))
+         ((:) ("  call void @" ++ (abi ++ "()\n  call void @mlf_require_byte_file_v2_abi()\n  call void @mlf_require_freeze_st_array_abi()\n  call void @mlf_require_st_to_io_abi()\n  call void @mlf_require_byte_array_crc32_abi()\n  call void @mlf_require_byte_array_equal_abi()"))
             ((:) ("  %root = call ptr " ++ (entry ++ "(ptr null, ptr null)"))
                ((:) "  ret ptr %root"
                   ((:) "}"

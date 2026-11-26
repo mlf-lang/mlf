@@ -32,7 +32,7 @@ metadata : IO ()
 metadata = do
   assert (Metadata.primitiveCode PConcatStringList == 107) "new opcode"
   assert (Metadata.primitiveCode PIOErrorWithStack == 106) "previous opcode"
-  assert (Metadata.primitiveCode PByteArrayCRC32 == 134) "latest appended opcode"
+  assert (Metadata.primitiveCode PByteArrayEqual == 137) "latest appended opcode"
   assert (eqString (Metadata.primitiveName PConcatStringList) "concatStringList") "primitive name"
   assert (Metadata.primitiveArity PConcatStringList == 1) "primitive arity"
   assert (Metadata.primitiveStrict PConcatStringList) "strict operand"
@@ -43,7 +43,7 @@ metadata = do
   assert (case Metadata.lookupTargetPrimitive "concatStringList" of
     Just PConcatStringList -> true
     _ -> false) "primitive lookup"
-  assert (S.eqList eqInt (S.map Metadata.primitiveCode Metadata.allPrimitives) (S.range 0 136))
+  assert (S.eqList eqInt (S.map Metadata.primitiveCode Metadata.allPrimitives) (S.range 0 137))
     "append-only opcode inventory"
 
 literals : String -> IO ()

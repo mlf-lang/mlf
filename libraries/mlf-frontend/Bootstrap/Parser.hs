@@ -1187,7 +1187,7 @@ module Bootstrap.Parser where {
   parenthesizedAtomChoices = pChoices [
     pMap (\_ -> SConstructor ":") (pToken ":"),
     pBind (pSome (pToken ",")) (\commas -> pMap SConstructor (sourceTupleName (1 + length commas))),
-    pTry (locatedReference (pBefore operatorReference (pLook (pToken ")")))),
+    pTry parenthesizedOperatorReference,
     pTry (pMap SIntLit (pThen (pToken "-") (pMap (\n -> 0 - n) naturalLiteral))),
     groupedExpression];
   sharedAtomChoices =
@@ -1287,7 +1287,7 @@ module Bootstrap.Parser where {
     pChoices
       ((:)
          (pParens
-            (pChoice (pTry (locatedReference (pBefore operatorReference (pLook (pToken ")"))))) (pBind (collectionItems ")" expr)
+            (pChoice (pTry parenthesizedOperatorReference) (pBind (collectionItems ")" expr)
                (tupleValue (SConstructor "()")
                   (\name fields -> foldl SApp (SConstructor name) fields)))))
          ((:)
@@ -1976,6 +1976,28 @@ module Bootstrap.Parser where {
     item <- suffix;
     pPure (build prefixes item)
   };
+  -- Both prefix and infix references consume the final operator token in full.
+  -- Save its endpoint while parsing, including a suffix split from ".+", so a
+  -- short reference never measures the two unconsumed token-list suffixes.
+  operatorReferenceSpan :: Parser ((,) SourceSpan String);
+  operatorReferenceSpan = do {
+    original <- pState;
+    first <- referenceToken;
+    located <- operatorReferenceWith (\prefixes ((,) final name) ->
+      (,) final (qualifiedName prefixes name)) (do {
+        final <- referenceToken;
+        name <- operatorName;
+        pPure ((,) final name)
+      });
+    case original of { ParseState file _ _ _ sourceModule sourcePackage ->
+      let { final = fst located } in
+      pPure ((,) (SourceSpan sourcePackage sourceModule file (tokenLine first) (tokenColumn first)
+        (tokenEndLine final) (tokenEndColumn final)) (snd located))
+    }
+  };
+  parenthesizedOperatorReference :: Parser SExpr;
+  parenthesizedOperatorReference = pBind
+    (pBefore operatorReferenceSpan (pLook (pToken ")"))) referenceAt;
   bindingName :: Parser String;
   bindingName = pChoice lowerIdentifier (pParens operatorName);
   valueReference :: Parser String;
@@ -1994,22 +2016,11 @@ module Bootstrap.Parser where {
   -- A successful infix ends at the operator token, including the suffix
   -- left when a qualifier consumes the dot of a combined token such as ".+".
   sharedOperatorParser choices = pTry (do {
-    original <- pState;
-    first <- referenceToken;
-    located <- operatorReferenceWith (\prefixes ((,) final name) ->
-      (,) final (qualifiedName prefixes name)) (do {
-        final <- referenceToken;
-        name <- operatorName;
-        pPure ((,) final name)
-      });
-    case located of { (,) final operator -> let { leaf = referenceLeaf operator } in
-      if elem eqString leaf choices then case original of {
-        ParseState file _ _ _ sourceModule sourcePackage -> let {
-          location = SourceSpan sourcePackage sourceModule file (tokenLine first) (tokenColumn first)
-            (tokenEndLine final) (tokenEndColumn final)
-        } in pPure (\a b -> SApp (SApp (SCallSite leaf location
-          (SVar (sourceOperatorName operator))) a) b)
-      } else pFail "operator at another precedence"
+    located <- operatorReferenceSpan;
+    case located of { (,) location operator -> let { leaf = referenceLeaf operator } in
+      if elem eqString leaf choices then pPure (\a b ->
+        SApp (SApp (SCallSite leaf location (SVar (sourceOperatorName operator))) a) b)
+      else pFail "operator at another precedence"
     }
   });
   sharedApplyExpr :: Parser SExpr;

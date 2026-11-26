@@ -121,6 +121,8 @@ def main():
     H.require(setup.get('endpoint')==args.endpoint,'setup belongs to endpoint profile '+str(setup.get('endpoint'))
               +', not '+args.endpoint)
     source = Path(setup.setdefault('source', str(ROOT))).resolve()
+    setup_pins = compiler_reference.fixed_setup_pins(setup)
+    H.check_pins(setup_pins)
     endpoint=data['endpoints'][args.endpoint]
     auth=H.authenticate(Path(setup['producer']),source)
     generated = [out, args.setup.parent, setup['producer']]
@@ -130,7 +132,8 @@ def main():
     selection = compiler_reference.select_revision(source, generated) if not args.pilot else None
     if args.sweep_reference and selection != json.loads(args.sweep_reference):
         raise ValueError('candidate revision or baseline changed during sweep')
-    reference = compiler_reference.prepare(setup, selection, auth['ghc']['path']) if selection else None
+    reference = compiler_reference.prepare(setup, selection, auth['ghc']['path'],
+                                           out/'reference-setup') if selection else None
     repeats=1 if args.pilot else args.repeats
     H.require(repeats>=1,'positive repeats')
     sizes = list(dict.fromkeys(size for _, size in cells if size))
@@ -149,7 +152,7 @@ def main():
     if reference:
         schedule = with_reference(schedule)
     lanes_per_round = 3 if reference else 2
-    inputs={str(p.resolve()):H.sha(p) for p in [args.setup,Path(H.__file__),HERE/'command_runner.py',HERE/'bench.py',HERE/'run.py',HERE/'worker.py',HERE/'generate.py',
+    inputs={str(p.resolve()):H.sha(p) for p in [args.setup,Path(H.__file__),HERE/'command_runner.py',HERE/'bench.py',HERE/'run.py',HERE/'prepare.py',HERE/'worker.py',HERE/'generate.py',
         HERE/'data_shapes.py',HERE/'rank_shapes.py',HERE/'fit_growth.py',HERE/'analyze.py',HERE/'compiler_reference.py',
         HERE/'framework_results.py',ROOT/'tools/testing/events.py',
         HERE/'matrix.json',HERE/'query_cache.py',HERE/'provenance.py',Q.SHARED/'artifact_binary_reference.py',
@@ -157,9 +160,11 @@ def main():
         Path(setup['producer'])/'receipt.json',Path(setup['producer'])/'bin/emlf',
         Path(setup['ghc']),Path(setup['clang']),Path(setup['runtime']),Path(setup['builtin']+'.mlfci'),
         Path(setup['builtin']+'.mlfco')]}
+    inputs.update(setup_pins)
     if reference:
         inputs.update({str(Path(reference['producer'])/'receipt.json'):reference['receipt_sha256'],
                        str(Path(reference['producer'])/'bin/emlf'):reference['emlf_sha256']})
+        inputs.update(reference['fixed_dependencies']['inputs'])
     inputs.update(H.file_pins(Path(setup['package_db']).parent))
     inputs.update({c['source']:c['source_sha256'] for c in cases})
     inputs.update({lib['source']:lib['sha256'] for c in cases for lib in worker.dependencies(c)})
@@ -212,7 +217,7 @@ def main():
         plan['benchmark']['order'] = 'candidate between GHC and the committed compiler, reversing each round; ' + ('interleaved cells' if args.interleave_pairs else 'grouped cells')
     plan_path=out/'plan.json';H.save(plan_path,plan);plan_sha=H.sha(plan_path)
     scripts=out/'scripts';scripts.mkdir()
-    for name in ['run.py','worker.py','generate.py','data_shapes.py','rank_shapes.py','fit_growth.py','analyze.py',
+    for name in ['run.py','prepare.py','worker.py','generate.py','data_shapes.py','rank_shapes.py','fit_growth.py','analyze.py',
                  'matrix.json','query_cache.py','provenance.py','framework_results.py','compiler_reference.py']:
         shutil.copy2(HERE/name,scripts/name)
     shutil.copy2(ROOT/'tools/testing/events.py', scripts/'events.py')
@@ -324,6 +329,8 @@ def main():
                                  **({'detail': r['error'], 'lane': lane} if 'error' in r else {}))
         H.check_pins(inputs)
         H.require(H.authenticate(Path(setup['producer']),source)==auth,'ordinary producer unchanged')
+        if reference:
+            compiler_reference.authenticate(reference, H)
     record.update(complete=True,all_cases_passed=not blocked,failed_cases=sorted(blocked));save()
     print('Completed; failures retained:',len(record['failures']),flush=True)
     if not args.pilot and not args.record_only:

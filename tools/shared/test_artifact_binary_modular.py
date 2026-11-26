@@ -49,12 +49,12 @@ class ModularControls(unittest.TestCase):
     def test_current_primitive_abi_is_append_only_and_closed(self):
         import artifact_binary_reference as R
         import artifact_binary_typed as T
-        self.assertEqual([code for _, code in T.CONTRACT['primitive_codes']], list(range(137)))
-        self.assertEqual(T.CONTRACT['primitive_codes'][-1], ['PStringUtf8Length', 136])
-        for code in range(137):
+        self.assertEqual([code for _, code in T.CONTRACT['primitive_codes']], list(range(138)))
+        self.assertEqual(T.CONTRACT['primitive_codes'][-1], ['PByteArrayEqual', 137])
+        for code in range(138):
             doc = R.read_document(R.tree_document([T.n(32, ('int', code))], 7), 7)
             T.validate_type(doc, doc.roots[0], 'Primitive')
-        for value in [('int', -1), ('int', 137), ('int', 2147483647), ('bits', 136)]:
+        for value in [('int', -1), ('int', 138), ('int', 2147483647), ('bits', 136)]:
             with self.subTest(value=value):
                 doc = R.read_document(R.tree_document([T.n(32, value)], 7), 7)
                 with self.assertRaises(R.Invalid):
@@ -400,7 +400,14 @@ class ModularControls(unittest.TestCase):
         self.bad_fixture(self.fixture.read_text().replace('  import MLF.Primitive;', '  import Missing.Module;'))
 
     def test_fixture_rejects_reduced_scope(self):
-        self.bad_fixture('module Main where {\n import MLF.Primitive;\n main = return ();\n}\n')
+        # Closure discovery is intentionally generic; the following production
+        # planning stage enforces the complete artifact-library inventory.
+        with tempfile.TemporaryDirectory() as d:
+            fixture = Path(d) / 'Main.hs'
+            fixture.write_text('module Main where {\n import MLF.Primitive;\n main = return ();\n}\n')
+            rows = M.native_source_closure(SOURCE, fixture, self.manifest)
+            with self.assertRaisesRegex(ValueError, 'native library coverage mismatch'):
+                M.native_crate_plan(rows, Path(d) / 'plan', SOURCE)
 
     def complete_commands(self):
         return [{'name': name, 'state': 'passed',

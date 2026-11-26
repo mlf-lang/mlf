@@ -17,7 +17,7 @@ failed label wanted value=do
  result<-E.try (E.evaluate value)
  case result of {Left (B.HostError message)->need label (message==wanted);Right _->fail (label++": missing error")}
 main=do
- need "append-only opcode inventory" (map Meta.primitiveCode Meta.allPrimitives==[0..136])
+ need "append-only opcode inventory" (map Meta.primitiveCode Meta.allPrimitives==[0..137])
  need "previous opcode preserved" (Meta.primitiveCode T.PPackStringFields==135)
  need "UTF-8 opcode metadata" (Meta.primitiveCode T.PStringUtf8Length==136 && Meta.primitiveArity T.PStringUtf8Length==1 && Meta.primitiveStrict T.PStringUtf8Length)
  need "UTF-8 name" (B.unpack (Meta.primitiveName T.PStringUtf8Length)=="stringUtf8Length")

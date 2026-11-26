@@ -305,7 +305,10 @@ def loop_allocations(llvm):
             workers.append((match[1], match[3]))
     require(len(workers) == 1, 'scalar-loop control did not emit exactly one recursive worker')
     name, body = workers[0]
-    return {'worker': name, 'thunk_allocations': len(re.findall(r'call ptr @mlf\.(?:allocate\.thunk|thunk_new)\(', body))}
+    # Captured thunks use a fill helper that performs the same allocation.
+    # The direct runtime entry has an underscore after mlf, not a dot.
+    allocations = r'call ptr @(?:mlf\.allocate\.thunk(?:\.fill\.[0-9]+)?|mlf_thunk_new)\('
+    return {'worker': name, 'thunk_allocations': len(re.findall(allocations, body))}
 
 
 def main():

@@ -580,7 +580,7 @@ module Bootstrap.Runtime where {
     let {
       n = P.primitiveCode primitive
     } in
-    ((n == 134) || (n == 133) || (((n == 129) || (n == 131)) || ((n == 130) || ((n == 106) || ((n == 100) || ((n == 101) || ((n <= 5) ||
+    ((n == 137) || (n == 134) || (n == 133) || (((n == 129) || (n == 131)) || ((n == 130) || ((n == 106) || ((n == 100) || ((n == 101) || ((n <= 5) ||
      (((n >= 27) && (n <= 44)) || (((n >= 56) && (n <= 65)) || ((n >= 73) && (n <= 94)))))))))));
   isSTAction primitive =
     case primitive of {
@@ -1190,6 +1190,9 @@ module Bootstrap.Runtime where {
           else checkedIO (byteArray b)
             (\bytes -> wrapIO (writeByteFileOrError file bytes) RString));
       PByteArrayDigest -> checkedIO (byteArray a) (\bytes -> wrapIO (byteArrayDigest bytes) RString);
+      PByteArrayEqual -> checkedIO (do {
+        left <- byteArray a; right <- byteArray b; Right ((,) left right)
+      }) (\((,) left right) -> wrapIO (byteArrayEqual left right) RBoolean);
       PByteArrayCRC32 -> checkedIO (byteArray a) (\bytes -> do {
         size <- lengthByteArray bytes;
         checkedIO (do {

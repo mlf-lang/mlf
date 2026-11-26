@@ -17,6 +17,7 @@ void mlf_require_byte_file_v2_abi(void);
 void mlf_require_freeze_st_array_abi(void);
 void mlf_require_st_to_io_abi(void);
 void mlf_require_byte_array_crc32_abi(void);
+void mlf_require_byte_array_equal_abi(void);
 
 typedef struct MlfValue MlfValue;
 typedef struct MlfEnv MlfEnv;

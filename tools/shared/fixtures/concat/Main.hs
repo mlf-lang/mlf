@@ -94,7 +94,7 @@ metadataCases :: [(String, Bool)]
 metadataCases =
   [("new opcode", Metadata.primitiveCode T.PConcatStringList == 107),
    ("previous opcode", Metadata.primitiveCode T.PIOErrorWithStack == 106),
-   ("latest appended opcode", Metadata.primitiveCode T.PByteArrayCRC32 == 134),
+   ("latest appended opcode", Metadata.primitiveCode T.PByteArrayEqual == 137),
    ("name", B.unpack (Metadata.primitiveName T.PConcatStringList) == "concatStringList"),
    ("arity", Metadata.primitiveArity T.PConcatStringList == 1),
    ("strict operand", Metadata.primitiveStrict T.PConcatStringList),
@@ -105,7 +105,7 @@ metadataCases =
    ("name lookup", case Metadata.lookupTargetPrimitive (B.literal "concatStringList") of
       T.Just T.PConcatStringList -> True
       _ -> False),
-   ("append-only opcode inventory", map Metadata.primitiveCode Metadata.allPrimitives == [0..136])]
+   ("append-only opcode inventory", map Metadata.primitiveCode Metadata.allPrimitives == [0..137])]
 
 -- The interpreter's RString constructor can be WHNF while its payload is
 -- bottom. Source panic alone exercises Either failure and misses this case.

@@ -216,6 +216,280 @@ class CompilerReferenceTests(unittest.TestCase):
             runner.fit_growth.paired_cell(samples,2)
 
 
+class ReferenceDependencyIsolationTests(unittest.TestCase):
+    """Independent executable ABI sentinels exercise the real worker process.
+
+    These fixtures validate transport and pin enforcement, not MLF semantics
+    or performance. Neither sentinel uses the worker's framing decoder.
+    """
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.clang = self.root / 'clang'
+        self.executable(self.clang, '''
+import pathlib, sys
+args = sys.argv[1:]
+ir = next(pathlib.Path(p) for p in args if p.endswith('.ll')).read_text().strip()
+runtime = next(pathlib.Path(p) for p in args if p.endswith('runtime.o')).read_text().strip()
+if ir != runtime or '-l' + runtime not in args:
+    sys.exit('runtime ABI mismatch')
+target = pathlib.Path(args[args.index('-o')+1])
+target.write_text('#!/bin/sh\\necho ' + ir + '\\n')
+target.chmod(0o755)
+''')
+        self.ghc = self.root / 'ghc'
+        self.ghc.write_text('pinned test GHC identity')
+        self.candidate = self.lane('candidate')
+        self.reference = self.lane('baseline')
+        self.source = self.root / 'Main.hs'
+        self.source.write_text('main = printInt 42\n')
+
+    def executable(self, path, body):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('#!' + sys.executable + '\n' + body)
+        path.chmod(0o755)
+
+    def lane(self, abi):
+        folder = self.root / abi
+        source = folder / 'source'
+        (source / 'runtime').mkdir(parents=True)
+        (source / 'host/ghc').mkdir(parents=True)
+        (source / 'runtime/mlf_runtime.c').write_text(abi)
+        (source / 'runtime/mlf_runtime.h').write_text('header ' + abi)
+        (source / 'host/ghc/Primitive.hs').write_text('host ' + abi)
+        producer = folder / 'producer'
+        producer.mkdir()
+        (producer / 'receipt.json').write_text(json.dumps({'fixture': abi}))
+        (producer / 'bin').mkdir()
+        (producer / 'bin/builtin-prelude').write_text('prelude ' + abi)
+        self.executable(producer / 'bin/emlf', 'ABI = ' + repr(abi) + '\n' + '''
+import pathlib, sys
+def fields(text):
+    values = []
+    while text:
+        size, rest = text.split(':', 1)
+        count = int(size)
+        values.append(rest[:count])
+        text = rest[count:]
+    return values
+def compile_crate(spec, prefix):
+    row = fields(pathlib.Path(spec).read_text())
+    for suffix in ['.mlfci', '.mlfco']:
+        if pathlib.Path(row[7] + suffix).read_text() != ABI:
+            sys.exit('builtin ABI mismatch')
+    for dependency in fields(row[5]):
+        if pathlib.Path(dependency).read_text() != ABI:
+            sys.exit('import ABI mismatch')
+    for suffix in ['.mlfci', '.mlfco']:
+        pathlib.Path(prefix + suffix).write_text(ABI)
+args = sys.argv[1:]
+if args[0] == '--crate-to-llvm-gc':
+    if pathlib.Path(args[1]).read_text() != ABI:
+        sys.exit('checked ABI mismatch')
+    print(ABI)
+elif args[0] == '--emit-llvm-gc':
+    print(ABI)
+else:
+    if args[0] == '--compile-crate-plan':
+        plan = fields(pathlib.Path(args[1]).read_text())
+        for entry in fields(plan[1]):
+            spec, prefix = fields(entry)
+            compile_crate(spec, prefix)
+        spec = args[2]
+    else:
+        spec = args[1]
+    compile_crate(spec, args[args.index('-o')+1])
+    if args[0] != '--compile-crate':
+        print(ABI)
+''')
+        fixed = folder / 'fixed'
+        fixed.mkdir()
+        builtin = fixed / 'builtin'
+        for suffix in ('.mlfci', '.mlfco'):
+            Path(str(builtin) + suffix).write_text(abi)
+        runtime = fixed / 'runtime.o'
+        runtime.write_text(abi)
+        return {'complete': True, 'source': str(source), 'producer': str(producer),
+                'clang': str(self.clang), 'ghc': str(self.ghc), 'builtin': str(builtin),
+                'runtime': str(runtime), 'libs': ['-l' + abi], 'endpoint': 'crate-bootstrap-v1',
+                'identity': {'producer_receipt_sha256': digest(producer / 'receipt.json'),
+                             'producer_emlf_sha256': digest(producer / 'bin/emlf'),
+                             'builtin_prelude_sha256': digest(producer / 'bin/builtin-prelude')},
+                'builtin_record': {str(builtin) + s: digest(str(builtin) + s) for s in ('.mlfci', '.mlfco')}}
+
+    def plan(self, endpoint='crate-bootstrap-v1', cold=False):
+        case = {'id': 'abi-control', 'source': str(self.source)}
+        if cold:
+            case['dependencies'] = [{'module': 'First', 'source': str(self.source)},
+                                    {'module': 'Second', 'source': str(self.source)}]
+        return {'setup': self.candidate, 'cases': [case],
+                'benchmark': {'endpoint': {'id': endpoint}},
+                'native_target_policy': {'mlf': {'flags': []}, 'reference': {'flags': []}},
+                'compiler_reference': {'producer': self.reference['producer'],
+                                       'fixed_dependencies': {'setup': self.reference}}}
+
+    def run_worker(self, plan, lane, label):
+        plan_path = self.root / (label + '.json')
+        plan_path.write_text(json.dumps(plan))
+        output = self.root / label
+        result = subprocess.run([sys.executable, '-B', HERE / 'worker.py', '--plan', plan_path,
+                                 '--case', 'abi-control', '--lane', lane, '--out', output],
+                                capture_output=True, text=True)
+        return result, output
+
+    def test_each_lane_uses_its_own_builtin_and_runtime_at_all_endpoints(self):
+        endpoints = ['crate-bootstrap-v1', 'crate-fused-v1', 'crate-plan-v1', *worker.PRODUCTION_ENDPOINTS]
+        for index, endpoint in enumerate(endpoints):
+            for lane, abi in [('mlf', 'candidate'), ('reference', 'baseline')]:
+                with self.subTest(endpoint=endpoint, lane=lane):
+                    result, output = self.run_worker(self.plan(endpoint, cold=endpoint == 'crate-plan-v1'),
+                                                     lane, f'correct-{index}-{lane}')
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertTrue(json.loads((output / 'stages.json').read_text())['complete'])
+                    self.assertEqual(subprocess.check_output([output / 'program'], text=True), abi + '\n')
+
+    def test_independent_sentinels_reject_each_cross_abi_substitution(self):
+        for field in ('builtin', 'runtime'):
+            with self.subTest(field=field):
+                plan = copy.deepcopy(self.plan())
+                plan['compiler_reference']['fixed_dependencies']['setup'][field] = self.candidate[field]
+                result, output = self.run_worker(plan, 'reference', 'wrong-' + field)
+                self.assertNotEqual(result.returncode, 0)
+                stages = json.loads((output / 'stages.json').read_text())
+                self.assertFalse(stages['complete'])
+                self.assertIn(field + ' ABI mismatch', Path(stages['stages'][-1]['stderr']).read_text())
+
+    def test_old_plans_cannot_silently_share_candidate_dependencies(self):
+        plan = self.plan()
+        del plan['compiler_reference']['fixed_dependencies']
+        result, _ = self.run_worker(plan, 'reference', 'old-plan')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('create a fresh cohort', result.stderr)
+
+    def test_candidate_setup_cannot_repin_changed_prepared_inputs(self):
+        helper = runner.command_runner.load_helper()
+        pins = runner.compiler_reference.fixed_setup_pins(self.candidate)
+        helper.check_pins(pins)
+        for name in pins:
+            with self.subTest(path=name):
+                path = Path(name)
+                original = path.read_bytes()
+                path.write_bytes(original + b' replaced after preparation')
+                try:
+                    with self.assertRaisesRegex(RuntimeError, 'immutable input changed'):
+                        helper.check_pins(runner.compiler_reference.fixed_setup_pins(self.candidate))
+                finally:
+                    path.write_bytes(original)
+
+    def prepare_fixture(self):
+        script = self.root / 'prepare-fixture.py'
+        script.write_text('''
+import argparse, hashlib, json, pathlib
+p = argparse.ArgumentParser()
+for key in ['source','producer','endpoint','ghc','clang','output']:
+    p.add_argument('--' + key, required=True)
+p.add_argument('--build-builtin', action='store_true', required=True)
+a = p.parse_args()
+source, producer, out = map(pathlib.Path, [a.source, a.producer, a.output])
+out.mkdir()
+abi = (source / 'runtime/mlf_runtime.c').read_text()
+builtin, runtime = out / 'builtin', out / 'runtime.o'
+for suffix in ['.mlfci','.mlfco']:
+    pathlib.Path(str(builtin) + suffix).write_text(abi)
+runtime.write_text(abi)
+def sha(path): return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+def pins(folder): return {str(f): sha(f) for f in folder.rglob('*') if f.is_file()}
+setup = dict(complete=True, endpoint=a.endpoint, source=a.source, producer=a.producer,
+             ghc=a.ghc, clang=a.clang, builtin=str(builtin), runtime=str(runtime), libs=['-l' + abi],
+             identity=dict(producer_receipt_sha256=sha(producer / 'receipt.json'),
+                           producer_emlf_sha256=sha(producer / 'bin/emlf'),
+                           builtin_prelude_sha256=sha(producer / 'bin/builtin-prelude')),
+             builtin_record={str(builtin) + s: sha(str(builtin) + s) for s in ['.mlfci','.mlfco']})
+(out / 'setup.json').write_text(json.dumps(setup))
+(out / 'preparation.json').write_text(json.dumps(dict(source_pins=pins(source / 'host/ghc'),
+                                                    runtime_pins=pins(source / 'runtime'))))
+''')
+        helper = runner.command_runner.load_helper()
+        auth = {'ghc': {'path': str(self.ghc), 'version': '9.14.1'}}
+        helper.authenticate = mock.Mock(return_value=auth)
+        reference = {key: self.reference[key] for key in ('producer', 'source')}
+        reference.update(emlf_sha256=digest(Path(reference['producer']) / 'bin/emlf'),
+                         receipt_sha256=digest(Path(reference['producer']) / 'receipt.json'))
+        output = self.root / 'prepared-baseline'
+        with mock.patch.object(runner.compiler_reference, 'PREPARE', script):
+            fixed = runner.compiler_reference.prepare_fixed_dependencies(self.candidate, reference, output, helper)
+        return fixed, helper, output
+
+    def test_preparation_selects_baseline_inputs_and_reauthenticates_without_rebuilding(self):
+        original = Path(self.reference['producer']) / 'receipt.json'
+        before = original.read_bytes()
+        fixed, helper, output = self.prepare_fixture()
+        self.assertEqual(Path(fixed['setup']['builtin'] + '.mlfci').read_text(), 'baseline')
+        self.assertEqual(Path(fixed['setup']['runtime']).read_text(), 'baseline')
+        self.assertEqual(original.read_bytes(), before)
+        self.assertEqual(helper.authenticate.call_args_list,
+                         [mock.call(Path(self.reference['producer']), Path(self.reference['source']))] * 2)
+        helper.check_pins(fixed['inputs'])
+        for relative in ['setup.json', 'preparation.json', 'builtin.mlfci', 'builtin.mlfco', 'runtime.o']:
+            self.assertIn(str(output / relative), fixed['inputs'])
+
+    def test_preparation_pins_reject_dependency_evidence_and_source_mutations(self):
+        fixed, helper, output = self.prepare_fixture()
+        paths = [output / name for name in ['setup.json', 'preparation.json', 'builtin.mlfci',
+                                           'builtin.mlfco', 'runtime.o']]
+        paths += [Path(self.reference['source']) / 'runtime/mlf_runtime.h',
+                  Path(self.reference['source']) / 'runtime/mlf_runtime.c',
+                  Path(self.reference['source']) / 'host/ghc/Primitive.hs',
+                  Path(self.reference['producer']) / 'bin/emlf',
+                  Path(self.reference['producer']) / 'bin/builtin-prelude',
+                  Path(self.reference['producer']) / 'receipt.json',
+                  self.root / 'prepare-fixture.py', self.clang, self.ghc]
+        for path in paths:
+            with self.subTest(path=path):
+                before = path.read_bytes()
+                path.write_bytes(before + b' changed')
+                try:
+                    with self.assertRaisesRegex(RuntimeError, 'immutable input changed'):
+                        helper.check_pins(fixed['inputs'])
+                finally:
+                    path.write_bytes(before)
+
+    def test_cached_producer_record_stays_unchanged_and_dependencies_are_rechecked(self):
+        _, helper, _ = self.prepare_fixture()
+        source = Path(self.reference['source'])
+        def git(*args):
+            return subprocess.check_output(['git', '-C', source, *args], text=True).strip()
+        git('init', '-q')
+        git('config', 'user.name', 'Baseline dependency test')
+        git('config', 'user.email', 'test@example.invalid')
+        git('add', '.')
+        git('commit', '-qm', 'baseline fixture')
+        commit = git('rev-parse', 'HEAD')
+        reference = {key: self.reference[key] for key in ('source', 'producer')}
+        reference.update(commit=commit,
+                         receipt_sha256=digest(Path(reference['producer']) / 'receipt.json'),
+                         emlf_sha256=digest(Path(reference['producer']) / 'bin/emlf'))
+        cache = Path(self.candidate['source']) / '.mlf-build/compiler-shapes-head' / commit / digest(self.ghc)
+        cache.mkdir(parents=True)
+        ready = cache / 'reference.json'
+        ready.write_text(json.dumps(reference))
+        original = ready.read_bytes()
+        selection = dict(commit=commit, candidate_commit=commit, dirty=True, basis='test fixture')
+        with mock.patch.object(runner.compiler_reference.command_runner, 'load_helper', return_value=helper), \
+                mock.patch.object(runner.compiler_reference, 'PREPARE', self.root / 'prepare-fixture.py'):
+            actual = runner.compiler_reference.prepare(self.candidate, selection, self.ghc, self.root / 'second-setup')
+        self.assertEqual(ready.read_bytes(), original)
+        self.assertEqual(actual['producer'], reference['producer'])
+        runner.compiler_reference.authenticate(actual, helper)
+        builtin = Path(actual['fixed_dependencies']['setup']['builtin'] + '.mlfco')
+        builtin.write_text('candidate')
+        helper.authenticate.reset_mock()
+        with self.assertRaisesRegex(RuntimeError, 'immutable input changed'):
+            runner.compiler_reference.authenticate(actual, helper)
+        helper.authenticate.assert_not_called()
+
+
 class ScheduleTests(unittest.TestCase):
     def test_interleaving_visits_each_cell_once_per_round_and_keeps_pairs(self):
         cases = ['baseline', 'small', 'medium', 'large']

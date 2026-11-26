@@ -84,7 +84,7 @@ main = do
   expect (IS.size (IS.union (IS.fromList (L.range 1 30)) (IS.fromList (L.range 20 50))) == 50) "IntSet union"
   expect (S.size (S.fromList compareString ((:) "z" ((:) "a" ((:) "z" [])))) == 2) "generic Set"
   expect (listEquals (L.map P.primitiveCode P.legacyPrimitives) (L.range 0 94)) "legacy primitive ABI sequence"
-  expect (listEquals (L.map P.primitiveCode P.allPrimitives) (L.range 0 136)) "primitive ABI sequence"
+  expect (listEquals (L.map P.primitiveCode P.allPrimitives) (L.range 0 137)) "primitive ABI sequence"
   expect (P.primitiveArity PStringSlice == 3 && P.primitiveArity PGetArgCount == 0 && L.not (P.primitiveStrict PSeq)) "primitive metadata"
   expect (P.primitiveCode PPackStringFields == 135 && P.primitiveArity PPackStringFields == 1 && P.primitiveStrict PPackStringFields) "field framing metadata"
   expect (stringUtf8Length "λ😀" == 6 && stringLength "λ😀" == 2 && stringUtf8Length (stringFromCode 0) == 1) "UTF-8 byte length"

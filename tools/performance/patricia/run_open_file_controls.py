@@ -263,7 +263,7 @@ def run_session_files(H, output, record, inputs, binaries, producer, source,
         'exact_source_inverse_verified': True}
     rows['current_independent_dependency_schema_extension'] = {
         'active_route': 'current_dependency_decoded',
-        'fixed_primitive_abi': 'mlf-primitive-137-v12',
+        'fixed_primitive_abi': 'mlf-primitive-138-v13',
         'registry_provenance': {
             'introduced_commit': 'd8325d909c249fd82d4ad6173d44d8818cc6f8bf',
             'parent_commit': '63fbd13d253a3f1a54170311dcbe076f1d0718f4',

@@ -1,0 +1,52 @@
+{
+  "format": 1,
+  "scope": "maintained demand/order integration gate",
+  "producer_receipt": ".mlf-build/pr55-final/receipt.json",
+  "producer_receipt_sha256": "87671243b435ac03484399cccfa9006d26028d72080ed6530d94ecf8838a0761",
+  "producer_optimization": "2",
+  "compiler_sha256": "71d83d351ebb0ee681933422fc13ea4fe21fe5f7cd51d4de87ca0122e4c9e436",
+  "gate_receipt": ".mlf-build/pr55-ready-total-final/receipt.json",
+  "gate_receipt_sha256": "e3be0f2f8efa8e3109470bf5cbbb23620a3ec2f3542bd23569261a8b07036afa",
+  "gate_status": "passed",
+  "complete": true,
+  "producer_authenticated_before_and_after": true,
+  "interpreted_cases": 79,
+  "native_cases": 158,
+  "detector_unit_tests": {
+    "command": [
+      "python3",
+      "tools/shared/test_ready_total_controls.py"
+    ],
+    "passed": 3,
+    "source_sha256": "805134c2e3f426448ec9dc84d021de9fc30bb7d1d1190e08fc9a7c215c8eb7a2"
+  },
+  "initial_harness_failure": {
+    "status": "failed",
+    "error": "multiplication with ready operands lost its lazy suspension",
+    "receipt": ".mlf-build/pr55-ready-total/receipt.json",
+    "receipt_sha256": "e51b10176e35799c1054310b8a2eb55c3cfc95814ec55903977b94df8e5cecaa",
+    "baseline_commit": "94e086c15c40aaf220c764f0e723cc3cfe627587",
+    "baseline_llvm_sha256": "b5a153a14ce4578d2e6525712d08ee1aa1038a4f6ce2ef36e155d022b9cbf3dc",
+    "candidate_llvm_sha256": "c7d852f721f7ab812c52d11c88720c60ca46c0eac58d0792807e186264e0dda8",
+    "normalized_llvm_sha256": "b5a153a14ce4578d2e6525712d08ee1aa1038a4f6ce2ef36e155d022b9cbf3dc",
+    "llvm_equal_except_added_byte_equality_abi_guard": true,
+    "original_detector_count": 0,
+    "corrected_detector_count": 1,
+    "diff": "--- baseline94\n+++ candidate\n@@ -453,12 +453,14 @@\n declare void @mlf_require_freeze_st_array_abi()\n declare void @mlf_require_st_to_io_abi()\n declare void @mlf_require_byte_array_crc32_abi()\n+declare void @mlf_require_byte_array_equal_abi()\n define ptr @mlf_entry() {\n   call void @mlf_require_haskell_boundary_v4_abi()\n   call void @mlf_require_byte_file_v2_abi()\n   call void @mlf_require_freeze_st_array_abi()\n   call void @mlf_require_st_to_io_abi()\n   call void @mlf_require_byte_array_crc32_abi()\n+  call void @mlf_require_byte_array_equal_abi()\n   %root = call ptr @mlf.code.0(ptr null, ptr null)\n   ret ptr %root\n }\n"
+  },
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "/workspace/scratch/5fb8e37e44aa/mlf/tools/shared/test_ready_total.py",
+    "--compiler",
+    "/workspace/scratch/5fb8e37e44aa/mlf/.mlf-build/pr55-final/bin/emlf",
+    "--gc-prefix",
+    "/workspace/scratch/5fb8e37e44aa/toolchain/gc",
+    "--output",
+    "/workspace/scratch/5fb8e37e44aa/mlf/.mlf-build/pr55-ready-total-final"
+  ],
+  "wall_seconds": 242.97696137428284,
+  "limitations": [
+    "This runs the maintained focused gate, not the entire backends campaign.",
+    "The gate authenticates selected native tools and local C closure; system libraries are not fully pinned."
+  ]
+}

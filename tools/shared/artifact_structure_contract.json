@@ -1464,6 +1464,10 @@
     [
       "PStringUtf8Length",
       136
+    ],
+    [
+      "PByteArrayEqual",
+      137
     ]
   ],
   "schema_fields": [

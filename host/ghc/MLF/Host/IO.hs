@@ -373,6 +373,20 @@ v_writeByteFileOrError name array =
           B.packCString message >>= evaluate . fromUtf8
 
 foreign import ccall safe "mlf_ghc_byte_array_digest" c_byteArrayDigest :: Ptr Word8 -> CSize -> CString -> IO ()
+foreign import ccall safe "mlf_ghc_byte_array_equal" c_byteArrayEqual :: Ptr Word8 -> Ptr Word8 -> CSize -> IO CInt
+-- Borrow both pinned owners without copying. The IO boundary preserves
+-- mutations made after construction of the action; operands are demanded
+-- left to right even when their lengths differ. As with CRC, callers must
+-- synchronize concurrent writes if they need a stable snapshot.
+v_byteArrayEqual :: ByteArray -> ByteArray -> IO Bool
+v_byteArrayEqual left right = do
+  ByteArray leftSize leftCells <- evaluate left
+  ByteArray rightSize rightCells <- evaluate right
+  if leftSize /= rightSize then pure False else
+    withByteStorage leftCells $ \a ->
+      withByteStorage rightCells $ \b ->
+        (/= 0) <$> c_byteArrayEqual a b (fromIntegral leftSize)
+
 v_byteArrayDigest :: ByteArray -> IO String
 v_byteArrayDigest array = do
   ByteArray size _ <- evaluate array

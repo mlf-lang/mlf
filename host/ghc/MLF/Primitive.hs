@@ -18,7 +18,7 @@ module MLF.Primitive
   , newByteArray, readByteArray, writeByteArray, lengthByteArray, byteArrayFromString, putBytes, getByteLine
   , newIntTable, readIntTable, writeIntTable, andInt, stringLength, stringUtf8Length, stringCodeAt, stringSlice
   , stringFromCode, compareString, readDouble, doubleToBits, doubleFromBits, seq, panic
-  , readByteFileOrError, writeByteFileOrError, byteArrayDigest, byteArrayCRC32
+  , readByteFileOrError, writeByteFileOrError, byteArrayDigest, byteArrayCRC32, byteArrayEqual
   , readFile, writeFile, fileExists, canonicalPath, getArgCount, getArg, putErr
   , exitWith, getExecutablePath, getContents, stReturn, stBind, runST, stToIO, newSTArray
   , readSTArray, writeSTArray, lengthSTArray, freezeSTArray, getEnv, setEnv, unsetEnv, runProcess
@@ -270,6 +270,10 @@ byteArrayDigest = IO.v_byteArrayDigest
 -- CRC32/ISO-HDLC of the current bytes; the bounded range is logically zero.
 byteArrayCRC32 :: ByteArray -> Int -> Int -> IO Int
 byteArrayCRC32 = IO.v_byteArrayCRC32
+
+-- Compare current contents exactly when the action runs, left operand first.
+byteArrayEqual :: ByteArray -> ByteArray -> IO Bool
+byteArrayEqual = IO.v_byteArrayEqual
 
 readFile :: String -> IO String
 readFile = IO.v_readFile

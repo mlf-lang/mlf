@@ -71,6 +71,11 @@ import qualified MLF.Primitive as Prim
 import qualified Package.Json as J
 import qualified Package.Manifest as P
 import qualified Package.Scheduler as Jobs
+import qualified OptimizationCrates
+import qualified OptimizationFrontend
+import qualified OptimizationInference
+import qualified OptimizationLLVM
+import qualified OptimizationMetadata
 
 check label expected actual =
   unless (expected == actual) (error (label ++ ": expected " ++ show expected ++ ", got " ++ show actual))
@@ -4254,6 +4259,11 @@ manualSurvivorDemand = do
     check "manual graph leaves disconnected names lazy" (Right True) =<< observe memo unused
 
 main = do
+  OptimizationCrates.run
+  OptimizationFrontend.run
+  OptimizationInference.run
+  OptimizationLLVM.run
+  OptimizationMetadata.run
   manualSurvivorDemand
   reviewBoundaryChecks
   permissionMemoPages

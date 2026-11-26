@@ -22,7 +22,7 @@ failed label wanted value = do
 
 main = do
  need "primitive code and previous bound" (Metadata.primitiveCode T.PPackStringFields==135 && Metadata.primitiveCode T.PByteArrayCRC32==134)
- need "primitive inventory" (map Metadata.primitiveCode Metadata.allPrimitives==[0..136])
+ need "primitive inventory" (map Metadata.primitiveCode Metadata.allPrimitives==[0..137])
  need "primitive name, arity and strictness" (B.unpack(Metadata.primitiveName T.PPackStringFields)=="packStringFields" && Metadata.primitiveArity T.PPackStringFields==1 && Metadata.primitiveStrict T.PPackStringFields)
  need "primitive signature" (case Metadata.primitiveSignature T.PPackStringFields of
    ([],T.Function (T.Applied list [T.Applied input []]) (T.Applied output [])) -> map B.unpack [list,input,output]==["[]","String","String"]

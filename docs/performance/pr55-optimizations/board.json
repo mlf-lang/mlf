@@ -1,0 +1,556 @@
+{
+  "schema_version": 1,
+  "board_revision": 4,
+  "mode": "standard",
+  "project": {
+    "name": "PR55 algorithmic optimizations",
+    "source": "https://github.com/mlf-lang/mlf",
+    "canonical_location": "docs/performance/pr55-optimizations/board.json",
+    "desired_outcome": "Implement, verify and push the ten requested optimizations.",
+    "scope": "codex/pr55-algorithmic-optimizations",
+    "constraints": [
+      "Preserve successful outputs, demand order, first errors, identities and cache authentication.",
+      "Keep main and PR55 source branches unchanged.",
+      "Keep historical microbenchmark claims separate from newly observed results."
+    ],
+    "observed_facts": [
+      "Optimization branch started at 45ddd6da0f2488523fbf9f773a2bd83c5c78d1ea.",
+      "Latest observed PR55 head 94e086c15c40aaf220c764f0e723cc3cfe627587 was fast-forwarded locally.",
+      "Capture propagation, lexical let summary sharing and normalizeRow cons/reverse were already present at that head.",
+      "Resumed from the existing staged implementation; upstream PR55 now has three test-only commits through 1297b5c. Keep the recorded 94e086c production baseline for comparisons."
+    ]
+  },
+  "profile": {
+    "id": "P1",
+    "revision": 1,
+    "observed_workflow": "Source change, independent semantic checks, measured performance, review, commit, push.",
+    "work_types": [
+      "implementation",
+      "verification",
+      "integration"
+    ],
+    "relevant_skills": [
+      "task-board-designer"
+    ],
+    "validation_entry_points": [
+      "tools/shared/build.py",
+      "tests/indexvec/run.py",
+      "tools/shared/test_byte_array_equal.py",
+      "tools/performance/compiler-shapes/bench.py",
+      "tools/performance/pr55-optimizations/run.py"
+    ],
+    "workflows": [
+      {
+        "id": "W1",
+        "work_type": "implementation",
+        "states": [
+          "ready",
+          "working",
+          "checking",
+          "closed"
+        ],
+        "wip": {
+          "limit": 4,
+          "counted_states": [
+            "working",
+            "checking"
+          ],
+          "count_started_blocked_items": true,
+          "resource_limits": [
+            {
+              "resource": "agent-owner",
+              "limit": 1,
+              "unit": "active implementation group"
+            }
+          ]
+        },
+        "transitions": [
+          {
+            "from": "working",
+            "to": "checking",
+            "policy": "Implementation and actual subject recorded."
+          },
+          {
+            "from": "checking",
+            "to": "closed",
+            "policy": "Record outcome and evidence; assess goal acceptance separately."
+          }
+        ]
+      }
+    ]
+  },
+  "goals": [
+    {
+      "id": "G1",
+      "revision": 2,
+      "statement": "Deliver all ten optimizations to the requested branch.",
+      "required_criterion_ids": [
+        "C1",
+        "C2",
+        "C3",
+        "C4",
+        "C5"
+      ],
+      "support": {
+        "mode": "direct",
+        "child_goal_ids": []
+      },
+      "assessment": {
+        "support": "unsupported",
+        "acceptance": "pending",
+        "evaluated_board_revision": 4,
+        "rationale": "Implementation, targeted semantic tests and reduced-shape performance threshold pass. Remote publication is the remaining criterion."
+      }
+    }
+  ],
+  "criteria": [
+    {
+      "id": "C1",
+      "statement": "All ten requested production paths are integrated on the selected branch.",
+      "method": "source review and regression coverage per T1\u2013T10",
+      "expected_result": "implemented or verified upstream",
+      "revision": 1,
+      "goal_id": "G1",
+      "goal_revision": 2,
+      "required": true,
+      "evaluation": "satisfied",
+      "rationale": "Current reviewed source and integrated semantic gates are recorded in validation.json."
+    },
+    {
+      "id": "C2",
+      "statement": "Build and semantic regression gates pass against current source.",
+      "method": "GHC 9.14.1 build, shared frontend check, targeted differential and runtime tests",
+      "expected_result": "passing",
+      "revision": 1,
+      "goal_id": "G1",
+      "goal_revision": 2,
+      "required": true,
+      "evaluation": "satisfied",
+      "rationale": "Current reviewed source and integrated semantic gates are recorded in validation.json."
+    },
+    {
+      "id": "C3",
+      "statement": "Performance evidence measures actual repository functions and compiler inputs.",
+      "method": "before/after repeated runs with source and executable identities; independent output oracles",
+      "expected_result": "reproducible measurements; limitations explicit",
+      "revision": 1,
+      "goal_id": "G1",
+      "goal_revision": 2,
+      "required": true,
+      "evaluation": "satisfied",
+      "rationale": "Production-helper probes and 108 complete compiler builds are recorded with source identities, all samples, independent oracles and scope limits."
+    },
+    {
+      "id": "C4",
+      "statement": "The reviewed result is pushed to codex/pr55-algorithmic-optimizations.",
+      "method": "remote commit/ref readback",
+      "expected_result": "remote head equals delivered commit",
+      "revision": 1,
+      "goal_id": "G1",
+      "goal_revision": 2,
+      "required": true,
+      "evaluation": "unknown",
+      "rationale": "Verification pending"
+    },
+    {
+      "id": "C5",
+      "statement": "Reduced compiler shapes beat GHC median compilation wall time on identical source before claiming the parent compiler performance goal.",
+      "method": "crate-fused-v1 candidate/GHC runs at sizes 16 and 64, three repetitions with independent runtime oracles",
+      "expected_result": "mlf_over_ghc < 1 in each measured cell",
+      "revision": 1,
+      "goal_id": "G1",
+      "goal_revision": 2,
+      "required": true,
+      "evaluation": "satisfied",
+      "rationale": "All12 measured candidate/GHC median full-build wall ratios are <1 (0.122\u20130.439). This does not establish parent/self-host or growth-rate goals."
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "kind": "implementation",
+      "group": "llvm_optimizations",
+      "goal_ids": [
+        "G1"
+      ],
+      "intended_output": "Verify caller-dependent capture propagation and retained set summaries",
+      "workflow_id": "W1",
+      "phase": "closed",
+      "disposition": "completed",
+      "owner": "llvm_optimizations",
+      "input_revision": "94e086c15c40aaf220c764f0e723cc3cfe627587",
+      "edit_scope": [
+        "libraries/mlf-llvm/Bootstrap/LLVM/Analysis.hs"
+      ],
+      "task_completion_condition": "upstream at 94e086c; differential fixed-point checks",
+      "blocker": null,
+      "attempt_ids": [
+        "A-review",
+        "A-validation"
+      ],
+      "output_refs": [
+        "docs/pr55-algorithmic-optimizations.md",
+        "docs/performance/pr55-optimizations/validation.json"
+      ],
+      "next_action": "Implementation and targeted regression verification complete; integration owner finishes timing and publication."
+    },
+    {
+      "id": "T2",
+      "kind": "implementation",
+      "group": "llvm_optimizations",
+      "goal_ids": [
+        "G1"
+      ],
+      "intended_output": "Verify one lexical let-spine demand summary is shared across code-generation paths",
+      "workflow_id": "W1",
+      "phase": "closed",
+      "disposition": "completed",
+      "owner": "llvm_optimizations",
+      "input_revision": "94e086c15c40aaf220c764f0e723cc3cfe627587",
+      "edit_scope": [
+        "libraries/mlf-llvm/Bootstrap/LLVM/Analysis.hs",
+        "libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs"
+      ],
+      "task_completion_condition": "upstream at 94e086c; order and barrier checks",
+      "blocker": null,
+      "attempt_ids": [
+        "A-review",
+        "A-validation"
+      ],
+      "output_refs": [
+        "docs/pr55-algorithmic-optimizations.md",
+        "docs/performance/pr55-optimizations/validation.json"
+      ],
+      "next_action": "Implementation and targeted regression verification complete; integration owner finishes timing and publication."
+    },
+    {
+      "id": "T3",
+      "kind": "implementation",
+      "group": "root",
+      "goal_ids": [
+        "G1"
+      ],
+      "intended_output": "Compare reread metadata snapshots with exact bulk byte equality across all hosts",
+      "workflow_id": "W1",
+      "phase": "closed",
+      "disposition": "completed",
+      "owner": "root",
+      "input_revision": "94e086c15c40aaf220c764f0e723cc3cfe627587",
+      "edit_scope": [
+        "libraries/mlf-crates/Bootstrap/ArtifactStorage.hs",
+        "libraries/mlf-language-core/Bootstrap/Primitive.hs",
+        "host/ghc",
+        "runtime"
+      ],
+      "task_completion_condition": "append-only opcode 137, no digest substitution",
+      "blocker": null,
+      "attempt_ids": [
+        "A-review",
+        "A-validation"
+      ],
+      "output_refs": [
+        "docs/pr55-algorithmic-optimizations.md",
+        "docs/performance/pr55-optimizations/validation.json"
+      ],
+      "next_action": "Implementation and targeted regression verification complete; integration owner finishes timing and publication."
+    },
+    {
+      "id": "T4",
+      "kind": "implementation",
+      "group": "toolchain_frontend",
+      "goal_ids": [
+        "G1"
+      ],
+      "intended_output": "Record token endpoints for infix and parenthesized operator spans",
+      "workflow_id": "W1",
+      "phase": "closed",
+      "disposition": "completed",
+      "owner": "toolchain_frontend",
+      "input_revision": "94e086c15c40aaf220c764f0e723cc3cfe627587",
+      "edit_scope": [
+        "libraries/mlf-frontend/Bootstrap/Parser.hs"
+      ],
+      "task_completion_condition": "all profiles, qualified and split tokens",
+      "blocker": null,
+      "attempt_ids": [
+        "A-review",
+        "A-validation"
+      ],
+      "output_refs": [
+        "docs/pr55-algorithmic-optimizations.md",
+        "docs/performance/pr55-optimizations/validation.json"
+      ],
+      "next_action": "Implementation and targeted regression verification complete; integration owner finishes timing and publication."
+    },
+    {
+      "id": "T5",
+      "kind": "implementation",
+      "group": "toolchain_frontend",
+      "goal_ids": [
+        "G1"
+      ],
+      "intended_output": "Verify cons/reverse row construction preserves patterns and Fresh state",
+      "workflow_id": "W1",
+      "phase": "closed",
+      "disposition": "completed",
+      "owner": "toolchain_frontend",
+      "input_revision": "94e086c15c40aaf220c764f0e723cc3cfe627587",
+      "edit_scope": [
+        "libraries/mlf-frontend/Bootstrap/Surface.hs"
+      ],
+      "task_completion_condition": "upstream at 94e086c; wide and mixed rows",
+      "blocker": null,
+      "attempt_ids": [
+        "A-review",
+        "A-validation"
+      ],
+      "output_refs": [
+        "docs/pr55-algorithmic-optimizations.md",
+        "docs/performance/pr55-optimizations/validation.json"
+      ],
+      "next_action": "Implementation and targeted regression verification complete; integration owner finishes timing and publication."
+    },
+    {
+      "id": "T6",
+      "kind": "implementation",
+      "group": "inference_optimizations",
+      "goal_ids": [
+        "G1"
+      ],
+      "intended_output": "Reuse traversal ranks for certified tree roots with exact shared-DAG fallback",
+      "workflow_id": "W1",
+      "phase": "closed",
+      "disposition": "completed",
+      "owner": "inference_optimizations",
+      "input_revision": "94e086c15c40aaf220c764f0e723cc3cfe627587",
+      "edit_scope": [
+        "libraries/mlf-inference/Bootstrap/Elaborate.hs"
+      ],
+      "task_completion_condition": "root-local order, alias and sparse-ID coverage",
+      "blocker": null,
+      "attempt_ids": [
+        "A-review",
+        "A-validation"
+      ],
+      "output_refs": [
+        "docs/pr55-algorithmic-optimizations.md",
+        "docs/performance/pr55-optimizations/validation.json"
+      ],
+      "next_action": "Implementation and targeted regression verification complete; integration owner finishes timing and publication."
+    },
+    {
+      "id": "T7",
+      "kind": "implementation",
+      "group": "inference_optimizations",
+      "goal_ids": [
+        "G1"
+      ],
+      "intended_output": "Find shared binder path suffix by depth alignment",
+      "workflow_id": "W1",
+      "phase": "closed",
+      "disposition": "completed",
+      "owner": "inference_optimizations",
+      "input_revision": "94e086c15c40aaf220c764f0e723cc3cfe627587",
+      "edit_scope": [
+        "libraries/mlf-inference/Bootstrap/Graph/Solver.hs"
+      ],
+      "task_completion_condition": "same-head and different-generation cases preserved",
+      "blocker": null,
+      "attempt_ids": [
+        "A-review",
+        "A-validation"
+      ],
+      "output_refs": [
+        "docs/pr55-algorithmic-optimizations.md",
+        "docs/performance/pr55-optimizations/validation.json"
+      ],
+      "next_action": "Implementation and targeted regression verification complete; integration owner finishes timing and publication."
+    },
+    {
+      "id": "T8",
+      "kind": "implementation",
+      "group": "root",
+      "goal_ids": [
+        "G1"
+      ],
+      "intended_output": "Check first-occurrence binder order using indexed membership",
+      "workflow_id": "W1",
+      "phase": "closed",
+      "disposition": "completed",
+      "owner": "root",
+      "input_revision": "94e086c15c40aaf220c764f0e723cc3cfe627587",
+      "edit_scope": [
+        "libraries/mlf-crates/Bootstrap/ImportedRoot.hs"
+      ],
+      "task_completion_condition": "complete prefix validation; fallback retained",
+      "blocker": null,
+      "attempt_ids": [
+        "A-review",
+        "A-validation"
+      ],
+      "output_refs": [
+        "docs/pr55-algorithmic-optimizations.md",
+        "docs/performance/pr55-optimizations/validation.json"
+      ],
+      "next_action": "Implementation and targeted regression verification complete; integration owner finishes timing and publication."
+    },
+    {
+      "id": "T9",
+      "kind": "implementation",
+      "group": "root",
+      "goal_ids": [
+        "G1"
+      ],
+      "intended_output": "Build source type, kind and predicate fields before one render",
+      "workflow_id": "W1",
+      "phase": "closed",
+      "disposition": "completed",
+      "owner": "root",
+      "input_revision": "94e086c15c40aaf220c764f0e723cc3cfe627587",
+      "edit_scope": [
+        "libraries/mlf-crates/Bootstrap/CrateQuery.hs"
+      ],
+      "task_completion_condition": "legacy bytes and Unicode scalar lengths unchanged",
+      "blocker": null,
+      "attempt_ids": [
+        "A-review",
+        "A-validation"
+      ],
+      "output_refs": [
+        "docs/pr55-algorithmic-optimizations.md",
+        "docs/performance/pr55-optimizations/validation.json"
+      ],
+      "next_action": "Implementation and targeted regression verification complete; integration owner finishes timing and publication."
+    },
+    {
+      "id": "T10",
+      "kind": "implementation",
+      "group": "llvm_optimizations",
+      "goal_ids": [
+        "G1"
+      ],
+      "intended_output": "Share ordered demand concatenations and flattened lexical aliases without forcing future summaries",
+      "workflow_id": "W1",
+      "phase": "closed",
+      "disposition": "completed",
+      "owner": "llvm_optimizations",
+      "input_revision": "94e086c15c40aaf220c764f0e723cc3cfe627587",
+      "edit_scope": [
+        "libraries/mlf-llvm/Bootstrap/LLVM/Analysis.hs"
+      ],
+      "task_completion_condition": "first occurrence hints, duplicate leaves and incomplete barriers",
+      "blocker": null,
+      "attempt_ids": [
+        "A-review",
+        "A-validation"
+      ],
+      "output_refs": [
+        "docs/pr55-algorithmic-optimizations.md",
+        "docs/performance/pr55-optimizations/validation.json"
+      ],
+      "next_action": "Implementation and targeted regression verification complete; integration owner finishes timing and publication."
+    }
+  ],
+  "attempts": [
+    {
+      "id": "A-review",
+      "kind": "independent_review",
+      "input_revision": "94e086c plus pending implementation",
+      "result": "Found and repaired later-summary eagerness, stale concat primitive boundary and mismatched prepared-library interface version. Combined verification in progress."
+    },
+    {
+      "id": "A-validation",
+      "task_ids": [
+        "T1",
+        "T2",
+        "T3",
+        "T4",
+        "T5",
+        "T6",
+        "T7",
+        "T8",
+        "T9",
+        "T10"
+      ],
+      "input_revision": "94e086c plus the source hashes recorded in validation.json",
+      "result": "passed",
+      "output_refs": [
+        "docs/performance/pr55-optimizations/validation.json"
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E-source",
+      "kind": "source_review",
+      "subject": "176 source identities plus reviewed optimization test modules",
+      "artifact": "docs/performance/pr55-optimizations/validation.json"
+    },
+    {
+      "id": "E-semantics",
+      "kind": "empirical_tests",
+      "subject": "reviewed GHC 9.14.1 O2 producer and independent O0 graph harness",
+      "artifact": "docs/performance/pr55-optimizations/validation.json"
+    },
+    {
+      "id": "E-performance",
+      "kind": "empirical_benchmarks",
+      "subject": "reviewed producer vs94e086c and GHC, six families at16/64, three repetitions",
+      "artifact": "tools/performance/pr55-optimizations/end-to-end-results.json"
+    },
+    {
+      "id": "E-threshold",
+      "kind": "benchmark_evaluation",
+      "subject": "12 full-compilation medians; arithmetic independently rechecked",
+      "artifact": "docs/performance/pr55-optimizations/validation.json"
+    }
+  ],
+  "evidence_bindings": [
+    {
+      "evidence_id": "E-source",
+      "criterion_id": "C1",
+      "criterion_revision": 1,
+      "applicability": "current",
+      "evaluation": "satisfied"
+    },
+    {
+      "evidence_id": "E-semantics",
+      "criterion_id": "C2",
+      "criterion_revision": 1,
+      "applicability": "current",
+      "evaluation": "satisfied"
+    },
+    {
+      "evidence_id": "E-performance",
+      "criterion_id": "C3",
+      "criterion_revision": 1,
+      "applicability": "current",
+      "evaluation": "satisfied"
+    },
+    {
+      "evidence_id": "E-threshold",
+      "criterion_id": "C5",
+      "criterion_revision": 1,
+      "applicability": "current",
+      "evaluation": "satisfied"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D1",
+      "decision": "Fast-forward the requested optimization branch locally to latest PR55 before editing.",
+      "reason": "Avoid reintroducing older code and retain upstream fixes.",
+      "subject": "94e086c15c40aaf220c764f0e723cc3cfe627587"
+    },
+    {
+      "id": "D2",
+      "decision": "Append a byte-array equality primitive and invalidate compiler/builtin identity normally.",
+      "reason": "Use exact comparison at the metadata reuse boundary without per-byte language calls."
+    },
+    {
+      "id": "D3",
+      "decision": "Use each measured compiler with its own builtin/runtime and prepare those inputs outside timed compilation.",
+      "reason": "The added primitive changes ABI; the earlier shared-ABI cohort failed and cannot establish performance."
+    }
+  ]
+}

@@ -5,6 +5,9 @@
   "title": "GHC / MLF compiler shape classification benchmark",
   "purpose": "Compile identical generated shared-Haskell programs with GHC and with GHC-hosted MLF, from fresh targets to native executables. This classifies compiler behaviour by program shape; it is not the C/MLF Benchmarks Game comparison in tools/bench.",
   "families": {
+    "ordered_worker_demands": {"label": "Wide ordered worker demands", "default": false, "work": "one signed n-argument worker sums a left-associated strict prefix and is called with two runtime-dependent argument lists"},
+    "parenthesized_operator_sites": {"label": "Parenthesized operator token spans", "default": false, "work": "n signed functions use a prefix operator and a growing source suffix, forming a runtime-dependent increment chain"},
+    "wide_pattern_rows": {"label": "Wide wildcard and as-pattern equations", "default": false, "work": "two n-column equations mix wildcard and as-pattern columns, preserving positional weights and selecting with a final Boolean"},
     "module_string_literals": {"label": "Module string literal definitions", "default": false, "work": "a balanced runtime lookup selects among n short string constants with repeated ASCII names and distinct mixed Unicode text"},
     "mixed_unicode_literal": {"label": "ASCII run between Unicode scalars", "default": false, "work": "one typed literal has n sixteen-character ASCII blocks between two Unicode scalars and a runtime-selected scalar lookup"},
     "captured_parameter_uses": {"label": "Captured parameter used as an integer", "default": false, "work": "n inferred functions each capture an outer parameter in a local binding and use its value in integer addition"},

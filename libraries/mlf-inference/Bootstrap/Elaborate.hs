@@ -49,11 +49,12 @@ module Bootstrap.Elaborate where {
     nodes = G.nodes graph;
     count = IM.size nodes;
     bindings = Solver.bindingChildren solved;
-    sparse = prepareSolvedTypes solved;
+    order = boundOrder graph;
+    sparse = prepareTypesUsing (Just bindings) order graph;
     dense low high = let {
       result = DenseTypeContext graph low high
         (runST (stBind (newSTArray (high - low + 1) Nothing)
-          (\table -> stBind (fillTypeCells low result bindings (IM.toList nodes) table)
+          (\table -> stBind (fillTypeCells low result order bindings (IM.toList nodes) table)
             (\_ -> freezeSTArray table)))) sparse
     } in result
   } in if count < 128 then sparse else case (,) (IM.lookupMin nodes) (IM.lookupMax nodes) of {
@@ -62,13 +63,13 @@ module Bootstrap.Elaborate where {
       if space >= 0 && space <= 262144 && space <= 3 * count then dense low high else sparse;
     _ -> sparse
   };
-  fillTypeCells :: forall s. Int -> TypeContext -> IntMap IntSet -> [] ((,) Int Node)
+  fillTypeCells :: forall s. Int -> TypeContext -> BoundOrder -> IntMap IntSet -> [] ((,) Int Node)
     -> STArray s (Maybe TypeCell) -> ST s ();
-  fillTypeCells low context bindings entries table = case entries of {
+  fillTypeCells low context order bindings entries table = case entries of {
     [] -> stReturn ();
     (:) ((,) n node) rest -> let {
-      cell = TypeCell node (typeAtNode context n node) (boundsAtIndexed context bindings n node)
-    } in stBind (writeSTArray table (n - low) (Just cell)) (\_ -> fillTypeCells low context bindings rest table)
+      cell = TypeCell node (typeAtNode context n node) (boundsAtIndexedUsing order context bindings n node)
+    } in stBind (writeSTArray table (n - low) (Just cell)) (\_ -> fillTypeCells low context order bindings rest table)
   };
   readTypeCell context n = case context of {
     DenseTypeContext _ low high cell _ ->
@@ -80,7 +81,9 @@ module Bootstrap.Elaborate where {
     Nothing -> let { live = G.resolve graph n } in mapOptional ((,) live) (readTypeCell context live)
   };
   prepareTypesWith :: Maybe (IntMap IntSet) -> Graph -> TypeContext;
-  prepareTypesWith bindings graph =
+  prepareTypesWith bindings graph = prepareTypesUsing bindings (boundOrder graph) graph;
+  prepareTypesUsing :: Maybe (IntMap IntSet) -> BoundOrder -> Graph -> TypeContext;
+  prepareTypesUsing bindings order graph =
     let {
       context :: TypeContext;
       context =
@@ -96,7 +99,7 @@ module Bootstrap.Elaborate where {
       renderBounds n node = case bindings of {
         Nothing -> if IM.notMember n (G.links graph)
           then boundsAtNode context n node else boundsAtRaw context n;
-        Just children -> boundsAtIndexed context children n node
+        Just children -> boundsAtIndexedUsing order context children n node
       }
     } in
     context;
@@ -178,12 +181,49 @@ module Bootstrap.Elaborate where {
   boundsAtRaw context parent = boundsAtNode context parent (G.nodeAt (contextGraph context) parent);
   boundRoot :: Int -> Node -> Int;
   boundRoot parent node = case G.tag node of { GGen root -> root; _ -> parent };
+  -- A single forest postorder is reusable only inside an unshared subtree.
+  -- A node with several incoming type edges may start such a subtree, but
+  -- any shared strict descendant requires the original root-local DFS order.
+  -- Gen payload edges are entry points, not incoming type edges. Starting at
+  -- structural roots ensures that a descendant with one incoming edge cannot
+  -- have been visited before its parent. The lazy certificate table shares
+  -- overlapping subtree checks; neither it nor the ranks is needed for an
+  -- empty or singleton bound query.
+  data BoundOrder = BoundOrder (IntMap Bool) (IntMap Int);
+  boundOrder :: Graph -> BoundOrder;
+  boundOrder graph = let {
+    nodes = IM.filter (\node -> not (G.isGen (G.tag node))) (G.nodes graph);
+    incoming = foldlStrict
+      (\table node -> foldlStrict
+        (\next child -> IM.insertWith (\_ _ -> False) (G.resolve graph child) True next)
+        table (G.children (G.tag node))) IM.empty (IM.elems nodes);
+    trees = IM.mapWithKey (\_ node -> all unshared (G.children (G.tag node))) nodes;
+    unshared child = let { live = G.resolve graph child } in
+      IM.findWithDefault False live incoming && IM.findWithDefault False live trees;
+    roots = filter (\n -> IM.notMember n incoming) (IM.keys nodes);
+    visited = foldlStrict (G.orderedVisitReverse graph) ((,) IS.empty []) roots;
+    ordered = reverse (snd visited);
+    ranks = IM.fromList (zip ordered (range 0 (length ordered - 1)))
+  } in BoundOrder trees ranks;
+  orderedBoundCandidates :: BoundOrder -> Graph -> Int -> IntSet -> [] Int;
+  orderedBoundCandidates order graph root candidates = case IS.toList candidates of {
+    [] -> [];
+    (:) one [] -> (:) one [];
+    several -> case order of { BoundOrder trees ranks ->
+      if IM.findWithDefault False root trees then
+        map snd (sortBy (\a b -> compareInt (fst a) (fst b))
+          (map (\n -> (,) (IM.get n ranks) n) several))
+      else filter (\identity -> IS.member identity candidates) (G.orderedBelow graph root)
+    }
+  };
   -- A solved, normalized graph certifies that a type binder reaches its
   -- children, and normalization makes unreachable Gen children rigid. Use
   -- the checked reverse index to answer empty and singleton bounds directly.
   -- Several bounds still follow the structural postorder used by elaboration.
   boundsAtIndexed :: TypeContext -> IntMap IntSet -> Int -> Node -> [] ((,) XTyVar XType);
-  boundsAtIndexed context children parent node = let {
+  boundsAtIndexed context = boundsAtIndexedUsing (boundOrder (contextGraph context)) context;
+  boundsAtIndexedUsing :: BoundOrder -> TypeContext -> IntMap IntSet -> Int -> Node -> [] ((,) XTyVar XType);
+  boundsAtIndexedUsing order context children parent node = let {
     graph = contextGraph context;
     eligible identity = let {
       child = case readTypeCell context identity of {
@@ -191,11 +231,7 @@ module Bootstrap.Elaborate where {
       }
     } in isFlexible (G.flag child) && not (G.isGen (G.tag child));
     candidates = IS.filter eligible (IM.findWithDefault IS.empty parent children);
-    ordered = case IS.toList candidates of {
-      [] -> [];
-      (:) one [] -> (:) one [];
-      _ -> filter (\identity -> IS.member identity candidates) (G.orderedBelow graph (boundRoot parent node))
-    }
+    ordered = orderedBoundCandidates order graph (boundRoot parent node) candidates
   } in map (\identity -> (,) (XTyVar identity) (typeAtIn context identity)) ordered;
   boundsAtNode :: TypeContext -> Int -> Node -> [] ((,) XTyVar XType);
   boundsAtNode context parent node =

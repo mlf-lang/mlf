@@ -172,7 +172,8 @@ module Bootstrap.Types where {
     PSTToIO |
     PByteArrayCRC32 |
     PPackStringFields |
-    PStringUtf8Length;
+    PStringUtf8Length |
+    PByteArrayEqual;
   data SType =
     STVar String |
     SBottom |

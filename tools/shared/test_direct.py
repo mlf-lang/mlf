@@ -377,6 +377,10 @@ def main():
                    ROOT / 'tools/shared/test_utf8_length.py',
                    ROOT / 'tools/shared/fixtures/utf8-length/Main.hs', ROOT / 'tools/shared/fixtures/utf8-length/Length.hs',
                    ROOT / 'tests/native/runtime_utf8_length.c',
+                   ROOT / 'tools/shared/test_byte_array_equal.py',
+                   ROOT / 'tools/shared/fixtures/byte-array-equal/Host.hs',
+                   ROOT / 'tools/shared/fixtures/byte-array-equal/Equal.hs',
+                   ROOT / 'tests/native/runtime_byte_array_equal.c',
                    ROOT / 'tools/shared/test_parser_satisfy.py',
                    ROOT / 'tools/shared/fixtures/ParserSatisfyControls.hs',
                    ROOT / 'tools/shared/test_metadata_receipt.py',
@@ -426,6 +430,9 @@ def main():
         runner.run('utf8-length', [sys.executable, '-B', ROOT / 'tools/shared/test_utf8_length.py',
                    '--build-receipt', build_receipt, '--clang', args.clang,
                    '--output', output / 'utf8-length'], timeout=600)
+        runner.run('byte-array-equal', [sys.executable, '-B', ROOT / 'tools/shared/test_byte_array_equal.py',
+                   '--build-receipt', build_receipt, '--clang', args.clang,
+                   '--output', output / 'byte-array-equal'], timeout=600)
         runner.run('parser-satisfy', [sys.executable, '-B', ROOT / 'tools/shared/test_parser_satisfy.py',
                    '--build-receipt', build_receipt, '--output', output / 'parser-satisfy'], timeout=300)
         runner.run('candidate-selection', [sys.executable, '-B', ROOT / 'tools/shared/test_candidate_selection.py',

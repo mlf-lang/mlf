@@ -135,6 +135,7 @@ void mlf_require_byte_file_v2_abi(void) {}
 void mlf_require_freeze_st_array_abi(void) {}
 void mlf_require_st_to_io_abi(void) {}
 void mlf_require_byte_array_crc32_abi(void) {}
+void mlf_require_byte_array_equal_abi(void) {}
 
 typedef enum {
     HOLE, BUSY, INDIRECT, THUNK, APPLICATION, CLOSURE,
@@ -174,7 +175,7 @@ typedef enum {
     EMPTY_CALL_STACK, PUSH_CALL_STACK, PRETTY_CALL_STACK, IO_ERROR_WITH_STACK,
     CONCAT_STRING_LIST,
     OR_INT, XOR_INT, SHIFT_LINT, SHIFT_RINT, UNSIGNED_SHIFT_RINT, COUNT_LEADING_ZEROS_INT, COUNT_TRAILING_ZEROS_INT, POP_COUNT_INT, INT_TO_INTEGER, INTEGER_TO_INT, ADD_INTEGER, SUB_INTEGER, MUL_INTEGER, QUOT_INTEGER, REM_INTEGER, EQ_INTEGER, LT_INTEGER, SHOW_INTEGER, READ_INTEGER, INTEGER_TO_DOUBLE, UNSIGNED_LT_INT,
-    READ_BYTE_FILE_OR_ERROR, WRITE_BYTE_FILE_OR_ERROR, BYTE_ARRAY_DIGEST, FREEZE_ST_ARRAY, ST_TO_IO, BYTE_ARRAY_CRC32, PACK_STRING_FIELDS, STRING_UTF8_LENGTH,
+    READ_BYTE_FILE_OR_ERROR, WRITE_BYTE_FILE_OR_ERROR, BYTE_ARRAY_DIGEST, FREEZE_ST_ARRAY, ST_TO_IO, BYTE_ARRAY_CRC32, PACK_STRING_FIELDS, STRING_UTF8_LENGTH, BYTE_ARRAY_EQUAL,
     PRIMITIVE_COUNT
 } Primitive;
 
@@ -1480,7 +1481,7 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
     case NEW_DOUBLE_ARRAY: case READ_DOUBLE_ARRAY: case LENGTH_DOUBLE_ARRAY:
     case NEW_BYTE_ARRAY: case READ_BYTE_ARRAY: case LENGTH_BYTE_ARRAY: case BYTE_ARRAY_FROM_STRING:
     case GET_BYTE_LINE: case NEW_INT_TABLE: case READ_INT_TABLE:
-    case READ_BYTE_FILE_OR_ERROR: case WRITE_BYTE_FILE_OR_ERROR: case BYTE_ARRAY_DIGEST:
+    case READ_BYTE_FILE_OR_ERROR: case WRITE_BYTE_FILE_OR_ERROR: case BYTE_ARRAY_DIGEST: case BYTE_ARRAY_EQUAL:
     case READ_FILE: case WRITE_FILE: case FILE_EXISTS: case CANONICAL_PATH:
     case GET_ARG_COUNT: case GET_ARG: case PUT_ERR: case EXIT_WITH:
     case GET_EXECUTABLE_PATH: case GET_CONTENTS:
@@ -1588,7 +1589,7 @@ static MlfValue *primitive(Primitive p, MlfEnv *arguments) {
         1,2,3,1,2,1,1,1,2,1,1,2,1,1,0,1,1,1,0,0,
         1,2,1,2,2,3,1,
         1,2,1,2,1,1,1,1,1,1, 2,1,3,2,3,2,1,1,1,2,3,2, 1,1,1,1,1,1,2,1, 0,2,1,2, 1,
-        2,2,2,2,2,1,1,1,1,1,2,2,2,2,2,2,2,1,1,1,2,2,2,1,1,1,3,1,1
+        2,2,2,2,2,1,1,1,1,1,2,2,2,2,2,2,2,1,1,1,2,2,2,1,1,1,3,1,1,2
     };
     _Static_assert(sizeof(arities) / sizeof(arities[0]) == PRIMITIVE_COUNT,
                    "primitive arity inventory mismatch");
@@ -1719,7 +1720,7 @@ MlfValue *mlf_prim2(int64_t p, MlfValue *a, MlfValue *b) {
     case ADD_DOUBLE: case SUB_DOUBLE: case MUL_DOUBLE: case DIV_DOUBLE: case EQ_DOUBLE: case LT_DOUBLE:
     case FORMAT_DOUBLE: case NEW_INT_ARRAY: case READ_INT_ARRAY: case NEW_DOUBLE_ARRAY: case READ_DOUBLE_ARRAY:
     case NEW_BYTE_ARRAY: case READ_BYTE_ARRAY: case READ_INT_TABLE:
-    case READ_BYTE_FILE_OR_ERROR: case WRITE_BYTE_FILE_OR_ERROR:
+    case READ_BYTE_FILE_OR_ERROR: case WRITE_BYTE_FILE_OR_ERROR: case BYTE_ARRAY_EQUAL:
     case STRING_CODE_AT: case MLF_COMPARE_STRING: case SEQ: case WRITE_FILE:
     case SET_ENV: case RUN_PROCESS:
     case ASYNC_SCOPE_NEW: case ASYNC_RESOLVE_COMPLETION: case ASYNC_SUBSCRIBE_COMPLETION: case ASYNC_ENQUEUE: case ASYNC_WAIT:
@@ -1814,6 +1815,13 @@ static MlfValue *byte_array_digest(MlfValue *bytes) {
     char hex[65];
     build_hash(bytes->as.byte_array.cells, bytes->as.byte_array.length, hex);
     return mlf_string(hex, 64);
+}
+static MlfValue *byte_array_equal(MlfValue *left, MlfValue *right) {
+    left = expect(left, BYTE_ARRAY);
+    right = expect(right, BYTE_ARRAY);
+    size_t length = left->as.byte_array.length;
+    return mlf_boolean(length == right->as.byte_array.length &&
+        (!length || memcmp(left->as.byte_array.cells, right->as.byte_array.cells, length) == 0));
 }
 static MlfValue *read_byte_file_or_error(MlfValue *name, MlfValue *bound) {
     name = expect(name, STRING);
@@ -2533,6 +2541,8 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
         case ST_TO_IO: result = run_st(operation->as.action.first); break;
         case GET_LINE: result = read_line(); break;
         case BYTE_ARRAY_DIGEST: result = byte_array_digest(operation->as.action.first); break;
+        case BYTE_ARRAY_EQUAL:
+            result = byte_array_equal(operation->as.action.first, operation->as.action.second); break;
         case READ_BYTE_FILE_OR_ERROR:
             result = read_byte_file_or_error(operation->as.action.first, operation->as.action.second); break;
         case WRITE_BYTE_FILE_OR_ERROR:

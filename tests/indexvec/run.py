@@ -148,6 +148,7 @@ def main():
         "-O0",
         "-ihost/ghc",
         "-ibootstrap",
+        "-i" + str(HERE),
         *["-i" + str(d) for d in sorted((ROOT / "libraries").iterdir())],
     ]
     for name in ["Graphs", "Vector", "World", "DeclQueryControls", "ImportBindings", "PreparedImports", "FragmentAdmission", "DeclCore"]:

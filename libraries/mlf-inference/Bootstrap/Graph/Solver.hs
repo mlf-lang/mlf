@@ -2478,7 +2478,24 @@ module Bootstrap.Graph.Solver where {
   commonLocalBinderPath :: ScopeIndex -> LocalBinderPath -> LocalBinderPath -> LocalBinderPath;
   commonLocalBinderPath scopes (LocalBinderPath left a) (LocalBinderPath right b) =
     if a /= b then LocalBinderPath [] (scopeLCA scopes a b)
-    else LocalBinderPath (L.dropWhile (\n -> L.not (L.elem eqInt n left)) right) a;
+    else LocalBinderPath (commonBinderSuffix left right) a;
+  -- Paths in the placed binding tree share a suffix after their first common
+  -- ancestor. Align their depths once, then walk in lockstep. Return the
+  -- existing right suffix so no ancestor list is copied. Equal starting nodes
+  -- keep their constant-time path and do not force either tail.
+  commonBinderSuffix :: [] Int -> [] Int -> [] Int;
+  commonBinderSuffix left right = case (,) left right of {
+    (,) ((:) a _) ((:) b _) -> if a == b then right else let {
+      excess = L.length left - L.length right
+    } in if excess >= 0 then alignedBinderSuffix (L.drop excess left) right
+      else alignedBinderSuffix left (L.drop (0 - excess) right);
+    _ -> []
+  };
+  alignedBinderSuffix :: [] Int -> [] Int -> [] Int;
+  alignedBinderSuffix left right = case (,) left right of {
+    (,) ((:) a as) ((:) b bs) -> if a == b then right else alignedBinderSuffix as bs;
+    _ -> []
+  };
   localLiftProvenUsing :: (Int -> Int -> Bool) -> Graph -> Graph -> Bool -> Int -> Int -> IntMap IntSet -> Int ->
     Either String (Maybe (IntMap IntSet));
   localLiftProvenUsing scopeLift before skeleton merged winner parent cache original = let {

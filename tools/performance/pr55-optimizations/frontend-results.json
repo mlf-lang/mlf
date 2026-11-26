@@ -1,0 +1,552 @@
+{
+  "baseline": "94e086c15c40aaf220c764f0e723cc3cfe627587",
+  "ghc": "9.14.1",
+  "optimization": "-O2 -fstatic-argument-transformation -fpedantic-bottoms -fno-state-hack",
+  "scope": "Isolated production parseModule timing and historical normalizeRow append accumulator; CPU time and GHC allocations, not end-to-end compiler speed. Row before uses the pre-9815b98 accumulator reference.",
+  "results": [
+    {
+      "family": "parse",
+      "width": 128,
+      "version": "before",
+      "median_cpu_seconds": 0.001734729,
+      "median_allocated_bytes": 2731664,
+      "samples": [
+        {
+          "cpu_seconds": 0.001734729,
+          "allocated_bytes": 2731664,
+          "checksum": 22440
+        },
+        {
+          "cpu_seconds": 0.001330117,
+          "allocated_bytes": 2731664,
+          "checksum": 22440
+        },
+        {
+          "cpu_seconds": 0.001754077,
+          "allocated_bytes": 2731664,
+          "checksum": 22440
+        },
+        {
+          "cpu_seconds": 0.001266693,
+          "allocated_bytes": 2731664,
+          "checksum": 22440
+        },
+        {
+          "cpu_seconds": 0.07635166,
+          "allocated_bytes": 2731664,
+          "checksum": 22440
+        }
+      ]
+    },
+    {
+      "family": "parse",
+      "width": 128,
+      "version": "after",
+      "median_cpu_seconds": 0.001988115,
+      "median_allocated_bytes": 2697816,
+      "samples": [
+        {
+          "cpu_seconds": 0.001777292,
+          "allocated_bytes": 2697816,
+          "checksum": 22440
+        },
+        {
+          "cpu_seconds": 0.006938154,
+          "allocated_bytes": 2697816,
+          "checksum": 22440
+        },
+        {
+          "cpu_seconds": 0.001988115,
+          "allocated_bytes": 2697816,
+          "checksum": 22440
+        },
+        {
+          "cpu_seconds": 0.001746366,
+          "allocated_bytes": 2697816,
+          "checksum": 22440
+        },
+        {
+          "cpu_seconds": 0.01074962,
+          "allocated_bytes": 2697816,
+          "checksum": 22440
+        }
+      ]
+    },
+    {
+      "family": "parse",
+      "width": 512,
+      "version": "before",
+      "median_cpu_seconds": 0.025398756,
+      "median_allocated_bytes": 10219528,
+      "samples": [
+        {
+          "cpu_seconds": 0.025398756,
+          "allocated_bytes": 10219528,
+          "checksum": 287016
+        },
+        {
+          "cpu_seconds": 0.044142819,
+          "allocated_bytes": 10219528,
+          "checksum": 287016
+        },
+        {
+          "cpu_seconds": 0.0127006,
+          "allocated_bytes": 10219528,
+          "checksum": 287016
+        },
+        {
+          "cpu_seconds": 0.034721516,
+          "allocated_bytes": 10219528,
+          "checksum": 287016
+        },
+        {
+          "cpu_seconds": 0.011051569,
+          "allocated_bytes": 10219528,
+          "checksum": 287016
+        }
+      ]
+    },
+    {
+      "family": "parse",
+      "width": 512,
+      "version": "after",
+      "median_cpu_seconds": 0.00450013,
+      "median_allocated_bytes": 9953232,
+      "samples": [
+        {
+          "cpu_seconds": 0.004068508,
+          "allocated_bytes": 9953232,
+          "checksum": 287016
+        },
+        {
+          "cpu_seconds": 0.005535278,
+          "allocated_bytes": 9953232,
+          "checksum": 287016
+        },
+        {
+          "cpu_seconds": 0.004094076,
+          "allocated_bytes": 9953232,
+          "checksum": 287016
+        },
+        {
+          "cpu_seconds": 0.00450013,
+          "allocated_bytes": 9953232,
+          "checksum": 287016
+        },
+        {
+          "cpu_seconds": 0.006406674,
+          "allocated_bytes": 9953232,
+          "checksum": 287016
+        }
+      ]
+    },
+    {
+      "family": "parse",
+      "width": 2048,
+      "version": "before",
+      "median_cpu_seconds": 0.205653412,
+      "median_allocated_bytes": 40299608,
+      "samples": [
+        {
+          "cpu_seconds": 0.224042497,
+          "allocated_bytes": 40299608,
+          "checksum": 4296538
+        },
+        {
+          "cpu_seconds": 0.205653412,
+          "allocated_bytes": 40299608,
+          "checksum": 4296538
+        },
+        {
+          "cpu_seconds": 0.178589209,
+          "allocated_bytes": 40299608,
+          "checksum": 4296538
+        },
+        {
+          "cpu_seconds": 0.277811016,
+          "allocated_bytes": 40299608,
+          "checksum": 4296538
+        },
+        {
+          "cpu_seconds": 0.197917984,
+          "allocated_bytes": 40299608,
+          "checksum": 4296538
+        }
+      ]
+    },
+    {
+      "family": "parse",
+      "width": 2048,
+      "version": "after",
+      "median_cpu_seconds": 0.01739634,
+      "median_allocated_bytes": 39431200,
+      "samples": [
+        {
+          "cpu_seconds": 0.014630239,
+          "allocated_bytes": 39431200,
+          "checksum": 4296538
+        },
+        {
+          "cpu_seconds": 0.01739634,
+          "allocated_bytes": 39431200,
+          "checksum": 4296538
+        },
+        {
+          "cpu_seconds": 0.096561131,
+          "allocated_bytes": 39431200,
+          "checksum": 4296538
+        },
+        {
+          "cpu_seconds": 0.015015022,
+          "allocated_bytes": 39431200,
+          "checksum": 4296538
+        },
+        {
+          "cpu_seconds": 0.056350266,
+          "allocated_bytes": 39431200,
+          "checksum": 4296538
+        }
+      ]
+    },
+    {
+      "family": "parse",
+      "width": 4096,
+      "version": "before",
+      "median_cpu_seconds": 0.73170754,
+      "median_allocated_bytes": 80805440,
+      "samples": [
+        {
+          "cpu_seconds": 0.73170754,
+          "allocated_bytes": 80805440,
+          "checksum": 16983898
+        },
+        {
+          "cpu_seconds": 0.759319265,
+          "allocated_bytes": 80805440,
+          "checksum": 16983898
+        },
+        {
+          "cpu_seconds": 0.763196532,
+          "allocated_bytes": 80805440,
+          "checksum": 16983898
+        },
+        {
+          "cpu_seconds": 0.68162607,
+          "allocated_bytes": 80805440,
+          "checksum": 16983898
+        },
+        {
+          "cpu_seconds": 0.69257683,
+          "allocated_bytes": 80805440,
+          "checksum": 16983898
+        }
+      ]
+    },
+    {
+      "family": "parse",
+      "width": 4096,
+      "version": "after",
+      "median_cpu_seconds": 0.043662396,
+      "median_allocated_bytes": 79068680,
+      "samples": [
+        {
+          "cpu_seconds": 0.039215004,
+          "allocated_bytes": 79068680,
+          "checksum": 16983898
+        },
+        {
+          "cpu_seconds": 0.041516045,
+          "allocated_bytes": 79068680,
+          "checksum": 16983898
+        },
+        {
+          "cpu_seconds": 0.045994193,
+          "allocated_bytes": 79068680,
+          "checksum": 16983898
+        },
+        {
+          "cpu_seconds": 0.043662396,
+          "allocated_bytes": 79068680,
+          "checksum": 16983898
+        },
+        {
+          "cpu_seconds": 0.044540861,
+          "allocated_bytes": 79068680,
+          "checksum": 16983898
+        }
+      ]
+    },
+    {
+      "family": "rows",
+      "width": 256,
+      "version": "before",
+      "median_cpu_seconds": 0.000433013,
+      "median_allocated_bytes": 1968144,
+      "samples": [
+        {
+          "cpu_seconds": 0.000429778,
+          "allocated_bytes": 1968144,
+          "checksum": 32913
+        },
+        {
+          "cpu_seconds": 0.000378894,
+          "allocated_bytes": 1968144,
+          "checksum": 32913
+        },
+        {
+          "cpu_seconds": 0.000433013,
+          "allocated_bytes": 1968144,
+          "checksum": 32913
+        },
+        {
+          "cpu_seconds": 0.000455517,
+          "allocated_bytes": 1968144,
+          "checksum": 32913
+        },
+        {
+          "cpu_seconds": 0.000870644,
+          "allocated_bytes": 1968144,
+          "checksum": 32913
+        }
+      ]
+    },
+    {
+      "family": "rows",
+      "width": 256,
+      "version": "after",
+      "median_cpu_seconds": 1.0225e-05,
+      "median_allocated_bytes": 107112,
+      "samples": [
+        {
+          "cpu_seconds": 1.2899e-05,
+          "allocated_bytes": 107112,
+          "checksum": 32913
+        },
+        {
+          "cpu_seconds": 1.0225e-05,
+          "allocated_bytes": 107112,
+          "checksum": 32913
+        },
+        {
+          "cpu_seconds": 1.0015e-05,
+          "allocated_bytes": 107112,
+          "checksum": 32913
+        },
+        {
+          "cpu_seconds": 9.725e-06,
+          "allocated_bytes": 107112,
+          "checksum": 32913
+        },
+        {
+          "cpu_seconds": 1.0936e-05,
+          "allocated_bytes": 107112,
+          "checksum": 32913
+        }
+      ]
+    },
+    {
+      "family": "rows",
+      "width": 1024,
+      "version": "before",
+      "median_cpu_seconds": 0.003176282,
+      "median_allocated_bytes": 30080016,
+      "samples": [
+        {
+          "cpu_seconds": 0.003176282,
+          "allocated_bytes": 30080016,
+          "checksum": 524817
+        },
+        {
+          "cpu_seconds": 0.003129512,
+          "allocated_bytes": 30080016,
+          "checksum": 524817
+        },
+        {
+          "cpu_seconds": 0.003171224,
+          "allocated_bytes": 30080016,
+          "checksum": 524817
+        },
+        {
+          "cpu_seconds": 0.003617548,
+          "allocated_bytes": 30080016,
+          "checksum": 524817
+        },
+        {
+          "cpu_seconds": 0.003344562,
+          "allocated_bytes": 30080016,
+          "checksum": 524817
+        }
+      ]
+    },
+    {
+      "family": "rows",
+      "width": 1024,
+      "version": "after",
+      "median_cpu_seconds": 3.0325e-05,
+      "median_allocated_bytes": 420456,
+      "samples": [
+        {
+          "cpu_seconds": 3.322e-05,
+          "allocated_bytes": 420456,
+          "checksum": 524817
+        },
+        {
+          "cpu_seconds": 3.0966e-05,
+          "allocated_bytes": 420456,
+          "checksum": 524817
+        },
+        {
+          "cpu_seconds": 2.9994e-05,
+          "allocated_bytes": 420456,
+          "checksum": 524817
+        },
+        {
+          "cpu_seconds": 3.0075e-05,
+          "allocated_bytes": 420456,
+          "checksum": 524817
+        },
+        {
+          "cpu_seconds": 3.0325e-05,
+          "allocated_bytes": 420456,
+          "checksum": 524817
+        }
+      ]
+    },
+    {
+      "family": "rows",
+      "width": 4096,
+      "version": "before",
+      "median_cpu_seconds": 0.094392045,
+      "median_allocated_bytes": 681331728,
+      "samples": [
+        {
+          "cpu_seconds": 0.094392045,
+          "allocated_bytes": 681331728,
+          "checksum": 8390673
+        },
+        {
+          "cpu_seconds": 0.110328649,
+          "allocated_bytes": 681331728,
+          "checksum": 8390673
+        },
+        {
+          "cpu_seconds": 0.083903092,
+          "allocated_bytes": 681331728,
+          "checksum": 8390673
+        },
+        {
+          "cpu_seconds": 0.110882712,
+          "allocated_bytes": 681331728,
+          "checksum": 8390673
+        },
+        {
+          "cpu_seconds": 0.080037288,
+          "allocated_bytes": 681331728,
+          "checksum": 8390673
+        }
+      ]
+    },
+    {
+      "family": "rows",
+      "width": 4096,
+      "version": "after",
+      "median_cpu_seconds": 0.00014096,
+      "median_allocated_bytes": 1673832,
+      "samples": [
+        {
+          "cpu_seconds": 0.000192476,
+          "allocated_bytes": 1673832,
+          "checksum": 8390673
+        },
+        {
+          "cpu_seconds": 0.00018784,
+          "allocated_bytes": 1673832,
+          "checksum": 8390673
+        },
+        {
+          "cpu_seconds": 0.000116974,
+          "allocated_bytes": 1673832,
+          "checksum": 8390673
+        },
+        {
+          "cpu_seconds": 0.00014096,
+          "allocated_bytes": 1673832,
+          "checksum": 8390673
+        },
+        {
+          "cpu_seconds": 0.000118506,
+          "allocated_bytes": 1673832,
+          "checksum": 8390673
+        }
+      ]
+    },
+    {
+      "family": "rows",
+      "width": 8192,
+      "version": "before",
+      "median_cpu_seconds": 0.388045833,
+      "median_allocated_bytes": 2858945552,
+      "samples": [
+        {
+          "cpu_seconds": 0.355340793,
+          "allocated_bytes": 2858945552,
+          "checksum": 33558545
+        },
+        {
+          "cpu_seconds": 0.403128773,
+          "allocated_bytes": 2858945552,
+          "checksum": 33558545
+        },
+        {
+          "cpu_seconds": 0.396337143,
+          "allocated_bytes": 2858945552,
+          "checksum": 33558545
+        },
+        {
+          "cpu_seconds": 0.375502892,
+          "allocated_bytes": 2858945552,
+          "checksum": 33558545
+        },
+        {
+          "cpu_seconds": 0.388045833,
+          "allocated_bytes": 2858945552,
+          "checksum": 33558545
+        }
+      ]
+    },
+    {
+      "family": "rows",
+      "width": 8192,
+      "version": "after",
+      "median_cpu_seconds": 0.000254247,
+      "median_allocated_bytes": 3345000,
+      "samples": [
+        {
+          "cpu_seconds": 0.000278584,
+          "allocated_bytes": 3345000,
+          "checksum": 33558545
+        },
+        {
+          "cpu_seconds": 0.000270191,
+          "allocated_bytes": 3345000,
+          "checksum": 33558545
+        },
+        {
+          "cpu_seconds": 0.000237563,
+          "allocated_bytes": 3345000,
+          "checksum": 33558545
+        },
+        {
+          "cpu_seconds": 0.000254247,
+          "allocated_bytes": 3345000,
+          "checksum": 33558545
+        },
+        {
+          "cpu_seconds": 0.000237833,
+          "allocated_bytes": 3345000,
+          "checksum": 33558545
+        }
+      ]
+    }
+  ]
+}

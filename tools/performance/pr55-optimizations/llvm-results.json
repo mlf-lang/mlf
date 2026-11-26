@@ -1,0 +1,1320 @@
+{
+  "format": 1,
+  "metadata": {
+    "baseline_commit": "94e086c15c40aaf220c764f0e723cc3cfe627587",
+    "ghc_version": "9.14.1",
+    "optimization": "-O1",
+    "flags": [
+      "-fpedantic-bottoms",
+      "-fno-state-hack",
+      "-Werror=incomplete-patterns",
+      "-Werror=incomplete-uni-patterns"
+    ],
+    "repetitions": 3,
+    "source_sha256": {
+      "libraries/mlf-llvm/Bootstrap/LLVM/Analysis.hs": "b3f45e085cc91877fc70c229e6a962ea9eb0ca7e507f479020990885d9b4d806",
+      "tools/performance/pr55-optimizations/LLVM.hs": "2847f93f3111e0dc7ac2f684c5d61bba8f8708cdfe2f349fda6e09cf0cd88294",
+      "tests/indexvec/OptimizationLLVM.hs": "ee322d888c2b4eb7e011b67a3c17c60d47af77c292fcc3decf5f8d922df28db9"
+    },
+    "note": "Analysis-only CPU samples in fresh processes. Baseline samples retained from unchanged exact-base binary in an earlier measurement window; final candidate samples rerun in a reserved no-contention window after preserving prefix laziness by caching lexical alias leaves. Previous candidate samples retained separately as historical prior_candidate. Independent mathematical oracle checked outside timed interval. Not end-to-end compilation measurements or same-window speedup claims.",
+    "candidate_command": [
+      "ghc",
+      "--make",
+      "-v0",
+      "-w",
+      "-O1",
+      "-fpedantic-bottoms",
+      "-fno-state-hack",
+      "-Werror=incomplete-patterns",
+      "-Werror=incomplete-uni-patterns",
+      "-i",
+      "-i/workspace/scratch/5fb8e37e44aa/mlf/libraries/mlf-async",
+      "-i/workspace/scratch/5fb8e37e44aa/mlf/libraries/mlf-crates",
+      "-i/workspace/scratch/5fb8e37e44aa/mlf/libraries/mlf-developer-tools",
+      "-i/workspace/scratch/5fb8e37e44aa/mlf/libraries/mlf-foundation",
+      "-i/workspace/scratch/5fb8e37e44aa/mlf/libraries/mlf-frontend",
+      "-i/workspace/scratch/5fb8e37e44aa/mlf/libraries/mlf-inference",
+      "-i/workspace/scratch/5fb8e37e44aa/mlf/libraries/mlf-interpreter",
+      "-i/workspace/scratch/5fb8e37e44aa/mlf/libraries/mlf-language-core",
+      "-i/workspace/scratch/5fb8e37e44aa/mlf/libraries/mlf-llvm",
+      "-i/workspace/scratch/5fb8e37e44aa/mlf/libraries/mlf-package-core",
+      "-i/workspace/scratch/5fb8e37e44aa/mlf/libraries/mlf-xmlf",
+      "-i/workspace/scratch/5fb8e37e44aa/mlf/bootstrap",
+      "-i/workspace/scratch/5fb8e37e44aa/mlf/package",
+      "-i/workspace/scratch/5fb8e37e44aa/mlf/tests",
+      "-i/workspace/scratch/5fb8e37e44aa/mlf/tests/shared",
+      "-i/workspace/scratch/5fb8e37e44aa/mlf/testing",
+      "-i/workspace/scratch/5fb8e37e44aa/mlf/host/ghc",
+      "-odir",
+      "/workspace/scratch/aeed24b506f1/llvm-review-o1",
+      "-hidir",
+      "/workspace/scratch/aeed24b506f1/llvm-review-o1",
+      "/workspace/scratch/5fb8e37e44aa/mlf/tools/performance/pr55-optimizations/LLVM.hs",
+      "/workspace/scratch/5fb8e37e44aa/mlf/host/ghc/cbits/host.c",
+      "/workspace/scratch/5fb8e37e44aa/mlf/runtime/mlf_process_supervisor.c",
+      "-I/workspace/scratch/5fb8e37e44aa/mlf/runtime",
+      "-o",
+      "/workspace/scratch/aeed24b506f1/llvm-review-o1/probe"
+    ],
+    "candidate_executable_sha256": "cc966c01d42237871b58499ca8289c59696f1d709caa11e53e27e76698aa99df",
+    "candidate_build_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "candidate_measured_at_utc": "2026-11-26T16:03:10.848901+00:00"
+  },
+  "raw_results_path": "/workspace/scratch/aeed24b506f1/llvm-review-o1/results.json",
+  "cases": [
+    {
+      "family": "demand-balanced",
+      "size": 1024,
+      "samples": {
+        "baseline": [
+          {
+            "family": "demand-balanced",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.008581737,
+            "wall_seconds": 0.012407059999986814
+          },
+          {
+            "family": "demand-balanced",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.009824685,
+            "wall_seconds": 0.01282387900005233
+          },
+          {
+            "family": "demand-balanced",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.006016644,
+            "wall_seconds": 0.008412307999833502
+          }
+        ],
+        "candidate": [
+          {
+            "family": "demand-balanced",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.005519886,
+            "wall_seconds": 0.009971258000405214
+          },
+          {
+            "family": "demand-balanced",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.001644925,
+            "wall_seconds": 0.0036386219999258174
+          },
+          {
+            "family": "demand-balanced",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.001864231,
+            "wall_seconds": 0.004309767000449938
+          }
+        ]
+      },
+      "baseline_median_cpu": 0.008581737,
+      "baseline_median_wall": 0.012407059999986814,
+      "candidate_median_cpu": 0.001864231,
+      "candidate_median_wall": 0.004309767000449938,
+      "speedup": 4.603365677322178,
+      "prior_candidate": {
+        "samples": [
+          {
+            "family": "demand-balanced",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.001418058,
+            "wall_seconds": 0.004303818999687792
+          },
+          {
+            "family": "demand-balanced",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.001220324,
+            "wall_seconds": 0.002848822000032669
+          },
+          {
+            "family": "demand-balanced",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.001145362,
+            "wall_seconds": 0.002821701999891957
+          }
+        ],
+        "median_cpu": 0.001220324,
+        "median_wall": 0.002848822000032669,
+        "speedup": 7.032343049878557
+      }
+    },
+    {
+      "family": "demand-balanced",
+      "size": 4096,
+      "samples": {
+        "baseline": [
+          {
+            "family": "demand-balanced",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.058801042,
+            "wall_seconds": 0.06099392300006912
+          },
+          {
+            "family": "demand-balanced",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.057999129,
+            "wall_seconds": 0.060259119999955146
+          },
+          {
+            "family": "demand-balanced",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.065688549,
+            "wall_seconds": 0.06826496299981955
+          }
+        ],
+        "candidate": [
+          {
+            "family": "demand-balanced",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.024993253,
+            "wall_seconds": 0.027461345000119763
+          },
+          {
+            "family": "demand-balanced",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.011454117,
+            "wall_seconds": 0.014478695999969204
+          },
+          {
+            "family": "demand-balanced",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.01088525,
+            "wall_seconds": 0.013676161999683245
+          }
+        ]
+      },
+      "baseline_median_cpu": 0.058801042,
+      "baseline_median_wall": 0.06099392300006912,
+      "candidate_median_cpu": 0.011454117,
+      "candidate_median_wall": 0.014478695999969204,
+      "speedup": 5.133616323283585,
+      "prior_candidate": {
+        "samples": [
+          {
+            "family": "demand-balanced",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.007544605,
+            "wall_seconds": 0.009636665000016365
+          },
+          {
+            "family": "demand-balanced",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.006308538,
+            "wall_seconds": 0.009163773000182118
+          },
+          {
+            "family": "demand-balanced",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.004786365,
+            "wall_seconds": 0.006787782000174047
+          }
+        ],
+        "median_cpu": 0.006308538,
+        "median_wall": 0.009163773000182118,
+        "speedup": 9.32086673647682
+      }
+    },
+    {
+      "family": "demand-balanced",
+      "size": 16384,
+      "samples": {
+        "baseline": [
+          {
+            "family": "demand-balanced",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 1.168987048,
+            "wall_seconds": 1.1865263740000955
+          },
+          {
+            "family": "demand-balanced",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 1.081007913,
+            "wall_seconds": 1.0854623000000174
+          },
+          {
+            "family": "demand-balanced",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 1.298054263,
+            "wall_seconds": 1.3208562180000172
+          }
+        ],
+        "candidate": [
+          {
+            "family": "demand-balanced",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 0.049529696,
+            "wall_seconds": 0.05233491299986781
+          },
+          {
+            "family": "demand-balanced",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 0.040890765,
+            "wall_seconds": 0.04393496200009395
+          },
+          {
+            "family": "demand-balanced",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 0.042878281,
+            "wall_seconds": 0.04597949799972412
+          }
+        ]
+      },
+      "baseline_median_cpu": 1.168987048,
+      "baseline_median_wall": 1.1865263740000955,
+      "candidate_median_cpu": 0.042878281,
+      "candidate_median_wall": 0.04597949799972412,
+      "speedup": 27.262917746166178,
+      "prior_candidate": {
+        "samples": [
+          {
+            "family": "demand-balanced",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 0.03173145,
+            "wall_seconds": 0.034927380999761226
+          },
+          {
+            "family": "demand-balanced",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 0.039281508,
+            "wall_seconds": 0.04207974699966144
+          },
+          {
+            "family": "demand-balanced",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 0.039701853,
+            "wall_seconds": 0.04302063900013309
+          }
+        ],
+        "median_cpu": 0.039281508,
+        "median_wall": 0.04207974699966144,
+        "speedup": 29.759220241748356
+      }
+    },
+    {
+      "family": "demand-left",
+      "size": 1024,
+      "samples": {
+        "baseline": [
+          {
+            "family": "demand-left",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.048246782,
+            "wall_seconds": 0.05167388299992126
+          },
+          {
+            "family": "demand-left",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.025773413,
+            "wall_seconds": 0.028969468000013876
+          },
+          {
+            "family": "demand-left",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.040586583,
+            "wall_seconds": 0.04409622000002855
+          }
+        ],
+        "candidate": [
+          {
+            "family": "demand-left",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.000816814,
+            "wall_seconds": 0.0029798349996781326
+          },
+          {
+            "family": "demand-left",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.005981712,
+            "wall_seconds": 0.009890978999465005
+          },
+          {
+            "family": "demand-left",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.000821571,
+            "wall_seconds": 0.002785218000099121
+          }
+        ]
+      },
+      "baseline_median_cpu": 0.040586583,
+      "baseline_median_wall": 0.04409622000002855,
+      "candidate_median_cpu": 0.000821571,
+      "candidate_median_wall": 0.0029798349996781326,
+      "speedup": 49.40118748105763,
+      "prior_candidate": {
+        "samples": [
+          {
+            "family": "demand-left",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.000929361,
+            "wall_seconds": 0.003095115000178339
+          },
+          {
+            "family": "demand-left",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.001208727,
+            "wall_seconds": 0.0031616139999641746
+          },
+          {
+            "family": "demand-left",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.000980718,
+            "wall_seconds": 0.0028130790001341666
+          }
+        ],
+        "median_cpu": 0.000980718,
+        "median_wall": 0.003095115000178339,
+        "speedup": 41.38456008760929
+      }
+    },
+    {
+      "family": "demand-left",
+      "size": 4096,
+      "samples": {
+        "baseline": [
+          {
+            "family": "demand-left",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.901136371,
+            "wall_seconds": 0.9134692589998394
+          },
+          {
+            "family": "demand-left",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 1.1171761,
+            "wall_seconds": 1.1300180530001853
+          },
+          {
+            "family": "demand-left",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.844976682,
+            "wall_seconds": 0.8592725920000248
+          }
+        ],
+        "candidate": [
+          {
+            "family": "demand-left",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.00339732,
+            "wall_seconds": 0.005542490000152611
+          },
+          {
+            "family": "demand-left",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.016665154,
+            "wall_seconds": 0.01991082299991831
+          },
+          {
+            "family": "demand-left",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.003082002,
+            "wall_seconds": 0.005087614000331087
+          }
+        ]
+      },
+      "baseline_median_cpu": 0.901136371,
+      "baseline_median_wall": 0.9134692589998394,
+      "candidate_median_cpu": 0.00339732,
+      "candidate_median_wall": 0.005542490000152611,
+      "speedup": 265.24918788927744,
+      "prior_candidate": {
+        "samples": [
+          {
+            "family": "demand-left",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.005974942,
+            "wall_seconds": 0.00805831700017734
+          },
+          {
+            "family": "demand-left",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.006091961,
+            "wall_seconds": 0.008762695999848802
+          },
+          {
+            "family": "demand-left",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.005194242,
+            "wall_seconds": 0.007430249999742955
+          }
+        ],
+        "median_cpu": 0.005974942,
+        "median_wall": 0.00805831700017734,
+        "speedup": 150.81926669748427
+      }
+    },
+    {
+      "family": "demand-left",
+      "size": 16384,
+      "samples": {
+        "baseline": [
+          {
+            "family": "demand-left",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 23.605445209,
+            "wall_seconds": 23.81040229900009
+          },
+          {
+            "family": "demand-left",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 17.08209605,
+            "wall_seconds": 17.278120738000098
+          },
+          {
+            "family": "demand-left",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 16.462763136,
+            "wall_seconds": 16.62493110699984
+          }
+        ],
+        "candidate": [
+          {
+            "family": "demand-left",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 0.035745578,
+            "wall_seconds": 0.03950072800034832
+          },
+          {
+            "family": "demand-left",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 0.054134425,
+            "wall_seconds": 0.05751876399972389
+          },
+          {
+            "family": "demand-left",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 0.033613358,
+            "wall_seconds": 0.036209402999702434
+          }
+        ]
+      },
+      "baseline_median_cpu": 17.08209605,
+      "baseline_median_wall": 17.278120738000098,
+      "candidate_median_cpu": 0.035745578,
+      "candidate_median_wall": 0.03950072800034832,
+      "speedup": 477.8799786088226,
+      "prior_candidate": {
+        "samples": [
+          {
+            "family": "demand-left",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 0.02560888,
+            "wall_seconds": 0.028567173999817896
+          },
+          {
+            "family": "demand-left",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 0.025918444,
+            "wall_seconds": 0.029366232000029413
+          },
+          {
+            "family": "demand-left",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 0.02709678,
+            "wall_seconds": 0.03058199199995215
+          }
+        ],
+        "median_cpu": 0.025918444,
+        "median_wall": 0.029366232000029413,
+        "speedup": 659.0710480150738
+      }
+    },
+    {
+      "family": "demand-right",
+      "size": 1024,
+      "samples": {
+        "baseline": [
+          {
+            "family": "demand-right",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.046533575,
+            "wall_seconds": 0.050077162000206954
+          },
+          {
+            "family": "demand-right",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.046101232,
+            "wall_seconds": 0.04955369000003884
+          },
+          {
+            "family": "demand-right",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.04991407,
+            "wall_seconds": 0.053538296999931845
+          }
+        ],
+        "candidate": [
+          {
+            "family": "demand-right",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.000903893,
+            "wall_seconds": 0.002951527999357495
+          },
+          {
+            "family": "demand-right",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.005949535,
+            "wall_seconds": 0.00919547400008014
+          },
+          {
+            "family": "demand-right",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.000897304,
+            "wall_seconds": 0.0026344359994254773
+          }
+        ]
+      },
+      "baseline_median_cpu": 0.046533575,
+      "baseline_median_wall": 0.050077162000206954,
+      "candidate_median_cpu": 0.000903893,
+      "candidate_median_wall": 0.002951527999357495,
+      "speedup": 51.48128705499434,
+      "prior_candidate": {
+        "samples": [
+          {
+            "family": "demand-right",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.001282677,
+            "wall_seconds": 0.0036425369999051327
+          },
+          {
+            "family": "demand-right",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.001002811,
+            "wall_seconds": 0.0034476210003049346
+          },
+          {
+            "family": "demand-right",
+            "size": 1024,
+            "count": 1024,
+            "checksum": 358438400,
+            "complete": true,
+            "cpu_seconds": 0.001148356,
+            "wall_seconds": 0.0031082450000212702
+          }
+        ],
+        "median_cpu": 0.001148356,
+        "median_wall": 0.0034476210003049346,
+        "speedup": 40.5219069696157
+      }
+    },
+    {
+      "family": "demand-right",
+      "size": 4096,
+      "samples": {
+        "baseline": [
+          {
+            "family": "demand-right",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 1.406549421,
+            "wall_seconds": 1.4339056680000795
+          },
+          {
+            "family": "demand-right",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 1.100935802,
+            "wall_seconds": 1.1216489280000133
+          },
+          {
+            "family": "demand-right",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 1.36720561,
+            "wall_seconds": 1.3876489300000685
+          }
+        ],
+        "candidate": [
+          {
+            "family": "demand-right",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.003756535,
+            "wall_seconds": 0.005685781000465795
+          },
+          {
+            "family": "demand-right",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.003456548,
+            "wall_seconds": 0.00547228699997504
+          },
+          {
+            "family": "demand-right",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.003185315,
+            "wall_seconds": 0.004977400999450765
+          }
+        ]
+      },
+      "baseline_median_cpu": 1.36720561,
+      "baseline_median_wall": 1.3876489300000685,
+      "candidate_median_cpu": 0.003456548,
+      "candidate_median_wall": 0.00547228699997504,
+      "speedup": 395.5407562689713,
+      "prior_candidate": {
+        "samples": [
+          {
+            "family": "demand-right",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.006702704,
+            "wall_seconds": 0.009068605999800639
+          },
+          {
+            "family": "demand-right",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.006107799,
+            "wall_seconds": 0.008443124999757856
+          },
+          {
+            "family": "demand-right",
+            "size": 4096,
+            "count": 4096,
+            "checksum": 22914881536,
+            "complete": true,
+            "cpu_seconds": 0.006762543,
+            "wall_seconds": 0.00952304800011916
+          }
+        ],
+        "median_cpu": 0.006702704,
+        "median_wall": 0.009068605999800639,
+        "speedup": 203.9782168509903
+      }
+    },
+    {
+      "family": "demand-right",
+      "size": 16384,
+      "samples": {
+        "baseline": [
+          {
+            "family": "demand-right",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 31.671839308,
+            "wall_seconds": 32.19717214100001
+          },
+          {
+            "family": "demand-right",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 38.436963484,
+            "wall_seconds": 38.78974567499995
+          },
+          {
+            "family": "demand-right",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 39.576561985,
+            "wall_seconds": 40.02512601400008
+          }
+        ],
+        "candidate": [
+          {
+            "family": "demand-right",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 0.018402376,
+            "wall_seconds": 0.021722364999732235
+          },
+          {
+            "family": "demand-right",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 0.022340751,
+            "wall_seconds": 0.025150486999336863
+          },
+          {
+            "family": "demand-right",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 0.018928938,
+            "wall_seconds": 0.02253347100031533
+          }
+        ]
+      },
+      "baseline_median_cpu": 38.436963484,
+      "baseline_median_wall": 38.78974567499995,
+      "candidate_median_cpu": 0.018928938,
+      "candidate_median_wall": 0.02253347100031533,
+      "speedup": 2030.5927085819608,
+      "prior_candidate": {
+        "samples": [
+          {
+            "family": "demand-right",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 0.034965607,
+            "wall_seconds": 0.038493230000312906
+          },
+          {
+            "family": "demand-right",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 0.032808468,
+            "wall_seconds": 0.037105818999862095
+          },
+          {
+            "family": "demand-right",
+            "size": 16384,
+            "count": 16384,
+            "checksum": 1466149724160,
+            "complete": true,
+            "cpu_seconds": 0.033258584,
+            "wall_seconds": 0.036928041000010126
+          }
+        ],
+        "median_cpu": 0.033258584,
+        "median_wall": 0.037105818999862095,
+        "speedup": 1155.7005398666402
+      }
+    },
+    {
+      "family": "demand-alias",
+      "size": 4096,
+      "samples": {
+        "baseline": [
+          {
+            "family": "demand-alias",
+            "size": 4096,
+            "count": 2,
+            "checksum": 5,
+            "complete": true,
+            "cpu_seconds": 0.014250084,
+            "wall_seconds": 0.016878037999958906
+          },
+          {
+            "family": "demand-alias",
+            "size": 4096,
+            "count": 2,
+            "checksum": 5,
+            "complete": true,
+            "cpu_seconds": 0.020345876,
+            "wall_seconds": 0.023138963000064905
+          },
+          {
+            "family": "demand-alias",
+            "size": 4096,
+            "count": 2,
+            "checksum": 5,
+            "complete": true,
+            "cpu_seconds": 0.017023397,
+            "wall_seconds": 0.019693129000188492
+          }
+        ],
+        "candidate": [
+          {
+            "family": "demand-alias",
+            "size": 4096,
+            "count": 2,
+            "checksum": 5,
+            "complete": true,
+            "cpu_seconds": 0.02042327,
+            "wall_seconds": 0.028858340000624594
+          },
+          {
+            "family": "demand-alias",
+            "size": 4096,
+            "count": 2,
+            "checksum": 5,
+            "complete": true,
+            "cpu_seconds": 0.017876015,
+            "wall_seconds": 0.020303878000049735
+          },
+          {
+            "family": "demand-alias",
+            "size": 4096,
+            "count": 2,
+            "checksum": 5,
+            "complete": true,
+            "cpu_seconds": 0.018646719,
+            "wall_seconds": 0.02134806799949729
+          }
+        ]
+      },
+      "baseline_median_cpu": 0.017023397,
+      "baseline_median_wall": 0.019693129000188492,
+      "candidate_median_cpu": 0.018646719,
+      "candidate_median_wall": 0.02134806799949729,
+      "speedup": 0.912943290452331,
+      "prior_candidate": {
+        "samples": [
+          {
+            "family": "demand-alias",
+            "size": 4096,
+            "count": 2,
+            "checksum": 5,
+            "complete": true,
+            "cpu_seconds": 0.015177672,
+            "wall_seconds": 0.017848313999820675
+          },
+          {
+            "family": "demand-alias",
+            "size": 4096,
+            "count": 2,
+            "checksum": 5,
+            "complete": true,
+            "cpu_seconds": 0.016644122,
+            "wall_seconds": 0.019518616999903315
+          },
+          {
+            "family": "demand-alias",
+            "size": 4096,
+            "count": 2,
+            "checksum": 5,
+            "complete": true,
+            "cpu_seconds": 0.018043486,
+            "wall_seconds": 0.02128614399998696
+          }
+        ],
+        "median_cpu": 0.016644122,
+        "median_wall": 0.019518616999903315,
+        "speedup": 1.0227873239573706
+      }
+    },
+    {
+      "family": "capture-chain",
+      "size": 1024,
+      "samples": {
+        "baseline": [
+          {
+            "family": "capture-chain",
+            "size": 1024,
+            "count": 1024,
+            "checksum": -524800,
+            "complete": true,
+            "cpu_seconds": 0.005498534,
+            "wall_seconds": 0.00825053000016851
+          },
+          {
+            "family": "capture-chain",
+            "size": 1024,
+            "count": 1024,
+            "checksum": -524800,
+            "complete": true,
+            "cpu_seconds": 0.00554946,
+            "wall_seconds": 0.007912331000170525
+          },
+          {
+            "family": "capture-chain",
+            "size": 1024,
+            "count": 1024,
+            "checksum": -524800,
+            "complete": true,
+            "cpu_seconds": 0.005300079,
+            "wall_seconds": 0.00753412400013076
+          }
+        ],
+        "candidate": [
+          {
+            "family": "capture-chain",
+            "size": 1024,
+            "count": 1024,
+            "checksum": -524800,
+            "complete": true,
+            "cpu_seconds": 0.004898252,
+            "wall_seconds": 0.007100342999365239
+          },
+          {
+            "family": "capture-chain",
+            "size": 1024,
+            "count": 1024,
+            "checksum": -524800,
+            "complete": true,
+            "cpu_seconds": 0.004653236,
+            "wall_seconds": 0.006905975999870861
+          },
+          {
+            "family": "capture-chain",
+            "size": 1024,
+            "count": 1024,
+            "checksum": -524800,
+            "complete": true,
+            "cpu_seconds": 0.00463528,
+            "wall_seconds": 0.007148042999688187
+          }
+        ]
+      },
+      "baseline_median_cpu": 0.005498534,
+      "baseline_median_wall": 0.007912331000170525,
+      "candidate_median_cpu": 0.004653236,
+      "candidate_median_wall": 0.007100342999365239,
+      "speedup": 1.1816580977195226,
+      "prior_candidate": {
+        "samples": [
+          {
+            "family": "capture-chain",
+            "size": 1024,
+            "count": 1024,
+            "checksum": -524800,
+            "complete": true,
+            "cpu_seconds": 0.005294861,
+            "wall_seconds": 0.007717703999787773
+          },
+          {
+            "family": "capture-chain",
+            "size": 1024,
+            "count": 1024,
+            "checksum": -524800,
+            "complete": true,
+            "cpu_seconds": 0.00482249,
+            "wall_seconds": 0.006899235999753728
+          },
+          {
+            "family": "capture-chain",
+            "size": 1024,
+            "count": 1024,
+            "checksum": -524800,
+            "complete": true,
+            "cpu_seconds": 0.005476278,
+            "wall_seconds": 0.007723341999735567
+          }
+        ],
+        "median_cpu": 0.005294861,
+        "median_wall": 0.007717703999787773,
+        "speedup": 1.0384661655896161
+      }
+    },
+    {
+      "family": "let-summary",
+      "size": 4096,
+      "samples": {
+        "baseline": [
+          {
+            "family": "let-summary",
+            "size": 4096,
+            "count": 4097,
+            "checksum": 22923272191,
+            "complete": true,
+            "cpu_seconds": 0.003011066,
+            "wall_seconds": 0.005571128000156023
+          },
+          {
+            "family": "let-summary",
+            "size": 4096,
+            "count": 4097,
+            "checksum": 22923272191,
+            "complete": true,
+            "cpu_seconds": 0.002924097,
+            "wall_seconds": 0.0047482540001055895
+          },
+          {
+            "family": "let-summary",
+            "size": 4096,
+            "count": 4097,
+            "checksum": 22923272191,
+            "complete": true,
+            "cpu_seconds": 0.003126657,
+            "wall_seconds": 0.005090338000172778
+          }
+        ],
+        "candidate": [
+          {
+            "family": "let-summary",
+            "size": 4096,
+            "count": 4097,
+            "checksum": 22923272191,
+            "complete": true,
+            "cpu_seconds": 0.003574764,
+            "wall_seconds": 0.0055500959997516475
+          },
+          {
+            "family": "let-summary",
+            "size": 4096,
+            "count": 4097,
+            "checksum": 22923272191,
+            "complete": true,
+            "cpu_seconds": 0.00397586,
+            "wall_seconds": 0.006096883000282105
+          },
+          {
+            "family": "let-summary",
+            "size": 4096,
+            "count": 4097,
+            "checksum": 22923272191,
+            "complete": true,
+            "cpu_seconds": 0.003739179,
+            "wall_seconds": 0.0057149300000673975
+          }
+        ]
+      },
+      "baseline_median_cpu": 0.003011066,
+      "baseline_median_wall": 0.005090338000172778,
+      "candidate_median_cpu": 0.003739179,
+      "candidate_median_wall": 0.0057149300000673975,
+      "speedup": 0.8052746338166747,
+      "prior_candidate": {
+        "samples": [
+          {
+            "family": "let-summary",
+            "size": 4096,
+            "count": 4097,
+            "checksum": 22923272191,
+            "complete": true,
+            "cpu_seconds": 0.005403722,
+            "wall_seconds": 0.008147513000039908
+          },
+          {
+            "family": "let-summary",
+            "size": 4096,
+            "count": 4097,
+            "checksum": 22923272191,
+            "complete": true,
+            "cpu_seconds": 0.007400326,
+            "wall_seconds": 0.010949767000056454
+          },
+          {
+            "family": "let-summary",
+            "size": 4096,
+            "count": 4097,
+            "checksum": 22923272191,
+            "complete": true,
+            "cpu_seconds": 0.00605408,
+            "wall_seconds": 0.008830856000258791
+          }
+        ],
+        "median_cpu": 0.00605408,
+        "median_wall": 0.008830856000258791,
+        "speedup": 0.4973614488080766
+      }
+    }
+  ],
+  "prior_candidate_metadata": {
+    "baseline_commit": "94e086c15c40aaf220c764f0e723cc3cfe627587",
+    "ghc_version": "9.14.1",
+    "optimization": "-O1",
+    "flags": [
+      "-fpedantic-bottoms",
+      "-fno-state-hack",
+      "-Werror=incomplete-patterns",
+      "-Werror=incomplete-uni-patterns"
+    ],
+    "repetitions": 3,
+    "source_sha256": {
+      "libraries/mlf-llvm/Bootstrap/LLVM/Analysis.hs": "d0724ebf41e605e87fb23471ed300b70023e6e5afdf91951d6fdaca28a1f0cc9",
+      "tools/performance/pr55-optimizations/LLVM.hs": "2847f93f3111e0dc7ac2f684c5d61bba8f8708cdfe2f349fda6e09cf0cd88294",
+      "tests/indexvec/OptimizationLLVM.hs": "3d169bf457d1565ad714f452c613af1ce1387b027c71091da9867c0e7db7ab60"
+    },
+    "note": "Analysis-only CPU samples in fresh processes. Baseline samples retained from unchanged exact-base binary; final candidate samples rerun after empty-summary pruning. Independent mathematical oracle checked outside timed interval."
+  }
+}
