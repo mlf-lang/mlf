@@ -506,12 +506,17 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
     localData = filter (\declaration -> not (Set.member compareString (D.datatypeName declaration) importedData)) declarations;
     moduleRow = Crate.CompilationModule owner (Modules.Renamed symbols [] [] [] [] Nothing)
       (Right (R.Local entry)) (Right Modules.emptyInterface);
-    modules = Crate.CompilationModules (Modules.Bindings symbols M.empty) [moduleRow] M.empty;
+    -- Script lowering admits exactly these dependency interfaces. Keep that
+    -- scope when the checked entry is instantiated, so its imported class
+    -- dictionaries remain visible after the source declarations are split.
+    reach = M.singleton owner (Set.fromList compareString
+      (concatMap (compose Artifact.crateModules snd) interfaces));
+    modules = Crate.CompilationModules (Modules.Bindings symbols M.empty) [moduleRow] reach;
     spec = Crate.CrateSpec identity owner NoImplicitPrelude [] (map fst interfaces) "" ""
   } in case lookup eqString entry (zip membersByName ids) of {
     Nothing -> ioReturn (Left (CompileError Inference "class lowering lost the script entry declaration"));
     Just slot -> compilePreparedSourceRoot storage spec interfaces names
-      (FileCrate modules localData [] [] lowered (CrateEntry symbols slot) M.empty Nothing)
+      (FileCrate modules localData [] [] lowered (CrateEntry symbols slot) reach Nothing)
   };
 
   runSourceGroupsWithEncodings :: Maybe Query.SourceEncodings -> String -> String -> String ->

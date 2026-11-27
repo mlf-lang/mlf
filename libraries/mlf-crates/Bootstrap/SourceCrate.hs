@@ -48,9 +48,10 @@ module Bootstrap.SourceCrate
     }
   };
 
-  -- Insert the entry below the user's declarations and above its expression.
-  -- This exposes each top-level SCC to the query graph, including the main
-  -- binding in a declaration-only script, without splitting local lets.
+  -- Keep the final expression in its use-site class scope while lowering.
+  -- An empty recursive group introduces no binding or generalization and
+  -- preserves that boundary through lowering. Only then make the checked
+  -- entry a declaration; its RHS still contains all of the user's local lets.
   compileScriptWith :: Session.QueryStorage -> SourceModule -> [] ((,) String Artifact.CrateInterface) ->
     (SProgram -> Either CompileError ((,) (Map String String) ((,) SProgram (Map String String)))) ->
     IO (Either CompileError Session.SourceRoot);
@@ -63,7 +64,7 @@ module Bootstrap.SourceCrate
     } in if Set.member compareString entry used then choose (index + 1) else (,) identity entry
   } in case choose 0 of { (,) identity entry -> case do {
     program <- Compiler.atPhase Parsing (Parser.standaloneProgramWith
-      (\expression -> SLet entry expression (SConstructor "()")) source);
+      (SLetRec []) source);
     (,) names ((,) lowered dictionaries) <- lower program;
     case lowered of {
       SClassProgram _ _ _ _ -> Left (CompileError Inference "class translation did not produce a core program");
@@ -77,7 +78,8 @@ module Bootstrap.SourceCrate
           };
           _ -> Left "script import parameters are missing from lowered declarations"
         });
-        members <- Compiler.atPhase Inference (Inference.extractLoweredDeclarations local);
+        body <- Compiler.atPhase Verification (insertScriptEntry entry local);
+        members <- Compiler.atPhase Inference (Inference.extractLoweredDeclarations body);
         Right ((,,,) names declarations members dictionaries)
       }
     }
@@ -86,6 +88,15 @@ module Bootstrap.SourceCrate
     Right ((,,,) names declarations members dictionaries) ->
       Session.compileExpressionRoot storage identity owner names interfaces declarations members dictionaries
   } };
+
+  insertScriptEntry :: String -> SExpr -> Either String SExpr;
+  insertScriptEntry entry expression = case expression of {
+    SDeclScope ids body -> mapEither (SDeclScope ids) (insertScriptEntry entry body);
+    SLet name value body -> mapEither (SLet name value) (insertScriptEntry entry body);
+    SLetRec [] body -> Right (SLet entry body (SConstructor "()"));
+    SLetRec members body -> mapEither (SLetRec members) (insertScriptEntry entry body);
+    _ -> Left "class lowering lost the script expression boundary"
+  };
 
   data Compilation = Compilation Checked.CheckedTerm String (Map String String);
   checkedTerm (Compilation checked _ _) = checked;

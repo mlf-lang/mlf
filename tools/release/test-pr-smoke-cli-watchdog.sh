@@ -13,7 +13,8 @@ cleanup() {
 }
 trap cleanup EXIT
 checkout="$scratch/checkout with spaces"
-mkdir -p "$scratch/bin" "$checkout/tools/release"
+mkdir -p "$scratch/bin" "$checkout/tools/release" "$checkout/tools/testing"
+cp "$scripts/../testing/compiler-diagnostics.sh" "$checkout/tools/testing/"
 export TEST_CLI_SCRATCH="$scratch"
 export TEST_CLI_REAL_SLEEP
 TEST_CLI_REAL_SLEEP=$(command -v sleep)

@@ -61,6 +61,7 @@ FRONTEND_CASE = 'installed-frontend-controls'
 SOURCE_CLI = 'source-root-cli'
 PACKAGE_CLI = 'package-dependency-cli'
 INSTALLED_CLI = 'installed-root-cli'
+CLI_CASES = (SOURCE_CLI, PACKAGE_CLI, INSTALLED_CLI)
 PREFIX = 'mlf_fixed_' + 'a' * 64
 FRONTEND_FIXTURE = ROOT / 'tools/experimental/prepared-libraries/NativeFrontendControls.hs'
 FRONTEND_OUTPUT = (b'Implicit.emlf accepted\nSubset.emlf accepted\nUserDatatype.emlf accepted\n'
@@ -212,7 +213,7 @@ def main():
         if not link_objects:
             raise ValueError('producer has no authenticated linkable objects')
         transports = []
-        if selection not in (SOURCE_CLI, INSTALLED_CLI):
+        if selection not in CLI_CASES:
             for label, source in [('host', ROOT / 'host/ghc/cbits/host.c'),
                                   ('supervisor', ROOT / 'runtime/mlf_process_supervisor.c')]:
                 target = output / (label + '.o')
@@ -252,7 +253,7 @@ def main():
             fixture_sources = {emitter: FIXTURES / (emitter + '.hs')}
         elif selection == FRONTEND_CASE:
             fixture_sources = {'NativeFrontendControls': FRONTEND_FIXTURE}
-        elif selection in (SOURCE_CLI, INSTALLED_CLI):
+        elif selection in CLI_CASES:
             fixture_sources = {}
         else:
             selected_fixture = HOST_FIXTURES[selection]

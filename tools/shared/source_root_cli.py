@@ -1,6 +1,7 @@
 """Exercise the public compiler against independent types, effects and cache expectations."""
 import hashlib
 import json
+import re
 
 from artifact_binary_reference import read_document
 from artifact_binary_typed import unpack
@@ -78,6 +79,75 @@ def check_headerless_groups(runner, compiler):
     after = headerless_inference(cache)
     require(after['quietcell'] == before['quietcell'] and after['loudcell'] != before['loudcell'],
             'headerless edit must retain the independent query and replace the changed one')
+
+
+def check_script_instances(runner, compiler):
+    # The final expression must solve its imported and local dictionaries as
+    # a use site, after each real source declaration has been generalized.
+    body = 'do { value <- pure 41; printInt (addInt value 1) }'
+    runner.run('script-instance-expr-type', [compiler, '--type', '--expr', body],
+               expected=b'IO ()\n')
+    runner.run('script-instance-expr-run', [compiler, '--run', '--expr', body],
+               expected=b'42\n')
+    runner.run('script-instance-stdin-run', [compiler, '--run', '-'],
+               stdin=body.encode(), expected=b'42\n')
+    own_class = ('class Bump a where { bump :: a -> Int }\n'
+                 'instance Bump Int where { bump value = addInt (helper value) 1 }\n'
+                 'helper value = value\n'
+                 'main = printInt (bump 41)\n')
+    runner.run('script-instance-own-expr', [compiler, '--run', '--expr', own_class],
+               expected=b'42\n')
+    runner.run('script-instance-own-no-prelude',
+               [compiler, '--no-prelude', '--run', '--expr', own_class], expected=b'42\n')
+    runner.run('script-instance-own-stdin', [compiler, '--run', '-'],
+               stdin=own_class.encode(), expected=b'42\n')
+    runner.run('script-instance-local-eq', [compiler, '--run', '--expr',
+               'data Box = Box Int\n'
+               'instance Eq Box where { (==) (Box a) (Box b) = eqInt a b }\n'
+               'main = printInt (if Box 1 == Box 1 then 42 else 0)\n'], expected=b'42\n')
+    cache = runner.root / 'script-instance-cache'
+    for label, text in (('imported', 'main = ' + body + '\n'), ('own', own_class)):
+        entry = runner.root / ('ScriptInstances-' + label + '.emlf')
+        entry.write_text(text)
+        argv = [compiler, '--run', entry]
+        runner.run('script-instance-file-' + label + '-cold', argv,
+                   overrides={'MLF_SOURCE_CACHE_DIR': str(cache)}, expected=b'42\n')
+        runner.run('script-instance-file-' + label + '-warm', argv,
+                   overrides={'MLF_SOURCE_CACHE_DIR': str(cache), 'MLF_QUERY_FAILPOINT': 'before-index'},
+                   expected=b'42\n')
+        if label == 'own':
+            entry.write_text(text.replace('addInt (helper value) 1', 'addInt (helper value) 2'))
+            runner.run('script-instance-file-own-edited', argv,
+                       overrides={'MLF_SOURCE_CACHE_DIR': str(cache)}, expected=b'43\n')
+
+    # The entry boundary must enclose the complete final expression. Hoisting
+    # either of its local lets would merge distinct lexical identities.
+    runner.run('script-nested-shadow-type', [compiler, '--no-prelude', '--type', '--expr',
+               'let value = 1 in let value = true in value'], expected=b'Bool\n')
+    for label, text in (
+        ('nested-shadow', 'let value = 1 in let value = true in printInt (if value then 42 else 0)'),
+        ('declaration-shadow', 'value = 1\nlet value = true in printInt (if value then 42 else 0)'),
+        ('local-polymorphism', 'let identity = \\value -> value in '
+         'printInt (if identity true then identity 42 else 0)'),
+        ('unused-let', 'let unused = panic "not demanded" in printInt 42'),
+        ('signed-use', 'same :: forall a. Eq a => a -> Bool\nsame value = value == value\n'
+         'main = printInt (if same 1 then 42 else 0)\n'),
+    ):
+        runner.run('script-' + label, [compiler, '--run', '--expr', text], expected=b'42\n')
+
+    qualified = runner.run('script-qualified-type', [compiler, '--type', '--expr',
+        'class Bump a where { bump :: a -> Int }\n'
+        '(\\value -> bump value) :: forall a. Bump a => a -> Int'])
+    require(re.fullmatch(rb'forall (\w+)\. Bump \1 => \1 -> Int\n', qualified.stdout),
+            'script entry lost its explicitly qualified source type')
+    missing = runner.run('script-missing-instance', [compiler, '--no-prelude', '--run', '--expr',
+        'class Bump a where { bump :: a -> Int }\nmain = printInt (bump 41)\n'], status=1, expected=b'')
+    require(missing.stderr.startswith(b'Resolution:') and b'Bump Int' in missing.stderr,
+            'script entry did not reject the missing local instance during resolution')
+    no_prelude = runner.run('script-no-prelude', [compiler, '--no-prelude', '--run', '--expr', body],
+                            status=1, expected=b'')
+    require(no_prelude.stderr.startswith(b'ModuleResolution:'),
+            'script instance recovery silently introduced an implicit Prelude')
 
 
 def check_source_root(runner, compiler):
@@ -162,6 +232,7 @@ def check_source_root(runner, compiler):
     odd.write_text(odd_source)
     file_run('restored-run', ['--run', entry], expected=b'42\n')
     check_headerless_groups(runner, compiler)
+    check_script_instances(runner, compiler)
 
 
 def check_installed_root(runner, compiler):

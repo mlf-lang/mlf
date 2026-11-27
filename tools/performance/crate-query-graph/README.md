@@ -142,6 +142,12 @@ dangling graph edges, source failure, output failure, five publication failpoint
 resumption from the previous generation, and corrupt formal objects. Warm runs
 must preserve every cache file's bytes and modification time. Two concurrent
 writers must serialize into one cold and one fully warm compilation.
+For a damaged shared template, one owner re-infers its checked payload; later
+owners reuse the queued bytes in the same compilation before publication. The
+control requires exactly one affected owner to miss, all other groups to reuse,
+and the original graph, payload bytes, contracts and formal outputs to be
+restored. The independent receipt reader checks both owners after corrupt and
+missing payload recovery.
 The publication controls require the actual failpoint diagnostic, and add 96
 distinct definitions to interrupt a publication with some result batches moved
 and others still staged. The previous graph and every reachable result must

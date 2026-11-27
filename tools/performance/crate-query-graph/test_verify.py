@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Pure verifier adapters and attack fixtures; no compiler or production imports."""
 from pathlib import Path
+import copy
 import re
 import tempfile
 import unittest
@@ -21,6 +22,43 @@ def integer(value):
 
 
 class VerifierTests(unittest.TestCase):
+    def test_payload_recovery_checks_owners_contracts_and_counts(self):
+        groups = [dict(id=name, members=[name], cached=False, query_key=payload,
+                       semantic_fingerprint=name + '-contract')
+                  for name, payload in [('dependency', H1), ('left', H2), ('right', H2)]]
+        original = dict(format=1, crate='fixture', semantic_fingerprint='crate-contract',
+                        inferred_groups=3, reused_groups=0, groups=groups)
+
+        def repaired(owner):
+            return dict(original, inferred_groups=1, reused_groups=2,
+                        groups=[dict(g, cached=g['id'] != owner) for g in groups])
+
+        # Either template owner may be encountered first. The other owner and
+        # the unrelated dependency must be hits with unchanged result metadata.
+        for owner in ('left', 'right'):
+            v.check_payload_recovery(repaired(owner), original, H2)
+        v.check_payload_recovery(repaired('dependency'), original, H1)
+        for bad in (repaired('dependency'), repaired('absent')):
+            with self.assertRaisesRegex(Invalid, 'one owner of the damaged result'):
+                v.check_payload_recovery(bad, original, H2)
+        both = repaired('left')
+        both['groups'][2]['cached'] = False
+        with self.assertRaisesRegex(Invalid, 'one owner of the damaged result'):
+            v.check_payload_recovery(both, original, H2)
+        variants = [dict(repaired('left'), inferred_groups=2, reused_groups=1),
+                    dict(repaired('left'), semantic_fingerprint='changed-contract')]
+        for field, value in [('query_key', H3), ('members', ['wrong']),
+                             ('semantic_fingerprint', 'changed')]:
+            bad = copy.deepcopy(repaired('left'))
+            bad['groups'][2][field] = value
+            variants.append(bad)
+        missing = repaired('left')
+        missing['groups'].pop()
+        variants.append(missing)
+        for bad in variants:
+            with self.assertRaisesRegex(Invalid, 'unrelated groups, contracts or reuse counts'):
+                v.check_payload_recovery(bad, original, H2)
+
     def test_resume_requires_complete_current_verifier_input_identity(self):
         inputs = v.verifier_inputs()
         self.assertIn('tools/performance/crate-query-graph/template_receipts.py', inputs)

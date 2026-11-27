@@ -138,6 +138,11 @@ unusable, the compiler loads a pinned checked fallback on demand or identifies
 the reachable dependency that lacks an implementation. The report lists the
 objects to pass to the native linker.
 
+This optional `.mlfco` applies to the pinned compiler handoff above. Ordinary
+`mlfpkg build` still prepares and hashes the checked dependency closure before
+selecting native objects, so that preparation requires each dependency's
+`.mlfci` and `.mlfco`. Release v1 continues to distribute both files.
+
 The interpreter and standalone xMLF or LLVM output require a closed program.
 These commands select checked IR and source implementations. They print their
 result on stdout, so a command such as `emlf Main.emlf >main.xmlf` can be used

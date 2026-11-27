@@ -106,6 +106,18 @@ def graph(cache):
     return current, result
 
 
+def check_payload_recovery(report, original, payload):
+    """One checked refill serves every owner of the damaged content address."""
+    owners = {g['id'] for g in original['groups'] if g['query_key'] == payload}
+    misses = [g['id'] for g in report['groups'] if g['cached'] is False]
+    require(len(misses) == 1 and misses[0] in owners,
+            'payload recovery must re-infer one owner of the damaged result')
+    expected = dict(original, inferred_groups=1, reused_groups=len(original['groups']) - 1,
+                    groups=[dict(g, cached=g['id'] != misses[0]) for g in original['groups']])
+    require(report == expected,
+            'payload recovery changed unrelated groups, contracts or reuse counts')
+
+
 def execute(binary, argv, *, env=None, success=True):
     variables = dict(os.environ, GHCRTS='', GHC_ENVIRONMENT='-', LANG='C.UTF-8', LC_ALL='C.UTF-8', TZ='UTC')
     variables.update(env or {})
@@ -301,6 +313,9 @@ def main():
             if name == 'body' and version == 1:
                 assert report['inferred_groups'] == 1, 'body edit should reuse same-contract callers'
         # A corrupt/missing result is repaired; final output remains exact.
+        # Multiple owners can share one content address. The first miss queues
+        # checked bytes in the current session, so later owners can reuse them
+        # before publication instead of independently re-inferring the payload.
         current, nodes = graph(cache)
         raw_payloads = [n['payload'] for k, n in nodes.items() if unpack(k)[0] == 'InferScc']
         payload = max(raw_payloads, key=raw_payloads.count) if name in ('template-rebind', 'signed-template-rebind') else raw_payloads[0]
@@ -308,18 +323,25 @@ def main():
         if name in ('template-rebind', 'signed-template-rebind'):
             require(affected == 2, 'shared-template corruption must target both actual owners')
         damaged = cache_directory(cache) / 'results' / (payload + '.mlfqr')
+        original_payload = damaged.read_bytes()
         damaged.write_bytes(b'corrupt checked record')
         repaired = compile('repaired')
-        assert json.loads(repaired.with_suffix('.queries').read_text())['inferred_groups'] == affected
-        assert outputs(repaired) == outputs(inc)
-        graph(cache)
+        check_payload_recovery(json.loads(repaired.with_suffix('.queries').read_text()), report, payload)
+        require(outputs(repaired) == outputs(inc), 'corrupt payload repair changed formal outputs')
+        require(graph(cache) == (current, nodes) and damaged.read_bytes() == original_payload,
+                'corrupt payload repair did not restore the original graph and checked bytes')
+        check_receipts(repaired, cache, nodes)
         damaged.unlink()
         missing = compile('missing')
-        assert json.loads(missing.with_suffix('.queries').read_text())['inferred_groups'] == affected
-        assert outputs(missing) == outputs(inc)
-        graph(cache)
+        check_payload_recovery(json.loads(missing.with_suffix('.queries').read_text()), report, payload)
+        require(outputs(missing) == outputs(inc), 'missing payload repair changed formal outputs')
+        require(graph(cache) == (current, nodes) and damaged.read_bytes() == original_payload,
+                'missing payload repair did not restore the original graph and checked bytes')
+        check_receipts(missing, cache, nodes)
         if name in ('template-rebind', 'signed-template-rebind'):
-            record.setdefault('shared_template_payload_recovery', {})[name] = dict(owners=affected, corrupt=True, missing=True)
+            record.setdefault('shared_template_payload_recovery', {})[name] = dict(
+                owners=affected, inferred_per_repair=1, reused_owners=affected - 1,
+                corrupt=True, missing=True)
         # Failed source/output/publication cannot advance the generation pointer.
         pointer = cache_directory(cache) / 'CURRENT'; old = pointer.read_bytes()
         source.write_text(source_text(versions[-1] + '\ninvalid = missingDefinition\n'))
