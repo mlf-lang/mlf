@@ -51,7 +51,14 @@ module Bootstrap.SourceCrate
   compileClosed :: Session.QueryStorage -> PreludeMode -> [] SourceModule ->
     IO (Either CompileError Compilation);
   compileClosed storage mode sources = let {
-    dependencies = if needsBuiltin mode sources then do {
+    -- A caller may pass an MLF.Primitive source to stand in for the builtin
+    -- module (the indexvec probes do this to control instance visibility).
+    -- The checked Prelude already owns that module and crate validation
+    -- refuses a second owner, so the builtin interface supplies it and the
+    -- caller's placeholder is not compiled as an owned module.
+    owned = filter (\source ->
+      not (Modules.isBuiltinModule (Modules.moduleIdentity source))) sources;
+    dependencies = if needsBuiltin mode owned then do {
       object <- Compiler.atPhase Verification Artifact.builtinPrelude;
       Right [object]
     } else Right []
@@ -60,7 +67,7 @@ module Bootstrap.SourceCrate
     Right objects -> do {
       let { interfaces = map (\object ->
         (,) "/builtin/prelude.mlfci" (Artifact.objectInterface object)) objects };
-      result <- compile storage mode sources interfaces;
+      result <- compile storage mode owned interfaces;
       ioReturn (bindEither result (close objects))
     }
   };
