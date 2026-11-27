@@ -293,19 +293,8 @@ module Bootstrap.ImportedRoot
       });
       let { datatypes = if null kinds then E.graphDatatypes graph else
         D.withKinds (append kinds (mapMaybe E.nodeConstructorKind (IM.elems (G.nodes graph)))) };
-      evidence <- Core.atPhase Resolution (E.resolveWithinIn types datatypes M.empty (C.skeleton constraints));
-      body <- Core.atPhase Elaboration (E.elaborateWithinIn types datatypes evidence solved M.empty (C.skeleton constraints));
-      let { userType = E.schemeTypeIn types (C.generalization (C.skeleton constraints));
-            wrapped = foldr (\((,) name ty) rest -> XAbs name ty rest) body parameters;
-            term = if null declarations then wrapped else XWithData declarations wrapped;
-            expected = foldr (\((,) _ ty) rest -> XArrow ty rest) userType parameters;
-            erased = foldr (\((,) name _) rest -> XEAbs name rest)
-              (C.eraseSourceWith evidence (C.skeleton constraints)) parameters };
-      checked <- Core.atPhase Verification (check term);
-      Core.atPhase Verification (ensure (T.alphaEq (Checked.typeOf checked) expected)
-        "direct import elaboration changed the inferred type");
-      Core.atPhase Verification (ensure (X.equalErased (X.erase term) erased)
-        "direct import elaboration changed source erasure");
+      (,) checked userType <- Core.finishCheckedRoot types datatypes constraints solved declarations parameters check
+        "direct import elaboration changed the inferred type" "direct import elaboration changed source erasure";
       Right (Compilation checked userType (Classes.prettyQualified names userType))
     }
   };

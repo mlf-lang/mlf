@@ -65,27 +65,36 @@ module Bootstrap.CompilerCore where {
           let {
             types = prepareTypes solved
           };
-          evidence <- atPhase Resolution (E.resolveEvidenceIn types (C.skeleton constraints));
-          body <-
-            atPhase Elaboration
-              (E.elaboratePreparedIn types solved evidence (C.skeleton constraints));
-          let {
-            term = if L.null declarations then body else XWithData declarations body
-          };
-          checked <- atPhase Verification (Checked.check term);
-          let {
-            ty = Checked.typeOf checked
-          };
-          let {
-            expected = E.schemeTypeIn types (C.generalization (C.skeleton constraints))
-          };
-          if L.not (T.alphaEq ty expected)
-          then Left (CompileError Verification "elaboration changed the inferred type")
-          else if L.not
-                    (X.equalErased (X.erase term)
-                       (C.eraseSourceWith evidence (C.skeleton constraints)))
-               then Left (CompileError Verification "elaboration changed source erasure")
-               else Right (Compilation checked graph (Classes.prettyQualified names ty))
+          (,) checked _ <- finishCheckedRoot types
+            (E.graphDatatypes (E.contextGraph types)) constraints solved declarations []
+            Checked.check "elaboration changed the inferred type" "elaboration changed source erasure";
+          Right (Compilation checked graph (Classes.prettyQualified names (Checked.typeOf checked)))
         }
-    }
+    };
+  -- Imported callers authenticate their ordered parameters before this stage.
+  -- Keep the checked wrapper and the user result type separate: import arrows
+  -- belong to the wrapper, while source diagnostics report the user's type.
+  finishCheckedRoot :: E.TypeContext -> DataEnv -> Constraints -> Solver ->
+    [] DataDecl -> [] ((,) XName XType) ->
+    (XTerm -> Either String Checked.CheckedTerm) -> String -> String ->
+    Either CompileError ((,) Checked.CheckedTerm XType);
+  finishCheckedRoot types datatypes constraints solved declarations parameters check typeError erasureError = do {
+    evidence <- atPhase Resolution (E.resolveWithinIn types datatypes M.empty (C.skeleton constraints));
+    body <- atPhase Elaboration
+      (E.elaborateWithinIn types datatypes evidence solved M.empty (C.skeleton constraints));
+    let {
+      userType = E.schemeTypeIn types (C.generalization (C.skeleton constraints));
+      wrapped = L.foldr (\((,) name ty) rest -> XAbs name ty rest) body parameters;
+      term = if L.null declarations then wrapped else XWithData declarations wrapped;
+      expected = L.foldr (\((,) _ ty) rest -> XArrow ty rest) userType parameters;
+      erased = L.foldr (\((,) name _) rest -> XEAbs name rest)
+        (C.eraseSourceWith evidence (C.skeleton constraints)) parameters
+    };
+    checked <- atPhase Verification (check term);
+    if L.not (T.alphaEq (Checked.typeOf checked) expected)
+    then Left (CompileError Verification typeError)
+    else if L.not (X.equalErased (X.erase term) erased)
+         then Left (CompileError Verification erasureError)
+         else Right ((,) checked userType)
+  }
 }

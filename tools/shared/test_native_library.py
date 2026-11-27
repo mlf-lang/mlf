@@ -60,6 +60,7 @@ PREFIX = 'mlf_fixed_' + 'a' * 64
 FRONTEND_FIXTURE = ROOT / 'tools/experimental/prepared-libraries/NativeFrontendControls.hs'
 FRONTEND_OUTPUT = (b'Implicit.emlf accepted\nSubset.emlf accepted\nUserDatatype.emlf accepted\n'
                    b'InstanceControl.hs accepted\n'
+                   b'shared roots preserve polymorphism, IO, imported/local scopes, checked results and rejection phases\n'
                    b'native subset, implicit Prelude, instance reach and default loader controls passed\n')
 
 
