@@ -35,23 +35,29 @@ module Bootstrap.InferenceUnit where {
   -- built. Its generated selectors/dictionaries become ordinary signed graph
   -- vertices. Inference queries consume this lowered representation directly.
   data LoweredDeclarations =
-    LoweredDeclarations (Maybe String) ([] DataDecl) ([] ((,,) String (Maybe SAnnotation) SExpr)) (Map String String) |
+    ScriptDeclarations String LoweredDeclarations |
+    LoweredDeclarations ([] DataDecl) ([] ((,,) String (Maybe SAnnotation) SExpr)) (Map String String) |
     IndexedDeclarations ([] DataDecl) Dependency.GeneratedTable
       ([] ((,) (V.Index Declaration) ((,,) String (Maybe SAnnotation) SExpr))) (Map String String);
   loweredData lowered = case lowered of {
-    LoweredDeclarations _ ds _ _ -> ds; IndexedDeclarations ds _ _ _ -> ds
+    ScriptDeclarations _ declarations -> loweredData declarations;
+    LoweredDeclarations ds _ _ -> ds; IndexedDeclarations ds _ _ _ -> ds
   };
   loweredValues lowered = case lowered of {
-    LoweredDeclarations _ _ values _ -> values; IndexedDeclarations _ _ values _ -> map snd values
+    ScriptDeclarations _ declarations -> loweredValues declarations;
+    LoweredDeclarations _ values _ -> values; IndexedDeclarations _ _ values _ -> map snd values
   };
   loweredNames lowered = case lowered of {
-    LoweredDeclarations _ _ _ names -> names; IndexedDeclarations _ _ _ names -> names
+    ScriptDeclarations _ declarations -> loweredNames declarations;
+    LoweredDeclarations _ _ names -> names; IndexedDeclarations _ _ _ names -> names
   };
   loweredDeclarationTable lowered = case lowered of {
-    LoweredDeclarations _ _ _ _ -> Nothing; IndexedDeclarations _ table _ _ -> Just table
+    ScriptDeclarations _ declarations -> loweredDeclarationTable declarations;
+    LoweredDeclarations _ _ _ -> Nothing; IndexedDeclarations _ table _ _ -> Just table
   };
   loweredIdValues lowered = case lowered of {
-    LoweredDeclarations _ _ _ _ -> []; IndexedDeclarations _ _ rows _ -> rows
+    ScriptDeclarations _ declarations -> loweredIdValues declarations;
+    LoweredDeclarations _ _ _ -> []; IndexedDeclarations _ _ rows _ -> rows
   };
   recursiveAnnotation :: RecursiveMode -> Maybe SAnnotation;
   recursiveAnnotation mode =
@@ -146,7 +152,7 @@ module Bootstrap.InferenceUnit where {
       (,) (SProgram ds expression) names -> case generation of {
         Nothing -> do {
           declarations <- extractLoweredDeclarations expression;
-          Right (LoweredDeclarations Nothing ds (filter (\((,,) n _ _) -> not (M.member compareString n externals)) declarations) names)
+          Right (LoweredDeclarations ds (filter (\((,,) n _ _) -> not (M.member compareString n externals)) declarations) names)
         };
         Just table -> do {
           imported <- traverseEither (\key -> case Dependency.generatedImportId table key of {

@@ -104,7 +104,7 @@ module Bootstrap.SourceCrate
         });
         body <- Compiler.atPhase Verification (insertScriptEntry entry local);
         members <- Compiler.atPhase Inference (Inference.extractLoweredDeclarations body);
-        Right ((,,) names (fromMaybe ((,) declarations []) headers) (Inference.LoweredDeclarations (Just entry) declarations members dictionaries))
+        Right ((,,) names (fromMaybe ((,) declarations []) headers) (Inference.ScriptDeclarations entry (Inference.LoweredDeclarations declarations members dictionaries)))
       }
     }
   } of {

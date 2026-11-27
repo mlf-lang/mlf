@@ -1066,7 +1066,7 @@ module Bootstrap.CrateGraph where {
   compileLoweredIn lowered verify crateId compilerHash directory =
     compileLoweredQueries (openFileQueries directory) lowered verify crateId compilerHash;
   compileLoweredQueries begin lowered verify crateId compilerHash imports = case Inference.loweredDeclarationTable lowered of {
-    Nothing -> compileNamedQueries (case lowered of { Inference.LoweredDeclarations entry _ _ _ -> entry; _ -> Nothing })
+    Nothing -> compileNamedQueries (case lowered of { Inference.ScriptDeclarations entry _ -> Just entry; _ -> Nothing })
       begin verify crateId compilerHash imports
       (Inference.loweredData lowered) (Inference.loweredValues lowered);
     Just generation -> let { entries = Inference.loweredIdValues lowered;
