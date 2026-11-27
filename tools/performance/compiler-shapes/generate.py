@@ -78,6 +78,30 @@ def program(family, n):
     """Generate one shared module with a runtime input at its IO entry."""
     if family == 'baseline':
         declarations, expression = '', 'x'
+    elif family == 'local_worker_demand_chain':
+        # Only step0 tests its argument. The back edge keeps the local workers
+        # mutually recursive while the demanded argument propagates up the chain.
+        workers = [f'step0 v = if ltInt v 0 then step{n} 0 else addInt v 1']
+        workers.extend(f'step{i} v = addInt (step{i-1} v) {i}' for i in range(1, n+1))
+        declarations = ''
+        expression = 'let { ' + ';\n'.join(workers) + f' }} in step{n} x'
+    elif family == 'managed_signature_spans':
+        declarations = '''hasSignatureFrame :: String -> Bool;
+hasSignatureFrame text = let {
+  marker = "an expression type signature,";
+  width = stringLength marker;
+  limit = subInt (stringLength text) width;
+  search i = if ltInt limit i then False else if eqString (stringSlice text i width) marker
+    then True else search (addInt i 1)
+} in search 0;
+observed :: HasCallStack => Int -> Int;
+observed v = if hasSignatureFrame (textFromChars (prettyCallStack callStack))
+  then v else panic "missing expression signature frame";
+'''
+        # Each successful result witnesses the managed signature's own frame.
+        sites = [f'(observed :: HasCallStack => Int -> Int) (addInt x {i})'
+                 for i in range(1, n+1)]
+        expression = balanced(sites, lambda a, b: f'addInt ({a}) ({b})') if sites else 'x'
     elif family == 'ordered_worker_demands':
         if not n:
             declarations, expression = '', 'x'
@@ -1152,6 +1176,13 @@ run x (More (Job worker) rest) = let { saved = worker x (addInt x 1) } in
 
 def expected(family, n, x):
     """Closed-form specifications; no compiled results or generated helpers used."""
+    if family == 'local_worker_demand_chain':
+        circuit = n*(n+1)//2
+        result = 1 + (2*circuit if x < 0 else x + circuit)
+        return (result + 2**63) % 2**64 - 2**63
+    if family == 'managed_signature_spans':
+        result = n*x + n*(n+1)//2 if n else x
+        return (result + 2**63) % 2**64 - 2**63
     if family == 'metadata_import_fanout':
         result = (n+1)*(x+1) + n*(n+1)//2 if n else x
         return (result + 2**63) % 2**64 - 2**63

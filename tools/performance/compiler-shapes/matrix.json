@@ -7,6 +7,8 @@
   "families": {
     "ground_evidence_telescope": {"label": "Wide ground dictionary instantiation", "default": false, "work": "a single class method instantiates n distinct quantified parameters at Int, each occurring twice in the instance head"},
     "metadata_import_fanout": {"label": "Shared crate metadata across branches", "default": false, "work": "a cold plan compiles a shared Seed crate, n one-function branches importing Seed, and Main importing and using all of them"},
+    "local_worker_demand_chain": {"label": "Demand through saturated local workers", "default": false, "matched_zero": true, "work": "n local workers call their predecessor at full arity before adding a constant; only the base demands its argument directly, and negative input traverses the chain twice"},
+    "managed_signature_spans": {"label": "Managed expression signature spans", "default": false, "matched_zero": true, "work": "n expression signatures contribute separate call-stack frames; every runtime result requires its signature frame to appear in the rendered stack"},
     "ordered_worker_demands": {"label": "Wide ordered worker demands", "default": false, "work": "one signed n-argument worker sums a left-associated strict prefix and is called with two runtime-dependent argument lists"},
     "parenthesized_operator_sites": {"label": "Parenthesized operator token spans", "default": false, "work": "n signed functions use a prefix operator and a growing source suffix, forming a runtime-dependent increment chain"},
     "wide_pattern_rows": {"label": "Wide wildcard and as-pattern equations", "default": false, "work": "two n-column equations mix wildcard and as-pattern columns, preserving positional weights and selecting with a final Boolean"},

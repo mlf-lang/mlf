@@ -20,8 +20,9 @@ check :: String -> Bool -> IO ()
 check label passed = unless passed (fail label)
 
 tokenView (Lexer.Token text sl sc el ec) = (H.unpack text,sl,sc,el,ec)
-stateView (Parsec.ParseState file tokens finish syntax owner packageName) =
-  (H.unpack file,map tokenView tokens,tokenView finish,profile syntax,H.unpack owner,H.unpack packageName)
+stateView (Parsec.ParseState file tokens finish syntax owner packageName endpoint) =
+  (H.unpack file,map tokenView tokens,tokenView finish,profile syntax,H.unpack owner,H.unpack packageName,
+   map tokenView (take 1 endpoint))
   where
     profile T.LegacyEmlfV1 = (0 :: Int)
     profile T.SharedHaskellV1 = 1
@@ -40,15 +41,86 @@ tokensFor = snd . mapAccumL token 5
       let end = column + fromIntegral (length spelling)
       in (end+1, Lexer.Token (H.literal spelling) 3 column 3 end)
 
-stateFor syntax spellings = Parsec.ParseState "Operators.hs" (tokensFor spellings)
+stateFor syntax spellings = Parsec.initialParseState "Operators.hs" (tokensFor spellings)
   (Lexer.Token "<end>" 9 7 9 7) syntax "Operators" "span-package"
 
--- Keep the previous span implementation as the differential oracle. Comparing
--- the complete result checks error selection and consumption as well as ASTs.
-oldPrefix = Parser.locatedReference
-  (Parsec.pBefore Parser.operatorReference (Parsec.pLook (Parsec.pToken ")")))
+-- Reconstruct spans from the consumed prefix as the original parser did.
+-- This oracle uses only the token streams, independently of the endpoint cursor.
+oldSpan parser = Parsec.Parser $ \state@(Parsec.ParseState file tokens _ _ owner packageName _) ->
+  case Parsec.pRun parser state of
+    Parsec.PFailure message end consumed -> Parsec.PFailure message end consumed
+    Parsec.PSuccess value end@(Parsec.ParseState _ rest _ _ _ _ _) consumed ->
+      let first = Parsec.stateToken state
+          count = length tokens - length rest
+          final = if count == 0 then first else last (take count tokens)
+          location = T.SourceSpan packageName owner file (Lexer.tokenLine first) (Lexer.tokenColumn first)
+                       (Lexer.tokenEndLine final) (Lexer.tokenEndColumn final)
+      in Parsec.PSuccess (location,value) end consumed
+
+spanChecks :: IO ()
+spanChecks = do
+  let unit = fmap (const ())
+      token value = unit (Parsec.pToken value)
+      prefix = unit (Parsec.pSymbolPrefix ".")
+      cases spanOf =
+        [ ("empty span at EOF", [], pure ())
+        , ("empty span before another token", ["a"], pure ())
+        , ("lookahead", ["a","b"], Parsec.pLook (token "a" >> token "b"))
+        , ("negative lookahead after a token", ["a","b"], token "a" >> Parsec.pNot (token "c"))
+        , ("partial symbol", [".+"], prefix)
+        , ("partial symbol after a whole token", ["a",".+"], token "a" >> prefix)
+        , ("repeated partial symbols", ["..+"], prefix >> prefix)
+        , ("completing a split token", ["..+"], prefix >> prefix >> token "+")
+        , ("whole symbol prefix", ["a","."], token "a" >> prefix)
+        , ("inner empty span preserves outer endpoint", ["a","b"], token "a" >> unit (spanOf (pure ())))
+        , ("inner prefix preserves outer endpoint", ["a",".+"], token "a" >> unit (spanOf prefix))
+        , ("inner lookahead preserves outer endpoint", ["a","b"], token "a" >> unit (spanOf (Parsec.pLook (token "b"))))
+        , ("source module changes inside span", ["a"], Parsec.pSetSourceModule "New" >> token "a")
+        , ("recover after consuming failure", ["a","b"], Parsec.pChoice (Parsec.pTry (token "a" >> token "z")) (token "a"))
+        , ("failed inner prefix restores outer cursor", ["a",".+"], token "a" >> unit (spanOf (prefix >> Parsec.pFail "fail")))
+        , ("consuming failure state", ["a","b"], token "a" >> token "z")
+        , ("tried failure state", ["a","b"], Parsec.pTry (token "a" >> token "z"))
+        , ("quick nested equation at delimiter", ["f","(","x","(","y",")",")",";"], unit (Parser.equationExpressionWith True))
+        , ("quick nested equation at EOF", ["f","(","x","(","y",")",")"], unit (Parser.equationExpressionWith True))
+        , ("quick variable pattern", ["x","tail"], unit Parser.sharedPatternAtom)
+        ]
+      same (Parsec.PSuccess (a,()) end used) (Parsec.PSuccess (b,()) other usedOther) =
+        Equality.eqSourceSpan a b && stateView end == stateView other && used == usedOther
+      same (Parsec.PFailure a end used) (Parsec.PFailure b other usedOther) =
+        H.unpack a == H.unpack b && stateView end == stateView other && used == usedOther
+      same _ _ = False
+      compareSpan label state expected actual =
+        check label (same (Parsec.pRun (oldSpan expected) state) (Parsec.pRun (Parsec.pWithSpan actual) state))
+  forM_ (zip (cases oldSpan) (cases Parsec.pWithSpan)) $ \((label,names,expected),(_,_,actual)) ->
+    compareSpan label (stateFor T.SharedHaskellV1 names) expected actual
+  -- Layout can insert several zero-width tokens at identical coordinates.
+  let virtual name = Lexer.Token name 2 3 2 3
+      initial tokens = Parsec.initialParseState "Layout.hs" tokens (virtual "") T.SharedHaskellV1 "Layout" "pkg"
+      layout = initial [virtual ";",virtual "}",Lexer.Token "a" 2 3 2 4]
+  compareSpan "virtual tokens at the same location" layout (token ";" >> token "}") (token ";" >> token "}")
+  let signature = initial [Lexer.Token "source" 3 5 3 11, Lexer.Token "::" 3 12 3 14,
+                    Lexer.Token "HasCallStack" 4 7 4 19, Lexer.Token "=>" 4 20 4 22,
+                    Lexer.Token "Int" 5 10 5 13, virtual ";"]
+  case Parsec.pRun Parser.expr signature of
+    Parsec.PSuccess (T.SCallSite label location (T.SAnn _ _)) _ True ->
+      check "managed expression signature covers the expression and the full type"
+        (H.unpack label == "an expression type signature" &&
+         Equality.eqSourceSpan location (T.SourceSpan "pkg" "Layout" "Layout.hs" 3 5 5 13))
+    _ -> fail "managed expression signature span"
+  case Parsec.pRun Parser.sharedStatement (stateFor T.SharedHaskellV1 ["x","<-","f",";"]) of
+    Parsec.PSuccess (Parser.SharedBind _ _ location) _ True ->
+      check "do binding span ends at the action before the delimiter"
+        (Equality.eqSourceSpan location (T.SourceSpan "span-package" "Operators" "Operators.hs" 3 5 3 11))
+    _ -> fail "do binding span"
+  -- Reading the end of a short span must leave all later input lazy.
+  case Parsec.pRun (Parsec.pWithSpan (token "x")) (initial (Lexer.Token "x" 2 3 2 4 : error "span forced suffix")) of
+    Parsec.PSuccess (T.SourceSpan _ _ _ _ _ 2 4,()) _ True -> pure ()
+    _ -> fail "span endpoint of one complete token"
+
+oldPrefix = Parsec.pBind
+  (oldSpan (Parsec.pBefore Parser.operatorReference (Parsec.pLook (Parsec.pToken ")")))) Parser.referenceAt
 oldInfix choices = Parsec.pTry $ do
-  (location, operator) <- Parsec.pWithSpan Parser.operatorReference
+  (location, operator) <- oldSpan Parser.operatorReference
   let leaf = Parser.referenceLeaf operator
   if Std.elem Prim.eqString leaf choices
     then Parsec.pPure (\a b -> T.SApp
@@ -83,7 +155,7 @@ operatorChecks = do
         (T.SourceSpan "span-package" "Operators" "Operators.hs" 3 5 3 14)
         (T.SVar "M.N.++")
   case Parsec.pRun Parser.parenthesizedOperatorReference state of
-    Parsec.PSuccess tree (Parsec.ParseState _ rest _ _ _ _) True -> do
+    Parsec.PSuccess tree (Parsec.ParseState _ rest _ _ _ _ _) True -> do
       check "qualified prefix has exact package/module/file and token endpoints"
         (Equality.eqSExpr expected tree)
       check "prefix leaves closing delimiter and continuation untouched"
@@ -156,4 +228,4 @@ rowChecks = do
       (sameFresh (runRow oldNormalizeRow values patterns) (runRow Surface.normalizeRow values patterns))
 
 run :: IO ()
-run = operatorChecks >> moduleChecks >> rowChecks
+run = spanChecks >> operatorChecks >> moduleChecks >> rowChecks

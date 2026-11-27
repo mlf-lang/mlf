@@ -2336,12 +2336,12 @@ module MLF.Tests.SharedFrontend where {
     conjunction = Parsing.pChainr level4 (at ["&&"]);
     disjunction = Parsing.pChainr conjunction (at ["||"]);
     reference = Parsing.pChainl disjunction (at [">>=",">>"]);
-    remaining = \(Parsing.ParseState _ tokens _ _ _ _) -> map Lexer.tokenText tokens;
+    remaining = \(Parsing.ParseState _ tokens _ _ _ _ _) -> map Lexer.tokenText tokens;
     sameState = \a b -> Parsing.stateOffset a == Parsing.stateOffset b && eqList eqString (remaining a) (remaining b);
     agrees = \spellings -> let {
       tokens = zipWith (\index word -> Lexer.Token word 3 (index * 5) 3 (index * 5 + stringLength word))
         (range 1 (length spellings)) spellings;
-      start = Parsing.ParseState "Prec.hs" tokens (Lexer.Token "" 4 1 4 1) SharedHaskellV1 "Prec" "pkg"
+      start = Parsing.initialParseState "Prec.hs" tokens (Lexer.Token "" 4 1 4 1) SharedHaskellV1 "Prec" "pkg"
     } in case (,) (Parsing.pRun reference start) (Parsing.pRun P.sharedBindExpr start) of {
       (,) (Parsing.PSuccess a end used) (Parsing.PSuccess b next more) -> used == more && sameState end next && SourceEquality.eqSExpr a b;
       (,) (Parsing.PFailure a end used) (Parsing.PFailure b next more) -> used == more && sameState end next && eqString a b;
@@ -2357,13 +2357,13 @@ module MLF.Tests.SharedFrontend where {
   applicationParserChecks :: IO ();
   applicationParserChecks = let {
     reference = Parsing.pBind P.atom (\first -> Parsing.pMap (foldl SApp first) (Parsing.pMany P.atom));
-    remaining = \(Parsing.ParseState _ tokens _ _ _ _) -> map Lexer.tokenText tokens;
+    remaining = \(Parsing.ParseState _ tokens _ _ _ _ _) -> map Lexer.tokenText tokens;
     sameState = \a b -> Parsing.stateOffset a == Parsing.stateOffset b &&
       eqList eqString (remaining a) (remaining b);
     agrees expected actual syntax spellings = let {
       tokens = zipWith (\col spelling -> Lexer.Token spelling 3 col 3 (col + stringLength spelling))
         (range 1 (length spellings)) spellings;
-      state = Parsing.ParseState "App.hs" tokens (Lexer.Token "" 4 1 4 1) syntax "App" "pkg"
+      state = Parsing.initialParseState "App.hs" tokens (Lexer.Token "" 4 1 4 1) syntax "App" "pkg"
     } in case (,) (Parsing.pRun expected state) (Parsing.pRun actual state) of {
       (,) (Parsing.PSuccess a end used) (Parsing.PSuccess b next more) ->
         used == more && sameState end next && SourceEquality.eqSExpr a b;

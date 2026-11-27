@@ -179,20 +179,46 @@ module Bootstrap.LLVM.Analysis where {
       (\f -> WorkerFunction (parameters f) (functionBody f) (S.toList captured)
         (strict f) (entrySummary f)) name table
   } in M.foldlWithKeyStrict publish fs (propagate M.empty (M.keys fs));
+  -- A dependency is recorded when a saturated call reads its callee's
+  -- summary. Later rounds can expose further calls in arguments and let
+  -- bindings; add those edges before scheduling the next round.
   demandFixed :: Map XName WorkerFunction -> Map XName WorkerFunction;
-  demandFixed fs =
-    let {
-      next = M.map (\f -> let { demand = workerDemand fs f } in
-        WorkerFunction (parameters f) (functionBody f) (captures f)
-          (S.fromList O.compareName (demandNames demand)) demand) fs
-    } in
-    if M.eqMap O.eqName (\a b -> sameDemand (entrySummary a) (entrySummary b)) fs next
-    then fs
-    else demandFixed next;
+  demandFixed fs = let {
+    observe previous old = let {
+      observation = entryDemandUsing previous M.empty (functionBody old);
+      demand = restrictWorkerDemand old (observedValue observation);
+      fresh = WorkerFunction (parameters old) (functionBody old) (captures old)
+        (S.fromList O.compareName (demandNames demand)) demand;
+      different = L.not (sameDemand (entrySummary old) demand);
+      -- Parameter hints never escape a call, but captured names can be
+      -- forwarded verbatim even when the numeric prefix stays the same.
+      forwardsCapture = L.not (L.null (demandNames demand)) && L.not (L.null (captures old))
+    } in (,,,) fresh (observedCalls observation) different (different || forwardsCapture);
+    propagate previous callers observations publish = let {
+      record ((,,) index changed touched) name ((,,,) _ callees different notify) = let {
+        addCaller tree callee = M.insertWith O.compareName (S.union O.compareName) callee (S.singleton name) tree;
+        nextIndex = L.foldlStrict addCaller index (S.toList callees);
+        affected = if notify then (:) name touched else touched;
+        advanced = different || changed
+      } in seq nextIndex (seq advanced (seq affected ((,,) nextIndex advanced affected)));
+      next = publish (M.map (\((,,,) fresh _ _ _) -> fresh) observations)
+    } in case M.foldlWithKeyStrict record ((,,) callers False []) observations of {
+      (,,) index changed touched -> if changed then let {
+        dirty = L.foldlStrict
+          (\names callee -> S.union O.compareName names (M.findWithDefault O.compareName S.empty callee index))
+          S.empty touched;
+        pending = M.fromDistinctAscList (L.map
+          (\name -> (,) name (observe next (M.get O.compareName name next))) (S.toList dirty))
+      } in if S.null dirty then next else
+        propagate next index pending (\updates -> M.union O.compareName updates next)
+      else previous
+    }
+  } in propagate fs M.empty (M.map (observe fs) fs) (\updates -> updates);
   workerDemand :: Map XName WorkerFunction -> WorkerFunction -> EntryDemand;
-  workerDemand fs f = let {
-    allowed = S.fromList O.compareName (L.append (parameters f) (captures f));
-    demand = entryDemand fs M.empty (functionBody f)
+  workerDemand fs f = restrictWorkerDemand f (entryDemand fs M.empty (functionBody f));
+  restrictWorkerDemand :: WorkerFunction -> EntryDemand -> EntryDemand;
+  restrictWorkerDemand f demand = let {
+    allowed = S.fromList O.compareName (L.append (parameters f) (captures f))
   } in indexedDemand
        (nameSequence (L.filter (\name -> S.member O.compareName name allowed) (demandNames demand)))
        (demandComplete demand);
@@ -309,84 +335,125 @@ module Bootstrap.LLVM.Analysis where {
       appendDemand (EntryDemand before True) (appendDemand rhs (EntryDemand after (demandComplete demand)));
     _ -> demand
   };
+  -- The ordinary analysis returns an ordered prefix. Fixed-point analysis
+  -- also records the worker summaries consulted to produce it. Both use
+  -- the same evaluator, including its barrier and lexical sharing rules.
+  class DemandOperations d where {
+    plainEntry :: [] XName -> Bool -> d;
+    shareEntry :: d -> d;
+    barrierEntry :: d -> d;
+    appendEntry :: d -> d -> d;
+    calledEntry :: XName -> d -> d
+  };
+  instance DemandOperations EntryDemand where {
+    plainEntry = EntryDemand;
+    shareEntry = sharedDemand;
+    barrierEntry = barrierAfter;
+    appendEntry = appendDemand;
+    calledEntry _ demand = demand
+  };
+  data ObservedDemand = ObservedDemand EntryDemand (Set XName);
+  observedValue (ObservedDemand value _) = value;
+  observedCalls (ObservedDemand _ calls) = calls;
+  instance DemandOperations ObservedDemand where {
+    plainEntry names complete = ObservedDemand (EntryDemand names complete) S.empty;
+    shareEntry value = ObservedDemand (sharedDemand (observedValue value)) (observedCalls value);
+    barrierEntry value = ObservedDemand (barrierAfter (observedValue value)) (observedCalls value);
+    appendEntry first next = let { demand = observedValue first } in
+      if demandComplete demand then ObservedDemand (appendDemand demand (observedValue next))
+        (S.union O.compareName (observedCalls first) (observedCalls next)) else first;
+    calledEntry name value = ObservedDemand (observedValue value) (S.insert O.compareName name (observedCalls value))
+  };
   entryDemand :: Map XName WorkerFunction -> Map XName EntryDemand -> XErased -> EntryDemand;
-  entryDemand fs local expression = case expression of {
+  entryDemand = entryDemandUsing;
+  entryDemandUsing :: forall d. DemandOperations d => Map XName WorkerFunction -> Map XName d -> XErased -> d;
+  entryDemandUsing fs local expression = case expression of {
     XEVar name ->
-      if M.member O.compareName name fs then EntryDemand [] True
+      if M.member O.compareName name fs then plainEntry [] True
       else case M.lookup O.compareName name local of {
         Just demand -> demand;
-        Nothing -> EntryDemand ((:) name []) True
+        Nothing -> plainEntry ((:) name []) True
       };
-    XEInt _ -> EntryDemand [] True;
-    XEDouble _ -> EntryDemand [] True;
-    XEBool _ -> EntryDemand [] True;
-    XEString _ -> EntryDemand [] True;
-    XEPrimitive _ -> EntryDemand [] True;
-    XEConstructor _ -> EntryDemand [] True;
-    XEAbs _ _ -> EntryDemand [] True;
+    XEInt _ -> plainEntry [] True;
+    XEDouble _ -> plainEntry [] True;
+    XEBool _ -> plainEntry [] True;
+    XEString _ -> plainEntry [] True;
+    XEPrimitive _ -> plainEntry [] True;
+    XEConstructor _ -> plainEntry [] True;
+    XEAbs _ _ -> plainEntry [] True;
     XELet name rhs body ->
       -- Lazy shared summaries preserve aliases without reanalyzing a closed
       -- RHS at each use or visiting an unused binding.
-      entryDemand fs (M.insert O.compareName name (sharedDemand (entryDemand fs local rhs)) local) body;
+      entryDemandUsing fs (M.insert O.compareName name (shareEntry (entryDemandUsing fs local rhs)) local) body;
     XELetRec bindings body ->
-      entryDemand fs
+      entryDemandUsing fs
         (L.foldr (\binding rest -> case binding of {
-          (,) name rhs -> M.insert O.compareName name (EntryDemand [] False) rest
+          (,) name rhs -> M.insert O.compareName name (plainEntry [] False) rest
         }) local bindings) body;
     XECase subject ((:) (XErasedAlternative (XDefaultPattern optional) body) []) ->
       case optional of {
-        Nothing -> entryDemand fs local body;
-        Just name -> entryDemand fs
-          (M.insert O.compareName name (sharedDemand (entryDemand fs local subject)) local) body
+        Nothing -> entryDemandUsing fs local body;
+        Just name -> entryDemandUsing fs
+          (M.insert O.compareName name (shareEntry (entryDemandUsing fs local subject)) local) body
       };
-    XECase subject alternatives -> barrierAfter (entryDemand fs local subject);
-    XEApp _ _ -> entryApplication fs local expression;
-    _ -> EntryDemand [] False
+    XECase subject alternatives -> barrierEntry (entryDemandUsing fs local subject);
+    XEApp _ _ -> entryApplicationUsing fs local expression;
+    _ -> plainEntry [] False
   };
   entryArguments :: Map XName WorkerFunction -> Map XName EntryDemand -> [] XErased -> EntryDemand;
-  entryArguments fs local arguments = case arguments of {
-    [] -> EntryDemand [] True;
-    (:) first rest -> appendDemand (entryDemand fs local first) (entryArguments fs local rest)
+  entryArguments = entryArgumentsUsing;
+  entryArgumentsUsing :: forall d. DemandOperations d => Map XName WorkerFunction -> Map XName d -> [] XErased -> d;
+  entryArgumentsUsing fs local arguments = case arguments of {
+    [] -> plainEntry [] True;
+    (:) first rest -> appendEntry (entryDemandUsing fs local first) (entryArgumentsUsing fs local rest)
   };
   entryWorkerArgument :: Map XName WorkerFunction -> Map XName EntryDemand ->
                          WorkerFunction -> [] XErased -> XName -> EntryDemand;
-  entryWorkerArgument fs local function arguments selected =
+  entryWorkerArgument = entryWorkerArgumentUsing;
+  entryWorkerArgumentUsing :: forall d. DemandOperations d => Map XName WorkerFunction -> Map XName d ->
+                         WorkerFunction -> [] XErased -> XName -> d;
+  entryWorkerArgumentUsing fs local function arguments selected =
     case L.find (\binding -> O.eqName selected (L.fst binding))
            (L.zip (parameters function) arguments) of {
-      Just ((,) name argument) -> entryDemand fs local argument;
+      Just ((,) name argument) -> entryDemandUsing fs local argument;
       Nothing ->
         if L.elem O.eqName selected (captures function)
-        then entryDemand fs local (XEVar selected)
-        else EntryDemand [] False
+        then entryDemandUsing fs local (XEVar selected)
+        else plainEntry [] False
     };
   entryWorkerArguments :: Map XName WorkerFunction -> Map XName EntryDemand ->
                           WorkerFunction -> [] XErased -> [] XName -> EntryDemand;
-  entryWorkerArguments fs local function arguments names = case names of {
-    [] -> EntryDemand [] (demandComplete (entrySummary function));
-    (:) first rest -> appendDemand
-      (entryWorkerArgument fs local function arguments first)
-      (entryWorkerArguments fs local function arguments rest)
+  entryWorkerArguments = entryWorkerArgumentsUsing;
+  entryWorkerArgumentsUsing :: forall d. DemandOperations d => Map XName WorkerFunction -> Map XName d ->
+                          WorkerFunction -> [] XErased -> [] XName -> d;
+  entryWorkerArgumentsUsing fs local function arguments names = case names of {
+    [] -> plainEntry [] (demandComplete (entrySummary function));
+    (:) first rest -> appendEntry
+      (entryWorkerArgumentUsing fs local function arguments first)
+      (entryWorkerArgumentsUsing fs local function arguments rest)
   };
   entryApplication :: Map XName WorkerFunction -> Map XName EntryDemand -> XErased -> EntryDemand;
-  entryApplication fs local expression = case O.applications expression of {
+  entryApplication = entryApplicationUsing;
+  entryApplicationUsing :: forall d. DemandOperations d => Map XName WorkerFunction -> Map XName d -> XErased -> d;
+  entryApplicationUsing fs local expression = case O.applications expression of {
     (,) (XEPrimitive PIfThenElse) ((:) condition ((:) yes ((:) no []))) ->
-      barrierAfter (entryDemand fs local condition);
+      barrierEntry (entryDemandUsing fs local condition);
     (,) (XEPrimitive PSeq) ((:) first ((:) rest [])) ->
-      appendDemand (entryDemand fs local first) (entryDemand fs local rest);
+      appendEntry (entryDemandUsing fs local first) (entryDemandUsing fs local rest);
     (,) (XEPrimitive p) arguments ->
-      if L.length arguments < P.primitiveArity p then EntryDemand [] True
-      else if L.length arguments /= P.primitiveArity p then EntryDemand [] False
-      else if L.not (P.primitiveStrict p) then EntryDemand [] False
-      else let { demand = entryArguments fs local arguments } in
-        if entryTotalPrimitive p then demand else barrierAfter demand;
-    (,) (XEConstructor name) arguments -> EntryDemand [] True;
+      if L.length arguments < P.primitiveArity p then plainEntry [] True
+      else if L.length arguments /= P.primitiveArity p then plainEntry [] False
+      else if L.not (P.primitiveStrict p) then plainEntry [] False
+      else let { demand = entryArgumentsUsing fs local arguments } in
+        if entryTotalPrimitive p then demand else barrierEntry demand;
+    (,) (XEConstructor name) arguments -> plainEntry [] True;
     (,) (XEVar name) arguments -> case M.lookup O.compareName name fs of {
       Just function ->
-        if L.length arguments < L.length (parameters function) then EntryDemand [] True
-        else if L.length arguments /= L.length (parameters function) then EntryDemand [] False
-        else entryWorkerArguments fs local function arguments (entryOrder function);
-      Nothing -> barrierAfter (entryDemand fs local (XEVar name))
+        if L.length arguments < L.length (parameters function) then plainEntry [] True
+        else if L.length arguments /= L.length (parameters function) then plainEntry [] False
+        else calledEntry name (entryWorkerArgumentsUsing fs local function arguments (entryOrder function));
+      Nothing -> barrierEntry (entryDemandUsing fs local (XEVar name))
     };
-    (,) function arguments -> barrierAfter (entryDemand fs local function)
+    (,) function arguments -> barrierEntry (entryDemandUsing fs local function)
   }
 }

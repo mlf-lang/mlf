@@ -30,6 +30,8 @@ GROUPS = {
         'demand-right': [1024, 4096],
         'demand-alias': [64, 256],
         'capture-chain': [128, 512],
+        'worker-demand-chain': [64, 256, 1024],
+        'worker-demand-independent': [64, 256, 1024],
         'let-summary': [1024, 4096],
     }),
     'inference': ('Inference.hs', {
@@ -78,6 +80,9 @@ def independent_result(family, size):
                 'checksum': sum(i * ord(c) for i, c in enumerate(text, 1)) % 1000000007}
     if family in ('demand-left', 'demand-right', 'demand-balanced'):
         return {'count': size, 'checksum': size * (size + 1) * (2 * size + 1) // 6,
+                'complete': True}
+    if family in ('worker-demand-chain', 'worker-demand-independent'):
+        return {'count': size, 'checksum': -(size * (size + 1) * (2 * size + 1) // 6),
                 'complete': True}
     if family == 'demand-alias':
         return {'count': 2, 'checksum': 5, 'complete': True}

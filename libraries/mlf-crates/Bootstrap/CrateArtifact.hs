@@ -1915,6 +1915,11 @@ module Bootstrap.CrateArtifact where {
     _ -> Left "malformed binary crate object roots"
   };
   data PublishedMetadata = PublishedMetadata ByteArray (Either String CrateInterface);
+  -- A plan's sequential jobs may import the same installed Prelude. Keep one
+  -- immutable read and its own admission; paths remain replaceable between jobs.
+  data PlanPrelude = PlanPrelude (STArray IOWorld (Maybe ((,) String PublishedMetadata)));
+  newPlanPrelude :: IO PlanPrelude;
+  newPlanPrelude = do { slot <- stToIO (newSTArray 1 Nothing); ioReturn (PlanPrelude slot) };
   decodeInterfaceBytes bytes = do {
     input <- Storage.decode 3 bytes;
     ioReturn (bindEither input (\decoded -> case decoded of {
@@ -1924,18 +1929,43 @@ module Bootstrap.CrateArtifact where {
   };
   readInterface = readInterfaceProfiled Nothing;
   readInterfaceProfiled profile = readInterfaceRetaining profile M.empty;
-  readInterfaceRetaining profile retained path = Host.phaseIO profile "validate_ms" (do {
+  readInterfaceRetaining profile = readInterfaceWithPrelude profile Nothing;
+  readInterfaceWithPrelude profile prelude retained path = Host.phaseIO profile "validate_ms" (do {
     raw <- Host.phaseIO profile "read_ms" (Storage.readRaw path);
     interface <- case raw of {
       Left message -> ioReturn (Left message);
-      Right bytes -> let { decode = Host.phaseIO profile "decode_ms" (decodeInterfaceBytes bytes) } in
-        case M.lookup compareString path retained of {
+      Right bytes -> do {
+        previous <- case M.lookup compareString path retained of {
+          Just published -> ioReturn (Just published);
+          Nothing -> case prelude of {
+            Nothing -> ioReturn Nothing;
+            Just (PlanPrelude slot) -> do {
+              saved <- stToIO (readSTArray slot 0);
+              ioReturn (case saved of {
+                Just ((,) cached snapshot) -> if eqString cached path then Just snapshot else Nothing;
+                Nothing -> Nothing
+              })
+            }
+          }
+        };
+        let { decode = do {
+          admitted <- Host.phaseIO profile "decode_ms" (decodeInterfaceBytes bytes);
+          case (,) prelude admitted of {
+            (,) (Just (PlanPrelude slot)) (Right iface) -> if eqString (crateId iface) builtinCrateIdentity
+              then stToIO (writeSTArray slot 0 (Just ((,) path (PublishedMetadata bytes admitted))))
+              else ioReturn ();
+            _ -> ioReturn ()
+          };
+          ioReturn admitted
+        } };
+        case previous of {
           Nothing -> decode;
           Just (PublishedMetadata published admitted) -> do {
             exact <- Storage.sameBytes bytes published;
             if exact then ioReturn admitted else decode
           }
         }
+      }
     };
     ioReturn (mapLeft (\error -> path ++ ": " ++ error) interface)
   });
@@ -1953,7 +1983,8 @@ module Bootstrap.CrateArtifact where {
                [] String -> IO (Either String ([] ((,) String CrateInterface)));
   loadGraph = loadGraphProfiled Nothing;
   loadGraphProfiled profile = loadGraphReading profile (readInterfaceProfiled profile);
-  loadGraphRetaining retained = loadGraphReading Nothing (readInterfaceRetaining Nothing retained);
+  loadGraphRetaining = loadGraphWithPrelude Nothing;
+  loadGraphWithPrelude prelude retained = loadGraphReading Nothing (readInterfaceWithPrelude Nothing prelude retained);
   data LoadedInterfaces = LoadedInterfaces (Set String) (Map String CrateInterface)
     ([] ((,) String CrateInterface));
   loadGraphReading profile reader trail done paths = Host.phaseIO profile "validate_ms" (let {

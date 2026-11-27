@@ -95,8 +95,8 @@ module Bootstrap.Parser where {
   -- then retain its token alone, even when they outlive the parser.
   referenceToken :: Parser Token;
   referenceToken = Parser (\state -> case state of {
-    ParseState _ ((:) token _) _ _ _ _ -> PSuccess token state False;
-    ParseState _ [] finish _ _ _ -> PSuccess finish state False
+    ParseState _ ((:) token _) _ _ _ _ _ -> PSuccess token state False;
+    ParseState _ [] finish _ _ _ _ -> PSuccess finish state False
   });
   -- The final identifier consumes one whole token; a successful qualifier
   -- consumes an identifier followed by a dot. Capture those token endpoints
@@ -110,7 +110,7 @@ module Bootstrap.Parser where {
         suffix <- lowerIdentifier;
         pPure ((,) final suffix)
       }));
-    case original of { ParseState file _ _ _ sourceModule sourcePackage ->
+    case original of { ParseState file _ _ _ sourceModule sourcePackage _ ->
       let { final = fst result } in
       referenceAt ((,) (SourceSpan sourcePackage sourceModule file (tokenLine first) (tokenColumn first)
         (tokenEndLine final) (tokenEndColumn final)) (snd result))
@@ -641,29 +641,28 @@ module Bootstrap.Parser where {
   -- choosing a diagnostic. Only source scanned by the module reader has
   -- fully defined token positions. Manual token streams retain that demand.
   equationExpressionWith scanned = Parser (\state -> case state of {
-    ParseState file tokens end SharedHaskellV1 owner packageName -> let {
-      finish body rest = PSuccess body (ParseState file rest end SharedHaskellV1 owner packageName) True;
+    ParseState file tokens end SharedHaskellV1 owner packageName previous -> let {
       appendAtom prior atom = case prior of { Nothing -> atom; Just f -> SApp f atom };
       -- Several nested applications can end at consecutive closing tokens.
       -- Collapse these frames directly, retaining the first following token.
-      close known groups body remaining = case groups of {
+      close known groups body lastSlot remaining = case groups of {
         [] -> Nothing;
         (:) parent outer -> let { next = appendAtom parent body } in seq next (case remaining of {
-          (:) (Token name _ _ _ _) more -> if eqString name ")" then close known outer next more
-            else scan known outer (Just next) remaining;
-          [] -> finishAt outer (Just next) []
+          (:) (Token name _ _ _ _) more -> if eqString name ")" then close known outer next remaining more
+            else scan known outer (Just next) lastSlot remaining;
+          [] -> finishAt outer (Just next) lastSlot []
         })
       };
-      scan known groups current remaining = case remaining of {
-        [] -> finishAt groups current remaining;
+      scan known groups current endpoint remaining = case remaining of {
+        [] -> finishAt groups current endpoint remaining;
         (:) (Token name sl sc el ec) more -> let {
           size = stringLength name;
           code = if size > 0 then stringCodeAt name 0 else (-1);
-          put names atom = let { next = appendAtom current atom } in seq next (scan names groups (Just next) more)
-        } in if size == 1 && code == 40 then scan known ((:) current groups) Nothing more
+          put names atom = let { next = appendAtom current atom } in seq next (scan names groups (Just next) remaining more)
+        } in if size == 1 && code == 40 then scan known ((:) current groups) Nothing remaining more
           else if size == 1 && code == 41 then case current of {
-            Just body -> close known groups body more; Nothing -> Nothing
-          } else if size == 1 && (code == 59 || code == 125) then finishAt groups current remaining
+            Just body -> close known groups body remaining more; Nothing -> Nothing
+          } else if size == 1 && (code == 59 || code == 125) then finishAt groups current endpoint remaining
           else if (code >= 97 && code <= 122) || (scanned && code >= 65 && code <= 90) then let {
             lower = code >= 97;
             -- Variables retain each occurrence's call site. Constructors
@@ -681,31 +680,30 @@ module Bootstrap.Parser where {
             Right number -> put known (SIntLit number); Left _ -> Nothing
           } else Nothing
       };
-      finishAt groups current remaining = case (,) groups current of {
-        (,) [] (Just body) -> Just (finish body remaining);
+      finishAt groups current endpoint remaining = case (,) groups current of {
+        (,) [] (Just body) -> Just (PSuccess body
+          (ParseState file remaining end SharedHaskellV1 owner packageName endpoint) True);
         _ -> Nothing
       }
-    } in case scan M.empty [] Nothing tokens of { Just result -> result; Nothing -> pRun expr state };
+    } in case scan M.empty [] Nothing previous tokens of { Just result -> result; Nothing -> pRun expr state };
     _ -> pRun expr state
   });
   expr :: Parser SExpr;
   expr = do {
-    located <- pWithSpan (do {
-      e <- pBySyntax sharedApplyExpr disjunction;
-      pOption ((,) e False) (do {
-        annotationSymbol;
-        a <- annotation;
-        pPure ((,) (SAnn e a) (annotationHasManagedStack a))
-      })
-    });
-    syntax <- pSourceSyntax;
-    case located of { (,) location ((,) expression managed) ->
-      case syntax of {
+    start <- pState;
+    e <- pBySyntax sharedApplyExpr disjunction;
+    pOption e (do {
+      annotationSymbol;
+      -- Only a signature can retain this range. The required type consumes
+      -- at least one whole token and supplies the expression's final token.
+      located <- pSpanStartingAt start annotation;
+      syntax <- pSourceSyntax;
+      case located of { (,) location a -> let { expression = SAnn e a } in case syntax of {
         MetadataSyntax -> pPure expression;
-        _ -> if managed then pPure (SCallSite "an expression type signature" location expression)
+        _ -> if annotationHasManagedStack a then pPure (SCallSite "an expression type signature" location expression)
              else pPure expression
-      }
-    }
+      } }
+    })
   };
   annotationHasManagedStack :: SAnnotation -> Bool;
   annotationHasManagedStack (SAnnotation _ ty) = typeHasManagedStack ty;
@@ -880,8 +878,8 @@ module Bootstrap.Parser where {
     eqString text "]" || eqString text "}";
   applicationArguments :: SExpr -> ParseState -> Bool -> PResult SExpr;
   applicationArguments function state used = case state of {
-    ParseState _ [] _ _ _ _ -> PSuccess function state used;
-    ParseState _ ((:) token _) _ _ _ _ -> let { text = tokenText token } in
+    ParseState _ [] _ _ _ _ _ -> PSuccess function state used;
+    ParseState _ ((:) token _) _ _ _ _ _ -> let { text = tokenText token } in
       if closesExpression text
       then PSuccess function state used else case pRun atom state of {
         PFailure message end True -> PFailure message end True;
@@ -1042,9 +1040,9 @@ module Bootstrap.Parser where {
   sharedPatternAtom = Parser (\state -> let {
     ordinary = pRun generalSharedPatternAtom state
   } in case state of {
-    ParseState file ((:) (Token name _ _ _ _) rest) end SharedHaskellV1 owner pkg -> let {
+    ParseState file tokens@((:) (Token name _ _ _ _) rest) end SharedHaskellV1 owner pkg _ -> let {
       accept variable = PSuccess (SDefaultPattern variable)
-        (ParseState file rest end SharedHaskellV1 owner pkg) True;
+        (ParseState file rest end SharedHaskellV1 owner pkg tokens) True;
       first = if stringLength name == 0 then 0 else stringCodeAt name 0;
       asPattern = case rest of {
         (:) (Token next _ _ _ _) _ -> eqString next "@";
@@ -1156,7 +1154,7 @@ module Bootstrap.Parser where {
   -- An ordinary lower-case identifier can only succeed as a reference.
   -- Keep the full alternative ordering for reserved words and failed parses.
   sharedAtom = Parser (\state -> case state of {
-    ParseState file ((:) (Token text sl sc el ec) _) _ syntax sourceModule sourcePackage -> let {
+    ParseState file ((:) (Token text sl sc el ec) _) _ syntax sourceModule sourcePackage _ -> let {
       first = stringCodeAt text 0
     } in if stringLength text > 0 && first >= 97 && first <= 122
       then case pRun lowerIdentifier state of {
@@ -1179,7 +1177,7 @@ module Bootstrap.Parser where {
   groupedExpression = pBind (collectionItems ")" expr)
     (sourceTupleValue (SConstructor "()") (\name fields -> foldl SApp (SConstructor name) fields));
   parenthesizedAtom = Parser (\state -> case state of {
-    ParseState _ ((:) token _) _ _ _ _ -> let { text = tokenText token; first = stringCodeAt text 0 } in
+    ParseState _ ((:) token _) _ _ _ _ _ -> let { text = tokenText token; first = stringCodeAt text 0 } in
       if stringLength text > 0 && ((first >= 97 && first <= 122) || (first >= 48 && first <= 57) ||
         first == 40 || first == 41) then pRun groupedExpression state else pRun parenthesizedAtomChoices state;
     _ -> pRun parenthesizedAtomChoices state
@@ -1989,7 +1987,7 @@ module Bootstrap.Parser where {
         name <- operatorName;
         pPure ((,) final name)
       });
-    case original of { ParseState file _ _ _ sourceModule sourcePackage ->
+    case original of { ParseState file _ _ _ sourceModule sourcePackage _ ->
       let { final = fst located } in
       pPure ((,) (SourceSpan sourcePackage sourceModule file (tokenLine first) (tokenColumn first)
         (tokenEndLine final) (tokenEndColumn final)) (snd located))
@@ -2027,8 +2025,8 @@ module Bootstrap.Parser where {
   sharedApplyExpr = pChainr sharedBindExpr (sharedOperatorParser ["$"]);
   sharedBindExpr :: Parser SExpr;
   sharedBindExpr = pBind operand (\first -> Parser (\state -> case state of {
-    ParseState _ [] _ _ _ _ -> PSuccess first state False;
-    ParseState _ ((:) token _) _ _ _ _ -> if closesExpression (tokenText token)
+    ParseState _ [] _ _ _ _ _ -> PSuccess first state False;
+    ParseState _ ((:) token _) _ _ _ _ _ -> if closesExpression (tokenText token)
       then PSuccess first state False else pRun (sharedAfterOperand first) state
   }));
   -- The first operand is already parsed. Resume at the tightest level when

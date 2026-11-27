@@ -1,15 +1,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 module OptimizationMetadata (run) where
 
-import Control.Exception (bracket)
+import Control.Exception (bracket, catch)
 import Control.Monad (forM_, unless)
 import Data.List (intercalate)
 import System.Directory (canonicalizePath, createDirectory, doesFileExist, getTemporaryDirectory,
                          removeDirectoryRecursive, removeFile)
 import System.IO (hClose, openBinaryTempFile)
+import qualified Bootstrap.BuiltinPreludeLiteral as Literal
 import qualified Bootstrap.CrateArtifact as Artifact
+import qualified Bootstrap.CrateSession as Session
+import qualified Bootstrap.Separate as Separate
 import qualified Bootstrap.Map as M
 import qualified Bootstrap.Types as T
+import qualified MLF.BuiltinPreludeData as Builtin
 import qualified MLF.Host.Base as H
 import qualified MLF.Primitive as P
 
@@ -55,6 +59,7 @@ run = bracket temporary cleanup $ \path -> do
   actual <- readRetained
   need "retained metadata skipped a fresh failing file read" (observe expected == observe actual)
   graphChecks (path ++ ".graph")
+  planPreludeChecks (path ++ ".plan")
   where
     temporary = do
       directory <- getTemporaryDirectory
@@ -97,3 +102,58 @@ graphChecks scratch = bracket (createDirectory scratch >> canonicalizePath scrat
   duplicate <- load done ["left"]
   need "different metadata paths were accepted for a completed crate identity"
     (duplicate == Left "duplicate crate identity from different metadata paths: seed")
+
+-- Compile independent targets against the actual binary Prelude in a single
+-- plan. The sentinel makes a second decode distinguishable from snapshot reuse.
+planPreludeChecks :: FilePath -> IO ()
+planPreludeChecks scratch = bracket (createDirectory scratch >> canonicalizePath scratch) removeDirectoryRecursive $ \dir -> do
+  let path name = H.literal (dir ++ "/" ++ name)
+      file = path "builtin.mlfci"
+      source = path "Fixture.emlf"
+      save bytes = P.writeByteFileOrError file bytes >>= \err -> need "failed to write test Prelude" (H.unpack err == "")
+      succeed action = action >>= \r -> case r of
+        T.Left msg -> fail (H.unpack msg)
+        T.Right v -> pure v
+  bytes <- succeed (Literal.openCompilerImage Builtin.interfaceOctets)
+  save bytes
+  writeFile (H.unpack source) "module Fixture where\nvalue = 42\n"
+  compiler <- Session.compilerImageDigest
+  prelude@(Artifact.PlanPrelude slot) <- Artifact.newPlanPrelude
+  let compileWith memory name = do
+        let spec = path (name ++ ".spec")
+            body = Separate.pack ["MLF-CRATE-1",H.literal name,"","true",
+                    Separate.pack [Separate.pack ["Fixture",source]],Separate.pack [file],
+                    path (name ++ ".cache"),path "builtin"]
+        P.writeFile spec body
+        Session.compileSpecFileRetainedInPlan (Session.PlanInputs compiler M.empty memory)
+          False (\_ -> fail "explicit Prelude unexpectedly required installation") spec (path name)
+      compile = compileWith prelude
+      failure action = action >>= \r -> case r of
+        T.Left msg -> pure (H.unpack msg)
+        T.Right _ -> fail "expected dependency admission to fail"
+  _ <- succeed (compile "first")
+  _ <- succeed (compile "second")
+  snapshot <- P.stToIO (P.readSTArray slot 0)
+  case snapshot of
+    T.Just (cached, Artifact.PublishedMetadata observed (T.Right iface)) -> do
+      equal <- P.byteArrayEqual bytes observed
+      need "plan did not capture the bytes of the admitted Prelude"
+        (equal && H.unpack cached == H.unpack file && H.unpack (Artifact.crateId iface) == H.unpack Artifact.builtinCrateIdentity)
+      P.stToIO (P.writeSTArray slot 0 (T.Just (cached, Artifact.PublishedMetadata observed (T.Left "retained plan Prelude"))))
+    _ -> fail "plan did not retain its first builtin admission"
+  let sentinel = H.unpack file ++ ": retained plan Prelude"
+  failure (compile "unchanged") >>= need "plan decoded the unchanged Prelude again" . (== sentinel)
+  altered <- succeed (Literal.openCompilerImage Builtin.interfaceOctets)
+  first <- P.readByteArray altered 0
+  P.writeByteArray altered 0 (if first == 0 then 1 else 0)
+  save altered
+  ordinary <- failure (Artifact.readInterface file)
+  failure (compile "modified") >>= need "plan reused a same-length modified Prelude" . (== ordinary)
+  save bytes
+  failure (compile "restored") >>= need "plan did not recognize the restored bytes" . (== sentinel)
+  removeFile (H.unpack file)
+  fresh <- Artifact.newPlanPrelude
+  let missing action = catch (failure action) (\(H.HostError message) -> pure message)
+  expected <- missing (compileWith fresh "missing-fresh")
+  actual <- missing (compile "missing")
+  need "plan changed the ordinary missing-file diagnostic" (actual == expected)

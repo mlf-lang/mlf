@@ -59,7 +59,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   compiledObject (CompiledCrate object _ _) = object;
   compiledInterfaces (CompiledCrate _ interfaces _) = interfaces;
   compiledMetadata (CompiledCrate _ _ metadata) = metadata;
-  data PlanInputs = PlanInputs String (Map String Artifact.PublishedMetadata);
+  data PlanInputs = PlanInputs String (Map String Artifact.PublishedMetadata) Artifact.PlanPrelude;
   compilerImageDigest = ioBind getExecutablePath fileDigest;
 
   compilePreparedWithEncoding :: forall a. Bool -> Bool ->
@@ -256,7 +256,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   compileGraphLocked planInputs verify spec interfaces prepared plan prefix directory = do {
     compiler <- case planInputs of {
       Nothing -> compilerImageDigest;
-      Just (PlanInputs image _) -> ioReturn image
+      Just (PlanInputs image _ _) -> ioReturn image
     };
     let { imported = map (\((,) _ iface) -> Separate.UnitInterface (Artifact.crateId iface)
           [] [] [] [] [] (Artifact.crateBindings iface) "metadata") interfaces;
@@ -450,7 +450,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   compileSpecFileRetainedFor planInputs verifyAll install file prefix = let {
     load = case planInputs of {
       Nothing -> Artifact.loadGraph;
-      Just (PlanInputs _ retained) -> Artifact.loadGraphRetaining retained
+      Just (PlanInputs _ retained prelude) -> Artifact.loadGraphWithPrelude (Just prelude) retained
     }
   } in do {
       present <- fileExists file;

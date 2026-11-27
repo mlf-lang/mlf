@@ -140,8 +140,10 @@ module MLF.Entry.Emlf where {
         Left message -> fatal message;
         Right entries -> do {
           compiler <- CrateSession.compilerImageDigest;
-          (,) retained headers <- compilePlanDependencies compiler SourceMap.empty SourceMap.empty entries;
-          compileCrateLLVMRetaining (Just (CrateSession.PlanInputs compiler headers)) retained False file prefix report
+          prelude <- CrateArtifact.newPlanPrelude;
+          (,) retained inputs <- compilePlanDependencies (CrateSession.PlanInputs compiler SourceMap.empty prelude)
+            SourceMap.empty entries;
+          compileCrateLLVMRetaining (Just inputs) retained False file prefix report
         }
       }
     }
@@ -169,10 +171,10 @@ module MLF.Entry.Emlf where {
       _ -> Left "invalid crate plan"
     }
   };
-  compilePlanDependencies compiler retained headers rows = case rows of {
-    [] -> ioReturn ((,) retained headers);
+  compilePlanDependencies inputs@(CrateSession.PlanInputs compiler headers prelude) retained rows = case rows of {
+    [] -> ioReturn ((,) retained inputs);
     (:) ((,) spec prefix) rest -> do {
-      result <- CrateSession.compileSpecFileRetainedInPlan (CrateSession.PlanInputs compiler headers)
+      result <- CrateSession.compileSpecFileRetainedInPlan inputs
         False Prepared.installCompilerPrelude spec prefix;
       case result of {
         Left message -> fatal message;
@@ -180,9 +182,9 @@ module MLF.Entry.Emlf where {
           path <- canonicalPath (prefix ++ ".mlfci");
           case CrateSession.compiledMetadata compiled of {
             Nothing -> fatal "crate plan publication lacks metadata";
-            Just header -> compilePlanDependencies compiler
-              (SourceMap.insert compareString path (CrateSession.compiledObject compiled) retained)
-              (SourceMap.insert compareString path header headers) rest
+            Just header -> compilePlanDependencies
+              (CrateSession.PlanInputs compiler (SourceMap.insert compareString path header headers) prelude)
+              (SourceMap.insert compareString path (CrateSession.compiledObject compiled) retained) rest
           }
         }
       }
@@ -202,7 +204,7 @@ module MLF.Entry.Emlf where {
               Nothing -> printLLVM (LLVM.emitCheckedChunks False checked);
               Just ((,) cache report) -> case planInputs of {
                 Nothing -> emitCachedCrate cache (Just report) checked;
-                Just (CrateSession.PlanInputs compiler _) -> emitCachedCrateUsing
+                Just (CrateSession.PlanInputs compiler _ _) -> emitCachedCrateUsing
                   (CrateCodegen.emitCrateCheckedUsing (ioReturn compiler)) cache (Just report) checked
               }
             } }

@@ -25,10 +25,9 @@ comparison against its older append implementation is labeled separately.
 | 9 | `CrateQuery.encodeType`, `encodeKind`, `encodePredicate` | Keep source types, kinds and predicates in a length-carrying builder until one final render. |
 | 10 | `LLVM.Analysis.appendDemand` | Share ordered concatenation trees, cache flattened lexical aliases and filter later leaves with indexed identities without forcing future summaries. |
 
-The generic parser `pWithSpan` remains available for general syntax ranges. The
-new endpoint helper addresses the operator-reference hotspot without changing
-the parser state representation. The quantified-bound optimization deliberately
-uses the old traversal for graphs whose sharing invalidates a global rank.
+The operator-reference helper records its final token directly. General syntax
+ranges use the parser state to remember the last whole token consumed.
+Quantified-bound ordering keeps the root-local traversal on shared graphs.
 
 ## Preserved behavior
 
@@ -168,9 +167,10 @@ Groups are separate measurement windows and are not pooled.
 | Left-skewed ordered demands, 16,384 names | 17.08 s | 35.746 ms | About 478×; separate baseline/candidate windows. |
 | Right-skewed ordered demands, 16,384 names | 38.44 s | 18.929 ms | About 2,030×; separate baseline/candidate windows. |
 
-Some controls are neutral or slower. The complete evidence-import path at size
-128 was effectively unchanged (856.017 ms → 856.233 ms), so the indexed
-first-occurrence change is not presented as an observed end-to-end speedup.
+The original first-occurrence change left the complete size-128 evidence-import
+probe essentially unchanged (856.017 ms → 856.233 ms). A subsequent change
+to ground xMLF elimination (`df7d5ddc`) reduced the same probe from 837.30 ms
+to 42.45 ms in five paired runs.
 The isolated 4,096-let summary control increased from 3.01 ms to 3.74 ms;
 the 4,096-level fixed-prefix alias control increased from 17.02 ms to 18.65 ms.
 Capture-chain controls were approximately unchanged. The common
@@ -234,6 +234,99 @@ need not sum to the total median.
 The complete sample and stage-median table is recorded in
 `tools/performance/pr55-optimizations/end-to-end-results.json`, separately from
 the helper timings.
+
+## Follow-up measurements against `84e7c179`
+
+The local worker chain has one saturated call per worker and a back edge.
+At size 512 the previous compiler computed the fixed point twice during
+source-to-LLVM compilation. Across those two analyses, 1,026 of 527,364
+recomputed summaries changed. The new evaluator records the callee summaries
+it consults and schedules their callers on subsequent rounds. It preserves
+the order of forced names and stops at the same demand barriers.
+
+In the managed-signature workload, each expression contributes its source
+location to an observable call stack. At size 512 the previous parser visited
+5,004,800 token-list cells to measure the 512 endpoints. The new parser
+retains the last whole token and restores the enclosing endpoint for empty
+spans, lookahead and split-token prefixes.
+
+The metadata fanout builds a shared dependency, independent crates that
+import it, and a final executable. At size 64 the installed Prelude interface
+was opened 67 times. The plan now retains one successful Prelude decode with
+the canonical path and exact bytes from the same read. Each job reads the
+current file and can reuse the interface only when the bytes match.
+
+| Isolated measurement on arm64 macOS | Baseline | Candidate |
+|---|---:|---:|
+| LLVM demand propagation, 1,024 chained workers (CPU, GHC 9.14.1 `-O1`, 5 runs) | 1,523.18 ms | 5.15 ms |
+| LLVM demand propagation, 1,024 independent workers (same probe) | 2.44 ms | 2.51 ms |
+| Parse a module and check 2,048 managed signature spans (CPU, GHC 9.14.1 `-O2`, 5 runs) | 226.57 ms | 37.74 ms |
+| Parse 4,096 operator bindings with the existing token fast path (CPU, 9 runs) | 34.39 ms | 35.08 ms |
+| LLVM let summaries, 4,096 bindings (CPU, 5 runs) | 1.86 ms | 1.98 ms |
+| Compile and link a 64-branch crate plan with only the Prelude reuse change (wall, 5 runs) | 3.054 s | 2.548 s |
+
+The `worker-demand-chain` and `worker-demand-independent` probes live in
+`tools/performance/pr55-optimizations/`. The corresponding source workloads
+are `local_worker_demand_chain`, `managed_signature_spans` and
+`metadata_import_fanout` in the compiler-shapes matrix. The first two use
+`crate-fused-v1`. The fanout uses `crate-plan-v1`.
+
+The combined candidate completed 90 fresh compilations and 270 executable
+output checks on identical source. The table gives median wall time in
+seconds over three interleaved runs with each compiler. The
+[per-build samples](../tools/performance/pr55-optimizations/followup-compile-samples.csv)
+include elapsed time, CPU time, sampled peak RSS and executable hashes.
+
+| Family | Size | Baseline `84e7c179` | Candidate | GHC 9.14.1 | Candidate / GHC |
+|---|---:|---:|---:|---:|---:|
+| `local_worker_demand_chain` | 64 | 0.2812 | 0.2828 | 0.7170 | 0.394 |
+| `local_worker_demand_chain` | 512 | 1.0640 | 0.7687 | 0.9311 | 0.826 |
+| `managed_signature_spans` | 64 | 0.3252 | 0.3314 | 0.9674 | 0.343 |
+| `managed_signature_spans` | 512 | 1.1231 | 1.0637 | 3.4557 | 0.308 |
+| `quotient_let_chain` | 64 | 0.2530 | 0.2574 | 0.6926 | 0.372 |
+| `quotient_let_chain` | 512 | 0.3083 | 0.3310 | 0.9717 | 0.341 |
+| `baseline` | 0 | 0.2142 | 0.2195 | 0.6450 | 0.340 |
+| `metadata_import_fanout` | 16 | 0.8595 | 0.7877 | 1.3662 | 0.577 |
+| `metadata_import_fanout` | 32 | 1.5394 | 1.2557 | 2.1257 | 0.591 |
+| `metadata_import_fanout` | 64 | 2.7873 | 2.6371 | 3.7672 | 0.700 |
+
+The size-512 worker chain spent 796 ms of CPU in source-to-LLVM compilation
+with the baseline and 393 ms with the candidate. The three pairs of complete
+size-512 signature builds also favored the candidate. The size-64 worker
+and signature workloads showed small increases in median wall time.
+
+The `quotient_let_chain` control used zero span endpoints. At size 512 its
+median complete build was 7.4% slower. In 11 additional interleaved pairs,
+the public source-to-LLVM command used 156.34 ms of CPU with the baseline
+and 155.79 ms with the candidate, with identical LLVM bytes. Another
+build was active on this host during part of the wall-time cohort.
+
+The fanout medians beat GHC at every positive size. The harness marked its
+overall growth verdict `unmet`. The fitted time exponent was 1.150 for MLF
+and 1.068 for GHC, and the fitted peak-RSS slope was higher for MLF.
+
+The O2 producer passed the builtin regeneration check, all six locked package
+plans, 106 formatter comparisons, 169 indexvec cases and 205 compiler-shapes
+tests. The demand controls passed 79 interpreter and 158 native O0/O2 cases.
+A locked package build produced an arm64 `emlf` that ran the module example
+with output `25` and compiled each new workload at size 4. All nine native
+outputs matched their independent expectations.
+
+To repeat the follow-up on the commit directly following `84e7c179`, build
+an O2 producer and give each endpoint its own work directory.
+
+```sh
+python3 -B tools/shared/build.py --bootstrap-only --optimization 2 --build-dir .mlf-build/followup-producer
+bench=tools/performance/compiler-shapes/bench.py
+python3 -B "$bench" all --producer .mlf-build/followup-producer --build-builtin \
+  --workdir .mlf-build/followup-fused --endpoint crate-fused-v1 --cohort fused-64-512 \
+  --family local_worker_demand_chain,managed_signature_spans,quotient_let_chain \
+  --size 64,512 --repeats 3 --interleave-pairs
+python3 -B "$bench" prepare --producer .mlf-build/followup-producer --build-builtin \
+  --workdir .mlf-build/followup-plan --endpoint crate-plan-v1
+python3 -B "$bench" run --workdir .mlf-build/followup-plan --endpoint crate-plan-v1 \
+  --cohort metadata-16-64 --family metadata_import_fanout --size 16,32,64 --repeats 3 --interleave-pairs
+```
 
 ## Reproduction
 

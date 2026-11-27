@@ -250,8 +250,67 @@ captureChecks = do
         check "capture propagation retains strict facts" (map O.nameId (S.toList (A.strict original))) (map O.nameId (S.toList (A.strict updated)))
         check "capture propagation retains entry order and completeness" (observe (actual (A.entrySummary original))) (observe (actual (A.entrySummary updated)))
 
+-- Evaluate each body against the preceding host Map until the whole table
+-- stops changing. Prefixes, strict sets and hints all come from the list
+-- interpreter above, independently of the production propagation and index.
+demandReference :: Map.Map H.Int A.WorkerFunction -> Map.Map H.Int A.WorkerFunction
+demandReference previous =
+  let step f =
+        let allowed = map O.nameId (A.parameters f ++ A.captures f)
+            (names,complete) = reference previous Map.empty (A.functionBody f)
+            kept = filter ((`elem` allowed) . O.nameId) names
+        in A.WorkerFunction (A.parameters f) (A.functionBody f) (A.captures f)
+             (S.fromList O.compareName kept) (A.EntryDemand kept complete)
+      key f = (map O.nameId (A.entryOrder f), A.demandComplete (A.entrySummary f))
+      next = Map.map step previous
+  in if Map.map key previous == Map.map key next then previous else demandReference next
+
+demandFixedChecks :: IO ()
+demandFixedChecks = do
+  let worker i args body = (name i, A.WorkerFunction (map name args) body [] S.empty (A.EntryDemand [] False))
+      call i = foldl T.XEApp (var i)
+      chain n = [worker i [-i] (if i == n then var (-i) else call (i+1) [var (-i)]) | i <- [1..n]]
+      -- g is bound inside the caller, so a free-variable index misses its edge.
+      nested = T.XELet (name 2) (T.XEAbs (name 102) (var 102)) (call 2 [var 101])
+      subject term = T.XECase term [T.XErasedAlternative (T.XDefaultPattern (T.Just (name 800))) (var 800)]
+      cap hint = T.XName 900 hint
+      seeded i body captured = (name i, A.WorkerFunction [name (-i)] body captured
+                                 (S.singleton (name 555)) (A.EntryDemand [cap "old"] True))
+      captures = [seeded 3 (T.XEVar (cap "new")) [cap "new"],
+                  seeded 2 (call 3 [var (-2)]) [cap "outer"],
+                  seeded 1 (call 2 [var (-1)]) [cap "outer"]]
+      unused = error "worker demand forced an unused AST subtree"
+      lazyWorkers =
+        [worker 1 [101] (T.XELet (name 801) unused (var 101)),
+         worker 2 [] (call 3 [unused]), worker 3 [301] (T.XEInt 0),
+         worker 4 [] (prim T.PSeq [T.XEEvidenceHole 1,unused]),
+         worker 5 [] (prim T.PIfThenElse [T.XEBool False,unused,unused]),
+         worker 6 [] (T.XEApp (T.XEConstructor "Box") unused),
+         worker 7 [] (prim T.PAddInt [unused]),
+         worker 8 [] (T.XECase unused [T.XErasedAlternative (T.XDefaultPattern T.Nothing) (T.XEInt 0)]),
+         worker 9 [] (call 9000 [unused])]
+      fixtures =
+        [[], chain 1, chain 48, lazyWorkers, [worker 1 [101] nested, worker 2 [102] (var 102)],
+         [worker 1 [101,102] (T.XELet (name 801) (call 3 [var 101]) (call 2 [var 801, var 102])),
+          worker 2 [201,202] (call 4 [var 202,var 201]),
+          worker 3 [301] (subject (call 5 [var 301])),
+          worker 4 [401,402] (prim T.PAddInt [var 401,var 402]), worker 5 [501] (var 501)],
+         [worker 1 [101,102] (prim T.PSeq [var 101,call 2 [var 102,var 101]]),
+          worker 2 [201,202] (prim T.PSeq [var 201,call 1 [var 202,var 201]])],
+         [worker 1 [101] (call 2 [var 101]), worker 2 [201] (call 3 [var 201]),
+          worker 3 [301] (T.XEInt 1), worker 4 [] (call 1 []),
+          worker 5 [] (call 1 [T.XEInt 0,T.XEInt 0])],
+         captures, captures ++ [(name (i+10), f) | (i, rhs) <- zip [1..5] [12,13,14,15,0],
+           let (_,f) = worker (i+10) [-i] (if rhs == 0 then var (-i) else call rhs [var (-i)])]]
+      facts f = (observe (actual (A.entrySummary f)), observe (S.toList (A.strict f), True))
+  forM_ fixtures $ \workers -> do
+    let expected = demandReference (Map.fromList [(O.nameId k, f) | (k, f) <- workers])
+        result = M.toList (A.demandFixed (M.fromList O.compareName workers))
+    check "demand worklist preserves each worker's ordered prefix, hints, completeness and strict set"
+      (Map.toList (Map.map facts expected)) [(O.nameId k, facts f) | (k,f) <- result]
+
 run :: IO ()
-run = mergeChecks >> entryChecks >> captureChecks
+run = mergeChecks >> entryChecks >> captureChecks >> demandFixedChecks
 
 main :: IO ()
 main = run >> putStrLn "LLVM ordered demand and capture controls passed"

@@ -35,6 +35,13 @@ shape family size = case family of
   "demand-alias" -> foldr (\i body -> T.XELet (name (1000000+i))
       (if i == 1 then add (var 1) (var 2) else add (var (999999+i)) (var (999999+i))) body)
     (var (1000000+size)) [1..size]
+  "worker-demand-independent" -> T.XELetRec
+    [(name i, T.XEAbs (name (-i)) (add (var (-i)) (T.XEInt 1))) | i <- [1..size]]
+    (T.XEApp (var 1) (T.XEInt 0))
+  "worker-demand-chain" -> T.XELetRec
+    [(name i, T.XEAbs (name (-i)) (if i == size then add (var (-i)) (T.XEInt 1)
+       else T.XEApp (var (i+1)) (var (-i)))) | i <- [1..size]]
+    (T.XEApp (var 1) (T.XEInt 0))
   "capture-chain" -> T.XELetRec
     [(name i,T.XEAbs (name (1000000+i)) (var (if i == size then -1 else i+1))) | i <- [1..size]]
     (var 1)
@@ -57,6 +64,10 @@ summaries (A.LetDemands demand rest) = A.demandNames demand ++ case rest of
 
 run :: String -> H.Int -> (Int, H.Int, Bool)
 run family size = case family of
+  _ | family == "worker-demand-chain" || family == "worker-demand-independent" ->
+    let workers = map snd (M.toList (A.demandFixed (A.collect term)))
+        (count,checksum) = digest (concatMap A.entryOrder workers)
+    in (count,checksum,all (A.demandComplete . A.entrySummary) workers)
   "capture-chain" -> let entries = M.toList (A.captureFixed (A.collect term))
                          (count,checksum) = digest (concatMap (A.captures . snd) entries)
                      in (count,checksum,True)
@@ -69,6 +80,8 @@ run family size = case family of
 
 expected :: String -> H.Int -> (Int, H.Int, Bool)
 expected family size = case family of
+  _ | family == "worker-demand-chain" || family == "worker-demand-independent" ->
+    (fromIntegral size, fromInteger (negate (n*(n+1)*(2*n+1) `div` 6)), True)
   "capture-chain" -> (fromIntegral size, fromInteger (negate (n*(n+1) `div` 2)), True)
   "let-summary" -> (fromIntegral size+1, fromInteger (n*(n+1)*(n+2) `div` 3-1), True)
   "demand-alias" -> (2,5,True)

@@ -94,6 +94,29 @@ def edit(folder, mutate):
 
 
 class BindingShapeTests(unittest.TestCase):
+    def test_local_worker_chain_forwards_demand_to_one_conditional(self):
+        family = 'local_worker_demand_chain'
+        for n in (0, 1, 8):
+            source = generate.program(family, n)
+            self.assertIn(f'let {{ step0 v = if ltInt v 0 then step{n} 0', source)
+            self.assertEqual(re.findall(r'step(\d+) v = addInt \(step(\d+) v\)', source),
+                             [(str(i), str(i-1)) for i in range(1, n+1)])
+            self.assertIn(f'}} in step{n} x', source)
+            for x in (-1, 0, 7):
+                one_pass = sum(range(1, n+1))
+                self.assertEqual(generate.expected(family, n, x),
+                                 max(x, 0) + 1 + one_pass * (2 if x < 0 else 1))
+
+    def test_managed_expression_sites_each_require_their_signature_frame(self):
+        family = 'managed_signature_spans'
+        for n in (0, 1, 8):
+            source = generate.program(family, n)
+            offsets = re.findall(r'\(observed :: HasCallStack => Int -> Int\) \(addInt x (\d+)\)', source)
+            self.assertEqual(list(map(int, offsets)), list(range(1, n+1)))
+            for x in (-1, 0, 7):
+                self.assertEqual(generate.expected(family, n, x),
+                                 sum(x + i for i in range(1, n+1)) if n else x)
+
     def test_closures_capture_runtime_values_and_escape_before_application(self):
         for n in (1, 8, 32, 128):
             with self.subTest(n=n):

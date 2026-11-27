@@ -7,7 +7,13 @@ module Bootstrap.Parsec where {
   import Bootstrap.Types;
   import Bootstrap.Std;
   import Bootstrap.Lexer;
-  data ParseState = ParseState String ([] Token) Token SourceSyntax String String;
+  -- While measuring a span, keep the input cell of its last whole token.
+  -- A split symbol leaves a suffix in the same slot. Reusing the input
+  -- cell needs no counter or extra allocation for each consumed token.
+  data ParseState = ParseState String ([] Token) Token SourceSyntax String String ([] Token);
+  initialParseState :: String -> [] Token -> Token -> SourceSyntax -> String -> String -> ParseState;
+  initialParseState file tokens finish syntax owner packageName =
+    ParseState file tokens finish syntax owner packageName [];
   data PResult a = PSuccess a ParseState Bool | PFailure String ParseState Bool;
   data Parser a = Parser (ParseState -> PResult a);
   pRun :: forall a. Parser a -> ParseState -> PResult a;
@@ -109,7 +115,7 @@ module Bootstrap.Parsec where {
   pState :: Parser ParseState;
   pState = Parser (\state -> PSuccess state state False);
   stateToken :: ParseState -> Token;
-  stateToken (ParseState _ tokens finish _ _ _) =
+  stateToken (ParseState _ tokens finish _ _ _ _) =
     case tokens of {
       [] -> finish;
       (:) t _ -> t
@@ -121,7 +127,7 @@ module Bootstrap.Parsec where {
     } in
     ((tokenLine token * 1000000) + tokenColumn token);
   stateError :: ParseState -> String -> String;
-  stateError (ParseState file tokens finish _ _ _) message =
+  stateError (ParseState file tokens finish _ _ _ _) message =
     let {
       token =
         case tokens of {
@@ -139,12 +145,12 @@ module Bootstrap.Parsec where {
   pSatisfyState :: (String -> Bool) -> String -> ParseState -> PResult String;
   pSatisfyState predicate expected state =
          case state of {
-           ParseState file tokens finish syntax sourceModule sourcePackage ->
+           ParseState file tokens finish syntax sourceModule sourcePackage _ ->
              case tokens of {
                [] -> PFailure ("unexpected end of input; expected " ++ expected) state False;
                (:) t rest ->
                  if predicate (tokenText t)
-                 then PSuccess (tokenText t) (ParseState file rest finish syntax sourceModule sourcePackage) True
+                 then PSuccess (tokenText t) (ParseState file rest finish syntax sourceModule sourcePackage tokens) True
                  else PFailure ("unexpected " ++ (tokenText t ++ ("; expected " ++ expected))) state
                         False
              }
@@ -156,7 +162,7 @@ module Bootstrap.Parsec where {
     Parser
       (\state ->
          case state of {
-           ParseState _ tokens _ _ _ _ ->
+           ParseState _ tokens _ _ _ _ _ ->
              case tokens of {
                [] -> PSuccess () state False;
                (:) t _ ->
@@ -177,7 +183,7 @@ module Bootstrap.Parsec where {
   runParserWithProfileInPackage :: forall a. String -> SourceSyntax ->
                                     Parser a -> String -> Scanned -> Either String a;
   runParserWithProfileInPackage sourcePackage syntax parser file (Scanned tokens finish) =
-    case pRun (pBefore parser pEof) (ParseState file tokens finish syntax "Main" sourcePackage) of {
+    case pRun (pBefore parser pEof) (initialParseState file tokens finish syntax "Main" sourcePackage) of {
       PFailure message state _ -> Left (stateError state message);
       PSuccess a _ _ -> Right a
     };
@@ -210,7 +216,7 @@ module Bootstrap.Parsec where {
     Parser
       (\state ->
          case state of {
-           ParseState file tokens finish syntax sourceModule sourcePackage ->
+           ParseState file tokens finish syntax sourceModule sourcePackage previous ->
              case tokens of {
                (:) (Token text line column endLine endColumn) rest ->
                  let {
@@ -218,49 +224,54 @@ module Bootstrap.Parsec where {
                  } in
                  if ((stringLength text >= size) && eqString symbol (stringSlice text 0 size))
                  then let {
-                        remaining =
-                          if (stringLength text == size)
-                          then rest
-                          else (:)
-                                 (Token (stringSlice text size (stringLength text - size)) line
-                                    (column + size)
-                                    endLine
-                                    endColumn)
-                                 rest
-                      } in
-                      PSuccess symbol (ParseState file remaining finish syntax sourceModule sourcePackage) True
+                        accept remaining endpoint = PSuccess symbol
+                          (ParseState file remaining finish syntax sourceModule sourcePackage endpoint) True
+                      } in if stringLength text == size then accept rest tokens
+                        else accept ((:) (Token (stringSlice text size (stringLength text - size)) line
+                                      (column + size) endLine endColumn) rest) previous
                  else PFailure ("expected " ++ symbol) state False;
                [] -> PFailure ("expected " ++ symbol) state False
              }
          });
   pSetSourceModule :: String -> Parser ();
   pSetSourceModule name = Parser (\state -> case state of {
-    ParseState file tokens finish syntax _ sourcePackage ->
-      PSuccess () (ParseState file tokens finish syntax name sourcePackage) False
+    ParseState file tokens finish syntax _ sourcePackage previous ->
+      PSuccess () (ParseState file tokens finish syntax name sourcePackage previous) False
   });
+  -- Empty and prefix-only spans end at their first token (or EOF). Restore
+  -- the enclosing endpoint when a nested parser advances no whole token.
   pWithSpan :: forall a. Parser a -> Parser ((,) SourceSpan a);
-  pWithSpan parser = Parser (\state -> case state of {
-    ParseState file tokens finish _ sourceModule sourcePackage ->
-      case pRun parser state of {
-        PFailure message end consumed -> PFailure message end consumed;
-        PSuccess value end consumed -> case end of {
-          ParseState _ remaining _ _ _ _ -> let {
-            count = length tokens - length remaining;
-            first = stateToken state;
-            final = if count > 0 then last (take count tokens) else first
-          } in PSuccess
-            ((,) (SourceSpan sourcePackage sourceModule file
-                    (tokenLine first) (tokenColumn first)
-                    (tokenEndLine final) (tokenEndColumn final)) value) end consumed
+  pWithSpan parser = Parser (\state -> pRun (pSpanStartingAt state parser) state);
+  pSpanStartingAt :: forall a. ParseState -> Parser a -> Parser ((,) SourceSpan a);
+  pSpanStartingAt original parser = Parser (\state -> case state of {
+    ParseState file tokens finish syntax owner packageName previous -> let {
+      start = ParseState file tokens finish syntax owner packageName [];
+      restore end = case end of {
+        ParseState path rest eof profile name pkg [] -> ParseState path rest eof profile name pkg previous;
+        _ -> end
+      }
+    } in case pRun parser start of {
+      PFailure message end used -> PFailure message (restore end) used;
+      PSuccess value end used -> case original of {
+        ParseState path originalTokens eof _ name pkg _ -> let {
+          located first final result = PSuccess ((,) (SourceSpan pkg name path
+            (tokenLine first) (tokenColumn first) (tokenEndLine final) (tokenEndColumn final)) value) result used
+        } in case end of {
+          ParseState _ _ _ _ _ _ ((:) final _) -> case originalTokens of {
+            (:) first _ -> located first final end;
+            [] -> located eof final end
+          };
+          _ -> let { first = stateToken original } in located first first (restore end)
         }
       }
+    }
   });
   pSourceSyntax :: Parser SourceSyntax;
   pSourceSyntax =
     Parser
       (\state ->
          case state of {
-           ParseState _ _ _ syntax _ _ -> PSuccess syntax state False
+           ParseState _ _ _ syntax _ _ _ -> PSuccess syntax state False
          });
   pBySyntax :: forall a. Parser a -> Parser a -> Parser a;
   pBySyntax shared legacy =

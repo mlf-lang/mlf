@@ -14,14 +14,14 @@ join = B.v_concatStringList
 
 -- Frozen pre-worker semantics, independent of the maintained pSatisfy helper.
 reference predicate expected = C.Parser $ \state -> case state of
-  C.ParseState file tokens finish syntax source package -> case tokens of
+  C.ParseState file tokens finish syntax source package _ -> case tokens of
     [] -> C.PFailure (append (literal "unexpected end of input; expected ") expected) state False
     token : rest -> if predicate (L.tokenText token)
-      then C.PSuccess (L.tokenText token) (C.ParseState file rest finish syntax source package) True
+      then C.PSuccess (L.tokenText token) (C.ParseState file rest finish syntax source package tokens) True
       else C.PFailure (append (literal "unexpected ") (append (L.tokenText token) (append (literal "; expected ") expected))) state False
 
 tokenView (L.Token value a b c d) = (B.unpack value,a,b,c,d)
-stateView (C.ParseState file tokens finish syntax source package) =
+stateView (C.ParseState file tokens finish syntax source package _) =
   (B.unpack file,map tokenView tokens,tokenView finish,B.unpack (L.sourceSyntaxName syntax),B.unpack source,B.unpack package)
 resultView result = case result of
   C.PFailure message state consumed -> (False,B.unpack message,stateView state,consumed)
@@ -64,7 +64,7 @@ main = do
       labels = ["expected","","wanted\0λ"]
       makeTokens base names = zipWith (\index name -> L.Token (literal name) (base+index) 3 (base+index) 7) [0..] names
       finish = L.Token (literal "<eof>") 999 9 999 9
-      state tokens syntax = C.ParseState (literal "input\0λ") tokens finish syntax (literal "M") (literal "pkg")
+      state tokens syntax = C.initialParseState (literal "input\0λ") tokens finish syntax (literal "M") (literal "pkg")
   forM_ profiles $ \syntax -> forM_ lists $ \names -> forM_ offsets $ \offset -> forM_ labels $ \label -> do
     let current = parsers C.pSatisfy (literal label)
         old = parsers reference (literal label)
