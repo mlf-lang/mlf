@@ -231,7 +231,8 @@ module Bootstrap.Parser where {
       Just n -> n
     };
   standaloneProgram :: SourceModule -> Either String SProgram;
-  standaloneProgram (SourceModule _ _ _ _ datatypes classes instances values body _) =
+  standaloneProgram = standaloneProgramWith (\expression -> expression);
+  standaloneProgramWith wrapEntry (SourceModule _ _ _ _ datatypes classes instances values body _) =
     let {
       entry =
         case body of {
@@ -245,7 +246,7 @@ module Bootstrap.Parser where {
     case entry of {
       Left e -> Left e;
       Right e ->
-        case Surface.bindValues values e of {
+        case Surface.bindValues values (wrapEntry e) of {
           Left error -> Left error;
           Right expression ->
             case Surface.closeSourceInstances values instances of {

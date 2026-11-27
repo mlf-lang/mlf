@@ -40,6 +40,7 @@
       "Bootstrap.PreparedLibraries": "Bootstrap/PreparedLibraries.hs",
       "Bootstrap.PreparedLibraryLiteral": "Bootstrap/PreparedLibraryLiteral.hs",
       "Bootstrap.Separate": "Bootstrap/Separate.hs",
+      "Bootstrap.SourceCrate": "Bootstrap/SourceCrate.hs",
       "Bootstrap.SourceEquality": "Bootstrap/SourceEquality.hs",
       "Bootstrap.SourceInference": "Bootstrap/SourceInference.hs",
       "Bootstrap.GroundProofEdit": "Bootstrap/GroundProofEdit.hs",

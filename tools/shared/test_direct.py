@@ -279,11 +279,15 @@ class CommandRunner:
             cleanup['error'] = 'original process-group cleanup could not drain captures or reap the leader within its bounds'
         return stdout, stderr, cleanup
 
-    def run(self, name, command, *, overrides=None, status=0, expected=None, timeout=180):
+    def run(self, name, command, *, overrides=None, status=0, expected=None, timeout=180, stdin=None):
         command = list(map(str, command))
         overrides = overrides or {}
         entry = {'name': name, 'argv': command, 'cwd': str(self.root), 'started': time.time(),
                  'timeout_seconds': timeout, 'environment_overrides': overrides, 'state': 'running'}
+        if stdin is not None:
+            input_path = self.output / (name + '.stdin')
+            input_path.write_bytes(stdin)
+            entry['stdin_sha256'] = sha(input_path)
         self.receipt['commands'].append(entry)
         self.save()
         stdout, stderr = b'', b''
@@ -293,9 +297,10 @@ class CommandRunner:
         group_stopped = False
         try:
             process = subprocess.Popen(command, cwd=self.root, env={**os.environ, **overrides},
+                                       stdin=subprocess.PIPE if stdin is not None else None,
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
             try:
-                stdout, stderr = process.communicate(timeout=timeout)
+                stdout, stderr = process.communicate(input=stdin, timeout=timeout)
             except subprocess.TimeoutExpired:
                 entry['timed_out'] = True
                 stdout, stderr, entry['cleanup'] = self.stop_group(process)

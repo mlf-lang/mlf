@@ -106,7 +106,8 @@ main = do
         compiled <- compileRequire (Compiler.compileProgramWithPrelude ImplicitPrelude program)
         require (LLVM.emitCheckedChunks False (Core.checkedTerm compiled)) >>= mapM_ (putStr . P.textToChars)
       else do
-       let outcome = Prepared.compileProgramWithPrelude ImplicitPrelude program
+       outcome <- Prepared.compileSource ImplicitPrelude []
+         (Prepared.SourceText (P.textFromChars path) (P.textFromChars bytes))
        if operation `elem` ["--compare", "--compare-direct"]
          then compareRoot program (Compiler.compileProgramWithPrelude ImplicitPrelude program) outcome
          else do

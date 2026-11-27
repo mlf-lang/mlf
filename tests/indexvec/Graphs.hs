@@ -1267,7 +1267,7 @@ queryChecks = do
       input = Q.inputKey "root"
       links i = if i == size-1 then [(input,sha)] else [(query (i+1),sha), (query (i+1),sha)]
       queries = [node (query i) (links i) | i <- [0..size-1]]
-      session old active = Q.Session "" "" "" (table old) (table active) M.empty
+      session old active = Q.Session Q.MemoryStore "" "" (table old) (table active) M.empty
       validate old active = Q.validate (query 0) (session old active)
       reused (answer,stable) = (case answer of { T.Just _ -> True; T.Nothing -> False },
                                 M.size (Q.currentNodes stable))

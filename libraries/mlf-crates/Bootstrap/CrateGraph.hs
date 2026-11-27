@@ -232,12 +232,12 @@ module Bootstrap.CrateGraph where {
         } in (,) (G.recordDigest wanted reads (Just digest) digest (Just bytes) session) next) encoded)
       }
     };
-  loadRaw info declarations path digest references group env slots prepared owners names =
+  loadRaw info declarations readBytes digest references group env slots prepared owners names =
     case info of {
-      Left _ -> Open.decodeTrustedIds path digest references "raw" group env
+      Left _ -> Open.decodeTrustedIdsFrom readBytes digest references "raw" group env
         (Source.expectedParameters slots prepared) (zip owners names);
       Right (TemplateInfo identity parameters members canonicalParameters canonicalMembers) -> do {
-        loaded <- Open.decodeTrustedIds path digest (templateReferences identity) "raw" "template" env
+        loaded <- Open.decodeTrustedIdsFrom readBytes digest (templateReferences identity) "raw" "template" env
           canonicalParameters (map (\((,) i ((,,) name _ _)) -> (,) i name) canonicalMembers);
         ioReturn (do {
           template <- loaded;
@@ -1019,11 +1019,16 @@ module Bootstrap.CrateGraph where {
   rawValueWith :: (W.Value -> String -> String -> Open.Fragment -> W.Value) -> [] ((,) String String) -> String -> Open.Fragment -> W.Value;
   rawValueWith encode references group fragment = encode
     (A.toList (A.toPair A.toText A.toText) references) "raw" group fragment;
+  openFileQueries directory = G.begin (directory ++ "/query-graph-v3");
   compile = compileWithData Q.requiredDataIn;
-  compileFile = compileReading True Dependency.fileLastValueOccurrences Dependency.fileDeclarationOccurrences Q.requiredFileDataIn;
+  compileFile verify crateId compiler directory = compileFileQueries (openFileQueries directory) verify crateId compiler;
+  compileFileQueries begin = compileGroupsReading begin True
+    Dependency.fileLastValueOccurrences Dependency.fileDeclarationOccurrences Q.requiredFileDataIn;
   compileWithData = compileUsing (Dependency.valueOccurrences True) (Dependency.valueOccurrences True False);
   compileUsing = compileReading False;
-  compileReading owned occurrences declarationReads selectData verify crateId compilerHash cacheDir imports protected originalPlan =
+  compileReading owned occurrences declarationReads selectData verify crateId compilerHash directory =
+    compileGroupsReading (openFileQueries directory) owned occurrences declarationReads selectData verify crateId compilerHash;
+  compileGroupsReading begin owned occurrences declarationReads selectData verify crateId compilerHash imports protected originalPlan =
     case do {
       (,) plan open <- Source.protectedQueryPlanReading declarationReads originalPlan protected;
       inventory <- Q.prepareData (Source.planData plan);
@@ -1033,7 +1038,7 @@ module Bootstrap.CrateGraph where {
       Right ((,,,) plan inventory checked steps)
     } of {
       Left e -> ioReturn (Left e);
-      Right ((,,,) plan inventory checked steps) -> startGroupUsing owned occurrences declarationReads selectData verify crateId compilerHash cacheDir
+      Right ((,,,) plan inventory checked steps) -> startGroupWith begin owned occurrences declarationReads selectData verify crateId compilerHash
         "source" inventory (Source.planData plan) checked steps
     };
   -- The already-lowered fallback has no unsigned-root evidence finalization.
@@ -1041,7 +1046,9 @@ module Bootstrap.CrateGraph where {
   -- Preserve its existing conservative (protected, no source-class slots)
   -- calling contract, including mixed source/dictionary recursive groups.
   -- Standalone named callers own no resolver or class-lowering table.
-  compileLowered verify crateId compilerHash cacheDir imports datatypes members =
+  compileLowered verify crateId compilerHash cacheDir =
+    compileNamedQueries (openFileQueries cacheDir) verify crateId compilerHash;
+  compileNamedQueries begin verify crateId compilerHash imports datatypes members =
     case Dependency.declarationGroups members of {
       Left e -> ioReturn (Left e);
       Right groups -> let {
@@ -1049,24 +1056,29 @@ module Bootstrap.CrateGraph where {
         ids = V.indices (Dependency.symbolNodes base);
         scope = Source.declarationScope base ids [] (concatMap (compose (map fst) Separate.unitBindings) imports)
       } in case traverseEither (traverseEither (Source.requireDecl scope)) groups of {
-        Left e -> ioReturn (Left e); Right grouped -> startLowered scope (zip ids members) grouped
-          verify crateId compilerHash cacheDir imports datatypes
+        Left e -> ioReturn (Left e); Right grouped -> startLoweredQueries begin scope (zip ids members) grouped
+          verify crateId compilerHash imports datatypes
       }
     };
   -- Only actual resolved inputs enter this boundary. Class lowering has
   -- already allocated all selectors and dictionaries. The fallback uses
   -- that exact table and traverses the final, rewritten expression edges.
-  compileLoweredIn lowered verify crateId compilerHash cacheDir imports = case Inference.loweredDeclarationTable lowered of {
-    Nothing -> ioReturn (Left "resolved lowered group has no declaration table");
+  compileLoweredIn lowered verify crateId compilerHash directory =
+    compileLoweredQueries (openFileQueries directory) lowered verify crateId compilerHash;
+  compileLoweredQueries begin lowered verify crateId compilerHash imports = case Inference.loweredDeclarationTable lowered of {
+    Nothing -> compileNamedQueries begin verify crateId compilerHash imports
+      (Inference.loweredData lowered) (Inference.loweredValues lowered);
     Just generation -> let { entries = Inference.loweredIdValues lowered;
       scope = Source.loweredScope generation (map fst entries)
     } in case Surface.indexedMemberGroups entries of {
       Left e -> ioReturn (Left e);
-      Right grouped -> startLowered scope entries grouped verify crateId compilerHash cacheDir imports
+      Right grouped -> startLoweredQueries begin scope entries grouped verify crateId compilerHash imports
         (Inference.loweredData lowered)
     }
   };
-  startLowered scope entries grouped verify crateId compilerHash cacheDir imports datatypes = case do {
+  startLowered scope entries grouped verify crateId compilerHash directory =
+    startLoweredQueries (openFileQueries directory) scope entries grouped verify crateId compilerHash;
+  startLoweredQueries begin scope entries grouped verify crateId compilerHash imports datatypes = case do {
     inventory <- Q.prepareData datatypes;
     types <- foldM Inference.mergeExternal M.empty (concatMap Separate.unitBindings imports);
     checked <- Source.installContracts scope (M.map (\ty -> Source.SourceContract ty [] True) types);
@@ -1081,16 +1093,19 @@ module Bootstrap.CrateGraph where {
     };
     Right ((,,) inventory checked (map (\ids -> (,) ids (prepare ids)) grouped))
   } of { Left e -> ioReturn (Left e); Right ((,,) inventory checked steps) ->
-    start verify crateId compilerHash cacheDir "lowered" inventory datatypes checked steps
+    startGroupWith begin False (Dependency.valueOccurrences True) (Dependency.valueOccurrences True False)
+      Q.requiredDataIn verify crateId compilerHash "lowered" inventory datatypes checked steps
   };
   start = startWithData Q.requiredDataIn;
   startWithData = startUsing (Dependency.valueOccurrences True) (Dependency.valueOccurrences True False);
   startUsing = startGroupUsing False;
-  startGroupUsing owned occurrences declarationReads selectData verify crateId compilerHash cacheDir flavor inventory datatypes contracts groups = do {
+  startGroupUsing owned occurrences declarationReads selectData verify crateId compilerHash directory =
+    startGroupWith (openFileQueries directory) owned occurrences declarationReads selectData verify crateId compilerHash;
+  startGroupWith begin owned occurrences declarationReads selectData verify crateId compilerHash flavor inventory datatypes contracts groups = do {
         statistics <- G.profile;
         graphStarted <- G.clock statistics;
         auditSetting <- getEnv "MLF_QUERY_SEMANTIC_AUDIT";
-        started <- G.begin (cacheDir ++ "/query-graph-v3")
+        started <- begin
           (Separate.pack [crateId,compilerHash,Q.sourceQueryFormat,"open-fragment-checker-1/finish-receipt-1",flavor]);
         case started of { Left e -> ioReturn (Left e); Right session -> do {
           let { initial = Source.checkedIndexed contracts };
@@ -1203,7 +1218,7 @@ module Bootstrap.CrateGraph where {
                           Just node -> case G.nodePayload node of {
                             Nothing -> ioReturn (Left "query result is absent");
                             Just digest -> do {
-                              loaded <- loadRaw template declarations (G.payloadPath active digest) digest
+                              loaded <- loadRaw template declarations (G.readPayloadBytes active digest) digest
                                 references group env slots prepared owners names;
                               case loaded of {
                                 Left e -> ioReturn (Left e);
@@ -1578,7 +1593,7 @@ module Bootstrap.CrateGraph where {
                 Just node -> case G.nodePayload node of {
                   Nothing -> ioReturn (Left "missing evidence payload");
                   Just digest -> do {
-                    read <- G.readValue (G.payloadPath current digest) (Just digest);
+                    read <- G.readPayloadValue current digest;
                     ioReturn (bindEither read (\graph -> decodeEvidence graph goal dependencies aliases))
                   }
                 }

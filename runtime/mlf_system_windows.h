@@ -70,14 +70,19 @@ static MLF_NOINLINE MlfValue *os_listDirectory(MlfValue *name) {
     if (error!=ERROR_NO_MORE_FILES) { free(text); fail("IO error: listDirectory failed"); }
     MlfValue *result=mlf_string(text,size); free(text); return result;
 }
-static MlfValue *os_acquireFileLock(MlfValue *name) {
-    wchar_t *wide=mlf_wide(file_path(name));
+static intptr_t os_file_lock(const char *path) {
+    wchar_t *wide=mlf_wide(path);
     HANDLE file=wide ? CreateFileW(wide,GENERIC_READ|GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL) : INVALID_HANDLE_VALUE;
     free(wide);
-    if (file==INVALID_HANDLE_VALUE) fail("IO error: acquireFileLock failed");
+    if (file==INVALID_HANDLE_VALUE) return -1;
     OVERLAPPED overlapped={0};
-    if (!LockFileEx(file,LOCKFILE_EXCLUSIVE_LOCK,0,MAXDWORD,MAXDWORD,&overlapped)) { CloseHandle(file); fail("IO error: acquireFileLock failed"); }
-    return small((intptr_t)file);
+    if (!LockFileEx(file,LOCKFILE_EXCLUSIVE_LOCK,0,MAXDWORD,MAXDWORD,&overlapped)) { CloseHandle(file); return -1; }
+    return (intptr_t)file;
+}
+static MlfValue *os_acquireFileLock(MlfValue *name) {
+    intptr_t handle=os_file_lock(file_path(name));
+    if (handle < 0) fail("IO error: acquireFileLock failed");
+    return small(handle);
 }
 static MlfValue *os_releaseFileLock(MlfValue *handle) {
     HANDLE file=(HANDLE)(uintptr_t)bounded_integer(handle,INTPTR_MAX,"invalid file lock");

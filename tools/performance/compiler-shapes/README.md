@@ -59,9 +59,13 @@ produces a GHC-hosted compiler with an installed native standard library. The
 paired runner uses a separate schema and analyzer. Five workloads cover a
 chain, wide fan-out, a recursive SCC, a four-module diamond and the compiler's
 Unicode classifier. The latter uses its production source with a renamed module
-so both compilers compile it as user code. Each sample starts with empty target
-outputs or is a no-edit repeat of that lane's preceding build. GHC can reuse
-user objects on the repeat. The installed MLF command recompiles user code. Pass `--diamond-edit` with a fresh output directory for a separate cohort that changes the shared leaf and checks the new result through both branches of the diamond.
+so both compilers compile it as user code. Each workload, round and compiler
+starts with fresh target outputs. Each MLF installation gets its own empty
+source query cache. Its repeat uses the same cache, so the compiler can reuse
+checked declaration groups while compiling the user object and linking the
+executable again. GHC can reuse user objects on the repeat. Pass
+`--diamond-edit` with a fresh output directory to measure an edit to the shared
+leaf and check the new result through both branches of the diamond.
 The installed runner records sampled peak build RSS medians, MLF/GHC ratios,
 and memory checks for its before and after builds. It records one size per
 workload, so its growth verdict is `incomplete`.

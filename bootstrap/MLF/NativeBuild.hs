@@ -97,8 +97,7 @@ module MLF.NativeBuild (run) where {
     if code == 0 then ioReturn updated else failBuild build updated
       (phase ++ " failed; see " ++ errors)
   };
-  validateFile row = do {
-    let { path = J.getText "path" "" row; digest = J.getText "sha256" "" row };
+  validateFile ((,) path digest) = do {
     require (O.absolute path && stringLength digest == 64) "invalid installed file record";
     present <- fileExists path;
     require present ("installed file missing: " ++ path);
@@ -137,16 +136,12 @@ module MLF.NativeBuild (run) where {
         (,) "compiler" (J.str compiler), (,) "fresh_user_compilation" (J.Boolean True),
         (,) "llvm_jobs" (J.num 1), (,) "commands" (J.array [])] };
       sourceHash <- fileDigest source;
-      input <- readFile source;
-      result <- Prepared.compileNative selected roots (Prepared.SourceText source input);
+      result <- Prepared.compileNativeFile selected roots source;
       case result of {
         Left error -> fatal (Core.prettyError error);
-        Right compiled -> case J.parse (Prepared.nativeManifest compiled) of {
-          Left message -> fatal message;
-          Right installation -> do {
-            let { objectRows = J.values (J.get "objects" installation);
-                  linkRows = J.values (J.get "link_inputs" installation);
-                  flags = J.getStrings "link_args" installation;
+        Right compiled -> case Prepared.nativeLink compiled of {
+          Prepared.NativeLink objectFiles linkFiles flags -> do {
+            let { installation = Prepared.nativeInstallation compiled;
                   fallback = Prepared.nativeFallback compiled;
                   count = Prepared.nativeExportCount compiled;
                   inlineCount = Prepared.nativeInlineCount compiled;
@@ -162,9 +157,10 @@ module MLF.NativeBuild (run) where {
             -- The compiler already authenticated this exact manifest
             -- and its files. Keep their paths for destination protection; the
             -- bytes are checked again immediately before and after linking.
-            let { objects = S.map (J.getText "path" "") objectRows;
-                  dependencies = S.map (J.getText "path" "") linkRows };
-            clang <- validateFile (J.get "clang" installation);
+            let { objects = S.map S.fst objectFiles;
+                  dependencies = S.map S.fst linkFiles;
+                  tool = J.get "clang" installation };
+            clang <- validateFile ((,) (J.getText "path" "" tool) (J.getText "sha256" "" tool));
             protect output (S.append [source, compiler, Native.manifestPath, clang]
               (S.append (S.map S.fst sourceInputs) (S.append objects dependencies)));
             canonicalOutput <- destinationPath output;
@@ -192,13 +188,13 @@ module MLF.NativeBuild (run) where {
               (S.append [clang, "-O2", "-Wno-override-module"]
                 (S.append (O.nativeTargetFlags Native.targetTriple)
                   ["-c", build ++ "/program.ll", "-o", build ++ "/program.o"]));
-            validateFiles objectRows;
-            validateFiles linkRows;
+            validateFiles objectFiles;
+            validateFiles linkFiles;
             afterLink <- runPhase build afterLLVM "link"
               (S.append [clang, build ++ "/program.o"]
                 (S.append objects (S.append flags ["-o", build ++ "/program"])));
-            validateFiles objectRows;
-            validateFiles linkRows;
+            validateFiles objectFiles;
+            validateFiles linkFiles;
             sourceRows <- validateSources sourceInputs;
             sourceAfter <- fileDigest source;
             require (eqString sourceHash sourceAfter) "source changed during compilation";

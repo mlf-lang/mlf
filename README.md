@@ -36,7 +36,8 @@ In a package, use `mlfpkg build` or `mlfpkg build --target NAME`. The package
 manager schedules the declared dependencies and reuses checked artifacts.
 For an intermediate result, `emlf Main.emlf` writes checked xMLF and
 `emlf --emit-llvm Main.emlf` writes LLVM IR. `emlf --help tools` lists the
-stage commands available to build tools.
+stage commands available to build tools. See [compiler roots and
+caching](docs/compiler-entry-unification.md).
 
 ## Build and run
 
@@ -225,8 +226,10 @@ its fixed standard library and runtime:
 .mlf-build/snake
 ```
 
-Each invocation freshly checks and compiles the user program, runs one ordinary
-Clang `-O2` job, and links the installed objects. `--compile SOURCE -o OUTPUT`
+File compilation reuses checked declaration groups under
+`.mlf-build/cache/source-roots/` in the working directory. Each native invocation
+emits LLVM for the user root, compiles it with Clang `-O2`, and links the
+installed objects. `--compile SOURCE -o OUTPUT`
 is an equivalent spelling. By default, a fresh hidden `.emlf-<output>-N`
 directory beside the output retains the IR, object, process logs and
 `receipt.json`, including selected standard-library exports and any fallback

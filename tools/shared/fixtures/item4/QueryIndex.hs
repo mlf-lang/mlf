@@ -161,7 +161,7 @@ publicationTests root = do
       need ("old generation survives " ++ point) (actual == generation && M.size oldAgain == 2)
   -- A retained payload corruption prevents switching CURRENT. The hash
   -- mismatch is real on disk, not merely an invalid ID in an in-memory value.
-  Storage.write 6 (Q.payloadPath warm (Q.nodeHash node)) [W.VText "corrupt retained payload"]
+  Storage.write 6 (Q.payloadPath path (Q.nodeHash node)) [W.VText "corrupt retained payload"]
     >>= right "corrupt own test payload"
   Q.publish warm >>= reject "retained payload hash" "missing/corrupt"
   P.fileDigest current >>= (need "payload failure CURRENT preserved" . (== baseline))
@@ -169,7 +169,7 @@ publicationTests root = do
   (_,repaired) <- Q.record (Q.nodeKey node) (Q.nodeReads node) True (W.VText "root payload") warm
     >>= right "recompute payload"
   Q.publish repaired >>= right "repair retained payload" >>= need "repair keeps generation" . not
-  P.fileDigest (Q.payloadPath repaired (Q.nodeHash node)) >>= need "payload restored" . (== Q.nodeHash node)
+  P.fileDigest (Q.payloadPath path (Q.nodeHash node)) >>= need "payload restored" . (== Q.nodeHash node)
   Storage.write 6 generationPath [W.VText "corrupt generation"] >>= right "corrupt index bytes"
   cold@(Q.Session _ _ previous missed _ _) <- Q.begin path "config" >>= right "begin after index corruption"
   need "damaged generation misses" (previous == "" && M.null missed)

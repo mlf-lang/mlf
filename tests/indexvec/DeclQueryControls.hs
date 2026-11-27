@@ -503,7 +503,7 @@ expectedReads = do
       oldReads = [G.edge input,G.edge shared]
       old = G.QueryNode wanted h oldReads (T.Just h)
       current = M.fromList P.compareString [(G.nodeKey n,n) | n <- [input,shared,private]]
-      session = G.Session "" "cfg" "" (M.fromList P.compareString [(wanted,old)]) current M.empty
+      session = G.Session G.MemoryStore "cfg" "" (M.fromList P.compareString [(wanted,old)]) current M.empty
       hit result = case fst result of T.Just _ -> True; _ -> False
   check "old dependencies are green in transition counterexample" (hit (G.validate wanted session))
   check "same current dependency list reuses" (hit (G.validateExpected wanted oldReads session))
@@ -528,7 +528,7 @@ directFinishReads = do
       empty = G.QueryNode CG.emptyScopeKey h [] T.Nothing
       reads = [G.edge raw,G.edge source,G.edge empty]
       contract flag = Source.SourceContract (T.XArrow (T.XCon "Int" []) (T.XCon "Int" [])) [] flag
-      session = G.Session "" "cfg" "" M.empty (M.fromList P.compareString [(G.nodeKey n,n) | n <- [raw,source,empty]]) M.empty
+      session = G.Session G.MemoryStore "cfg" "" M.empty (M.fromList P.compareString [(G.nodeKey n,n) | n <- [raw,source,empty]]) M.empty
       run digest evidence delta = CG.recordCheckedFinish T.Nothing slots "g" digest Source.KeepRawBody raw [] [] evidence delta reads session >>= expect
       binding state = case M.lookup P.compareString key (G.currentNodes (fst state)) of
         T.Just row -> pure row; _ -> fail "missing direct Binding"

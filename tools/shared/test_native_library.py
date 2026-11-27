@@ -15,6 +15,7 @@ import shlex
 import sys
 from build import DEMAND_FLAGS, EXHAUSTIVENESS_FLAGS, PACKAGES
 from test_direct import CommandRunner, authenticate_build, sha
+from source_root_cli import check_source_root, check_installed_root
 from test_native_string_index import local_c_closure, resolve_tool
 from header_validation_adapter import (input_paths as header_validation_inputs,
                                        prepare as prepare_header_validation,
@@ -56,6 +57,8 @@ HOST_FIXTURES = {
     'split-builtin-selection-controls': 'SplitBuiltinControls',
 }
 FRONTEND_CASE = 'installed-frontend-controls'
+SOURCE_CLI = 'source-root-cli'
+INSTALLED_CLI = 'installed-root-cli'
 PREFIX = 'mlf_fixed_' + 'a' * 64
 FRONTEND_FIXTURE = ROOT / 'tools/experimental/prepared-libraries/NativeFrontendControls.hs'
 FRONTEND_OUTPUT = (b'Implicit.emlf accepted\nSubset.emlf accepted\nUserDatatype.emlf accepted\n'
@@ -79,7 +82,7 @@ def verify_root_shape(source, count):
 
 
 def case_inventory(installed):
-    frontend = (FRONTEND_CASE,) if installed else ()
+    frontend = (FRONTEND_CASE, INSTALLED_CLI) if installed else (SOURCE_CLI,)
     return frontend + tuple(HOST_FIXTURES) + NATIVE_CASES
 
 
@@ -123,7 +126,7 @@ def main():
     output.mkdir(parents=True, exist_ok=False)
     record = {'format': 1, 'complete': False, 'status': 'running',
               'scope': 'checked-fixed-native-library', 'compiler_modules_rebuilt': False,
-              'native_execution': native_selected, 'full_corpus_qualification': False,
+              'native_execution': native_selected or selection == INSTALLED_CLI, 'full_corpus_qualification': False,
               'performance_assertions': False, 'native_toolchain_closure_complete': False,
               'installed_frontend_controls_requested': args.frontend_source_root is not None,
               'framework_selection': selection, 'framework_plan': [selection] if selection else list(inventory),
@@ -184,6 +187,9 @@ def main():
                  *runtime_sources, *sorted((ROOT / 'runtime').glob('*.h')),
                  *sorted((gc / 'include').rglob('*.h'))]
         paths.append(ROOT / 'tools/testing/receipt_selection.py')
+        paths.extend(ROOT / 'tools/shared' / name for name in (
+            'source_root_cli.py', 'query_generation.py', 'artifact_binary_reference.py',
+            'artifact_binary_typed.py', 'artifact_structure_contract.json'))
         if args.frontend_source_root is not None:
             paths.append(FRONTEND_FIXTURE)
         inputs = {str(p.resolve(strict=True)): sha(p) for p in paths}
@@ -202,12 +208,13 @@ def main():
         if not link_objects:
             raise ValueError('producer has no authenticated linkable objects')
         transports = []
-        for label, source in [('host', ROOT / 'host/ghc/cbits/host.c'),
-                              ('supervisor', ROOT / 'runtime/mlf_process_supervisor.c')]:
-            target = output / (label + '.o')
-            runner.run('compile-' + label, [producer['cc']['path'], '-O2', '-std=c11',
-                       '-I' + str(ROOT / 'runtime'), '-c', source, '-o', target], timeout=120)
-            transports.append(target)
+        if selection not in (SOURCE_CLI, INSTALLED_CLI):
+            for label, source in [('host', ROOT / 'host/ghc/cbits/host.c'),
+                                  ('supervisor', ROOT / 'runtime/mlf_process_supervisor.c')]:
+                target = output / (label + '.o')
+                runner.run('compile-' + label, [producer['cc']['path'], '-O2', '-std=c11',
+                           '-I' + str(ROOT / 'runtime'), '-c', source, '-o', target], timeout=120)
+                transports.append(target)
         artifacts.update({str(p): sha(p) for p in transports})
         header_objects = []
         header_dir = output
@@ -241,6 +248,8 @@ def main():
             fixture_sources = {emitter: FIXTURES / (emitter + '.hs')}
         elif selection == FRONTEND_CASE:
             fixture_sources = {'NativeFrontendControls': FRONTEND_FIXTURE}
+        elif selection in (SOURCE_CLI, INSTALLED_CLI):
+            fixture_sources = {}
         else:
             selected_fixture = HOST_FIXTURES[selection]
             fixture_directory = header_dir if headers_selected else FIXTURES
@@ -269,6 +278,14 @@ def main():
             passed(FRONTEND_CASE)
         else:
             record['installed_frontend_controls_passed'] = False
+        cli_case = INSTALLED_CLI if installed else SOURCE_CLI
+        if wants(cli_case):
+            cli_root = output / cli_case
+            cli_root.mkdir()
+            cli_runner = CommandRunner(cli_root, output, record, save)
+            check_cli = check_installed_root if installed else check_source_root
+            check_cli(cli_runner, producer_dir / 'bin/emlf')
+            passed(cli_case, native=installed)
         if wants('checked-boundary-controls'):
             runner.run('checked-boundary-controls', [executables['NativeBoundaryTests']],
                        expected=BOUNDARY_OUTPUT, timeout=120)

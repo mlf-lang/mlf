@@ -221,10 +221,10 @@ graphChecks root = do
  assert "actual dictionary changes identity with fixed compiler" (Old.sourceFormatFor actualBuiltinChange/=Old.sourceQueryFormat)
  let poison=G.QueryNode (G.key "Q" "poison") (error "later dependency forced after red edge") [] T.Nothing
      old=M.fromList P.compareString [(G.key "Q" "caller",G.QueryNode (G.key "Q" "caller") "hash" [(G.nodeKey changed,"different"),(G.key "Q" "poison","poison")] T.Nothing),(G.key "Q" "poison",poison)]
-     selected=G.Session path config "" old (M.fromList P.compareString [(G.nodeKey changed,changed)]) M.empty
+     selected=G.Session G.MemoryStore config "" old (M.fromList P.compareString [(G.nodeKey changed,changed)]) M.empty
  assert "old read order short-circuits after first changed edge" (case fst (G.validate (G.key "Q" "caller") selected) of T.Nothing->True;_->False)
  let cyclic=M.fromList P.compareString [(G.key "Q" "a",G.QueryNode (G.key "Q" "a") "h" [(G.key "Q" "b","h")] T.Nothing),(G.key "Q" "b",G.QueryNode (G.key "Q" "b") "h" [(G.key "Q" "a","h")] T.Nothing)]
- assert "query cycle rejected" (case fst(G.validate (G.key "Q" "a") (G.Session path config "" cyclic M.empty M.empty)) of T.Nothing->True;_->False)
+ assert "query cycle rejected" (case fst(G.validate (G.key "Q" "a") (G.Session G.MemoryStore config "" cyclic M.empty M.empty)) of T.Nothing->True;_->False)
  putStrLn "PASS graph read order, red/green propagation, compiler/builtin namespace, and cycle handling"
 
 formalChecks file = do

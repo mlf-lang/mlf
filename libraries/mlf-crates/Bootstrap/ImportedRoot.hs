@@ -3,7 +3,7 @@
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
 module Bootstrap.ImportedRoot
-  (Compilation, finishCompilation, finishSelected, fileImports, finishFileImports, finishFileImportsIn, checkedWrapper, inferredType, sourceType,
+  (Compilation, fromCheckedWrapper, finishCompilation, finishSelected, fileImports, finishFileImports, finishFileImportsIn, checkedWrapper, inferredType, sourceType,
    remove, finishLinked, materializeImports, materializeLinked, usedImportSignatures) where {
   import MLF.Primitive;
   import Bootstrap.Types;
@@ -36,6 +36,22 @@ module Bootstrap.ImportedRoot
   checkedWrapper (Compilation checked _ _) = checked;
   inferredType (Compilation _ ty _) = ty;
   sourceType (Compilation _ _ rendered) = rendered;
+  -- A grouped crate already carries checked declaration bodies. Its user
+  -- type is the codomain after exactly the authenticated external binders.
+  fromCheckedWrapper :: Map String XType -> Checked.CheckedTerm -> Either String Compilation;
+  fromCheckedWrapper signatures checked = do {
+    let { expression = case Checked.term checked of { XWithData _ body -> body; body -> body };
+          consume ty row = case ty of {
+            XArrow argument answer -> do {
+              ensure (T.alphaEq argument (snd row)) "checked crate import arrow type mismatch";
+              Right answer
+            };
+            _ -> Left "checked crate import arrow missing"
+          } };
+    _ <- takeParameters (M.toList signatures) expression;
+    answer <- foldEither consume (Checked.typeOf checked) (M.toList signatures);
+    Right (Compilation checked answer (Classes.prettyQualified M.empty answer))
+  };
   -- The composition constructor accepts actual checked terms only. Requested
   -- imports select a verified prefix; they never supply a claimed result type.
   finishLinked linked signatures compiled = do {

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Compile a fresh user program against an authenticated fixed native installation.
+"""Compile a source file against an authenticated fixed native installation.
 
 The compiler supplies the installed library/runtime objects and their link
-contract. Each invocation emits new user LLVM, runs one ordinary Clang -O2
-compilation, and links a new executable. No user compilation cache is read.
+contract. File compilation can reuse previously checked declaration groups.
+Each invocation emits user LLVM, compiles it with Clang -O2 and links a new executable.
 """
 from __future__ import annotations
 

@@ -318,7 +318,9 @@ module Bootstrap.Crate where {
     };
     Right ((,) inputs (PreparedCrate full))
   });
-  prepareFileCrate finish = prepareCrateUsing (\mode external definition sources -> let {
+  prepareFileCrate finish = prepareCrateUsing (resolveFileCrate finish);
+  prepareFileCratePhased finish = prepareCratePhasedUsing (resolveFileCrate finish);
+  resolveFileCrate finish mode external definition sources = let {
     capture bindings source env exported renamed = let {
       owner = Modules.moduleIdentity source;
       hasMain = any (\v -> eqString (Modules.valueName v) "main") (Modules.sourceValues source);
@@ -329,44 +331,47 @@ module Bootstrap.Crate where {
       result = CompilationModules bindings units reach
     } in seq (M.foldlWithKeyStrict (\_ name reachable -> seq name (seq (Set.size reachable) ())) () reach) ((,) result (finish result));
     run = Modules.resolveModuleRows (Modules.resolveFileModuleUsing capture) collect
-  } in Modules.resolveWithTermKeyUsing run mode external definition definition sources);
-  prepareCrateUsing resolve spec interfaces sources =
-    do {
-      traverseEither
-        (\source ->
-           ensure
-             (eqString (Modules.moduleIdentity source) (specEntry spec) ||
-              (case Modules.sourceBody source of {
-                 Nothing -> True;
-                 Just _ -> False
-               }))
-             ("imported module contains a top-level expression: " ++ Modules.moduleIdentity source))
-        sources;
-      external <- externalNamespaces (specDependencies spec) interfaces;
-      owners <- moduleOwners (specIdentity spec) sources interfaces;
-      let {
-        -- All names owned by a crate share this exact encoded prefix.
-        encodedOwners = M.map Separate.compactName owners;
-        encodedDefault = Separate.compactName (specIdentity spec);
-        mangle =
-          \entity ->
-            Artifact.definitionNameEncoded
-              (M.findWithDefault compareString encodedDefault (Modules.owner entity) encodedOwners)
-              entity
-      };
-      (,) inputs@(CompilationModules table resolved ownedReach) complete <- resolve (specMode spec) external mangle sources;
+  } in Modules.resolveWithTermKeyUsing run mode external definition definition sources;
+  prepareCrateUsing resolve spec interfaces sources = mapLeft (\(CompileError _ message) -> message)
+    (prepareCratePhasedUsing resolve spec interfaces sources);
+  prepareCratePhasedUsing resolve spec interfaces sources = do {
+      (,) inputs@(CompilationModules table resolved ownedReach) complete <- mapLeft (CompileError ModuleResolution) (do {
+        traverseEither
+          (\source ->
+             ensure
+               (eqString (Modules.moduleIdentity source) (specEntry spec) ||
+                (case Modules.sourceBody source of {
+                   Nothing -> True;
+                   Just _ -> False
+                 }))
+               ("imported module contains a top-level expression: " ++ Modules.moduleIdentity source))
+          sources;
+        external <- externalNamespaces (specDependencies spec) interfaces;
+        owners <- moduleOwners (specIdentity spec) sources interfaces;
+        let {
+          -- All names owned by a crate share this exact encoded prefix.
+          encodedOwners = M.map Separate.compactName owners;
+          encodedDefault = Separate.compactName (specIdentity spec);
+          mangle =
+            \entity ->
+              Artifact.definitionNameEncoded
+                (M.findWithDefault compareString encodedDefault (Modules.owner entity) encodedOwners)
+                entity
+        };
+        resolve (specMode spec) external mangle sources
+      });
       let { symbols = Modules.bindingSymbols table;
             ownBindings = Dependency.BoundValues symbols (concatMap compilationBindings resolved) };
-      (,) ownData ownClasses <- Classes.canonicalSourceHeaders Set.empty
+      (,) ownData ownClasses <- mapLeft (CompileError Inference) (Classes.canonicalSourceHeaders Set.empty
         (concatMap (compose Artifact.crateData snd) interfaces)
         (concatMap (compose Artifact.crateClasses snd) interfaces)
         (concatMap (compose Modules.renamedDatatypes compilationContents) resolved)
-        (concatMap (compose Modules.renamedClasses compilationContents) resolved);
+        (concatMap (compose Modules.renamedClasses compilationContents) resolved));
       let { expression = case find (\unit -> eqString (compilationName unit) (specEntry spec)) resolved of {
         Nothing -> Left "crate entry module was not resolved"; Just unit -> compilationEntry unit
       } };
-      entryAndBindings <- entryBindingsFor spec ownBindings expression;
-      case entryAndBindings of {
+      entryAndBindings <- mapLeft (CompileError ModuleResolution) (entryBindingsFor spec ownBindings expression);
+      mapLeft (CompileError Inference) (case entryAndBindings of {
         (,) entry bindings ->
           do {
             let {
@@ -473,7 +478,7 @@ module Bootstrap.Crate where {
                  entry
                  reach sourcePlan)
           }
-      }
+      })
     };
   -- Query compilation consumes only metadata-derived schemes. Upstream checked
   -- bodies are opened later by the linker and never enter an inference key.
@@ -669,12 +674,12 @@ module Bootstrap.Crate where {
   withPreludeUsing = withPreludeLoading Artifact.loadInterfaces;
   withPreludeLoading = withPreludeMetadata (\((,) path iface) ->
     mapEither (\_ -> path) (Artifact.validateInterface iface));
+  needsBuiltin :: PreludeMode -> [] SourceModule -> Bool;
+  needsBuiltin mode = any (\source ->
+    Lexer.isSharedSyntax (Modules.sourceSyntax source) ||
+    any (\entry -> Modules.isBuiltinModule (Modules.importedModule entry)) (Modules.importsFor mode source));
   withPreludeMetadata existing load install spec sources interfaces =
-    if any
-         (\source ->
-            (Lexer.isSharedSyntax (Modules.sourceSyntax source) || any (\entry -> Modules.isBuiltinModule (Modules.importedModule entry))
-              (Modules.importsFor (specMode spec) source)))
-         sources
+    if needsBuiltin (specMode spec) sources
     then do {
            builtin <-
              case find

@@ -284,7 +284,7 @@ class Runner:
     def __init__(self, work, limits):
         self.work, self.limits = Path(work), limits
 
-    def run(self, argv, cwd, output, expected_exit=0, timed=False):
+    def run(self, argv, cwd, output, expected_exit=0, timed=False, *, env_overrides=None):
         output = Path(output)
         require(not output.exists(), 'fresh command output required: ' + str(output))
         output.mkdir(parents=True)
@@ -292,9 +292,14 @@ class Runner:
         limit = self.limits
         require(memory_available() >= limit['host_available_floor_bytes'], 'host memory floor before launch')
         require(__import__('shutil').disk_usage(self.work).free >= limit['disk_free_floor_bytes'], 'disk floor before launch')
+        child_env = env()
+        reported_env = {key: child_env[key] for key in (
+            'GHC_ENVIRONMENT', 'GHCRTS', 'LC_ALL', 'OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MAKEFLAGS')}
+        if env_overrides:
+            child_env.update(env_overrides)
+            reported_env.update(env_overrides)
         record = {'complete': False, 'argv': argv, 'cwd': str(Path(cwd).resolve()),
-                  'timed_target_leg': timed, 'limits': limit, 'environment': {
-                      key: env()[key] for key in ['GHC_ENVIRONMENT','GHCRTS','LC_ALL','OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','MAKEFLAGS']},
+                  'timed_target_leg': timed, 'limits': limit, 'environment': reported_env,
                   'boundary': 'Popen launch through exact-child wait4 completion; setup/copy/auth/postchecks excluded',
                   'started_utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
         receipt = output / 'command.json'
@@ -310,7 +315,7 @@ class Runner:
                 resource.setrlimit(resource.RLIMIT_AS, (maximum, maximum))
         with (output / 'stdout').open('wb') as stdout, (output / 'stderr').open('wb') as stderr:
             begin = time.perf_counter_ns()
-            process = subprocess.Popen(argv, cwd=cwd, env=env(), stdin=subprocess.DEVNULL,
+            process = subprocess.Popen(argv, cwd=cwd, env=child_env, stdin=subprocess.DEVNULL,
                                        stdout=stdout, stderr=stderr, start_new_session=True, preexec_fn=limits)
             def wait():
                 try:

@@ -9,6 +9,7 @@ module Bootstrap.PreparedLibraries
    metadataHash, objectHash, libraryObject, compileLoaded, checkedTerm,
    sourceType, reused, nameMap, NativeRoot, nativeCheckedWrapper, nativeSignatures,
    nativeSourceType, nativeInferredType, nativeDeclarations, nativeBuiltinCount, compileNativeRoot, compileNativeRootUsing,
+   nativeCrateInputsUsing, nativeCrateRoot,
    nativeLibrary, nativeLibraryDeclarations, nativeExportSignatures, nativeInstalledIds, nativeLayoutIds, nativeSelectedIds) where {
   import MLF.Primitive;
   import Bootstrap.Types;
@@ -21,6 +22,7 @@ module Bootstrap.PreparedLibraries
   import qualified Bootstrap.Parser as Parser;
   import qualified Bootstrap.Primitive as Primitive;
   import qualified Bootstrap.Compiler as Compiler;
+  import qualified Bootstrap.Constraint as Constraint;
   import qualified Bootstrap.CompilerCore as Core;
   import qualified Bootstrap.Classes as Classes;
   import qualified Bootstrap.Data as D;
@@ -32,6 +34,8 @@ module Bootstrap.PreparedLibraries
   import qualified Bootstrap.ImportedRoot as Imported;
   import qualified Bootstrap.X.Checked as Checked;
   import qualified Bootstrap.X.Type as T;
+  import qualified Bootstrap.X.Syntax as X;
+  import qualified Bootstrap.X.Traversal as Traversal;
 
   -- These constructors are compiler-owned generated data, never a cache wire
   -- format. The build pins the source and artifact SHA256s and regenerates the
@@ -355,7 +359,10 @@ module Bootstrap.PreparedLibraries
   } in length names == length (nubBy eqString names) && all
     (\source -> all (\entry -> let { name = Modules.importedModule entry } in
       Modules.isBuiltinModule name || elem eqString name names) (Modules.sourceImports source)) sources;
-  compileNativeRootUsingV1 parseSource raw mode loaded = do {
+  -- Source admission precedes either checked or native dependency selection.
+  -- Validate module visibility on the original reads, then compare resolved
+  -- headers with the closed interfaces generated for the installation.
+  admitNativeSources parseSource raw mode loaded = do {
     let { sources = Modules.loadedSources loaded;
       ordinary = Modules.resolveCrateWithAllocator mode M.empty Modules.freshNames sources };
     Core.atPhase Verification (ensure (nativeLoadedMatches raw mode loaded)
@@ -371,12 +378,51 @@ module Bootstrap.PreparedLibraries
         (bindEither (Modules.prepareCrateResolution mode M.empty completed) (resolvePreparedPlan raw));
       Core.atPhase Verification (validatePrepared raw prepared);
       Core.atPhase Verification (nativeHeaders raw);
-      compileNativeResolvedRoot raw prepared
+      Right prepared
     } };
     case attempt of {
       Right value -> Right value;
       Left failure -> do { Core.atPhase ModuleResolution ordinary; Left failure }
     }
+  };
+  compileNativeRootUsingV1 parseSource raw mode loaded = do {
+    resolved <- admitNativeSources parseSource raw mode loaded;
+    case compileNativeResolvedRoot raw resolved of {
+      Right result -> Right result;
+      Left failure -> do {
+        Core.atPhase ModuleResolution (Modules.resolveCrateWithAllocator mode M.empty
+          Modules.freshNames (Modules.loadedSources loaded));
+        Left failure
+      }
+    }
+  };
+  nativeCrateInputsUsing :: (String -> String -> Either String SourceModule) -> RawLibrary ->
+    PreludeMode -> Modules.LoadedModules ->
+    Either CompileError ((,) ([] SourceModule) ([] ((,) String Artifact.CrateInterface)));
+  nativeCrateInputsUsing parseSource raw mode loaded = do {
+    resolved <- admitNativeSources parseSource raw mode loaded;
+    let { sources = Modules.loadedSources loaded;
+          ownership = owners raw;
+          own = filter (\source -> not (M.member compareString (Modules.moduleIdentity source) ownership)) sources;
+          present = S.fromList compareString (map Modules.moduleIdentity sources);
+          -- The package checker sees the entire installed crate. Its extra
+          -- instance heads must not invalidate the loaded program's own heads.
+          missingOwner name = not (Modules.isBuiltinModule name || S.member compareString name present);
+          localInstances = map snd (filter (\entry -> not (M.member compareString (fst entry) ownership))
+            (Modules.resolvedCrateInstances resolved));
+          absent iface ((,) name instanceDecl) = do {
+            owner <- Artifact.instanceOwner iface name;
+            Right (if missingOwner owner then [instanceDecl] else [])
+          };
+          label iface = "/prepared/" ++ inputIdentity raw ++ "/" ++
+            Separate.compactName (Artifact.crateId iface) ++ ".mlfci" };
+    if null localInstances then Right () else Core.atPhase Verification (do {
+      inherited <- traverseEither (\iface -> traverseEither (absent iface) (Artifact.crateInstances iface)) (interfaces raw);
+      let { extras = concat (concat inherited) };
+      traverseEither (\inst -> traverseEither (\extra -> Classes.checkOverlap [inst,extra]) extras) localInstances;
+      Right ()
+    });
+    Right ((,) own (map (\iface -> (,) (label iface) iface) (interfaces raw)))
   };
   -- Only the canonical builtin crate is eligible for local materialization.
   -- Ownership comes from validated crate metadata, never a spelling or hint.
@@ -436,12 +482,14 @@ module Bootstrap.PreparedLibraries
     Right (CheckedLibraryRoot compiled imports (Parameters.project (snd selected)))
   };
   compileNativeResolvedRootV1 raw resolution = do {
-    CheckedLibraryRoot compiled imports selectedSignatures <- checkLibraryRoot raw resolution;
-    let { display = Modules.displayNames (Modules.resolvedCrateDisplayNames resolution);
-          sourcePhase phase result = Core.atPhase phase (mapLeft display result) };
+    checked <- checkLibraryRoot raw resolution;
+    Core.atPhase Verification (materializeNativeRoot raw
+      (Modules.displayNames (Modules.resolvedCrateDisplayNames resolution)) checked)
+  };
+  materializeNativeRoot raw display (CheckedLibraryRoot compiled imports selectedSignatures) = do {
     let { wrapper = Imported.checkedWrapper compiled;
           declarations = case Checked.term wrapper of { XWithData ds _ -> ds; _ -> [] } };
-    Core.atPhase Verification (do {
+    do {
       combined <- foldEither Separate.mergeDeclaration declarations
         (concatMap Artifact.crateLoweredData (interfaces raw));
       ensure (length combined == length declarations) "installed native library added an unowned datatype layout";
@@ -449,19 +497,19 @@ module Bootstrap.PreparedLibraries
       -- additionally checks their names against the installation's sealed
       -- nominal-use census before extending its fixed constructor-tag prefix.
       Right ()
-    });
-    usedSignatures <- sourcePhase Verification (Imported.usedImportSignatures selectedSignatures compiled);
+    };
+    usedSignatures <- mapLeft display (Imported.usedImportSignatures selectedSignatures compiled);
     let { builtinKeys = S.fromList compareString (concatMap (\iface ->
       if eqString (Artifact.crateId iface) Artifact.builtinCrateIdentity
         then map fst (Artifact.crateBindings iface) else []) (interfaces raw));
       needsBuiltin = any (\key -> S.member compareString key builtinKeys) (M.keys usedSignatures) };
-    local <- if not needsBuiltin then sourcePhase Verification
+    local <- if not needsBuiltin then mapLeft display
       (Imported.materializeLinked Checked.emptySpine selectedSignatures compiled) else do {
-      admitted <- sourcePhase Verification (nativeBuiltinState (filter (\key -> S.member compareString key builtinKeys) (M.keys usedSignatures)) raw);
+      admitted <- mapLeft display (nativeBuiltinState (filter (\key -> S.member compareString key builtinKeys) (M.keys usedSignatures)) raw);
       let { builtins = fst admitted;
         fallback = Imported.materializeImports selectedSignatures compiled
           (Artifact.fragmentSerial builtins) (Artifact.fragmentBindings builtins) (Artifact.fragmentBodies builtins) };
-      sourcePhase Verification (case snd admitted of {
+      mapLeft display (case snd admitted of {
         Left _ -> fallback;
         Right proof -> case Imported.materializeLinked proof selectedSignatures compiled of {
           Left _ -> fallback;
@@ -471,6 +519,48 @@ module Bootstrap.PreparedLibraries
     };
     Right (NativeRoot (fst local) (snd local) (display (Imported.sourceType compiled))
       (Imported.inferredType compiled) declarations (length (filter (\key -> S.member compareString key builtinKeys) (M.keys usedSignatures))) imports)
+  };
+  -- Link checked declaration groups with external bindings in the native ABI's
+  -- stable key order. The linker freshens every local name above the reserved
+  -- parameter range; only parameters read by reachable code enter the wrapper.
+  nativeCrateRoot :: RawLibrary -> [] Artifact.CrateObject -> Artifact.CrateObject -> Either String NativeRoot;
+  nativeCrateRoot raw dependencies root = do {
+    nativeHeaders raw;
+    installedSlots <- nativeInstalledIds raw;
+    let { objects = snoc dependencies root;
+          signatures = map snd installedSlots;
+          parameters = zipWith (\index ((,) key ty) ->
+            (,) key ((,) (XName index (Constraint.targetNameHint key)) ty))
+            (range 0 (length signatures - 1)) signatures };
+    ensure (all Artifact.openMarked objects) "native imports require checked open crate groups";
+    ensure (not (eqString (Artifact.crateEntry (Artifact.objectInterface root)) ""))
+      "native root lacks a program entry";
+    declarations <- nativeLibraryDeclarations raw;
+    let { firstLocal = length parameters;
+          -- Every wrapper shares the fixed tag and export layout. Its actual
+          -- binding environment contains only its declared crate dependencies.
+          initial imported = let {
+            keys = S.fromList compareString (concatMap (compose (map fst) Artifact.crateBindings) imported);
+            available = filter (\row -> S.member compareString (fst row) keys) parameters
+          } in Artifact.FragmentState firstLocal (M.fromDistinctAscList available) [] declarations S.empty };
+    (,) state entry <- Artifact.nativeObjectParts initial (map libraryObject (libraryObjects raw)) objects
+      (Artifact.crateId (Artifact.objectInterface root));
+    body <- foldEither (\rest spine -> Separate.graft spine rest) entry (Artifact.fragmentBodies state);
+    let { -- Linked local binders and their uses are freshly numbered above
+          -- the entire import range. This pass stays linear in deeply nested
+          -- binding spines and keeps only possible external identities.
+          reads = S.fromList X.compareName
+            (filter (\name -> X.nameId name < firstLocal) (Traversal.names body));
+          selected = filter (\pair -> S.member X.compareName (fst (snd pair)) reads) parameters;
+          types = M.fromDistinctAscList (map (\((,) key ((,) _ ty)) -> (,) key ty) selected);
+          -- The checked import wrapper convention delimits the parameter spine
+          -- from the user's own declarations, including a function-valued entry.
+          scoped = if null selected then body else XLetRec [] body;
+          wrapped = foldr (\((,) _ ((,) name ty)) term -> XAbs name ty term) scoped selected };
+    checked <- Checked.check (XWithData (Artifact.fragmentData state) wrapped);
+    compiled <- Imported.fromCheckedWrapper types checked;
+    materializeNativeRoot raw id
+      (CheckedLibraryRoot compiled (Parameters.namedImports (M.fromDistinctAscList signatures)) types)
   };
   compilePreparedV1 raw admitted resolution = do {
     CheckedLibraryRoot compiled _ selectedSignatures <- checkLibraryRoot raw resolution;

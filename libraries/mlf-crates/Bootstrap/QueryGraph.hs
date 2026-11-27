@@ -18,7 +18,8 @@ module Bootstrap.QueryGraph where {
   import qualified Bootstrap.ArtifactStorage as Storage;
 
   data QueryNode = QueryNode String String ([] ((,) String String)) (Maybe String);
-  data Session = Session String String String (Map String QueryNode) (Map String QueryNode)
+  data QueryStore = MemoryStore | DirectoryStore String;
+  data Session = Session QueryStore String String (Map String QueryNode) (Map String QueryNode)
     (Map String ByteArray);
   key kind identity = Separate.pack [kind,identity];
   nodeKey (QueryNode k _ _ _) = k;
@@ -26,10 +27,9 @@ module Bootstrap.QueryGraph where {
   nodeReads (QueryNode _ _ reads _) = reads;
   nodePayload (QueryNode _ _ _ payload) = payload;
   edge node = (,) (nodeKey node) (nodeHash node);
-  directory (Session path _ _ _ _ _) = path;
   currentNodes (Session _ _ _ _ nodes _) = nodes;
-  payloadPath session digest = directory session ++ "/results/" ++ digest ++ ".mlfqr";
-  stagingPath session digest = directory session ++ "/staging/" ++ digest ++ ".mlfqr";
+  payloadPath directory digest = directory ++ "/results/" ++ digest ++ ".mlfqr";
+  stagingPath directory digest = directory ++ "/staging/" ++ digest ++ ".mlfqr";
   validHash text = stringLength text == 64 && validHashFrom text 0;
   validHashFrom text index = if index == 64 then True else let { c = stringCodeAt text index } in
     ((c >= 48 && c <= 57) || (c >= 97 && c <= 102)) && validHashFrom text (index + 1);
@@ -52,11 +52,13 @@ module Bootstrap.QueryGraph where {
     encoded <- encodeHashedUsing limits value;
     ioReturn (mapEither fst encoded)
   };
+  beginMemory :: String -> IO (Either String Session);
+  beginMemory configuration = ioReturn (Right (Session MemoryStore configuration "" M.empty M.empty M.empty));
   begin :: String -> String -> IO (Either String Session);
   begin path configuration = do {
     code <- command ["/bin/mkdir","-p",path ++ "/results",path ++ "/generations",path ++ "/staging"];
     if code /= 0 then ioReturn (Left "cannot create query graph directory") else do {
-      let { empty = Session path configuration "" M.empty M.empty M.empty };
+      let { empty = Session (DirectoryStore path) configuration "" M.empty M.empty M.empty };
       pointer <- readValue (path ++ "/CURRENT") Nothing;
       case pointer of {
         Right graph -> case W.graphRoots graph of {
@@ -65,7 +67,7 @@ module Bootstrap.QueryGraph where {
               saved <- readValue (path ++ "/generations/" ++ digest ++ ".mlfqg") (Just digest);
               ioReturn (Right (case saved of {
                 Right graph -> case admitIndex configuration graph of {
-                  Right ((,) nodes canonical) -> Session path configuration
+                  Right ((,) nodes canonical) -> Session (DirectoryStore path) configuration
                     (if canonical then digest else "") nodes M.empty M.empty;
                   Left _ -> empty };
                 Left _ -> empty }))
@@ -80,12 +82,29 @@ module Bootstrap.QueryGraph where {
   };
   readValue path expected = do {
     raw <- Storage.readRaw path;
-    case raw of { Left e -> ioReturn (Left e); Right bytes -> do {
+    decodeValue expected raw
+  };
+  -- A checked group can consume a result produced earlier in this session,
+  -- before a persistent generation is published.
+  readPayloadBytes (Session store _ _ _ _ pending) digest = case M.lookup compareString digest pending of {
+    Just bytes -> ioReturn (Right bytes);
+    Nothing -> case store of {
+      MemoryStore -> ioReturn (Left "missing in-memory query result");
+      DirectoryStore path -> Storage.readRaw (payloadPath path digest)
+    }
+  };
+  readPayloadValue session digest = do {
+    raw <- readPayloadBytes session digest;
+    decodeValue (Just digest) raw
+  };
+  decodeValue expected raw = case raw of {
+    Left e -> ioReturn (Left e);
+    Right bytes -> do {
       digest <- case expected of { Nothing -> ioReturn ""; Just _ -> byteArrayDigest bytes };
       if (case expected of { Nothing -> True; Just wanted -> eqString digest wanted })
       then W.decodeGraph W.defaultLimits 6 bytes
       else ioReturn (Left "query graph checksum mismatch")
-    } }
+    }
   };
   -- Inputs are refreshed by their authoritative providers before validation.
   -- An old input with no current value means deletion, never an empty green leaf.
@@ -117,10 +136,10 @@ module Bootstrap.QueryGraph where {
             (S.insert compareString wanted visiting) parents session
         }
     };
-  validateReads node reads visiting parents session@(Session path config generation old current pending) = case reads of {
+  validateReads node reads visiting parents session@(Session store config generation old current pending) = case reads of {
     [] -> let { wanted = nodeKey node; remaining = S.delete compareString wanted visiting;
       active = M.insert compareString wanted node current } in
-      seq remaining (seq active (validateReady node remaining parents (Session path config generation old active pending)));
+      seq remaining (seq active (validateReady node remaining parents (Session store config generation old active pending)));
     (:) ((,) wanted expected) rest -> validateAt wanted visiting ((:) (ReadFrame node expected rest) parents) session
   };
   validateReady node visiting parents session = case parents of {
@@ -138,14 +157,14 @@ module Bootstrap.QueryGraph where {
     ioReturn (mapEither (\((,) digest bytes) -> recordDigest wanted reads
       (if persist then Just digest else Nothing) digest (if persist then Just bytes else Nothing) session) encoded)
   };
-  recordDigest wanted reads location digest value (Session path config generation old current pending) =
+  recordDigest wanted reads location digest value (Session store config generation old current pending) =
     let { fresh = QueryNode wanted digest reads location;
       node = case M.lookup compareString wanted old of {
         Just previous -> if sameNode previous fresh then previous else fresh;
         Nothing -> fresh
       };
       queued = case value of { Nothing -> pending; Just payload -> M.insert compareString digest payload pending } }
-    in (,) node (Session path config generation old (M.insert compareString (nodeKey node) node current) queued);
+    in (,) node (Session store config generation old (M.insert compareString (nodeKey node) node current) queued);
   forget wanted (Session p c g old current queued) = Session p c g old
     (M.delete compareString wanted current) queued;
   -- Generation numbers are local to these four tables. A read must resolve
@@ -458,13 +477,17 @@ module Bootstrap.QueryGraph where {
         ioReturn (mapEither Just encoded)
       }
     };
-  publish session@(Session path config previous old nodes pending) = do {
+  publish (Session MemoryStore _ _ _ _ _) = ioReturn (Right False);
+  publish (Session (DirectoryStore path) config previous old nodes pending) = do {
     failpoint <- getEnv "MLF_QUERY_FAILPOINT";
     if eqString failpoint "before-results" then ioReturn (Left "query publication interrupted before results") else do {
       encoded <- publication config previous old nodes;
       case encoded of { Left e -> ioReturn (Left e); Right generation -> do {
-        written <- publishValues failpoint session (M.toList pending);
-        closure <- case written of { Left e -> ioReturn (Left e); Right _ -> verifyPayloads session (M.elems nodes) };
+        written <- publishValues failpoint path (M.toList pending);
+        closure <- case written of {
+          Left e -> ioReturn (Left e);
+          Right _ -> verifyPayloadsAfter path (S.fromList compareString (M.keys pending)) (M.elems nodes)
+        };
         case closure of { Left e -> ioReturn (Left e); Right _ -> case generation of {
           Nothing -> ioReturn (Right False);
           Just ((,) digest bytes) -> if eqString digest previous then ioReturn (Right False)
@@ -486,27 +509,27 @@ module Bootstrap.QueryGraph where {
   -- Staging starts only at the caller's successful crate-output boundary.
   -- Every result still enters results/ by same-filesystem rename. A partial
   -- batch is unreachable until CURRENT switches; existing good results stay put.
-  publishValues failpoint session values = do {
-    staged <- stageValues session values [];
+  publishValues failpoint directory values = do {
+    staged <- stageValues directory values [];
     case staged of { Left e -> ioReturn (Left e); Right paths ->
       if eqString failpoint "after-result-staging"
         then ioReturn (Left "query publication interrupted after result staging")
-        else moveResults failpoint session paths
+        else moveResults failpoint directory paths
     }
   };
-  stageValues session values staged = case values of {
+  stageValues directory values staged = case values of {
     [] -> ioReturn (Right (reverse staged));
     (:) ((,) digest bytes) rest -> do {
-      let { path = payloadPath session digest };
+      let { path = payloadPath directory digest };
       actual <- existingHash path;
-      if eqString actual digest then stageValues session rest staged else do {
+      if eqString actual digest then stageValues directory rest staged else do {
         -- mv into results/ must not silently treat a corrupt entry as a directory.
         isDirectory <- directoryExists path;
         if isDirectory then ioReturn (Left "query result destination is a directory") else do {
-          let { destination = stagingPath session digest };
+          let { destination = stagingPath directory digest };
           saved <- Storage.writeRaw destination bytes;
           case saved of { Left e -> ioReturn (Left e);
-            Right _ -> stageValues session rest
+            Right _ -> stageValues directory rest
               ((:) ((,) ("staging/" ++ digest ++ ".mlfqr") ("results/" ++ digest ++ ".mlfqr")) staged) }
         }
       }
@@ -521,8 +544,8 @@ module Bootstrap.QueryGraph where {
         let { next = moveBatch (remaining - cost) (count - 1) rest }
         in (,) ((:) path (fst next)) (snd next)
   };
-  moveResults :: String -> Session -> [] ((,) String String) -> IO (Either String ());
-  moveResults failpoint session paths = case paths of {
+  moveResults :: String -> String -> [] ((,) String String) -> IO (Either String ());
+  moveResults failpoint directory paths = case paths of {
     [] -> ioReturn (Right ());
     (:) first rest -> do {
       -- The native Windows helper accepts one source and an exact target file;
@@ -534,12 +557,12 @@ module Bootstrap.QueryGraph where {
       -- Resolve generated names beneath the same cache directory. Keeping the
       -- common prefix out of argv lets the unchanged byte/count bounds batch
       -- equally well in short and long checkout paths.
-      code <- commandIn (directory session) (append ["/bin/mv","-f"]
+      code <- commandIn directory (append ["/bin/mv","-f"]
         (append (map (compose absolute fst) (fst batch)) destinations));
       if code /= 0 then ioReturn (Left "cannot publish query result batch") else
         if eqString failpoint "after-result-batch"
           then ioReturn (Left "query publication interrupted after a result batch")
-          else moveResults failpoint session (snd batch)
+          else moveResults failpoint directory (snd batch)
     }
   };
   data QueryId = QueryId;
@@ -584,17 +607,14 @@ module Bootstrap.QueryGraph where {
         (\_ -> visit rows marks (V.at rows i) ((:) ((,) i siblings) parents))
     })
   };
-  verifyPayloads :: Session -> [] QueryNode -> IO (Either String ());
-  verifyPayloads session@(Session _ _ _ _ _ pending) nodes =
-    verifyPayloadsAfter session (S.fromList compareString (M.keys pending)) nodes;
-  verifyPayloadsAfter :: Session -> Set String -> [] QueryNode -> IO (Either String ());
-  verifyPayloadsAfter session checked nodes = case nodes of {
+  verifyPayloadsAfter :: String -> Set String -> [] QueryNode -> IO (Either String ());
+  verifyPayloadsAfter directory checked nodes = case nodes of {
     [] -> ioReturn (Right ());
     (:) node rest -> case nodePayload node of {
-      Nothing -> verifyPayloadsAfter session checked rest;
-      Just digest -> if S.member compareString digest checked then verifyPayloadsAfter session checked rest else do {
-        actual <- existingHash (payloadPath session digest);
-        if eqString actual digest then verifyPayloadsAfter session (S.insert compareString digest checked) rest
+      Nothing -> verifyPayloadsAfter directory checked rest;
+      Just digest -> if S.member compareString digest checked then verifyPayloadsAfter directory checked rest else do {
+        actual <- existingHash (payloadPath directory digest);
+        if eqString actual digest then verifyPayloadsAfter directory (S.insert compareString digest checked) rest
         else ioReturn (Left "query publication has a missing/corrupt retained result")
       }
     }

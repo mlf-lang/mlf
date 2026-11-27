@@ -1809,52 +1809,57 @@ module Bootstrap.CrateArtifact where {
         (finish state entry)
     }
   };
-  linkedObjectParts initial prelinked objects root =
-    do {
-      let {
-        interfaces = append prelinked (map objectInterface objects)
-      };
-      uniqueNames "object identity" (map crateId interfaces);
-      ensure (all (compose null crateDependencies) prelinked)
-        "prelinked crate must have no dependencies";
-      let {
-        byName = interfaceMap interfaces
-      };
-      ordered <- dependencyClosure byName [] [] ((:) root []);
-      let { ready = map crateId prelinked };
-      ensure (all (\identity -> elem eqString identity (map crateId ordered)) ready)
-        "prelinked crate is outside the dependency closure";
-      traverseEither (validateDependencies byName) ordered;
-      traverseEither (validateExportBoundary byName) ordered;
-      dataEnv <- validateLayouts ordered;
-      let {
-        layouts =
-          M.fromList compareString
-            (map (\d -> (,) (D.datatypeName d) (datatypePart d))
-               (concatMap crateLoweredData ordered))
-      };
-      let {
-        objectMap =
-          M.fromList compareString (map (\o -> (,) (crateId (objectInterface o)) o) objects)
-      };
-      program <- openProgramFrom ready ordered objectMap root;
-      state <-
-        foldEither
-          (\s i ->
-             case M.lookup compareString (crateId i) objectMap of {
-               Nothing -> Left "missing crate object";
-               Just o -> linkProgramCrate program byName layouts s o
-             })
-          initial
-          (filter (\iface -> not (elem eqString (crateId iface) ready)) ordered);
-      let {
-        rootInterface = M.findWithDefault compareString (panic "missing root crate") root byName
-      };
-      entry <-
-        linkEntry (fragmentSerial state) ordered rootInterface (fragmentBindings state)
-          (crateEntry rootInterface);
-      Right ((,) state entry)
+  linkedObjectParts initial prelinked objects root = do {
+    let { interfaces = append prelinked (map objectInterface objects);
+          byName = interfaceMap interfaces };
+    uniqueNames "object identity" (map crateId interfaces);
+    ensure (all (compose null crateDependencies) prelinked)
+      "prelinked crate must have no dependencies";
+    ordered <- dependencyClosure byName [] [] [root];
+    let { ready = map crateId prelinked };
+    ensure (all (\identity -> elem eqString identity (map crateId ordered)) ready)
+      "prelinked crate is outside the dependency closure";
+    traverseEither (validateDependencies byName) ordered;
+    traverseEither (validateExportBoundary byName) ordered;
+    validateLayouts ordered;
+    let { layouts = M.fromList compareString (map (\d -> (,) (D.datatypeName d) (datatypePart d))
+            (concatMap crateLoweredData ordered));
+          objectMap = M.fromList compareString (map (\o -> (,) (crateId (objectInterface o)) o) objects) };
+    composeObjectParts initial ready root byName ordered layouts objectMap
+  };
+  -- Bind imports only within the checked root's transitive crate closure.
+  -- The actual installed objects own metadata admission, including the
+  -- semantic digest, layout and entry-rendering budget of a marked object.
+  nativeObjectParts initial installed objects root = do {
+    prepared <- envelopePrepareKnownObjects (append installed objects) [root] True;
+    case prepared of { EnvelopeKnownObjects ordered byName objectMap table layouts -> do {
+      let { identities = Set.fromList compareString (map (compose crateId objectInterface) installed);
+            imported = filter (\iface -> Set.member compareString (crateId iface) identities) ordered };
+      charged <- envelopePrechargeEntry root table ordered;
+      seq charged (composeObjectParts (initial imported) (map crateId imported) root byName ordered layouts objectMap)
+    } }
+  };
+  -- Closed spines and external ABI binders share reachable fragment
+  -- selection, capture-free substitution and entry elaboration.
+  composeObjectParts initial ready root byName ordered layouts objectMap = do {
+    program <- openProgramFrom ready ordered objectMap root;
+    state <-
+      foldEither
+        (\s i ->
+           case M.lookup compareString (crateId i) objectMap of {
+             Nothing -> Left "missing crate object";
+             Just o -> linkProgramCrate program byName layouts s o
+           })
+        initial
+        (filter (\iface -> not (elem eqString (crateId iface) ready)) ordered);
+    let {
+      rootInterface = M.findWithDefault compareString (panic "missing root crate") root byName
     };
+    entry <-
+      linkEntry (fragmentSerial state) ordered rootInterface (fragmentBindings state)
+        (crateEntry rootInterface);
+    Right ((,) state entry)
+  };
   finishLinkedState state entry = do {
     body <- foldEither (\body declarations -> Separate.graft declarations body) entry
       (fragmentBodies state);

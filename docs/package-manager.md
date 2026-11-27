@@ -189,7 +189,9 @@ checked-artifact and LLVM cache actions: a fresh target hands its verified LLVM
 to the emission action, while a no-edit build reuses their completed artifacts.
 Libraries still compile to checked artifacts only. Older seed compilers and
 checked-only artifacts use the staged commands with the existing cache checks.
-The ordinary `emlf SOURCE -o OUTPUT` installed driver is a separate entry.
+For a source file, `emlf SOURCE -o OUTPUT` infers an implicit crate and can link
+the installed standard-library and runtime objects. See [compiler roots and
+caching](compiler-entry-unification.md).
 
 Libraries and targets compile as crates through generated `.mlfci` metadata and
 `.mlfco` checked fragments. Declaration SCC inference releases each solver graph

@@ -6,12 +6,14 @@
 module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, compileSpecFileWithVerification, compileSpecFileUsingInstaller,
     CompiledCrate, compiledObject, compiledInterfaces, compiledMetadata, compiledCompilerDigest, PlanInputs(..), compilerImageDigest,
     CompilationSession, freshSession, loadPlan, compileInSession, sessionObjects,
+    QueryStorage(..), SourceRoot, compileSourceRoot, compileExpressionRoot, rootObject, rootDisplayNames, rootDictionaryNames,
     compileSpecFileRetainedUsingInstaller, compileSpecFileRetainedInPlan) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.ST as ST;
+  import qualified Bootstrap.Host as Host;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.Resolved as R;
@@ -188,64 +190,143 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
       }
     };
 
+  data QueryStorage = MemoryQueries | FileQueries String | DefaultFileQueries String;
+  data SourceRoot = SourceRoot Artifact.CrateObject (Map String String) (Map String String);
+  rootObject (SourceRoot object _ _) = object;
+  rootDisplayNames (SourceRoot _ names _) = names;
+  rootDictionaryNames (SourceRoot _ _ names) = names;
+
+  compileSourceRoot :: QueryStorage -> PreludeMode -> String -> String -> [] SourceModule ->
+    [] ((,) String Artifact.CrateInterface) -> IO (Either CompileError SourceRoot);
+  compileSourceRoot storage mode identity entry sources interfaces = let {
+    inventory = map (\source -> (,) (Modules.moduleIdentity source) (Modules.sourcePath source)) sources;
+    spec = Crate.CrateSpec identity entry mode inventory (map fst interfaces) "" ""
+  } in case Crate.prepareFileCratePhased FileCrate spec interfaces sources of {
+    Left err -> ioReturn (Left err);
+    Right prepared -> compilePreparedSourceRoot storage spec interfaces
+      (Crate.compilationNames (fileModules prepared)) prepared
+  };
+
+  -- Group inference reports can already carry a CompilerCore phase. Recover it
+  -- at the public source boundary; untagged SCC diagnostics belong to inference.
+  sourceGroupError display message = let {
+    locate phases = case phases of {
+      [] -> CompileError Inference (display message);
+      (:) phase rest -> let { prefix = Compiler.prettyPhase phase ++ ": "; width = stringLength prefix } in
+        if width <= stringLength message && eqString prefix (stringSlice message 0 width) then CompileError phase
+          (display (stringSlice message width (stringLength message - width))) else locate rest
+    }
+  } in locate [Inference,Resolution,Elaboration,Verification];
+  compilePreparedSourceRoot storage spec interfaces names prepared = do {
+    let { dictionaries = M.map (Modules.displayNames names) (fileNames prepared);
+          display = Modules.displayNames (M.union compareString dictionaries names) };
+    result <- withSourceQueries storage (\begin compiler ->
+      checkCrateGroups begin compiler False spec interfaces prepared (filePlan prepared)
+        (\object _ session _ _ -> do {
+          published <- QueryGraph.publish session;
+          ioReturn (mapEither (\_ -> SourceRoot object names dictionaries) (mapLeft sourceStorageError published))
+        }));
+    ioReturn (mapLeft (sourceGroupError display) result)
+  };
+
+  sourceStorageError message = Compiler.prettyError (CompileError Verification message);
+  withSourceQueries storage use = let {
+    memory = use QueryGraph.beginMemory "in-memory";
+    disk optional path = do {
+      let { directory = Query.cachePath path; graph = directory ++ "/query-graph-v3" };
+      -- Probe the directory and the OS lock before starting any source work.
+      -- A read-only working tree can still compile with the default policy.
+      windows <- Host.isWindows;
+      command <- Host.hostArguments ["/bin/mkdir","-p",graph ++ "/results",graph ++ "/generations",graph ++ "/staging"];
+      let { stderrPath = if windows then "NUL" else "/dev/null" };
+      created <- runProcess "" (concatMapString (\field -> field ++ stringFromCode 0)
+        (append ["1800","","",stderrPath] command));
+      let { unavailable message = if optional then memory
+            else ioReturn (Left (sourceStorageError (message ++ ": " ++ directory))) };
+      if created /= 0 then unavailable "cannot create source query cache" else do {
+        reply <- processSupervisor ("MLF-PROCESS-1\0acquire-file-lock\0" ++ directory ++ "/.lock" ++ stringFromCode 0);
+        if stringLength reply < 4 || not (eqString (stringSlice reply 0 2) "0\0")
+          then unavailable "cannot acquire source query cache lock"
+          else runLockedQueries directory (readInt (stringSlice reply 2 (stringLength reply - 3)))
+            Nothing sourceStorageError use
+      }
+    }
+  } in case storage of {
+    MemoryQueries -> memory;
+    FileQueries path -> disk False path;
+    DefaultFileQueries path -> disk True path
+  };
+  runLockedQueries directory lock planInputs storageError use = do {
+    result <- catchIOError (do {
+      compiler <- case planInputs of {
+        Nothing -> compilerImageDigest;
+        Just (PlanInputs image _) -> ioReturn image
+      };
+      if Query.validSourceContextDigest compiler then use (CrateGraph.openFileQueries directory) compiler
+        else ioReturn (Left (storageError "cannot fingerprint query graph compiler"))
+    }) (\error -> ioReturn (Left (storageError (textFromChars (ioeGetErrorString error)))));
+    releaseFileLock lock;
+    ioReturn result
+  };
   compileGraphSources planInputs verify spec interfaces prepared plan prefix = do {
     let { directory = Query.cachePath (specCache spec) };
     created <- Query.cacheCommand ["/bin/mkdir","-p",directory];
     if created /= 0 then ioReturn (Left "cannot create query graph cache directory") else do {
       lock <- acquireFileLock (directory ++ "/.lock");
-      result <- catchIOError (compileGraphLocked planInputs verify spec interfaces prepared plan prefix directory)
-        (\error -> ioReturn (Left (textFromChars (ioeGetErrorString error))));
-      releaseFileLock lock;
-      ioReturn result
+      runLockedQueries directory lock planInputs (\message -> message) (\begin compiler ->
+      checkCrateGroups begin compiler verify spec interfaces prepared plan (\object report session statistics outputStarted -> do {
+        written <- case planInputs of {
+          Nothing -> do {
+            result <- Artifact.writeObjectEither prefix object;
+            ioReturn (mapEither (\_ -> Nothing) result)
+          };
+          Just _ -> do {
+            result <- Artifact.writeOpenObjectRetaining prefix object;
+            ioReturn (mapEither Just result)
+          }
+        };
+        case written of {
+          Left message -> ioReturn (Left message);
+          Right metadata -> do {
+            writeFile (prefix ++ ".queries") (Query.reportJSON (specIdentity spec)
+              (Artifact.semanticFingerprint (Artifact.objectInterface object)) report);
+            QueryGraph.elapsed statistics 4 outputStarted;
+            publishStarted <- QueryGraph.clock statistics;
+            published <- QueryGraph.publish session;
+            QueryGraph.elapsed statistics 5 publishStarted;
+            QueryGraph.writeProfile (prefix ++ ".query-profile") statistics;
+            ioReturn (mapEither (\_ -> (,,) object metadata compiler) published)
+          }
+        }
+      }))
     }
   };
-  compileGraphLocked planInputs verify spec interfaces prepared plan prefix directory = do {
-    compiler <- case planInputs of {
-      Nothing -> compilerImageDigest;
-      Just (PlanInputs image _) -> ioReturn image
-    };
+  checkCrateGroups begin compiler verify spec interfaces prepared plan complete = do {
     let { imported = map (\((,) _ iface) -> Separate.UnitInterface (Artifact.crateId iface)
           [] [] [] [] [] (Artifact.crateBindings iface) "metadata") interfaces;
       protected = M.fromList compareString (concatMap (compose Artifact.crateProtection snd) interfaces) };
-    compiled <- if Query.validSourceContextDigest compiler
-      then case plan of {
-        Just source -> CrateGraph.compileFile verify (specIdentity spec) compiler directory imported protected source;
-        Nothing -> CrateGraph.compileLoweredIn (fileLowered prepared) verify (specIdentity spec) compiler directory imported
-      }
-      else ioReturn (Left "cannot fingerprint query graph compiler");
-    case compiled of { Left e -> ioReturn (Left e); Right state -> case CrateGraph.checkedResult state of {
-      (,,,) fragments report contracts session -> let {
-        linked = pruneCheckedProjections prepared (simplifyCheckedProjections fragments)
-      } in case graphInterface spec interfaces prepared linked contracts of {
-        Left e -> ioReturn (Left e);
-        Right iface -> do {
-          outputStarted <- QueryGraph.clock (CrateGraph.statistics state);
-          made <- Artifact.makeOpenObject iface (map snd interfaces) (map (\((,,) n f _) -> (,) n f) linked);
-          case made of { Left e -> ioReturn (Left e); Right object -> do {
-            written <- case planInputs of {
-              Nothing -> do {
-                result <- Artifact.writeObjectEither prefix object;
-                ioReturn (mapEither (\_ -> Nothing) result)
-              };
-              Just _ -> do {
-                result <- Artifact.writeOpenObjectRetaining prefix object;
-                ioReturn (mapEither Just result)
-              }
-            };
-            case written of { Left e -> ioReturn (Left e); Right metadata -> do {
-              writeFile (prefix ++ ".queries") (Query.reportJSON (specIdentity spec)
-                (Artifact.semanticFingerprint (Artifact.objectInterface object)) report);
-              QueryGraph.elapsed (CrateGraph.statistics state) 4 outputStarted;
-              publishStarted <- QueryGraph.clock (CrateGraph.statistics state);
-              published <- QueryGraph.publish session;
-              QueryGraph.elapsed (CrateGraph.statistics state) 5 publishStarted;
-              QueryGraph.writeProfile (prefix ++ ".query-profile") (CrateGraph.statistics state);
-              ioReturn (mapEither (\_ -> (,,) object metadata compiler) published)
-            } }
-          } }
+    compiled <- case plan of {
+      Just source -> CrateGraph.compileFileQueries begin verify (specIdentity spec) compiler imported protected source;
+      Nothing -> CrateGraph.compileLoweredQueries begin (fileLowered prepared) verify (specIdentity spec) compiler imported
+    };
+    case compiled of {
+      Left message -> ioReturn (Left message);
+      Right state -> case CrateGraph.checkedResult state of {
+        (,,,) fragments report contracts session -> let {
+          linked = pruneCheckedProjections prepared (simplifyCheckedProjections fragments)
+        } in case graphInterface spec interfaces prepared linked contracts of {
+          Left message -> ioReturn (Left message);
+          Right iface -> do {
+            started <- QueryGraph.clock (CrateGraph.statistics state);
+            made <- Artifact.makeOpenObject iface (map snd interfaces) (map (\((,,) n f _) -> (,) n f) linked);
+            case made of {
+              Left message -> ioReturn (Left message);
+              Right object -> complete object report session (CrateGraph.statistics state) started
+            }
+          }
         }
       }
-    } }
+    }
   };
   -- This rewrite runs after query validation. Published code can depend on a
   -- local projection's implementation while inference uses only its type.
@@ -407,6 +488,30 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
           (Crate.withPreludeMetadata (compose Right fst) (load [] interfaces))
           verifyAll install True spec sources interfaces prefix
     }
+  };
+
+  -- Named script bindings retain their lexical source spelling. Only the
+  -- outer declaration spine is split: nested lets and lambdas stay in the RHS.
+  compileExpressionRoot :: QueryStorage -> String -> String -> Map String String ->
+    [] ((,) String Artifact.CrateInterface) -> [] DataDecl ->
+    [] ((,,) String (Maybe SAnnotation) SExpr) -> Map String String -> IO (Either CompileError SourceRoot);
+  compileExpressionRoot storage identity owner names interfaces declarations members dictionaries = let {
+    entry = Artifact.definitionName identity (Modules.Entity owner "<crate-entry>" Modules.Value);
+    membersByName = map Source.sourceName members;
+    symbols = Dependency.symbols (map (\n -> (,) n False) membersByName);
+    ids = V.indices (Dependency.symbolNodes symbols);
+    lowered = Inference.LoweredDeclarations declarations members dictionaries;
+    importedData = Set.fromList compareString (concatMap (compose (map D.datatypeName)
+      (compose Artifact.crateLoweredData snd)) interfaces);
+    localData = filter (\declaration -> not (Set.member compareString (D.datatypeName declaration) importedData)) declarations;
+    moduleRow = Crate.CompilationModule owner (Modules.Renamed symbols [] [] [] [] Nothing)
+      (Right (R.Local entry)) (Right Modules.emptyInterface);
+    modules = Crate.CompilationModules (Modules.Bindings symbols M.empty) [moduleRow] M.empty;
+    spec = Crate.CrateSpec identity owner NoImplicitPrelude [] (map fst interfaces) "" ""
+  } in case lookup eqString entry (zip membersByName ids) of {
+    Nothing -> ioReturn (Left (CompileError Inference "class lowering lost the script entry declaration"));
+    Just slot -> compilePreparedSourceRoot storage spec interfaces names
+      (FileCrate modules localData [] [] lowered (CrateEntry symbols slot) M.empty Nothing)
   };
 
   runSourceGroupsWithEncodings :: Maybe Query.SourceEncodings -> String -> String -> String ->

@@ -5,7 +5,7 @@
 module Bootstrap.OpenFragment
   (Environment, environment, environmentUsing, checkClosedIn, declarations, dataEnvironment, Fragment, check, fromChecked,
    parameters, body, bodyValue, storageValue, checkedStorageValue, bindings, usedParameters, context, fingerprint,
-   normalize, withNameHints, encodeBody, encodeRaw, encodeCheckedRaw, decodeTrusted, decodeTrustedIds, audit, closedTerm, fresh, linkBody,
+   normalize, withNameHints, encodeBody, encodeRaw, encodeCheckedRaw, decodeTrusted, decodeTrustedIds, decodeTrustedIdsFrom, audit, closedTerm, fresh, linkBody,
    Package, makePackage, makeCheckedPackage, readPackage, readPackageProfiled, packageFragments, packageBytes,
    packageHash, packageMetadata, packageFamily, declarationValue, compatibilityIdentity,
    MetadataReceipt, makeMetadataReceipt, metadataReceiptHash, withMetadataReceipt, cachedMetadata) where {
@@ -805,8 +805,12 @@ module Bootstrap.OpenFragment
   decodeTrustedIds :: String -> String -> [] ((,) String String) -> String -> String -> Environment ->
     [] ((,,) (V.Index Declaration) String XType) -> [] ((,) (V.Index Declaration) String) ->
     IO (Either String Fragment);
-  decodeTrustedIds path expected references stage name env expectedParameters expectedMembers = do {
-    acquired <- Storage.readRaw path;
+  decodeTrustedIds path = decodeTrustedIdsFrom (Storage.readRaw path);
+  decodeTrustedIdsFrom :: IO (Either String ByteArray) -> String -> [] ((,) String String) -> String -> String -> Environment ->
+    [] ((,,) (V.Index Declaration) String XType) -> [] ((,) (V.Index Declaration) String) ->
+    IO (Either String Fragment);
+  decodeTrustedIdsFrom acquire expected references stage name env expectedParameters expectedMembers = do {
+    acquired <- acquire;
     case acquired of {
       Left message -> ioReturn (Left message);
       Right bytes -> do {

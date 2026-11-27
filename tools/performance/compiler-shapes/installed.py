@@ -166,10 +166,10 @@ def leaf_edit(case):
     }
 
 
-def measured(argv, cwd, directory, runner):
+def measured(argv, cwd, directory, runner, env_overrides):
     started = time.time_ns()
     try:
-        row = runner.run(argv, cwd, directory, timed=True)
+        row = runner.run(argv, cwd, directory, timed=True, env_overrides=env_overrides)
     except RuntimeError:
         if not (directory / "command.json").exists():
             raise
@@ -303,6 +303,7 @@ def main():
         "ghc_host_package": sha(out / "host/libHSmlf-shape-primitives-0.1.a"),
         "setup": setup_commands,
         "os_cache": "not flushed",
+        "source_query_cache": "isolated per workload, round and MLF producer; shared with its warm or edited build",
         "limits": LIMITS,
         "producers": producers,
         "cases": cases,
@@ -351,6 +352,7 @@ def main():
                 )
             else:
                 require(not program.exists(), "fresh output exists")
+            env_overrides = {}
             if lane == "ghc":
                 command = [
                     ghc,
@@ -380,6 +382,11 @@ def main():
                     program,
                 ]
             else:
+                source_queries = dest / "source-queries"
+                if state == "fresh":
+                    require(not source_queries.exists(), "fresh source query cache exists")
+                env_overrides["MLF_SOURCE_CACHE_DIR"] = str(source_queries)
+                sample["source_query_cache"] = str(source_queries)
                 build = dest / (state + "-build")
                 require(not build.exists(), "user build directory exists")
                 command = [
@@ -392,7 +399,7 @@ def main():
                     "--build-dir",
                     build,
                 ]
-            sample.update(measured(command, src, dest / state, runner))
+            sample.update(measured(command, src, dest / state, runner, env_overrides))
             require(
                 sample["exit"] == 0 and not sample["guard"],
                 sample["guard"] or (dest / state / "stderr").read_text()[-1400:],

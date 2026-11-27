@@ -13,10 +13,11 @@ Clang and the GMP/BDWGC development packages are discovered through `pkg-config`
 Public installations default to GHC `-O2`; explicit `--bootstrap-only` and
 `--typecheck-only` development builds default to `-O0`. An explicit
 `--optimization 0` or `--optimization 2` is honored on either route. Fixed library and
-runtime objects always use ordinary Clang `-O2`. Fresh user programs are inferred,
-checked, emitted and compiled on every invocation, with one ordinary Clang `-O2`
-job. Default source roots belong to the installation; explicit user roots retain
-ordinary resolution semantics rather than being relabeled as installed sources.
+runtime objects always use ordinary Clang `-O2`. User files can reuse checked
+declaration groups under `.mlf-build/cache/source-roots/` in the working
+directory. Each native invocation emits user LLVM, compiles it with Clang
+`-O2`, and links the installed objects. Explicit module search paths take
+precedence over the installation's default source roots.
 
 Selected small builtin methods and dictionaries retain their checked definitions
 inside the fresh user compilation so ordinary optimization can specialize numeric
@@ -122,11 +123,10 @@ object and link-library hashes, target layout, Clang identity and link arguments
 Its `runtime_abi` field must match the compiler's `mlf_require_runtime_v5_abi`
 link symbol. Rebuild an installation produced before this boundary.
 The compiler's native mode authenticates the sealed manifest and its fixed input
-files; callers cannot select another manifest. A fresh user program is compiled
-and optimized on every invocation. The generic native program driver uses one
-ordinary Clang `-O2` job for that fresh program, then links installed fixed
-objects. Installation costs and per-program costs are distinct and must be
-reported separately. The standalone LLVM mode remains available.
+files. File roots reuse eligible checked groups through the crate session. The
+native program driver emits the user LLVM, compiles it with Clang `-O2`, then
+links the installed fixed objects. Report installation and per-program costs
+separately. The standalone LLVM mode remains available.
 
 This is local reproducible-build evidence, not a signing authority: modifying
 all verifier source, compiler source and receipts coherently is outside this
