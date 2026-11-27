@@ -455,6 +455,7 @@ module MLF.PreparedCompiler
   data RootPlan = RootPlan RootSource ([] ((,) String Artifact.CrateInterface))
     CheckedDependencies (Either CompileError Libraries.RawLibrary);
   data CompiledRoot = CompiledRoot Session.SourceRoot CheckedDependencies (Either CompileError Libraries.RawLibrary);
+  builtinMetadata :: Artifact.CrateInterface -> [] ((,) String Artifact.CrateInterface);
   builtinMetadata iface = [(,) "/mlf/implicit-dependencies/builtin.mlfci" iface];
   closeSourceRoot dependencies root = case dependencies of {
     CheckedObjects objects -> SourceCrate.close objects root;
