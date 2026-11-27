@@ -13,8 +13,8 @@
 #ifndef IO_EXPORT
 #define IO_EXPORT 0
 #endif
-extern MlfValue *mlf_fixed_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_get(uint64_t);
-#define get_export mlf_fixed_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_get
+extern MlfValue *mlf_crate_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_get(uint64_t);
+#define get_export mlf_crate_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_get
 
 /* The emitted static pointer array is separately checked by the harness.
  * This pressure test additionally exercises the actual BDWGC-linked image. */

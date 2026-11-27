@@ -6,54 +6,54 @@ module Main where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
-  import qualified Bootstrap.Constraint as C;
-  import qualified Bootstrap.Map as M;
-  import qualified Bootstrap.Data as D;
-  import qualified Bootstrap.X.Pretty as Pretty;
+  import qualified Bootstrap.CrateArtifact as Artifact;
   import qualified Bootstrap.PreparedLibraries as Prepared;
+  import qualified Bootstrap.NativeCrate as Native;
   import qualified Bootstrap.LLVM as LLVM;
-  import qualified Bootstrap.LLVM.Library as Library;
+  import qualified MLF.CrateNativeCommand as Command;
   import qualified MLF.PreparedLibraryData as Data;
   import qualified Package.Json as J;
   fatal :: forall a. String -> IO a;
   fatal message = do { putErr (message ++ "\n"); exitWith 1; panic "exitWith returned" };
   require :: forall a. Either String a -> IO a;
   require result = case result of { Left message -> fatal message; Right value -> ioReturn value };
-  text :: String -> J.Json;
-  text = J.String;
-  metadata :: Library.ExportLayout -> J.Json;
-  metadata layout = J.Object [
-    (,) "format" (text "MLF-NATIVE-LIBRARY-2"),
-    (,) "identity" (text (Library.identity layout)),
-    (,) "export_abi" (text "mlf-native-typed-tuple/2"),
-    (,) "runtime_abi" (text LLVM.runtimeAbi),
-    (,) "exports" (J.Array (zipWith (\slot ((,,) key hint ty) -> J.Object [
-      (,) "key" (text key), (,) "hint" (text hint),
-      (,) "type" (text (Pretty.prettyType ty)), (,) "slot" (J.Number (showInt slot))])
-      (range 0 (length (Library.exports layout) - 1)) (Library.exports layout))),
-    (,) "declarations" (J.Array (map (\d -> text (D.prettyDeclaration d)) (Library.declarations layout))),
-    (,) "reserved_type_names" (J.Array (map text (Library.reservedTypeNames layout))),
-    (,) "constructor_tags" (J.Array (map (\((,) name ((,) tag arity)) -> J.Object [
-      (,) "name" (text name), (,) "tag" (J.Number (showInt tag)), (,) "arity" (J.Number (showInt arity))])
-      (M.toList (Library.constructorTags layout))))
-  ];
+  emit :: String -> [] Artifact.CrateInterface -> (,) Int ((,) Prepared.LibraryObject Artifact.CrateObject) -> IO J.Json;
+  emit directory headers ((,) index ((,) recorded object)) = do {
+    let {
+          owner = Artifact.crateId (Artifact.objectInterface object);
+          identity = Prepared.objectHash recorded;
+          filename = "library-" ++ showInt index ++ ".ll" };
+    result <- require (Native.emitLibrary identity headers object);
+    case result of {
+      Left reason -> ioReturn (J.object [(,) "contract" (J.set "status" (J.str "unsupported")
+        (J.set "reason" (J.str reason) (Command.nativeContractHeader owner identity))), (,) "llvm" J.Null]);
+      Right ((,) chunks contract) -> do {
+        writeFile (directory ++ "/" ++ filename) (concatStrings chunks);
+        ioReturn (J.object [(,) "contract" (Command.nativeContract contract), (,) "llvm" (J.str filename)])
+      }
+    }
+  };
   main :: IO ();
   main = do {
     count <- getArgCount;
-    if count /= 2 then fatal "usage: GenerateNative LLVM_OUTPUT METADATA_OUTPUT" else ioReturn ();
-    output <- getArg 0;
+    if count /= 2 then fatal "usage: GenerateNative OUTPUT_DIRECTORY METADATA_OUTPUT" else ioReturn ();
+    directory <- getArg 0;
     manifest <- getArg 1;
-    raw <- require (case Data.libraries of { [value] -> Right value; _ -> Left "native installation requires one fixed library registry" });
-    installed <- require (Prepared.nativeLibrary raw);
-    ds <- require (Prepared.nativeLibraryDeclarations raw);
-    let { linked = case installed of { (,,) value _ _ -> value } };
-    signatures <- require (Prepared.nativeInstalledIds raw);
-    let { entries = map (\((,) d ((,) key ty)) -> (,) d ((,,) key (C.targetNameHint key) ty)) signatures };
-    base <- require (Library.prepareLayoutIds (Prepared.inputIdentity raw) entries ds);
-    names <- require (Library.libraryTypeNames base linked);
-    layout <- require (Library.withTypeNames base names);
-    generated <- require (Library.emitLibrary layout linked);
-    writeFile output (concatStrings generated);
-    writeFile manifest (J.render (metadata layout) ++ "\n")
+    raw <- require (case Data.libraries of { [value] -> Right value; _ -> Left "native installation requires one prepared source inventory" });
+    objects <- Prepared.readLibraryObjects raw >>= require;
+    let { recorded = zip (Prepared.libraryObjects raw) objects;
+          headers = map Artifact.objectInterface objects;
+          providers = sortBy (\a b -> compareString
+            (Artifact.crateId (Prepared.libraryInterface (fst a)))
+            (Artifact.crateId (Prepared.libraryInterface (fst b))))
+            (filter (\entry -> not (eqString Artifact.builtinCrateIdentity
+              (Artifact.crateId (Prepared.libraryInterface (fst entry))))) recorded) };
+    rows <- mapM (emit directory headers) (zip (range 0 (length providers - 1)) providers);
+    writeFile manifest (J.render (J.object [
+      (,) "format" (J.str "MLF-NATIVE-INSTALLATION-1"),
+      (,) "identity" (J.str (Prepared.inputIdentity raw)),
+      (,) "export_abi" (J.str Native.nativeABI),
+      (,) "runtime_abi" (J.str LLVM.runtimeAbi),
+      (,) "providers" (J.array rows)]) ++ "\n")
   }
 }

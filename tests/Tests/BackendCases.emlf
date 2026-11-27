@@ -20,7 +20,7 @@ import qualified Package.OS as O
 import Prelude hiding (printInt, listDirectory)
 
 checked : String -> IO XTerm
-checked source = do { compiled <- (B.rightCase (compile "<backend source test>" source)); (B.rightCase (XP.parseTerm "<standalone xMLF test>" (prettyTerm (compiledTerm compiled)))) }
+checked source = do { compiled <- (ioBind (compile "<backend source test>" source) (B.rightCase)); (B.rightCase (XP.parseTerm "<standalone xMLF test>" (prettyTerm (compiledTerm compiled)))) }
 
 checkOutput : B.Backends -> XTerm -> ([] ( String )) -> String -> IO ()
 checkOutput backends term inputs expected = do { ((,) result trace) <- (B.capture backends term inputs); do { (B.rightCase result); (let { actual = (H.concat (S.concatMap (\comprehension1 -> case comprehension1 of { (Write text) -> ((:) text []); _ -> [] }) trace)) } in (B.assertCase (H.eq actual expected) (H.append "unexpected output: " (H.show actual)))) } }

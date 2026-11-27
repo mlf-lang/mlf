@@ -10,6 +10,7 @@ import qualified Bootstrap.Map as BootstrapMap
 import qualified Bootstrap.Compiler as Compiler
 import qualified Bootstrap.Parser as Parser
 import qualified Bootstrap.Crate as Crate
+import qualified Bootstrap.CrateSession as Session
 import qualified Bootstrap.CrateArtifact as Artifact
 import qualified Bootstrap.ArtifactStorage as Storage
 import qualified Bootstrap.Separate as Separate
@@ -210,7 +211,7 @@ compileFixture directory identity entry dependencies prefix moduleName text = do
   loaded <- Artifact.loadInterfaces dependencies
   interfaces <- H.right loaded
   let spec = Crate.CrateSpec identity entry NoImplicitPrelude ((:) ((,) moduleName path) []) dependencies (directory ++ "/queries/" ++ identity) (directory ++ "/builtin")
-  compiled <- Crate.compileSources spec ((:) source []) interfaces prefix
+  compiled <- Session.compileSources spec ((:) source []) interfaces prefix
   _ <- H.right compiled
   metadata <- Artifact.readInterface (prefix ++ ".mlfci")
   storedInterface <- H.right metadata

@@ -59,7 +59,7 @@ evaluate term = do
 
 stackCase selected label source present absent = when (maybe True (== label) selected) $ do
   putStrLn ("BEGIN " ++ label)
-  compiled <- case Compiler.compile "RecursiveManagedEvidence.hs" (Host.literal (header ++ source)) of
+  compiled <- Compiler.compile "RecursiveManagedEvidence.hs" (Host.literal (header ++ source)) >>= \outcome -> case outcome of
     T.Left err -> error (label ++ ": " ++ Host.unpack (Compiler.prettyError err))
     T.Right value -> pure value
   putStrLn ("COMPILED " ++ label)
@@ -149,8 +149,8 @@ explicitStandaloneChecks selected = forM_ explicitCases $ \(name, wrapper, class
       expression = T.SLet name (wrapper explicitBody (explicitAnnotation classes))
         (apply name [number 42])
   when (maybe True (== label) selected) $ do
-    compiled <- case Compiler.compileProgramWithPrelude T.NoImplicitPrelude
-        (T.SClassProgram [] [classTag] [instanceTag] expression) of
+    compiled <- Compiler.compileProgramWithPrelude T.NoImplicitPrelude
+        (T.SClassProgram [] [classTag] [instanceTag] expression) >>= \outcome -> case outcome of
       T.Left err -> error (label ++ ": " ++ Host.unpack (Compiler.prettyError err))
       T.Right value -> pure value
     putStrLn ("COMPILED " ++ label)
@@ -193,7 +193,7 @@ rawManagedChecks selected = forM_ [("first", [managedQualifier, T.SPredicate "Ta
           (T.SLetRec definitions (T.SLet "caller" caller result))
     when (maybe True (== label) selected) $ do
       putStrLn ("BEGIN " ++ label)
-      compiled <- case Compiler.compileProgramWithPrelude T.NoImplicitPrelude program of
+      compiled <- Compiler.compileProgramWithPrelude T.NoImplicitPrelude program >>= \outcome -> case outcome of
         T.Left err -> error (label ++ ": " ++ Host.unpack (Compiler.prettyError err))
         T.Right value -> pure value
       putStrLn ("COMPILED " ++ label)
@@ -234,7 +234,7 @@ copiedScopeChecks selected = forM_ [("direct", Nothing), ("unsigned", Just T.Inf
       program = T.SClassProgram [] [declaration] [instanceDecl] (T.SLet "caller" caller result)
   when (maybe True (== label) selected) $ do
     putStrLn ("BEGIN " ++ label)
-    compiled <- case Compiler.compileProgramWithPrelude T.NoImplicitPrelude program of
+    compiled <- Compiler.compileProgramWithPrelude T.NoImplicitPrelude program >>= \outcome -> case outcome of
       T.Left err -> error (label ++ ": " ++ Host.unpack (Compiler.prettyError err))
       T.Right value -> pure value
     putStrLn ("COMPILED " ++ label)
@@ -279,9 +279,9 @@ consumedStandaloneChecks selected = forM_ consumedCases $ \(name, classes) -> do
     forM_ [("located", located), ("copied", copied)] $ \(kind, rhs) -> do
       let label = caseLabel kind
       when (maybe True (== label) selected) $ do
-        compiled <- case Compiler.compileProgramWithPrelude T.NoImplicitPrelude
+        compiled <- Compiler.compileProgramWithPrelude T.NoImplicitPrelude
             (T.SClassProgram [] [classTag] [instanceTag]
-              (T.SLet name rhs (apply name [number 42]))) of
+              (T.SLet name rhs (apply name [number 42]))) >>= \outcome -> case outcome of
           T.Left err -> error (label ++ ": " ++ Host.unpack (Compiler.prettyError err))
           T.Right value -> pure value
         putStrLn ("COMPILED " ++ label)
@@ -307,7 +307,7 @@ parsedConsumedChecks selected = forM_ consumedCases $ \(name, classes) -> do
         "bound = ((\\x -> tag x) :: forall a. (" ++ predicates ++ ") => a -> Int)\n" ++
         "main = bound (42 :: Int)\n"
   when (maybe True (== label) selected) $ do
-    compiled <- case Compiler.compile "RecursiveManagedEvidence.hs" (Host.literal (header ++ source)) of
+    compiled <- Compiler.compile "RecursiveManagedEvidence.hs" (Host.literal (header ++ source)) >>= \outcome -> case outcome of
       T.Left err -> error (label ++ ": " ++ Host.unpack (Compiler.prettyError err))
       T.Right value -> pure value
     putStrLn ("COMPILED " ++ label)

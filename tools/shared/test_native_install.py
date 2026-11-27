@@ -65,8 +65,8 @@ def main():
         producer.write_text('import MLF.PreparedNativeData\n')
         rejects('producer generated native dependency', lambda: N.producer_closure(root))
         fields = ['format', 'identity', 'target_triple', 'data_layout', 'primitive_abi', 'runtime_abi',
-                  'export_abi', 'objects', 'clang', 'link_args', 'link_inputs',
-                  'source_roots', 'reserved_type_names']
+                  'export_abi', 'providers', 'runtime', 'objects', 'clang', 'link_args', 'link_inputs',
+                  'source_roots']
         manifest = {field: {'sentinel': field} for field in fields}
         manifest.update(exports=['large schema'], declarations=['layout'], constructor_tags=['tags'])
         manifest['runtime_abi'] = 'mlf_require_haskell_boundary_v4_abi'
@@ -80,6 +80,36 @@ def main():
             del incomplete[field]
             rejects('compact contract requires ' + field, lambda: N.runtime_contract(incomplete))
         print('PASS compact contract exact field projection')
+
+        # A provider set may contain an unsupported crate between two eligible
+        # crates. The inventory must retain that crate without inventing an
+        # object, and preserve the producer's stable index for later providers.
+        providers = []
+        for index, owner in enumerate(('alpha', 'beta', 'gamma')):
+            eligible = owner != 'beta'
+            contract = {'format': 'MLF-NATIVE-CRATE-1', 'export_abi': 'mlf-crate-boxed/1',
+                        'runtime_abi': 'mlf_require_runtime_v5_abi', 'crate_id': owner,
+                        'identity': 'abc'[index] * 64,
+                        'status': 'eligible' if eligible else 'unsupported'}
+            if eligible:
+                contract.update(imports=[], exports=[], constructor_tags=[])
+            else:
+                contract['reason'] = 'fixture requires checked IR'
+            providers.append({'contract': contract, 'llvm': f'library-{index}.ll' if eligible else None})
+        metadata = {'format': 'MLF-NATIVE-INSTALLATION-1', 'export_abi': 'mlf-crate-boxed/1',
+                    'runtime_abi': 'mlf_require_runtime_v5_abi', 'providers': providers}
+        assert N.provider_rows(metadata) == providers
+        outputs = set(N.output_names(metadata))
+        assert {'library-0.ll', 'library-0.o', 'library-2.ll', 'library-2.o', 'runtime.o'} <= outputs
+        assert not {'library-1.ll', 'library-1.o', 'library.o'}.intersection(outputs)
+        commands = N.native_commands(root / 'native', {'clang': {'path': '/fixture/clang'}, 'runtime_flags': []}, metadata)
+        assert set(commands) == {'target', 'library-0', 'library-2', 'runtime'}
+        assert commands['library-2'][-1] == str(root / 'native/library-2.o')
+        duplicate = {**metadata, 'providers': [providers[0], providers[0]]}
+        rejects('duplicate provider owner', lambda: N.provider_rows(duplicate))
+        unsupported_object = {**metadata, 'providers': [providers[0], {**providers[1], 'llvm': 'library-1.ll'}, providers[2]]}
+        rejects('unsupported provider with LLVM', lambda: N.provider_rows(unsupported_object))
+        print('PASS mixed provider inventory preserves stable indices')
     if args.disposable_idle_sources is None:
         return
     root = args.disposable_idle_sources.resolve()
@@ -87,8 +117,15 @@ def main():
     native = root.parent / 'native'
     receipt = native / 'receipt.json'
     data = root / N.DATA
-    for label, path in [('object corruption', native / 'library.o'),
-                        ('backup corruption', native / 'first/library.o'),
+    manifest = native / 'manifest.json'
+    providers = [row for row in N.read(manifest)['providers'] if row['object'] is not None]
+    assert providers, 'fixture installation must provide a native crate'
+    provider_object = Path(providers[0]['object']['path'])
+    provider_backup = Path(N.read(receipt)['first_outputs'][str(provider_object)]['path'])
+    # Installation provenance rejects mutated bytes even though a per-program
+    # consumer may choose checked IR when an optional provider is unavailable.
+    for label, path in [('object corruption', provider_object),
+                        ('backup corruption', provider_backup),
                         ('generated module mutation', data),
                         ('runtime contract mutation', native / 'runtime-contract.json')]:
         with changed(path, path.read_bytes() + b'\n'):
@@ -101,19 +138,27 @@ def main():
     for label, edit in edits:
         with mutate_json(receipt, edit):
             rejects(label, lambda: N.verify(root))
-    manifest = native / 'manifest.json'
     contract = native / 'runtime-contract.json'
     contract_edits = [
         ('target', lambda c: c.__setitem__('target_triple', 'forged-unknown-target')),
         ('source roots', lambda c: c.__setitem__('source_roots', ['/untrusted/stdlib'])),
-        ('reserved type census', lambda c: c.__setitem__('reserved_type_names', [])),
+        ('provider ABI', lambda c: c['providers'][0]['contract'].__setitem__('export_abi', 'forged')),
+        ('provider inventory', lambda c: c['providers'].pop()),
     ]
     for label, edit in contract_edits:
         with mutate_json(contract, edit):
             with changed(data, N.registry(N.read(contract), contract)):
                 rejects('compact ' + label + ' plus self-rehashed registry', lambda: N.verify(root))
-    with changed(native / 'library.o', (native / 'library.o').read_bytes() + b'forged'):
-        with mutate_json(manifest, lambda m: m['objects'][0].__setitem__('sha256', N.sha(native / 'library.o'))):
+    def rehash_provider(value):
+        for row in value['objects']:
+            if row['path'] == str(provider_object):
+                row['sha256'] = N.sha(provider_object)
+        for row in value['providers']:
+            if row['object'] is not None and row['object']['path'] == str(provider_object):
+                row['object']['sha256'] = N.sha(provider_object)
+
+    with changed(provider_object, provider_object.read_bytes() + b'forged'):
+        with mutate_json(manifest, rehash_provider):
             contract = native / 'runtime-contract.json'
             with changed(contract, (json.dumps(N.runtime_contract(N.read(manifest))) + '\n').encode()):
                 with changed(data, N.registry(N.read(manifest), contract)):

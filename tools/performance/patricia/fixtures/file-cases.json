@@ -2,7 +2,7 @@
   "format": 1,
   "source_only": true,
   "case_count": 9,
-  "old_entry": "Bootstrap.Crate.compileSpecFile",
+  "old_entry": "FileControls.legacyCompileSpecFile",
   "new_entry": "Bootstrap.CrateSession.compileSpecFile",
   "oracle_policy": "Handwritten status/type/error constraints plus byte-exact old P3 diagnostic/artifact comparison; no candidate-derived expected outputs.",
   "prelude_mode": "NoImplicitPrelude",

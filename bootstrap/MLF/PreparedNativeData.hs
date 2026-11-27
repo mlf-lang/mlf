@@ -4,11 +4,11 @@
              MultiParamTypeClasses, OverloadedStrings #-}
 module MLF.PreparedNativeData
   (enabled, identity, manifestPath, manifestSHA, objectPaths,
-   targetTriple, dataLayout, primitiveABI, exportABI, reservedTypeNames) where {
+   targetTriple, dataLayout, primitiveABI, exportABI) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   -- Installation replaces only this sealed consumer registry after independent
-  -- regeneration of the fixed library, runtime and complete native manifest.
+  -- regeneration of native crate providers, runtime and complete manifest.
   enabled :: Bool;
   enabled = False;
   identity :: String;
@@ -26,7 +26,5 @@ module MLF.PreparedNativeData
   primitiveABI :: String;
   primitiveABI = "";
   exportABI :: String;
-  exportABI = "";
-  reservedTypeNames :: [] String;
-  reservedTypeNames = []
+  exportABI = ""
 }

@@ -5,16 +5,18 @@
 module Bootstrap.PreparedLibraryLiteral (rawLibrary, rawLibraryPieces) where {
   import MLF.Primitive;
   import Bootstrap.Types;
-  import Bootstrap.Std (map, append, ensure);
+  import Bootstrap.Std;
   import qualified Bootstrap.BuiltinPreludeLiteral as L;
   import qualified Bootstrap.PreparedLibraries as P;
   import qualified Bootstrap.CrateArtifact as Artifact;
   import qualified Bootstrap.Separate as Separate;
+  import qualified Bootstrap.OpenFragment as Open;
   import qualified Bootstrap.ArtifactStructure as Q;
   import qualified Bootstrap.Bitstream as W;
 
-  -- Lossless constructor serialization; no checked witness is serialized.
-  -- Both host compilers consume the same canonical generated source module.
+  -- An installed open object is one exact byte image plus its checked header.
+  -- Ordinary package decoding supplies its fragments when an IR body is needed;
+  -- no second AST can claim that image's identity.
   unitInterface value = case value of {
     Separate.UnitInterface identity dependencies exports declarations classes instances bindings fingerprint ->
       L.application "UnitInterface" [L.string identity, L.list (L.pair L.string L.string) dependencies,
@@ -22,47 +24,20 @@ module Bootstrap.PreparedLibraryLiteral (rawLibrary, rawLibraryPieces) where {
         L.list (L.pair L.string L.sourceInstance) instances,
         L.list (L.pair L.string L.typeLiteral) bindings, L.string fingerprint]
   };
-  fragment value = L.application "UnitObject"
-    [unitInterface (Separate.objectInterface value), L.term (Separate.objectTerm value)];
-  object :: Artifact.CrateObject -> String;
-  object value = if Artifact.envelopeMarked value then case checkObject value of {
-    Left message -> panic message;
-    Right () -> objectV1 value
-  } else objectV1 value;
-  objectV1 :: Artifact.CrateObject -> String;
-  objectV1 value = case value of {
-    Artifact.OpenCrateObject _ _ -> objectV1 (Artifact.legacyObject value);
-    Artifact.CrateObject iface fragments -> L.application "CrateObject"
-      [L.interface iface, L.list fragment fragments];
-    Artifact.LegacyCrateObject iface fragments -> L.application "LegacyCrateObject"
-      [L.interface iface, L.list fragment fragments];
-    Artifact.EnvelopeCrateObject legacy iface fragments -> L.application "EnvelopeCrateObject"
-      [L.boolean legacy, L.interface iface, L.list fragment fragments]
-  };
   source value = case value of {
     P.LibrarySource identity path text digest syntax -> L.application "LibrarySource"
       [L.string identity, L.string path, L.string text, L.string digest, L.sourceSyntax syntax]
-  };
-  recordedObject value = case value of {
-    P.LibraryObject metadata digest body -> L.application "LibraryObject"
-      [L.string metadata, L.string digest, object body]
   };
   mode :: PreludeMode -> String;
   mode value = case value of {
     ImplicitPrelude -> "ImplicitPrelude";
     NoImplicitPrelude -> "NoImplicitPrelude"
   };
-  -- Admission is at each actual object rendering point, not at RawLibrary
-  -- entry. Earlier fields retain their original demand/error order.
-  rawLibrary :: P.RawLibrary -> String;
-  rawLibrary = rawLibraryV1;
-  rawLibraryPieces :: P.RawLibrary -> (,) String String;
-  rawLibraryPieces = rawLibraryPiecesV1;
-  rawLibraryV1 :: P.RawLibrary -> String;
-  rawLibraryV1 value = case value of {
-    P.RawLibrary identity schema prelude sources objects witnesses -> L.application "RawLibrary"
-      [L.string identity, L.string schema, mode prelude, L.list source sources, L.list recordedObject objects,
-       L.list L.sourceModule witnesses]
+  rawLibrary :: P.RawLibrary -> IO (Either String String);
+  rawLibrary value = do {
+    result <- rawLibraryPieces value;
+    ioReturn (mapEither (\((,) definitions expression) ->
+      "let { " ++ definitions ++ " } in " ++ expression) result)
   };
   fragmentPiece value serial = let {
     pieces = L.termPieces (Separate.objectTerm value) serial;
@@ -71,19 +46,11 @@ module Bootstrap.PreparedLibraryLiteral (rawLibrary, rawLibraryPieces) where {
       L.application "UnitObject" [unitInterface (Separate.objectInterface value), L.pieceText pieces] ++ ";\n"
   } in L.TermPieces (L.pieceNext pieces + 1)
     (append (L.pieceDefinitions pieces) [definition]) ("(" ++ label ++ " ())");
-
-  objectPiece :: Artifact.CrateObject -> Int -> L.TermPieces;
-  objectPiece value serial = if Artifact.envelopeMarked value then case checkObject value of {
-    Left message -> panic message;
-    Right () -> objectPieceV1 value serial
-  } else objectPieceV1 value serial;
-  objectPieceV1 :: Artifact.CrateObject -> Int -> L.TermPieces;
-  objectPieceV1 original serial = objectPieceClosed (Artifact.legacyObject original) serial;
-  objectPieceClosed value serial = let {
+  closedObjectPiece value serial = let {
     units = L.listPieces (map fragmentPiece (Artifact.objectFragments value)) serial;
     label = "mlfLiteralObject" ++ showInt (L.pieceNext units);
     rendered = case value of {
-      Artifact.OpenCrateObject _ _ -> panic "literal legacy adapter invariant";
+      Artifact.OpenCrateObject _ _ -> panic "open literal dispatch invariant";
       Artifact.CrateObject iface _ -> L.application "CrateObject" [L.interface iface, L.pieceText units];
       Artifact.LegacyCrateObject iface _ -> L.application "LegacyCrateObject" [L.interface iface, L.pieceText units];
       Artifact.EnvelopeCrateObject legacy iface _ -> L.application "EnvelopeCrateObject"
@@ -91,19 +58,63 @@ module Bootstrap.PreparedLibraryLiteral (rawLibrary, rawLibraryPieces) where {
     };
     definition = label ++ " :: () -> CrateObject;\n" ++ label ++ " _ = " ++ rendered ++ ";\n"
   } in L.TermPieces (L.pieceNext units + 1) (append (L.pieceDefinitions units) [definition]) ("(" ++ label ++ " ())");
-  recordedPiece value serial = case value of {
-    P.LibraryObject metadata digest body -> let { pieces = objectPiece body serial } in
-      L.TermPieces (L.pieceNext pieces) (L.pieceDefinitions pieces)
-        (L.application "LibraryObject" [L.string metadata, L.string digest, L.pieceText pieces])
+  encodedPiece metadata digest iface image serial = L.TermPieces serial []
+    (L.application "EncodedLibraryObject" [L.string metadata, L.string digest, L.interface iface,
+      L.application "(,)" ["(" ++ L.objectLiteral (fst image) ++ ")",
+        "(" ++ L.objectLiteral (snd image) ++ ")"]]);
+  recordedPiece :: [] Artifact.CrateInterface -> P.LibraryObject -> Int -> IO (Either String L.TermPieces);
+  recordedPiece headers recorded serial = do {
+    actual <- P.readLibraryObject headers recorded;
+    case actual of {
+      Left message -> ioReturn (Left message);
+      Right object -> case if Artifact.envelopeMarked object || Artifact.openMarked object
+          then checkObject object else Right () of {
+        Left message -> ioReturn (Left message);
+        Right () -> case recorded of {
+          P.EncodedLibraryObject metadata digest iface image ->
+            ioReturn (Right (encodedPiece metadata digest iface image serial));
+          P.LibraryObject metadata digest value -> case value of {
+            Artifact.OpenCrateObject iface package -> do {
+              let { bytes = Open.packageBytes package };
+              actualHash <- byteArrayDigest bytes;
+              if not (eqString actualHash digest) then ioReturn (Left "prepared object image SHA mismatch") else do {
+                size <- lengthByteArray bytes;
+                image <- L.compilerImageFields bytes size;
+                ioReturn (Right (encodedPiece metadata digest iface image serial))
+              }
+            };
+            _ -> let { pieces = closedObjectPiece value serial } in ioReturn (Right
+              (L.TermPieces (L.pieceNext pieces) (L.pieceDefinitions pieces)
+                (L.application "LibraryObject" [L.string metadata, L.string digest, L.pieceText pieces])))
+          }
+        }
+      }
+    }
   };
-  rawLibraryPiecesV1 :: P.RawLibrary -> (,) String String;
-  rawLibraryPiecesV1 value = case value of {
-    P.RawLibrary identity schema prelude sources objects witnesses -> let {
-      pieces = L.listPieces (map recordedPiece objects) 0
-    } in (,) (concatStringList (L.pieceDefinitions pieces))
-      (L.application "RawLibrary"
-        [L.string identity, L.string schema, mode prelude, L.list source sources, L.pieceText pieces,
-         L.list L.sourceModule witnesses])
+  recordedPieces headers entries serial = case entries of {
+    [] -> ioReturn (Right (L.TermPieces serial [] "[]"));
+    (:) entry rest -> do {
+      first <- recordedPiece headers entry serial;
+      case first of {
+        Left message -> ioReturn (Left message);
+        Right pieces -> do {
+          later <- recordedPieces headers rest (L.pieceNext pieces);
+          ioReturn (mapEither (\tail -> L.TermPieces (L.pieceNext tail)
+            (append (L.pieceDefinitions pieces) (L.pieceDefinitions tail))
+            (L.application "(:)" [L.pieceText pieces, L.pieceText tail])) later)
+        }
+      }
+    }
+  };
+  rawLibraryPieces :: P.RawLibrary -> IO (Either String ((,) String String));
+  rawLibraryPieces value = case value of {
+    P.RawLibrary identity schema prelude sources objects witnesses -> do {
+      result <- recordedPieces (map P.libraryInterface objects) objects 0;
+      ioReturn (mapEither (\pieces -> (,) (concatStringList (L.pieceDefinitions pieces))
+        (L.application "RawLibrary"
+          [L.string identity, L.string schema, mode prelude, L.list source sources, L.pieceText pieces,
+           L.list L.sourceModule witnesses])) result)
+    }
   };
 
   -- Literal generation preserves the ACTUAL interface instance bodies. The
@@ -132,8 +143,15 @@ module Bootstrap.PreparedLibraryLiteral (rawLibrary, rawLibraryPieces) where {
   fragmentValue value = W.VNode 241
     [unitValue (Separate.objectInterface value), Q.toXTerm (Separate.objectTerm value)];
   objectValue :: Artifact.CrateObject -> W.Value;
-  objectValue original = let { value = Artifact.legacyObject original } in W.VNode 243 [Q.toBool (Artifact.envelopeLegacyObject value),
-    interfaceValue (Artifact.objectInterface value), Q.toList fragmentValue (Artifact.objectFragments value)];
+  objectValue value = case value of {
+    Artifact.OpenCrateObject iface package -> W.VNode 244 [interfaceValue iface,
+      Q.toList (\((,) owner fragment) -> W.VNode 245 [Q.toText owner,
+        Q.toList Q.toDataDecl (Open.declarations (Open.context fragment)),
+        Q.toList (Q.toPair Q.toXName Q.toXType) (Open.parameters fragment), Open.bodyValue fragment])
+        (Open.packageFragments package)];
+    _ -> W.VNode 243 [Q.toBool (Artifact.envelopeLegacyObject value),
+      interfaceValue (Artifact.objectInterface value), Q.toList fragmentValue (Artifact.objectFragments value)]
+  };
 
   data Scan = One Int W.Value | Many Int ([] W.Value);
   -- Explicit frames count occurrences, not physical sharing. All arithmetic
@@ -169,9 +187,11 @@ module Bootstrap.PreparedLibraryLiteral (rawLibrary, rawLibraryPieces) where {
     scan limits [One 1 (objectValue value)] 0 0
   };
   checkObject :: Artifact.CrateObject -> Either String ();
-  checkObject original = let { value = Artifact.legacyObject original } in do {
+  checkObject value = do {
     checkObjectWith Artifact.crateEnvelopeLimits value;
-    _ <- Artifact.envelopePrepareMarkedLink Artifact.crateEnvelopeLimits value;
-    Right ()
+    case value of {
+      Artifact.OpenCrateObject _ package -> mapM_ (compose Open.audit snd) (Open.packageFragments package);
+      _ -> mapEither (\_ -> ()) (Artifact.envelopePrepareMarkedLink Artifact.crateEnvelopeLimits value)
+    }
   }
 }

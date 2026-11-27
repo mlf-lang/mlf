@@ -406,12 +406,20 @@ module Test.Runner where {
   -- Selection adapters pass a validated projection of the full inventory.
   -- Replace a stale report before running and check exact result identities.
   runOptionsObserved :: (Result -> IO ()) -> Options -> [] C.Case -> [] C.Case -> IO Int;
-  runOptionsObserved observe options cases selected = case Selection.project cases selected of {
+  runOptionsObserved = runOptionsObservedWith executeWith;
+  -- A suite may share identical fixture outcomes while retaining every selected
+  -- identity. Selection validation, reporting and completion remain common.
+  runOptionsObservedWith :: ((Result -> IO ()) -> [] C.Case -> IO ([] Result)) ->
+    (Result -> IO ()) -> Options -> [] C.Case -> [] C.Case -> IO Int;
+  runOptionsObservedWith execute observe options cases selected = case Selection.project cases selected of {
     Left message -> do { putErr ("test: " ++ message ++ "\n"); ioReturn 2 };
-    Right selection -> runSelected observe options selection
+    Right selection -> runSelectedWith execute observe options selection
   };
   runSelected :: (Result -> IO ()) -> Options -> Selection.CaseSelection -> IO Int;
-  runSelected observe options selection =
+  runSelected = runSelectedWith executeWith;
+  runSelectedWith :: ((Result -> IO ()) -> [] C.Case -> IO ([] Result)) ->
+    (Result -> IO ()) -> Options -> Selection.CaseSelection -> IO Int;
+  runSelectedWith execute observe options selection =
     do {
       let { selected = Selection.cases selection };
       let {
@@ -447,7 +455,7 @@ module Test.Runner where {
              saveReport options (start ++ "\n");
              if json options then putStrLn start else ioReturn ();
              results <-
-               executeWith
+               execute
                  (\result -> do {
                     putStrLn (if json options then resultJson result else resultText result);
                     observe result

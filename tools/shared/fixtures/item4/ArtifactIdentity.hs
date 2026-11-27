@@ -67,7 +67,7 @@ tuple64 = B.literal ("(" ++ replicate 63 ',' ++ ")")
 fullChars = T.CharString (list [0,65,55296,57343,1114111])
 terminal (T.Function _ result) = terminal result
 terminal result = result
-checks =
+checks compiledSource =
   [ ("source definition boundary changes query encoding", not (same
       (Q.encodeExpression (T.SSourceDefinition (T.SVar "f"))) (Q.encodeExpression (T.SVar "f"))))
   , ("source definition equality retains boundary and body", E.eqSExpr
@@ -133,7 +133,7 @@ checks =
       T.Right (tag:_) -> same tag "MLF-CRATE-QUERY-4"
       _ -> False)
   , ("actual source canonical datatype fields preserve target type and erasure",
-      case C.compile "CanonicalFields.emlf" "data Box = Box [Int] (Int,Int) (); Box [42] (1,2) ()" of
+      case compiledSource of
         T.Left _ -> False
         T.Right result -> let term = C.compiledTerm result in
           case XP.parseTerm "CanonicalFields.xmlf" (Pretty.prettyTerm term) of
@@ -218,5 +218,6 @@ main = do
   case A.decodeInterface (A.encodeInterface (crate classes)) of
     T.Left err -> putStrLn ("CRATE DIAGNOSTIC: " ++ B.unpack err)
     _ -> pure ()
-  results <- mapM (\(name, ok) -> putStrLn ((if ok then "PASS " else "FAIL ") ++ name) >> pure ok) checks
+  compiledSource <- C.compile "CanonicalFields.emlf" "data Box = Box [Int] (Int,Int) (); Box [42] (1,2) ()"
+  results <- mapM (\(name, ok) -> putStrLn ((if ok then "PASS " else "FAIL ") ++ name) >> pure ok) (checks compiledSource)
   if and results then putStrLn "item4 artifact contracts: passed" else exitFailure

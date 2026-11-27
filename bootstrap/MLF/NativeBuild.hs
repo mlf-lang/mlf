@@ -132,7 +132,7 @@ module MLF.NativeBuild (run) where {
       isDirectory <- directoryExists output;
       require (S.not isDirectory) "output is a directory";
       let { initial = J.object [
-        (,) "format" (J.str "MLF-NATIVE-PROGRAM-BUILD-2"), (,) "complete" (J.Boolean False),
+        (,) "format" (J.str "MLF-NATIVE-PROGRAM-BUILD-3"), (,) "complete" (J.Boolean False),
         (,) "source" (J.str source), (,) "output" (J.str output),
         (,) "compiler" (J.str compiler), (,) "fresh_user_compilation" (J.Boolean True),
         (,) "llvm_jobs" (J.num 1), (,) "commands" (J.array [])] };
@@ -144,8 +144,7 @@ module MLF.NativeBuild (run) where {
           Prepared.NativeLink objectFiles linkFiles flags -> do {
             let { installation = Prepared.nativeInstallation compiled;
                   fallback = Prepared.nativeFallback compiled;
-                  count = Prepared.nativeExportCount compiled;
-                  inlineCount = Prepared.nativeInlineCount compiled;
+                  providers = Prepared.nativeProviders compiled;
                   sourceInputs = Prepared.nativeInputs compiled;
                   runtime = Mode.Decision "runtime" Mode.Native "installed runtime object";
                   decisions = S.snoc (Prepared.nativeDecisions compiled) runtime;
@@ -154,12 +153,9 @@ module MLF.NativeBuild (run) where {
                   receipt = J.set "dependency_modes" (J.array (S.map Mode.json decisions))
                     (J.set "link_objects" linkObjects (J.set "installation" installation
                     (J.set "source_sha256" (J.str sourceHash)
-                    (J.set "fixed_library_reused" (J.Boolean (eqString fallback "" && count > 0))
-                    (J.set "stdlib_path" (J.str (if eqString fallback "" then "installed" else "fallback"))
-                    (J.set "native_export_count" (J.num count)
-                    (J.set "builtin_inline_count" (J.num inlineCount)
-                    (J.set "fixed_runtime_reused" (J.Boolean True)
-                    (J.set "fallback_reason" (J.str fallback) initial))))))))) };
+                    (J.set "native_providers" (J.array providers)
+                    (J.set "runtime_reused" (J.Boolean True)
+                    (J.set "fallback_reason" (J.str fallback) initial)))))) };
             -- The compiler already authenticated this exact manifest
             -- and its files. Keep their paths for destination protection; the
             -- bytes are checked again immediately before and after linking.

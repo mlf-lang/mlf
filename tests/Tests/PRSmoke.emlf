@@ -49,7 +49,7 @@ select backends = do
 
 independentType : String -> XType -> A.Test ()
 independentType source expected = do
- compiled <- A.right C.prettyError (C.compile "<PR smoke independent target>" source)
+ compiled <- A.andThen (A.liftIO (C.compile "<PR smoke independent target>" source)) (A.right C.prettyError)
  term <- A.right (\error -> error) (Parser.parseTerm "<PR smoke serialized target>" (Pretty.prettyTerm (C.compiledTerm compiled)))
  actual <- A.right (\error -> error) (Independent.checkClosed term)
  A.equal IndependentType.alphaEq Pretty.prettyType "independent target type" expected actual

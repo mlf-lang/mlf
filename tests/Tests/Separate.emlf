@@ -14,6 +14,7 @@ import Bootstrap.Module
 import Bootstrap.Parser (parseModule)
 import qualified Bootstrap.Separate as Fragment
 import qualified Bootstrap.Crate as Crate
+import qualified Bootstrap.CrateSession as Session
 import qualified Bootstrap.CrateArtifact as Artifact
 import qualified Bootstrap.CrateQuery as Query
 import qualified Bootstrap.Host as Host
@@ -104,7 +105,7 @@ compileSeparateProgram mode libraries source = withScratch (\directory -> do
       O.mkdir (O.parent builtin)
       let spec = Crate.CrateSpec fixtureIdentity "Main" mode (S.map (\m -> (,) (moduleIdentity m) (sourcePath m)) modules) [] (directory ++ "/queries") builtin
       let prefix = directory ++ "/crate"
-      result <- Crate.compileSources spec modules [] prefix
+      result <- Session.compileSources spec modules [] prefix
       case result of {Left message -> return (Left message); Right _ -> readCrateObjects (prefix ++ ".mlfci")})
 
 expect reason result = case result of

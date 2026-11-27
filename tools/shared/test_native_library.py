@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Checked native-library contracts and fresh O0/O2 runtime controls.
+"""Checked native crate contracts and fresh O0/O2 runtime controls.
 
 Compile only independent test entry points against authenticated producer
 objects. Exercise lazy exports, checked wrapper rejection, collector roots,
@@ -27,7 +27,7 @@ sys.path.insert(0, str(ROOT / 'tools/testing'))
 from receipt_selection import identity, select
 FIXTURES = ROOT / 'tools/shared/fixtures/native'
 BOUNDARY_OUTPUT = (b'PASS native schema and actual checked-wrapper negative controls; 0/1/2/65 export library terms independently checked\n'
-                   b'PASS native datatype extension: complete census, kind preservation, stable tags and collision rejection\n')
+                   b'PASS native crate closed layouts, stable tags and collision rejection\n')
 EMIT_OUTPUT = (b'PASS emitted checked native libraries: poison0 poison1 poison7 poison65 io\n'
                b'PASS emitted native datatype extension: user-first saved-first\n'
                b'PASS emitted native open fields: delayed unused demanded\n')
@@ -62,12 +62,12 @@ SOURCE_CLI = 'source-root-cli'
 PACKAGE_CLI = 'package-dependency-cli'
 INSTALLED_CLI = 'installed-root-cli'
 CLI_CASES = (SOURCE_CLI, PACKAGE_CLI, INSTALLED_CLI)
-PREFIX = 'mlf_fixed_' + 'a' * 64
+PREFIX = 'mlf_crate_' + 'a' * 64
 FRONTEND_FIXTURE = ROOT / 'tools/experimental/prepared-libraries/NativeFrontendControls.hs'
 FRONTEND_OUTPUT = (b'Implicit.emlf accepted\nSubset.emlf accepted\nUserDatatype.emlf accepted\n'
                    b'InstanceControl.hs accepted\n'
                    b'shared roots preserve polymorphism, IO, imported/local scopes, checked results and rejection phases\n'
-                   b'native subset, implicit Prelude, instance reach and default loader controls passed\n')
+                   b'installed crate subset, implicit Prelude, instance reach and default loader controls passed\n')
 
 
 def verify_root_shape(source, count):
@@ -128,7 +128,7 @@ def main():
         parser.error('output must be separate from the immutable producer')
     output.mkdir(parents=True, exist_ok=False)
     record = {'format': 1, 'complete': False, 'status': 'running',
-              'scope': 'checked-fixed-native-library', 'compiler_modules_rebuilt': False,
+              'scope': 'checked-native-crate-library', 'compiler_modules_rebuilt': False,
               'native_execution': native_selected or selection in (INSTALLED_CLI, PACKAGE_CLI), 'full_corpus_qualification': False,
               'performance_assertions': False, 'native_toolchain_closure_complete': False,
               'installed_frontend_controls_requested': args.frontend_source_root is not None,
@@ -372,13 +372,10 @@ def main():
                 if sorted(p.name for p in private_work.iterdir()) != sorted(
                         [name + '.ll' for name in wanted] + ['private-library.ll']):
                     raise ValueError('private constructor boundary artifact inventory changed')
-                if 'private-escape-demand' in wanted:
-                    # Both sites must survive into the actual root, exercising the
-                    # escaping site and overwriting an earlier strict-field fact.
-                    private_ir = (private_work / 'private-escape-demand.ll').read_text()
-                    if ('call ptr @mlf.construct.1(i64 69,' not in private_ir
-                            or 'call ptr @mlf_constructor(i64 69, i64 1)' not in private_ir):
-                        raise ValueError('private strict-site plus escaping-constructor control became vacuous')
+                # The crate ABI keeps constructors boxed on both sides. The
+                # executable controls below distinguish ignored poison fields
+                # from demanded ones, without assuming fixed ordinal tags or a
+                # private strict-field optimization in the emitted text.
                 artifacts.update({str(p): sha(p) for p in private_work.iterdir()})
             cflags = shlex.split(runner.run('gmp-cflags', [pkg_config, '--cflags', 'gmp'], timeout=30).stdout.decode())
             libraries = shlex.split(runner.run('gmp-libs', [pkg_config, '--libs', 'gmp'], timeout=30).stdout.decode())

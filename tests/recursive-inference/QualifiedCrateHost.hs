@@ -11,6 +11,7 @@ module QualifiedCrateHost where {
   import qualified Bootstrap.Compiler as Compiler;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.Crate as Crate;
+  import qualified Bootstrap.CrateSession as Session;
   import qualified Bootstrap.CrateQuery as Query;
   import qualified Bootstrap.CrateArtifact as Artifact;
   import qualified Bootstrap.X.Check as Check;
@@ -146,7 +147,8 @@ module QualifiedCrateHost where {
     let { inputs = M.fromList compareString
       (map (\((,) name text) -> (,) name ((,) (directory ++ "/" ++ name ++ ".emlf") text)) libraries) };
     putStrLn ("CHECK exact direct-module fixture: " ++ label);
-    case Compiler.compileModules inputs (directory ++ "/Main.emlf") source of {
+    outcome <- Compiler.compileModules inputs (directory ++ "/Main.emlf") source;
+    case outcome of {
       Left error -> case expected of {
         Nothing -> do {
           assert (case Compiler.phase error of { Resolution -> True; _ -> False })
@@ -169,7 +171,7 @@ module QualifiedCrateHost where {
       (map (\m -> (,) (Modules.moduleIdentity m) (Modules.sourcePath m)) modules)
       [] (directory ++ "/queries") (work ++ "/builtin/unit") };
     let { prefix = directory ++ "/crate" };
-    result <- Crate.compileSources spec modules [] prefix;
+    result <- Session.compileSources spec modules [] prefix;
     case expected of {
       Nothing -> case result of {
         Left message -> assert (contains reason message)

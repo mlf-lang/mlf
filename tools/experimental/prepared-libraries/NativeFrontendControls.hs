@@ -7,6 +7,11 @@ module Main where {
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.Set as S;
+  import qualified Bootstrap.SourceCrate as Source;
+  import qualified Bootstrap.CrateSession as Session;
+  import qualified Bootstrap.CrateArtifact as Artifact;
+  import qualified Bootstrap.OpenFragment as Open;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Parser as Parser;
   import qualified Bootstrap.PreparedLibraries as Libraries;
@@ -26,14 +31,55 @@ module Main where {
     parsed <- require (Parser.parseModule (Modules.joinPath directory name) text);
     Modules.loadModuleFilesWithEvidenceUsingFallback Data.parseLibrary [] defaults parsed text >>= require
   };
+  -- The installation now supplies ordinary crate dependencies. Inspect the
+  -- checked root groups' authenticated free parameters, not a second native
+  -- wrapper compiler. Native contract/runtime checks live in the ABI controls.
+  data AdmittedRoot = AdmittedRoot Source.Compilation (Map String XType) Int;
+  rootChecked (AdmittedRoot compiled _ _) = Source.checkedTerm compiled;
+  rootType compiled = Checked.typeOf (rootChecked compiled);
+  importedBindings (AdmittedRoot _ bindings _) = bindings;
+  builtinBindings (AdmittedRoot _ _ count) = count;
+  compileAdmitted raw mode loaded = case Libraries.nativeCrateInputsUsing Data.parseLibrary raw mode loaded of {
+    Left err -> ioReturn (Left err);
+    Right ((,) sources interfaces) -> do {
+      result <- Source.compile Session.MemoryQueries mode sources interfaces;
+      case result of {
+        Left err -> ioReturn (Left err);
+        Right root -> do {
+          admitted <- Libraries.readLibraryObjects raw;
+          ioReturn (do {
+            objects <- Core.atPhase Verification admitted;
+            closed <- Source.close objects root;
+            let { object = Session.rootObject root;
+                  own = S.fromList compareString (map fst (Artifact.crateBindings (Artifact.objectInterface object)));
+                  builtin = S.fromList compareString (concatMap (\((,) _ iface) ->
+                    if eqString (Artifact.crateId iface) Artifact.builtinCrateIdentity then map fst (Artifact.crateBindings iface) else []) interfaces);
+                  parameters = case object of {
+                    Artifact.OpenCrateObject _ package -> concatMap (compose Open.parameters snd) (Open.packageFragments package);
+                    _ -> []
+                  };
+                  imported = M.fromList compareString (filter (\row -> not (S.member compareString (fst row) own))
+                    (map (\((,) name ty) -> (,) (X.nameHint name) ty) parameters));
+                  external = M.filterWithKey (\key _ -> not (S.member compareString key builtin)) imported;
+                  builtinCount = length (filter (\key -> S.member compareString key builtin) (M.keys imported)) };
+            Right (AdmittedRoot closed external builtinCount)
+          })
+        }
+      }
+    }
+  };
   compiled raw directory defaults name text = do {
     loaded <- load directory defaults name text;
-    require (mapLeft Core.prettyError
-      (Libraries.compileNativeRootUsing Data.parseLibrary raw ImplicitPrelude loaded))
+    result <- compileAdmitted raw ImplicitPrelude loaded;
+    require (mapLeft Core.prettyError result)
+  };
+  rejectedSource raw loaded message = do {
+    result <- compileAdmitted raw ImplicitPrelude loaded;
+    assertion (isLeft result) message
   };
   accepted raw directory defaults name text requireImports = do {
     result <- compiled raw directory defaults name text;
-    if requireImports then assertion (not (M.null (Libraries.nativeSignatures result)) || Libraries.nativeBuiltinCount result > 0)
+    if requireImports then assertion (not (M.null (importedBindings result)) || builtinBindings result > 0)
       (name ++ ": did not select any installed exports") else ioReturn ();
     putStrLn (name ++ " accepted")
   };
@@ -43,31 +89,29 @@ module Main where {
     assertion (Type.alphaEq actual expected && Type.alphaEq (Checked.typeOf checked) expected)
       (label ++ ": checked type differs from the independent oracle")
   };
-  nativeType :: String -> XType -> Libraries.NativeRoot -> IO ();
-  nativeType label expected compiled = do {
-    assertion (Type.alphaEq (Libraries.nativeInferredType compiled) expected)
-      (label ++ ": native root type differs from the independent oracle");
-    let { wrapper = Libraries.nativeCheckedWrapper compiled };
+  admittedType :: String -> XType -> AdmittedRoot -> IO ();
+  admittedType label expected compiled = do {
+    assertion (Type.alphaEq (rootType compiled) expected)
+      (label ++ ": crate root type differs from the independent oracle");
+    let { wrapper = rootChecked compiled };
     checkedType label (Checked.typeOf wrapper) wrapper
   };
   sharedRoot :: Libraries.RawLibrary -> String -> Modules.LoadedModules -> XType -> IO Checked.CheckedTerm;
   sharedRoot raw label loaded expected = do {
-    ordinary <- require (mapLeft Core.prettyError
-      (Compiler.compileLinked ImplicitPrelude (Modules.loadedSources loaded)));
-    fallback <- require (mapLeft Core.prettyError (Libraries.compileLoaded [] ImplicitPrelude loaded));
-    native <- require (mapLeft Core.prettyError
-      (Libraries.compileNativeRootUsing Data.parseLibrary raw ImplicitPrelude loaded));
-    checkedType (label ++ " ordinary") expected (Core.checkedTerm ordinary);
+    ordinaryResult <- Compiler.compileLinked ImplicitPrelude (Modules.loadedSources loaded);
+    ordinary <- require (mapLeft Core.prettyError ordinaryResult);
+    fallbackResult <- Libraries.compileLoaded [] ImplicitPrelude loaded;
+    fallback <- require (mapLeft Core.prettyError fallbackResult);
+    nativeResult <- compileAdmitted raw ImplicitPrelude loaded;
+    native <- require (mapLeft Core.prettyError nativeResult);
+    checkedType (label ++ " ordinary") expected (Compiler.checkedTerm ordinary);
     checkedType (label ++ " fallback") expected (Libraries.checkedTerm fallback);
-    nativeType label expected native;
-    assertion (not (Libraries.reused fallback) &&
-      eqString (Core.sourceType ordinary) (Libraries.sourceType fallback) &&
-      X.equalErased (X.erase (Core.compiledTerm ordinary))
-        (X.erase (Checked.term (Libraries.checkedTerm fallback))))
-      (label ++ ": empty-registry fallback changed the ordinary checked root");
-    ioReturn (Core.checkedTerm ordinary)
+    admittedType label expected native;
+    assertion (not (Libraries.reused fallback))
+      (label ++ ": empty-registry source unexpectedly reported reuse");
+    ioReturn (Compiler.checkedTerm ordinary)
   };
-  -- Prepared grafting requires the entire recorded library inventory. Keep
+  -- Prepared registry selection requires the entire recorded library inventory. Keep
   -- every actual parser read and import edge, and supply exact missing records
   -- only in this qualification fixture. A subset would silently test fallback.
   completeFixture :: Libraries.RawLibrary -> Modules.LoadedModules -> IO Modules.LoadedModules;
@@ -93,13 +137,16 @@ module Main where {
     assertion (case value of { Runtime.RInteger number -> number == 42; _ -> False })
       (label ++ ": datatype, import or local scope changed the result 42")
   };
-  rejected :: forall a. String -> Phase -> Either CompileError a -> IO CompileError;
-  rejected label phase result = case result of {
+  rejected :: forall a. String -> Phase -> IO (Either CompileError a) -> IO CompileError;
+  rejected label phase action = do {
+    result <- action;
+    case result of {
     Right _ -> fatal (label ++ ": invalid root was accepted");
     Left error -> do {
       assertion (eqString (Core.prettyPhase (Core.phase error)) (Core.prettyPhase phase))
         (label ++ ": rejection phase changed: " ++ Core.prettyError error);
       ioReturn error
+    }
     }
   };
   sharedRejection raw label loaded phase exactNative = do {
@@ -109,7 +156,7 @@ module Main where {
     complete <- completeFixture raw loaded;
     prepared <- rejected (label ++ " prepared") phase (Libraries.compileLoaded [raw] ImplicitPrelude complete);
     native <- rejected (label ++ " native") phase
-      (Libraries.compileNativeRootUsing Data.parseLibrary raw ImplicitPrelude complete);
+      (compileAdmitted raw ImplicitPrelude complete);
     assertion (eqString (Core.diagnostic ordinary) (Core.diagnostic fallback))
       (label ++ ": fallback changed the exact ordinary diagnostic");
     if exactNative then assertion
@@ -130,14 +177,15 @@ module Main where {
     ordinary <- sharedRoot raw "imported and local scopes" scoped (XCon "Int" []);
     integerResult "ordinary scope" ordinary;
     complete <- completeFixture raw scoped;
-    prepared <- require (mapLeft Core.prettyError (Libraries.compileLoaded [raw] ImplicitPrelude complete));
+    preparedResult <- Libraries.compileLoaded [raw] ImplicitPrelude complete;
+    prepared <- require (mapLeft Core.prettyError preparedResult);
     assertion (Libraries.reused prepared) "shared-root control fell back instead of checking prepared imports";
     checkedType "prepared scope" (XCon "Int" []) (Libraries.checkedTerm prepared);
     integerResult "prepared scope" (Libraries.checkedTerm prepared);
-    native <- require (mapLeft Core.prettyError
-      (Libraries.compileNativeRootUsing Data.parseLibrary raw ImplicitPrelude complete));
-    nativeType "complete native scope" (XCon "Int" []) native;
-    assertion (not (M.null (Libraries.nativeSignatures native)))
+    nativeResult <- compileAdmitted raw ImplicitPrelude complete;
+    native <- require (mapLeft Core.prettyError nativeResult);
+    admittedType "complete native scope" (XCon "Int" []) native;
+    assertion (not (M.null (importedBindings native)))
       "shared-root native control did not retain its installed import";
     missing <- load directory defaults "SharedMissing.emlf" "main = Missing.value\n";
     sharedRejection raw "unresolved namespace" missing ModuleResolution True;
@@ -157,28 +205,28 @@ module Main where {
     accepted raw directory defaults "InstanceControl.hs" instanceSource True;
     returned <- compiled raw directory defaults "Returned.emlf"
       "main = \\x -> do { printInt x; return () }\n";
-    assertion (Libraries.nativeBuiltinCount returned > 0 && M.null (Libraries.nativeSignatures returned))
+    assertion (builtinBindings returned > 0 && M.null (importedBindings returned))
       "builtin-only returned function retained native parameters or failed to materialize";
-    assertion (case Libraries.nativeInferredType returned of { XArrow _ _ -> True; _ -> False })
+    assertion (case rootType returned of { XArrow _ _ -> True; _ -> False })
       "builtin materialization removed the user-returned function";
     mixed <- compiled raw directory defaults "Mixed.emlf"
       "import qualified Bootstrap.Std as S\nmain = do { printInt (S.length ((:) 1 [])); return () }\n";
-    assertion (Libraries.nativeBuiltinCount mixed > 0 && not (M.null (Libraries.nativeSignatures mixed)))
+    assertion (builtinBindings mixed > 0 && not (M.null (importedBindings mixed)))
       "mixed builtin and native imports were not preserved separately";
 
     subset <- load directory defaults "Mutation.emlf" "import qualified Bootstrap.Std as S\nmain = printInt (S.length ((:) 1 []))\n";
     let { missing = Modules.LoadedModules [last (Modules.loadedEntries subset)];
           duplicate = Modules.LoadedModules (append (Modules.loadedEntries subset) [head (Modules.loadedEntries subset)]) };
-    assertion (isLeft (Libraries.compileNativeRootUsing Data.parseLibrary raw ImplicitPrelude missing)) "completion repaired missing actual import";
-    assertion (isLeft (Libraries.compileNativeRootUsing Data.parseLibrary raw ImplicitPrelude duplicate)) "completion removed duplicate actual module";
+    rejectedSource raw missing "completion repaired missing actual import";
+    rejectedSource raw duplicate "completion removed duplicate actual module";
     badQualified <- load directory defaults "Qualified.emlf" "main = Missing.value\n";
-    assertion (isLeft (Libraries.compileNativeRootUsing Data.parseLibrary raw ImplicitPrelude badQualified)) "missing qualified namespace became visible";
+    rejectedSource raw badQualified "missing qualified namespace became visible";
     let { altered = Modules.LoadedModules (map (\entry -> Modules.LoadedModule
       (Modules.loadedSource entry) (Modules.loadedText entry ++ "\n")) (Modules.loadedEntries subset)) };
-    assertion (isLeft (Libraries.compileNativeRootUsing Data.parseLibrary raw ImplicitPrelude altered))
+    rejectedSource raw altered
       "changed loaded installed source was silently replaced by completion";
     loaded <- load directory defaults "Invisible.emlf" "main = compile \"a\"\n";
-    assertion (isLeft (Libraries.compileNativeRootUsing Data.parseLibrary raw ImplicitPrelude loaded))
+    rejectedSource raw loaded
       "unimported installed value became visible";
     let { primary = Modules.joinPath directory "primary";
           fallback = Modules.joinPath directory "default";
@@ -201,6 +249,6 @@ module Main where {
     ambiguous <- Modules.fetchFileWithEvidenceUsingFallback Data.parseLibrary [primary] [fallback] "Choice";
     assertion (isLeft ambiguous) "ambiguous explicit source silently replaced";
     sharedRoots raw directory defaults;
-    putStrLn "native subset, implicit Prelude, instance reach and default loader controls passed"
+    putStrLn "installed crate subset, implicit Prelude, instance reach and default loader controls passed"
   }
 }

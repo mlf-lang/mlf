@@ -18,6 +18,9 @@
     "mlf-inference": {
       "path": "../libraries/mlf-inference"
     },
+    "mlf-interpreter": {
+      "path": "../libraries/mlf-interpreter"
+    },
     "mlf-language-core": {
       "path": "../libraries/mlf-language-core"
     },

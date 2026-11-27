@@ -3,14 +3,14 @@
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
 module Bootstrap.SourceCrate
-  (Compilation, compile, compileScriptWith, needsBuiltin, close, finish, checkedTerm, sourceType, dictionaryIdentities) where {
+  (Compilation, compile, compileClosed, compileScriptWith, needsBuiltin, close, finish, checkedTerm, sourceType, dictionaryIdentities, nameMap) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Parser as Parser;
-  import qualified Bootstrap.Compiler as Compiler;
+  import qualified Bootstrap.SourceFrontend as Compiler;
   import qualified Bootstrap.Classes as Classes;
   import qualified Bootstrap.InferenceUnit as Inference;
   import qualified Bootstrap.ImportParameters as Parameters;
@@ -45,6 +45,23 @@ module Bootstrap.SourceCrate
     else case Compiler.atPhase ModuleResolution (traverseEither Separate.cleanParsedSource sources) of {
       Left error -> ioReturn (Left error);
       Right cleaned -> Session.compileSourceRoot storage mode identity owner cleaned interfaces
+    }
+  };
+
+  compileClosed :: Session.QueryStorage -> PreludeMode -> [] SourceModule ->
+    IO (Either CompileError Compilation);
+  compileClosed storage mode sources = let {
+    dependencies = if needsBuiltin mode sources then do {
+      object <- Compiler.atPhase Verification Artifact.builtinPrelude;
+      Right [object]
+    } else Right []
+  } in case dependencies of {
+    Left err -> ioReturn (Left err);
+    Right objects -> do {
+      let { interfaces = map (\object ->
+        (,) "/builtin/prelude.mlfci" (Artifact.objectInterface object)) objects };
+      result <- compile storage mode sources interfaces;
+      ioReturn (bindEither result (close objects))
     }
   };
 
@@ -98,15 +115,17 @@ module Bootstrap.SourceCrate
     _ -> Left "class lowering lost the script expression boundary"
   };
 
-  data Compilation = Compilation Checked.CheckedTerm String (Map String String);
-  checkedTerm (Compilation checked _ _) = checked;
-  sourceType (Compilation _ rendered _) = rendered;
-  dictionaryIdentities (Compilation _ _ names) = names;
+  data Compilation = Compilation Checked.CheckedTerm String (Map String String) Modules.Names;
+  checkedTerm (Compilation checked _ _ _) = checked;
+  sourceType (Compilation _ rendered _ _) = rendered;
+  dictionaryIdentities (Compilation _ _ names _) = names;
+  nameMap (Compilation _ _ _ (Modules.Names names)) = names;
   finish :: Session.SourceRoot -> Checked.CheckedTerm -> Compilation;
   finish root checked = let {
     display = Modules.displayNames (Session.rootDisplayNames root);
     dictionaries = Session.rootDictionaryNames root
-  } in Compilation checked (display (Classes.prettyQualified dictionaries (Checked.typeOf checked))) dictionaries;
+  } in Compilation checked (display (Classes.prettyQualified dictionaries (Checked.typeOf checked))) dictionaries
+    (Session.rootNames root);
   close :: [] Artifact.CrateObject -> Session.SourceRoot -> Either CompileError Compilation;
   close dependencies root = do {
     let {

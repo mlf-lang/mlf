@@ -2,16 +2,40 @@
 import hashlib
 import json
 import re
+from contextlib import ExitStack, contextmanager
+from pathlib import Path
 
 from artifact_binary_reference import read_document
 from artifact_binary_typed import unpack
 from query_generation import Generation, digest
 from test_direct import dependency_diagnostics, sha
 
+UNIFIED_SOURCE = ('data Box a = Box a\n'
+                  'identity value = value\n'
+                  'project (Box value) = value\n'
+                  'main = printInt (if identity true then project (Box (identity 42)) else 0)\n')
+
 
 def require(condition, message):
     if not condition:
         raise ValueError(message)
+
+
+@contextmanager
+def unavailable_native_file(path, corrupt=False):
+    """Retain the exact original while mutating a disposable CI installation."""
+    path = Path(path)
+    backup = path.with_name(path.name + '.unification-backup')
+    require(not backup.exists(), 'native mutation backup already exists: ' + str(backup))
+    path.rename(backup)
+    try:
+        if corrupt:
+            path.write_bytes(backup.read_bytes() + b'\nunified-provider-corruption\n')
+        yield
+    finally:
+        if path.exists():
+            path.unlink()
+        backup.rename(path)
 
 
 def modes(runner, name):
@@ -152,6 +176,14 @@ def check_script_instances(runner, compiler):
 
 def check_source_root(runner, compiler):
     work = runner.root
+    # The same independent program is also built through the package and
+    # installed-native entry adapters. Its local identity is used at two types.
+    common = work / 'Unified.emlf'
+    common.write_text(UNIFIED_SOURCE)
+    runner.run('unified-file', [compiler, '--run', common],
+               overrides={'MLF_SOURCE_CACHE_DIR': str(work / 'unified-cache')}, expected=b'42\n')
+    runner.run('unified-expr', [compiler, '--run', '--expr', UNIFIED_SOURCE], expected=b'42\n')
+    runner.run('unified-stdin', [compiler, '--run', '-'], stdin=UNIFIED_SOURCE.encode(), expected=b'42\n')
     modules = work / 'modules'
     modules.mkdir()
     # The import cycle contains a mutually recursive pair and a separately
@@ -246,6 +278,10 @@ def check_installed_root(runner, compiler):
     executable = work / 'native-main'
     receipt = work / 'native-build/receipt.json'
     installation = json.loads(runner.run('installed-info', [compiler, '--native-install-info']).stdout)
+    require(installation['format'] == 'MLF-NATIVE-INSTALLATION-1'
+            and installation['export_abi'] == 'mlf-crate-boxed/1',
+            'installation does not use the generic native crate contract')
+    runtime = installation['runtime']
     argv = [compiler, '-i', work]
     includes = [arg for path in installation['source_roots'] for arg in ('-i', path)]
     checked = runner.run('installed-standalone-llvm', [*argv, *includes, '--emit-llvm', entry]).stdout
@@ -270,13 +306,77 @@ def check_installed_root(runner, compiler):
     link = next(row for row in report['commands'] if row['phase'] == 'link')['command']
     require(len(linked) >= 2 and all(row['path'] in link and sha(row['path']) == row['sha256'] for row in linked),
             'link did not receive both the recorded native library object and runtime')
-    require(report.get('complete') and report.get('fixed_library_reused')
-            and report.get('native_export_count', 0) > 0 and report.get('stdlib_path') == 'installed',
-            'executable did not use checked exports from the installed library')
+    providers = report['native_providers']
+    require(report.get('complete') and report.get('runtime_reused')
+            and report.get('format') == 'MLF-NATIVE-PROGRAM-BUILD-3'
+            and len(providers) == len(owners)
+            and {row['dependency'] for row in providers} == owners,
+            'executable did not record its selected native crate providers')
+    installed = {row['contract']['crate_id']: row for row in installation['providers']}
+    require(all(installed[row['dependency']]['contract']['format'] == 'MLF-NATIVE-CRATE-1'
+                and installed[row['dependency']]['object'] ==
+                    {'path': row['path'], 'sha256': row['sha256']} for row in providers),
+            'selected objects differ from their installed crate contracts')
+    require({row['path'] for row in linked} == {row['path'] for row in providers} | {runtime['path']}
+            and runtime in linked,
+            'native link inventory differs from the selected providers and runtime')
     require(published_queries(work / '.mlf-build/cache/source-roots'),
             'executable preparation skipped file-root query publication')
     require(not list(work.rglob('*.mlfci')) and not list(work.rglob('*.mlfco')),
             'direct executable compilation published package crate artifacts')
+
+    # Missing or damaged optional provider objects must use the checked bodies
+    # through the same plan runner as package dependencies. The original native
+    # boundary program still has the independently known result 2.
+    for label, corrupt in (('missing-provider', False), ('damaged-provider', True)):
+        with ExitStack() as mutations:
+            for provider in providers:
+                mutations.enter_context(unavailable_native_file(provider['path'], corrupt))
+            fallback_exe = work / label
+            fallback_receipt = work / (label + '-build/receipt.json')
+            runner.run('build-' + label,
+                       [*argv, entry, '-o', fallback_exe, '--build-dir', label + '-build'],
+                       expected=(str(fallback_receipt) + '\n').encode())
+            fallback = json.loads(fallback_receipt.read_text())
+            decisions = require_source(runner, 'build-' + label, 'Main', 'Local')
+            fallback_owners = {row['dependency']: row['mode'] for row in decisions}
+            require(decisions == fallback['dependency_modes'] and fallback['complete']
+                    and fallback['runtime_reused'] and fallback['fallback_reason']
+                    and any(fallback_owners.get(owner) == 'ir' for owner in owners)
+                    and all(fallback_owners.get(owner) in ('ir', 'unused') for owner in owners),
+                    label + ' did not fall back to checked crate implementations')
+            require(not owners.intersection(row['dependency'] for row in fallback['native_providers'])
+                    and not {row['path'] for row in providers}.intersection(
+                        row['path'] for row in fallback['link_objects'])
+                    and runtime in fallback['link_objects'],
+                    label + ' linked an unavailable object or omitted the runtime')
+            runner.run('execute-' + label, [fallback_exe], expected=b'2\n')
+
+    # The runtime has no checked-library fallback. Reject corruption before
+    # publishing either a completed receipt or an executable.
+    runtime_exe = work / 'damaged-runtime'
+    with unavailable_native_file(runtime['path'], corrupt=True):
+        rejected = runner.run('reject-damaged-runtime',
+                              [*argv, entry, '-o', runtime_exe, '--build-dir', 'damaged-runtime-build'],
+                              status=1, expected=b'')
+        require(str(runtime['path']).encode() in rejected.stderr and not runtime_exe.exists()
+                and not (work / 'damaged-runtime-build/receipt.json').exists(),
+                'damaged runtime was accepted or published a build')
+
+    restored_exe = work / 'restored-native'
+    runner.run('build-restored-native', [*argv, entry, '-o', restored_exe, '--build-dir', 'restored-build'],
+               expected=(str(work / 'restored-build/receipt.json') + '\n').encode())
+    restored = json.loads((work / 'restored-build/receipt.json').read_text())
+    require(restored['native_providers'] == providers and restored['link_objects'] == linked,
+            'restoring installation bytes did not restore native selection')
+    runner.run('execute-restored-native', [restored_exe], expected=b'2\n')
+
+    common = work / 'Unified.emlf'
+    common.write_text(UNIFIED_SOURCE)
+    unified_exe = work / 'unified-native'
+    runner.run('build-unified-installed', [compiler, common, '-o', unified_exe, '--build-dir', 'unified-build'],
+               expected=(str(work / 'unified-build/receipt.json') + '\n').encode())
+    runner.run('execute-unified-installed', [unified_exe], expected=b'42\n')
 
     # An explicit local module with the same public name has different semantics.
     override = work / 'override'
@@ -289,8 +389,8 @@ def check_installed_root(runner, compiler):
                expected=(str(shadow_receipt) + '\n').encode())
     shadow = json.loads(shadow_receipt.read_text())
     shadow_rows = require_source(runner, 'build-shadowed-source', 'Main', 'Local', 'Bootstrap.Std')
-    require(shadow_rows == shadow['dependency_modes'] and not shadow['fixed_library_reused']
-            and len(shadow['link_objects']) == 1 and shadow['link_objects'][0] in linked,
+    require(shadow_rows == shadow['dependency_modes'] and not shadow['native_providers']
+            and shadow['runtime_reused'] and shadow['link_objects'] == [runtime],
             'the shadowed standard-library object still entered the native link')
     runner.run('execute-shadowed-source', [shadow_exe], expected=b'19\n')
 

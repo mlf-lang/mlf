@@ -12,23 +12,22 @@ FRESH_INSTALL/bin/emlf USER.emlf -o program
 Clang and the GMP/BDWGC development packages are discovered through `pkg-config`.
 Public installations default to GHC `-O2`; explicit `--bootstrap-only` and
 `--typecheck-only` development builds default to `-O0`. An explicit
-`--optimization 0` or `--optimization 2` is honored on either route. Fixed library and
+`--optimization 0` or `--optimization 2` is honored on either route. Native crate and
 runtime objects always use ordinary Clang `-O2`. User files can reuse checked
 declaration groups under `.mlf-build/cache/source-roots/` in the working
 directory. Each native invocation emits user LLVM, compiles it with Clang
 `-O2`, and links the installed objects. Explicit module search paths take
 precedence over the installation's default source roots.
 
-Selected small builtin methods and dictionaries retain their checked definitions
-inside the fresh user compilation so ordinary optimization can specialize numeric
-and IO loops. These definitions come from the verified fixed builtin object and
-are composed with the independently checked fresh root; they are not cached user
-code. Remaining selected
-standard-library exports and the runtime use the installed native objects.
-Per-program receipts distinguish `builtin_inline_count`, `native_export_count`,
-and `fixed_runtime_reused`, so builtin unfolding is not reported as a native export
-reuse count. `builtin_inline_count` counts referenced builtin import keys that
-were substituted, not unused bindings removed from a prefix.
+Builtin methods and dictionaries remain available as checked crate definitions
+inside the fresh user compilation. Each reachable ordinary library can supply
+its implementation through a native object or checked IR. The same generic
+crate linker makes these choices for package builds and installed compilers.
+Per-program `MLF-NATIVE-PROGRAM-BUILD-3` receipts record `native_providers`,
+`dependency_modes`, `link_objects`, `runtime_reused`, and `fallback_reason`.
+Provider rows identify the actual selected crate and object digest; the runtime
+has its own row. Source compilation is reported separately from the choice of
+dependency implementation.
 
 Each program compilation retains a fresh hidden `.emlf-<output>-N` directory
 beside its output, containing LLVM, objects, logs, and the receipt.
@@ -112,21 +111,31 @@ For a fixed native installation, add `--native-config CONFIG.json`. This is an
 installation step: no user program is supplied. The config contains `clang`,
 `runtime_flags` (joined `-I...`/`-D...` arguments), and `link_args` (absolute
 library files and optional `-lm`). Use explicit GMP and GC library filenames so
-link dependency identities are unambiguous. The installer compiles the checked
-fixed library and runtime using ordinary Clang `-O2`, independently rebuilds its
-GHC producer and both native objects, and compares same-path output bytes before
-sealing `MLF.PreparedNativeData`. The final compiler still goes through the full
-normal GHC build, shared syntax/signature checks and builtin/prepared gates.
+link dependency identities are unambiguous. The installer asks
+`NativeCrate.emitLibrary` to emit each nonbuiltin checked crate. Eligible crates
+produce `library-N.ll` and `library-N.o`; unsupported crates retain their typed
+contract and reason and are supplied as checked IR. It compiles eligible
+providers and the runtime using ordinary Clang `-O2`, independently rebuilds its
+GHC producer and native outputs, and compares same-path bytes before sealing
+`MLF.PreparedNativeData`. The installation receipt is `MLF-NATIVE-INSTALL-2`.
+The final compiler still goes through the full normal GHC build, shared
+syntax/signature checks and builtin/prepared gates.
 
-The `MLF-NATIVE-LIBRARY-2` manifest records typed exports, constructor layout,
-object and link-library hashes, target layout, Clang identity and link arguments.
-Its `runtime_abi` field must match the compiler's `mlf_require_runtime_v5_abi`
-link symbol. Rebuild an installation produced before this boundary.
-The compiler's native mode authenticates the sealed manifest and its fixed input
-files. File roots reuse eligible checked groups through the crate session. The
-native program driver emits the user LLVM, compiles it with Clang `-O2`, then
-links the installed fixed objects. Report installation and per-program costs
-separately. The standalone LLVM mode remains available.
+The `MLF-NATIVE-INSTALLATION-1` manifest contains a provider array and a separate
+runtime record, object and link-library hashes, target layout, Clang identity,
+and link arguments. Every provider uses the package linker's
+`MLF-NATIVE-CRATE-1` contract and `mlf-crate-boxed/1` ABI. Its `runtime_abi` must
+match the compiler's `mlf_require_runtime_v5_abi` link symbol. Existing
+installations using the earlier fixed-library ABI must be rebuilt.
+
+The compiler authenticates the sealed inventory and required runtime/link
+inputs. File roots reuse checked groups through the crate session. The shared
+native dependency runner validates each provider against its checked interface
+and can independently choose IR when a provider object is missing, damaged, or
+incompatible. A damaged runtime or required link input is an error. The native
+program driver emits the user LLVM, compiles it with Clang `-O2`, and links only
+the selected provider objects and runtime. Report installation and per-program
+costs separately. Standalone LLVM emission composes checked IR.
 
 This is local reproducible-build evidence, not a signing authority: modifying
 all verifier source, compiler source and receipts coherently is outside this
@@ -152,10 +161,11 @@ prints them on stderr. Its link command includes the library object when the
 program uses native exports, together with the authenticated runtime and link
 inputs.
 
-The complete typed native metadata stays in installation evidence. The installed
-compiler seals a small `runtime-contract.json` projection containing identities,
-ABI/target fields, objects, tool and link inputs. Independent regeneration
-compares both files; the normal verifier re-derives the compact projection from
-the authenticated full manifest. Per-program validation hashes the sealed
-compact contract and native/link files without repeatedly rendering the fixed
-library's full type metadata.
+The installed compiler seals `runtime-contract.json`, containing identities,
+ABI/target fields, typed provider contracts, the runtime, objects, tool and link
+inputs. Independent regeneration compares both files; the normal verifier
+re-derives this projection from the authenticated full manifest. The checked
+literal preserves its interface and the exact implementation image. Interface
+access does not decode those bodies; an IR fallback reads the actual checked
+implementation through the same object decoder used by package dependencies.
+The literal does not supply a second AST that could differ from its image.

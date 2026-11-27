@@ -316,8 +316,9 @@ main = do
  when (wanted exactLabel || wanted countsLabel) $ do
   forM_ (zip [0::Int ..] generated) $ \(i,t) -> term ("generated " ++ show i) t
   -- The authored input is shared; the frozen baseline remains the oracle.
-  forM_ IOFixture.cases $ \(IOFixture.Case label body _ _) ->
-   case Compiler.compile (B.literal (label ++ ".hs")) (IOFixture.source body) of
+  forM_ IOFixture.cases $ \(IOFixture.Case label body _ _) -> do
+   outcome <- Compiler.compile (B.literal (label ++ ".hs")) (IOFixture.source body)
+   case outcome of
     T.Left err -> fail (B.unpack (Compiler.prettyError err))
     T.Right result -> term ("authored IO " ++ label) (X.erase (Compiler.compiledTerm result))
   announce exactLabel

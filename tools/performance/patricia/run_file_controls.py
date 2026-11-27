@@ -66,8 +66,12 @@ def main():
     OpenFiles.verify_c_support(H,out,root,producer,auth,folder,inputs,record,save,limits)
     objects=folder/'objects';shutil.copytree(producer/'objects',objects);original=H.file_pins(objects)
     H.require({'objects/'+str(Path(p).relative_to(objects)):h for p,h in original.items()}==auth['object_inputs'],'exact copied production object inventory')
-    text=source.replace('Bootstrap.Crate as Old','Bootstrap.CrateSession as Old') if session else source
-    H.require((text.replace('Bootstrap.CrateSession as Old','Bootstrap.Crate as Old') if session else text)==source,'only reviewed entry-point import adaptation')
+    session_import='import qualified Bootstrap.Crate as Old\nimport qualified Bootstrap.CrateSession as Session'
+    text=source.replace('import qualified Bootstrap.Crate as Old',session_import).replace(
+      'compileFile = legacyCompileSpecFile','compileFile = Session.compileSpecFile') if session else source
+    restored=text.replace(session_import,'import qualified Bootstrap.Crate as Old').replace(
+      'compileFile = Session.compileSpecFile','compileFile = legacyCompileSpecFile') if session else text
+    H.require(restored==source,'only reviewed historical/production entry-point adaptation')
     (folder/'FileControls.hs').write_text(text);entry=folder/'Main.hs';entry.write_text('module Main where\nimport qualified FileControls as C\nmain=C.main\n')
     flags=[]
     for token in auth['flags']:

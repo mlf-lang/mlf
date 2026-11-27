@@ -176,12 +176,13 @@ checkOutput result = do
   ty <- right (XC.checkClosed parsed)
   ensure (XT.alphaEq ty (C.inferredType result)) "Figure12 target roundtrip changed type"
   ensure (XS.equalErased (XS.erase parsed) (XS.erase (C.compiledTerm result))) "Figure12 target roundtrip changed erasure"
-compileSource source = case C.compile (H.literal "<Figure12 direct host>") (H.literal source) of
+compileSource source = C.compile (H.literal "<Figure12 direct host>") (H.literal source) >>= \outcome -> case outcome of
   T.Left e -> fail (H.unpack (C.prettyError e))
   T.Right result -> checkOutput result >> return result
 checkCase fixture c = do
   source <- program fixture c
-  case C.compile (H.literal ("<Figure12 " ++ str "id" c ++ ">")) (H.literal source) of
+  outcome <- C.compile (H.literal ("<Figure12 " ++ str "id" c ++ ">")) (H.literal source)
+  case outcome of
     T.Left e -> do
       ensure (not (boolean "expected_acceptance" c)) (H.unpack (C.prettyError e))
       ensure (case C.phase e of T.Inference -> True; _ -> False) "wrong rejection phase"

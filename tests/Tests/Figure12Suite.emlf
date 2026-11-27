@@ -26,8 +26,9 @@ checkOutput result = do
  A.assert (X.equalErased (X.erase parsed) (X.erase (compiledTerm result))) "Figure12 target roundtrip changed erasure"
 
 testCase : Case -> String -> A.Test String
-testCase c source =
- case compile ("<Figure12 " ++ caseId c ++ ">") source of
+testCase c source = do
+ compilation <- A.liftIO (compile ("<Figure12 " ++ caseId c ++ ">") source)
+ case compilation of
   Left err -> do
    A.assert (S.not (expectedAcceptance c)) ("expected acceptance: " ++ prettyError err)
    A.assert (H.eq (phase err) Inference) ("wrong rejection phase: " ++ prettyError err)
@@ -43,7 +44,7 @@ testCase c source =
 
 typed : String -> XType -> A.Test String
 typed source expected = do
- result <- A.right prettyError (compile "<Figure 12 type assertion>" source)
+ result <- A.andThen (A.liftIO (compile "<Figure 12 type assertion>" source)) (A.right prettyError)
  checkOutput result
  A.equal T.alphaEq prettyType "Figure12 principal type" expected (inferredType result)
  return (prettyType (inferredType result))
@@ -62,8 +63,8 @@ tagged identity label category body = C.test ("figure12/" ++ identity) label
 paperId name = "paper/" ++ name
 paperEntry c action = tagged (paperId (caseId c)) (caseId c) "paper" action
 
--- The action closes over the pure compilation and its checks. An exact alias
--- selection can run it alone, while a full run shares the same lazy value.
+-- Aliases retain the same source and complete check action. The executor below
+-- shares its observed result, so an exact alias also works without its owner.
 paperCases seen inputs = case inputs of
  [] -> (,) [] []
  (:) ((,) c source) rest ->
@@ -87,7 +88,9 @@ repair label =
 
 assumption index ((,) name signature) =
  tagged ("assumption/" ++ showInt index) ("assumption " ++ name ++ " : " ++ signature) "assumption" (do
-  result <- A.right prettyError (compile "<signature control>" ("\\(" ++ name ++ " :: " ++ signature ++ ") -> " ++ name))
+  result <- A.andThen
+    (A.liftIO (compile "<signature control>" ("\\(" ++ name ++ " :: " ++ signature ++ ") -> " ++ name)))
+    (A.right prettyError)
   checkOutput result
   return "checked")
 
@@ -116,6 +119,29 @@ registry = do
         (S.append types (S.map repair repairLabels))
  return ((,,) (S.append supplementary paper) aliases (S.length rows))
 
+-- IO actions are repeatable, unlike the old pure compilation thunk. Cache the
+-- actual checked outcome by canonical fixture identity within this one run.
+-- Both pass and failure are retained; every selected label is still reported.
+canonicalIdentity : [] ((,) String String) -> String -> String
+canonicalIdentity aliases identity =
+ case S.find (\((,) label _) -> eqString identity ("figure12/" ++ paperId label)) aliases of
+  Nothing -> identity
+  Just ((,) _ original) -> "figure12/" ++ paperId original
+
+executeShared : [] ((,) String String) -> Map String (Either A.Failure ()) ->
+ (Runner.Result -> IO ()) -> [] C.Case -> IO ([] Runner.Result)
+executeShared aliases completed observeResult selected = case selected of
+ [] -> return []
+ (:) entry rest -> do
+  let key = canonicalIdentity aliases (C.id entry)
+  outcome <- case Map.lookup compareString key completed of
+   Nothing -> A.run (C.action entry)
+   Just result -> return result
+  let result = Runner.Result entry outcome
+  observeResult result
+  remaining <- executeShared aliases (Map.insert compareString key outcome completed) observeResult rest
+  return ((:) result remaining)
+
 run : [] String -> IO ()
 run args = do
  (,,) entries aliases rows <- registry
@@ -128,7 +154,8 @@ run args = do
     if code == 0 then return () else exitWith code
    else do
     Coverage.begin "figure12" full
-    code <- Runner.runObserved (observe aliases (S.map C.id selected)) args entries
+    code <- Runner.runOptionsObservedWith (executeShared aliases Map.empty)
+      (observe aliases (S.map C.id selected)) options entries selected
     if code == 0 then do
      if full then do
       Coverage.metric "figure12" "paper-rows" rows
@@ -141,14 +168,20 @@ run args = do
      Coverage.finish "figure12"
     else do { Coverage.flush; exitWith code }
 
+-- A selection adapter may put an alias before its owner. Its shared action has
+-- already checked the canonical fixture, so record that completion once before
+-- recording any alias; public result ordering still follows the selection.
+observe : [] ((,) String String) -> [] String -> Runner.Result -> IO ()
 observe aliases selected result = case result of
- Runner.Result entry (Right ()) ->
-  case S.lookup eqString (C.name entry) aliases of
-   Just original ->
-    if S.elem eqString ("figure12/" ++ paperId original) selected
-    then Coverage.alias "figure12" (C.name entry) original
-    else Coverage.passed "figure12" (C.name entry)
-   Nothing -> Coverage.passed "figure12" (C.name entry)
+ Runner.Result entry (Right ()) -> do
+  let identity = C.id entry
+  let key = canonicalIdentity aliases identity
+  let original = S.fromMaybe (C.name entry) (S.lookup eqString (C.name entry) aliases)
+  if S.elem eqString key selected then do
+   let first = S.find (\candidate -> eqString (canonicalIdentity aliases candidate) key) selected
+   if H.eq first (Just identity) then Coverage.passed "figure12" original else return ()
+   if eqString identity key then return () else Coverage.alias "figure12" (C.name entry) original
+  else Coverage.passed "figure12" (C.name entry)
  _ -> return ()
 
 main : IO ()

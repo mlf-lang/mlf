@@ -17,16 +17,16 @@ import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Type as T
 
 checked : String -> A.Test Compilation
-checked source = do { result <- (A.right H.show (compile "<do test>" source)); do { parsed <- (A.right H.show (P.parseTerm "<do xMLF>" (prettyTerm (compiledTerm result)))); do { ty <- (A.right H.show (C.checkClosed parsed)); do { (A.assert (T.alphaEq ty (inferredType result)) "do xMLF round trip changed type"); do { (A.assert (H.eq (X.erase parsed) (X.erase (compiledTerm result))) "do xMLF round trip changed erasure"); (return result) } } } } }
+checked source = do { result <- (A.andThen (A.liftIO (compile "<do test>" source)) (A.right H.show)); do { parsed <- (A.right H.show (P.parseTerm "<do xMLF>" (prettyTerm (compiledTerm result)))); do { ty <- (A.right H.show (C.checkClosed parsed)); do { (A.assert (T.alphaEq ty (inferredType result)) "do xMLF round trip changed type"); do { (A.assert (H.eq (X.erase parsed) (X.erase (compiledTerm result))) "do xMLF round trip changed erasure"); (return result) } } } } }
 
 hasType : String -> String -> XType -> (,) String (A.Test ())
 hasType label source expected = ((,) (H.append "do: " label) do { result <- (checked source); (A.assert (T.alphaEq (inferredType result) expected) (H.append "expected " (H.append (prettyType expected) (H.append ", got " (sourceType result))))) })
 
 rejects : String -> String -> Phase -> String -> (,) String (A.Test ())
-rejects label source expectedPhase reason = ((,) (H.append "do rejection: " label) (case (compile "<invalid do>" source) of { (Left err) -> do { (A.assert (H.eq (phase err) expectedPhase) (H.append "wrong rejection phase: " (H.show err))); (A.assert (H.contains reason (diagnostic err)) (H.append "wrong rejection reason: " (H.show err))) }; (Right result) -> (A.fail (H.append "unexpected acceptance: " (sourceType result))) }))
+rejects label source expectedPhase reason = ((,) (H.append "do rejection: " label) (do { compilationResult <- A.liftIO (compile "<invalid do>" source); case compilationResult of { (Left err) -> do { (A.assert (H.eq (phase err) expectedPhase) (H.append "wrong rejection phase: " (H.show err))); (A.assert (H.contains reason (diagnostic err)) (H.append "wrong rejection reason: " (H.show err))) }; (Right result) -> (A.fail (H.append "unexpected acceptance: " (sourceType result))) } }))
 
 rejectsMissingMonadFail : String -> (,) String (A.Test ())
-rejectsMissingMonadFail source = ((,) "do rejection: refutable pattern requires canonical MonadFail" (case compile "<missing MonadFail>" source of { Left err -> A.assert ((H.eq (phase err) Resolution) && (H.contains "no instance or given constraint" (diagnostic err)) && (H.contains "MonadFail" (diagnostic err))) (H.show err); Right result -> A.fail (H.append "unexpected acceptance: " (sourceType result)) }))
+rejectsMissingMonadFail source = ((,) "do rejection: refutable pattern requires canonical MonadFail" (do { compilationResult <- A.liftIO (compile "<missing MonadFail>" source); case compilationResult of { Left err -> A.assert ((H.eq (phase err) Resolution) && (H.contains "no instance or given constraint" (diagnostic err)) && (H.contains "MonadFail" (diagnostic err))) (H.show err); Right result -> A.fail (H.append "unexpected acceptance: " (sourceType result)) } }))
 
 int : XType
 int = (XCon "Int" [])

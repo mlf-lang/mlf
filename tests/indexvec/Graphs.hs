@@ -290,10 +290,10 @@ capturedGivenChecks = do
         ,"let rec { loop fuel x = if eqInt fuel 0 then score x else"
         ,"  let helper = \\y -> addInt (score y) (loop (subInt fuel 1) x) in"
         ,"  addInt (helper 1) (helper true) } in loop 1 3"])
-  compiled <- case Compiler.compile "CapturedGivens.emlf" source of
+  compiled <- Compiler.compile "CapturedGivens.emlf" source >>= \outcome -> case outcome of
     T.Left err -> fail (H.unpack (CompilerCore.prettyError err))
     T.Right result -> pure result
-  let term = CompilerCore.compiledTerm compiled
+  let term = Compiler.compiledTerm compiled
   case Runtime.prepare False term of
     T.Left message -> fail (H.unpack message)
     T.Right (datatypes,_) -> case Runtime.integer
@@ -1638,7 +1638,7 @@ resolverChecks = do
           ("Inst","module Inst () where\nimport Inspect\ninstance Inspect Int where { inspect = \\x -> true }\n"),
           ("A","module A (f) where\nimport Inspect\n" ++ imports ++ "f :: Bool\nf = inspect (1 :: Int)\n"),
           ("Main","module Main where\nimport A\nimport Inst ()\nmain = f\n")]
-        pure (Compiler.compileLinked T.NoImplicitPrelude (primitive:modules))
+        Compiler.compileLinked T.NoImplicitPrelude (primitive:modules)
   visible <- runScoped "import Inst ()\n"
   case visible of
     T.Right _ -> pure (); T.Left e -> error ("defining module lost its instance: " ++ H.unpack (Compiler.prettyError e))

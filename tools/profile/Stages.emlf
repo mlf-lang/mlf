@@ -1,3 +1,5 @@
+-- Low-level inference-kernel phase probe. Public source compilation uses the
+-- crate session; this tool deliberately exposes solver phases for diagnosis.
 module Main where
 import Bootstrap.Types
 import qualified Bootstrap.Std as L
@@ -17,7 +19,7 @@ import qualified Bootstrap.LLVM as LLVM
 import qualified Bootstrap.LLVM.Optimize as Optimize
 import qualified Bootstrap.LLVM.StrictWrappers as Wrappers
 import qualified Bootstrap.LLVM.Codegen as Codegen
-import qualified Bootstrap.Compiler as Compiler
+import qualified Bootstrap.SourceFrontend as Compiler
 import qualified Force as F
 
 mark label = putErr ("MLF_PHASE " ++ label ++ "\n")

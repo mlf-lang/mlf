@@ -16,7 +16,7 @@ import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Type as T
 
 checked : String -> IO ((,) (Compilation) (XTerm))
-checked source = do { result <- (B.rightCase (compile "<IO test>" source)); do { term <- (B.rightCase (XP.parseTerm "<IO xMLF>" (prettyTerm (compiledTerm result)))); do { ty <- (B.rightCase (C.checkClosed term)); do { (B.assertCase (T.alphaEq ty (inferredType result)) "IO round trip changed the type"); do { (B.assertCase (H.eq (X.erase term) (X.erase (compiledTerm result))) "IO round trip changed erasure"); (return ((,) result term)) } } } } }
+checked source = do { result <- (ioBind (compile "<IO test>" source) (B.rightCase)); do { term <- (B.rightCase (XP.parseTerm "<IO xMLF>" (prettyTerm (compiledTerm result)))); do { ty <- (B.rightCase (C.checkClosed term)); do { (B.assertCase (T.alphaEq ty (inferredType result)) "IO round trip changed the type"); do { (B.assertCase (H.eq (X.erase term) (X.erase (compiledTerm result))) "IO round trip changed erasure"); (return ((,) result term)) } } } } }
 
 runsOn : B.Backends -> String -> String -> ([] ( String )) -> ([] ( B.Event )) -> (,) String (IO ())
 runsOn backends label source inputs expected = ((,) (H.append "IO: " label) do { ((,) _ term) <- (checked source); do { ((,) result trace) <- (B.capture backends term inputs); do { (B.rightCase result); (B.assertCase (H.eq trace expected) (H.append "expected " (H.append (H.show expected) (H.append ", got " (H.show trace))))) } } })
@@ -25,10 +25,10 @@ hasType : String -> String -> XType -> (,) String (IO ())
 hasType label source expected = ((,) (H.append "IO type: " label) do { ((,) result _) <- (checked source); (B.assertCase (T.alphaEq (inferredType result) expected) (H.append "wrong type: " (sourceType result))) })
 
 rejects : String -> String -> String -> (,) String (IO ())
-rejects label source reason = ((,) (H.append "IO rejection: " label) (case (compile "<invalid IO>" source) of { (Left err) -> (B.assertCase ((H.eq (phase err) Inference) && (H.contains reason (diagnostic err))) (H.show err)); (Right result) -> (B.failCase (H.append "unexpected acceptance: " (sourceType result))) }))
+rejects label source reason = ((,) (H.append "IO rejection: " label) (do { compilationResult <- (compile "<invalid IO>" source); case compilationResult of { (Left err) -> (B.assertCase ((H.eq (phase err) Inference) && (H.contains reason (diagnostic err))) (H.show err)); (Right result) -> (B.failCase (H.append "unexpected acceptance: " (sourceType result))) } }))
 
 rejectsIsStringInt : String -> String -> (,) String (IO ())
-rejectsIsStringInt label source = ((,) (H.append "IO string constraint: " label) (case (compile "<invalid string instance>" source) of { Left err -> B.assertCase ((H.eq (phase err) Resolution) && (H.contains "no instance or given constraint" (diagnostic err)) && (H.contains "IsString" (diagnostic err)) && (H.contains "Int" (diagnostic err))) (H.show err); Right result -> B.failCase (H.append "unexpected acceptance: " (sourceType result)) }))
+rejectsIsStringInt label source = ((,) (H.append "IO string constraint: " label) (do { compilationResult <- (compile "<invalid string instance>" source); case compilationResult of { Left err -> B.assertCase ((H.eq (phase err) Resolution) && (H.contains "no instance or given constraint" (diagnostic err)) && (H.contains "IsString" (diagnostic err)) && (H.contains "Int" (diagnostic err))) (H.show err); Right result -> B.failCase (H.append "unexpected acceptance: " (sourceType result)) } }))
 
 targetRejectsOn : B.Backends -> String -> XTerm -> String -> (,) String (IO ())
 targetRejectsOn backends label term reason = ((,) (H.append "IO target: " label) do { observed <- (B.execute backends IOEntry (Input "" false) term); (case (B.outcome observed) of { (Left err) -> (B.assertCase ((H.contains reason (H.show err)) && (H.null (B.events observed))) (H.show err)); (Right ()) -> (B.failCase "invalid target accepted by both backends") }) })

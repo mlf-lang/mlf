@@ -42,8 +42,13 @@ absolute times must not be presented as the installed compiler's performance.
 
 The separate `emlf-source-v1` runner compares two authenticated public
 installations with GHC. It measures the installed `emlf SOURCE -o OUTPUT`
-command and verifies the executable for every leg. Run it on POSIX from the
-repository root, with fresh installation and output directories.
+command and verifies the executable for every leg. Its
+`MLF-NATIVE-PROGRAM-BUILD-3` receipts retain `native_providers`,
+`dependency_modes`, `link_objects`, and `runtime_reused`. The runner checks
+selected provider identities against their installed crate contracts, verifies
+every native input digest, and confirms that the actual link command uses those
+objects and the runtime. Run it on POSIX from the repository root, with fresh
+installation and output directories.
 
 ```sh
 # In each of the before and after worktrees

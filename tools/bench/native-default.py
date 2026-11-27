@@ -64,7 +64,7 @@ def main():
   cr=report['compiler_receipt']; ir=report['install_receipt']; tr=report['install_timing']
   record=cr.get('outputs',{}).get('emlf',{})
   if cr.get('format')!=1 or cr.get('complete') is not True or not isinstance(record.get('path'),str) or Path(record['path']).resolve(strict=True)!=compiler or record.get('sha256')!=sha(compiler): raise ValueError('compiler receipt does not authenticate selected compiler')
-  if ir.get('format')!='MLF-NATIVE-INSTALL-1' or ir.get('complete') is not True: raise ValueError('native installation receipt incomplete')
+  if ir.get('format')!='MLF-NATIVE-INSTALL-2' or ir.get('complete') is not True: raise ValueError('native installation receipt incomplete')
   if tr.get('status')!='complete' or tr.get('returncode')!=0: raise ValueError('installation timing receipt incomplete')
   dependencies=[compiler,compiler_receipt,install,timing,MANIFEST,validate,clang,baseline/'results.json',check/'results.json',ROOT/'benchmarks/fasta/c/upstream.c',Path(__file__).resolve(),ROOT/'tools/bench/Oracle.hs'] + [baseline/w['name']/'program' for w in manifest['workloads']]
   for name,expected in previous['fingerprints'].items():
@@ -106,9 +106,19 @@ def main():
     sd=d/f'sample-{i}'; sd.mkdir(); rec={'index':i,'warmup':i==0}
     def candidate_compile():
      rec['candidate_compile']=run([compiler,source,'-o',sd/'program','--build-dir',sd/'build'],stdout=sd/'compile.stdout')
-     receipt=json.loads((sd/'build/receipt.json').read_text()); cmds=receipt['commands']; count=receipt.get('native_export_count'); inline=receipt.get('builtin_inline_count')
-     if receipt.get('format')!='MLF-NATIVE-PROGRAM-BUILD-2' or receipt.get('complete') is not True or receipt.get('fresh_user_compilation') is not True or receipt.get('llvm_jobs')!=1 or receipt.get('stdlib_path')!='installed' or not isinstance(count,int) or count<0 or receipt.get('fixed_library_reused')!=(count>0) or receipt.get('fallback_reason')!='' or type(inline) is not int or inline<0 or receipt.get('fixed_runtime_reused') is not True: raise ValueError('invalid installed-path receipt '+name)
+     receipt=json.loads((sd/'build/receipt.json').read_text()); cmds=receipt['commands']
+     if receipt.get('format')!='MLF-NATIVE-PROGRAM-BUILD-3' or receipt.get('complete') is not True or receipt.get('fresh_user_compilation') is not True or receipt.get('llvm_jobs')!=1 or receipt.get('fallback_reason')!='' or receipt.get('runtime_reused') is not True: raise ValueError('invalid installed-path receipt '+name)
+     providers=receipt['native_providers']; decisions=receipt['dependency_modes']; installation=receipt['installation']
+     owners=[row['dependency'] for row in providers]
+     selected=[row['dependency'] for row in decisions if row['mode']=='native' and row['dependency']!='runtime']
+     if len(owners)!=len(set(owners)) or sorted(owners)!=sorted(selected) or not any(row['dependency']=='runtime' and row['mode']=='native' for row in decisions): raise ValueError('invalid selected dependency inventory '+name)
+     installed={row['contract']['crate_id']:row for row in installation['providers']}
+     objects=[{'path':row['path'],'sha256':row['sha256']} for row in providers]
+     if any(installed[row['dependency']]['object']!=objects[index] or installed[row['dependency']]['contract']['export_abi']!='mlf-crate-boxed/1' for index,row in enumerate(providers)): raise ValueError('selected provider contract differs '+name)
+     expected=[*objects,installation['runtime']]
+     if receipt['link_objects']!=expected or any(sha(row['path'])!=row['sha256'] for row in expected): raise ValueError('native link input differs '+name)
      if [x['phase'] for x in cmds]!=['llvm','link'] or any(x['exit_code']!=0 for x in cmds): raise ValueError('invalid stages '+name)
+     if any(cmds[1]['command'].count(row['path'])!=1 for row in expected): raise ValueError('selected native object omitted from link '+name)
      llvm=cmds[0]['command']
      if Path(llvm[0]).resolve()!=clang or llvm[1:4]!=['-O2','-Wno-override-module','-c']: raise ValueError('invalid clang invocation '+name)
      if sha(sd/'program')!=receipt['output_sha256'] or sha(sd/'build/program.ll')!=receipt['llvm_sha256'] or sha(sd/'build/program.o')!=receipt['user_object_sha256']: raise ValueError('output receipt mismatch '+name)
@@ -139,7 +149,7 @@ def main():
    cmed=statistics.median(x['c_compile']['wall_seconds'] for x in wrow['samples']); mmed=statistics.median(x['candidate_compile']['wall_seconds'] for x in wrow['samples'])
    wrow['compile_medians']={'candidate':mmed,'c':cmed,'ratio':mmed/cmed}
    wrow['runtime_medians']={key:statistics.median(x[key+'_runtime']['wall_seconds'] for x in wrow['samples']) for key in ['candidate','baseline','c']}
-   wrow['stdlib_path']='installed'; wrow['native_export_count']=wrow['samples'][0]['receipt']['native_export_count']; wrow['fixed_library_reused']=wrow['samples'][0]['receipt']['fixed_library_reused']; wrow['builtin_inline_count']=wrow['samples'][0]['receipt']['builtin_inline_count']; wrow['fixed_runtime_reused']=wrow['samples'][0]['receipt']['fixed_runtime_reused']
+   wrow.update({key:wrow['samples'][0]['receipt'][key] for key in ('native_providers','dependency_modes','link_objects','runtime_reused')})
    save()
    if registered and performance_id in ids:
     events.result(performance_id,'pass',samples=len(wrow['samples']),receipt=str(output/'results.json'))

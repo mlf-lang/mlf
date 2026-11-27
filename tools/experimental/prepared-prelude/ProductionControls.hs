@@ -78,9 +78,9 @@ compareRoot program ordinary candidate = case (ordinary,candidate) of
     beforeNames <- ordinaryDictionaries program
     let checked = Prepared.checkedTerm second
         afterNames = if Prepared.reused second then Prepared.dictionaryIdentities second else beforeNames
-        beforeData = map (P.textToChars . Data.prettyDeclaration . layoutDeclaration beforeNames) (declarations (Core.compiledTerm first))
+        beforeData = map (P.textToChars . Data.prettyDeclaration . layoutDeclaration beforeNames) (declarations (Compiler.compiledTerm first))
         afterData = map (P.textToChars . Data.prettyDeclaration . layoutDeclaration afterNames) (declarations (Checked.term checked))
-    if Type.alphaEq (layoutType beforeNames (Core.inferredType first)) (layoutType afterNames (Checked.typeOf checked))
+    if Type.alphaEq (layoutType beforeNames (Compiler.inferredType first)) (layoutType afterNames (Checked.typeOf checked))
       then pure () else fatal "prepared prototype changed inferred target scheme"
     if beforeData == afterData then pure () else do
       mapM_ print (take 8 [(index,a,b) | (index,(a,b)) <- zip [0 :: Int ..] (zip beforeData afterData), a /= b])
@@ -103,13 +103,15 @@ main = do
       if Compiler.standalone source then pure () else fatal "prepared prototype accepts unnamed standalone roots only"
       program <- require (Parser.standaloneProgram source)
       if operation == "--ordinary-emit-llvm-gc" then do
-        compiled <- compileRequire (Compiler.compileProgramWithPrelude ImplicitPrelude program)
-        require (LLVM.emitCheckedChunks False (Core.checkedTerm compiled)) >>= mapM_ (putStr . P.textToChars)
+        compiled <- Compiler.compileProgramWithPrelude ImplicitPrelude program >>= compileRequire
+        require (LLVM.emitCheckedChunks False (Compiler.checkedTerm compiled)) >>= mapM_ (putStr . P.textToChars)
       else do
        outcome <- Prepared.compileSource ImplicitPrelude []
          (Prepared.SourceText (P.textFromChars path) (P.textFromChars bytes))
        if operation `elem` ["--compare", "--compare-direct"]
-         then compareRoot program (Compiler.compileProgramWithPrelude ImplicitPrelude program) outcome
+         then do
+           ordinary <- Compiler.compileProgramWithPrelude ImplicitPrelude program
+           compareRoot program ordinary outcome
          else do
            result <- compileRequire outcome
            if Prepared.reused result then pure () else fatal ("prepared prototype fallback: " P.++ "ordinary source route")

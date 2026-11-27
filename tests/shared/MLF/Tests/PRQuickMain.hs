@@ -30,7 +30,7 @@ module MLF.Tests.PRQuickMain where {
         file = fixtures ++ ("/" ++ (name ++ ".emlf"))
       };
       source <- A.liftIO (readFile file);
-      result <- A.right C.prettyError (C.compile file source);
+      result <- A.andThen (A.liftIO (C.compile file source)) (A.right C.prettyError);
       let {
         expected = XCon "Int" [];
         serialized = Pretty.prettyTerm (C.compiledTerm result)
@@ -53,7 +53,8 @@ module MLF.Tests.PRQuickMain where {
       };
       source <- A.liftIO (readFile file);
       expected <- A.liftIO (readFile (fixtures ++ ("/" ++ (name ++ ".stderr"))));
-      case C.compile file source of {
+      compilation <- A.liftIO (C.compile file source);
+      case compilation of {
         Left error -> do {
           A.assert (case C.phase error of { Inference -> True; _ -> False }) "wrong rejection phase";
           A.equal eqString (\message -> message) "wrong rejection diagnostic" expected (C.prettyError error ++ "\n")

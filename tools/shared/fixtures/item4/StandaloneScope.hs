@@ -10,7 +10,9 @@ import qualified Data.List as L
 import qualified Bootstrap.Types as T
 import qualified Bootstrap.Standalone as S
 import qualified Bootstrap.Parser as Parser
-import qualified Bootstrap.Compiler as C
+import qualified Bootstrap.Compiler as Compiler
+import qualified Bootstrap.CompilerCore as C
+import qualified Bootstrap.SourceFrontend as Frontend
 import qualified Bootstrap.Classes as Classes
 import qualified Bootstrap.Module as Modules
 import qualified Bootstrap.Map as M
@@ -38,9 +40,11 @@ withMarker e = let_ "ignoredString" (text "test") e
 compile = compileWith S.normalizeDemanded
 compileWith normalizer mode p = case normalizer mode p of
   T.Left e -> T.Left e
-  T.Right T.Nothing -> case C.compileProgramWithPrelude mode p of
+  T.Right T.Nothing -> case Frontend.lowerStandalone mode p of
     T.Left e -> T.Left (C.prettyError e)
-    T.Right c -> T.Right c
+    T.Right (_,lowered) -> case C.finishCompilation lowered of
+      T.Left e -> T.Left (C.prettyError e)
+      T.Right c -> T.Right c
   T.Right (T.Just ((,,) imported normalized _)) -> case Classes.lowerClassesWithImports imported normalized of
     T.Left e -> T.Left e
     T.Right lowered -> case C.finishCompilation lowered of
@@ -128,9 +132,11 @@ sourceBoundaries = do
   case Parser.parseExpr "<legacy Bool>" "True" of
     T.Right expression -> do
       noChange "legacy Bool keeps class-free path" (program expression)
-      case (C.compileProgram (program expression), C.compileProgram (program (T.SBoolLit True))) of
+      first <- Compiler.compileProgram (program expression)
+      second <- Compiler.compileProgram (program (T.SBoolLit True))
+      case (first,second) of
         (T.Right a,T.Right b) -> check "legacy Bool preserves target type and erasure"
-          (XT.alphaEq (C.inferredType a) (C.inferredType b) && X.equalErased (X.erase (C.compiledTerm a)) (X.erase (C.compiledTerm b)))
+          (XT.alphaEq (Compiler.inferredType a) (Compiler.inferredType b) && X.equalErased (X.erase (Compiler.compiledTerm a)) (X.erase (Compiler.compiledTerm b)))
         _ -> error "legacy Bool failed compilation"
     T.Left e -> error (B.unpack e)
   let branch name n = T.SAlternative (T.SConstructorPattern name []) (lit n)
@@ -150,10 +156,12 @@ allChecks = do
     (T.Right a,T.Right b) -> check "mixed canonical marker preserves abstract nominal inferred type" (XT.alphaEq (C.inferredType a) (C.inferredType b))
     (T.Left e,_) -> error (B.unpack e)
     (_,T.Left e) -> error (B.unpack e)
-  case (C.compileProgram (program abstract),compile T.ImplicitPrelude (program abstract)) of
+  ordinary <- Compiler.compileProgram (program abstract)
+  case (ordinary,compile T.ImplicitPrelude (program abstract)) of
     (T.Right a,T.Right b) -> do
-      check "ordinary target type alphaEq" (XT.alphaEq (C.inferredType a) (C.inferredType b))
-      check "ordinary target erasure unchanged" (X.equalErased (X.erase (C.compiledTerm a)) (X.erase (C.compiledTerm b)))
+      check "ordinary target type alphaEq" (XT.alphaEq (Compiler.inferredType a) (C.inferredType b))
+      check "ordinary crate target is independently checked" (case Check.checkClosed (Compiler.compiledTerm a) of
+        T.Right ty -> XT.alphaEq ty (C.inferredType b); T.Left _ -> False)
     _ -> error "ordinary differential compile failed"
   opaque "generated string bypasses local fromString" T.ImplicitPrelude
     (program (let_ "fromString" (lit 9) (text "ok"))) "ok"

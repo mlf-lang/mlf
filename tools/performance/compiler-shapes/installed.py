@@ -73,7 +73,8 @@ def installation(path):
         "an authenticated optimized public installation is required",
     )
     native = json.loads((path / "native/receipt.json").read_text())
-    require(native["complete"], "native library regeneration did not succeed")
+    require(native["format"] == "MLF-NATIVE-INSTALL-2" and native["complete"],
+            "native crate installation regeneration did not succeed")
     compiler = path / "bin/emlf"
     identity = subprocess.check_output([compiler, "--implementation-identity"], text=True).strip()
     require(identity == build["implementation_identity"], "compiler identity differs from receipt")
@@ -407,15 +408,34 @@ def main():
             if lane != "ghc":
                 receipt = json.loads((build / "receipt.json").read_text())
                 require(
-                    receipt["complete"]
+                    receipt["format"] == "MLF-NATIVE-PROGRAM-BUILD-3"
+                    and receipt["complete"]
                     and receipt["fresh_user_compilation"]
-                    and receipt["fixed_runtime_reused"]
+                    and receipt["runtime_reused"]
                     and receipt["source_sha256"] == case["sources"]["Main.hs"]
                     and receipt["output_sha256"] == sha(program)
                     and [c["phase"] for c in receipt["commands"]] == ["llvm", "link"]
                     and receipt["compiler"] == producers[lane]["binary"],
                     "incomplete or mismatched installed receipt",
                 )
+                providers = receipt["native_providers"]
+                owners = [row["dependency"] for row in providers]
+                selected = [row["dependency"] for row in receipt["dependency_modes"]
+                            if row["mode"] == "native" and row["dependency"] != "runtime"]
+                installed = {row["contract"]["crate_id"]: row
+                             for row in receipt["installation"]["providers"]}
+                objects = [{"path": row["path"], "sha256": row["sha256"]} for row in providers]
+                expected = [*objects, receipt["installation"]["runtime"]]
+                require(len(owners) == len(set(owners)) and sorted(owners) == sorted(selected)
+                        and receipt["link_objects"] == expected
+                        and any(row["dependency"] == "runtime" and row["mode"] == "native"
+                                for row in receipt["dependency_modes"])
+                        and all(installed[row["dependency"]]["object"] == objects[index]
+                                and installed[row["dependency"]]["contract"]["export_abi"] == "mlf-crate-boxed/1"
+                                for index, row in enumerate(providers))
+                        and all(sha(row["path"]) == row["sha256"]
+                                and receipt["commands"][1]["command"].count(row["path"]) == 1
+                                for row in expected), "native dependency selection differs from actual link inputs")
                 for key, digest in case["sources"].items():
                     if key != "Main.hs":
                         require(
@@ -428,9 +448,10 @@ def main():
                 sample["installed"] = {
                     k: receipt[k]
                     for k in (
-                        "stdlib_path",
-                        "native_export_count",
-                        "builtin_inline_count",
+                        "native_providers",
+                        "dependency_modes",
+                        "link_objects",
+                        "runtime_reused",
                         "llvm_sha256",
                         "user_object_sha256",
                         "commands",

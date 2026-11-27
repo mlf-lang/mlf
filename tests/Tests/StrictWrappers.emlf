@@ -43,7 +43,7 @@ suite : [] ((,) String (IO ()))
 suite = (:) ((,) "strict unary representation requires whole-program evaluated fields" proofs) []
 
 observe backends source input expected = do
- compilation <- B.rightCase (C.compile "<strict wrappers>" source)
+ compilation <- ioBind (C.compile "<strict wrappers>" source) (B.rightCase)
  result <- B.execute backends B.IOEntry (B.Input input false) (C.compiledTerm compilation)
  _ <- B.rightCase (B.outcome result)
  B.assertCase (eqString (B.output result) expected) "strict wrapper lowering changed output"

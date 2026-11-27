@@ -114,7 +114,8 @@
         "mlf-inference",
         "mlf-xmlf",
         "mlf-language-core",
-        "mlf-test"
+        "mlf-test",
+        "mlf-crates"
       ],
       "modules": {
         "Tests.IndependentCheck": "Tests/IndependentCheck.hs",

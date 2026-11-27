@@ -182,7 +182,16 @@ def main():
                         run(name+'-build',[a.clang,'-O2','-Wno-override-module',ir,runtime,*libs,'-lm','-lpthread','-o',binary])
                     else:
                         build=out/(name+'-objects');run(name+'-build',[sys.executable,scope,producer/'bin/emlf','-i',source/'libraries/mlf-foundation',entry,'-o',binary,'--build-dir',build])
-                        receipt=H.load(build/'receipt.json');H.require(receipt['complete'] and receipt['fresh_user_compilation'] and receipt['llvm_jobs']==1 and receipt['stdlib_path']=='installed' and receipt['fixed_library_reused'],'installed generic standard-library reuse')
+                        receipt=H.load(build/'receipt.json')
+                        providers=receipt['native_providers'];owners=[row['dependency'] for row in providers]
+                        decisions=receipt['dependency_modes'];selected=[row['dependency'] for row in decisions if row['mode']=='native' and row['dependency']!='runtime']
+                        objects=[{'path':row['path'],'sha256':row['sha256']} for row in providers]
+                        installed={row['contract']['crate_id']:row for row in receipt['installation']['providers']}
+                        native_inputs=[*objects,receipt['installation']['runtime']]
+                        H.require(receipt['format']=='MLF-NATIVE-PROGRAM-BUILD-3' and receipt['complete'] and receipt['fresh_user_compilation'] and receipt['llvm_jobs']==1 and receipt['runtime_reused'] and receipt['fallback_reason']=='' and owners and len(owners)==len(set(owners)) and sorted(owners)==sorted(selected),'installed generic standard-library reuse')
+                        H.require(receipt['link_objects']==native_inputs and any(row['dependency']=='runtime' and row['mode']=='native' for row in decisions) and all(installed[row['dependency']]['object']==objects[index] and installed[row['dependency']]['contract']['export_abi']=='mlf-crate-boxed/1' for index,row in enumerate(providers)),'installed selected provider contracts')
+                        link=next(row['command'] for row in receipt['commands'] if row['phase']=='link')
+                        H.require(all(H.sha(row['path'])==row['sha256'] and link.count(row['path'])==1 for row in native_inputs),'installed actual native link inputs')
                     check(name+'-run',binary,failure,wanted)
                     if not failure:outputs.append((out/(name+'-run')/'stdout').read_bytes())
                 if exact is None:

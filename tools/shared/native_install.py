@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Generate and authenticate fixed native installation inputs in an owned job.
+"""Install authenticated generic native crate providers and their runtime.
 
-No measured user program is an input. The producer imports only fixed checked
-library data; native registry bytes are never an input to their own producer.
+No measured user program is an input. The producer imports checked crate data;
+native registry bytes are never an input to their own producer.
 """
 from __future__ import annotations
 import argparse
@@ -16,7 +16,7 @@ import subprocess
 import time
 
 DATA = 'bootstrap/MLF/PreparedNativeData.hs'
-EMPTY_SHA256 = '908d33b2f9a5c74067684be01b0aecfb1a3ab802bfeda18b8f02608d0dc7de33'
+EMPTY_SHA256 = '55dc609cf3911b383589f47d2e043af74b48b816c16774c4be4038b922541d6f'
 
 def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
@@ -45,13 +45,12 @@ def registry(manifest, manifest_path):
         '             MultiParamTypeClasses, OverloadedStrings #-}',
         'module MLF.PreparedNativeData',
         '  (enabled, identity, manifestPath, manifestSHA, objectPaths,',
-        '   targetTriple, dataLayout, primitiveABI, exportABI, reservedTypeNames) where {',
+        '   targetTriple, dataLayout, primitiveABI, exportABI) where {',
         '  import MLF.Primitive; import Bootstrap.Types;',
         '  enabled :: Bool; enabled = True;']
     for name, value in fields:
         lines += [f'  {name} :: String; {name} = {text(value)};']
     values = ', '.join('(,) ' + text(row['path']) + ' ' + text(row['sha256']) for row in manifest['objects'])
-    lines += ['  reservedTypeNames :: [] String;', '  reservedTypeNames = [' + ', '.join(text(name) for name in manifest['reserved_type_names']) + '];']
     lines += ['  objectPaths :: [] ((,) String String);', '  objectPaths = [' + values + ']', '}']
     return ('\n'.join(lines) + '\n').encode()
 
@@ -74,13 +73,58 @@ def commands(root, job, request, generation, fresh):
     command[command.index('-o') + 1] = str(work / 'generate-native')
     command.insert(1, '-fforce-recomp')
     result['producer'] = command
-    result['generate'] = [str(work / 'generate-native'), str(native / 'library.ll'), str(native / 'metadata.json')]
+    result['generate'] = [str(work / 'generate-native'), str(native), str(native / 'metadata.json')]
+    return result
+
+def provider_rows(metadata):
+    require(metadata.get('format') == 'MLF-NATIVE-INSTALLATION-1', 'metadata format')
+    require(metadata.get('export_abi') == 'mlf-crate-boxed/1', 'metadata ABI')
+    require(metadata.get('runtime_abi') == 'mlf_require_runtime_v5_abi', 'runtime ABI')
+    rows = metadata.get('providers')
+    require(isinstance(rows, list), 'provider inventory')
+    owners, identities = [], []
+    for index, row in enumerate(rows):
+        require(isinstance(row, dict) and set(row) == {'contract', 'llvm'}, 'provider metadata fields')
+        contract = row['contract']
+        require(isinstance(contract, dict) and contract.get('format') == 'MLF-NATIVE-CRATE-1'
+                and contract.get('export_abi') == metadata['export_abi']
+                and contract.get('runtime_abi') == metadata['runtime_abi'], 'provider contract ABI')
+        owner, identity = contract.get('crate_id'), contract.get('identity')
+        require(isinstance(owner, str) and owner and isinstance(identity, str)
+                and re.fullmatch('[0-9a-f]{64}', identity), 'provider identity')
+        owners.append(owner); identities.append(identity)
+        status = contract.get('status')
+        require(status in ('eligible', 'unsupported'), 'provider eligibility')
+        if status == 'eligible':
+            require(row['llvm'] == f'library-{index}.ll', 'provider LLVM path')
+            require(all(isinstance(contract.get(field), list) for field in
+                        ('imports', 'exports', 'constructor_tags')), 'provider layout inventory')
+        else:
+            require(row['llvm'] is None and isinstance(contract.get('reason'), str)
+                    and contract['reason'], 'unsupported provider reason')
+    require(owners == sorted(set(owners)) and len(set(identities)) == len(identities),
+            'duplicate or unordered native providers')
+    return rows
+
+def native_commands(native, request, metadata):
     clang = request['clang']['path']
-    result['target'] = [clang, '-S', '-emit-llvm', '-x', 'c', '/dev/null', '-o', str(native / 'target.ll')]
-    result['library'] = [clang, '-O2', '-Wno-override-module', '-c', str(native / 'library.ll'), '-o', str(native / 'library.o')]
+    result = {'target': [clang, '-S', '-emit-llvm', '-x', 'c', '/dev/null', '-o', str(native / 'target.ll')]}
+    for index, row in enumerate(provider_rows(metadata)):
+        if row['llvm'] is not None:
+            result[f'library-{index}'] = [clang, '-O2', '-Wno-override-module', '-c',
+                str(native / row['llvm']), '-o', str(native / f'library-{index}.o')]
+    root = native.parent / 'sources'
     result['runtime'] = [clang, '-O2', '-std=c11', '-MD', '-MF', str(native / 'runtime.d'), '-c',
                          str(root / 'runtime/mlf_runtime.c'), *request['runtime_flags'], '-o', str(native / 'runtime.o')]
     return result
+
+def output_names(metadata):
+    names = ['metadata.json', 'runtime.o', 'runtime.d', 'target.ll', 'manifest.json',
+             'runtime-contract.json', 'PreparedNativeData.hs']
+    for index, row in enumerate(provider_rows(metadata)):
+        if row['llvm'] is not None:
+            names += [row['llvm'], f'library-{index}.o']
+    return names
 
 def producer_closure(root):
     sources = {row['module']: row['path'] for row in read(root / 'shared-sources.json')['modules']}
@@ -133,30 +177,37 @@ def native_tool_inputs(clang):
 
 def manifest_for(root, native, request):
     result = read(native / 'metadata.json')
-    require(result['format'] == 'MLF-NATIVE-LIBRARY-2', 'metadata format')
-    require(result['export_abi'] == 'mlf-native-typed-tuple/2', 'metadata ABI')
+    rows = provider_rows(result)
     require(result['identity'] == read(root.parent / 'request.json')['input_identity'], 'metadata input identity mismatch')
     target = (native / 'target.ll').read_text()
-    require(('target triple = \"' + request['target_triple'] + '\"') in target and ('target datalayout = \"' + request['data_layout'] + '\"') in target, 'native target probe differs')
-    ir = (native / 'library.ll').read_text()
-    # LLVM output may omit target declarations; the exact Clang target defaults
-    # are captured from a separately compiled empty C translation unit.
+    require(('target triple = "' + request['target_triple'] + '"') in target
+            and ('target datalayout = "' + request['data_layout'] + '"') in target, 'native target probe differs')
+    def recorded(path):
+        return {'path': str(path), 'sha256': sha(path)}
+    providers, objects = [], []
+    for index, row in enumerate(rows):
+        object_record = None
+        if row['llvm'] is not None:
+            ir = (native / row['llvm']).read_text()
+            require('target triple =' not in ir or ('target triple = "' + request['target_triple'] + '"') in ir,
+                    'emitted target differs from installation')
+            object_record = recorded(native / f'library-{index}.o')
+            objects.append(object_record)
+        providers.append({**row, 'object': object_record})
+    runtime = recorded(native / 'runtime.o')
     result.update(target_triple=request['target_triple'], data_layout=request['data_layout'],
                   primitive_abi=read(root / 'shared-sources.json')['primitive_abi'],
                   source_roots=[read(root.parent / 'request.json')['source_root']],
                   clang=request['clang'], link_args=request['link_args'],
-                  link_inputs=[{'path':str(Path(p).resolve()), 'sha256':sha(p)} for p in request['link_args'] if Path(p).is_absolute()],
-                  objects=[{'path': str(native / name), 'sha256': sha(native / name)}
-                           for name in ['library.o', 'runtime.o']])
-    require('target triple =' not in ir or ('target triple = "' + request['target_triple'] + '"') in ir,
-            'emitted target differs from installation')
+                  link_inputs=[recorded(Path(p).resolve()) for p in request['link_args'] if Path(p).is_absolute()],
+                  providers=providers, runtime=runtime, objects=[*objects, runtime])
     return result
 
 def runtime_contract(manifest):
-    """Small per-invocation contract, derived from the full checked metadata."""
+    """The consumer reconstructs each typed contract from checked headers."""
     require(manifest.get('runtime_abi') == 'mlf_require_runtime_v5_abi', 'runtime ABI mismatch')
     fields = ['format', 'identity', 'target_triple', 'data_layout', 'primitive_abi', 'runtime_abi',
-              'export_abi', 'objects', 'clang', 'link_args', 'link_inputs', 'source_roots', 'reserved_type_names']
+              'export_abi', 'providers', 'runtime', 'objects', 'clang', 'link_args', 'link_inputs', 'source_roots']
     return {field: manifest[field] for field in fields}
 
 def install(job, config):
@@ -182,7 +233,7 @@ def install(job, config):
     dump(native / 'request.json', request)
     (native / 'target.ll').write_bytes(target.stdout)
     generation = read(job / 'build/receipt.json')
-    receipt = {'format': 'MLF-NATIVE-INSTALL-1', 'complete': False,
+    receipt = {'format': 'MLF-NATIVE-INSTALL-2', 'complete': False,
                'measurement_scope': 'installation only; concurrency not controlled; not a user-program benchmark',
                'request_sha256': sha(native / 'request.json'), 'source_inputs': producer_closure(root),
                'commands': [], 'first_outputs': {}, 'comparisons': [],
@@ -205,6 +256,8 @@ def install(job, config):
         for fresh in [False, True]:
             prefix = 'fresh' if fresh else 'first';work = native / prefix;(work / 'objects').mkdir(parents=True)
             for label, argv in commands(root, job, request, generation, fresh).items(): run(prefix + '-' + label, argv)
+            metadata = read(native / 'metadata.json')
+            for label, argv in native_commands(native, request, metadata).items(): run(prefix + '-' + label, argv)
             import shlex
             dependency_text = (native / 'runtime.d').read_text().replace('\\\n', '')
             dependencies = {str((root / p).resolve()): sha(root / p) for p in shlex.split(dependency_text.split(':', 1)[1])}
@@ -216,7 +269,10 @@ def install(job, config):
             manifest = manifest_for(root, native, request);dump(native / 'manifest.json', manifest)
             dump(native / 'runtime-contract.json', runtime_contract(manifest))
             (native / 'PreparedNativeData.hs').write_bytes(registry(manifest, native / 'runtime-contract.json'))
-            for name in ['library.ll','metadata.json','library.o','runtime.o','runtime.d','target.ll','manifest.json','runtime-contract.json','PreparedNativeData.hs']:
+            names = output_names(metadata)
+            if fresh:
+                require(set(receipt['first_outputs']) == {str(native / name) for name in names}, 'fresh provider inventory changed')
+            for name in names:
                 path = native / name
                 if not fresh:
                     backup = native / 'first' / name;shutil.copy2(path, backup);backup.chmod(0o444)
@@ -245,7 +301,7 @@ def verify(root):
     job, native = root.parent, root.parent / 'native'
     require(root == job / 'sources', 'enabled registry requires owned job')
     receipt = read(native / 'receipt.json');request = read(native / 'request.json')
-    require(receipt['format'] == 'MLF-NATIVE-INSTALL-1' and receipt['complete'], 'incomplete receipt')
+    require(receipt['format'] == 'MLF-NATIVE-INSTALL-2' and receipt['complete'], 'incomplete receipt')
     require(receipt['helper_sha256'] == sha(root / 'tools/shared/native_install.py'), 'installer source changed')
     require(receipt['request_sha256'] == sha(native / 'request.json'), 'request changed')
     require(receipt['source_inputs'] == producer_closure(root), 'producer source closure changed')
@@ -253,10 +309,11 @@ def verify(root):
     for fresh in [False, True]:
         prefix = 'fresh' if fresh else 'first'
         expected.update({prefix + '-' + key: value for key,value in commands(root, job, request, read(job / 'build/receipt.json'), fresh).items()})
+        expected.update({prefix + '-' + key: value for key,value in native_commands(native, request, read(native / 'metadata.json')).items()})
         producer = receipt[prefix + '_producer']
         require(producer['path'] == str(native / prefix / 'generate-native') and sha(producer['path']) == producer['sha256'], 'producer executable changed')
     rows = receipt['commands']; require(len(rows) == len(expected) and {r['label']:r['argv'] for r in rows} == expected and all(r['exit_code'] == 0 for r in rows), 'producer commands differ')
-    outputs = {str(native / name) for name in ['library.ll','metadata.json','library.o','runtime.o','runtime.d','target.ll','manifest.json','runtime-contract.json','PreparedNativeData.hs']}
+    outputs = {str(native / name) for name in output_names(read(native / 'metadata.json'))}
     require(set(receipt['first_outputs']) == outputs, 'output inventory mismatch')
     require(len(receipt['comparisons']) == len(outputs) and {r['path'] for r in receipt['comparisons']} == outputs, 'regeneration inventory mismatch')
     for path, record in receipt['first_outputs'].items():

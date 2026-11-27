@@ -23,7 +23,7 @@ BASE_LABELS = (
     'actual copied-definition fallback, legacy parity, runtime result, and warm graph reuse',
     'actual Session same-process failure/retry, lock release, whole-crate publication and retained generation',
 )
-FORMAL_LABEL = 'cross-executable formal loading and legacy prepared-native literal compatibility'
+FORMAL_LABEL = 'cross-executable formal loading and prepared open-object literal compatibility'
 
 
 def sha(path):

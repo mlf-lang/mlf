@@ -11,14 +11,15 @@ import qualified Bootstrap.X.Check as Check
 import qualified Bootstrap.X.Type as XT
 import qualified MLF.Host.Base as B
 
-compile source = case C.compile "SourceValueScope.emlf" (B.literal source) of
+compile source = C.compile "SourceValueScope.emlf" (B.literal source) >>= \outcome -> pure $ case outcome of
   T.Left e -> Left (B.unpack (C.prettyError e))
   T.Right c -> case Check.checkClosed (C.compiledTerm c) of
     T.Left e -> Left (B.unpack e)
     T.Right _ -> Right c
 integer label source expected = do
   putStrLn ("BEGIN " ++ label)
-  case compile source of
+  outcome <- compile source
+  case outcome of
     Left e -> error (label ++ ": " ++ e)
     Right c -> case R.prepare False (C.compiledTerm c) of
       T.Left e -> error (B.unpack e)
@@ -28,7 +29,8 @@ integer label source expected = do
         _ -> error (label ++ ": wrong result")
 reject label source = do
   putStrLn ("BEGIN " ++ label)
-  case compile source of
+  outcome <- compile source
+  case outcome of
     Left _ -> putStrLn ("PASS " ++ label)
     Right _ -> error (label ++ ": unexpectedly accepted")
 header = "class C a where { c :: a -> Int };\n"
@@ -36,7 +38,8 @@ main = do
   hSetBuffering stdout LineBuffering
   source <- readFile "examples/monad-state-do.emlf"
   putStrLn "BEGIN exact State standalone source"
-  case compile source of
+  outcome <- compile source
+  case outcome of
     Left e -> error e
     Right c -> if B.unpack (C.sourceType c) == "Pair Int Int" then putStrLn "PASS exact State standalone source" else error ("State type: " ++ B.unpack (C.sourceType c))
   integer "transitive source kernels close over instance" (header ++ "kernel x = 42;\nhelper = kernel;\ninstance C Int where { c = helper };\nc (0 :: Int)") 42
@@ -49,11 +52,14 @@ main = do
   let rawClass = T.SClassDecl "RawC" [("a",T.Star)] [] [("rawC",T.SArrow (T.STVar "a") (T.SCon "Int" []))]
       rawInstance = T.SInstanceDecl [] [] "RawC" [T.SCon "Int" []] [("rawC",T.SVar "hidden")]
       rawBody = T.SLet "hidden" (T.SLam "x" T.Nothing (T.SIntLit 42)) (T.SApp (T.SVar "rawC") (T.SIntLit 0))
-  case C.compileProgram (T.SClassProgram [] [rawClass] [rawInstance] rawBody) of
+  raw <- C.compileProgram (T.SClassProgram [] [rawClass] [rawInstance] rawBody)
+  case raw of
     T.Left _ -> putStrLn "PASS raw body-only let cannot supply instance scope"
     T.Right _ -> error "raw body-only let unexpectedly captured by instance"
   let identity = T.SLam "x" T.Nothing (T.SVar "x")
-  case (C.compileExpr identity,C.compileExpr (T.SSourceDefinition identity)) of
+  plain <- C.compileExpr identity
+  marked <- C.compileExpr (T.SSourceDefinition identity)
+  case (plain,marked) of
     (T.Right a,T.Right b) | XT.alphaEq (C.inferredType a) (C.inferredType b)
       && X.equalErased (X.erase (C.compiledTerm a)) (X.erase (C.compiledTerm b)) -> putStrLn "PASS source-definition marker preserves ordinary MLF type and erasure"
     _ -> error "ordinary MLF source-definition marker changed inference"

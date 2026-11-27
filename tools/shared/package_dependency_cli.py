@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 from test_direct import dependency_diagnostics, sha
+from source_root_cli import UNIFIED_SOURCE
 
 
 def check_package_dependencies(runner, tools, root, clang, gc):
@@ -45,17 +46,25 @@ def check_package_dependencies(runner, tools, root, clang, gc):
     fresh = manifest('fresh', library={'modules': {'Fresh': 'Fresh.emlf'}})
     implementation = fresh.parent / 'Fresh.emlf'
     implementation.write_text('module Fresh (count) where\ncount n = addInt n 5\n')
+    composed = manifest('composed', library={'modules': {'Composed': 'Composed.emlf'}}, dependencies={
+        'fresh': {'path': '../fresh'},
+        'sealed': {'release': '../checked-release', 'sha256': sha(release / 'release.json')}})
+    (composed.parent / 'Composed.emlf').write_text(
+        'module Composed (total) where\nimport qualified Fresh\nimport qualified Sealed\n'
+        'total n = addInt (Fresh.count n) (Sealed.count 1)\n')
     dormant = manifest('dormant', library={'modules': {'Dormant': 'Dormant.emlf'}})
     (dormant.parent / 'Dormant.emlf').write_text('module Dormant (Ticket(..), count) where\n'
                                                 'data Ticket = Ticket Int\ncount n = addInt n 100\n')
     app = manifest('consumer', executables={'mixed': {'main': 'Main.emlf'}}, dependencies={
-        'fresh': {'path': '../fresh'}, 'dormant': {'path': '../dormant'}, 'sealed': {'release': '../checked-release', 'sha256': sha(release / 'release.json')}})
-    (app.parent / 'Main.emlf').write_text('module Main where\nimport qualified Fresh\nimport qualified Sealed\n'
+        'fresh': {'path': '../fresh'}, 'composed': {'path': '../composed'},
+        'dormant': {'path': '../dormant'}, 'sealed': {'release': '../checked-release', 'sha256': sha(release / 'release.json')}})
+    (app.parent / 'Main.emlf').write_text('module Main where\nimport qualified Fresh\nimport qualified Composed\n'
                                          'import qualified Dormant\n'
                                          'measure :: (Dormant.Ticket -> Dormant.Ticket) -> Int -> Int\n'
                                          'measure witness number = number\n'
-                                         'main = printInt (measure (\\x -> x) (addInt (Fresh.count 2) (Sealed.count 1)))\n')
+                                         'main = printInt (measure (\\x -> x) (addInt (Composed.total 2) (Fresh.count 0)))\n')
     fresh_id = 'fresh/0.1.0/library'
+    composed_id = 'composed/0.1.0/library'
     sealed_id = 'sealed/0.1.0/library'
 
     def build(name, chosen, expected):
@@ -70,7 +79,8 @@ def check_package_dependencies(runner, tools, root, clang, gc):
         for row in recorded:
             check({k: row[k] for k in ('dependency', 'mode', 'reason')} in decisions,
                   name + ' did not print the recorded decision')
-        required = {(fresh_id, chosen), (sealed_id, 'ir'), ('dormant/0.1.0/library', 'unused')}
+        required = {(fresh_id, chosen), (composed_id, 'native'),
+                    (sealed_id, 'ir'), ('dormant/0.1.0/library', 'unused')}
         check(required <= {(row['dependency'], row['mode']) for row in recorded if row['stage'] == 'link'},
               name + ' selected the wrong artifact for a direct dependency')
         check(len(report['codegen']) == 1, name + ' did not emit exactly one executable')
@@ -79,28 +89,34 @@ def check_package_dependencies(runner, tools, root, clang, gc):
         check(required <= {(r['dependency'], r['mode']) for r in inventory['dependency_modes']},
               name + ' emitted different dependency modes')
         objects = {r['dependency']: r for r in inventory['objects']}
-        check(sealed_id not in objects and 'dormant/0.1.0/library' not in objects
-              and (fresh_id in objects) == (chosen == 'native'),
+        check(len(objects) == len(inventory['objects']), name + ' linked one provider more than once')
+        check(set(objects) == ({fresh_id, composed_id} if chosen == 'native' else {composed_id}),
               name + ' linked an object for a checked dependency or omitted a selected object')
         for row in objects.values():
             check(sha(row['path']) == row['sha256'], name + ' linked different object bytes')
         runner.run(name + '-executable', [exe], expected=expected)
         return objects, recorded
 
-    cold, cold_modes = build('package-cold', 'native', b'48\n')
+    # Composed consumes native Fresh and checked-only Sealed; the root also
+    # consumes Fresh directly. (2 + 5) + (1 + 40) + (0 + 5) = 53.
+    cold, cold_modes = build('package-cold', 'native', b'53\n')
     check(any(row['dependency'] == fresh_id and row['mode'] == 'source' and row['stage'] == 'check'
               for row in cold_modes), 'cold package omitted its source dependency')
-    warm, _ = build('package-warm', 'native', b'48\n')
+    warm, _ = build('package-warm', 'native', b'53\n')
     check(cold[fresh_id] == warm[fresh_id], 'warm package used a different native object')
     Path(cold[fresh_id]['path']).write_bytes(b'damaged object in the isolated consumer cache\n')
-    build('package-checked-fallback', 'ir', b'48\n')
+    build('package-checked-fallback', 'ir', b'53\n')
     implementation.write_text('module Fresh (count) where\ncount n = addInt n 6\n')
-    changed, _ = build('package-edited', 'native', b'49\n')
+    changed, _ = build('package-edited', 'native', b'55\n')
     check(changed[fresh_id]['sha256'] != cold[fresh_id]['sha256'],
           'editing a library reused its obsolete native object')
 
     report = json.loads((work / 'build/build-report.json').read_text())
-    check_pinned_link(runner, compiler, fresh_id, report, changed, expected=b'49\n')
+    check_pinned_link(runner, compiler, fresh_id, report, changed, expected=b'55\n')
+    common = manifest('unified', executables={'unified': {'main': 'Main.emlf'}})
+    (common.parent / 'Main.emlf').write_text(UNIFIED_SOURCE)
+    package('unified-package', common, shared, work / 'unified-build', 'build')
+    runner.run('unified-package-execute', [work / 'unified-build/bin/unified'], expected=b'42\n')
 
 
 def check_pinned_link(runner, compiler, dep, package, linked, expected):

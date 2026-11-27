@@ -26,7 +26,8 @@ accepted : String -> String -> String -> IO Unit
 accepted fixtures output name = do
  let file = fixtures ++ "/" ++ name ++ ".emlf"
  source <- readFile file
- result <- case C.compile file source of
+ compilation <- C.compile file source
+ result <- case compilation of
   Left error -> fatal (C.prettyError error)
   Right compiled -> ioReturn compiled
  let expected = XCon "Int" Nil
@@ -46,7 +47,8 @@ rejected fixtures name = do
  let file = fixtures ++ "/" ++ name ++ ".emlf"
  source <- readFile file
  expected <- readFile (fixtures ++ "/" ++ name ++ ".stderr")
- case C.compile file source of
+ compilation <- C.compile file source
+ case compilation of
   Left error -> do
    require (case C.phase error of { Inference -> true; _ -> false }) (name ++ ": wrong rejection phase")
    require (eqString (C.prettyError error ++ "\n") expected) (name ++ ": wrong rejection diagnostic: " ++ C.prettyError error)

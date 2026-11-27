@@ -20,7 +20,6 @@
     "modules": {
       "Bootstrap.ClassDemand": "Bootstrap/ClassDemand.hs",
       "Bootstrap.Classes": "Bootstrap/Classes.hs",
-      "Bootstrap.Compiler": "Bootstrap/Compiler.hs",
       "Bootstrap.CompilerCore": "Bootstrap/CompilerCore.hs",
       "Bootstrap.Constraint": "Bootstrap/Constraint.hs",
       "Bootstrap.Elaborate": "Bootstrap/Elaborate.hs",
@@ -28,8 +27,9 @@
       "Bootstrap.EvidenceBoundary": "Bootstrap/EvidenceBoundary.hs",
       "Bootstrap.Graph": "Bootstrap/Graph.hs",
       "Bootstrap.Graph.IndexStore": "Bootstrap/Graph/IndexStore.hs",
+      "Bootstrap.Graph.ScopeIndex": "Bootstrap/Graph/ScopeIndex.hs",
       "Bootstrap.Graph.Solver": "Bootstrap/Graph/Solver.hs",
-      "Bootstrap.Graph.ScopeIndex": "Bootstrap/Graph/ScopeIndex.hs"
+      "Bootstrap.SourceFrontend": "Bootstrap/SourceFrontend.hs"
     }
   },
   "source-syntax": "shared-haskell-v1"

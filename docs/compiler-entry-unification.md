@@ -6,6 +6,13 @@ groups, infer their contracts, and produce checked xMLF. The input determines th
 root's namespace and dependencies. The requested output determines how to use the
 checked result.
 
+There is one production source compilation engine, with several input adapters.
+File, expression, stdin, caller-owned AST, package, and installed-library inputs
+all reach the crate declaration graph. Native executables have two ways to
+supply a dependency's implementation: compose its checked IR or link its native
+object. Compiling available source prepares a checked crate for those consumers;
+it is not another inference or native-linking pipeline.
+
 | Invocation | Root and dependencies | Result |
 | --- | --- | --- |
 | `emlf --type Main.emlf` | File and imports resolved from the entry directory and the ordered `-i` roots | Inferred source type |
@@ -14,6 +21,7 @@ checked result.
 | `emlf --emit-llvm Main.emlf` | Same source root | LLVM IR for a closed program |
 | `emlf Main.emlf -o main` | File and the installed compiler's authenticated library and runtime | Native executable |
 | `mlfpkg build --target NAME` | Manifest target, private modules, and declared library dependencies | Package target and build receipts |
+| `Bootstrap.Compiler.compile*` | Caller-owned source, modules, expression AST, or program AST | An IO action returning a checked crate compilation or a phased error |
 
 A saved xMLF file can enter the backend directly. For example,
 `emlf --xmlf-to-llvm term.xmlf` parses and checks the target before emitting LLVM.
@@ -41,8 +49,18 @@ The group engine records dependencies on source and imported contracts. It
 checks the inferred type and elaborated target before admitting a new fragment.
 The root adapter closes checked fragments for printing, interpreting, or
 ordinary LLVM emission. Native code generation can keep selected values as
-typed parameters supplied by the installed object.
+typed parameters supplied by native crate objects.
 
+`Bootstrap.Compiler` lives in `mlf-crates` and delegates its public APIs to
+`SourceCrate.compileClosed` and `CrateSession`. Its result exposes the checked
+term and rendered source type. It no longer supplies a whole-program
+`presolution`; a declaration-group build has several independent inference
+results. Solver inspection uses the explicit frontend and solver APIs.
+`Bootstrap.SourceFrontend` owns source normalization, class lowering, and
+diagnostic rendering. `CompilerCore` remains the lower inference/checking
+kernel used by crate groups and builtin preparation.
+
+[Public source and AST API](../libraries/mlf-crates/Bootstrap/Compiler.hs) ·
 [Source root adapter](../libraries/mlf-crates/Bootstrap/SourceCrate.hs) ·
 [crate session](../libraries/mlf-crates/Bootstrap/CrateSession.hs) ·
 [group inference](../libraries/mlf-crates/Bootstrap/CrateGraph.hs)
@@ -51,8 +69,9 @@ typed parameters supplied by the installed object.
 
 | Input | Storage and reuse |
 | --- | --- |
-| File | The compiler stores declaration-group queries under `.mlf-build/cache/source-roots/` in the working directory. Repeated builds can reuse checked groups whose inputs and dependencies still match. |
+| File through the CLI | The compiler stores declaration-group queries under `.mlf-build/cache/source-roots/` in the working directory. Repeated builds can reuse checked groups whose inputs and dependencies still match. |
 | Expression or stdin | The query graph and pending results live in the invocation. |
+| `Bootstrap.Compiler` API | The same crate session uses in-memory query storage, including file and AST requests. |
 | Package | `mlfpkg` uses the package build cache and publishes `.mlfci` interfaces and `.mlfco` implementation objects for independently compiled units. |
 
 Set `MLF_SOURCE_CACHE_DIR` to choose a different cache directory. A relative
@@ -88,7 +107,7 @@ interfaces in every case.
 | Choice | Inputs and work |
 | --- | --- |
 | `native` | The builder checks the object digest, compiler and target identity, ABI, constructor layout, and typed exports. Clang links the selected object into the executable. |
-| `ir` | The compiler combines checked implementations from their `.mlfco` objects with the user root before LLVM optimization and machine-code generation. |
+| `ir` | The compiler combines checked implementations from `.mlfco` objects or authenticated embedded crate data with the user root before LLVM optimization and machine-code generation. |
 | `source` | The compiler checks source declarations and creates the crate's checked implementation. An eligible source library can also produce a native object for later links. |
 
 A dependency with no reachable implementation can appear as `unused`; its interface can still participate in checking.
@@ -106,7 +125,11 @@ and shares the result. A native library can therefore use values supplied by
 another native library or by checked IR without generating a second copy of the
 dependency. The ABI fixes the export order and boxed representation. User
 constructor tags derive from qualified names, with collisions checked across
-the full target.
+the full target. Both package libraries and installed libraries use
+`MLF-NATIVE-CRATE-1` contracts and the `mlf-crate-boxed/1` ABI. Both invoke
+`NativeCrate.emitLibrary` to produce objects and
+`CrateNativeCommand.emitDependencies` to select providers, compose checked
+fallbacks, emit the root, and revalidate selected objects.
 
 Each decision appears on stderr with the dependency identity, mode and reason.
 For example, `dependency demo/1.0/library: source (compiled package sources)`
@@ -148,11 +171,22 @@ These commands select checked IR and source implementations. They print their
 result on stdout, so a command such as `emlf Main.emlf >main.xmlf` can be used
 without filtering compiler diagnostics.
 
-The installed compiler additionally knows its fixed standard library and
-runtime. Source search roots take precedence over installation defaults. When
-the library object is missing or incompatible, the compiler can compose its
-checked IR or compile available source. Creating the executable still requires
-the authenticated runtime and native toolchain.
+The installed compiler obtains its providers from an authenticated
+`MLF-NATIVE-INSTALLATION-1` inventory instead of a package plan on disk. The
+inventory can contain multiple native crates and crates that require checked
+IR. Its embedded checked libraries retain their interfaces and exact `.mlfco`
+images. A requested body is decoded and admitted by the ordinary crate object
+reader, preserving open declaration fragments without a legacy closed-spine
+conversion or a second independently supplied AST. Source search roots take precedence over
+installation defaults. A missing, damaged, or incompatible provider object can
+fall back independently to checked IR. Creating the executable still requires
+the authenticated runtime, native toolchain, and link inputs.
+
+The direct executable receipt uses `MLF-NATIVE-PROGRAM-BUILD-3`.
+`native_providers` records the selected dependency identities, object paths, and
+digests; `link_objects` records those objects and the runtime actually linked.
+`runtime_reused`, `dependency_modes`, and `fallback_reason` describe the actual
+build. There is no separate fixed-library ABI, emitter, or reuse count.
 
 [Native crate ABI](../libraries/mlf-llvm/Bootstrap/LLVM/Library.hs) ·
 [package artifact admission](../libraries/mlf-package-core/Package/NativeArtifact.hs) ·

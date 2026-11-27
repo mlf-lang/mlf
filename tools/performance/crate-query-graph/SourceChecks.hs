@@ -243,11 +243,11 @@ formalChecks file = do
    digest<-P.fileDigest path
    pure(Libraries.LibrarySource name path source digest (Modules.sourceSyntax parsed))) names
  identity<-P.fileDigest(B.literal file)
- raw<-expect "prepared library open-object admission" (Libraries.prepareFresh identity T.ImplicitPrelude sources objects)
- _<-expect "prepared native literal compatibility" (Libraries.nativeLibrary raw)
- let (declarations,expression)=Literal.rawLibraryPieces raw
+ raw<-Libraries.prepareFresh identity T.ImplicitPrelude sources objects >>= expect "prepared library open-object admission"
+ _<-Libraries.admitLibrary raw >>= expect "prepared open-object admission"
+ (declarations,expression)<-Literal.rawLibraryPieces raw >>=expect "prepared literal object encoding"
  assert "prepared literal rendered" (P.stringLength declarations>0 && P.stringLength expression>0)
- putStrLn "PASS cross-executable formal loading and legacy prepared-native literal compatibility"
+ putStrLn "PASS cross-executable formal loading and prepared open-object literal compatibility"
 
 loweredChecks root = do
  let members=[("copy",T.Nothing,T.SSourceDefinition(T.SIntLit 42)),
@@ -322,5 +322,5 @@ main = do
  when (wanted "actual Session same-process failure/retry, lock release, whole-crate publication and retained generation") (sessionTransactionChecks directory)
  case tail arguments of
   [] -> pure ()
-  [file] -> when (wanted "cross-executable formal loading and legacy prepared-native literal compatibility") (formalChecks file)
+  [file] -> when (wanted "cross-executable formal loading and prepared open-object literal compatibility") (formalChecks file)
   _ -> error "expected directory [formal-interface]"

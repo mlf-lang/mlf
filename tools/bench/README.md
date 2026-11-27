@@ -317,12 +317,16 @@ programs. Flags outside the supported link form retain Clang's normal driver.
 `native-default.py` measures the direct `emlf SOURCE -o EXE --build-dir DIR`
 command, including process startup, installed-library validation, fresh user
 frontend and LLVM generation, one ordinary Clang O2 object compilation and a
-fresh link. Fixed library installation is excluded and its separately measured
+fresh link. Native crate installation is excluded and its separately measured
 receipt and timing are recorded. This is a distinct measurement boundary from
-the fresh-runtime runner above. Every workload must use the installed standard
-library path; a zero native-export count is allowed and recorded. The report
-separately records fixed runtime reuse, native library export reuse and checked
-builtin unfolding; these are distinct mechanisms.
+the fresh-runtime runner above. Each workload requires an authenticated
+installation and no dependency fallback. A program may need no native provider;
+its actual checked-IR and source dependencies remain recorded. The runner accepts
+`MLF-NATIVE-PROGRAM-BUILD-3` receipts and compares `native_providers` with the
+native entries in `dependency_modes`, the installed crate contracts, and every
+object passed to the linker. `link_objects` records those selected provider
+objects followed by the authenticated runtime; `runtime_reused` records that
+runtime reuse independently.
 
 Supply a prebuilt independent oracle executable that implements
 `ORACLE WORKLOAD SIZE OUTPUT` by calling `Package.Benchmark.validateOutput`;
@@ -347,7 +351,7 @@ python3 -B tools/testing/run.py application-benchmarks-installed -- \
 
 Each workload has an excluded warmup and five fresh paired candidate/C builds,
 plus candidate/C/baseline runtime processes. The report retains exact commands,
-receipts, correctness cases, medians, reuse counts and input identities. Its
+receipts, correctness cases, medians, dependency modes and input identities. Its
 `complete` status means collection and correctness succeeded; evaluate ratios
 against the desired limits separately. Do not describe it as the ten-workload
 fresh-runtime gate.

@@ -65,8 +65,8 @@ main=do
     then putStrLn "FACTOR-PROJECTION-EQUAL" else fail "normalize factoring changed source result"
   ["original-check",which,path,out]->do
    m<-mode which;bytes<-getContents;_<-evaluate(length bytes);(root,_)<-parsed path(text bytes)
-   compiled<-compileRequire(Compiler.compileStandalone m root)
-   fresh out;writeChecked out(Core.checkedTerm compiled)
+   compiled<-Compiler.compileStandalone m root >>= compileRequire
+   fresh out;writeChecked out(Compiler.checkedTerm compiled)
   ["emit-installed-llvm",which,expected,path]->do
    m<-mode which;bytes<-getContents;_<-evaluate(length bytes)
    fields<-require(Separate.unpack(text bytes))
@@ -75,7 +75,7 @@ main=do
      -- Exact externally authenticated bytes, same restore and whole-root path.
      context<-require(Installed.restoreVerified(text expected)actual metadata object)
      (_,program)<-parsed path source
-     outcome<-compileRequire(Installed.compileInstalledRoot context m program)
+     outcome<-Installed.compileInstalledRoot context m program >>= compileRequire
      if Installed.reused outcome then pure()
       else fail ("installed LLVM-only route refused OriginalFallback: "++untext(Installed.routeReason outcome))
      chunks<-require(LLVM.emitCheckedChunks False(Installed.checkedTerm outcome))
@@ -91,12 +91,12 @@ main=do
      -- launching this process; no filesystem artifact re-read occurs here.
      context<-require(Installed.restoreVerified(text expected)actual metadata object)
      (_,program)<-parsed path source
-     outcome<-compileRequire(Installed.compileInstalledRoot context m program)
+     outcome<-Installed.compileInstalledRoot context m program >>= compileRequire
      fresh out
      writeUtf8File(out</>"route.txt")(if Installed.reused outcome then "InstalledRoot\n" else "OriginalFallback\n")
      writeUtf8File(out</>"route-reason.txt")(untext(Installed.routeReason outcome)++"\n")
      writeChecked out(Installed.checkedTerm outcome)
-     writeUtf8File(out</>"root-target-type.txt")(untext(Pretty.prettyType(Core.inferredType(Installed.rawRootCompilation outcome)))++"\n")
+     writeUtf8File(out</>"root-target-type.txt")(untext(Pretty.prettyType(Installed.rootInferredType outcome))++"\n")
      writeUtf8File(out</>"actual-lowering-map.pack")(untext(Separate.pack[Separate.pack[x,y]|(x,y)<-M.toList(Installed.rootDictionaryMap outcome)]))
      if operation=="consume-llvm" then do
       chunks<-require(LLVM.emitCheckedChunks False(Installed.checkedTerm outcome))

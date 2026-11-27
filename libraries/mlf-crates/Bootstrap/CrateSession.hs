@@ -2,11 +2,11 @@
 {-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
--- File-owned candidate route. No raw AST, Solver, region, or callback escapes.
-module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, compileSpecFileWithVerification, compileSpecFileUsingInstaller,
+-- Shared source/file compilation owns its solver regions and checked groups.
+module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, compileSpecFileWithVerification, compileSpecFileUsingInstaller, compileSources,
     CompiledCrate, compiledObject, compiledInterfaces, compiledMetadata, compiledCompilerDigest, PlanInputs(..), compilerImageDigest,
     CompilationSession, freshSession, loadPlan, compileInSession, sessionObjects,
-    QueryStorage(..), SourceRoot, compileSourceRoot, compileExpressionRoot, rootObject, rootDisplayNames, rootDictionaryNames,
+    QueryStorage(..), SourceRoot, compileSourceRoot, compileExpressionRoot, rootObject, rootDisplayNames, rootDictionaryNames, rootNames,
     compileSpecFileRetainedUsingInstaller, compileSpecFileRetainedInPlan) where {
   import MLF.Primitive;
   import Bootstrap.Types;
@@ -23,7 +23,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.IntRank as Rank;
   import qualified Bootstrap.BuiltinPreludeContext as Builtin;
-  import Bootstrap.Crate (CrateSpec, PreparedCrate, CrateEntry(..), withPreludeLoading,
+  import Bootstrap.Crate (CrateSpec, CrateEntry(..), withPreludeLoading,
     ensureBuiltinWith, specIdentity, specDependencies, specCache);
   import qualified Bootstrap.Crate as Crate;
   import qualified Bootstrap.CrateQuery as Query;
@@ -127,12 +127,12 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
     }
   };
 
-  compilePreparedWithEncoding :: forall a. Bool -> Bool ->
-    (Artifact.CrateObject -> String -> Query.QueryReport -> a) ->
-    CrateSpec -> [] ((,) String Artifact.CrateInterface) -> PreparedCrate ->
-    IO (Either String a);
-  compilePreparedWithEncoding verifyAll shareEncoding = Crate.compilePreparedUsing
-    (if shareEncoding then compileParsedSourceGroups verifyAll else Query.compileSourceGroups);
+  -- Loaded source producers use the same checked declaration groups and
+  -- publication lifecycle as compileSpecFile. No closed-object compiler is
+  -- selected merely because the caller already owns its parsed source.
+  compileSources :: CrateSpec -> [] SourceModule -> [] ((,) String Artifact.CrateInterface) ->
+    String -> IO (Either String ());
+  compileSources = compileSourcesWithEncoding False Nothing True;
   compileSourcesWithEncoding :: Bool -> Maybe ((,) Builtin.PreparedPrelude String) -> Bool -> CrateSpec -> [] SourceModule ->
     [] ((,) String Artifact.CrateInterface) -> String -> IO (Either String ());
   compileSourcesWithEncoding verifyAll witness = compileSourcesUsingInstaller verifyAll (ensureBuiltinWith witness);
@@ -191,10 +191,11 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
     };
 
   data QueryStorage = MemoryQueries | FileQueries String | DefaultFileQueries String;
-  data SourceRoot = SourceRoot Artifact.CrateObject (Map String String) (Map String String);
-  rootObject (SourceRoot object _ _) = object;
-  rootDisplayNames (SourceRoot _ names _) = names;
-  rootDictionaryNames (SourceRoot _ _ names) = names;
+  data SourceRoot = SourceRoot Artifact.CrateObject (Map String String) (Map String String) Modules.Names;
+  rootObject (SourceRoot object _ _ _) = object;
+  rootDisplayNames (SourceRoot _ names _ _) = names;
+  rootDictionaryNames (SourceRoot _ _ names _) = names;
+  rootNames (SourceRoot _ _ _ names) = names;
 
   compileSourceRoot :: QueryStorage -> PreludeMode -> String -> String -> [] SourceModule ->
     [] ((,) String Artifact.CrateInterface) -> IO (Either CompileError SourceRoot);
@@ -224,7 +225,8 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
       checkCrateGroups begin compiler False spec interfaces prepared (filePlan prepared)
         (\object _ session _ _ -> do {
           published <- QueryGraph.publish session;
-          ioReturn (mapEither (\_ -> SourceRoot object names dictionaries) (mapLeft sourceStorageError published))
+          ioReturn (mapEither (\_ -> SourceRoot object names dictionaries
+            (case fileModules prepared of { Crate.CompilationModules bindings _ _ -> Modules.bindingNames bindings })) (mapLeft sourceStorageError published))
         }));
     ioReturn (mapLeft (sourceGroupError display) result)
   };

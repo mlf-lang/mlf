@@ -196,10 +196,13 @@ module MLF.Entry.Emlf where {
         Right info -> putStrLn info
       }
     };
-    ["--emit-native-library-llvm"] -> printLLVM Prepared.emitNativeLibraryChunks;
-    ["--native-library-metadata"] -> case Prepared.nativeLibraryMetadata of {
-      Left message -> fatal message;
-      Right info -> putStrLn info
+    ["--emit-native-library-llvm"] -> ioBind Prepared.emitNativeLibraryChunks printLLVM;
+    ["--native-library-metadata"] -> do {
+      result <- Prepared.nativeLibraryMetadata;
+      case result of {
+        Left message -> fatal message;
+        Right info -> putStrLn info
+      }
     };
     (:) "--emit-native-llvm" rest -> nativeSourceCommand mode paths rest;
     _ -> if executableBuildArguments arguments then NativeBuild.run mode paths arguments

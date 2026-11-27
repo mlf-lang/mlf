@@ -27,7 +27,8 @@ main = runEntry $ do
           expected = if kind == "int" then T.XCon "Int" [] else T.XCon "Bool" []
       startWall <- getMonotonicTimeNSec
       startCPU <- getCPUTime
-      result <- S.recursiveRight "probe compilation" (L.mapLeft C.prettyError (C.compileWithPrelude T.NoImplicitPrelude (B.literal file) source))
+      outcome <- C.compileWithPrelude T.NoImplicitPrelude (B.literal file) source
+      result <- S.recursiveRight "probe compilation" (L.mapLeft C.prettyError outcome)
       term <- S.recursiveCompilation "probe" result expected
       prepared <- S.recursiveRight "probe prepare" (R.prepare False term)
       let value = R.evaluate (L.fst prepared) (R.REnv M.empty) (X.erase term)

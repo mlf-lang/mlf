@@ -17,14 +17,17 @@ module MLF.Tests.CallStackEvidence where {
   import qualified Bootstrap.X.Type as TargetType;
   prologue :: String;
   prologue = "-- mlf:syntax shared-haskell-v1\n{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}\nmodule CallStackCase where\nimport MLF.Primitive\n";
-  evaluated :: String -> Either String String;
+  evaluated :: String -> IO (Either String String);
   evaluated body = do {
-    compiled <- mapLeft Compiler.prettyError (Compiler.compile "CallStackCase.hs" (prologue ++ body));
-    let { term = Compiler.compiledTerm compiled };
-    Check.checkClosed term;
-    state <- Runtime.prepare False term;
-    result <- Runtime.evaluate (fst state) (Runtime.REnv Map.empty) (X.erase term);
-    case result of { Runtime.RString text -> Right text; _ -> Left "expected opaque text result" }
+    compilation <- Compiler.compile "CallStackCase.hs" (prologue ++ body);
+    ioReturn (do {
+      compiled <- mapLeft Compiler.prettyError compilation;
+      let { term = Compiler.compiledTerm compiled };
+      Check.checkClosed term;
+      state <- Runtime.prepare False term;
+      result <- Runtime.evaluate (fst state) (Runtime.REnv Map.empty) (X.erase term);
+      case result of { Runtime.RString text -> Right text; _ -> Left "expected opaque text result" }
+    })
   };
   containsFrom :: String -> String -> Int -> Bool;
   containsFrom needle haystack offset =
@@ -34,21 +37,27 @@ module MLF.Tests.CallStackEvidence where {
   contains :: String -> String -> Bool;
   contains needle haystack = containsFrom needle haystack 0;
   checkStack :: String -> String -> [] String -> [] String -> IO ();
-  checkStack label body present absent = case evaluated body of {
-    Left error -> do { putErr (label ++ (": " ++ (error ++ "\n"))); exitWith 1 };
-    Right text ->
-      if all (\part -> contains part text) present && all (\part -> not (contains part text)) absent
-      then putStrLn ("PASS " ++ label)
-      else do { putErr (label ++ (": unexpected stack\n" ++ (text ++ "\n"))); exitWith 1 }
+  checkStack label body present absent = do {
+    result <- evaluated body;
+    case result of {
+      Left error -> do { putErr (label ++ (": " ++ (error ++ "\n"))); exitWith 1 };
+      Right text ->
+        if all (\part -> contains part text) present && all (\part -> not (contains part text)) absent
+        then putStrLn ("PASS " ++ label)
+        else do { putErr (label ++ (": unexpected stack\n" ++ (text ++ "\n"))); exitWith 1 }
+    }
   };
   leaf :: String;
   leaf = "leaf :: HasCallStack => Int -> CallStack\nleaf x = callStack\n";
   probe :: String;
   probe = "data Probe a = Pure a | Failed CallStack\ninstance Functor Probe where { fmap f (Pure x) = Pure (f x); fmap f (Failed s) = Failed s }\ninstance Applicative Probe where { pure = Pure; (<*>) (Pure f) (Pure x) = Pure (f x); (<*>) (Failed s) x = Failed s; (<*>) x (Failed s) = Failed s }\ninstance Monad Probe where { (>>=) (Pure x) f = f x; (>>=) (Failed s) f = Failed s }\ninstance MonadFail Probe where { fail message = Failed callStack }\nresult (Pure x) = \"success\"\nresult (Failed s) = textFromChars (prettyCallStack s)\n";
   checkRejected :: String -> String -> IO ();
-  checkRejected label body = case Compiler.compile "CallStackCase.hs" (prologue ++ body) of {
-    Left _ -> putStrLn ("PASS " ++ label);
-    Right _ -> do { putErr (label ++ ": unexpectedly accepted\n"); exitWith 1 }
+  checkRejected label body = do {
+    compilation <- Compiler.compile "CallStackCase.hs" (prologue ++ body);
+    case compilation of {
+      Left _ -> putStrLn ("PASS " ++ label);
+      Right _ -> do { putErr (label ++ ": unexpectedly accepted\n"); exitWith 1 }
+    }
   };
   checkStructural :: String -> Bool -> IO ();
   checkStructural label result =
@@ -140,19 +149,19 @@ module MLF.Tests.CallStackEvidence where {
         ((:) (SAlternative (SConstructorPattern "Capture" ((:) (Just "stack") [])) (SVar "stack")) [])
     } in Compiler.compileProgramWithPrelude NoImplicitPrelude
                 (SClassProgram ((:) capture []) ((:) declaration []) ((:) inst []) body);
-  managedTargetCheck :: Bool;
-  managedTargetCheck = case managedTargetCompilation of {
-      Left _ -> False;
-      Right compiled ->
-        isRight (Check.checkClosed (Compiler.compiledTerm compiled)) &&
-        TargetType.alphaEq (Compiler.inferredType compiled) (XCon "MLFCallStack" [])
-    };
+  managedTargetCheck :: Compiler.Compilation -> Bool;
+  managedTargetCheck compiled =
+    isRight (Check.checkClosed (Compiler.compiledTerm compiled)) &&
+    TargetType.alphaEq (Compiler.inferredType compiled) (XCon "MLFCallStack" []);
   checkManagedTarget :: IO ();
-  checkManagedTarget = case managedTargetCompilation of {
-    Left error -> do { putErr (Compiler.prettyError error ++ "\n"); exitWith 1 };
-    Right _ -> checkStructural "managed method evidence passes target checker" managedTargetCheck
+  checkManagedTarget = do {
+    compilation <- managedTargetCompilation;
+    case compilation of {
+      Left error -> do { putErr (Compiler.prettyError error ++ "\n"); exitWith 1 };
+      Right compiled -> checkStructural "managed method evidence passes target checker" (managedTargetCheck compiled)
+    }
   };
-  locatedIdentityInference :: Bool;
+  locatedIdentityInference :: IO Bool;
   locatedIdentityInference =
     let {
       identityType = SForall Flexible "a" SBottom (SArrow (STVar "a") (STVar "a"));
@@ -160,16 +169,19 @@ module MLF.Tests.CallStackEvidence where {
       located = SAnn
         (SLam "x" Nothing (SCallSite "x" (SourceSpan "main" "Example" "Example.hs" 1 7 1 8) (SVar "x")))
         (SAnnotation [] identityType)
-    } in case Compiler.compileExprWithPrelude NoImplicitPrelude plain of {
-      Left _ -> False;
-      Right before -> case Compiler.compileExprWithPrelude NoImplicitPrelude located of {
-        Left _ -> False;
-        Right after -> TargetType.alphaEq (Compiler.inferredType before) (Compiler.inferredType after)
-      }
+    } in do {
+      before <- Compiler.compileExprWithPrelude NoImplicitPrelude plain;
+      after <- Compiler.compileExprWithPrelude NoImplicitPrelude located;
+      ioReturn (case (,) before after of {
+        (,) (Right first) (Right second) ->
+          TargetType.alphaEq (Compiler.inferredType first) (Compiler.inferredType second);
+        _ -> False
+      })
     };
   basicSourceChecks :: IO ();
   basicSourceChecks = do {
-    checkStructural "location preserves ordinary inferred MLF type" locatedIdentityInference;
+    locationPreserved <- locatedIdentityInference;
+    checkStructural "location preserves ordinary inferred MLF type" locationPreserved;
     checkManagedTarget;
     checkStack "local accessor spelling is not captured"
       "main = let { mlfCallStack = 42 } in showInt mlfCallStack\n"

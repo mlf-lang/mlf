@@ -12,7 +12,8 @@ main = do
   case args of
     [sourcePath, destination] -> do
       source <- readFile sourcePath
-      case C.compile (B.literal sourcePath) (B.literal source) of
+      outcome <- C.compile (B.literal sourcePath) (B.literal source)
+      case outcome of
         T.Left e -> error (B.unpack (C.prettyError e))
         T.Right result -> case L.emitLLVMIO (C.compiledTerm result) of
           T.Left e -> error (B.unpack e)

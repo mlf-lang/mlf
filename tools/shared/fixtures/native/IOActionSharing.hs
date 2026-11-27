@@ -225,7 +225,7 @@ observe label declarations term expected = do
 
 runCase :: FilePath -> Case -> IO ()
 runCase destination (Case label body expected wantKernel) = do
-  compiled <- case C.compile (B.literal (label ++ ".hs")) (source body) of
+  compiled <- C.compile (B.literal (label ++ ".hs")) (source body) >>= \outcome -> case outcome of
     T.Left err -> fail (label ++ ": " ++ B.unpack (C.prettyError err))
     T.Right result -> pure (C.compiledTerm result)
   checkTarget compiled

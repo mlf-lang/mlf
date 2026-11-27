@@ -85,7 +85,12 @@
     },
     {
       "module": "Bootstrap.Compiler",
-      "path": "libraries/mlf-inference/Bootstrap/Compiler.hs",
+      "path": "libraries/mlf-crates/Bootstrap/Compiler.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.SourceFrontend",
+      "path": "libraries/mlf-inference/Bootstrap/SourceFrontend.hs",
       "role": "implementation"
     },
     {

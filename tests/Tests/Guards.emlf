@@ -40,16 +40,18 @@ conditional condition yes no = SApp (SApp (SApp (SPrimitive PIfThenElse) conditi
 
 hasType : String -> String -> XType -> (,) String (A.Test ())
 hasType label source expected = (,) ("guards checking: " ++ label) (do
-  result <- A.right H.show (compile "<guards test>" source)
+  result <- A.andThen (A.liftIO (compile "<guards test>" source)) (A.right H.show)
   term <- A.right H.show (XP.parseTerm "<guards xMLF>" (prettyTerm (compiledTerm result)))
   actual <- A.right H.show (C.checkClosed term)
   A.assert (T.alphaEq actual expected && T.alphaEq actual (inferredType result)) ("wrong type: " ++ sourceType result)
   A.assert (H.eq (X.erase term) (X.erase (compiledTerm result))) "xMLF round trip changed erasure")
 
 rejects : String -> String -> Phase -> String -> (,) String (A.Test ())
-rejects label source expectedPhase reason = (,) ("guards rejection: " ++ label) (case compile "<invalid guards>" source of
-  Left err -> A.assert (H.eq (phase err) expectedPhase && H.contains reason (diagnostic err)) ("wrong rejection: " ++ H.show err)
-  Right result -> A.fail ("unexpected acceptance: " ++ sourceType result))
+rejects label source expectedPhase reason = (,) ("guards rejection: " ++ label) (do
+  compilation <- A.liftIO (compile "<invalid guards>" source)
+  case compilation of
+    Left err -> A.assert (H.eq (phase err) expectedPhase && H.contains reason (diagnostic err)) ("wrong rejection: " ++ H.show err)
+    Right result -> A.fail ("unexpected acceptance: " ++ sourceType result))
 
 int : XType
 int = XCon "Int" []
@@ -103,7 +105,7 @@ checkingTests = (:)
   (hasType "guard condition can contain an expression guard" "if { | if { | false -> false; | otherwise -> true } -> 42; | otherwise -> 0 }" int) ((:)
   (hasType "unselected branches preserve polymorphism" "id x = x; main = (if { | false -> id; | otherwise -> id }) 42;" int) ((:)
   ((,) "guards checking: no implicit prelude required" (do
-    result <- A.right H.show (compileWithPrelude NoImplicitPrelude "<guards without prelude>" "choose x | x > 0 = x | otherwise = 0; main = if { | true -> choose 42; | otherwise -> 0 };")
+    result <- A.andThen (A.liftIO (compileWithPrelude NoImplicitPrelude "<guards without prelude>" "choose x | x > 0 = x | otherwise = 0; main = if { | true -> choose 42; | otherwise -> 0 };")) (A.right H.show)
     A.assert (T.alphaEq (inferredType result) int) (sourceType result)))
   []))))))))
 

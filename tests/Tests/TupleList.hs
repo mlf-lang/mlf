@@ -32,12 +32,14 @@ module Tests.TupleList where {
       Left error -> fatal error;
       Right value -> A.succeed value
     };
-  compiled :: Either CompileError Compiler.Compilation -> A.Test Compiler.Compilation;
-  compiled result =
+  compiled :: IO (Either CompileError Compiler.Compilation) -> A.Test Compiler.Compilation;
+  compiled action = do {
+    result <- A.liftIO action;
     case result of {
       Left error -> fatal (Compiler.prettyError error);
       Right value -> A.succeed value
-    };
+    }
+  };
   contains :: String -> String -> Bool;
   contains needle text = containsAt needle text 0;
   containsAt :: String -> String -> Int -> Bool;
@@ -200,12 +202,12 @@ module Tests.TupleList where {
       result <- compiled (Compiler.compile "tuple-list.emlf" source);
       checkResult label expected result
     };
-  checkedCompilation :: String -> Either CompileError Compiler.Compilation -> A.Test ();
+  checkedCompilation :: String -> IO (Either CompileError Compiler.Compilation) -> A.Test ();
   checkedCompilation label compilation = do {
     result <- compiled compilation;
     checkResult label int result
   };
-  evaluates :: String -> Either CompileError Compiler.Compilation -> Int -> A.Test ();
+  evaluates :: String -> IO (Either CompileError Compiler.Compilation) -> Int -> A.Test ();
   evaluates label compilation expected =
     do {
       result <- compiled compilation;
@@ -246,7 +248,8 @@ module Tests.TupleList where {
   rejected :: String -> String -> Phase -> String -> A.Test ();
   rejected label source phase reason =
     do {
-      case Compiler.compile "tuple-list.emlf" source of {
+      compilation <- A.liftIO (Compiler.compile "tuple-list.emlf" source);
+      case compilation of {
         Left error ->
           require
             (eqString (Compiler.prettyPhase (Compiler.phase error)) (Compiler.prettyPhase phase) &&
@@ -269,7 +272,8 @@ module Tests.TupleList where {
   moduleRejected :: String -> Map String ((,) String String) -> String -> String -> A.Test ();
   moduleRejected label libraries source reason =
     do {
-      case Compiler.compileModules libraries "Main.emlf" source of {
+      compilation <- A.liftIO (Compiler.compileModules libraries "Main.emlf" source);
+      case compilation of {
         Left error ->
           require (contains reason (Compiler.diagnostic error))
             (label ++ (": " ++ Compiler.prettyError error));
@@ -996,7 +1000,8 @@ module Tests.TupleList where {
   moduleRejectedAt :: String -> Map String ((,) String String) -> String -> Phase -> String -> A.Test ();
   moduleRejectedAt label libraries source phase reason =
     do {
-      case Compiler.compileModules libraries "Main.emlf" source of {
+      compilation <- A.liftIO (Compiler.compileModules libraries "Main.emlf" source);
+      case compilation of {
         Left error ->
           require
             (eqString (Compiler.prettyPhase (Compiler.phase error)) (Compiler.prettyPhase phase) &&

@@ -276,6 +276,19 @@
     },
     "exact": true
   },
+  "native-install-verification": {
+    "kind": "exit",
+    "ids": [
+      "native-install-verification/provider-integrity"
+    ],
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_native_install.py",
+      "--disposable-idle-sources",
+      ".mlf-build/stdlib-default/sources"
+    ]
+  },
   "native-library": {
     "command": [
       "python3",

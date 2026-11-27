@@ -164,7 +164,7 @@ def main():
     observe("host/decl-query", run, [out / "DeclQueryControls/probe", out / "decl-query-cache"])
     observe("host/import-bindings", run, [out / "ImportBindings/probe"], expected=b"consumer import ID controls passed\n")
     observe("host/prepared-imports", run, [out / "PreparedImports/probe", out / "crates"],
-        expected=b"prepared source and native wrapper import controls passed\n")
+        expected=b"prepared source and checked crate import controls passed\n")
 
     observe("host/fragments", run, [out / "FragmentAdmission/probe", out], expected=b"raw and final fragment admission controls passed\n")
     observe("host/decl-core", run, [out / "DeclCore/probe"],

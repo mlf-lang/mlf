@@ -17,17 +17,17 @@ announce name action = do
   putStrLn (P.show now P.++ " BEGIN: " P.++ name)
   action
 source body = B.literal $ "-- mlf:syntax shared-haskell-v1\n{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}\nmodule Example where\nimport MLF.Primitive\n" P.++ body P.++ "\n"
-run body = case C.compile "Example.hs" (source body) of
+run body = C.compile "Example.hs" (source body) P.>>= \outcome -> P.pure $ case outcome of
   T.Left err -> T.Left (C.prettyError err)
   T.Right result -> let term = C.compiledTerm result in
     case R.prepare P.False term of
       T.Left err -> T.Left err
       T.Right ((,) env _) -> R.evaluate env (R.REnv M.empty) (X.erase term)
-check name body expected = announce name $ case run body of
+check name body expected = announce name $ run body P.>>= \outcome -> case outcome of
   T.Right (R.RInteger actual) | actual == expected -> putStrLn ("pass: " P.++ name)
   T.Left err -> error (name P.++ ": " P.++ B.unpack err)
   _ -> error (name P.++ ": wrong result")
-reject name body = announce name $ case run body of
+reject name body = announce name $ run body P.>>= \outcome -> case outcome of
   T.Left _ -> putStrLn ("pass: reject " P.++ name)
   _ -> error (name P.++ ": unexpectedly accepted")
 main :: IO ()

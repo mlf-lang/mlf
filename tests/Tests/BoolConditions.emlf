@@ -15,7 +15,7 @@ import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Type as T
 
 checked : String -> IO XTerm
-checked = (S.compose (S.either (S.compose B.failCase H.show) (S.compose return compiledTerm)) (compile "<Boolean condition>"))
+checked source = ioBind (compile "<Boolean condition>" source) (S.either (S.compose B.failCase H.show) (S.compose return compiledTerm))
 
 observe : B.Backends -> Input -> XTerm -> String -> IO ()
 observe backends input term expected = do { result <- (B.execute backends IOEntry input term); do { (S.either (S.compose B.failCase H.show) return (B.outcome result)); (S.unless (H.eq (B.output result) expected) (B.failCase (H.show result))) } }

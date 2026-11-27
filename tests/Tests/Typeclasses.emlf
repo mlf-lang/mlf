@@ -19,13 +19,13 @@ import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Type as T
 
 checked : String -> A.Test Compilation
-checked source = do { result <- (A.right H.show (compile "<class test>" source)); do { parsed <- (A.right H.show (P.parseTerm "<class xMLF>" (prettyTerm (compiledTerm result)))); do { ty <- (A.right H.show (C.checkClosed parsed)); do { (A.assert (T.alphaEq ty (inferredType result)) "class xMLF round trip changed type"); do { (A.assert (H.eq (X.erase parsed) (X.erase (compiledTerm result))) "class xMLF round trip changed erasure"); (return result) } } } } }
+checked source = do { result <- (A.andThen (A.liftIO (compile "<class test>" source)) (A.right H.show)); do { parsed <- (A.right H.show (P.parseTerm "<class xMLF>" (prettyTerm (compiledTerm result)))); do { ty <- (A.right H.show (C.checkClosed parsed)); do { (A.assert (T.alphaEq ty (inferredType result)) "class xMLF round trip changed type"); do { (A.assert (H.eq (X.erase parsed) (X.erase (compiledTerm result))) "class xMLF round trip changed erasure"); (return result) } } } } }
 
 hasType : String -> String -> XType -> (,) String (A.Test ())
 hasType label source expected = ((,) (H.append "class: " label) do { result <- (checked source); (A.assert (T.alphaEq (inferredType result) expected) (H.append "expected " (H.append (prettyType expected) (H.append ", got " (sourceType result))))) })
 
 rejects : String -> String -> Phase -> String -> (,) String (A.Test ())
-rejects label source expectedPhase reason = ((,) (H.append "class rejection: " label) (case (compile "<class rejection>" source) of { (Left err) -> do { (A.assert (H.eq (phase err) expectedPhase) (H.append "wrong rejection phase: " (H.show err))); (A.assert (H.contains reason (diagnostic err)) (H.append "wrong rejection reason: " (H.show err))) }; (Right result) -> (A.fail (H.append "unexpected acceptance: " (sourceType result))) }))
+rejects label source expectedPhase reason = ((,) (H.append "class rejection: " label) (do { compilationResult <- A.liftIO (compile "<class rejection>" source); case compilationResult of { (Left err) -> do { (A.assert (H.eq (phase err) expectedPhase) (H.append "wrong rejection phase: " (H.show err))); (A.assert (H.contains reason (diagnostic err)) (H.append "wrong rejection reason: " (H.show err))) }; (Right result) -> (A.fail (H.append "unexpected acceptance: " (sourceType result))) } }))
 
 targetRejects : String -> XTerm -> String -> (,) String (A.Test ())
 targetRejects label term reason = ((,) (H.append "class target: " label) (case (C.checkClosed term) of { (Left err) -> (A.assert (H.contains reason err) (H.append "wrong target rejection: " err)); (Right ty) -> (A.fail (H.append "unexpected target type: " (prettyType ty))) }))

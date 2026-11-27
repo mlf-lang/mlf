@@ -480,8 +480,9 @@ module Bootstrap.Crate where {
           }
       })
     };
-  -- Query compilation consumes only metadata-derived schemes. Upstream checked
-  -- bodies are opened later by the linker and never enter an inference key.
+  -- Retained low-level artifact-format oracles use this closed-fragment
+  -- compiler. Production source/file producers belong to CrateSession and
+  -- publish checked open groups. Upstream bodies never enter an inference key.
   compilePrepared spec interfaces prepared =
     compilePreparedWith (\object _ report -> (,) object report) spec interfaces prepared;
   -- Preserve compilePrepared's public result while allowing the file producer
@@ -492,8 +493,8 @@ module Bootstrap.Crate where {
     IO (Either String a);
   compilePreparedWith complete spec interfaces prepared =
     compilePreparedWithEncoding False complete spec interfaces prepared;
-  -- Only compileSpecFile enables this internal parsed-source encoding path.
-  -- Generic prepared/source APIs retain their original no-pool demand behavior.
+  -- Historical encoding oracles explicitly select this parsed-source path.
+  -- Both modes retain their original payload and demand behavior.
   compilePreparedWithEncoding :: forall a. Bool ->
     (Artifact.CrateObject -> String -> Query.QueryReport -> a) ->
     CrateSpec -> [] ((,) String Artifact.CrateInterface) -> PreparedCrate ->
@@ -704,58 +705,6 @@ module Bootstrap.Crate where {
            }
          }
     else ioReturn (Right ((,) spec interfaces));
-  compileSources spec sources interfaces prefix =
-    compileSourcesWithEncoding False spec sources interfaces prefix;
-  compileSourcesWithEncoding :: Bool -> CrateSpec -> [] SourceModule ->
-    [] ((,) String Artifact.CrateInterface) -> String -> IO (Either String ());
-  compileSourcesWithEncoding shareEncoding spec sources interfaces prefix =
-    do {
-      dependencies <- withPrelude spec sources interfaces;
-      case do {
-             boundValueShared20 <- dependencies;
-             case boundValueShared20 of {
-               (,) updated loaded ->
-                 do {
-                   prepared <- prepareCrate updated loaded sources;
-                   Right ((,,) updated loaded prepared)
-                 }
-             }
-           } of {
-        Left message -> ioReturn (Left message);
-        Right ((,,) updated loaded prepared) ->
-          do {
-            result <- compilePreparedWithEncoding shareEncoding
-              (\object payload report -> (,,) object payload report) updated loaded prepared;
-            case result of {
-              Left message ->
-                let {
-                  names = Modules.resolvedCrateDisplayNames (preparedResolution prepared)
-                } in
-                let {
-                  diagnostics =
-                    M.union compareString
-                      (M.map (Modules.displayNames names)
-                         (preparedNames prepared))
-                      names
-                } in
-                ioReturn (Left (Modules.displayNames diagnostics message));
-              Right ((,,) object payload report) ->
-                do {
-                  written <- Artifact.writeObjectWithPayloadEither prefix object payload;
-                  case written of {
-                    Left message -> ioReturn (Left message);
-                    Right _ -> do {
-                      writeFile (prefix ++ ".queries")
-                        (Query.reportJSON (specIdentity spec)
-                           (Artifact.semanticFingerprint (Artifact.objectInterface object)) report);
-                      ioReturn (Right ())
-                    }
-                  }
-                }
-            }
-          }
-      }
-    };
   loadSpecFile load file = do {
     present <- fileExists file;
     if not present then ioReturn (Left ("crate specification does not exist: " ++ file)) else do {
@@ -773,13 +722,6 @@ module Bootstrap.Crate where {
           })
         }
       }
-    }
-  };
-  compileSpecFile file prefix = do {
-    loaded <- loadSpecFile Artifact.loadInterfaces file;
-    case loaded of {
-      Left message -> ioReturn (Left message);
-      Right ((,,) spec sources interfaces) -> compileSourcesWithEncoding True spec sources interfaces prefix
     }
   }
 }
