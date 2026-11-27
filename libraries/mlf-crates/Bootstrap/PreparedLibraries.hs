@@ -337,7 +337,6 @@ module Bootstrap.PreparedLibraries
     resolved <- admitNativeSources parseSource raw mode loaded;
     let { sources = Modules.loadedSources loaded;
           ownership = owners raw;
-          own = filter (\source -> not (M.member compareString (Modules.moduleIdentity source) ownership)) sources;
           present = S.fromList compareString (map Modules.moduleIdentity sources);
           -- The package checker sees the entire installed crate. Its extra
           -- instance heads must not invalidate the loaded program's own heads.
@@ -349,14 +348,24 @@ module Bootstrap.PreparedLibraries
             Right (if missingOwner owner then [instanceDecl] else [])
           };
           label iface = "/prepared/" ++ inputIdentity raw ++ "/" ++
-            Separate.compactName (Artifact.crateId iface) ++ ".mlfci" };
-    if null localInstances then Right () else Core.atPhase Verification (do {
-      inherited <- traverseEither (\iface -> traverseEither (absent iface) (Artifact.crateInstances iface)) (interfaces raw);
+            Separate.compactName (Artifact.crateId iface) ++ ".mlfci";
+          inputs selected = let {
+            supplied = S.fromList compareString (concatMap Artifact.crateModules selected);
+            own = filter (\source -> not (S.member compareString (Modules.moduleIdentity source) supplied)) sources
+          } in (,) own (map (\iface -> (,) (label iface) iface) selected);
+          available = interfaces raw };
+    if null localInstances then Right (inputs available) else do {
+      inherited <- Core.atPhase Verification (traverseEither
+        (\iface -> traverseEither (absent iface) (Artifact.crateInstances iface)) available);
       let { extras = concat (concat inherited) };
-      traverseEither (\inst -> traverseEither (\extra -> Classes.checkOverlap [inst,extra]) extras) localInstances;
-      Right ()
-    });
-    Right ((,) own (map (\iface -> (,) (label iface) iface) (interfaces raw)))
+      case traverseEither (\inst -> traverseEither (\extra -> Classes.checkOverlap [inst,extra]) extras) localInstances of {
+        Right _ -> Right (inputs available);
+        -- The combined library cannot be linked coherently with this source.
+        -- Compile the actual loaded modules and keep their checked builtin
+        -- dependency. Visible conflicting heads still meet in source inference.
+        Left _ -> Right (inputs (filter (\iface -> eqString (Artifact.crateId iface) Artifact.builtinCrateIdentity) available))
+      }
+    }
   };
   -- A prepared registry only selects dependency objects. The user source
   -- enters exactly the same crate session as an uncached source/AST request.

@@ -89,7 +89,10 @@ module Bootstrap.SourceCrate
   } in case choose 0 of { (,) identity entry -> case do {
     program <- Compiler.atPhase Parsing (Parser.standaloneProgramWith
       (SLetRec []) source);
-    (,,) names headers ((,) lowered dictionaries) <- lower program;
+    (,,) names headers ((,) lowered dictionaries) <- mapLeft (\err -> case err of {
+      CompileError ModuleResolution message -> CompileError ModuleResolution (Modules.sourcePath source ++ ": " ++ message);
+      _ -> err
+    }) (lower program);
     case lowered of {
       SClassProgram _ _ _ _ -> Left (CompileError Inference "class translation did not produce a core program");
       SProgram declarations body -> do {

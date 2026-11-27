@@ -7,6 +7,7 @@ module Bootstrap.Standalone where {
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Data as D;
+  import qualified Bootstrap.Unicode as U;
   import qualified Bootstrap.Desugar as Desugar;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Prelude as Prelude;
@@ -203,7 +204,11 @@ module Bootstrap.Standalone where {
             Modules.Method _ -> reject ("standalone facade method is not in scope without implicit Prelude: " ++ name);
             _ -> unchanged (SVar name)
           };
-          _ -> unchanged (SVar name)
+          _ -> case Modules.components name of {
+            (:) qualifier ((:) _ _) -> if D.identifier U.isUpper qualifier
+              then reject ("name is not in scope: " ++ name) else unchanged (SVar name);
+            _ -> unchanged (SVar name)
+          }
         };
       Just entity -> case Modules.role entity of {
         Modules.Primitive _ -> if eqString name (Modules.spelling entity)
