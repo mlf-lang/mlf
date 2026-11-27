@@ -19,6 +19,7 @@ module MLF.Entry.Emlf where {
   import qualified Bootstrap.X.Checked as Checked;
   import qualified Bootstrap.X.Parser as Parse;
   import qualified Bootstrap.X.Pretty as Pretty;
+  import qualified Bootstrap.X.Type as TargetType;
   import qualified Bootstrap.Runtime as Runtime;
   import qualified Bootstrap.LLVM as LLVM;
   import qualified Bootstrap.Crate as Crate;
@@ -158,7 +159,7 @@ module MLF.Entry.Emlf where {
     let { retained = CrateSession.sessionObjects session;
           link = ioBind (Prepared.linkCompiledCrateRetaining retained compiled) requireResult };
     case emission of {
-      DirectLLVM -> do { checked <- link; printLLVM (LLVM.emitCheckedChunks False checked) };
+      DirectLLVM -> do { checked <- link; printLLVM (emitExecutable checked) };
       CachedLLVM cache report -> do {
         checked <- link;
         emitCachedCrateUsing
@@ -297,6 +298,7 @@ module MLF.Entry.Emlf where {
   };
   emitCachedCrate = emitCachedCrateUsing CrateCodegen.emitCrateChecked;
   emitCachedCrateUsing generate cache report checked = do {
+    _ <- requireResult (checkExecutable checked);
     generated <- generate cache False checked;
     case generated of {
       Left message -> fatal message;
@@ -325,9 +327,12 @@ module MLF.Entry.Emlf where {
           putStrLn (Pretty.prettyTerm (Checked.term checked));
           Host.writePhaseProfile profilePath profile
         };
-        RunSource -> do { Host.writePhaseProfile profilePath profile; execute args (Checked.term checked) };
+        RunSource -> do { Host.writePhaseProfile profilePath profile; runExecutable args checked };
         EmitSource -> do {
-          prepared <- LLVM.prepareCheckedProfiled profile False checked;
+          prepared <- case checkExecutable checked of {
+            Left message -> ioReturn (Left message);
+            Right () -> LLVM.prepareCheckedProfiled profile False checked
+          };
           case prepared of {
             Left message -> do { Host.writePhaseProfile profilePath profile; fatal message };
             Right entry -> do {
@@ -369,8 +374,8 @@ module MLF.Entry.Emlf where {
             putStrLn ("-- type: " ++ Prepared.sourceType result);
             putStrLn (Pretty.prettyTerm (Prepared.compiledTerm result))
           };
-          RunSource -> execute args (Prepared.compiledTerm result);
-          EmitSource -> printLLVM (LLVM.emitCheckedChunks False (Prepared.checkedTerm result));
+          RunSource -> runExecutable args (Prepared.checkedTerm result);
+          EmitSource -> printLLVM (emitExecutable (Prepared.checkedTerm result));
           _ -> fatal "invalid source command"
         }
       }
@@ -466,6 +471,18 @@ module MLF.Entry.Emlf where {
         }
       }
     }
+  };
+  checkExecutable :: Checked.CheckedTerm -> Either String ();
+  checkExecutable checked = TargetType.checkExecutableType (Checked.typeOf checked);
+  emitExecutable :: Checked.CheckedTerm -> Either String ([] String);
+  emitExecutable checked = do {
+    checkExecutable checked;
+    LLVM.emitCheckedChunks False checked
+  };
+  runExecutable :: [] String -> Checked.CheckedTerm -> IO ();
+  runExecutable args checked = do {
+    _ <- requireResult (checkExecutable checked);
+    execute args (Checked.term checked)
   };
   execute :: [] String -> XTerm -> IO ();
   execute args term =

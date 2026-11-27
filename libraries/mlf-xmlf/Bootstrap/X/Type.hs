@@ -100,6 +100,10 @@ module Bootstrap.X.Type where {
     };
   alphaEq :: XType -> XType -> Bool;
   alphaEq a b = alphaIn M.empty M.empty 0 a b;
+  checkExecutableType :: XType -> Either String ();
+  checkExecutableType ty =
+    L.ensure (alphaEq ty (XCon "IO" [XCon "()" []]))
+      "program must have type IO () to run";
   alphaIn :: Map XTyVar Int -> Map XTyVar Int -> Int -> XType -> XType -> Bool;
   alphaIn l r depth a b =
     case a of {

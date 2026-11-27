@@ -257,8 +257,8 @@ clang -O2 -std=c11 .mlf-build/snake.ll "$MLF_RUNTIME" \
 it does not rerun source inference. It also accepts standard input. To compile
 eMLF directly through the same checked xMLF boundary, use
 `emlf --emit-llvm examples/snake.emlf` or `emlf --emit-llvm --expr 'printInt 42'`.
-Both commands write only LLVM IR to standard output. `--no-prelude` also
-applies to `--emit-llvm`.
+Both commands write only LLVM IR to standard output. The source entry must
+have type `IO ()`. `--no-prelude` also applies to `--emit-llvm`.
 
 For a manifest-driven native executable, the package manager builds, links,
 and runs the selected target:
@@ -279,8 +279,9 @@ with `./mlfpkg --clang /absolute/path/to/clang-mlf build`.
 The generated module contains native closure and case functions, `mlf_entry`,
 and `main`. It supports the complete current xMLF term syntax, including
 recursive dictionaries, polymorphism after checked erasure, lazy constructor
-fields, and IO. An `IO a` entry executes the action and discards its result;
-a pure entry evaluates to weak head normal form without printing a value.
+fields, and IO. With `--xmlf-to-llvm`, an `IO a` entry executes the action and
+discards its result. A pure entry evaluates to weak head normal form without
+printing a value.
 Known saturated functions use native workers, with conservative demand
 analysis to avoid unnecessary thunks. Partial applications and lazy fields
 retain their call-by-need behavior. Small integers and nullary constructors
@@ -1074,11 +1075,11 @@ do {
 ```
 
 Run it with `"$EMLF_BIN" --run examples/io-hello.emlf`. Ordinary
-compilation, `--type`, and `--check` perform no program IO. `--run` checks the
-generated target before executing its final action; the action's result is
-discarded. The entry point must have type `IO a` (possibly universally
-quantified). Runtime IO errors, including EOF, are reported on standard error
-and cause a nonzero exit. Console output is flushed before the next action.
+compilation, `--type`, and `--check` perform no program IO. Source and crate
+executables require an entry of type `IO ()`. `--run` checks the generated
+target before executing that action. Runtime IO errors, including EOF, are
+reported on standard error and cause a nonzero exit. Console output is flushed
+before the next action.
 
 | Operation | Type |
 | --- | --- |

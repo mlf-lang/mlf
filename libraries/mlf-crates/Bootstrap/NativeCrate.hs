@@ -239,8 +239,10 @@ module Bootstrap.NativeCrate
     body <- closeBodies linked renamed;
     let { wrapped = foldr (\((,) c name) rest -> XAbs name (factoryType c) rest) body numbered };
     checked <- Checked.check (XWithData (A.fragmentData linked) wrapped);
-    if null selected then LLVM.emitCheckedChunks False checked
-      else ABI.emitCrateProgram (map (\c -> (,) (physical c) (factoryKey c)) selected) checked
+    if null selected then do {
+      T.checkExecutableType (Checked.typeOf checked);
+      LLVM.emitCheckedChunks False checked
+    } else ABI.emitCrateExecutable (map (\c -> (,) (physical c) (factoryKey c)) selected) checked
     }))
   };
 

@@ -2135,7 +2135,17 @@ module MLF.Tests.SharedFrontend where {
     check "direct entry accepts checked closed monotype"
       (case Artifact.linkEntry 3 [ordinary] ordinary value entry of { Right (XVarTerm n) -> X.nameId n == 0; _ -> False });
     check "direct entry rejects import type mismatch"
-      (isLeft (Artifact.linkEntry 3 [ordinary] ordinary (M.fromList compareString [(,) entry ((,) (XName 0 "main") (XCon "Bool" []))]) entry))
+      (isLeft (Artifact.linkEntry 3 [ordinary] ordinary (M.fromList compareString [(,) entry ((,) (XName 0 "main") (XCon "Bool" []))]) entry));
+    let { variable = XTyVar 5;
+      scheme = XForall variable XBot
+        (XArrow (XCon "Dict_Eq" [XVar variable]) (XArrow (XVar variable) (XCon "Bool" [])));
+      polymorphic = iface [(,) entry scheme];
+      polyValue = M.fromList compareString [(,) entry ((,) (XName 0 "same") scheme)] };
+    check "direct entry retains quantified dictionary arguments"
+      (case Artifact.linkEntry 3 [polymorphic] polymorphic polyValue entry of {
+        Right (XVarTerm name) -> X.nameId name == 0;
+        _ -> False
+      })
   };
   sourceCandidateChecks = do {
     let { int = SCon "Int" [];

@@ -5,7 +5,7 @@
 module Bootstrap.LLVM.Library
   (ExportLayout, prepareLayout, prepareLayoutWithTypeNames, prepareLayoutIds, withTypeNames, identity, exports, declarations,
    reservedTypeNames, libraryTypeNames, libraryTerm,
-   exportProduct, exportProductType, projectExport, closedCrateTypes, emitCrateLibrary, emitCrateProgram, crateConstructorTags) where {
+   exportProduct, exportProductType, projectExport, closedCrateTypes, emitCrateLibrary, emitCrateProgram, emitCrateExecutable, crateConstructorTags) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
@@ -320,7 +320,11 @@ module Bootstrap.LLVM.Library
     }
   };
   emitCrateProgram :: [] ((,) ExportLayout String) -> Checked.CheckedTerm -> Either String ([] String);
-  emitCrateProgram selected checked = do {
+  emitCrateProgram = emitCrateRoot (\_ -> Right ());
+  emitCrateExecutable :: [] ((,) ExportLayout String) -> Checked.CheckedTerm -> Either String ([] String);
+  emitCrateExecutable = emitCrateRoot T.checkExecutableType;
+  emitCrateRoot :: (XType -> Either String ()) -> [] ((,) ExportLayout String) -> Checked.CheckedTerm -> Either String ([] String);
+  emitCrateRoot validate selected checked = do {
     let { parts = checkedParts checked; ds = fst parts; body = snd parts;
           layouts = M.fromList compareString (map (\entry -> (,) (identity (fst entry)) (fst entry)) selected);
           declarationsByName = M.fromList compareString (map (\d -> (,) (D.datatypeName d) (D.prettyDeclaration d)) ds);
@@ -333,6 +337,7 @@ module Bootstrap.LLVM.Library
       "native crate dependency datatype layout mismatch";
     tags <- crateConstructorTags ds;
     (,) imports result <- crateParameters selected body (Checked.typeOf checked);
+    validate result;
     generated <- generateWithTags tags checked;
     Right (chunks (concat [crateHeader, snd generated,
       rootAdapter (map crateSymbol (M.elems layouts)) (fst generated) imports (LLVM.ioType result)]))

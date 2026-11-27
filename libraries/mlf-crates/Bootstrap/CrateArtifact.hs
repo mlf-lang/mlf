@@ -1685,16 +1685,18 @@ module Bootstrap.CrateArtifact where {
          (eqString name entry ||
           (startsWith "select_" name || (startsWith "super_" name || startsWith "instance_" name))))
       bindings;
-  -- A closed monotype has no type instantiation or dictionary application at
-  -- the entry use. The linked binding already carries the checked type; keep
-  -- the import-boundary checks, but do not infer fake declarations for it.
+  -- A closed polymorphic entry already abstracts its type and dictionary
+  -- parameters. Re-inferring an occurrence would instantiate those parameters.
   directEntryType dictionaries ty = case ty of {
+    XForall _ _ _ -> Set.null (T.freeVars ty);
+    _ -> directEntryMonotype dictionaries ty
+  };
+  -- Ground evidence still needs to be resolved at the entry use.
+  directEntryMonotype dictionaries ty = case ty of {
     XCon name arguments -> not (M.member compareString name dictionaries) &&
-      all (directEntryType dictionaries) arguments;
-    XArrow argument result -> directEntryType dictionaries argument &&
-      directEntryType dictionaries result;
-    XApply function argument -> directEntryType dictionaries function &&
-      directEntryType dictionaries argument;
+      all (directEntryMonotype dictionaries) arguments;
+    XArrow argument result -> directEntryMonotype dictionaries argument && directEntryMonotype dictionaries result;
+    XApply function argument -> directEntryMonotype dictionaries function && directEntryMonotype dictionaries argument;
     _ -> False
   };
   -- Preserve the old import adapter's rejection of noncanonical legacy

@@ -133,7 +133,7 @@ generatedForce = H.withScratch (\directory -> do
  gc <- collectorFlags directory
  gmp <- flags directory
  let source = "tests/native/runtime_inline_force.c"
- code <- O.exec "" ((:) compiler (O.words "--emit-llvm-gc --expr 0")) "" (directory ++ "/original.ll") (directory ++ "/emission.err") 30
+ code <- O.exec "" [compiler, "--emit-llvm-gc", "--expr", "ioReturn ()"] "" (directory ++ "/original.ll") (directory ++ "/emission.err") 30
  O.require (code == 0) "force probe LLVM emission failed"
  llvm <- readFile (directory ++ "/original.ll")
  O.require (H.contains "define private ptr @mlf.force" llvm && H.contains "define i32 @main(" llvm) "missing generated force or main"

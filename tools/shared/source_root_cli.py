@@ -111,6 +111,15 @@ def check_script_instances(runner, compiler):
     body = 'do { value <- pure 41; printInt (addInt value 1) }'
     runner.run('script-instance-expr-type', [compiler, '--type', '--expr', body],
                expected=b'IO ()\n')
+    qualified = r'(\x -> x == x) :: forall a. Eq a => a -> Bool'
+    inferred = runner.run('qualified-expr-type', [compiler, '--type', '--expr', qualified]).stdout
+    require(re.fullmatch(rb'forall (a\d+)\. (?:MLF\.Primitive\.)?Eq \1 => \1 -> Bool\n', inferred),
+            'expression query did not retain its quantified Eq constraint')
+    (runner.root / 'Qualified.emlf').write_text('module Qualified (same) where\nsame = ' + qualified + '\n')
+    client = ('module Main where\nimport Qualified\n'
+              'main = printInt (if same 1 && same true then 42 else 0)\n')
+    runner.run('qualified-module-run', [compiler, '-i', runner.root, '--run', '--expr', client],
+               expected=b'42\n')
     runner.run('script-instance-expr-run', [compiler, '--run', '--expr', body],
                expected=b'42\n')
     runner.run('script-instance-stdin-run', [compiler, '--run', '-'],
@@ -172,6 +181,18 @@ def check_script_instances(runner, compiler):
                             status=1, expected=b'')
     require(no_prelude.stderr.startswith(b'ModuleResolution:'),
             'script instance recovery silently introduced an implicit Prelude')
+
+
+def check_executable_entry(runner, argv, modes):
+    entry = runner.root / 'InvalidEntry.emlf'
+    for label, declaration in (('pure', r'main = \x -> x'),
+                               ('non-unit', 'main = ioBind (printInt 99) (\\_ -> ioReturn 42)')):
+        entry.write_text('module Main where\n' + declaration + '\n')
+        for mode in modes:
+            result = runner.run(f'entry-{label}-{mode[2:]}', [*argv, mode, entry],
+                                status=1, expected=b'')
+            require(b'program must have type IO () to run' in result.stderr,
+                    f'{mode} did not reject the entry before running it or emitting LLVM')
 
 
 def check_source_root(runner, compiler):
@@ -265,6 +286,7 @@ def check_source_root(runner, compiler):
     file_run('restored-run', ['--run', entry], expected=b'42\n')
     check_headerless_groups(runner, compiler)
     check_script_instances(runner, compiler)
+    check_executable_entry(runner, [compiler], ('--run', '--emit-llvm', '--emit-llvm-gc'))
 
 
 def check_installed_root(runner, compiler):
@@ -283,6 +305,7 @@ def check_installed_root(runner, compiler):
             'installation does not use the generic native crate contract')
     runtime = installation['runtime']
     argv = [compiler, '-i', work]
+    check_executable_entry(runner, argv, ('--emit-native-llvm',))
     includes = [arg for path in installation['source_roots'] for arg in ('-i', path)]
     checked = runner.run('installed-standalone-llvm', [*argv, *includes, '--emit-llvm', entry]).stdout
     checked_rows = require_source(runner, 'installed-standalone-llvm', 'Main', 'Local')
@@ -324,6 +347,15 @@ def check_installed_root(runner, compiler):
             'executable preparation skipped file-root query publication')
     require(not list(work.rglob('*.mlfci')) and not list(work.rglob('*.mlfco')),
             'direct executable compilation published package crate artifacts')
+
+    invalid = work / 'InvalidNativeMain.emlf'
+    invalid.write_text(entry.read_text().replace('printInt (S.length Local.items)',
+        'ioBind (printInt (S.length Local.items)) (\\_ -> ioReturn 42)'))
+    rejected = work / 'invalid-native-main'
+    error = runner.run('reject-native-non-unit', [*argv, '--compile', invalid, '-o', rejected],
+                       status=1, expected=b'')
+    require(b'program must have type IO () to run' in error.stderr and not rejected.exists(),
+            'native executable compilation accepted an IO Int entry')
 
     # Missing or damaged optional provider objects must use the checked bodies
     # through the same plan runner as package dependencies. The original native
