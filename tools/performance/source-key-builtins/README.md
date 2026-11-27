@@ -16,8 +16,10 @@ by the datatype-context and sparse-contract controls. It reads only the
 do not select a new hash whitelist entry. Recognized indexed/dictionary forms
 receive explicit rejection branches in every frozen traversal; unknown or
 incompatible constructor signatures fail preparation. The old named algorithm
-and its independent output expectations remain unchanged. Only the fixed
-oracle file has an integrity digest.
+continues to encode named members, contracts, scopes and datatype layouts.
+The reference assembles v7 keys directly using the short dictionary tag and
+the user-only datatype field. Each suite verifies the live ordered builtin
+declarations against the fixed schema-1 digest below before comparing keys.
 
 ## Wire contract
 

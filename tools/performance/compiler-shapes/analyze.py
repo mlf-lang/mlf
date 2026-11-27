@@ -44,6 +44,7 @@ def compatibility(plan):
             'producer_receipt_sha256':toolchain['producer']['receipt_sha256'],
             'producer_emlf_sha256':toolchain['producer']['emlf_sha256'],
             'reference_commit':plan.get('compiler_reference',{}).get('commit'),
+            'reference_runtime_sha256':plan.get('compiler_reference',{}).get('runtime_sha256'),
             'reference_emlf_sha256':plan.get('compiler_reference',{}).get('emlf_sha256'),
             'builtin':builtin,'host_platform':plan['host'].get('platform'),'host_machine':plan['host'].get('machine')}
 
@@ -59,6 +60,9 @@ def analyze(folder):
         ref=plan['compiler_reference']
         require(ref['commit'] and plan['inputs'][str(Path(ref['producer'])/'bin/emlf')]==ref['emlf_sha256'],
                 'pinned baseline compiler')
+        if 'runtime' in ref:
+            require(Q.valid_hash(ref.get('runtime_sha256')) and
+                    plan['inputs'].get(ref['runtime']) == ref['runtime_sha256'], 'pinned baseline runtime')
     expected={(r['case'],r['position'],r['lane']) for r in plan['schedule']}
     actual=[(r['case'],r['position'],r['lane']) for r in receipt['runs']]
     require(len(actual)==len(expected)==len(plan['schedule']) and set(actual)==expected,'exact scheduled runs, no missing or duplicate samples')
@@ -123,26 +127,21 @@ def analyze(folder):
                         require(sample.get('codegen_cache') == Q.cold_codegen_evidence(
                             directory/'build', producer['emlf_sha256']), 'verified cold code generation receipt')
                 inventories=[load(d/'query-cache-inventory.json') for d in directories]
-                graph=[any(k.startswith(Q.GRAPH) or k.endswith(('.mlfqg','.mlfqr')) for k in inv)
-                       for inv in inventories]
-                require(all(graph) or not any(graph),'stable query storage format')
-                row[prefix+'query_storage']=next((f'query-graph-v{v}' for v in (3, 2, 1) if f'query-graph-v{v}/CURRENT' in inventories[0]), 'query-graph-v1') if all(graph) else 'legacy-mlfq'
-                if all(graph):
-                    checks=[]
-                    for directory,inventory in zip(directories,inventories):
-                        evidence=directory/'query-graph-evidence.json'
-                        require(evidence.is_file(),'query graph evidence missing; re-measure, do not reconstruct an old cohort')
-                        checks.append(Q.check_graph(inventory,load(evidence),row[prefix+'fresh'],row[prefix+'max_group_members'],
-                            'compiler-shapes/'+case['id'],(plan['toolchain']['producer'] if lane=='mlf' else plan['compiler_reference'])['emlf_sha256']))
-                    require(all(inv==inventories[0] for inv in inventories),'stable graph inventory bytes and identities')
-                    require(all(c['groups']==checks[0]['groups'] for c in checks),'stable ordered graph groups and raw hashes')
-                    row[prefix+'query_files']=checks[0]['files']
-                    row[prefix+'query_bytes_median']=S.median(c['bytes'] for c in checks)
-                else:
-                    counts=[sum(k.endswith('.mlfq') for k in inv) for inv in inventories]
-                    require(all(n==row[prefix+'fresh'] for n in counts),'one persisted query object per fresh group')
-                    row[prefix+'query_files']=counts[0]
-                    row[prefix+'query_bytes_median']=S.median(sum(v['bytes'] for k,v in inv.items() if k.endswith('.mlfq')) for inv in inventories)
+                checks=[]
+                for directory,inventory in zip(directories,inventories):
+                    evidence=directory/'query-graph-evidence.json'
+                    require(evidence.is_file(),'query graph evidence missing; re-measure the cohort')
+                    inputs = (inventory,load(evidence),row[prefix+'fresh'],row[prefix+'max_group_members'],
+                              'compiler-shapes/'+case['id'])
+                    if lane == 'reference':
+                        checks.append(Q.check_reference_inventory(*inputs))
+                    else:
+                        checks.append(Q.check_graph(*inputs,plan['toolchain']['producer']['emlf_sha256']))
+                require(all(inv==inventories[0] for inv in inventories),'stable graph inventory bytes and identities')
+                require(all(c['groups']==checks[0]['groups'] for c in checks),'stable ordered graph groups and raw hashes')
+                row[prefix+'query_storage']='reference-inventory' if lane=='reference' else Q.CACHE_DIRECTORY
+                row[prefix+'query_files']=checks[0]['files']
+                row[prefix+'query_bytes_median']=S.median(c['bytes'] for c in checks)
         if has_reference:
             row['reference_commit']=plan['compiler_reference']['commit']
             row['mlf_over_reference']=row['mlf_wall_median']/row['reference_wall_median']

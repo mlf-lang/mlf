@@ -51,8 +51,8 @@ def compiled_closure(fixture, before, build_log, suite):
         closure.add(input_key(path if path.is_absolute() else ROOT / path))
     return closure
 
-GUARD = 'mlf_require_haskell_boundary_v4_abi'
-PREVIOUS_GUARD = 'mlf_require_haskell_boundary_v2_abi'
+GUARD = 'mlf_require_runtime_v5_abi'
+PREVIOUS_GUARD = 'mlf_require_haskell_boundary_v4_abi'
 EXPECTED = 'roundtrip λ😀\n65\n0\ncaught λ😀\nDONE\n'
 
 

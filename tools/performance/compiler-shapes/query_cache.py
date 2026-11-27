@@ -8,12 +8,12 @@ import sys
 
 SHARED = Path(__file__).resolve().parents[2] / 'shared'
 sys.path.insert(0, str(SHARED))
-from query_generation import Generation, cache_directory
+from query_generation import CACHE_DIRECTORY, Generation
 from artifact_binary_reference import read_document  # noqa: E402
-from artifact_binary_open import compact_group_owner, compact_group_owner_v2  # noqa: E402
-from test_query_index import read_index  # noqa: E402
+from artifact_binary_open import compact_group_owner  # noqa: E402
+from artifact_binary_typed import pack, text  # noqa: E402
 
-GRAPH = 'query-graph-v1/'
+GRAPH = CACHE_DIRECTORY + '/'
 HASH = re.compile(r'[0-9a-f]{64}')
 
 
@@ -48,10 +48,6 @@ def cold_codegen_evidence(build, compiler):
     return {'report': report, 'llvm_sha256': emitted}
 
 
-def pack(values):
-    return ''.join(str(len(value)) + ':' + value for value in values)
-
-
 def unpack(value):
     fields = []
     while value:
@@ -65,34 +61,19 @@ def unpack(value):
     return fields
 
 
-def snapshot(query, report, destination):
-    """Retain actual CURRENT/index bytes before cleanup, outside timed work.
-
-    JSON wrapping also keeps these inputs in the CI receipts-only upload.
-    Result bytes are already hashed by the ordinary complete file inventory.
-    """
-    if not any((query / g / 'CURRENT').is_file() for g in (GRAPH, 'query-graph-v2', 'query-graph-v3')):
-        return
-    graph = cache_directory(query)
+def snapshot(query, report, destination, *, reference=False):
+    """Retain the compiler report and the candidate's CURRENT/index bytes before cleanup."""
     files = {}
-    for path in sorted(graph.rglob('*')):
-        if path.is_file() and (path.name == 'CURRENT' or path.suffix == '.mlfqg'):
-            files[path.relative_to(query).as_posix()] = base64.b64encode(path.read_bytes()).decode('ascii')
+    if not reference:
+        graph = query / CACHE_DIRECTORY
+        if not (graph / 'CURRENT').is_file():
+            return
+        for path in sorted(graph.rglob('*')):
+            if path.is_file() and (path.name == 'CURRENT' or path.suffix == '.mlfqg'):
+                files[path.relative_to(query).as_posix()] = base64.b64encode(path.read_bytes()).decode('ascii')
     evidence = {'format': 1, 'files_base64': files,
                 'query_report_json': report.read_bytes().decode('utf-8') if report.is_file() else None}
     destination.write_text(json.dumps(evidence, indent=2) + '\n')
-
-
-def text(value):
-    require(value[0] == 'text', 'query graph expected text')
-    return value[1]
-
-
-def node(value, tag, arity=None):
-    require(value[0] == 'node' and value[1] == tag, 'query graph expected tag ' + str(tag))
-    children = value[2]
-    require(arity is None or len(children) == arity, 'query graph constructor arity')
-    return children
 
 
 def document(raw):
@@ -105,14 +86,8 @@ def valid_hash(value):
     return isinstance(value, str) and HASH.fullmatch(value) is not None
 
 
-def check_graph(inventory, evidence, fresh, max_members, crate, compiler_sha):
-    """Validate committed index, exact InferScc identities and retained results.
-
-    Payloads may deduplicate across nodes. Extra results from overwritten nodes
-    remain valid publication output; they are counted, never treated as groups.
-    """
-    require(isinstance(evidence, dict) and evidence.get('format') == 1,
-            'query graph evidence missing; re-measure, do not reconstruct an old cohort')
+def validate_inventory(inventory):
+    require(isinstance(inventory, dict), 'query inventory mapping')
     for path, record in inventory.items():
         require(isinstance(path, str) and not path.startswith('/') and
                 all(part not in ('', '.', '..') for part in path.split('/')),
@@ -120,54 +95,11 @@ def check_graph(inventory, evidence, fresh, max_members, crate, compiler_sha):
         require(isinstance(record, dict) and type(record.get('bytes')) is int and
                 record['bytes'] >= 0 and valid_hash(record.get('sha256')),
                 'finite integral query inventory bytes and SHA')
-    require(not any(p.endswith('.mlfq') for p in inventory), 'mixed legacy and graph query storage')
-    graph = next((f'query-graph-v{v}/' for v in (3, 2, 1)
-                  if f'query-graph-v{v}/CURRENT' in inventory), GRAPH)
-    current = graph + 'CURRENT'
-    generations = [p for p in inventory if p.endswith('.mlfqg')]
-    results = [p for p in inventory if p.endswith('.mlfqr')]
-    require(current in inventory and len(generations) == 1 and results,
-            'one committed graph generation and nonempty results')
-    require(not any('/staging/' in p for p in inventory), 'unpublished query staging files')
-    for path in generations + results:
-        suffix = '.mlfqg' if path in generations else '.mlfqr'
-        directory = 'generations/' if suffix == '.mlfqg' else 'results/'
-        name = path.removeprefix(graph + directory).removesuffix(suffix)
-        require(path == graph + directory + name + suffix and valid_hash(name),
-                'content-addressed query graph path')
-        require(inventory[path]['bytes'] > 0 and inventory[path]['sha256'] == name,
-                'content-addressed query graph SHA')
-    files = evidence.get('files_base64')
-    require(isinstance(files, dict) and set(files) == {current, *generations},
-            'exact retained CURRENT and index evidence')
-    raw = {}
-    for path, encoded in files.items():
-        require(isinstance(encoded, str), 'query graph base64 text')
-        try:
-            value = base64.b64decode(encoded, validate=True)
-        except (ValueError, TypeError) as error:
-            raise ValueError('query graph invalid base64') from error
-        require(len(value) == inventory[path]['bytes'] and digest(value) == inventory[path]['sha256'],
-                'retained query graph bytes match inventory')
-        raw[path] = value
-    generation = text(document(raw[current]))
-    require(valid_hash(generation) and generations == [graph + 'generations/' + generation + '.mlfqg'],
-            'CURRENT selects retained generation')
-    wire = Generation(raw[generations[0]], expected_hash=generation)
-    expected_directory = 1 if wire.dictionary_format else wire.version
-    require(graph == 'query-graph-v' + str(expected_directory) + '/', 'generation directory version')
-    config = unpack(text(wire.config))
-    require(len(config) == 5 and config[0] == crate and config[1] == compiler_sha and
-            valid_hash(compiler_sha) and config[2] and config[3] in
-            ('open-fragment-checker-1', 'open-fragment-checker-1/finish-receipt-1') and
-            config[4] in ('source', 'lowered'), 'query graph crate/compiler configuration')
-    nodes = {}
-    for key, row in wire.nodes.items():
-        payload = row['payload']
-        if payload is not None:
-            require(graph + 'results/' + payload + '.mlfqr' in inventory,
-                    'query graph missing retained payload')
-        nodes[key] = (row['sha'], row['reads'], payload)
+
+
+def reported_groups(evidence, fresh, max_members, crate):
+    require(isinstance(evidence, dict) and evidence.get('format') == 1,
+            'query graph evidence missing; re-measure, do not reconstruct an old cohort')
     report_text = evidence.get('query_report_json')
     require(isinstance(report_text, str), 'actual query report text missing')
     def unique_pairs(pairs):
@@ -186,11 +118,11 @@ def check_graph(inventory, evidence, fresh, max_members, crate, compiler_sha):
     groups = report.get('groups')
     require(isinstance(groups, list) and len(groups) == fresh and groups,
             'actual query report group count')
-    ids, identities, members_seen = set(), set(), set()
+    ids, members_seen = set(), set()
     for group in groups:
         require(isinstance(group, dict) and group.get('cached') is False,
                 'actual query report contains reused group')
-        identity, members, sha = group.get('id'), group.get('members'), group.get('query_key')
+        identity, members = group.get('id'), group.get('members')
         require(isinstance(identity, str) and identity and identity not in ids,
                 'unique query report group identities')
         require(isinstance(members, list) and members and
@@ -199,22 +131,80 @@ def check_graph(inventory, evidence, fresh, max_members, crate, compiler_sha):
                 'nonempty disjoint query group members')
         ids.add(identity)
         members_seen.update(members)
-        encoded = lambda value: ''.join(str(ord(c)) + '_' for c in value)
-        framed_owner = pack(['MLF-OPEN-GROUP-1', crate, pack(sorted(members))])
-        legacy_owner = 'Query_' + encoded(crate) + 'z_' + encoded(min(members))
-        require(identity in (framed_owner, legacy_owner, compact_group_owner_v2(crate, members),
-                             compact_group_owner(crate, members)),
+    require(max(len(g['members']) for g in groups) == max_members, 'actual maximum group members')
+    return [(g['id'], g['members'], g.get('query_key')) for g in groups]
+
+
+def check_reference_inventory(inventory, evidence, fresh, max_members, crate):
+    """Measure the baseline compiler's private files without interpreting its cache schema."""
+    validate_inventory(inventory)
+    return {'files': len(inventory), 'bytes': sum(item['bytes'] for item in inventory.values()),
+            'groups': reported_groups(evidence, fresh, max_members, crate)}
+
+
+def check_graph(inventory, evidence, fresh, max_members, crate, compiler_sha):
+    """Validate committed index, exact InferScc identities and retained results.
+
+    Payloads may deduplicate across nodes. Extra results from overwritten nodes
+    remain valid publication output; they are counted, never treated as groups.
+    """
+    validate_inventory(inventory)
+    groups = reported_groups(evidence, fresh, max_members, crate)
+    current = GRAPH + 'CURRENT'
+    generations = [p for p in inventory if p.endswith('.mlfqg')]
+    results = [p for p in inventory if p.endswith('.mlfqr')]
+    require(current in inventory and len(generations) == 1 and results,
+            'one committed graph generation and nonempty results')
+    require(set(inventory) <= {current, *generations, *results, '.lock'},
+            'unexpected file in the measured query cache')
+    for path in generations + results:
+        suffix = '.mlfqg' if path in generations else '.mlfqr'
+        directory = 'generations/' if suffix == '.mlfqg' else 'results/'
+        name = path.removeprefix(GRAPH + directory).removesuffix(suffix)
+        require(path == GRAPH + directory + name + suffix and valid_hash(name),
+                'content-addressed query graph path')
+        require(inventory[path]['bytes'] > 0 and inventory[path]['sha256'] == name,
+                'content-addressed query graph SHA')
+    files = evidence.get('files_base64')
+    require(isinstance(files, dict) and set(files) == {current, *generations},
+            'exact retained CURRENT and index evidence')
+    raw = {}
+    for path, encoded in files.items():
+        require(isinstance(encoded, str), 'query graph base64 text')
+        try:
+            value = base64.b64decode(encoded, validate=True)
+        except (ValueError, TypeError) as error:
+            raise ValueError('query graph invalid base64') from error
+        require(len(value) == inventory[path]['bytes'] and digest(value) == inventory[path]['sha256'],
+                'retained query graph bytes match inventory')
+        raw[path] = value
+    generation = text(document(raw[current]))
+    require(valid_hash(generation) and generations == [GRAPH + 'generations/' + generation + '.mlfqg'],
+            'CURRENT selects retained generation')
+    wire = Generation(raw[generations[0]], expected_hash=generation)
+    config = unpack(text(wire.config))
+    require(len(config) == 5 and config[0] == crate and config[1] == compiler_sha and
+            valid_hash(compiler_sha) and config[2] and
+            config[3] == 'open-fragment-checker-1/finish-receipt-1' and
+            config[4] in ('source', 'lowered'), 'query graph crate/compiler configuration')
+    for row in wire.nodes.values():
+        payload = row['payload']
+        if payload is not None:
+            require(GRAPH + 'results/' + payload + '.mlfqr' in inventory,
+                    'query graph missing retained payload')
+    identities = set()
+    for identity, members, sha in groups:
+        require(identity == compact_group_owner(crate, members),
                 'actual query group id matches crate and members')
         key = pack(['InferScc', pack(sorted(members))])
-        require(key not in identities and key in nodes and valid_hash(sha) and
-                nodes[key][0] == sha and nodes[key][2] == sha,
+        require(key not in identities and key in wire.nodes and valid_hash(sha) and
+                wire.nodes[key]['sha'] == sha and wire.nodes[key]['payload'] == sha,
                 'exact InferScc identity and raw payload SHA')
         identities.add(key)
     # Canonical packed keys make this prefix exact, not a substring match.
-    require({k for k in nodes if k.startswith(pack(['InferScc']))} == identities,
+    require({k for k in wire.nodes if k.startswith(pack(['InferScc']))} == identities,
             'exact InferScc inventory, no extra groups')
-    require(max(len(g['members']) for g in groups) == max_members, 'actual maximum group members')
     paths = [current, *generations, *results]
     return {'files': len(paths), 'bytes': sum(inventory[p]['bytes'] for p in paths),
-            'groups': [(g['id'], g['members'], g['query_key']) for g in groups]}
+            'groups': groups}
 

@@ -200,8 +200,12 @@ cacheBoundary = do
   let forged = Separate.UnitInterface "CacheBoundary" [] [] [] [] [] ((:) ((,) "identity" (XCon "Int" [])) []) (Separate.unitObjectFingerprint original)
   proof <- H.right (Separate.objectChecked object)
   H.reject (Query.validateCached "CacheBoundary" [] [] ((:) "identity" []) (Separate.CheckedUnitObject forged proof))
-  let encoded = Query.encodeCached "key" (Separate.UnitObject forged (Separate.objectTerm object))
-  H.assert (case Query.decodeCached "key" "CacheBoundary" [] [] ((:) "identity" []) encoded of {Left _ -> true; Right _ -> false}) "cache trusted interface schemes without independently checking the body"
+  dir <- scratch "forged-lowered"
+  let path = dir ++ "/forged.mlfq"
+  written <- Query.writeLoweredCache path "key" (Separate.UnitObject forged (Separate.objectTerm object))
+  _ <- H.right written
+  decoded <- Query.readLoweredCache "key" "CacheBoundary" [] [] ((:) "identity" []) path
+  H.assert (case decoded of {Left _ -> true; Right _ -> false}) "cache trusted interface schemes without independently checking the body"
 
 crateQueryTests : [] ((,) String (IO ()))
 crateQueryTests = (:) ((,) "declaration SCC order and inventory permutation" orderedSCC)

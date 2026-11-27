@@ -1,9 +1,11 @@
 """Wire fixtures constructed from the specification, independently of the compiler."""
+import tempfile
 import unittest
+from pathlib import Path
 
 from artifact_binary_reference import Invalid, tree_document
 from artifact_binary_typed import l, n, pack, s
-from query_generation import Generation, V1, V2
+from query_generation import CACHE_DIRECTORY, Generation, V3, cache_directory
 
 
 def i(slot):
@@ -29,62 +31,54 @@ def fixture(names):
                       (pack(["Input", pack(["ScopeInventory", group])]), n(417, i(0)))]:
         rows.append((key, desc, "e" * 64, []))
     rows.sort()
-    fields = [s(V2), s("cfg"), l(*map(s, names)), l(l(i(d), i(e))),
+    fields = [s(V3), s("cfg"), l(*map(s, names)), l(l(i(d), i(e))),
               l(*(n(414, i(0), i(site), s(goal)) for site, goal in requests)),
-              l(s("A.f")), l(*(n(413, desc, s(h), l(*(ref for _, ref, _ in reads)), n(5, s(h)))
-                                for key, desc, h, reads in rows))]
-    v1 = n(411, s(V1), s("cfg"), l(*(n(410, s(key), s(h),
-           l(*(n(2, s(child), s(version)) for child, _, version in reads)), n(5, s(h)))
-           for key, _, h, reads in rows)))
-    return fields, tree_document([v1], 6)
+              l(s("A.f")), l(*(desc for _, desc, _, _ in rows)), l(*(s(h) for _, _, h, _ in rows)),
+              l(*(i(len(edges)) for _, _, _, edges in rows)),
+              l(*(ref for _, _, _, edges in rows for _, ref, _ in edges)),
+              l(*(i(ordinal) for ordinal in range(len(rows))))]
+    expected = {key: dict(sha=h, reads=[(name, sha) for name, _, sha in edges], payload=h)
+                for key, _, h, edges in rows}
+    return fields, expected
 
 
 class GenerationTests(unittest.TestCase):
-    def test_reordered_slots_and_complete_v1_bytes(self):
+    def test_generations_resolve_their_own_slots(self):
         slots = ["unused" + str(x) for x in range(13)]
         slots[7], slots[12] = "A.f", "B.f"
         graphs = []
         for names in [slots, slots[:7] + ["new1", "new2"] + slots[7:]]:
-            fields, legacy = fixture(names)
+            fields, expected = fixture(names)
             raw = tree_document([n(412, *fields)], 6)
             graph = Generation(raw, configuration="cfg")
+            self.assertEqual(graph.nodes, expected)
             self.assertEqual(graph.encode_rows(graph.rows), raw)
-            self.assertEqual(graph.legacy_bytes(), legacy)
-            self.assertEqual(Generation(legacy).nodes, graph.nodes)
             graphs.append(graph.nodes)
         self.assertEqual(*graphs)
 
-    def test_main_dictionary_shape_compatibility(self):
-        # Authored four-field dictionary fixture, distinct from typed snapshots.
-        raw = tree_document([n(412, s(V2), s("cfg"), l(s("1" * 64), s("leaf")),
-                               l(n(413, i(1), i(0), l(), n(4))))], 6)
-        graph = Generation(raw, configuration="cfg")
-        self.assertTrue(graph.dictionary_format)
-        self.assertEqual(graph.nodes, {"leaf": dict(sha="1" * 64, reads=[], payload=None)})
-        self.assertEqual(graph.encode_rows(graph.rows), raw)
-        self.assertEqual(Generation(graph.legacy_bytes()).nodes, graph.nodes)
-        unused = tree_document([n(412, s(V2), s("cfg"), l(s("1" * 64), s("leaf"), s("unused")),
-                                  l(n(413, i(1), i(0), l(), n(4))))], 6)
-        with self.assertRaises(Invalid):
-            Generation(unused, configuration="cfg")
+    def test_only_current_cache_directory_is_selected(self):
+        with tempfile.TemporaryDirectory() as root:
+            cache = Path(root)
+            for name in ("query-graph-v1", "query-graph-v2"):
+                (cache / name).mkdir()
+                (cache / name / "CURRENT").touch()
+            with self.assertRaisesRegex(Invalid, "CURRENT absent"):
+                cache_directory(cache)
+            (cache / CACHE_DIRECTORY).mkdir()
+            (cache / CACHE_DIRECTORY / "CURRENT").touch()
+            self.assertEqual(cache_directory(cache), cache / CACHE_DIRECTORY)
 
-    def test_malformed_tables_and_edges(self):
-        def corrupted(field, value):
-            fields, _ = fixture(["A.f", "B.f"])
-            fields[field] = value
-            return tree_document([n(412, *fields)], 6)
-        def row(k, edges):
-            return n(413, k, s("1" * 64), l(*edges), n(4))
-        tests = [(0, s(V1)), (2, l(s("A.f"), s("A.f"))), (3, l(l())),
-                 (3, l(l(i(0), i(0)))), (3, l(l(i(-1)))), (3, l(l(i(2)))),
+    def test_malformed_tables(self):
+        tests = [(2, l(s("A.f"), s("A.f"))), (3, l(l())), (3, l(l(i(0), i(0)))),
+                 (3, l(l(i(-1)))), (3, l(l(i(2)))),
                  (4, l(n(414, i(1), i(0), s("Eq Int")))),
                  (4, l(n(414, i(0), i(-1), s("Eq Int")))),
-                 (4, l(n(414, i(0), i(0), s("")))), (5, l(s(""), s("A"))),
-                 (6, l(row(n(426, i(0)), []))), (6, l(row(i(0), [i(1)]))),
-                 (6, l(row(i(0), [i(0)]))), (6, l(row(i(0), []), row(i(0), [])))]
+                 (4, l(n(414, i(0), i(0), s("")))), (5, l(s(""), s("A")))]
         for field, value in tests:
+            fields, _ = fixture(["A.f", "B.f"])
+            fields[field] = value
             with self.subTest(field=field, value=value), self.assertRaises(Invalid):
-                Generation(corrupted(field, value))
+                Generation(tree_document([n(412, *fields)], 6))
 
     def test_deep_shared_graph_and_cycle_in_both_row_orders(self):
         graph = Generation.__new__(Generation)
@@ -95,16 +89,13 @@ class GenerationTests(unittest.TestCase):
             with self.assertRaisesRegex(Invalid, "cycl"):
                 graph.check_cycles()
 
-    def test_checksum_configuration_and_payload(self):
+    def test_checksum_and_configuration(self):
         fields, _ = fixture(["A.f", "B.f"])
         raw = tree_document([n(412, *fields)], 6)
-        with self.assertRaises(Invalid):
+        with self.assertRaisesRegex(Invalid, "generation address"):
             Generation(raw, expected_hash="0" * 64)
-        with self.assertRaises(Invalid):
+        with self.assertRaisesRegex(Invalid, "generation configuration"):
             Generation(raw, configuration="other")
-        fields[-1] = l(n(413, i(0), s("1" * 64), l(), n(5, s("2" * 64))))
-        with self.assertRaises(Invalid):
-            Generation(tree_document([n(412, *fields)], 6))
 
 
 if __name__ == "__main__":

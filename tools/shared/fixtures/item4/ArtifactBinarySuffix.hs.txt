@@ -339,7 +339,7 @@ loweredLegacy path version = do
       pure (key,object)
     _ -> error "lowered driver did not write binary inline root300"
   let text=if version == "1" then U.pack ["MLF-QUERY-CACHE-1",key,U.encodeInterface (U.objectInterface object),U.encodeObject object]
-           else Q.encodeCached key object
+           else U.pack ["MLF-QUERY-CACHE-2",key,U.encodeContextualObject object]
   parts <- expect "legacy query framing" (U.unpack text)
   need "exact intended old lowered query format" (case parts of tag:_ -> tag == (if version == "1" then "MLF-QUERY-CACHE-1" else "MLF-QUERY-CACHE-2"); _ -> False)
   writeFile path (B.unpack text)
@@ -472,7 +472,7 @@ admissionTests = do
   putStrLn "PASS production-admission-distinct-from-raw-codec"
 
 
--- R2 regression: keep the source key and actual schema301 empty
+-- Keep the source key and the actual shared binary empty
 -- context/int-only raw body fixed. Only the caller's expected datatype list
 -- changes. A body that does not mention Other must not bypass key/context
 -- binding, including after a genuine invocation-local memo was established.
@@ -539,7 +539,7 @@ sourceAdmissionTests directory = do
     originalSha <- P.byteArrayFromString key >>= P.byteArrayDigest
     forM_ [False,True] $ \strict -> do
       old <- Q.readLocalSourceFile strict [] (B.literal directory)
-        key originalSha encoded "RawGroup" [] [] ["value"] (B.literal path)
+        originalSha encoded "RawGroup" [] [] ["value"] (B.literal path)
       rejected "unaddressed source record is a miss" "unsupported source query cache format" old
     Q.writeSourceCached T.Nothing (B.literal directory) (B.literal path) key object
       >>= expect "publish current source record"
@@ -558,7 +558,7 @@ sourceAdmissionTests directory = do
         rawBytes <- Storage.readRaw target >>= expect "actual fingerprint record bytes"
         roots <- W.decode W.defaultLimits 2 rawBytes >>= expect "actual fingerprint record"
         let loadInput digest strict = Q.readLocalSourceFile strict [] (B.literal directory)
-              full digest encoded "RawGroup" [] [] ["value"] target
+              digest encoded "RawGroup" [] [] ["value"] target
             tryAudit = loadInput sha
             other = B.literal (replicate 64 '0')
             address = W.VText sha
@@ -592,8 +592,8 @@ sourceAdmissionTests directory = do
         need "inline slot retained full raw body" (U.encodeObject actualSlot == U.encodeObject object)
         forM_ [[W.VText Q.resultSlot],[W.VNode 42 [W.VText Q.resultSlot]]] $ \aliased -> do
           safe <- Q.encodeLocalRecord sha aliased >>= expect "literal placeholder alias"
-          legacy <- Q.encodeLegacyLocalRecord sha aliased >>= expect "prior checked encoder"
-          equal <- Storage.sameBytes safe legacy
+          fallback <- Q.encodeFallbackLocalRecord sha aliased >>= expect "independent result hash encoder"
+          equal <- Storage.sameBytes safe fallback
           need "placeholder alias wrote through a semantic field" equal
         need "colliding stored digest must use the independent encoder"
           (Q.slotConflicts sha [W.Symbol Q.resultSlot 64,W.Symbol sha 64])
@@ -672,16 +672,27 @@ sourceAdmissionTests directory = do
       readCurrent [] other >>= rejected "corrupt carrier digest precedes expectedDS mismatch" invalid
       readCurrent memo other >>= rejected "warm structural miss validates carrier digest first" invalid
     readCurrent memo other >>= rejected "restored carrier still rejects wrong expectedDS" mismatch
+    keyFields <- expect "source key fields" (U.unpack key)
+    let compactFields=take 5 keyFields ++ drop 6 keyFields
+        retiredBinaryPath=B.literal (directory ++ "/retired-shared.mlfq")
+    case Q.localPayloadFields (T.Just reference) object of
+      [ref,header,body] -> Storage.write 2 retiredBinaryPath
+        [W.VNode 301 [ref,W.VNode 1 (map W.VText compactFields),header,body]]
+        >>= expect "install retired shared binary with its actual carrier"
+      _ -> error "expected a shared source payload"
+    forM_ [False,True] $ \strict ->
+      Q.readLocalSourceFile strict memo (B.literal directory) originalSha encoded "RawGroup" [] [] ["value"] retiredBinaryPath
+      >>= rejected "retired shared binary clears verified memo" "unsupported source query cache format"
     -- Exercise a real old CACHE3 record with its OWN old-text content SHA.
     -- No binary digest is relabeled as a legacy carrier identity.
-    let oldCarrier=Q.sourceContextContents encoded
+    let oldCarrier=U.pack ["MLF-SOURCE-QUERY-CONTEXT-1",encoded]
     oldBytes <- P.byteArrayFromString oldCarrier
     oldReference <- P.byteArrayDigest oldBytes
     need "legacy and binary physical identities are distinct" (oldReference /= reference)
     let oldPath=B.unpack (Q.sourceContextPath (B.literal directory) oldReference)
         oldRecordPath=directory ++ "/legacy.mlfq"
-    compact <- case Q.sourceCacheParts key of T.Just (value,_) -> pure value; T.Nothing -> error "source key projection"
-    let oldRecord=U.pack ["MLF-QUERY-CACHE-3",oldReference,compact,U.encodeContextualObject object]
+    let compact=U.pack compactFields
+        oldRecord=U.pack ["MLF-QUERY-CACHE-3",oldReference,compact,U.encodeContextualObject object]
     saveBytes oldPath oldBytes
     writeFile oldRecordPath (B.unpack oldRecord)
     let readOld = Q.readSourceCacheFileWithWindow [] (B.literal directory) key "RawGroup" [] [] ["value"] (B.literal oldRecordPath)

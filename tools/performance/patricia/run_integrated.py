@@ -125,7 +125,7 @@ def main():
                 if module in ['P1Controls','P3Controls']:
                     summaries=[json.loads(s) for s in stdout.decode().splitlines() if s.startswith('{')]
                     H.require(len(summaries)==1 and summaries[0]['complete'] is True,'one complete summary')
-                    H.require(summaries[0]['differential_controls' if module=='P3Controls' else 'checks']==dict(P1Controls=154072,P3Controls=929)[module],'all retained control cases')
+                    H.require(summaries[0]['differential_controls' if module=='P3Controls' else 'checks']==dict(P1Controls=154072,P3Controls=368)[module],'all retained control cases')
                 if module=='NativeCompatibilityControls':
                     H.require(stdout==b'{"complete":true,"native_compatibility_controls":1243}\n',
                               'all P2 serializer and summary controls')

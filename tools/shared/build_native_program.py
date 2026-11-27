@@ -105,7 +105,8 @@ def main():
     try:
         run('installation', [compiler, '--native-install-info'], build / 'installation.json')
         installation = json.loads((build / 'installation.json').read_text())
-        require(installation.get('format') == 'MLF-NATIVE-LIBRARY-1', 'unsupported native installation format')
+        require(installation.get('format') == 'MLF-NATIVE-LIBRARY-2', 'unsupported native installation format')
+        require(installation.get('runtime_abi') == 'mlf_require_runtime_v5_abi', 'installed runtime ABI mismatch')
         require(isinstance(installation.get('identity'), str), 'native installation omitted identity')
         native_records = installation.get('objects')
         require(isinstance(native_records, list) and len(native_records) >= 2, 'native library/runtime inventory missing')

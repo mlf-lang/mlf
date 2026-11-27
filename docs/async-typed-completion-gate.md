@@ -271,9 +271,9 @@ prove its allocation/signature rather than exposing a consumer-to-producer cast.
    1000 ms and never later than the nearest deadline. The interpreted clock/pause
    bridge transfers metadata only, using process transport 82. Precision is
    milliseconds, not a preemption or hard real-time guarantee.
-5. **LLVM/ABI/cache:** generated entries require
-   `mlf_require_async_completion_v2_abi`; cache keys include `completion-v2`.
-   The released compact ABI and primitive-82 guard remain for bootstrap inputs.
+5. **LLVM/ABI/cache.** The original completion gate used an additive guard.
+   Current native entries and code generation keys use the exact runtime epoch
+   documented in [the runtime contract](../bootstrap/RUNTIME.txt).
 6. **Qualified source/runtime slice:** the real stage-2 suite passed all six
    positives on both interpreter entry paths and native LLVM, plus nine source
    and seven target negatives. This includes the impredicative identity payload,

@@ -1,11 +1,14 @@
 """Select and build the Git baseline for the candidate compiler."""
 import fcntl
+import hashlib
+import json
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 
 import command_runner
+from prepare import runtime_cflags, runtime_command
 import provenance
 
 
@@ -31,6 +34,27 @@ def select_revision(root, outputs=()):
         commit = parents[0]
     return {'candidate_commit': head, 'dirty': dirty, 'commit': commit,
             'basis': 'working tree vs HEAD' if dirty else 'HEAD vs first parent'}
+
+
+def prepare_runtime(setup, source, cache, h):
+    # Called under prepare.lock after authenticating the reference checkout.
+    # The candidate runtime digest distinguishes setups built against different
+    # host dependencies. The reference object always comes from its own source.
+    cflags = setup['runtime_cflags'] if 'runtime_cflags' in setup else runtime_cflags()
+    command = runtime_command(setup['clang'], source, cflags, 'runtime.o')
+    inputs = [command, h.sha(setup['clang']), h.sha(setup['runtime'])]
+    key = hashlib.sha256(json.dumps(inputs).encode()).hexdigest()
+    folder = cache / 'runtime' / key
+    folder.mkdir(parents=True, exist_ok=True)
+    obj, receipt = folder / 'runtime.o', folder / 'receipt.json'
+    if receipt.exists():
+        digest = h.load(receipt)['sha256']
+        h.check_pins({obj: digest})
+    else:
+        subprocess.run(command, cwd=folder, check=True)
+        digest = h.sha(obj)
+        h.save(receipt, {'command': command, 'sha256': digest})
+    return {'runtime': str(obj), 'runtime_sha256': digest}
 
 
 def prepare(setup, selection, producer_ghc):
@@ -71,4 +95,4 @@ def prepare(setup, selection, producer_ghc):
         h.authenticate(producer, source)
         if not ready.exists():
             h.save(ready, reference)
-        return {**reference, **selection}
+        return {**reference, **selection, **prepare_runtime(setup, source, cache, h)}

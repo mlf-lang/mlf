@@ -9,17 +9,15 @@ import qualified Package.Benchmark as B
 import qualified Package.Build as Build
 import qualified Package.Verification as V
 
-data Context = Context String String String String String String ([] String) ([] String) J.Json Int
-out (Context d _ _ _ _ _ _ _ _ _) = d
-candidate (Context _ c _ _ _ _ _ _ _ _) = c
-baseline (Context _ _ b _ _ _ _ _ _ _) = b
-clang (Context _ _ _ c _ _ _ _ _ _) = c
-flags (Context _ _ _ _ _ _ fs _ _ _) = fs
-runs (Context _ _ _ _ _ _ _ _ _ n) = n
-backend (Context _ _ _ _ tool _ _ _ _ _) = tool
-baselineBackend (Context _ _ _ _ _ tool _ _ _ _) = tool
-collector (Context _ _ _ _ _ _ _ gc _ _) = gc
-packages (Context _ _ _ _ _ _ _ _ ps _) = ps
+data BenchCompiler = BenchCompiler String String String String
+data Context = Context String BenchCompiler BenchCompiler String ([] String) ([] String) J.Json Int
+out (Context d _ _ _ _ _ _ _) = d
+compilerFor (Context _ current previous _ _ _ _ _) language = if eqString language "mlf" then current else previous
+clang (Context _ _ _ c _ _ _ _) = c
+flags (Context _ _ _ _ fs _ _ _) = fs
+collector (Context _ _ _ _ _ gc _ _) = gc
+packages (Context _ _ _ _ _ _ ps _) = ps
+runs (Context _ _ _ _ _ _ _ n) = n
 packageFlags c work language = S.concatMap (\name -> J.getStrings "flags" (J.get name (packages c))) (J.getStrings language (J.getObject "pkg_config" work))
 right : forall a. Either String a -> IO a
 right result = case result of { Left message -> O.fatal message; Right a -> return a }
@@ -42,9 +40,14 @@ finishCase path selected identity passed details =
  if eqString selected "" || eqString selected identity then
   event path ((:) (pair "id" (J.str identity)) ((:) (pair "status" (J.str (if passed then "pass" else "fail"))) details))
  else return ()
-buildArtifacts = do
- split <- getEnv "MLF_BENCH_SPLIT_RUNTIME"
- return (S.append (O.words "program.ll runtime.o program.o") (if eqString split "1" then one "runtime-supervisor.o" else []))
+buildArtifacts (BenchCompiler _ _ _ split) =
+ S.append (O.words "program.ll runtime.o program.o") (if eqString split "1" then one "runtime-supervisor.o" else [])
+buildMlf (BenchCompiler compiler tool runtime split) directory source libraries includes =
+ B.buildParallelWithRuntime split directory compiler tool source runtime libraries includes 1800.0
+runtimeFiles runtime = do
+ let directory = O.parent runtime
+ entries <- O.entries directory
+ return (S.map (O.join directory) (S.filter (\name -> O.ends ".c" name || O.ends ".h" name) entries))
 median samples = let sorted = S.sortBy (\a b -> if ltDouble a b then -1 else if ltDouble b a then 1 else 0) samples in
  let n = S.length sorted in if remInt n 2 == 1 then S.index sorted (quotInt n 2) else divDouble (addDouble (S.index sorted (quotInt n 2 - 1)) (S.index sorted (quotInt n 2))) 2.0
 summary samples =
@@ -69,10 +72,9 @@ build c work language directory = do
   return ((,) (directory ++ "/program") sample)
  else do
   source <- canonicalPath (V.text "mlf" (J.get "sources" work))
-  runtime <- canonicalPath "runtime/mlf_runtime.c"
   -- buildParallel requires a fresh empty directory, including a fresh runtime.o.
   includes <- S.mapM canonicalPath (J.getStrings "mlf_include_dirs" work)
-  result <- B.buildParallelWithIncludes directory (if eqString language "mlf" then candidate c else baseline c) (if eqString language "mlf" then backend c else baselineBackend c) source runtime (S.append (S.append (flags c) (collector c)) (packageFlags c work "mlf")) includes 1800.0
+  result <- buildMlf (compilerFor c language) directory source (S.append (S.append (flags c) (collector c)) (packageFlags c work "mlf")) includes
   right result
 
 -- Byte transport is shared with the native test harness. No binary data is
@@ -154,7 +156,7 @@ checkWorkload c work check = do
  identities <- S.mapM (\((,) language binary) -> do
   hash <- fileDigest binary
   artifacts <- if eqString language "c" then return J.empty else do
-   names <- buildArtifacts
+   let names = buildArtifacts (compilerFor c language)
    entries <- S.mapM (\file -> do { digest <- fileDigest (directory ++ "/warmup/" ++ language ++ "/" ++ file); return ((,) file (J.str digest)) }) names
    return (row entries)
   return ((,) language (row (two (pair "binary_sha256" (J.str hash)) (pair "artifacts_sha256" artifacts))))) builds
@@ -183,7 +185,7 @@ workload c work checkCorrectness checkPerformance afterCorrectness = do
    compareOutput work (directory ++ "/reference/stdout") (scratch ++ "/run/stdout") checkPerformance
    hash <- fileDigest binary
    artifacts <- if eqString language "c" then return J.empty else do
-    names <- buildArtifacts
+    let names = buildArtifacts (compilerFor c language)
     entries <- S.mapM (\name -> do { digest <- fileDigest (scratch ++ "/build/" ++ name); return ((,) name (J.str digest)) }) names
     return (row entries)
    let record = row ((:) (pair "compilation" compiled) ((:) (pair "runtime" runtime) ((:) (pair "binary_sha256" (J.str hash)) ((:) (pair "artifacts_sha256" artifacts) []))))
@@ -244,6 +246,14 @@ main = do
    backend <- canonicalPath (if eqString backendSetting "" then clang else backendSetting)
    baselineBackendSetting <- getEnv "MLF_BENCH_BASELINE_CLANG"
    baselineBackend <- canonicalPath (if eqString baselineBackendSetting "" then backend else baselineBackendSetting)
+   runtime <- canonicalPath "runtime/mlf_runtime.c"
+   baselineRuntimeSetting <- getEnv "MLF_BENCH_BASELINE_RUNTIME"
+   baselineRuntime <- if eqString baselineRuntimeSetting "" then return runtime else canonicalPath baselineRuntimeSetting
+   split <- getEnv "MLF_BENCH_SPLIT_RUNTIME"
+   O.require (eqString split "" || eqString split "1") "invalid split runtime setting"
+   hasSupervisor <- fileExists (O.join (O.parent baselineRuntime) "mlf_process_supervisor.c")
+   let current = BenchCompiler candidate backend runtime split
+   let previousCompiler = BenchCompiler baseline baselineBackend baselineRuntime (if hasSupervisor then split else "")
    let n = readInt count
    O.require (n >= 3 && remInt n 2 == 1) "use an odd number of samples, at least three"
    let report = directory ++ "/results.json"
@@ -277,18 +287,17 @@ main = do
     return ((,) name identity)) requirements
    let nativePackages = row packageEntries
    J.write (directory ++ "/native-dependencies.json") nativePackages
-   let c = Context directory candidate baseline clang backend baselineBackend (Build.flags gmp) gc nativePackages n
+   let c = Context directory current previousCompiler clang (Build.flags gmp) gc nativePackages n
    if S.any usesFasta workloads then
     O.run "" ((:) clang (S.append (O.words "-O3 benchmarks/fasta/c/upstream.c -lm -o") (one (directory ++ "/fasta-generator"))))
    else return ()
-   let files = S.append ((:) candidate ((:) baseline ((:) clang ((:) "runtime/mlf_runtime.c" ((:) "runtime/mlf_runtime.h" ((:) "runtime/khash.h" ((:) "benchmarks/manifest.json" ((:) "tools/bench/Main.emlf" [])))))))) (S.concatMap (\w -> S.map (\l -> V.text l (J.get "sources" w)) (O.words "c mlf")) (V.array "workloads" manifest))
+   let files = S.append ((:) candidate ((:) baseline ((:) clang (O.words "benchmarks/manifest.json tools/bench/Main.emlf")))) (S.concatMap (\w -> S.map (\l -> V.text l (J.get "sources" w)) (O.words "c mlf")) (V.array "workloads" manifest))
    runner <- getExecutablePath
-   let dependencies = S.append (S.append ((:) runner ((:) backend (one baselineBackend))) (S.map S.fst (S.append (J.items (J.get "headers" gcIdentity)) (J.items (J.get "libraries" gcIdentity))))) (O.words "runtime/mlf_system.h tests/native/host_support.c tests/native/binary_files.c libraries/mlf-developer-tools/Package/Benchmark.hs libraries/mlf-package-core/Package/Build.hs libraries/mlf-developer-tools/Package/Verification.hs libraries/mlf-package-core/Package/Json.hs libraries/mlf-package-core/Package/OS.hs tools/bench/mlf-package.json")
-   runtimeEntries <- O.entries "runtime"
-   let runtimeFiles = S.map (O.join "runtime") (S.filter (\name -> O.ends ".c" name || O.ends ".h" name) runtimeEntries)
-   let extraFiles = S.append runtimeFiles (S.append (S.concatMap (\entry -> B.benchmarkPackageFiles (S.snd entry)) packageEntries) (S.concatMap (J.getStrings "mlf_dependencies") workloads))
+   let dependencies = S.append (S.append ((:) runner ((:) backend (one baselineBackend))) (S.map S.fst (S.append (J.items (J.get "headers" gcIdentity)) (J.items (J.get "libraries" gcIdentity))))) (O.words "tests/native/host_support.c tests/native/binary_files.c libraries/mlf-developer-tools/Package/Benchmark.hs libraries/mlf-package-core/Package/Build.hs libraries/mlf-developer-tools/Package/Verification.hs libraries/mlf-package-core/Package/Json.hs libraries/mlf-package-core/Package/OS.hs tools/bench/mlf-package.json")
+   runtimeInputs <- S.mapM runtimeFiles (S.nubBy eqString (two runtime baselineRuntime))
+   let extraFiles = S.append (S.concat runtimeInputs) (S.append (S.concatMap (\entry -> B.benchmarkPackageFiles (S.snd entry)) packageEntries) (S.concatMap (J.getStrings "mlf_dependencies") workloads))
    fingerprints <- S.mapM (\path -> do { hash <- fileDigest path; return ((,) path hash) }) (S.nubBy eqString (S.append extraFiles (S.append files dependencies)))
-   buildEnvironment <- S.mapM (\name -> do { value <- getEnv name; return ((,) name (J.str value)) }) (O.words "MLF_BENCH_SPLIT_RUNTIME MLF_BENCH_STREAM_LLVM MLF_BENCH_STREAM_LINK MLF_BENCH_MLF_CLANG MLF_BENCH_BASELINE_CLANG")
+   buildEnvironment <- S.mapM (\name -> do { value <- getEnv name; return ((,) name (J.str value)) }) (O.words "MLF_BENCH_SPLIT_RUNTIME MLF_BENCH_STREAM_LLVM MLF_BENCH_STREAM_LINK MLF_BENCH_MLF_CLANG MLF_BENCH_BASELINE_CLANG MLF_BENCH_BASELINE_RUNTIME")
    observed <- S.mapM (runWorkload c checkOnly limits eventPath exact) workloads
    let rows = S.map S.fst observed
    integrity <- B.checkIntegrity fingerprints
@@ -298,7 +307,8 @@ main = do
    summary <- right (B.runnerReport checkOnly n rows checks)
    let result = J.set "native_dependencies" nativePackages (J.set "limits" limits (J.set "workload_selection" (J.stringArray (S.map (V.text "name") workloads)) (J.set "fingerprints" (row (S.map (\((,) path hash) -> (,) path (J.str hash)) fingerprints)) summary)))
    let recorded = J.set "build_environment" (row buildEnvironment) result
-   J.write report recorded
+   let runtimes = row (two (pair "mlf" (J.str runtime)) (pair "baseline" (J.str baselineRuntime)))
+   J.write report (J.set "runtimes" runtimes recorded)
    O.require passed "performance limits exceeded; see results.json"
    putStrLn (if checkOnly then "All " ++ showInt (S.length rows) ++ " workloads passed correctness checks; performance was not measured." else "All " ++ showInt (S.length rows) ++ " selected workloads pass the requested compilation and runtime limits.")
   _ -> O.fatal "bench COMPILER BASELINE OUTPUT RUNS CLANG [MAX_COMPILE MAX_RUNTIME [WORKLOAD...] | --check-only] (run from repository root)"

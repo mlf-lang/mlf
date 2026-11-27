@@ -148,12 +148,6 @@ module Bootstrap.QueryGraph where {
     in (,) node (Session path config generation old (M.insert compareString (nodeKey node) node current) queued);
   forget wanted (Session p c g old current queued) = Session p c g old
     (M.delete compareString wanted current) queued;
-  encodeNode (QueryNode wanted digest reads location) = W.VNode 410
-    [W.VText wanted,W.VText digest,
-     A.toList (A.toPair A.toText A.toText) reads,A.toMaybe A.toText location];
-  -- Explicit legacy fixture/compatibility writer; production uses typed IDs.
-  encodeLegacyIndex config nodes = W.VNode 411
-    [W.VText "MLF-CRATE-QUERY-GRAPH-1",W.VText config,A.toList encodeNode (M.elems nodes)];
   -- Generation numbers are local to these four tables. A read must resolve
   -- against its own generation before comparison to the new session's nodes.
   data Address = Address Int String;
@@ -284,297 +278,12 @@ module Bootstrap.QueryGraph where {
       W.VNode 1 keys,A.toList (compose W.VText nodeHash) rows,
       A.toList (compose W.VInt length) references,W.VNode 1 targets,A.toList W.VInt locations])
   };
-  -- Version 2 makes string sharing explicit in the schema, rather than asking
-  -- the codec to admit a larger unfolded version-1 value. The dictionary is
-  -- sorted, unique and entirely used; rows are ordered by their key IDs.
-  -- Hash references retain the provider's expected value, not the target's
-  -- current value. Repeated reads, including their order, remain significant.
-  data IndexString = IndexString String Bool Int;
-  data IndexNode = IndexNode Int Int ([] ((,) Int Int)) (Maybe Int);
-  indexKey (IndexNode wanted _ _ _) = wanted;
-  indexHash (IndexNode _ digest _ _) = digest;
-  indexReads (IndexNode _ _ reads _) = reads;
-  indexStrings (QueryNode wanted digest reads location) =
-    append [wanted,digest] (append (concatMap (\((,) k h) -> [k,h]) reads)
-      (case location of { Nothing -> []; Just value -> [value] }));
-  indexString text = do {
-    bytes <- W.utf8Size (W.maxSymbolBytes W.defaultLimits) text;
-    let { hash = validHash text };
-    seq hash (Right (IndexString text hash bytes))
-  };
-  indexStringText (IndexString text _ _) = text;
-  indexStringHash (IndexString _ hash _) = hash;
-  indexStringBytes (IndexString _ _ bytes) = bytes;
-  indexDictionary strings = do {
-    values <- traverseEither indexString strings;
-    Right (M.fromDistinctAscList (mapIndexed (,) values))
-  };
-  encodeIndexV2 config nodes = do {
-    -- Bound hostile source rows before any full-string dictionary lookup.
-    validateIndexSourceWork (W.maxExpandedWork W.defaultLimits) Storage.maxBytes config (M.elems nodes);
-    let { strings = S.toList (S.fromList compareString (concatMap indexStrings (M.elems nodes)));
-      ids = M.fromDistinctAscList (mapIndexed (\index text -> (,) text index) strings);
-      rows = map (\(QueryNode wanted digest reads location) ->
-        IndexNode (M.get compareString wanted ids) (M.get compareString digest ids)
-          (map (\((,) k h) -> (,) (M.get compareString k ids) (M.get compareString h ids)) reads)
-          (mapOptional (\text -> M.get compareString text ids) location)) (M.elems nodes) };
-    dictionary <- indexDictionary strings;
-    _ <- validateIndexRows config dictionary rows;
-    Right (W.VNode 412 [W.VText "MLF-CRATE-QUERY-GRAPH-2",W.VText config,
-      A.toList A.toText strings,A.toList encodeIndexNode rows])
-  };
-  encodeIndexNode (IndexNode wanted digest reads location) = W.VNode 413
-    [W.VInt wanted,W.VInt digest,A.toList (A.toPair A.toInt A.toInt) reads,
-      A.toMaybe A.toInt location];
-  increasingStrings strings = case strings of {
-    [] -> Right ();
-    (:) _ [] -> Right ();
-    (:) first rest@((:) second _) -> do {
-      ensure (compareString first second < 0) "noncanonical query graph dictionary";
-      increasingStrings rest
-    }
-  };
-  increasingIndexRows rows = case rows of {
-    [] -> Right ();
-    (:) _ [] -> Right ();
-    (:) first rest@((:) second _) -> do {
-      ensure (indexKey first < indexKey second) "duplicate/unordered query node";
-      increasingIndexRows rest
-    }
-  };
-  decodeIndexV2 configuration graph format config dictionaryIndex entries = do {
-    f <- A.fromGraphText graph format;
-    c <- A.fromGraphText graph config;
-    ensure (eqString f "MLF-CRATE-QUERY-GRAPH-2" && eqString c configuration) "query graph version mismatch";
-    -- readValue already uses defaultLimits. Keep the same work bound even if
-    -- this pure helper receives a Graph planned under more permissive limits.
-    resources <- W.graphResourceStats graph;
-    ensure (W.resourceExpandedWork resources <= W.maxExpandedWork W.defaultLimits) "query index work limit exceeded";
-    stringIndices <- listAt graph dictionaryIndex;
-    strings <- traverseEither (A.fromGraphText graph) stringIndices;
-    increasingStrings strings;
-    dictionary <- indexDictionary strings;
-    indices <- listAt graph entries;
-    rows <- traverseEither (decodeIndexNode graph) indices;
-    table <- validateIndexRows configuration dictionary rows;
-    -- No string comparison or repeated text validation is needed here.
-    -- Canonical dictionary and row order make this a distinct ascending map.
-    Right (M.fromDistinctAscList (map (\row ->
-      let { node = materializeIndexNode dictionary row } in (,) (nodeKey node) node) (M.elems table)))
-  };
-  decodeIndexNode graph index = do {
-    value <- W.lookupGraphNode graph index;
-    case value of {
-      W.GNode 413 [k,h,edges,location] -> do {
-        wanted <- A.fromGraphInt graph k;
-        digest <- A.fromGraphInt graph h;
-        indices <- listAt graph edges;
-        reads <- traverseEither (decodeIndexRead graph) indices;
-        payload <- decodeIndexLocation graph location;
-        Right (IndexNode wanted digest reads payload)
-      };
-      _ -> Left "malformed indexed query node"
-    }
-  };
-  decodeIndexRead graph index = do {
-    value <- W.lookupGraphNode graph index;
-    case value of {
-      W.GNode 2 [k,h] -> do {
-        wanted <- A.fromGraphInt graph k;
-        digest <- A.fromGraphInt graph h;
-        Right ((,) wanted digest)
-      };
-      _ -> Left "malformed indexed query read"
-    }
-  };
-  decodeIndexLocation graph index = do {
-    value <- W.lookupGraphNode graph index;
-    case value of {
-      W.GNode 4 [] -> Right Nothing;
-      W.GNode 5 [h] -> mapEither Just (A.fromGraphInt graph h);
-      _ -> Left "malformed indexed query location"
-    }
-  };
-  indexNodeReferences (IndexNode wanted digest reads location) =
-    append [wanted,digest] (append (concatMap (\((,) k h) -> [k,h]) reads)
-      (case location of { Nothing -> []; Just value -> [value] }));
-  checkIndexReference dictionary hash index = do {
-    ensure (index >= 0 && index < M.size dictionary) "query string ID out of range";
-    ensure (not hash || indexStringHash (M.get compareInt index dictionary)) "invalid query graph digest";
-    Right ()
-  };
-  checkIndexNode dictionary (IndexNode wanted digest reads location) = do {
-    checkIndexReference dictionary False wanted;
-    checkIndexReference dictionary True digest;
-    mapM_ (\((,) k h) -> do {
-      checkIndexReference dictionary False k;
-      checkIndexReference dictionary True h
-    }) reads;
-    case location of { Nothing -> Right (); Just h -> checkIndexReference dictionary True h }
-  };
-
-  -- The ID grammar remains subject to the codec's original 64 Mi work limit.
-  -- A second, query-only policy bounds later string-key Session operations:
-  -- each row's inline-string projection is <= 64 Mi work, and the complete
-  -- projected index is <= 256 Mi work (Storage.maxBytes, used here as units).
-  -- This is deliberately NOT the old whole-index 64 Mi admission policy.
-  -- Count each referenced UTF-8 occurrence, without expanding/copying text:
-  -- header = 4 + marker/config bytes; row = 5 + key/hash bytes,
-  -- each read = 3 + key/hash bytes; Just location adds 1 + hash bytes.
-  -- The explicit dictionary is separately charged by the unchanged codec.
-  indexCharge remaining amount = do {
-    ensure (amount >= 0 && amount <= remaining) "query index referenced-work limit exceeded";
-    Right (remaining - amount)
-  };
-
-  indexChargeText remaining text = do {
-    -- Scalar length is a cheap lower bound; the exact UTF-8 scan is bounded
-    -- by the remaining budget and the unchanged per-symbol codec limit.
-    _ <- indexCharge remaining (stringLength text);
-    bytes <- W.utf8Size (min remaining (W.maxSymbolBytes W.defaultLimits)) text;
-    indexCharge remaining bytes
-  };
-  indexHeaderRemaining limit configuration = do {
-    first <- indexCharge limit 4;
-    second <- indexChargeText first "MLF-CRATE-QUERY-GRAPH-2";
-    indexChargeText second configuration
-  };
-  indexSourceNodeWork limit (QueryNode wanted digest reads location) = do {
-    first <- indexCharge limit 5;
-    second <- indexChargeText first wanted;
-    third <- indexChargeText second digest;
-    fourth <- foldM (\remaining ((,) k h) -> do {
-      pair <- indexCharge remaining 3;
-      key <- indexChargeText pair k;
-      indexChargeText key h
-    }) third reads;
-    final <- case location of {
-      Nothing -> Right fourth;
-      Just h -> do { tag <- indexCharge fourth 1; indexChargeText tag h }
-    };
-    Right (limit - final)
-  };
-  validateIndexSourceWork nodeLimit totalLimit configuration nodes = do {
-    ensure (nodeLimit >= 0 && totalLimit >= 0) "invalid query index work limits";
-    first <- indexHeaderRemaining totalLimit configuration;
-    _ <- foldM (\remaining node -> do {
-      work <- indexSourceNodeWork (min nodeLimit remaining) node;
-      indexCharge remaining work
-    }) first nodes;
-    Right ()
-  };
-
-  indexChargeReference dictionary remaining index =
-    indexCharge remaining (indexStringBytes (M.get compareInt index dictionary));
-  indexNodeWork limit dictionary (IndexNode wanted digest reads location) = do {
-    first <- indexCharge limit 5;
-    second <- indexChargeReference dictionary first wanted;
-    third <- indexChargeReference dictionary second digest;
-    fourth <- foldM (\remaining ((,) k h) -> do {
-      pair <- indexCharge remaining 3;
-      key <- indexChargeReference dictionary pair k;
-      indexChargeReference dictionary key h
-    }) third reads;
-    final <- case location of {
-      Nothing -> Right fourth;
-      Just h -> do {
-        tag <- indexCharge fourth 1;
-        indexChargeReference dictionary tag h
-      }
-    };
-    Right (limit - final)
-  };
-  -- Reference types/ranges are checked before calling this helper. Parameters
-  -- expose the exact production boundary logic to small, non-massive tests.
-  validateIndexWork nodeLimit totalLimit configuration dictionary rows = do {
-    ensure (nodeLimit >= 0 && totalLimit >= 0) "invalid query index work limits";
-    third <- indexHeaderRemaining totalLimit configuration;
-    _ <- foldM (\remaining row -> do {
-      work <- indexNodeWork nodeLimit dictionary row;
-      indexCharge remaining work
-    }) third rows;
-    Right ()
-  };
-
-  validateIndexRows configuration dictionary rows = do {
-    increasingIndexRows rows;
-    mapM_ (checkIndexNode dictionary) rows;
-    validateIndexWork (W.maxExpandedWork W.defaultLimits) Storage.maxBytes configuration dictionary rows;
-    let { used = S.fromList compareInt (concatMap indexNodeReferences rows);
-      table = M.fromDistinctAscList (map (\row -> (,) (indexKey row) row) rows) };
-    ensure (S.size used == M.size dictionary) "unused query graph dictionary string";
-    mapM_ (\row -> mapM_ (\((,) dependency expected) ->
-      case M.lookup compareInt dependency table of {
-        Nothing -> Left "unpublished query dependency";
-        Just target -> ensure (expected == indexHash target) "query publication has stale dependency version"
-      }) (indexReads row)) rows;
-    let { dependencies = \wanted -> case M.lookup compareInt wanted table of {
-      Just node -> Right (map fst (indexReads node));
-      Nothing -> Left "dangling query graph edge" } };
-    checkIndexDepth dependencies (map indexKey rows);
-    Right table
-  };
-  -- Memoize actual subtree height, not just membership in a completed set:
-  -- otherwise dependency-first key order can hide a chain longer than 4096.
-  checkIndexDepth dependencies roots = mapEither (\_ -> ())
-    (foldM (\heights root -> mapEither snd
-      (indexHeight dependencies S.empty 0 heights root)) M.empty roots);
-  indexHeight dependencies visiting depth heights wanted = do {
-    ensure (depth < 4096) "cyclic/deep query graph";
-    case M.lookup compareInt wanted heights of {
-      Just height -> do {
-        ensure (height <= 4096 - depth) "cyclic/deep query graph";
-        Right ((,) height heights)
-      };
-      Nothing -> do {
-        ensure (not (S.member compareInt wanted visiting)) "cyclic/deep query graph";
-        children <- dependencies wanted;
-        result <- foldM (\((,) largest done) dependency -> do {
-          child <- indexHeight dependencies (S.insert compareInt wanted visiting) (depth + 1) done dependency;
-          Right ((,) (max largest (fst child)) (snd child))
-        }) ((,) 0 heights) children;
-        let { height = fst result + 1; next = M.insert compareInt wanted height (snd result) };
-        seq height (seq next (Right ((,) height next)))
-      }
-    }
-  };
-  materializeIndexNode dictionary (IndexNode wanted digest reads location) =
-    let { text = \index -> indexStringText (M.get compareInt index dictionary) }
-    in QueryNode (text wanted) (text digest)
-      (map (\((,) k h) -> (,) (text k) (text h)) reads) (mapOptional text location);
-
-  -- Standalone decoding retains the legacy wire depth bound and diagnostic.
-  -- Cache admission uses the iterative closure policy shared by publication.
-  decodeIndex configuration graph = mapEither fst (admitIndexUsing validateLegacyClosure configuration graph);
-  admitIndex = admitIndexUsing validateClosure;
-  admitIndexUsing closeLegacy configuration graph = do {
+  admitIndex configuration graph = do {
     root <- case W.graphRoots graph of { [r] -> Right r; _ -> Left "query graph root count" };
     value <- W.lookupGraphNode graph root;
     case value of {
       W.GNode 412 [format,config,declarations,groups,evidence,types,keys,hashes,counts,targets,payloads] ->
         admitColumns configuration graph format config declarations groups evidence types keys hashes counts targets payloads;
-      W.GNode 412 [format,config,declarations,groups,evidence,types,entries] ->
-        admitSnapshot configuration graph format config declarations groups evidence types entries;
-      -- Older main snapshots use the dictionary-shaped version-2 envelope.
-      -- They are admitted independently and republished in the typed format.
-      W.GNode 412 [format,config,dictionary,entries] ->
-        mapEither (\nodes -> (,) nodes False)
-          (decodeIndexV2 configuration graph format config dictionary entries);
-      W.GNode 411 [format,config,entries] -> do {
-        f <- A.fromGraphText graph format;
-        c <- A.fromGraphText graph config;
-        ensure (eqString f "MLF-CRATE-QUERY-GRAPH-1" && eqString c configuration) "query graph version mismatch";
-        indices <- listAt graph entries;
-        -- A physical edge can appear in many read lists. The wire reader has
-        -- already proved that every child ID belongs to this graph. Share one
-        -- checked pair per ID, keeping its positions in every owner's list.
-        let { reads = V.fromList (map (decodeRead graph) (range 0 (W.graphNodeCount graph - 1))) };
-        nodes <- traverseEither (decodeNode graph reads) indices;
-        let { names = map nodeKey nodes; table = M.fromList compareString (map (\n -> (,) (nodeKey n) n) nodes) };
-        ensure (length names == M.size table) "duplicate query node";
-        closeLegacy table;
-        Right ((,) table False)
-      };
       _ -> Left "unsupported query graph index"
     }
   };
@@ -639,6 +348,9 @@ module Bootstrap.QueryGraph where {
       leaf kind table n = bindEither (direct kind table n) (\inner -> packLimited ["Input",inner]) };
     case node of {
       W.GInt n -> direct "Binding" declarations n;
+      W.GNode tag [] -> if tag == emptyInventoryTag then Right (inputKey (key "EmptyScopeInventory" ""))
+        else if tag == emptyScopeTag then Right (key "EmptyScope" "")
+        else Left "unknown query snapshot kind";
       W.GNode tag [child] -> do {
         n <- A.fromGraphInt graph child;
         if tag == inputBindingTag then leaf "Binding" declarations n
@@ -655,51 +367,7 @@ module Bootstrap.QueryGraph where {
       _ -> Left "invalid query snapshot descriptor"
     }
   };
-  -- Constant empty scopes have their own namespace. They are never assigned
-  -- a declaration/group identity or admitted by the older row-shaped reader.
-  descriptorAt3 graph tables index = do {
-    value <- W.lookupGraphNode graph index;
-    case value of {
-      W.GNode tag [] -> if tag == emptyInventoryTag
-        then Right (inputKey (key "EmptyScopeInventory" ""))
-        else if tag == emptyScopeTag then Right (key "EmptyScope" "")
-        else descriptorAt graph tables index;
-      _ -> descriptorAt graph tables index
-    }
-  };
   data StoredRow = StoredRow Int String String ([] Int) (Maybe String);
-  storedAt graph tables index = do {
-    value <- W.lookupGraphNode graph index;
-    case value of {
-      W.GNode 413 [k,h,reads,location] -> do {
-        wanted <- descriptorAt graph tables k;
-        digest <- A.fromGraphText graph h;
-        edges <- listAt graph reads;
-        p <- A.decodeGraphValue (A.ShapeMaybe A.ShapeText) graph location;
-        payload <- A.expectMaybe A.expectText p;
-        ensure (validDigest digest payload) "invalid query graph digest";
-        Right (StoredRow k wanted digest edges payload)
-      };
-      _ -> Left "invalid query snapshot row"
-    }
-  };
-  admitSnapshot configuration graph format config declarations groups evidence types entries = do {
-    f <- A.fromGraphText graph format;
-    c <- A.fromGraphText graph config;
-    ensure (eqString f "MLF-CRATE-QUERY-GRAPH-2" && not (eqString c "") && eqString c configuration) "query graph version mismatch";
-    ds <- decodeNameTable graph declarations (A.fromGraphText graph);
-    gs <- decodeNameTable graph groups (groupAt graph ds);
-    es <- decodeNameTable graph evidence (evidenceAt graph gs);
-    ts <- decodeNameTable graph types (A.fromGraphText graph);
-    ids <- listAt graph entries;
-    let { collect ((,) budget previous) index = do {
-      row@(StoredRow _ name _ _ _) <- storedAt graph (SnapshotTables ds gs es ts) index;
-      next <- chargeIdentity budget name;
-      Right ((,) next ((:) row previous))
-    } };
-    saved <- foldM collect ((,) identityBudget []) ids;
-    restoreSnapshot False (reverse (snd saved))
-  };
   admitColumns configuration graph format config declarations groups evidence types keys hashes counts targets payloads = do {
     f <- A.fromGraphText graph format;
     c <- A.fromGraphText graph config;
@@ -715,7 +383,7 @@ module Bootstrap.QueryGraph where {
     ensure (length hs == count && length cs == count) "query column lengths";
     validatePayloadRows count (0 - 1) ps;
     rows <- columnRows graph (SnapshotTables ds gs es ts) ks hs cs edges (length edges) ps 0 identityBudget [];
-    restoreSnapshot True rows
+    restoreSnapshot rows
   };
   validatePayloadRows count previous rows = case rows of {
     [] -> Right ();
@@ -736,7 +404,7 @@ module Bootstrap.QueryGraph where {
       Right (reverse reversed)
     };
     (,,) ((:) key ks) ((:) hash hs) ((:) count cs) -> do {
-      wanted <- descriptorAt3 graph tables key;
+      wanted <- descriptorAt graph tables key;
       nextBudget <- chargeIdentity budget wanted;
       digest <- A.fromGraphText graph hash;
       ensure (validHash digest) "invalid query graph digest";
@@ -752,7 +420,7 @@ module Bootstrap.QueryGraph where {
     };
     _ -> Left "query column lengths"
   };
-  restoreSnapshot canonical rows = do {
+  restoreSnapshot rows = do {
     let { byDescriptor = IM.fromList (map (\(StoredRow k name digest _ _) -> (,) k ((,) name digest)) rows);
       readEdge k = case IM.lookup k byDescriptor of {
         Just edge -> Right edge; Nothing -> Left "unpublished query dependency"
@@ -766,32 +434,7 @@ module Bootstrap.QueryGraph where {
     let { names = map nodeKey nodes; table = M.fromList compareString (zip names nodes) };
     ensure (length names == M.size table) "duplicate query node";
     validateClosure table;
-    Right ((,) table (canonical && eqList eqString names (M.keys table)))
-  };
-  data WireNode = WireNode;
-  decodeRead graph index = do {
-    value <- A.decodeGraphValue (A.ShapePair A.ShapeText A.ShapeText) graph index;
-    pair <- A.expectPair A.expectText A.expectText value;
-    ensure (validHash (snd pair)) "invalid query graph digest";
-    Right pair
-  };
-  decodeNode :: W.Graph -> V.IndexVec WireNode (Either String ((,) String String)) -> Int ->
-    Either String QueryNode;
-  decodeNode graph readTable index = do {
-    value <- W.lookupGraphNode graph index;
-    case value of {
-      W.GNode 410 [k,h,edges,location] -> do {
-        wanted <- A.fromGraphText graph k;
-        digest <- A.fromGraphText graph h;
-        ids <- listAt graph edges;
-        reads <- traverseEither (\i -> V.at readTable (V.fromInt i)) ids;
-        p <- A.decodeGraphValue (A.ShapeMaybe A.ShapeText) graph location;
-        payload <- A.expectMaybe A.expectText p;
-        ensure (validDigest digest payload) "invalid query graph digest";
-        Right (QueryNode wanted digest reads payload)
-      };
-      _ -> Left "malformed query graph node"
-    }
+    Right ((,) table (eqList eqString names (M.keys table)))
   };
   listAt graph index = do {
     value <- W.lookupGraphNode graph index;
@@ -903,16 +546,6 @@ module Bootstrap.QueryGraph where {
   -- Resolve and check each recorded version before cycle detection. Dense
   -- ordinals follow the old lexical root order and never enter the index file.
   validateClosure nodes = mapEither (\_ -> ()) (resolveClosure nodes);
-  -- The on-disk legacy reader retains the wire-format depth limit. Live
-  -- publication uses its separate iterative cycle-only traversal.
-  validateLegacyClosure nodes = do {
-    rows <- resolveQueryReads nodes;
-    let { edges = V.fromList rows;
-      dependencies = \wanted -> if wanted < 0 || wanted >= V.count edges
-        then Left "dangling query graph edge"
-        else Right (map V.toInt (V.at edges (V.fromInt wanted))) };
-    checkIndexDepth dependencies (range 0 (V.count edges - 1))
-  };
   resolveQueryReads :: Map String QueryNode -> Either String ([] ([] (V.Index QueryId)));
   resolveQueryReads nodes =
     let { ordered = M.elems nodes;

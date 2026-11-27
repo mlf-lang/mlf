@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
-import FrozenSourceKey (upgradeV6)
+import NamedQueryControls (checkBuiltinDictionary)
 import Prelude
 import Control.Exception (SomeException, evaluate, try, displayException)
 import Control.Monad (forM_, unless)
@@ -46,6 +46,7 @@ prepared candidates protected = S.PreparedGroup [("root",T.Nothing,T.SVar "value
   (T.Just (S.RootAuthority "root" [] False candidates protected)) [("value",False)]
 
 main = do
+  checkBuiltinDictionary
   n <- newIORef (0::Int)
   let check label ok = unless ok (fail label) >> modifyIORef' n (+1)
       roles = [T.GivenEvidence,T.SuperclassEvidence,T.InstanceEvidence]
@@ -54,9 +55,9 @@ main = do
       delta c = contracts [("value",c)]
       base = delta (head variants)
       empty = Q.prepareSourceContractEncodings M.empty
-      datum = F.encodeDatatypeContext []
+      datum = ""
       key pool env group = Q.sourceQueryKeyWithContractEncodings pool "crate" "compiler" group env (Q.encodeSourceDatatypes [])
-      old env group = upgradeV6 datum (F.sourceQueryKeyWithContext "crate" "compiler" group env datum)
+      old env group = F.sourceQueryKeyWithContext "crate" "compiler" group env datum
   forM_ variants $ \v -> do
     let env=delta v
         pool=Q.extendSourceContractEncodings env (Q.prepareSourceContractEncodings base)

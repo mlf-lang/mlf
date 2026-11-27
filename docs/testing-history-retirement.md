@@ -65,16 +65,24 @@ historical transition manifests are no longer benchmark inputs.
 
 The full-compiler timing-analysis tests and current source-manifest checker
 remain. Current cache tests exercise warm hits, source and dependency
-invalidation, corruption recovery, and rebuilding older source records in
-the current binary format.
+invalidation, corruption recovery, and replacement of older records.
+
+Source inference requires a fingerprinted binary record, including the bounded
+fallback published by the current writer. Lowered inference reads its current
+inline binary format. The persistent query graph requires its v3 column index
+and the current result-fingerprint contract. An unsupported cache entry takes
+the ordinary miss path and can be rebuilt by compiling again.
 
 The parity migration replay, inverse async migrations, fixed A1 experiment,
 DeclId comparison scripts, machine-specific source-context launchers and
 historical runtime ABI matrix are archived at
 [0704d216](https://github.com/mlf-lang/mlf/tree/0704d216b8cf6d887d3737efa30a2eae3c152f0a).
 That tree also holds the removed execution logs and October benchmark reports.
-Current ABI checks exercise the matching runtime and verify that an incompatible
-guard fails at link time.
+Current native LLVM and installed library manifests require
+`mlf_require_runtime_v5_abi`. The runtime exports that complete boundary guard.
+Regenerate native objects and installed libraries when switching to this
+compiler and runtime. Current ABI checks exercise successful builds and
+link-time rejection in both mismatch directions.
 
 ## Inspect or reproduce an old record
 

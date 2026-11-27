@@ -219,7 +219,7 @@ legacyCrate retainMethodQuantifier = do
 
 -- The payload remains well typed under either layout, so these failures cannot
 -- be explained by an ill-typed body, a stale checksum, or a broken wire frame.
-forgeryChecks check selected = do
+forgeryChecks base check selected = do
   let quantified = T.DataDecl "Forged" [] [T.ConstructorDecl "Forged" [vacantField]]
       canonical = T.DataDecl "Forged" [] [T.ConstructorDecl "Forged" [intField]]
       forged header payload =
@@ -244,9 +244,10 @@ forgeryChecks check selected = do
       check (label ++ ": exact cache context rejects")
         (rejects "cached datatype context mismatch"
           (Q.validateCached "ForgedFragment" [] [header] [] object))
-      check (label ++ ": encoded cache rejects")
-        (rejects "cached datatype context mismatch"
-          (Q.decodeCached key "ForgedFragment" [] [header] [] (Q.encodeCached key object)))
+      let path = B.literal (base ++ "/forged.mlfq")
+      Q.writeLoweredCache path key object >>= right "write binary lowered cache"
+      decoded <- Q.readLoweredCache key "ForgedFragment" [] [header] [] path
+      check (label ++ ": encoded cache rejects") (rejects "cached datatype context mismatch" decoded)
       check (label ++ ": expected cache metadata rejects opposite layout")
         (rejects "cached datatype metadata mismatch"
           (Q.validateCached "ForgedFragment" [] [header] [] matching))
@@ -554,7 +555,7 @@ main = do
         putStrLn ("PASS " ++ label)
         when (selected /= Nothing) exitSuccess
   -- Forged source and payload fixtures have no dependency on checked crates.
-  when (maybe False forgeryCase selected) (forgeryChecks check selected >> fail "unknown forgery control")
+  when (maybe False forgeryCase selected) (forgeryChecks base check selected >> fail "unknown forgery control")
   when (selected == Just "fresh-source canonicalizer validates original ill-kinded fields")
     (invalidFieldCheck check)
   builtin <- right "compile checked builtin dependency" A.builtinPrelude
@@ -568,7 +569,7 @@ main = do
       ordinaryChecks check base builtinPath savedBuiltin
       invalidFieldCheck check
       invalidContextCheck check local
-      forgeryChecks check selected
+      forgeryChecks base check selected
       freshSourceClassChecks check selected base builtinPath savedBuiltin
       total <- readIORef count
       require "source field-layout fixture check inventory changed" (total == 55)

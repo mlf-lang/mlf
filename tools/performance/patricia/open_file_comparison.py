@@ -17,7 +17,7 @@ from frozen_file_oracles import load_oracles
 
 ORACLE_PINS = {
     'artifact_binary_reference.py': 'de312e3415eba178b649d30b6fa2b113fc864455de16603a5902af034d036422',
-    'artifact_binary_typed.py': '30aced47cb227c8231f64e1910caeda309de1a5a0b5fb867c6eee4d7eb0928c9',
+    'artifact_binary_typed.py': 'cde4555f92c652411e32e942e06e7d83d0787d1f28a5396ec2a1b3b802e5a90b',
     'artifact_structure_contract.json': '20f1df71bc2fc1ebe01247dc986b01029b3e8e0c4a89f7dcc8cc517f756cf5a1',
 }
 ORACLE_DIRECTORY, _reference, _typed = load_oracles(ORACLE_PINS)

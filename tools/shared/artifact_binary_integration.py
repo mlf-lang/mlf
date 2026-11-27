@@ -77,14 +77,21 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures,selectio
             if not wants(install, mixed_case, repair_case):
                 continue
             target=cache/(changed_keys[0]+'.mlfq')
+            original=target.read_bytes()
             require(invoke(install,'lowered-legacy',target,version)==('PASS lowered-install-CACHE'+version+'\n').encode(),'explicit old lowered format seed')
-            if wants(mixed_case):
-                _,mixed=phase('mixed-cache'+version,42,0,2,binary|{'MLF-QUERY-CACHE-'+version})
-                require(mixed==changed,'old lowered record preserves exact raw/final meaning')
+            require(typed.unpack(target.read_text(encoding='utf-8'))[0]=='MLF-QUERY-CACHE-'+version,
+                    'installed lowered record has the intended historical format')
+            if wants(mixed_case, repair_case):
+                _,mixed=phase('mixed-cache'+version,42,1,1,binary)
+                groups=phases[-1]['query_report']['groups']
+                require(all(row['cached']==(row['query_key']!=changed_keys[0]) for row in groups),
+                        'only the group owning the retired entry reinfers')
+                require(mixed==changed and target.read_bytes()==original,
+                        'retired lowered entry restores canonical output and bytes')
             if wants(repair_case):
-                target.write_bytes(b'corrupt old cache')
-                _,repaired=phase('repair-cache'+version,42,1,1,binary)
-                require(repaired==changed,'lowered old record repair semantics')
+                _,warm=phase('repair-cache'+version,42,0,2,binary)
+                require(warm==changed and target.read_bytes()==original,
+                        'the rebuilt lowered entry and its sibling both hit')
         if wants('lowered-identified-binary-corruption'):
             target=cache/(changed_keys[0]+'.mlfq');original=target.read_bytes()
             corrupted=bytearray(original);corrupted[8:12]=(2).to_bytes(4,'little');target.write_bytes(ref.repair_crc(corrupted))

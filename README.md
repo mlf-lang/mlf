@@ -274,7 +274,9 @@ each bind. All native programs use compact BDWGC allocation and collection durin
 pure evaluation. Pointer-bearing values, environments and arrays are traced;
 GMP limbs use atomic collector allocations. The runtime requires a 64-bit ABI.
 Both default LLVM commands and their `-gc` aliases emit this single ABI; link
-GMP, BDWGC and libm. Old standard-layout LLVM/object files must be regenerated.
+GMP, BDWGC and libm. The compiler and installed native libraries require
+`mlf_require_runtime_v5_abi`. Rebuild LLVM and native objects produced by an
+earlier compiler before linking them against the current runtime.
 See [the migration record](docs/compact-only.md) for dependencies and validation.
 
 The native `backends` group runs every backend behavior test through both the

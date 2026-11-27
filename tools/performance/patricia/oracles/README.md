@@ -14,9 +14,10 @@ tests; changing current source does not regenerate an oracle.
 | `p123/FrozenSelectors.hs` | The independently retained P1 selector oracle | Use `FrozenSelectorMap` and `FrozenSelectorSet`. |
 | `V1FrozenSession.hs` | The pre-validation-reuse session described below | Retain the established rank-view interface adaptation and test module name. |
 
-Unchanged references are reused from their original locations:
+The P1 and P3 references live in their original locations:
 `crate-optimizations/p1/FrozenSelectorMap.hs`, `FrozenSelectorSet.hs`,
 `crate-optimizations/p3/FrozenPrefix.hs`, and `FrozenInferenceUnit.hs`.
+`FrozenPrefix.hs` retains the unit metadata, object and fingerprint oracles used by P3.
 The original source provenance for these inputs is archived at `0704d216`.
 The `map-policy` suite owns the separate map-balance references.
 
@@ -43,8 +44,10 @@ This is the already established pre-optimization oracle, not a copy of the
 current implementation. The existing preparation changes the three
 `Map Int Node` signatures to the current rank-view representation, adds the
 rank-view import/access, and exposes the reference as `V1FrozenSession`.
-The prepared bytes are unchanged. `V1SessionUnderTest` continues to be copied
-from the current source with only its module export header changed.
+The fixture exposes `finishCompilation` and `solvePrepared` and keeps their
+original algorithm bodies. The unused crate compiler and file/cache drivers
+were removed. `V1SessionUnderTest` uses the current source with only its
+module export header changed.
 
 The fixture hashes in `frozen_oracles.py` protect only the fixed reference inputs
 listed above.

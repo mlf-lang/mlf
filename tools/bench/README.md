@@ -68,6 +68,13 @@ BASELINE="$COMPILER"
   3 "$CLANG" 3 2
 ```
 
+The candidate links the checkout's `runtime/mlf_runtime.c`. When the baseline
+compiler uses a different runtime ABI, set `MLF_BENCH_BASELINE_RUNTIME` to
+its matching `mlf_runtime.c` before running `bench`. When unset, the
+baseline uses the checkout runtime. The release gate selects the runtime
+shipped with its pinned baseline. The report records both resolved runtime
+paths and fingerprints the C sources and headers in each runtime directory.
+
 For a qualified native pair, set `MLF_PACKAGE_MANAGER`, `COMPILER` and
 `MLF_BUILD_RUNNER` to that pair's tools and keep the same package-build and bench
 commands. The runner itself is a compiled native MLF executable in either case;
@@ -184,9 +191,10 @@ both selected backend executables. Keep streaming and runtime-splitting settings
 compatible with both backends.
 
 Set `MLF_BENCH_SPLIT_RUNTIME=1` to compile the runtime core and process supervisor
-as two fresh translation units in parallel. This option applies to both MLF
-compiler variants and works with the ordinary Clang backend as well as the
-streaming modes below. Each build compiles `mlf_runtime.c` with
+as two fresh translation units in parallel. A baseline whose runtime ships
+without `mlf_process_supervisor.c` builds its embedded runtime as one object.
+Splitting works with the ordinary Clang backend and the streaming modes
+below. Each split build compiles `mlf_runtime.c` with
 `-DMLF_RUNTIME_EXTERNAL_PROCESS_SUPERVISOR=1` into `runtime.o` and its sibling
 `mlf_process_supervisor.c` into `runtime-supervisor.o`, with the same O2 flags and
 library/include arguments. Linking consumes both objects directly; all process,

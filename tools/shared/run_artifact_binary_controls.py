@@ -77,7 +77,7 @@ def main():
     inputs=[regular(Path(__file__)),build_receipt,*fixtures.values(),
             *[regular(HERE/(name+suffix)) for name,suffix in [
               ('artifact_binary_reference','.py'),('artifact_binary_cases','.py'),('artifact_binary_typed','.py'),('artifact_binary_integration','.py'),('artifact_binary_open','.py'),
-              ('artifact_structure_contract','.json'),('artifact_binary_golden','.json'),('test_query_index','.py')]]]
+              ('artifact_structure_contract','.json'),('artifact_binary_golden','.json'),('query_generation','.py'),('test_query_generation','.py')]]]
     fingerprints={str(p):sha(p) for p in inputs}
     output.mkdir()
     record={'format':1,'complete':False,'state':'running','inputs':fingerprints,'commands':[],'framework_selection':selection,
@@ -105,9 +105,10 @@ def main():
     try:
         ref=load('artifact_binary_reference');cases=load('artifact_binary_cases');typed=load('artifact_binary_typed')
         if wants('query-index-pure'):
-            query=load('test_query_index')
-            expected_query_tests=('test_actual_row_64_mi_boundary_tiny_wire', 'test_actual_total_256_mi_boundary_tiny_wire', 'test_alternating_long_prefix_attack', 'test_canonicality_and_closure', 'test_depth_both_key_orders', 'test_exact_fields_and_wire_hash', 'test_legacy_and_empty', 'test_small_exact_budgets', 'test_types_ranges_and_hashes')
-            suite=unittest.defaultTestLoader.loadTestsFromTestCase(query.QueryIndexTests)
+            load('query_generation')
+            query=load('test_query_generation')
+            expected_query_tests=('test_checksum_and_configuration', 'test_deep_shared_graph_and_cycle_in_both_row_orders', 'test_generations_resolve_their_own_slots', 'test_malformed_tables', 'test_only_current_cache_directory_is_selected')
+            suite=unittest.defaultTestLoader.loadTestsFromTestCase(query.GenerationTests)
             require(tuple(test.id().rsplit('.',1)[-1] for test in suite)==expected_query_tests,
                     'exact named query index oracle inventory')
             class QueryResult(unittest.TestResult):
@@ -116,22 +117,18 @@ def main():
                 def addSuccess(self,test):
                     super().addSuccess(test);self.passed.append(test.id().rsplit('.',1)[-1])
             query_result=QueryResult();suite.run(query_result)
-            require(query_result.wasSuccessful() and query_result.testsRun==9
+            require(query_result.wasSuccessful() and query_result.testsRun==len(expected_query_tests)
                     and tuple(query_result.passed)==expected_query_tests,
                     'independent query index oracle: '+repr(query_result.errors+query_result.failures))
             record['query_index_reference_tests']=query_result.testsRun
             record['query_index_reference_results']=[{'name':name,'state':'passed'}
                                                     for name in query_result.passed]
-            query_expected=(
-                'PASS legacy and v2 exact roundtrip, order, repeated reads, independent location\n'
-                'PASS typed IDs, dictionary/row canonicality, closure, hashes, legacy rejection\n'
-                'PASS actual 4096/4097 depth boundary independent of key order\n'
-                'PASS referenced and codec budgets, exact 64/256 Mi boundaries, long-prefix attack\n').encode()
+            query_expected=b'PASS current columns, identity framing, ordered reads, payloads and admission bounds\n'
             require(run('query-index-pure',[fixtures['query-index-ghc'],'pure'])==query_expected,
                     'complete production query index controls')
         if wants('query-index-publication'):
             require(run('query-index-publication',[fixtures['query-index-ghc'],'publication',output/'query-publication'])
-                    ==b'PASS cold/warm publication, all failpoints, retained payload SHA, generation SHA\n',
+                    ==b'PASS obsolete and corrupt cache rebuilds, current hits and invalidation, atomic publication\n',
                     'production query index publication controls')
         if wants('wire-corpus'):
             vectors=json.loads((HERE/'artifact_binary_golden.json').read_text())['vectors']

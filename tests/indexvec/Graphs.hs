@@ -1172,30 +1172,16 @@ queryChecks = do
       other = H.literal (replicate 64 '2')
       node k reads = Q.QueryNode k sha reads T.Nothing
       table ns = M.fromList H.v_compareString [(Q.nodeKey n,n) | n <- ns]
-      admitted ns = case W.planGraph W.defaultLimits [W.VNode 411
-        [W.VText "MLF-CRATE-QUERY-GRAPH-1",W.VText "cfg",W.VNode 1 (map Q.encodeNode ns)]] of
-        T.Left err -> error (H.unpack err)
-        T.Right graph -> Q.admitIndex "cfg" graph
       result (T.Left err) = Left (H.unpack err)
       result (T.Right _) = Right ()
-      order ns = case admitted ns of
-        T.Left err -> error (H.unpack err)
-        T.Right (_,canonical) -> canonical
       a = node "a" []
       shared = [("a",sha),("a",sha)]
       b = node "b" shared
       c = node "c" shared
-  check "ordered v1 input needs a v2 publication" False (order [a,b,c])
-  check "unordered index still admitted" False (order [c,a,b])
   check "read multiplicity" False (Q.sameNode b (node "b" [("a",sha)]))
   check "read order" False (Q.sameNode (node "c" [("a",sha),("b",sha)])
                                        (node "c" [("b",sha),("a",sha)]))
   check "payload location" False (Q.sameNode a (Q.QueryNode "a" sha [] (T.Just sha)))
-  forM_ [([a,node "b" [("a",other)]], "query publication has stale dependency version"),
-         ([a,node "b" [("missing",sha)]], "unpublished query dependency"),
-         ([node "a" [("b",sha)],node "b" [("a",sha)]], "cyclic query graph"),
-         ([a,node "b" [("a","bad")]], "invalid query graph digest")] $ \(ns,err) ->
-    check err (Left err) (result (admitted ns))
   let stable (Q.QueryNode k h edges location) = Q.QueryNode (Q.key "Binding" k) h
         [(Q.key "Binding" target, digest) | (target,digest) <- edges] location
       generation previous ns = do
@@ -1205,21 +1191,22 @@ queryChecks = do
           T.Right T.Nothing -> Right False
           T.Right (T.Just _) -> Right True
   check "matching admitted generation" (Right False) =<< generation sha [a,b,c]
-  check "normalize unordered input on publish" (Right True) =<< generation "" [a,b,c]
+  check "publish a fresh generation" (Right True) =<< generation "" [a,b,c]
   check "changed reads, same value hash" (Right True) =<< generation sha [a,node "b" [],c]
   check "reject stale reads in edited generation" (Left "query publication has stale dependency version")
     =<< generation sha [a,node "b" [("a",other)],c]
   -- Both generations describe A.f, although its declaration slot changes
   -- when A.a is added. Edges refer to the producer generation's digest.
   let l = W.VNode 1
-      absent = W.VNode 4 []
-      row desc h reads = W.VNode 413 [desc,W.VText h,l reads,absent]
+      row desc h reads = (desc,W.VText h,reads)
       binding = W.VInt
       query tag i = W.VNode tag [W.VInt i]
       group = l . map binding
       snapshot names groups requests types rows = W.VNode 412
-        [W.VText "MLF-CRATE-QUERY-GRAPH-2",W.VText "cfg",l (map W.VText names),l groups,
-         l requests,l (map W.VText types),l rows]
+        [W.VText "MLF-CRATE-QUERY-GRAPH-3",W.VText "cfg",l (map W.VText names),l groups,
+         l requests,l (map W.VText types),l [k | (k,_,_) <- rows],l [h | (_,h,_) <- rows],
+         l [W.VInt (fromIntegral (length edges)) | (_,_,edges) <- rows],
+         l (concat [edges | (_,_,edges) <- rows]),l []]
       admit value = case W.planGraph W.defaultLimits [value] of
         T.Left err -> error (H.unpack err)
         T.Right graph -> Q.admitIndex "cfg" graph
@@ -3801,6 +3788,15 @@ applicationPatternChecks = do
   (oldTag,oldBody) <- payload plainQuery
   (newTag,newBody) <- payload compactQuery
   check "versioned private query body" (400,442) (oldTag,newTag)
+  let digest encode = W.encode W.indexedTextLimits 6 [wireRaw encode] >>= right >>= Prim.byteArrayDigest
+      verify saved = CrateGraph.finishContentHash True "checked" Source.KeepRawBody checkedSpine
+        (Q.QueryNode "raw" saved [] (T.Just saved)) [] []
+  current <- digest Open.encodeCheckedRaw
+  previous <- digest Open.encodeRaw
+  actual <- verify current >>= right
+  check "ICH reproduces the current checked query payload" (H.unpack current) (H.unpack actual)
+  stale <- verify previous
+  unless (rejected stale) (fail "ICH accepted a pre-spine hash for a current checked query")
   oldTerm <- right (Structure.fromGraphXTerm plainQuery oldBody)
   newTerm <- right (Structure.storedTermWith True True compactQuery newBody)
   oldBytes <- encoded (W.encode W.defaultLimits 6 [Structure.toXTerm oldTerm])

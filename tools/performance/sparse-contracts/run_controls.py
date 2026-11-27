@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sparse source contract selection against complete frozen 48275901 sources."""
+"""Sparse source contract selection against the frozen 48275901 inference and query encoders."""
 from pathlib import Path
 import argparse, hashlib, sys, types
 
@@ -7,7 +7,7 @@ ROOT=Path(__file__).resolve().parents[3]
 HERE=Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / 'tools/testing'))
 from receipt_selection import select
-ORACLE_MANIFEST_SHA='97e250f8beaf7269f6f6732117f9913d45760f99406fe27fd95b2cb1918b3222'
+ORACLE_MANIFEST_SHA='684256c8670fefd44e67b54e330ceb24c3e597a85638427a471f9c088277146e'
 CLASSES_MANIFEST_SHA='73e7836abfbafdf311269d25b321b4e6ffa3b44ab43ab272ad13c2e77e679961'
 
 def main():
@@ -31,7 +31,7 @@ def main():
     oracle=H.load(HERE/'oracle.json')
     for name,row in oracle['sources'].items():
         raw=(HERE/row.get('file','Frozen'+name+'.hs')).read_bytes()
-        H.require(hashlib.sha256(raw).hexdigest()==row['frozen_sha256'],'complete frozen '+name)
+        H.require(hashlib.sha256(raw).hexdigest()==row['frozen_sha256'],'fixed reference '+name)
     H.require(H.sha(HERE/'classes-oracle.json')==CLASSES_MANIFEST_SHA,'fixed classes oracle identity')
     classes=H.load(HERE/'classes-oracle.json')
     H.require(classes['format']=='sparse-contracts-classes-oracle-v1'
@@ -49,8 +49,7 @@ def main():
     files=[ROOT/x['path'] for x in manifest['modules']]+list((ROOT/'host/ghc').rglob('*.hs'))
     files+=list(HERE.glob('*.hs'))+[HERE/'oracle.json',HERE/'classes-oracle.json',Path(__file__),hp,direct_path]
     files += [adapter_dir/'frozen_query.py', adapted_query]
-    bridge=adapter_dir/'FrozenSourceKey.hs'
-    pins={str(f):H.sha(f) for f in [*files,bridge,bridge.with_name('NamedQueryControls.hs')]}
+    pins={str(f):H.sha(f) for f in [*files,adapter_dir/'NamedQueryControls.hs']}
     limits=dict(address_space_per_process_bytes=6*1024**3,disk_free_floor_bytes=5*1024**3,
         host_available_floor_bytes=3*1024**3,process_tree_rss_bytes=5*1024**3,max_work_bytes=2*1024**3,wall_seconds=600)
     record=dict(complete=False,performance_samples=0,inputs=pins,oracle=oracle,classes_oracle=classes,checks=[])
@@ -66,7 +65,7 @@ def main():
                 label='O'+opt;objects=out/(label+'-objects');binary=out/(label+'-binary')
                 argv=[auth['ghc']['path'],'--make','-j1','-O'+opt,'-fpedantic-bottoms','-fno-state-hack',
                     '-Werror=incomplete-patterns','-Werror=incomplete-uni-patterns','-package-env','-',
-                    '-i','-i'+str(generated),'-i'+str(HERE),'-i'+str(bridge.parent),*['-i'+str(ROOT/x) for x in manifest['source_roots']],
+                    '-i','-i'+str(generated),'-i'+str(HERE),'-i'+str(adapter_dir),*['-i'+str(ROOT/x) for x in manifest['source_roots']],
                     '-odir',objects,'-hidir',objects,HERE/'Main.hs',a.producer/'host.o',
                     a.producer/'supervisor.o','-o',binary]
                 H.Runner(out,limits).run(argv,ROOT,out/(label+'-build'))

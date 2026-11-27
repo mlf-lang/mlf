@@ -206,17 +206,19 @@ measured in the language's String units:
 Query keys include compiler identity, canonical resolved syntax with lexical
 alpha normalization, exact polymorphic predecessor schemes, and needed nominal
 layouts/kinds. They retain literal bits, annotation flags and evidence roles.
-They exclude predecessor body hashes. SHA-256 addresses cache files; the full
-canonical key is also compared on reload. A damaged cache entry is a miss.
-Writers use locks and atomic replacement.
+They exclude predecessor body hashes. SHA-256 addresses cache files. Lowered
+inference writes a binary record containing the full key and raw object. The
+reader requires that exact key. Historical text entries trigger fresh inference.
 
-Source inference cache entries use the current binary query records with an
-input address and a result fingerprint. Shared contexts are addressed by the
-hash of their binary contents and checked against the complete source query
-key. Reloading validates group ownership, schemes, datatype context and the
-checked term. An older text or unaddressed binary source record is a cache miss.
-The compiler infers the group again and publishes a current entry. Malformed
-records also trigger fresh inference.
+Source inference records bind an input hash and a result fingerprint. The
+usual layout also exposes the input address in a separate root for early
+rejection. When the extra root exceeds a wire limit, the writer can use a
+single root that still carries both hashes. Shared contexts are addressed by
+their binary content hash and checked against the expected datatype context.
+Reloading validates group ownership, schemes, datatype context and the checked
+term. Historical text records and binary envelopes that predate the result
+fingerprint trigger fresh inference, as do malformed entries. The compiler
+replaces each missed group’s entry atomically under the cache lock.
 
 The package manager's outer artifact cache remains conservative about source
 and implementation inputs because assembly and final code must reflect changed

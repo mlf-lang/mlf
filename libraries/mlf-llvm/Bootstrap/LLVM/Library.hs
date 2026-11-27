@@ -217,8 +217,6 @@ module Bootstrap.LLVM.Library
   header :: [] String;
   header = ["; Generated from checked xMLF and an authenticated fixed native library boundary.",
     "source_filename = \"emlf-fixed-native\"", ""];
-  abi :: [] String;
-  abi = ["declare void @mlf_require_haskell_boundary_v4_abi()", "declare void @mlf_require_byte_file_v2_abi()\ndeclare void @mlf_require_freeze_st_array_abi()\ndeclare void @mlf_require_st_to_io_abi()\ndeclare void @mlf_require_byte_array_crc32_abi()"];
   chunks :: [] String -> [] String;
   chunks = map (\line -> line ++ "\n");
   emitLibrary :: ExportLayout -> Checked.LinkedSpine -> Either String ([] String);
@@ -232,7 +230,7 @@ module Bootstrap.LLVM.Library
     };
     generated <- generate [] (declarations layout) checked;
     let { paths = case envelope layout of { Product _ _ value -> value } };
-    Right (chunks (concat [header, snd generated, abi, libraryAdapter layout (fst generated) paths]))
+    Right (chunks (concat [header, snd generated, [LLVM.abiDeclaration], libraryAdapter layout (fst generated) paths]))
   };
   -- The installed constructor prefix is independent of root declaration order.
   -- Fresh declarations may not change a nominal constant used by installed code.
@@ -299,8 +297,7 @@ module Bootstrap.LLVM.Library
       "  switch i32 %state, label %cycle [ i32 0, label %start i32 2, label %done ]",
       "cycle:", "  call void @llvm.trap()", "  unreachable", "start:",
       "  store i32 1, ptr @" ++ prefix ++ "_state",
-      "  call void @mlf_require_haskell_boundary_v4_abi()",
-      "  call void @mlf_require_byte_file_v2_abi()\n  call void @mlf_require_freeze_st_array_abi()\n  call void @mlf_require_st_to_io_abi()\n  call void @mlf_require_byte_array_crc32_abi()",
+      LLVM.abiCall,
       "  %root = call ptr " ++ entry ++ "(ptr null, ptr null)",
       "  store ptr %root, ptr @" ++ prefix ++ "_root, align 8"]
       (append (concatMap (slotCode prefix count) paths)
@@ -324,10 +321,8 @@ module Bootstrap.LLVM.Library
       "  store ptr " ++ value ++ ", ptr " ++ local ++ "_slot, align 8"];
   rootAdapter :: ExportLayout -> String -> [] Int -> Bool -> [] String;
   rootAdapter layout entry imports executeIO = let { prefix = symbol layout } in
-    concat [abi,
-      ["declare ptr @" ++ prefix ++ "_get(i64)", "define ptr @mlf_entry() {", "entry:",
-       "  call void @mlf_require_haskell_boundary_v4_abi()",
-      "  call void @mlf_require_byte_file_v2_abi()\n  call void @mlf_require_freeze_st_array_abi()\n  call void @mlf_require_st_to_io_abi()\n  call void @mlf_require_byte_array_crc32_abi()",
+    concat [[LLVM.abiDeclaration, "declare ptr @" ++ prefix ++ "_get(i64)", "define ptr @mlf_entry() {", "entry:",
+       LLVM.abiCall,
        "  %wrapper = call ptr " ++ entry ++ "(ptr null, ptr null)"],
       concat (zipWith (\index slot ->
         ["  %import" ++ showInt index ++ " = call ptr @" ++ prefix ++ "_get(i64 " ++ showInt slot ++ ")",

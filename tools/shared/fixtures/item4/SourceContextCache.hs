@@ -54,11 +54,9 @@ members n = [("value", T.Nothing, T.SIntLit n)]
 keyFor context = U.pack ["MLF-SOURCE-CRATE-QUERY-7", "crate:α😀", "compiler",
                         "member:opaque:😀", "bindings", context,
                         "source-group", "observed-contracts", "scope-table:α😀"]
-splitKey key = case Q.sourceCacheParts key of
-  T.Just pair -> pure pair
-  T.Nothing -> error "source v7 not recognized"
--- No textual view is ever fed to the new production reader. RecordInput keeps
--- the actual typed binary graph separate from explicitly old compatibility text.
+-- Independently frame retired text records only for rejection checks.
+retiredInline key object = U.pack ["MLF-QUERY-CACHE-1",key,
+  U.encodeInterface (U.objectInterface object),U.encodeObject object]
 data RecordInput = LegacyInput P.String | BinaryInput [Wire.Value]
 data Payload = Payload Wire.Value Wire.Value
 valueEqual a b = case (a,b) of
@@ -105,8 +103,7 @@ recordPartsWith keyForDigest record = case record of
     need "address matches stored input and hashes are valid"
       (address == digest && Q.validSourceContextDigest digest && Q.validSourceContextDigest ich)
     input <- keyForDigest digest
-    (compact,_) <- splitKey input
-    pure (ref,compact,Payload header body)
+    pure (ref,input,Payload header body)
 localRecord ref input (Payload header body) = do
   digest <- fingerprint input
   ich <- Q.localResultHash digest [Wire.VText ref,header,body] >>= expect "poison ICH"
@@ -134,7 +131,7 @@ readContext path = do
   case roots of
     [root] -> expect "typed datatype context" (Structure.fromDataContext root)
     _ -> error "default context is not binary"
-contextLogical path = Q.sourceContextContents . Q.encodeSourceDatatypes <$> readContext path
+contextLogical path = Q.encodeSourceDatatypes <$> readContext path
 readRecordWindow previous directory key name bindings ds wanted record = case record of
   LegacyInput text -> do
     let path = B.unpack directory </> "obsolete-source-record.tmp"
@@ -160,34 +157,26 @@ helperLocked directory = do
   let context = Q.encodeSourceDatatypes []
       key = keyFor context
       path = directory </> "record.mlfq"
-      old1 = Q.encodeCached key object
-      legacyKey = Q.queryKey "legacy" "compiler" (members 41) [] []
-      old2 = Q.encodeCached legacyKey object
+      old1 = retiredInline key object
+      old2 = U.pack ["MLF-QUERY-CACHE-2",key,U.encodeContextualObject object]
   forM_ [old1,old2] $ \retired -> do
     result <- readNew directory key (LegacyInput retired)
     _ <- exactLeft "obsolete source cache rejected" "unsupported source query cache format" result
     pure ()
-  b <- expect "lowered query CACHE2 reader" (Q.decodeCached legacyKey "RawGroup" [] [] names old2)
-  f1 <- fields old1; f2 <- fields old2
-  need "legacy writer formats unchanged" (case (f1,f2) of (tag1:_,tag2:_) -> tag1 == "MLF-QUERY-CACHE-1" && tag2 == "MLF-QUERY-CACHE-2"; _ -> False)
-  need "noncanonical source key is not eligible" (case Q.sourceCacheParts ("0" P.++ key) of T.Nothing -> True; _ -> False)
-  need "legacy query key is not source CACHE3 eligible" (case Q.sourceCacheParts legacyKey of T.Nothing -> True; _ -> False)
+  need "noncanonical source key is not eligible" (case Q.sourceQueryContext ("0" P.++ key) of T.Nothing -> True; _ -> False)
   before <- listDirectory directory
   need "legacy readers did not migrate/write" (sort before == [".lock"])
   Q.writeSourceCached T.Nothing (literal directory) (literal path) key object >>= expect "source write"
   input <- readRecord path
-  (ref,compact,payload) <- recordParts key input
-  (expectedCompact,expectedContext) <- splitKey key
-  need "source parts retain all eight non-context fields" (compact == expectedCompact && context == expectedContext)
-  restored <- expect "restore source key" (Q.restoreSourceCacheKey context compact)
-  need "full Unicode/scalar key roundtrip" (restored == key)
+  (ref,storedKey,payload) <- recordParts key input
+  need "source input hash binds the complete Unicode key" (storedKey == key)
   let contextPath = B.unpack (Q.sourceContextPath (literal directory) ref)
   originalContextBytes <- BS.readFile contextPath
   blob <- contextLogical contextPath
-  need "canonical context blob" (blob == Q.sourceContextContents context)
+  need "canonical context blob" (blob == context)
   digest <- P.fileDigest (literal contextPath)
   need "context SHA filename" (digest == ref && Q.validSourceContextDigest ref)
-  checked <- readNew directory key input >>= expect "source CACHE3 reader"
+  checked <- readNew directory key input >>= expect "addressed binary source reader"
   need "source checked object preserved" (sameObject checked object)
   -- Keep compiler, key pathname, context and well-typed payload fixed. Only
   -- change the saved identity, including after a successful context read.
@@ -212,7 +201,7 @@ helperLocked directory = do
     let forge xs = U.pack (fmt:drop 1 xs)
     record <- localRecord ref (forge fullFields) payload
     need (label ++ " claimed builtin identity rejected even with matching supplied key")
-      (case Q.sourceCacheParts (forge fullFields) of T.Nothing -> True; _ -> False)
+      (case Q.sourceQueryContext (forge fullFields) of T.Nothing -> True; _ -> False)
     (_,_,result) <- readRecordWindow window (literal directory) key "RawGroup" [] [] names record
     reject (label ++ " saved identity at current key with verified context") result
   let differentCompiler = U.pack (take 2 fullFields ++ ["other compiler"] ++ drop 3 fullFields)
@@ -285,11 +274,6 @@ helperLocked directory = do
   need "ineligible source object uses checked binary inline format" (case fallback of BinaryInput [_,Wire.VNode tag _] -> tag == 302 || tag == 305; _ -> False)
   fallbackObject <- readRecordChecked (literal directory) (keyFor "wrong") "RawGroup" [] [] names fallback >>= expect "inline fallback semantic read"
   need "inline fallback preserves complete raw" (sameObject fallbackObject object)
-  Q.writeSourceCached T.Nothing (literal directory) (literal (directory </> "legacy2.mlfq")) legacyKey object >>= expect "non-source inline write fallback"
-  legacy2 <- readRecord (directory </> "legacy2.mlfq")
-  need "non-source default is binary inline" (case legacy2 of BinaryInput [Wire.VNode 300 [Wire.VText saved,_]] -> saved == legacyKey; _ -> False)
-  inlineObject <- readRecordChecked (literal directory) legacyKey "RawGroup" [] [] names legacy2 >>= expect "non-source inline read"
-  need "non-source inline raw equals independently read old CACHE2" (sameObject inlineObject b)
   let boxA = T.DataDecl "Box" ["a"] [T.ConstructorDecl "Box" [T.Parameter "a"]]
       boxB = T.DataDecl "Box" ["b"] [T.ConstructorDecl "Box" [T.Parameter "b"]]
       changedBox = T.DataDecl "Box" ["b"] [T.ConstructorDecl "Box" [T.Parameter "b", T.Parameter "b"]]
@@ -306,16 +290,16 @@ helperLocked directory = do
   need "alpha-equivalent metadata preserves canonical layout" (Q.encodeSourceDatatypes (U.unitData (U.objectInterface alpha)) == Q.encodeSourceDatatypes [boxA])
   readRecordChecked (literal directory) boxKey "RawGroup" [] [changedBox] names boxInput >>= reject "same datatype name different layout"
   let legacyContextPath = directory </> "legacy-context.new"
-  save legacyContextPath (Q.sourceContextContents context)
+  save legacyContextPath (U.pack ["MLF-SOURCE-QUERY-CONTEXT-1",context])
   legacyRef <- P.fileDigest (literal legacyContextPath)
   let legacyContextDestination = B.unpack (Q.sourceContextPath (literal directory) legacyRef)
-      legacy3 = legacyRecord legacyRef compact (U.encodeContextualObject object)
+      legacy3 = legacyRecord legacyRef (U.pack (take 5 fullFields ++ drop 6 fullFields)) (U.encodeContextualObject object)
   need "old context namespace distinct from binary" (legacyRef /= ref)
   renameFile legacyContextPath legacyContextDestination
   old3 <- readNew directory key (LegacyInput legacy3)
   _ <- exactLeft "obsolete CACHE3 refused despite matching context" "unsupported source query cache format" old3
   removeFile legacyContextDestination
-  putStrLn "PASS helper CACHE1/CACHE2/CACHE3, complete-key and corrupt-input controls"
+  putStrLn "PASS helper rejects obsolete text and checks current keys and corrupt inputs"
 
 legacyOne directory = do
   files <- sort . filter (\name -> reverse (take 5 (reverse name)) == ".mlfq") <$> listDirectory directory
@@ -323,12 +307,9 @@ legacyOne directory = do
   input <- readRecord file
   plan <- makePlan 41
   keys <- sourceKeys "query-context-control" plan [] M.empty M.empty
-  (ref,compact,payload) <- localRecordParts keys input
-  blob <- contextLogical (B.unpack (Q.sourceContextPath (literal directory) ref)) >>= fields
-  context <- case blob of ["MLF-SOURCE-QUERY-CONTEXT-1",c] -> pure c; _ -> error "context shape"
-  key <- expect "legacy conversion full key" (Q.restoreSourceCacheKey context compact)
+  (_,key,payload) <- localRecordParts keys input
   raw <- expect "legacy conversion raw object" (decodePayload [] payload)
-  save file (Q.encodeCached key raw)
+  save file (retiredInline key raw)
   putStrLn "PASS fixture replaced one record with valid old CACHE1"
 
 makePlan value = do
@@ -368,10 +349,7 @@ rawFinal directory = do
   let file = directory </> (B.unpack digest ++ ".mlfq")
   input <- readRecord file
   keys <- sourceKeys "raw-final" plan [] M.empty contracts
-  (ref,compact,payload) <- localRecordParts keys input
-  contextBlob <- contextLogical (B.unpack (Q.sourceContextPath (literal directory) ref)) >>= fields
-  context <- case contextBlob of ["MLF-SOURCE-QUERY-CONTEXT-1",c] -> pure c; _ -> error "context shape"
-  key <- expect "raw/final full key" (Q.restoreSourceCacheKey context compact)
+  (ref,key,payload) <- localRecordParts keys input
   let ds = U.unitData (U.objectInterface finalObject)
   raw <- expect "raw contextual object" (decodePayload ds payload)
   let parameters = [(X.nameHint n,t) | (n,t) <- fst (U.splitParameters (strip (U.objectTerm raw)))]
@@ -380,17 +358,17 @@ rawFinal directory = do
   -- payload is poisoned. This must not become a trivial envelope mismatch.
   poisoned3 <- localRecord ref key (payloadFor finalObject)
   accepted3 <- readRecordChecked (literal directory) key groupId parameters ds ["sameDeps"] poisoned3 >>= expect "binary generic validator accepts finalized counterexample"
-  need "CACHE3 final payload actually decoded" (sameObject accepted3 finalObject)
+  need "binary final payload actually decoded" (sameObject accepted3 finalObject)
   saveRecord file poisoned3
-  (repaired3,report3,_) <- Q.compileSourceGroups "raw-final" (literal directory) [] M.empty plan >>= expect "CACHE3 raw/final rejection and reinference"
-  need "CACHE3 final-as-raw only reinfers poisoned group" (Q.inferredCount report3 == 1 && Q.reusedCount report3 == fromIntegral (length objects - 1))
-  need "CACHE3 final artifact exact after repair" (map U.encodeObject repaired3 == map U.encodeObject objects)
+  (repaired3,report3,_) <- Q.compileSourceGroups "raw-final" (literal directory) [] M.empty plan >>= expect "binary raw/final rejection and reinference"
+  need "binary final-as-raw only reinfers poisoned group" (Q.inferredCount report3 == 1 && Q.reusedCount report3 == fromIntegral (length objects - 1))
+  need "binary final artifact exact after repair" (map U.encodeObject repaired3 == map U.encodeObject objects)
   -- The repaired record must restore the raw payload, not simply preserve the
   -- poisoned cache while returning independently correct final artifacts.
   repairedInput3 <- readRecord file
-  (repairedRef,repairedCompact,repairedPayload) <- localRecordParts keys repairedInput3
-  need "CACHE3 repair keeps reference/key and restores raw payload"
-    (repairedRef == ref && repairedCompact == compact && repairedPayload == payload)
+  (repairedRef,repairedKey,repairedPayload) <- localRecordParts keys repairedInput3
+  need "binary repair keeps reference/key and restores raw payload"
+    (repairedRef == ref && repairedKey == key && repairedPayload == payload)
   -- Only the visible instance scope changes. Keep the caller's source and
   -- the Int instance fixed. Observe the actual source driver's per-SCC hit.
   broader <- expect "broader source scope" (SI.prepareSourcePlan M.empty [] [cls]
@@ -517,10 +495,9 @@ memoBad label reused (next,actual,result) = do
   reject label result
 memoEntry keys directory plan (Q.GroupResult groupId memberNames _ _ digest) = do
   input <- readRecord (directory </> (B.unpack digest ++ ".mlfq"))
-  (ref,compact,payload) <- localRecordParts keys input
+  (ref,key,payload) <- localRecordParts keys input
   blob <- contextLogical (B.unpack (Q.sourceContextPath (literal directory) ref))
-  need "helper real empty context" (blob == Q.sourceContextContents (Q.encodeSourceDatatypes []))
-  key <- expect "helper complete key" (Q.restoreSourceCacheKey (Q.encodeSourceDatatypes []) compact)
+  need "helper real empty context" (blob == Q.encodeSourceDatatypes [])
   raw <- expect "helper actual raw" (decodePayload [] payload)
   prepared <- expect "helper actual prepared" (SI.prepareGroup plan M.empty memberNames)
   _ <- expect "helper original prepared validation" (SI.validatePreparedRaw prepared raw)
@@ -579,7 +556,7 @@ memoHelper directory = do
     fresh otherDirectory
     withMemoLock otherDirectory $ \_ ->
       readChanged memo otherDirectory key gid [] [] ns input >>= memoBad "memo does not cross cache directory" False
-    (cleared,reused,old) <- readSame key gid [] [] ns (LegacyInput (Q.encodeCached key rawB))
+    (cleared,reused,old) <- readSame key gid [] [] ns (LegacyInput (retiredInline key rawB))
     need "old source text clears context memo" (memoAbsent cleared && not reused)
     _ <- exactLeft "retired source text" "unsupported source query cache format" old
     putStrLn "PASS obsolete source record clears memo"
@@ -628,14 +605,13 @@ memoCycle directory root keyWitnesses invoke = do
   let file = directory </> selected
   original <- readRecord file
   keys <- keyWitnesses
-  (ref,compact,payload) <- localRecordParts keys original
+  (ref,key,payload) <- localRecordParts keys original
   let contextPath = B.unpack (Q.sourceContextPath (literal directory) ref)
   contextBlob <- BS.readFile contextPath
   logicalContext <- contextLogical contextPath
-  need "memo public empty datatype fixture" (logicalContext == Q.sourceContextContents (Q.encodeSourceDatatypes []))
-  key <- expect "memo public full key" (Q.restoreSourceCacheKey (Q.encodeSourceDatatypes []) compact)
+  need "memo public empty datatype fixture" (logicalContext == Q.encodeSourceDatatypes [])
   raw <- expect "memo public raw" (decodePayload [] payload)
-  let legacy = Q.encodeCached key raw
+  let legacy = retiredInline key raw
   withMemoLock directory $ \_ -> save file legacy
   mixed <- call "mixed"
   current <- readRecord file
@@ -684,10 +660,7 @@ memoPreparedControl directory = do
   let file = directory </> (B.unpack digest ++ ".mlfq")
   input <- readRecord file
   keys <- sourceKeys "raw-final" plan [] M.empty contracts
-  (ref,compact,payload) <- localRecordParts keys input
-  contextBlob <- contextLogical (B.unpack (Q.sourceContextPath (literal directory) ref)) >>= fields
-  context <- case contextBlob of ["MLF-SOURCE-QUERY-CONTEXT-1",c] -> pure c; _ -> error "context shape"
-  key <- expect "raw/final full key" (Q.restoreSourceCacheKey context compact)
+  (ref,key,payload) <- localRecordParts keys input
   let ds = U.unitData (U.objectInterface finalObject)
   raw <- expect "raw contextual object" (decodePayload ds payload)
   let parameters = [(X.nameHint n,t) | (n,t) <- fst (U.splitParameters (strip (U.objectTerm raw)))]
@@ -728,7 +701,7 @@ contextDirectorySetup directory = do
     blob <- contextLogical contextPath
     actual <- P.fileDigest (literal contextPath)
     need "directory setup uses real context digest and contents"
-      (Q.validSourceContextDigest ref && actual == ref && blob == Q.sourceContextContents context)
+      (Q.validSourceContextDigest ref && actual == ref && blob == context)
     checked <- readNew directory key input >>= expect "directory setup source read"
     need "directory setup preserves checked raw object" (sameObject checked object)
     putStrLn ("PASS context directory setup " ++ B.unpack ref)
@@ -767,7 +740,7 @@ data WindowFixture = WindowFixture
   , windowObject :: U.UnitObject
   , windowInput :: RecordInput
   }
-windowRoutes entries = [(directory,reference) | Q.SourceContextRead directory reference _ _ _ <- entries]
+windowRoutes entries = [(directory,reference) | Q.SourceContextRead directory reference _ _ <- entries]
 windowExpected fixtures = [(literal (windowDirectory f),windowReference f) | f <- fixtures]
 windowRead previous f = readRecordWindow previous (literal (windowDirectory f))
   (windowKey f) "RawGroup" [] (windowDatatypes f) names (windowInput f)
@@ -803,14 +776,14 @@ windowCreate directory label ds value = do
       path = directory </> ("entry-" ++ label ++ ".mlfq")
   Q.writeSourceCached T.Nothing (literal directory) (literal path) key raw >>= expect "window real writer"
   input <- readRecord path
-  (reference,compact,payload) <- recordParts key input
-  (wantedCompact,context) <- splitKey key
+  (reference,storedKey,payload) <- recordParts key input
+  let context = Q.encodeSourceDatatypes ds
   let contextPath = Q.sourceContextPath (literal directory) reference
   actual <- P.fileDigest contextPath
   blob <- contextLogical (B.unpack contextPath)
   need "window real canonical writer carrier/reference/raw"
-    (Q.validSourceContextDigest reference && reference == actual && compact == wantedCompact &&
-     blob == Q.sourceContextContents context && payload == payloadFor raw)
+    (Q.validSourceContextDigest reference && reference == actual && storedKey == key &&
+     blob == context && payload == payloadFor raw)
   pure (WindowFixture directory label reference key ds raw input)
 windowSingle f = do
   result <- windowRead [] f >>= windowGood "singleton real verified entry" False [f] (windowObject f)
@@ -890,7 +863,7 @@ windowHelper directory = do
         windowPass (label ++ " guard refuses hidden context reuse")
       windowRead eight alpha >>= windowBad "alpha spelling must satisfy complete structural guard" False missing
       windowPass "alpha structural guard refuses hidden context reuse"
-      windowRead eight a { windowInput = LegacyInput (Q.encodeCached (windowKey a) (windowObject a)) }
+      windowRead eight a { windowInput = LegacyInput (retiredInline (windowKey a) (windowObject a)) }
         >>= windowBad "obsolete source record clears entire window" False "unsupported source query cache format"
       windowPass "obsolete source record clears all entries"
       windowRead eight a { windowInput = BinaryInput [] } >>= windowBad "malformed record clears entire window" False "malformed binary query roots"

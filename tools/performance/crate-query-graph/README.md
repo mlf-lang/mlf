@@ -24,7 +24,6 @@ compatibility; they reuse the existing body-check receipt. Source finalization
 still runs, and a changed evidence adapter is checked. `-Zincremental-verify-ich`
 rehashes the decoded raw result. `MLF_QUERY_SEMANTIC_AUDIT=1` separately runs the
 body checker. A final assembled program is still checked at the linking boundary.
-The old prepared-native literal ABI has an explicit closed-object adapter.
 
 Query cache compatibility includes the complete executable SHA and the actual
 builtin dictionary. Formal artifacts instead use their shared artifact/checker
@@ -45,13 +44,14 @@ graph. An explicit depth-first stack accepts long acyclic paths and detects a
 cycle when an edge reaches an active ancestor. Completed nodes are shared.
 Cache reuse checks each saved row's dependencies in their recorded order and
 marks the row current only when they all match. The wire reader still enforces
-its byte, work, and nesting limits. The historical four-field dictionary index
-also retains its original logical depth limit.
+its byte, work, and nesting limits. The current cache uses the v3 column index.
 
 ## Reproduce
 
-Build the pinned baseline and candidate in separate checkouts, using GHC 9.14.1
-and the ordinary build driver in each checkout:
+The historical PR 29 comparison, including the old cache reader, is archived
+with its original tools at [0704d216](https://github.com/mlf-lang/mlf/tree/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/performance/crate-query-graph).
+
+Build the current compiler with GHC 9.14.1 and the ordinary build driver:
 
 ```sh
 python3 tools/shared/build.py --optimization 2 --bootstrap-only --build-dir .mlf-build/producer
@@ -59,30 +59,16 @@ python3 tools/shared/build.py --optimization 2 --bootstrap-only --build-dir .mlf
 
 The driver uses `-O2 -fpedantic-bottoms -fno-state-hack`, one GHC job, an inferred
 interface audit, the shared-source frontend check, and exact builtin regeneration.
-The changed builtin literal differs from the baseline only in its generated
-nongenerated-source identity; its semantic content is unchanged.
 
-From the candidate checkout, supply the two qualified emlf paths, the candidate
-build receipt, and new output directories:
+Supply the qualified compiler, its build receipt, and new output directories:
 
 ```sh
 python3 tools/performance/crate-query-graph/verify.py "$query_candidate" "$query_acceptance"
 python3 tools/performance/crate-query-graph/external_checks.py \
-  "$query_baseline" "$query_candidate" "$query_external"
+  "$query_candidate" "$query_external"
 python3 tools/performance/crate-query-graph/source_checks.py \
   "$query_candidate_receipt" "$query_source_checks" \
   --interface "${query_external}-relocated/client.mlfci"
-env -u MLF_QUERY_PROFILE -u MLF_QUERY_SEMANTIC_AUDIT -u MLF_QUERY_FAILPOINT \
-  python3 tools/performance/foundation-query/compare.py \
-  "$query_baseline" --baseline-label 29 "$query_candidate" \
-  "$query_baseline_checkout/libraries/mlf-foundation" "$query_study"
-python3 tools/performance/crate-query-graph/compare_outputs.py \
-  "$query_study/0-29" "$query_study/1-candidate"
-python3 tools/performance/crate-query-graph/compare_outputs.py \
-  "$query_study/3-29" "$query_study/2-candidate"
-python3 tools/performance/crate-query-graph/profile.py \
-  "$query_candidate" "$query_baseline_checkout/libraries/mlf-foundation" \
-  "$query_study/builtin-candidate" "$query_profile"
 ```
 
 `external_checks.py` moves its complete output directory to `OUTPUT-relocated`
@@ -182,8 +168,7 @@ must release the lock, and a failed replacement must preserve the previous
 generation and its exact final artifacts. Source cache controls run separately
 with the registered `source-context-cache` suite. They exercise current cache
 reuse, invalidation, recovery, and rebuilding an old record as a current entry.
-`external_checks.py` covers old-cache migration without modifying old files,
-mixed old/new object formats, cross-crate body reuse/type invalidation, and
+`external_checks.py` covers cross-crate body reuse, type invalidation, and
 relocation without caches.
 
 ## Measurement protocol

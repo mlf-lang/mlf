@@ -42,8 +42,9 @@ Use the matching manager for subsequent package builds with the new compiler;
 switching back to the released manager would reintroduce the interface mismatch.
 
 The runtime used during the v0.3.0 seed transition accepted the seed's compact
-ABI guard. The current compiler emits the v4 boundary guard and needs a matching
-runtime. Rebuild older objects before linking them with the current runtime.
+ABI guard. The frozen bridge links its output against its bundled runtime.
+The current compiler emits `mlf_require_runtime_v5_abi`. Rebuild older
+objects before linking them with the current runtime.
 The runtime includes the supervisor implementation directly and supports
 single-runtime-object builds.
 

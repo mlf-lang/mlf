@@ -63,16 +63,6 @@ class ModularControls(unittest.TestCase):
         self.assertFalse(O.companion_group_matches(crate, legacy, owner + 'x', members))
         self.assertFalse(O.companion_group_matches(crate, 'wrong', owner, members))
 
-    def test_query_fixture_separates_dictionary_and_legacy_payload_contracts(self):
-        source = (SOURCE / 'tools/shared/fixtures/item4/QueryIndex.hs').read_text()
-        self.assertIn('rootRow = row 3 1 [refs 2 0, refs 2 0] (just (W.VInt 0))', source)
-        self.assertIn('(\"root\",Q.QueryNode \"root\" hashB [(\"leaf\",hashA),(\"leaf\",hashA)] (T.Just hashB))', source)
-        self.assertIn('right "legacy index reader" (decode (Q.encodeLegacyIndex "config" legacyNodes)) >>= same "legacy compatibility" legacyNodes', source)
-        self.assertIn('decodeReject "legacy mismatched payload" "invalid query graph digest"\n    (Q.encodeLegacyIndex "config" decoded)', source)
-        self.assertIn('oldRoot = legacyNode "root" hashB [("leaf",hashA)] (just (W.VText hashB))', source)
-        self.assertIn('decodeReject "legacy duplicate" "duplicate" (legacy [oldLeaf,oldLeaf,oldRoot])', source)
-        self.assertIn('decodeReject "legacy missing" "unpublished" (legacy [oldRoot])', source)
-
     def test_compact_owner_preserves_full_names_and_canonical_tags(self):
         import artifact_binary_open as O
         for crate in ('crate', 'crate/λ', '9:a\0😀'):

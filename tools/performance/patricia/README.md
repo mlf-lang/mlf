@@ -83,8 +83,10 @@ longer reconstructed from the candidate source.
 The P3 gate exposed an Int64 boundary bug: composing an encoding with a large
 positive seed can differ from the original recurrence because multiplication
 wraps before the first remainder. `appendDatatypeEncoding` now admits only
-canonical residues to composition. The gate keeps all 922 old checks and adds
-seven full-width seed checks.
+canonical residues to composition. P3 checks the current source key, pooled
+datatype fingerprints and the 12 signed seed cases against independent
+expectations. Its binary raw-object cases round-trip equal and different
+header/body datatype lists, with and without class and instance metadata.
 
 P2 compares the current scalar and block fingerprints against a two-residue
 reference using fixed digests, Unicode and block boundaries, signed seeds, and

@@ -97,8 +97,8 @@ def builtin_datatypes():
     evidence=data('MLFStackEvidence',[],constructor('MLFStackEvidence',applied('MLFCallStack')))
     return [data('MLFLegacyUnit',[],constructor('MLFLegacyUnit')),*source[:5],stack,evidence,*source[5:]]
 
-def logical_context(declarations, key_format):
-    """Independent datatype projection of the complete v6 or v7 source query key.
+def logical_context(declarations):
+    """Independent datatype projection of the current source query key.
     This is a logical key oracle; it is never stored as a binary payload.
     """
     def tagged(tag,*fields): return pack([tag,*fields])
@@ -138,9 +138,7 @@ def logical_context(declarations, key_format):
             cname,fields=value_node(constructor,25,2)
             cs.append(tagged('constructor',text(cname),pack([field(canonical_field(x,scope,len(binders))) for x in list_values(fields)])))
         return tagged('data',text(name),ps,pack(cs))
-    require(key_format in ('MLF-SOURCE-CRATE-QUERY-6','MLF-SOURCE-CRATE-QUERY-7'), 'known source key format')
-    builtins = builtin_datatypes() if key_format == 'MLF-SOURCE-CRATE-QUERY-6' else []
-    return pack([data(x) for x in [*builtins,*declarations]])
+    return pack([data(x) for x in declarations])
 
 
 def query_payload_root(doc):
@@ -177,14 +175,6 @@ def inspect_artifact(raw, schema):
         if tag==300:
             require(len(children)==2,'inline query arity')
             validate_type(doc,children[0],'String');validate_type(doc,children[1],'RawUnitObject')
-        elif tag==301:
-            require(len(children)==4,'shared query arity')
-            for i,t in zip(children,('String',('list','String'),'UnitInterface','XTerm')):validate_type(doc,i,t)
-            value=doc.values()[-1];ref,compact,iface,body=value[2]
-            require(re.fullmatch('[0-9a-f]{64}',text(ref)) is not None,'safe context digest')
-            fields=[text(x) for x in list_values(compact)]
-            require(len(fields)==8 and fields[0] in ('MLF-SOURCE-CRATE-QUERY-6','MLF-SOURCE-CRATE-QUERY-7'),'complete compact source key')
-            require(not list_values(value_node(iface,240,8)[3]),'shared query header has no duplicated datatype list')
         elif tag in (302,303,305,306):
             if tag in (305,306):
                 require(len(doc.roots) == 2, 'source result slot requires an addressed record')
@@ -279,53 +269,30 @@ def verify_source_result(doc):
 
 
 def cache_snapshot(root, active_hashes):
-    inventory=physical_inventory(root);files=inventory['files'];records={};contexts=set();legacy=[];details={}
+    inventory=physical_inventory(root);files=inventory['files'];records={};contexts=set();details={}
     for key in active_hashes:
         require(re.fullmatch('[0-9a-f]{64}',key) is not None,'query filename digest')
         name=key+'.mlfq'; require(name in files,'reachable record exists');raw=(root/name).read_bytes()
-        full=None
-        if raw.startswith(MAGIC):
-            doc=inspect_artifact(raw,2);value=doc.values()[-1];details[name]=doc.accounting()
-            if value[1] in (302,303,305,306):
-                require(verify_source_result(doc)==key, 'stored fingerprint matches source query filename')
-                version = 4 if value[1] in (305,306) else 3 if len(doc.roots)==2 else 2
-                representation=f'MLFBIN-QUERY-INLINE-{version}'
-                if value[1] in (303,306):
-                    digest=text(value[2][2 if value[1]==306 else 0]); context='context-'+digest+'.mlfqc'
-                    require(context in files and files[context]['sha256']==digest,'context exact physical SHA256')
-                    cdoc=inspect_artifact((root/context).read_bytes(),1)
-                    contexts.add(context); details[context]=cdoc.accounting()
-                    representation=f'MLFBIN-QUERY-SHARED-{version}'
-            elif value[1]==300:
-                full=text(value[2][0]); representation='MLFBIN-QUERY-INLINE-1'
-            else:
-                ref,compact,_,_=value[2];digest=text(ref);context='context-'+digest+'.mlfqc'
+        doc=inspect_artifact(raw,2);value=doc.values()[-1];details[name]=doc.accounting()
+        if value[1] in (302,303,305,306):
+            require(verify_source_result(doc)==key, 'stored fingerprint matches source query filename')
+            version = 4 if value[1] in (305,306) else 3 if len(doc.roots)==2 else 2
+            representation=f'MLFBIN-QUERY-INLINE-{version}'
+            if value[1] in (303,306):
+                digest=text(value[2][2 if value[1]==306 else 0]); context='context-'+digest+'.mlfqc'
                 require(context in files and files[context]['sha256']==digest,'context exact physical SHA256')
                 cdoc=inspect_artifact((root/context).read_bytes(),1)
-                declarations=list_values(value_node(cdoc.values()[0],244,1)[0])
-                fields=[text(x) for x in list_values(compact)]
-                full=pack(fields[:5]+[logical_context(declarations,fields[0])]+fields[5:])
-                contexts.add(context);details[context]=cdoc.accounting();representation='MLFBIN-QUERY-SHARED-1'
+                contexts.add(context); details[context]=cdoc.accounting()
+                representation=f'MLFBIN-QUERY-SHARED-{version}'
         else:
-            try:fields=unpack(raw.decode('utf-8','strict'))
-            except UnicodeError as error:raise Invalid('legacy UTF8') from error
-            require(fields and fields[0] in ('MLF-QUERY-CACHE-1','MLF-QUERY-CACHE-2','MLF-QUERY-CACHE-3') and
-                    len(fields)==(3 if fields[0]=='MLF-QUERY-CACHE-2' else 4),'known legacy query')
-            representation=fields[0];legacy.append(name)
-            if representation=='MLF-QUERY-CACHE-3':
-                digest=fields[1]; require(re.fullmatch('[0-9a-f]{64}',digest) is not None,'legacy safe context ref')
-                context='context-'+digest+'.mlfqc';require(context in files and files[context]['sha256']==digest,'legacy exact context SHA')
-                carrier=unpack((root/context).read_bytes().decode('utf-8','strict'));compact=unpack(fields[2])
-                require(len(carrier)==2 and carrier[0]=='MLF-SOURCE-QUERY-CONTEXT-1' and len(compact)==8,'legacy context/key shape')
-                full=pack(compact[:5]+[carrier[1]]+compact[5:]);contexts.add(context)
-            else:full=fields[1]
-        if full is not None:
-            require(hashlib.sha256(full.encode('utf-8')).hexdigest()==key,'unchanged full logical source/query SHA filename')
+            require(value[1]==300,'lowered query format')
+            full=text(value[2][0]); representation='MLFBIN-QUERY-INLINE-1'
+            require(hashlib.sha256(full.encode('utf-8')).hexdigest()==key,'complete lowered query key SHA filename')
         records[name]=representation
     reachable=set(records)|contexts;others=set(files)-reachable
     return dict(inventory, all_cache_logical_bytes=inventory['all_logical_bytes'],
                 all_cache_pathname_conservative_allocated_bytes=inventory['all_pathname_conservative_allocated_bytes'],
-                active_records=records,reachable_contexts=sorted(contexts),legacy_records=legacy,
+                active_records=records,reachable_contexts=sorted(contexts),
                 reachable_files=sorted(reachable),reachable_logical_bytes=sum(files[x]['bytes'] for x in reachable),
                 reachable_file_allocated_bytes=sum(files[x]['allocated'] for x in reachable),
                 other_physical_files=sorted(others),other_physical_bytes=sum(files[x]['bytes'] for x in others),

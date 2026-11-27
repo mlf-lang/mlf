@@ -225,12 +225,13 @@ python3 tools/performance/source-fingerprints/compare-decode.py --addresses "$ca
 Use the producer revisions recorded for each experiment and a fresh output
 directory. The Foundation argument is the libraries/mlf-foundation directory
 from PR 25. The commands below expect the historical CLI's per-group cache.
+Set `archive` to a checkout of the [raw-record inspector and its matching decoders](https://github.com/mlf-lang/mlf/tree/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/performance/foundation-query).
 
 ```sh
 python3 tools/performance/foundation-query/compare.py --baseline-label 32 "$pr32/bin/emlf" "$candidate/bin/emlf" "$foundation" "$study"
 python3 tools/performance/source-fingerprints/compare-decode.py "$pr32" "$candidate" "$study/1-candidate" "$wire"
 python3 tools/performance/source-fingerprints/verify-cost.py "$candidate/bin/emlf" "$study" "$audit"
-python3 tools/performance/foundation-query/check-raw.py "$study/0-32" "$study/1-candidate" "$pr32/bin/emlf" "$candidate/bin/emlf"
+python3 "$archive/tools/performance/foundation-query/check-raw.py" "$study/0-32" "$study/1-candidate" "$pr32/bin/emlf" "$candidate/bin/emlf"
 python3 tools/shared/test_source_fingerprints.py "$candidate/bin/emlf" "$controls"
 ```
 

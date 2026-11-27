@@ -46,6 +46,16 @@ def prepare_host_package(ghc, source, producer, deps, run, *, expose_host_io=Fal
     return db
 
 
+def runtime_cflags():
+    return shlex.split(subprocess.check_output(['pkg-config', '--cflags', 'bdw-gc', 'gmp'], text=True))
+
+
+def runtime_command(clang, source, cflags, output):
+    runtime = source / 'runtime'
+    return [str(clang), '-O2', '-std=c11', *cflags, '-I' + str(runtime),
+            '-c', str(runtime / 'mlf_runtime.c'), '-o', str(output)]
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--producer',type=Path,required=True)
@@ -76,10 +86,10 @@ def main():
     with H.SerialLock(ROOT/'.mlf-build'):
         deps=out/'dependencies'
         db=prepare_host_package(ghc,source,producer,deps,run,expose_host_io=a.expose_host_io)
-        cflags=shlex.split(subprocess.check_output(['pkg-config','--cflags','bdw-gc','gmp'],text=True))
+        cflags=runtime_cflags()
         libs=shlex.split(subprocess.check_output(['pkg-config','--libs','bdw-gc','gmp'],text=True))
         clang=Path(a.clang).resolve();runtime=deps/'runtime.o'
-        run('runtime',[clang,'-O2','-std=c11',*cflags,'-I'+str(source/'runtime'),'-c',source/'runtime/mlf_runtime.c','-o',runtime])
+        run('runtime',runtime_command(clang,source,cflags,runtime))
         if a.build_builtin:
             # The public crate path produces the fixed checked builtin pair once.
             # It is a reused dependency, never a timed target.
@@ -104,7 +114,7 @@ def main():
     builtin_record.update({str(builtin)+s: H.sha(str(builtin)+s) for s in ['.mlfci','.mlfco']})
     H.save(out/'setup.json',{'complete':True,'endpoint':a.endpoint,'endpoint_label':profile['label'],
         'producer':str(producer),'source':str(source),'ghc':str(ghc),'package_db':str(db),
-        'clang':str(clang),'runtime':str(runtime),'libs':libs,'limits':limits,'builtin':str(builtin),
+        'clang':str(clang),'runtime':str(runtime),'runtime_cflags':cflags,'libs':libs,'limits':limits,'builtin':str(builtin),
         'builtin_record':builtin_record,
         'identity':{'producer_receipt_sha256':H.sha(producer/'receipt.json'),
             'producer_emlf_sha256':H.sha(producer/'bin/emlf'),

@@ -5,6 +5,7 @@ These tests use synthetic receipts to prove that the analyzer refuses missing,
 duplicate, non-finite, failed, qualified-only and incompatible data, and that the
 frozen schedule stays balanced.
 """
+import base64
 import copy
 import hashlib
 import json
@@ -78,11 +79,13 @@ def write_cohort(root, label='screen', family='flat_functions', size=8, repeats=
     receipt = {'complete': True, 'all_cases_passed': True, 'failures': [],
                'plan_sha256': digest(folder / 'plan.json'), 'runs': runs}
     (folder / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+    inventory, evidence = graph_fixture(crate='compiler-shapes/' + case['id'])
     for index, item in enumerate(schedule):
         if item['lane'] == 'mlf':
             leg = folder / 'legs' / ('%03d-' % index + case['id'] + '-mlf')
             leg.mkdir(parents=True)
-            (leg / 'query-cache-inventory.json').write_text(json.dumps({'q.mlfq': {'bytes': 10, 'sha256': 'f' * 64}}))
+            (leg / 'query-cache-inventory.json').write_text(json.dumps(inventory))
+            (leg / 'query-graph-evidence.json').write_text(json.dumps(evidence))
     return folder
 
 
@@ -129,6 +132,63 @@ class BindingShapeTests(unittest.TestCase):
                     values = [x + i for i in fields]
                     self.assertEqual(generate.expected('wide_product', n, x),
                                      sum(value * weight for value, weight in zip(values, reversed(fields))))
+
+
+class ReferenceRuntimeTests(unittest.TestCase):
+    def test_workers_link_runtime_from_their_own_revision(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            clang = root / 'clang'
+            clang.write_text(
+                '#!' + sys.executable + '\n'
+                'from pathlib import Path\nimport sys\n'
+                'args = sys.argv[1:]\n'
+                'output = Path(args[args.index("-o") + 1])\n'
+                'if "-c" in args:\n'
+                '    output.write_bytes(Path(args[args.index("-c") + 1]).read_bytes())\n'
+                'else:\n'
+                '    ir = next(Path(p) for p in args if p.endswith(".ll"))\n'
+                '    obj = next(Path(p) for p in args if p.endswith(".o"))\n'
+                '    if ir.read_bytes() != obj.read_bytes(): sys.exit(1)\n'
+                '    output.write_bytes(ir.read_bytes())\n')
+            clang.chmod(0o755)
+
+            def checkout(name, marker):
+                source = root / name
+                (source / 'runtime').mkdir(parents=True)
+                (source / 'runtime/mlf_runtime.c').write_text(marker)
+                (source / 'bin').mkdir()
+                compiler = source / 'bin/emlf'
+                compiler.write_text("#!/bin/sh\nprintf '%s' " + marker + "\n")
+                compiler.chmod(0o755)
+                return source
+
+            candidate = checkout('candidate', 'candidate-abi')
+            baseline = checkout('reference', 'reference-abi')
+            candidate_runtime = candidate / 'runtime.o'
+            subprocess.run(prepare.runtime_command(clang, candidate, [], candidate_runtime), check=True)
+            setup = {'producer': str(candidate), 'runtime': str(candidate_runtime),
+                     'runtime_cflags': [], 'clang': str(clang), 'libs': [], 'builtin': 'fixed-builtin'}
+            helper = runner.command_runner.load_helper()
+            cache = root / 'baseline-cache'
+            reference = runner.compiler_reference.prepare_runtime(setup, baseline, cache, helper)
+            self.assertEqual(reference['runtime_sha256'], digest(baseline / 'runtime/mlf_runtime.c'))
+            reference['producer'] = str(baseline)
+            plan = root / 'plan.json'
+            plan.write_text(json.dumps({'cases': [{'id': 'case', 'source': 'Main.hs'}], 'setup': setup,
+                'benchmark': {'endpoint': {'id': 'crate-fused-v1'}}, 'compiler_reference': reference}))
+            for lane, marker in [('mlf', 'candidate-abi'), ('reference', 'reference-abi')]:
+                output = root / ('build-' + lane)
+                subprocess.run([sys.executable, '-B', HERE / 'worker.py', '--plan', plan, '--case',
+                                'case', '--lane', lane, '--out', output], check=True)
+                self.assertEqual((output / 'program').read_text(), marker)
+
+            with mock.patch.object(runner.compiler_reference.subprocess, 'run') as build_runtime:
+                runner.compiler_reference.prepare_runtime(setup, baseline, cache, helper)
+                build_runtime.assert_not_called()
+            Path(reference['runtime']).write_text('changed')
+            with self.assertRaisesRegex(RuntimeError, 'immutable input changed'):
+                runner.compiler_reference.prepare_runtime(setup, baseline, cache, helper)
 
 
 class CompilerReferenceTests(unittest.TestCase):
@@ -1403,70 +1463,58 @@ class AnalyzerTests(unittest.TestCase):
 
 
 
-# Graph fixtures are independently encoded by the frozen wire-format reference,
-# not a compiler run and never a substitute for retained measurement evidence.
-def graph_fixture(groups=1, mutate_nodes=None, version=1, mutate_index=None,
-                  members_per_group=None):
-    import base64
-    import query_cache as Q
+# Author the current wire columns directly so evidence checks see the same
+# schema as a cold compiler run. Repeated groups share an inference payload.
+def graph_fixture(groups=1, members_per_group=None, crate='compiler-shapes/flat_functions-8',
+                  mutate_index=None):
     from artifact_binary_reference import tree_document
-    def s(value): return ('text', value)
-    def n(tag, *children): return ('node', tag, tuple(children))
-    def l(*children): return n(1, *children)
-    raw_hash = hashlib.sha256(b'fixture raw payload').hexdigest()
+    from artifact_binary_typed import l, n, pack, s
+    def i(value):
+        return ('int', value)
+
+    bindings = ['imported', 'alias']
+    members_per_group = members_per_group or [['f' + str(index)] for index in range(groups)]
+    declarations = bindings + [name for members in members_per_group for name in sorted(members)]
+    evidence_payload, raw = b'fixture evidence payload', b'fixture inferred payload'
     binding_hash = hashlib.sha256(b'fixture shared binding').hexdigest()
-    binding = Q.pack(['Binding', 'imported'])
-    nodes = [
-        {'key': Q.pack(['Input', binding]), 'hash': binding_hash, 'reads': [], 'payload': None},
-        {'key': binding, 'hash': binding_hash,
-         'reads': [(Q.pack(['Input', binding]), binding_hash)], 'payload': binding_hash},
-        {'key': Q.pack(['Binding', 'alias']), 'hash': binding_hash,
-         'reads': [(binding, binding_hash)], 'payload': binding_hash},
-    ]
-    crate = 'compiler-shapes/flat_functions-8'
-    report = {'format': 1, 'crate': crate, 'inferred_groups': groups,
+    evidence_hash, raw_hash = (hashlib.sha256(payload).hexdigest() for payload in (evidence_payload, raw))
+    configuration = pack([crate, 'b' * 64, 'MLF-SOURCE-CRATE-QUERY-7',
+                          'open-fragment-checker-1/finish-receipt-1', 'source'])
+    keys = [n(415, i(0)), i(0), i(1), n(432, i(0))]
+    hashes = [s(binding_hash)] * 3 + [s(evidence_hash)]
+    read_counts = [i(0), i(1), i(1), i(0)]
+    targets = [keys[0], keys[1]]
+    payload_rows = [i(3)]
+    table = []
+    report = {'format': 1, 'crate': crate, 'inferred_groups': len(members_per_group),
               'reused_groups': 0, 'groups': []}
-    for i in range(groups):
-        members = members_per_group[i] if members_per_group is not None else ['f' + str(i)]
-        key = Q.pack(['InferScc', Q.pack(sorted(members))])
-        nodes.append({'key': key, 'hash': raw_hash,
-                      'reads': [(binding, binding_hash)], 'payload': raw_hash})
-        identity = 'Query_' + ''.join(str(ord(c)) + '_' for c in crate) + 'z_' + ''.join(
-            str(ord(c)) + '_' for c in min(members))
-        report['groups'].append({'id': identity, 'members': members,
-                                'cached': False, 'query_key': raw_hash})
-    if mutate_nodes:
-        mutate_nodes(nodes)
-    configuration = Q.pack([crate, 'b' * 64, 'fixture source format', 'open-fragment-checker-1', 'source'])
-    if version == 1:
-        value = n(411, s('MLF-CRATE-QUERY-GRAPH-1'), s(configuration),
-        l(*(n(410, s(x['key']), s(x['hash']),
-               l(*(n(2, s(k), s(h)) for k, h in x['reads'])),
-               n(4) if x['payload'] is None else n(5, s(x['payload']))) for x in nodes)))
-    else:
-        strings = sorted({value for x in nodes
-                          for value in [x['key'], x['hash'],
-                                        *(v for edge in x['reads'] for v in edge),
-                                        *([] if x['payload'] is None else [x['payload']])]})
-        ids = {value: i for i, value in enumerate(strings)}
-        def ref(value): return ('int', ids[value])
-        value = n(412, s('MLF-CRATE-QUERY-GRAPH-2'), s(configuration),
-                  l(*(s(value) for value in strings)),
-                  l(*(n(413, ref(x['key']), ref(x['hash']),
-                         l(*(n(2, ref(k), ref(h)) for k, h in x['reads'])),
-                         n(4) if x['payload'] is None else n(5, ref(x['payload'])))
-                      for x in sorted(nodes, key=lambda x: x['key']))))
+    for slot, members in enumerate(members_per_group):
+        table.append(l(*(i(declarations.index(name)) for name in sorted(members))))
+        payload_rows.append(i(len(keys)))
+        keys.append(n(419, i(slot)))
+        hashes.append(s(raw_hash))
+        read_counts.append(i(1))
+        targets.append(keys[1])
+        report['groups'].append({'id': analyze.Q.compact_group_owner(crate, members),
+                                 'members': members, 'cached': False, 'query_key': raw_hash})
+
+    fields = [s('MLF-CRATE-QUERY-GRAPH-3'), s(configuration), l(*map(s, declarations)),
+              l(*table), l(n(414, i(0), i(0), s('Eq Int'))), l(),
+              l(*keys), l(*hashes), l(*read_counts), l(*targets),
+              l(*payload_rows)]
     if mutate_index:
-        value = mutate_index(value)
-    index = tree_document([value], 6)
+        mutate_index(fields)
+    index = tree_document([n(412, *fields)], 6)
     generation = hashlib.sha256(index).hexdigest()
-    current = tree_document([s(generation)], 6)
-    files = {Q.GRAPH + 'CURRENT': current, Q.GRAPH + 'generations/' + generation + '.mlfqg': index}
-    inventory = {p: {'bytes': len(b), 'sha256': hashlib.sha256(b).hexdigest()} for p, b in files.items()}
-    for h in [binding_hash, raw_hash]:
-        inventory[Q.GRAPH + 'results/' + h + '.mlfqr'] = {'bytes': 40, 'sha256': h}
+    files = {analyze.Q.GRAPH + 'CURRENT': tree_document([s(generation)], 6),
+             analyze.Q.GRAPH + 'generations/' + generation + '.mlfqg': index}
     evidence = {'format': 1, 'query_report_json': json.dumps(report),
-                'files_base64': {p: base64.b64encode(b).decode('ascii') for p, b in files.items()}}
+                'files_base64': {path: base64.b64encode(data).decode('ascii')
+                                 for path, data in files.items()}}
+    for data in [evidence_payload, raw]:
+        files[analyze.Q.GRAPH + 'results/' + hashlib.sha256(data).hexdigest() + '.mlfqr'] = data
+    inventory = {path: {'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
+                 for path, data in files.items()}
     return inventory, evidence
 
 
@@ -1477,46 +1525,19 @@ def change_report(evidence, mutate):
 
 
 class GraphCacheTests(unittest.TestCase):
-    version = 1
-
-    def fixture(self, **kwargs):
-        return graph_fixture(version=self.version, **kwargs)
-
-    def index_error(self, legacy, indexed):
-        return legacy if self.version == 1 else indexed
-
     def check(self, inventory, evidence, groups=1, max_members=1):
         return analyze.Q.check_graph(inventory, evidence, groups, max_members,
                                      'compiler-shapes/flat_functions-8', 'b' * 64)
 
-    def test_accepts_complete_framed_group_owner(self):
-        for members in [['f0'], ['bc', 'a'], ['中文', 'é']]:
-            inventory, evidence = self.fixture(members_per_group=[members])
-            change_report(evidence, lambda q: q['groups'][0].update(id=analyze.Q.pack([
-                'MLF-OPEN-GROUP-1', q['crate'], analyze.Q.pack(sorted(members))])))
-            with self.subTest(members=members):
-                self.check(inventory, evidence, max_members=len(members))
-
-    def test_rejects_framed_owner_with_different_full_membership(self):
+    def test_owner_matches_crate_and_complete_membership(self):
         crate = 'compiler-shapes/flat_functions-8'
-        for owner_crate, members in [
-            ('other', ['a', 'bc']), (crate, []), (crate, ['a']),
-            (crate, ['a', 'bc', 'd']), (crate, ['ab', 'c']),
-            (crate, ['bc', 'a']), (crate, ['a', 'a', 'bc']),
-        ]:
-            inventory, evidence = self.fixture(members_per_group=[['bc', 'a']])
-            owner = analyze.Q.pack(['MLF-OPEN-GROUP-1', owner_crate, analyze.Q.pack(members)])
-            change_report(evidence, lambda q: q['groups'][0].update(id=owner))
-            with self.subTest(crate=owner_crate, members=members), self.assertRaisesRegex(
-                    ValueError, 'group id matches'):
-                self.check(inventory, evidence, max_members=2)
-
-    def test_compact_owner_matches_complete_membership(self):
-        crate = 'compiler-shapes/flat_functions-8'
-        prefix = ''.join(str(ord(c)) + '_' for c in crate) + 'z_'
-        members = ['module_' + prefix + '97_', 'Module_' + prefix + '84_', 'raw:λ']
-        inventory, evidence = self.fixture(members_per_group=[members])
-        owner = analyze.Q.compact_group_owner(crate, members)
+        # The compact name encodes slash, underscore and hyphen from the crate.
+        prefix = 'compilerz2dzshapesz2fzflatz5fzfunctionsz2dz8_'
+        members = ['module_c1_' + prefix + 'x', 'Module_c1_' + prefix + 'T', 'raw:λ']
+        pack = analyze.Q.pack
+        owner = pack(['MLF-OPEN-GROUP-3', crate, pack([pack(['type', 'T']),
+                      pack(['value', 'x']), pack(['raw', 'raw:λ'])])])
+        inventory, evidence = graph_fixture(members_per_group=[members])
         change_report(evidence, lambda q: q['groups'][0].update(id=owner))
         self.check(inventory, evidence, max_members=3)
         for wrong_crate, wrong_members in [(crate, members[:-1]), ('other', members),
@@ -1528,46 +1549,45 @@ class GraphCacheTests(unittest.TestCase):
                 self.check(inventory, changed, max_members=3)
 
     def test_accepts_extra_nodes_and_content_deduplication(self):
-        inventory, evidence = self.fixture(groups=3)
+        inventory, evidence = graph_fixture(groups=3)
         result = self.check(inventory, evidence, groups=3)
         self.assertEqual(len(result['groups']), 3)
         self.assertEqual(result['files'], 4)  # CURRENT, index, two unique payloads
         self.assertEqual(result['bytes'], sum(v['bytes'] for v in inventory.values()))
 
     def test_rejects_missing_evidence(self):
-        inventory, _ = self.fixture()
+        inventory, _ = graph_fixture()
         with self.assertRaisesRegex(ValueError, 're-measure'):
             self.check(inventory, None)
 
     def test_rejects_missing_payload(self):
-        inventory, evidence = self.fixture()
+        inventory, evidence = graph_fixture()
         del inventory[next(p for p in inventory if p.endswith('.mlfqr'))]
         with self.assertRaisesRegex(ValueError, 'missing retained payload'):
             self.check(inventory, evidence)
 
     def test_rejects_bad_content_address(self):
-        inventory, evidence = self.fixture()
+        inventory, evidence = graph_fixture()
         inventory[next(p for p in inventory if p.endswith('.mlfqr'))]['sha256'] = '0' * 64
         with self.assertRaisesRegex(ValueError, 'content-addressed query graph SHA'):
             self.check(inventory, evidence)
 
     def test_rejects_nonfinite_fractional_or_boolean_sizes(self):
         for size in [float('inf'), float('nan'), 1.5, True, -1]:
-            inventory, evidence = self.fixture()
+            inventory, evidence = graph_fixture()
             inventory[next(iter(inventory))]['bytes'] = size
             with self.subTest(size=size), self.assertRaisesRegex(ValueError, 'finite integral'):
                 self.check(inventory, evidence)
 
     def test_rejects_tampered_retained_bytes(self):
-        inventory, evidence = self.fixture()
+        inventory, evidence = graph_fixture()
         evidence['files_base64'][analyze.Q.GRAPH + 'CURRENT'] = 'AAAA'
         with self.assertRaisesRegex(ValueError, 'retained query graph bytes'):
             self.check(inventory, evidence)
 
     def test_rejects_current_selecting_other_generation(self):
-        import base64
         from artifact_binary_reference import tree_document
-        inventory, evidence = self.fixture()
+        inventory, evidence = graph_fixture()
         current = analyze.Q.GRAPH + 'CURRENT'
         wrong = tree_document([('text', '0' * 64)], 6)
         evidence['files_base64'][current] = base64.b64encode(wrong).decode('ascii')
@@ -1575,29 +1595,43 @@ class GraphCacheTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'CURRENT selects'):
             self.check(inventory, evidence)
 
-    def test_rejects_duplicate_node_keys(self):
-        inventory, evidence = self.fixture(mutate_nodes=lambda ns: ns.append(dict(ns[0])))
-        with self.assertRaisesRegex(ValueError, self.index_error('unique query graph keys', 'row canonicality')):
-            self.check(inventory, evidence)
+    def test_rejects_corrupt_column_evidence(self):
+        from artifact_binary_typed import l, list_values, n, s
+        def duplicate_key(fields):
+            keys = list_values(fields[6])
+            fields[6] = l(keys[1], *keys[1:])
+        def dangling_read(fields):
+            targets = list_values(fields[9])
+            fields[9] = l(*targets[:-1], n(415, ('int', 1)))
+        def cyclic_read(fields):
+            targets = list_values(fields[9])
+            fields[9] = l(('int', 0), *targets[1:])
+        def missing_group_payload(fields):
+            fields[10] = l(*list_values(fields[10])[:-1])
+        def obsolete_marker(fields):
+            fields[0] = s('MLF-CRATE-QUERY-GRAPH-2')
+        for mutate in [duplicate_key, dangling_read, cyclic_read, missing_group_payload, obsolete_marker]:
+            with self.subTest(mutation=mutate.__name__), self.assertRaises(ValueError):
+                self.check(*graph_fixture(mutate_index=mutate))
 
-    def test_rejects_missing_or_stale_dependency(self):
-        for missing in [True, False]:
-            def mutate(ns):
-                ns[-1]['reads'] = [('absent' if missing else ns[0]['key'], '0' * 64)]
-            inventory, evidence = self.fixture(mutate_nodes=mutate)
-            with self.subTest(missing=missing), self.assertRaisesRegex(ValueError, self.index_error('missing/stale', 'missing dependency|stale dependency')):
-                self.check(inventory, evidence)
-
-    def test_rejects_graph_cycle(self):
-        def mutate(ns):
-            ns[0]['reads'] = [(ns[1]['key'], ns[1]['hash'])]
-        inventory, evidence = self.fixture(mutate_nodes=mutate)
-        with self.assertRaisesRegex(ValueError, self.index_error('cyclic query graph', 'cycle')):
-            self.check(inventory, evidence)
+    def test_accepts_ordered_duplicate_reads(self):
+        from artifact_binary_typed import l, list_values
+        def mutate(fields):
+            counts, targets = map(list_values, fields[8:10])
+            fields[8] = l(*counts[:-1], ('int', 3))
+            fields[9] = l(*targets, ('int', 1), ('int', 0))
+        inventory, evidence = graph_fixture(mutate_index=mutate)
+        self.check(inventory, evidence)
+        index = next(data for path, data in evidence['files_base64'].items() if path.endswith('.mlfqg'))
+        nodes = analyze.Q.Generation(base64.b64decode(index)).nodes
+        pack = analyze.Q.pack
+        reads = nodes[pack(['InferScc', pack(['f0'])])]['reads']
+        self.assertEqual([key for key, _ in reads], [pack(['Binding', name])
+                                                    for name in ['imported', 'alias', 'imported']])
 
     def test_rejects_wrong_infer_identity_or_hash(self):
         for field, value in [('members', ['other']), ('query_key', '0' * 64)]:
-            inventory, evidence = self.fixture()
+            inventory, evidence = graph_fixture()
             change_report(evidence, lambda q: q['groups'][0].__setitem__(field, value))
             with self.subTest(field=field), self.assertRaisesRegex(ValueError, 'exact InferScc|group id matches'):
                 self.check(inventory, evidence)
@@ -1608,20 +1642,21 @@ class GraphCacheTests(unittest.TestCase):
             lambda q: q.update(format=True),
             lambda q: q['groups'][0].update(id='unrelated'),
         ]:
-            inventory, evidence = self.fixture()
+            inventory, evidence = graph_fixture()
             change_report(evidence, mutate)
             with self.assertRaises(ValueError):
                 self.check(inventory, evidence)
 
     def test_rejects_wrong_measured_crate_or_compiler(self):
         for crate, compiler in [('other', 'b' * 64), ('compiler-shapes/flat_functions-8', 'c' * 64)]:
-            inventory, evidence = self.fixture()
+            inventory, evidence = graph_fixture()
+            change_report(evidence, lambda report: report.update(crate=crate))
             with self.assertRaisesRegex(ValueError, 'crate/compiler configuration'):
                 analyze.Q.check_graph(inventory, evidence, 1, 1, crate, compiler)
 
     def test_rejects_missing_or_duplicate_report_groups(self):
         for mode in ['missing', 'duplicate', 'overlapping', 'extra-graph']:
-            inventory, evidence = self.fixture(groups=2)
+            inventory, evidence = graph_fixture(groups=2)
             report = json.loads(evidence['query_report_json'])
             groups = report['groups']
             if mode == 'missing':
@@ -1644,58 +1679,41 @@ class GraphCacheTests(unittest.TestCase):
             lambda q: q.update(inferred_groups=True),
             lambda q: q['groups'][0].update(cached=True),
         ]:
-            inventory, evidence = self.fixture()
+            inventory, evidence = graph_fixture()
             change_report(evidence, mutate)
             with self.assertRaises(ValueError):
                 self.check(inventory, evidence)
 
     def test_rejects_duplicate_report_json_keys(self):
-        inventory, evidence = self.fixture()
+        inventory, evidence = graph_fixture()
         evidence['query_report_json'] = '{"inferred_groups":1,' + evidence['query_report_json'][1:]
         with self.assertRaisesRegex(ValueError, 'duplicate query report JSON key'):
             self.check(inventory, evidence)
 
-    def test_rejects_payload_hash_different_from_node_hash(self):
-        valid_inventory, valid_evidence = self.fixture()
-        self.check(valid_inventory, valid_evidence)
-        report = json.loads(valid_evidence['query_report_json'])['groups'][0]
-        def mutate(nodes):
-            target = nodes[-1]
-            self.assertEqual(target['key'], analyze.Q.pack(['InferScc', analyze.Q.pack(sorted(report['members']))]))
-            self.assertEqual(target['hash'], report['query_key'])
-            self.assertEqual(target['payload'], target['hash'])
-            before = dict(target)
-            target['payload'] = nodes[1]['hash']
-            self.assertNotEqual(target['payload'], target['hash'])
-            self.assertEqual({k: v for k, v in target.items() if k != 'payload'},
-                             {k: v for k, v in before.items() if k != 'payload'})
-        inventory, evidence = self.fixture(mutate_nodes=mutate)
-        self.assertEqual(evidence['query_report_json'], valid_evidence['query_report_json'])
-        # Legacy admission enforces this before the report. Dictionary v2
-        # reaches the exact InferScc/raw-payload cross-check with valid identity.
-        reason = self.index_error('query graph payload matches result hash',
-                                  'exact InferScc identity and raw payload SHA')
-        with self.assertRaisesRegex(ValueError, '^' + reason + '$'):
-            self.check(inventory, evidence)
-
     def test_rejects_extra_generation(self):
-        inventory, evidence = self.fixture()
+        inventory, evidence = graph_fixture()
         inventory[analyze.Q.GRAPH + 'generations/' + '0' * 64 + '.mlfqg'] = {
             'bytes': 1, 'sha256': '0' * 64}
         with self.assertRaisesRegex(ValueError, 'one committed graph generation'):
             self.check(inventory, evidence)
 
     def test_rejects_mixed_storage_and_unpublished_staging(self):
-        for extra in ['legacy.mlfq', analyze.Q.GRAPH + 'staging/incomplete']:
-            inventory, evidence = self.fixture()
+        for extra in ['legacy.mlfq', 'query-graph-v2/CURRENT', analyze.Q.GRAPH + 'staging/incomplete']:
+            inventory, evidence = graph_fixture()
             inventory[extra] = {'bytes': 0, 'sha256': hashlib.sha256(b'').hexdigest()}
             with self.subTest(extra=extra), self.assertRaises(ValueError):
                 self.check(inventory, evidence)
 
+    def test_rejects_complete_graph_in_retired_directory(self):
+        inventory, evidence = graph_fixture()
+        for mapping in (inventory, evidence['files_base64']):
+            for path in list(mapping):
+                mapping[path.replace(analyze.Q.GRAPH, 'query-graph-v2/')] = mapping.pop(path)
+        with self.assertRaisesRegex(ValueError, 'one committed graph generation'):
+            self.check(inventory, evidence)
+
     def test_snapshot_retains_exact_actual_inputs(self):
-        import base64
-        import query_cache as Q
-        inventory, evidence = self.fixture()
+        _, evidence = graph_fixture()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             query = root / 'queries'
@@ -1706,26 +1724,16 @@ class GraphCacheTests(unittest.TestCase):
             report = root / 'unit.queries'
             report.write_text(evidence['query_report_json'])
             destination = root / 'query-graph-evidence.json'
-            Q.snapshot(query, report, destination)
+            analyze.Q.snapshot(query, report, destination)
             self.assertEqual(json.loads(destination.read_text()), evidence)
 
 
 class GraphAnalyzerTests(unittest.TestCase):
-    version = 1
-
-    def fixture(self, **kwargs):
-        return graph_fixture(version=self.version, **kwargs)
-
     def test_graph_cohort_and_existing_raw_reuse_guards(self):
         with tempfile.TemporaryDirectory() as directory:
             folder = write_cohort(directory)
-            inventory, evidence = self.fixture()
-            legs = sorted((folder / 'legs').iterdir())
-            for leg in legs:
-                (leg / 'query-cache-inventory.json').write_text(json.dumps(inventory))
-                (leg / 'query-graph-evidence.json').write_text(json.dumps(evidence))
             rows, _, _, samples = analyze.analyze(folder)
-            self.assertEqual(rows[0]['query_storage'], 'query-graph-v1')
+            self.assertEqual(rows[0]['query_storage'], 'query-graph-v3')
             self.assertEqual(rows[0]['fresh'], 1)
             self.assertEqual(rows[0]['query_files'], 4)
             self.assertEqual(len(samples), 6)
@@ -1733,10 +1741,40 @@ class GraphAnalyzerTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'actual raw-byte comparisons'):
                 analyze.analyze(folder)
 
+    def test_baseline_inventory_is_opaque_and_requires_cold_groups(self):
+        _, evidence = graph_fixture()
+        inventory = {'baseline/state': {'bytes': 9, 'sha256': '8' * 64}}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / 'unit.queries'
+            report.write_text(evidence['query_report_json'])
+            sidecar = root / 'evidence.json'
+            analyze.Q.snapshot(root, report, sidecar, reference=True)
+            recorded = json.loads(sidecar.read_text())
+            self.assertEqual(recorded['files_base64'], {})
+            args = (1, 1, 'compiler-shapes/flat_functions-8')
+            totals = analyze.Q.check_reference_inventory(inventory, recorded, *args)
+            self.assertEqual((totals['files'], totals['bytes']), (1, 9))
+            with self.assertRaisesRegex(ValueError, 'one committed graph generation'):
+                analyze.Q.check_graph(inventory, recorded, *args, 'b' * 64)
+            change_report(recorded, lambda q: q.update(reused_groups=1))
+            with self.assertRaisesRegex(ValueError, 'fresh/reused counts'):
+                analyze.Q.check_reference_inventory(inventory, recorded, *args)
+
+    def test_file_count_alone_cannot_qualify_a_cohort(self):
+        with tempfile.TemporaryDirectory() as directory:
+            folder = write_cohort(directory)
+            for leg in (folder / 'legs').iterdir():
+                (leg / 'query-graph-evidence.json').unlink()
+                (leg / 'query-cache-inventory.json').write_text(json.dumps(
+                    {'q.mlfq': {'bytes': 10, 'sha256': 'f' * 64}}))
+            with self.assertRaisesRegex(ValueError, 'query graph evidence missing'):
+                analyze.analyze(folder)
+
     def test_rejects_inventory_drift_with_same_file_count(self):
         with tempfile.TemporaryDirectory() as directory:
             folder = write_cohort(directory)
-            inventory, evidence = self.fixture()
+            inventory, evidence = graph_fixture()
             legs = sorted((folder / 'legs').iterdir())
             for i, leg in enumerate(legs):
                 if i == 2:
@@ -1745,101 +1783,6 @@ class GraphAnalyzerTests(unittest.TestCase):
                 (leg / 'query-graph-evidence.json').write_text(json.dumps(evidence))
             with self.assertRaisesRegex(ValueError, 'stable graph inventory'):
                 analyze.analyze(folder)
-
-class IndexedGraphCacheTests(GraphCacheTests):
-    version = 2
-
-    def test_v1_and_v2_preserve_groups_and_payload_deduplication(self):
-        first = self.check(*graph_fixture(groups=3), groups=3)
-        second = self.check(*self.fixture(groups=3), groups=3)
-        self.assertEqual(first['groups'], second['groups'])
-        self.assertEqual(first['files'], second['files'])
-
-    def test_accepts_ordered_duplicate_reads(self):
-        def mutate(nodes):
-            nodes[-1]['reads'] = [(nodes[1]['key'], nodes[1]['hash']),
-                                 (nodes[2]['key'], nodes[2]['hash']),
-                                 (nodes[1]['key'], nodes[1]['hash'])]
-        inventory, evidence = self.fixture(mutate_nodes=mutate)
-        self.check(inventory, evidence)
-        import base64
-        raw = base64.b64decode(next(value for path, value in evidence['files_base64'].items()
-                                   if path.endswith('.mlfqg')))
-        configuration = analyze.Q.document(raw)[2][1][1]
-        nodes, _ = analyze.Q.read_index(raw, configuration)
-        key = analyze.Q.pack(['InferScc', analyze.Q.pack(['f0'])])
-        reads = nodes[key][1]
-        self.assertEqual(len(reads), 3)
-        self.assertEqual(reads[0], reads[2])
-        self.assertNotEqual(reads[0], reads[1])
-
-    @staticmethod
-    def with_child(value, position, child):
-        children = list(value[2])
-        children[position] = child
-        return (value[0], value[1], tuple(children))
-
-    def test_rejects_index_tag_marker_and_arity(self):
-        mutations = [
-            lambda v: ('node', 999, v[2]),
-            lambda v: self.with_child(v, 0, ('text', 'MLF-CRATE-QUERY-GRAPH-1')),
-            lambda v: ('node', 412, v[2][:-1]),
-            lambda v: self.with_child(v, 1, ('text', '')),
-        ]
-        for mutate in mutations:
-            with self.subTest(mutate=mutate), self.assertRaises(ValueError):
-                self.check(*self.fixture(mutate_index=mutate))
-
-    def test_rejects_noncanonical_dictionary(self):
-        for mode in ('unordered', 'duplicate', 'unused'):
-            def mutate(value):
-                dictionary = list(value[2][2][2])
-                if mode == 'unordered':
-                    dictionary[0], dictionary[1] = dictionary[1], dictionary[0]
-                elif mode == 'duplicate':
-                    dictionary[1] = dictionary[0]
-                else:
-                    dictionary.append(('text', 'zz-unused'))
-                return self.with_child(value, 2, ('node', 1, tuple(dictionary)))
-            with self.subTest(mode=mode), self.assertRaisesRegex(
-                    ValueError, 'dictionary canonicality|unused dictionary'):
-                self.check(*self.fixture(mutate_index=mutate))
-
-    def test_rejects_invalid_ids_and_unordered_rows(self):
-        for mode in ('negative', 'out-of-range', 'wrong-type', 'unordered'):
-            def mutate(value):
-                rows = list(value[2][3][2])
-                if mode == 'unordered':
-                    rows.reverse()
-                else:
-                    wrong = {'negative': ('int', -1),
-                             'out-of-range': ('int', len(value[2][2][2])),
-                             'wrong-type': ('text', '0')}[mode]
-                    rows[0] = self.with_child(rows[0], 1, wrong)
-                return self.with_child(value, 3, ('node', 1, tuple(rows)))
-            with self.subTest(mode=mode), self.assertRaisesRegex(
-                    ValueError, 'ID range|int|row canonicality'):
-                self.check(*self.fixture(mutate_index=mutate))
-
-    def depth_fixture(self, count):
-        def mutate(nodes):
-            digest = nodes[0]['hash']
-            for i in range(count):
-                nodes.append({'key': 'Depth/%04d' % i, 'hash': digest, 'payload': None,
-                              'reads': [] if i == 0 else [('Depth/%04d' % (i - 1), digest)]})
-        return self.fixture(mutate_nodes=mutate)
-
-    def test_accepts_dependency_first_4096_node_path(self):
-        self.check(*self.depth_fixture(4096))
-
-    def test_rejects_dependency_first_4097_node_path(self):
-        with self.assertRaisesRegex(ValueError, 'depth'):
-            self.check(*self.depth_fixture(4097))
-
-
-class IndexedGraphAnalyzerTests(GraphAnalyzerTests):
-    version = 2
-
 
 class GraphReaderPinTests(unittest.TestCase):
     def test_runner_pins_index_reference(self):
@@ -1851,7 +1794,8 @@ class GraphReaderPinTests(unittest.TestCase):
                       any(isinstance(target, ast.Name) and target.id == 'inputs'
                           for target in node.targets))
         pinned = [node.value for node in ast.walk(inputs) if isinstance(node, ast.Constant)]
-        for name in ['test_query_index.py', 'artifact_binary_open.py', 'command_runner.py', 'bench.py',
+        for name in ['query_generation.py', 'artifact_binary_open.py', 'artifact_binary_typed.py',
+                     'artifact_structure_contract.json', 'command_runner.py', 'bench.py',
                      'fit_growth.py', 'analyze.py']:
             self.assertIn(name, pinned)
 

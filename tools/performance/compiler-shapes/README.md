@@ -388,14 +388,13 @@ repository does not contain them: `.mlf-build/` is ignored.
 
 ### Query storage evidence
 
-Legacy cohorts retain the original one-`.mlfq`-per-fresh-group check and footprint
-calculation. With `query-graph-v1`, group counts still come from the compiler's
-actual `.queries` report, never from the number of result files. Binding,
-Datatype and other graph nodes add results, and equal payloads share an address.
+Each candidate leg writes `query-graph-v3`. The compiler's `.queries` report
+records the group count. Inference and evidence nodes can both retain results,
+and equal payloads share an address.
 
-After timing, before the existing query-cache cleanup, the runner retains a
-`query-graph-evidence.json` sidecar containing the exact UTF-8 query report and
-base64 copies of the actual CURRENT and generation-index bytes. The ordinary
+After timing, the runner saves the exact UTF-8 query report in
+`query-graph-evidence.json`. For the candidate, the sidecar also retains
+base64 copies of CURRENT and the generation index before the cache is deleted. The ordinary
 inventory records every result's measured SHA-256 and byte count. The analyzer
 checks CURRENT's selected index, content addresses, graph closure and cycles,
 the measured crate/compiler configuration, and the exact correspondence between
@@ -404,12 +403,12 @@ each fresh group's reported identity, sorted members,
 missing or corrupt result inventories, and changes across repetitions. Existing
 raw checked-output comparisons and executable oracles remain required.
 
-`query_storage` labels the footprint: `legacy-mlfq` counts only `.mlfq` files;
-`query-graph-v1` counts CURRENT, its generation index and all unique persisted
-`.mlfqr` results, including initial or superseded-node results. Neither is a
-group count or a measurement of cumulative disk traffic. Historical measurements
-are not relabelled. Graph cohorts recorded before this sidecar cannot establish
-the index mapping or closure and must be re-measured, not retroactively filled in.
+`query_storage` records the graph directory name. The footprint counts CURRENT,
+its generation index and all unique persisted `.mlfqr` results, including
+superseded-node results. The Git baseline uses its own runtime and cache format.
+The analyzer checks its cold group report and counts all files and bytes in
+its private cache under `reference-inventory`. To reproduce an archived
+analysis, use the harness revision recorded with that cohort.
 
 ## CI
 

@@ -11,7 +11,9 @@ SHA-256 identities were checked:
 | `artifact_structure_contract.json` | `20f1df71bc2fc1ebe01247dc986b01029b3e8e0c4a89f7dcc8cc517f756cf5a1` |
 
 The reference codec and schema JSON are byte-identical to those inputs. The
-typed reader changes only its validator interface: `validate_type` accepts the
+typed reader retains the type validator, value accessors and builtin declarations
+used for closed/open comparison. The unused query cache inspector and schema
+sample generator were removed. The validator `validate_type` accepts the
 keyword-only `primitive_max` (default 131), checks that it is one of 131 or 136,
 and uses that value for the existing primitive-code bound. All schema traversal,
 framing, arity and validation algorithms are retained. This replaces runtime

@@ -17,8 +17,7 @@ SOURCES = {'p123': {'BinaryP2WriterControls.hs': 'tools/performance/artifact-bin
           'NativeCompatibilityControls.hs': 'tools/performance/patricia/controls/p123/NativeCompatibilityControls.hs',
           'P1Controls.hs': 'tools/performance/patricia/controls/p123/P1Controls.hs',
           'P2Controls.hs': 'tools/performance/patricia/controls/p123/P2Controls.hs',
-          'P3Controls.hs': 'tools/performance/patricia/controls/p123/P3Controls.hs',
-          'QueryV6Bridge.hs': 'tools/performance/patricia/controls/p123/QueryV6Bridge.hs'}}
+          'P3Controls.hs': 'tools/performance/patricia/controls/p123/P3Controls.hs'}}
 MODULES = {
     'p123': ['P1Controls', 'P2Controls', 'NativeCompatibilityControls', 'P3Controls'],
 }

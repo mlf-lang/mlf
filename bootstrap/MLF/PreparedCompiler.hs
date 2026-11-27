@@ -85,9 +85,10 @@ module MLF.PreparedCompiler
     let { exports = Libraries.nativeExportSignatures raw };
     declarations <- Libraries.nativeLibraryDeclarations raw;
     Right (Json.render (Json.object [
-      (,) "format" (Json.str "MLF-NATIVE-LIBRARY-1"),
+      (,) "format" (Json.str "MLF-NATIVE-LIBRARY-2"),
       (,) "identity" (Json.str (Libraries.inputIdentity raw)),
       (,) "export_abi" (Json.str nativeExportABI),
+      (,) "runtime_abi" (Json.str LLVM.runtimeAbi),
       (,) "reserved_type_names" (Json.stringArray (NativeLLVM.reservedTypeNames layout)),
       (,) "exports" (Json.array (map (\((,) slot ((,) key ty)) -> Json.object [
         (,) "key" (Json.str key), (,) "hint" (Json.str (Constraint.targetNameHint key)),
@@ -166,12 +167,12 @@ module MLF.PreparedCompiler
             (eqString (Json.getText field "" manifest) expected) ("installed native manifest mismatch: " ++ field))
             [(,) "identity" NativeData.identity, (,) "target_triple" NativeData.targetTriple,
              (,) "data_layout" NativeData.dataLayout, (,) "primitive_abi" NativeData.primitiveABI,
-             (,) "export_abi" NativeData.exportABI];
+             (,) "export_abi" NativeData.exportABI, (,) "runtime_abi" LLVM.runtimeAbi];
           -- The compiled manifest hash binds the layout produced and checked
           -- during independent installation regeneration. Reconstructing the
           -- full export schema here repeats that proof on every invocation;
           -- user wrappers still undergo their own checked layout validation.
-          ensure (eqString (Json.getText "format" "" manifest) "MLF-NATIVE-LIBRARY-1")
+          ensure (eqString (Json.getText "format" "" manifest) "MLF-NATIVE-LIBRARY-2")
             "installed native manifest format mismatch";
           let { objectRows = Json.array (map (\((,) path digest) -> Json.object
             [(,) "path" (Json.str path), (,) "sha256" (Json.str digest)]) NativeData.objectPaths) };

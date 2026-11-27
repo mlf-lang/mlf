@@ -64,11 +64,14 @@ def main():
         producer.parent.mkdir(parents=True)
         producer.write_text('import MLF.PreparedNativeData\n')
         rejects('producer generated native dependency', lambda: N.producer_closure(root))
-        fields = ['format', 'identity', 'target_triple', 'data_layout', 'primitive_abi',
+        fields = ['format', 'identity', 'target_triple', 'data_layout', 'primitive_abi', 'runtime_abi',
                   'export_abi', 'objects', 'clang', 'link_args', 'link_inputs',
                   'source_roots', 'reserved_type_names']
         manifest = {field: {'sentinel': field} for field in fields}
         manifest.update(exports=['large schema'], declarations=['layout'], constructor_tags=['tags'])
+        manifest['runtime_abi'] = 'mlf_require_haskell_boundary_v4_abi'
+        rejects('prior runtime ABI', lambda: N.runtime_contract(manifest))
+        manifest['runtime_abi'] = 'mlf_require_runtime_v5_abi'
         contract = N.runtime_contract(manifest)
         assert set(contract) == set(fields)
         assert all(contract[field] == manifest[field] for field in fields)

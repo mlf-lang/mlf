@@ -61,6 +61,8 @@ and the named `FrozenCrateQuery.hs` reference directly. The first is the exact
 prepared source that the former runner produced from `FrozenSourceInference`:
 only the module name and Classes import differ from that original fixture.
 `oracle.json` retains the original provenance and the compile-ready file digest.
+The query fixture keeps the baseline named encoders used for byte comparisons.
+Group compilation and file-cache routines were removed.
 Current controls are ordinary source files with per-run identity checks.
 The optional historical checkout comparison and inverse module proofs have
 been retired; use commit `496dcae024cae1a93096d9bdb9d6b93e57359dc0` to reproduce

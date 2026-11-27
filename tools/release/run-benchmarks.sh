@@ -29,7 +29,14 @@ manager=$PWD/.mlf-build/bin/mlfpkg
 # GITHUB_ENV. The published archive, source and both tools have source pins.
 GITHUB_ENV= tools/release/fetch-seed.sh "$output/baseline" .github/benchmark-baseline-macos.env
 source .github/benchmark-baseline-macos.env
-baseline=$output/baseline/mlf-$MLF_SEED_VERSION-macos-arm64/libexec/emlf
+baseline_bundle=$output/baseline/mlf-$MLF_SEED_VERSION-macos-arm64
+baseline=$baseline_bundle/libexec/emlf
+baseline_runtime=$baseline_bundle/runtime/mlf_runtime.c
+test -f "$baseline_runtime"
+# Retain the input digests immediately after verifying and extracting the archive.
+for file in "$baseline_bundle"/runtime/*.{c,h}; do
+  if [ -f "$file" ]; then shasum -a 256 "$file"; fi
+done > "$output/baseline-runtime.sha256"
 llvm=$(brew --prefix llvm)
 lld=$(brew --prefix lld)
 clang=$llvm/bin/clang
@@ -60,13 +67,14 @@ node tools/bench/configure-backend.cjs "$clang" "$llvm/bin/opt" "$lld/bin/ld64.l
 # independent correctness sizes and the unchanged measured default inputs.
 # Save failure status only to permit verification/evidence collection, then fail.
 status=0
-MLF_BENCH_MLF_CLANG="$output/backend/clang-mlf" MLF_BENCH_STREAM_LLVM=1 MLF_BENCH_STREAM_LINK=1 \
+MLF_BENCH_BASELINE_RUNTIME="$baseline_runtime" MLF_BENCH_MLF_CLANG="$output/backend/clang-mlf" MLF_BENCH_STREAM_LLVM=1 MLF_BENCH_STREAM_LINK=1 \
   tools/release/time-command.sh "$output/timing" measurements \
   "$output/driver/bin/bench" "$candidate" "$baseline" "$output/results" 7 "$clang" 3 2 \
   > "$output/benchmark.log" 2>&1 || status=$?
 cat "$output/benchmark.log"
 # Even a failed benchmark must not mutate any selected tool or source input.
 tools/release/shared-candidate.sh verify
+shasum -a 256 -c "$output/baseline-runtime.sha256"
 node tools/release/verify-benchmarks.mjs "$output/results/results.json" benchmarks/manifest.json \
   "$candidate" "$baseline" "$clang" "$output/backend" "$output/llvm-backend" "$output/linker-helper"
 test "$status" -eq 0

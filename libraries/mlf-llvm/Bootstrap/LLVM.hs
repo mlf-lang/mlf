@@ -2,7 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
-module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, ioType, dataConstructors, constructorEntry, emitEntry, emitEntryChunks, emitCheckedChunks, entryCode, PreparedEntry, prepareChecked, prepareCheckedProfiled, emitPreparedChunks, preparedKey, checkedInputKey, crateInputKey, canonicalErasedKey) where {
+module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, ioType, dataConstructors, constructorEntry, emitEntry, emitEntryChunks, emitCheckedChunks, entryCode, runtimeAbi, abiDeclaration, abiCall, PreparedEntry, prepareChecked, prepareCheckedProfiled, emitPreparedChunks, preparedKey, checkedInputKey, crateInputKey, canonicalErasedKey) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import qualified Bootstrap.Std as L;
@@ -287,7 +287,7 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
          Right
            (runtimePack
               ((:) "MLF-CODEGEN-INPUT-COMPACT-4-RESULT-SUM-1-LAZY-PRODUCER-1-STRING-INDEX-1-READY-TOTAL-3-SEQ-DEMAND-1-CONCAT-LIST-1-ORDERED-DEMAND-1-READY-LET-1-BYTE-FILE-2-EXHAUSTIVE-CASE-1"
-                 ((:) "compact-bdwgc-v1-process-v1-completion-v2-haskell-boundary-v3"
+                 ((:) runtimeAbi
                     ((:) (runtimeBool (ioType (Checked.typeOf checked)))
                        ((:) (constructorKey (entryConstructors declarations))
                           ((:) (runtimePack (L.map D.prettyDeclaration declarations))
@@ -295,7 +295,7 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
   preparedKey (PreparedEntry executeIO constructors families lowered) =
     runtimePack
       ((:) "MLF-CODEGEN-PREPARED-COMPACT-4-RESULT-SUM-1-LAZY-PRODUCER-1-STRING-INDEX-1-READY-TOTAL-3-SEQ-DEMAND-1-CONCAT-LIST-1-ORDERED-DEMAND-1-READY-LET-1-BYTE-FILE-2-EXHAUSTIVE-CASE-1"
-         ((:) "compact-bdwgc-v1-process-v1-completion-v2-haskell-boundary-v3"
+         ((:) runtimeAbi
             ((:) (runtimeBool executeIO)
                ((:) (constructorKey constructors) ((:) (runtimePack (L.map runtimePack families))
                   ((:) (canonicalErasedKey lowered) []))))));
@@ -380,27 +380,26 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
          Right
            (runtimePack
               ((:) "MLF-CODEGEN-CRATE-INPUT-COMPACT-4-RESULT-SUM-1-LAZY-PRODUCER-1-STRING-INDEX-1-READY-TOTAL-3-SEQ-DEMAND-1-CONCAT-LIST-1-ORDERED-DEMAND-1-READY-LET-1-BYTE-FILE-2-EXHAUSTIVE-CASE-1"
-                 ((:) "compact-bdwgc-v1-process-v1-completion-v2-haskell-boundary-v3"
+                 ((:) runtimeAbi
                     ((:) (runtimeBool (ioType (Checked.typeOf checked)))
                        ((:) (constructorKey (entryConstructors declarations))
                           ((:) (runtimePack (L.map D.prettyDeclaration declarations))
                              ((:) (entryRuntimeKey (X.erase (Checked.term checked))) [])))))));
+  -- One link symbol covers the complete value layout and primitive contract.
+  -- Replace it whenever the boundary changes so old producers cannot link
+  -- merely by requiring a subset of the current runtime's capabilities.
+  runtimeAbi :: String;
+  runtimeAbi = "mlf_require_runtime_v5_abi";
+  abiDeclaration :: String;
+  abiDeclaration = "declare void @" ++ runtimeAbi ++ "()";
+  abiCall :: String;
+  abiCall = "  call void @" ++ runtimeAbi ++ "()";
   entryCode :: String -> Bool -> [] String;
   entryCode entry executeIO =
-    let {
-      abi = "mlf_require_haskell_boundary_v4_abi"
-    } in
-    (:) ("declare void @" ++ (abi ++ "()\ndeclare void @mlf_require_byte_file_v2_abi()\ndeclare void @mlf_require_freeze_st_array_abi()\ndeclare void @mlf_require_st_to_io_abi()\ndeclare void @mlf_require_byte_array_crc32_abi()"))
-      ((:) "define ptr @mlf_entry() {"
-         ((:) ("  call void @" ++ (abi ++ "()\n  call void @mlf_require_byte_file_v2_abi()\n  call void @mlf_require_freeze_st_array_abi()\n  call void @mlf_require_st_to_io_abi()\n  call void @mlf_require_byte_array_crc32_abi()"))
-            ((:) ("  %root = call ptr " ++ (entry ++ "(ptr null, ptr null)"))
-               ((:) "  ret ptr %root"
-                  ((:) "}"
-                     ((:) "define i32 @main(i32 %argc, ptr %argv) {"
-                        ((:) "  call void @mlf_set_args(i32 %argc, ptr %argv)"
-                           ((:) "  %root = call ptr @mlf_entry()"
-                              ((:)
-                                 ("  %status = call i32 @mlf_run(ptr %root, i64 " ++
-                                  ((if executeIO then "1" else "0") ++ ")"))
-                                 ((:) "  ret i32 %status" ((:) "}" [])))))))))))
+    [abiDeclaration, "define ptr @mlf_entry() {", abiCall,
+     "  %root = call ptr " ++ entry ++ "(ptr null, ptr null)", "  ret ptr %root", "}",
+     "define i32 @main(i32 %argc, ptr %argv) {",
+     "  call void @mlf_set_args(i32 %argc, ptr %argv)", "  %root = call ptr @mlf_entry()",
+     "  %status = call i32 @mlf_run(ptr %root, i64 " ++ (if executeIO then "1" else "0") ++ ")",
+     "  ret i32 %status", "}"]
 }

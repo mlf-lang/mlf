@@ -117,8 +117,10 @@ GHC producer and both native objects, and compares same-path output bytes before
 sealing `MLF.PreparedNativeData`. The final compiler still goes through the full
 normal GHC build, shared syntax/signature checks and builtin/prepared gates.
 
-The native manifest records the typed exports and constructor layout, exact
+The `MLF-NATIVE-LIBRARY-2` manifest records typed exports, constructor layout,
 object and link-library hashes, target layout, Clang identity and link arguments.
+Its `runtime_abi` field must match the compiler's `mlf_require_runtime_v5_abi`
+link symbol. Rebuild an installation produced before this boundary.
 The compiler's native mode authenticates the sealed manifest and its fixed input
 files; callers cannot select another manifest. A fresh user program is compiled
 and optimized on every invocation. The generic native program driver uses one
@@ -132,10 +134,10 @@ local trust model. Arbitrary user manifests, changed native objects, incomplete
 producer records, missing independent output comparisons, and a populated native
 registry without its owned build evidence are rejected.
 
-For an explicitly prepared legacy installation, the optional Python diagnostic
-driver also builds a fresh user program. Normal default installations use
+For an explicitly prepared installation, the Python diagnostic driver
+can also build a fresh user program. Normal default installations use
 `INSTALL/bin/emlf USER.emlf -o program` directly; no Python helper is required.
-The legacy driver command is:
+Run the diagnostic driver with the installed compiler.
 
 ```
 python3 tools/shared/build_native_program.py \

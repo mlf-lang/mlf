@@ -80,8 +80,8 @@ def main():
             '-no-user-package-db','-hide-all-packages','-package','base','-package','mlf-shape-primitives',
             '-i',*includes,'-odir',out,'-hidir',out,case['source'],'-o',out/'program'])
     else:
-        producer = plan['compiler_reference']['producer'] if args.lane == 'reference' else setup['producer']
-        emlf=Path(producer)/'bin/emlf'
+        compiler = plan['compiler_reference'] if args.lane == 'reference' else setup
+        emlf=Path(compiler['producer'])/'bin/emlf'
         if args.lane in ('mlf', 'reference'):
             query=out/'queries'; query.mkdir()
             spec=out/'crate.spec'
@@ -117,7 +117,7 @@ def main():
         if args.lane in ('mlf', 'reference') and endpoint in PRODUCTION_ENDPOINTS:
             flags = [*flags, *plan['native_target_policy'][args.lane]['flags']]
         run('llvm-to-executable',[setup['clang'],*flags,out/'unit.ll',
-            setup['runtime'],*setup['libs'],'-lm','-lpthread','-ldl','-o',out/'program'])
+            compiler['runtime'],*setup['libs'],'-lm','-lpthread','-ldl','-o',out/'program'])
     save(True)
 
 

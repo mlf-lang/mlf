@@ -18,7 +18,6 @@ from receipt_selection import identity, select
 
 PREFIX = 'query-graph-acceptance/'
 from artifact_binary_reference import read_document, tree_document, Invalid, require
-from test_query_index import read_index
 from artifact_binary_typed import value_node as node, text, list_values as items, unpack, n, s, l
 from query_generation import Generation, cache_directory
 from finish_receipts import (check_receipts, forge_generation, wrong_template_stamp,
@@ -33,7 +32,7 @@ def verifier_inputs():
     paths = [Path(__file__), Path(__file__).with_name('finish_receipts.py'),
              Path(__file__).with_name('template_receipts.py'), ROOT / 'tools/testing/receipt_selection.py']
     paths += [ROOT / 'tools/shared' / name for name in (
-        'query_generation.py', 'test_query_index.py', 'artifact_binary_reference.py',
+        'query_generation.py', 'artifact_binary_reference.py',
         'artifact_binary_typed.py', 'artifact_binary_open.py', 'artifact_structure_contract.json')]
     return {str(path.relative_to(ROOT)): sha(path.read_bytes()) for path in paths}
 
@@ -50,60 +49,6 @@ def spec(source, cache, builtin, identity='query-acceptance'):
                   frame([frame(['App', str(source)])]), '', str(cache), str(builtin / 'unit')])
 def read(path, schema): return read_document(path.read_bytes(), schema).values()[0]
 def pair(value): return node(value, 2, 2)
-
-
-def index_data(raw, *, expected=None):
-    """Read either index version through the independent, bounded oracle."""
-    values = read_document(raw, 6).values()
-    require(len(values) == 1, 'query graph root count')
-    value = values[0]
-    require(value[0] == 'node' and value[1] in (411, 412), 'query graph index tag')
-    version = 1 if value[1] == 411 else 2
-    fields = node(value, value[1], 3 if version == 1 else 4)
-    configuration = text(fields[1])
-    records, _ = read_index(raw, configuration, expected=expected)
-    return version, configuration, {
-        key: {'sha': digest, 'reads': reads, 'payload': location}
-        for key, (digest, reads, location) in records.items()
-    }
-
-
-def index_bytes(configuration, records, *, version):
-    """Independent fixture writer, including intentionally invalid closure.
-
-    Rebuild the dictionary after edits so a missing/stale dependency is not
-    accidentally rejected for an unrelated unused string or noncanonical ID.
-    Never deduplicate or reorder the provider's reads.
-    """
-    require(version in (1, 2), 'fixture query graph version')
-    def n(tag, *children): return ('node', tag, tuple(children))
-    def s(value): return ('text', value)
-    def i(value): return ('int', value)
-    def sequence(values): return n(1, *values)
-    ordered = sorted(records.items())
-    if version == 1:
-        rows = [n(410, s(key), s(entry['sha']),
-                  sequence(n(2, s(k), s(h)) for k, h in entry['reads']),
-                  n(4) if entry['payload'] is None else n(5, s(entry['payload'])))
-                for key, entry in ordered]
-        value = n(411, s('MLF-CRATE-QUERY-GRAPH-1'), s(configuration), sequence(rows))
-    else:
-        strings = set()
-        for key, entry in ordered:
-            strings.update((key, entry['sha']))
-            for dependency, expected in entry['reads']:
-                strings.update((dependency, expected))
-            if entry['payload'] is not None:
-                strings.add(entry['payload'])
-        dictionary = sorted(strings)
-        ids = {value: index for index, value in enumerate(dictionary)}
-        rows = [n(413, i(ids[key]), i(ids[entry['sha']]),
-                  sequence(n(2, i(ids[k]), i(ids[h])) for k, h in entry['reads']),
-                  n(4) if entry['payload'] is None else n(5, i(ids[entry['payload']])))
-                for key, entry in ordered]
-        value = n(412, s('MLF-CRATE-QUERY-GRAPH-2'), s(configuration),
-                  sequence(map(s, dictionary)), sequence(rows))
-    return tree_document([value], schema=6)
 
 
 def replace_result(records, wanted, digest):
@@ -143,16 +88,6 @@ def repin_generation(wire, key, digest):
             result, location = s(digest), n(5, s(digest))
         rows.append(n(410, name, result, l(*edges), location))
     return wire.encode_rows(rows)
-
-
-def reject_index(raw, configuration, reason):
-    """Require the intended semantic rejection, not an incidental bad encoding."""
-    try:
-        read_index(raw, configuration)
-    except Invalid as error:
-        require(str(error) == reason, 'unexpected query-index rejection: ' + str(error))
-    else:
-        raise Invalid('invalid query-index fixture was accepted')
 
 
 def graph(cache):
@@ -420,16 +355,14 @@ def main():
         execute(binary, ['--link-crate', resumed.with_suffix('.mlfci')], success=False)
         objectfile.write_bytes(saved)
         # Broken, checksum-correct references reject the whole generation.
-        valid_generation, valid_nodes = graph(cache)
+        valid_generation, _ = graph(cache)
         index = cache_directory(cache) / 'generations' / (valid_generation + '.mlfqg')
         wire = Generation(index.read_bytes())
         bad_bytes = dangling_generation(wire)
         try:
             Generation(bad_bytes, configuration=text(wire.config))
         except Invalid as error:
-            expected_error = ('missing dependency' if wire.dictionary_format else
-                              'missing/stale dependency' if wire.version == 1 else 'dangling query read')
-            require(str(error) == expected_error, 'dangling fixture exact semantic rejection')
+            require(str(error) == 'dangling query read', 'dangling fixture exact semantic rejection')
         else:
             raise Invalid('dangling fixture was admitted')
         bad_hash = sha(bad_bytes)
@@ -440,6 +373,25 @@ def main():
         assert outputs(rebuilt) == outputs(inc)
         graph(cache)
         if name == 'body':
+            # A valid old-format generation and its pointer must still miss.
+            old_generation = tree_document([
+                n(411, s('MLF-CRATE-QUERY-GRAPH-1'), wire.config, l(*wire.rows))
+            ], schema=6)
+            old_hash = sha(old_generation)
+            old_index = index.parent / (old_hash + '.mlfqg')
+            old_index.write_bytes(old_generation)
+            pointer.write_bytes(tree_document([s(old_hash)], schema=6))
+            replacement = compile('old-index-rebuild')
+            old_report = json.loads(replacement.with_suffix('.queries').read_text())
+            assert old_report['reused_groups'] == 0 and old_report['inferred_groups'] == len(old_report['groups'])
+            assert outputs(replacement) == outputs(inc) and graph(cache)[0] != old_hash
+            assert old_index.read_bytes() == old_generation
+            warm = compile('old-index-rebuilt-warm')
+            warm_report = json.loads(warm.with_suffix('.queries').read_text())
+            assert warm_report['inferred_groups'] == 0 and warm_report['reused_groups'] == len(warm_report['groups'])
+            assert outputs(warm) == outputs(replacement)
+            record['old_index_rejected_rebuilt_and_reused'] = True
+
             # Deliberately forge a *trusted* receipt with a valid byte SHA and
             # graph closure. This is an audit-policy test, not corruption: the
             # normal reader/ICH must not silently become a second typechecker.
@@ -495,18 +447,15 @@ def main():
                     'multi-member fixture must retain two finish receipts')
             target = next(n for k,n in nodes.items() if unpack(k)[0] == 'FinishScc')
             assert target['payload'] is None, 'rebuilt finish receipt must not require a result file'
-            directory = cache_directory(cache)
-            layout = Generation((directory / 'generations' / (generation + '.mlfqg')).read_bytes()).version
-            address_attack = 'payload-row-range' if layout == 3 else 'wrong-address'
-            modes = ('swapped', 'stale', 'reordered', address_attack, 'finish-as-raw', 'previous-format')
+            modes = ('swapped', 'stale', 'reordered', 'payload-row-range', 'finish-as-raw', 'previous-format')
             for mode in modes:
                 forged = forge_generation(cache, generation, mode)
-                if mode not in ('wrong-address', 'payload-row-range'):
+                if mode != 'payload-row-range':
                     assert graph(cache)[0] == forged  # Valid checksums and dependency closure.
                 repaired = compile('repair-finish-' + mode)
                 assert graph(cache)[0] == generation and outputs(repaired) == outputs(inc)
                 report = json.loads(repaired.with_suffix('.queries').read_text())
-                expected = len(report['groups']) if mode in ('wrong-address', 'payload-row-range', 'previous-format') else int(mode == 'finish-as-raw')
+                expected = len(report['groups']) if mode in ('payload-row-range', 'previous-format') else int(mode == 'finish-as-raw')
                 assert report['inferred_groups'] == expected
             record['finish_receipt_recovery'] = ['reconstructed', *modes]
         if name == 'body':

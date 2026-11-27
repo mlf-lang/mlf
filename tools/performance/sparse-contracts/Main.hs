@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
-import FrozenSourceKey (upgradeV6)
-import NamedQueryControls (checkRejections)
+import NamedQueryControls (checkBuiltinDictionary, checkRejections)
 import Prelude
 import Control.Exception (SomeException, evaluate, try, displayException)
 import Control.Monad (forM_, unless, foldM)
@@ -45,6 +44,7 @@ int = T.XCon "Int" []
 boolean = T.XCon "Bool" []
 
 main = do
+  checkBuiltinDictionary
   rejected<-checkRejections FQ.encodeExpression (FQ.expressionKey FQ.inlineScopeKey)
     (FQ.canonicalExpression M.empty 0 M.empty 0)
     FQ.encodePattern (FQ.canonicalPattern M.empty M.empty 0)
@@ -74,9 +74,8 @@ main = do
       direct=S.selectedContractBindings (members (T.SVar "a")) lazyEnv
       synthetic=S.PreparedGroup (members (T.SVar "a")) (members (T.SVar "a")) [("a",boolean)]
         M.empty [("root",[],False)] T.Nothing [("a",False)]
-      builtin=FQ.encodeDatatypeContext []
       context=Q.encodeSourceDatatypes []
-      oldKey group current=upgradeV6 builtin (FQ.sourceQueryKeyWithContext "crate" "compiler" group current builtin)
+      oldKey group current=FQ.sourceQueryKeyWithContext "crate" "compiler" group current ""
       fullPool=Q.prepareSourceContractEncodings lazyEnv
       missingPool=Q.prepareSourceContractEncodings M.empty
       expectedKey=oldKey synthetic lazyEnv

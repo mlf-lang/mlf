@@ -1,11 +1,27 @@
 {-# LANGUAGE OverloadedStrings #-}
-module NamedQueryControls (checkRejections) where
+module NamedQueryControls (checkBuiltinDictionary, checkRejections) where
 
 import Prelude
 import Control.Exception (SomeException, displayException, evaluate, try)
-import Control.Monad (forM_)
+import Control.Monad (forM_, unless)
 import Data.List (isInfixOf)
+import qualified Bootstrap.ArtifactStorage as Storage
+import qualified Bootstrap.ArtifactStructure as Structure
+import qualified Bootstrap.Data as D
 import qualified Bootstrap.Types as T
+import qualified MLF.Primitive as P
+
+-- The short v7 tag represents this exact ordered dictionary, including binder
+-- names and constructor fields. The schema-1 bytes were independently generated.
+checkBuiltinDictionary :: IO ()
+checkBuiltinDictionary = do
+  encoded <- Storage.encode 1 [Structure.toDataContext D.builtinDeclarations]
+  case encoded of
+    T.Left message -> fail (P.textToChars message)
+    T.Right bytes -> do
+      digest <- P.byteArrayDigest bytes
+      unless (digest == "8769bc0f30eed0ef497f2b414239f9c8facc1dde749de6dcd7251da1a495224f")
+        (fail "named v7 query oracle requires the specified builtin dictionary")
 
 -- Exercise every adapter boundary. Undefined payloads ensure the named oracle
 -- refuses these forms itself, before touching data it cannot interpret.

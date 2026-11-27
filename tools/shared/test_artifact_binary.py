@@ -25,7 +25,7 @@ sys.path.insert(0, str(ROOT / 'tools/testing'))
 from receipt_selection import identity, select
 HELPERS = ('artifact_binary_reference.py', 'artifact_binary_cases.py',
            'artifact_binary_typed.py', 'artifact_binary_integration.py', 'artifact_binary_open.py',
-           'artifact_structure_contract.json', 'artifact_binary_golden.json', 'test_query_index.py')
+           'artifact_structure_contract.json', 'artifact_binary_golden.json', 'query_generation.py', 'test_query_generation.py')
 
 
 def require(ok, message):
@@ -692,8 +692,8 @@ def main():
                     'shared-ghc-public-pair', 'shared-native-public-pair', 'distribution-seed',
                     'query-index-pure', 'query-index-publication'}
         if selection is None or selection == 'query-index-pure':
-            require(body.get('query_index_reference_tests') == 9, 'independent query index tests omitted')
-            expected_query_tests=('test_actual_row_64_mi_boundary_tiny_wire', 'test_actual_total_256_mi_boundary_tiny_wire', 'test_alternating_long_prefix_attack', 'test_canonicality_and_closure', 'test_depth_both_key_orders', 'test_exact_fields_and_wire_hash', 'test_legacy_and_empty', 'test_small_exact_budgets', 'test_types_ranges_and_hashes')
+            expected_query_tests=('test_checksum_and_configuration', 'test_deep_shared_graph_and_cycle_in_both_row_orders', 'test_generations_resolve_their_own_slots', 'test_malformed_tables', 'test_only_current_cache_directory_is_selected')
+            require(body.get('query_index_reference_tests') == len(expected_query_tests), 'independent query index tests omitted')
             require(body.get('query_index_reference_results') ==
                     [{'name': name, 'state': 'passed'} for name in expected_query_tests],
                     'independent query index named results omitted or changed')

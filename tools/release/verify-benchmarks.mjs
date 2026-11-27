@@ -9,7 +9,27 @@ const hash = p => crypto.createHash('sha256').update(fs.readFileSync(p)).digest(
 const sameNames = (actual, expected) => assert.deepEqual([...actual].sort(), expected);
 const finite = n => assert(Number.isFinite(n) && n >= 0, 'missing/invalid measurement');
 const sha = h => assert(/^[0-9a-f]{64}$/.test(h), 'missing artifact digest');
-export function verify(report, manifest) {
+function verifyRuntimeInputs(report, runtimes) {
+  assert.deepEqual(report.runtimes, runtimes, 'compiler/runtime pairing');
+  assert.notEqual(runtimes.baseline, runtimes.mlf, 'release baseline requires its bundled runtime');
+  for (const runtime of Object.values(runtimes)) {
+    assert.equal(fs.realpathSync(runtime), runtime);
+    const directory = path.dirname(runtime);
+    for (const name of fs.readdirSync(directory).filter(name => /\.[ch]$/.test(name))) {
+      const file = path.join(directory, name);
+      assert.equal(report.fingerprints[file], hash(file), `runtime input fingerprint: ${file}`);
+    }
+  }
+}
+function verifyRuntimeCompile(stage, source, object) {
+  const command = stage.command;
+  assert.ok(Array.isArray(command) && command.includes('-c'), 'missing runtime compile command');
+  assert.deepEqual(command.filter(arg => arg.endsWith('.c')), [source], 'measured runtime source');
+  const output = command.indexOf('-o');
+  assert.ok(output !== -1 && path.basename(command[output + 1]) === object, 'runtime object output');
+}
+export function verify(report, manifest, runtimes) {
+  verifyRuntimeInputs(report, runtimes);
   assert.equal(report.status, 'passed');
   assert.equal(report.implementation, 'MLF');
   assert.equal(report.runs, 7);
@@ -31,12 +51,26 @@ export function verify(report, manifest) {
       const summary = row.languages[language][dimension];
       assert.equal(summary.samples.length, 7);
       const times = [];
-      for (const sample of summary.samples) {
+      for (const [index, sample] of summary.samples.entries()) {
         finite(sample.wall_seconds); finite(sample.cpu_seconds);
         assert(sample.wall_seconds > 0);
         times.push(sample.wall_seconds);
         const processes = sample.stages ?? [sample];
         assert(processes.length > 0);
+        if (language !== 'c' && dimension === 'compilation') {
+          const runtime = processes.filter(stage => stage.phase === 'runtime');
+          assert.equal(runtime.length, 1, 'one measured runtime compile');
+          verifyRuntimeCompile(runtime[0], runtimes[language], 'runtime.o');
+          const supervisor = processes.filter(stage => stage.phase === 'runtime-supervisor');
+          const artifacts = row.binary_samples[index][language].artifacts_sha256;
+          assert.equal(supervisor.length, Object.hasOwn(artifacts, 'runtime-supervisor.o') ? 1 : 0);
+          if (supervisor.length) {
+            const source = path.join(path.dirname(runtimes[language]), 'mlf_process_supervisor.c');
+            sha(report.fingerprints[source]);
+            sha(artifacts['runtime-supervisor.o']);
+            verifyRuntimeCompile(supervisor[0], source, 'runtime-supervisor.o');
+          }
+        }
         for (const process of processes) {
           finite(process.wall_seconds); finite(process.cpu_seconds); finite(process.peak_rss_bytes);
           assert(process.peak_rss_bytes > 0);
@@ -68,7 +102,11 @@ export function verify(report, manifest) {
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname)) {
   const [reportFile, manifestFile, candidate, baseline, clang, ...configs] = process.argv.slice(2);
   const report = JSON.parse(fs.readFileSync(reportFile));
-  verify(report, JSON.parse(fs.readFileSync(manifestFile)));
+  const runtimes = {
+    mlf: fs.realpathSync('runtime/mlf_runtime.c'),
+    baseline: fs.realpathSync(path.resolve(path.dirname(baseline), '../runtime/mlf_runtime.c')),
+  };
+  verify(report, JSON.parse(fs.readFileSync(manifestFile)), runtimes);
   for (const file of [candidate, baseline, clang]) assert.equal(report.fingerprints[fs.realpathSync(file)], hash(file));
   for (const [file, digest] of Object.entries(report.fingerprints)) assert.equal(hash(file), digest, `changed benchmark input: ${file}`);
   for (const directory of configs) {

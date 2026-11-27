@@ -1,4 +1,4 @@
-"""Independent reader of declaration-indexed and legacy query generations."""
+"""Independent reader of current declaration-indexed query generations."""
 import hashlib
 import re
 
@@ -6,8 +6,7 @@ from artifact_binary_reference import Invalid, Limits, read_document, require, t
 from artifact_binary_typed import list_values, n, pack, text, value_node
 
 
-V1 = "MLF-CRATE-QUERY-GRAPH-1"
-V2 = "MLF-CRATE-QUERY-GRAPH-2"
+CACHE_DIRECTORY = "query-graph-v3"
 V3 = "MLF-CRATE-QUERY-GRAPH-3"
 CONSTANTS = {435: ("Input", "EmptyScopeInventory"), 436: ("EmptyScope",)}
 DIGEST = re.compile(r"[0-9a-f]{64}")
@@ -18,11 +17,9 @@ KINDS = {415: ("Input", "Binding"), 416: ("Input", "Prepared"),
 
 
 def cache_directory(cache):
-    for name in ("query-graph-v3", "query-graph-v2", "query-graph-v1"):
-        path = cache / name
-        if (path / "CURRENT").is_file():
-            return path
-    raise Invalid("query generation CURRENT absent")
+    path = cache / CACHE_DIRECTORY
+    require((path / "CURRENT").is_file(), "query generation CURRENT absent")
+    return path
 
 
 def index(value):
@@ -71,7 +68,7 @@ def names(value):
 
 
 class Generation:
-    """Project wire slots into old logical rows; use the generation's own tables."""
+    """Resolve each descriptor and its observed hash in this generation's tables."""
 
     def __init__(self, raw, *, expected_hash=None, configuration=None):
         if expected_hash is not None:
@@ -80,113 +77,70 @@ class Generation:
         roots = doc.values()
         require(len(roots) == 1, "expected one query index")
         root = roots[0]
-        require(root[0] == "node" and root[1] in (411, 412), "unknown query generation")
-        # Main's dictionary v2 predates the seven-field declaration snapshot.
-        # Preserve its independent full-use, hash, UTF-8/work and depth checks.
-        self.dictionary_format = root[1] == 412 and len(root[2]) == 4
-        if self.dictionary_format:
-            from test_query_index import read_index
-            fields = value_node(root, 412, 4)
-            self.version, self.config = 2, fields[1]
-            require(configuration is None or text(self.config) == configuration,
-                    "generation configuration")
-            records, _ = read_index(raw, text(self.config), expected=expected_hash)
-            self.nodes = {k: dict(sha=h, reads=reads, payload=payload)
-                          for k, (h, reads, payload) in records.items()}
-            self.rows = [n(410, ("text", k), ("text", h),
-                           n(1, *(n(2, ("text", target), ("text", observed))
-                                  for target, observed in reads)),
-                           n(4) if payload is None else n(5, ("text", payload)))
-                         for k, (h, reads, payload) in records.items()]
-            self.refs = {}
-            return
-        self.version = 1 if root[1] == 411 else (3 if len(root[2]) == 11 else 2)
-        fields = value_node(root, root[1], {1: 3, 2: 7, 3: 11}[self.version])
-        require(text(fields[0]) == {1: V1, 2: V2, 3: V3}[self.version], "generation format")
+        fields = value_node(root, 412, 11)
+        require(text(fields[0]) == V3, "generation format")
+        self.version = 3
         self.config = fields[1]
         require(text(self.config) and (configuration is None or text(self.config) == configuration),
                 "generation configuration")
-        self.tables = fields[2:6] if self.version == 3 else fields[2:-1]
+        self.tables = fields[2:6]
         self.refs = {}
-        if self.version >= 2:
-            declarations, members, requests, datatypes = self.tables
-            self.declarations = names(declarations)
-            self.datatypes = names(datatypes)
-            def group_key(group):
-                ids = unique([lookup(self.declarations, ref) for ref in list_values(group)],
-                             "repeated group member")
-                require(ids, "empty query group")
-                return packed(ids)
-            self.groups = table(map(group_key, list_values(members)), "duplicate group")
+        declarations, members, requests, datatypes = self.tables
+        self.declarations = names(declarations)
+        self.datatypes = names(datatypes)
+        def group_key(group):
+            ids = unique([lookup(self.declarations, ref) for ref in list_values(group)],
+                         "repeated group member")
+            require(ids, "empty query group")
+            return packed(ids)
+        self.groups = table(map(group_key, list_values(members)), "duplicate group")
 
-            def evidence_key(request):
-                group, site, goal = value_node(request, 414, 3)
-                require(text(goal), "empty evidence goal")
-                return packed([lookup(self.groups, group), str(index(site)), text(goal)])
-            self.evidence = table(map(evidence_key, list_values(requests)), "duplicate evidence")
+        def evidence_key(request):
+            group, site, goal = value_node(request, 414, 3)
+            require(text(goal), "empty evidence goal")
+            return packed([lookup(self.groups, group), str(index(site)), text(goal)])
+        self.evidence = table(map(evidence_key, list_values(requests)), "duplicate evidence")
 
-        if self.version == 3:
-            keys, results, lengths, targets, locations = map(list_values, fields[6:])
-            require(len(keys) == len(results) == len(lengths), "query column lengths")
-            payloads = [index(value) for value in locations]
-            require(payloads == sorted(set(payloads)), "query payload row order")
-            require(all(row < len(keys) for row in payloads), "query payload row range")
-            payloads = set(payloads)
-            entries, cursor = [], 0
-            for row, (key, result, length) in enumerate(zip(keys, results, lengths)):
-                count = index(length)
-                require(count <= len(targets) - cursor, "query read column length")
-                reads = targets[cursor:cursor + count]
-                cursor += count
-                entries.append(n(413, key, result, n(1, *reads),
-                                 n(5, result) if row in payloads else n(4)))
-            require(cursor == len(targets), "query read column trailing targets")
-        else:
-            entries = list_values(fields[-1])
-        rows = []
+        keys, results, lengths, targets, locations = map(list_values, fields[6:])
+        require(len(keys) == len(results) == len(lengths), "query column lengths")
+        payloads = [index(value) for value in locations]
+        require(payloads == sorted(set(payloads)), "query payload row order")
+        require(all(row < len(keys) for row in payloads), "query payload row range")
+        payloads = set(payloads)
         hashes, descriptors, budget = {}, {}, Limits().work
-        for entry in entries:
-            key, result, reads, location = value_node(entry, 410 if self.version == 1 else 413, 4)
+        for key, result in zip(keys, results):
             logical = self.key(key)
             require(logical not in hashes, "unique query graph keys")
-            if self.version >= 2:
-                budget -= len(logical)
-                require(budget >= 0, "identity work limit")
-                descriptors[key] = logical
+            budget -= len(logical)
+            require(budget >= 0, "identity work limit")
+            descriptors[key] = logical
             hashes[logical] = digest(result)
             self.refs[logical] = key
-            rows.append((logical, result, list_values(reads), location))
 
-        self.nodes = {}
-        self.rows = []
-        for key, result, reads, location in rows:
-            if self.version == 1:
-                edges = [(text(k), digest(h)) for k, h in (value_node(e, 2, 2) for e in reads)]
-            else:
-                edges = []
-                for ref in reads:
-                    require((self.version == 3 and ref[0] == "node" and ref[1] in CONSTANTS and not ref[2]) or ref[0] == "int" or (ref[0] == "node" and len(ref[2]) == 1 and ref[2][0][0] == "int"),
-                            "invalid read descriptor")
-                    name = descriptors.get(ref)
-                    require(name is not None, "dangling query read")
-                    edges.append((name, hashes[name]))
-            for name, observed in edges:
-                require(hashes.get(name) == observed, "missing/stale dependency")
-            require(location[0] == "node" and location[1] in (4, 5), "payload location")
-            children = value_node(location, location[1], location[1] - 4)
-            address = digest(children[0]) if children else None
-            require(address is None or address == hashes[key], "query graph payload matches result hash")
-            self.nodes[key] = dict(sha=hashes[key], reads=edges, payload=address)
-            self.rows.append(n(410, ("text", key), result,
-                               n(1, *(n(2, ("text", k), ("text", h)) for k, h in edges)), location))
+        self.nodes, self.rows = {}, []
+        cursor = 0
+        for row, (key, result, length) in enumerate(zip(keys, results, lengths)):
+            logical = descriptors[key]
+            count = index(length)
+            require(count <= len(targets) - cursor, "query read column length")
+            edges = []
+            for target in targets[cursor:cursor + count]:
+                require(target in descriptors, "dangling query read")
+                name = descriptors[target]
+                edges.append((name, hashes[name]))
+            cursor += count
+            address = hashes[logical] if row in payloads else None
+            self.nodes[logical] = dict(sha=hashes[logical], reads=edges, payload=address)
+            self.rows.append(n(410, ("text", logical), result,
+                               n(1, *(n(2, ("text", k), ("text", h)) for k, h in edges)),
+                               n(5, result) if row in payloads else n(4)))
+        require(cursor == len(targets), "query read column trailing targets")
         self.check_cycles()
 
     def key(self, ref):
-        if self.version == 1:
-            return text(ref)
         if ref[0] == "int":
             return packed(["Binding", lookup(self.declarations, ref)])
-        if self.version == 3 and ref[0] == "node" and ref[1] in CONSTANTS:
+        if ref[0] == "node" and ref[1] in CONSTANTS:
             value_node(ref, ref[1], 0)
             key = ""
             for part in reversed(CONSTANTS[ref[1]]):
@@ -224,54 +178,22 @@ class Generation:
                     visiting.add(child)
                     stack.append((child, iter(self.nodes[child]["reads"])))
 
-    def legacy_bytes(self):
-        return tree_document([n(411, ("text", V1), self.config, n(1, *self.rows))], schema=6)
-
     def encode_rows(self, rows, config=None):
-        """Rebuild using this generation's tables (also used to forge corrupt test data)."""
+        """Rebuild with this generation's tables, including intentionally dangling test edges."""
         config = self.config if config is None else config
-        if self.version == 1:
-            return tree_document([n(411, ("text", V1), config, n(1, *rows))], schema=6)
-        if self.dictionary_format:
-            logical = []
-            for row in rows:
-                key, result, reads, payload = value_node(row, 410, 4)
-                logical.append((text(key), text(result),
-                    [(text(k), text(h)) for k, h in
-                     (value_node(edge, 2, 2) for edge in list_values(reads))],
-                    None if payload == n(4) else text(value_node(payload, 5, 1)[0])))
-            strings = sorted({v for k, h, edges, payload in logical
-                              for v in [k, h, *(x for edge in edges for x in edge),
-                                        *([] if payload is None else [payload])]})
-            ids = {value: i for i, value in enumerate(strings)}
-            ref = lambda value: ("int", ids[value])
-            encoded = [n(413, ref(k), ref(h), n(1, *(n(2, ref(a), ref(b)) for a, b in edges)),
-                         n(4) if payload is None else n(5, ref(payload)))
-                       for k, h, edges, payload in sorted(logical)]
-            return tree_document([n(412, ("text", V2), config,
-                                      n(1, *(("text", value) for value in strings)),
-                                      n(1, *encoded))], schema=6)
-        encoded = []
-        for row in rows:
+        keys, results, counts, targets, locations = [], [], [], [], []
+        for ordinal, row in enumerate(rows):
             key, result, reads, payload = value_node(row, 410, 4)
-            refs = []
-            for edge in list_values(reads):
+            edges = list_values(reads)
+            keys.append(self.refs[text(key)])
+            results.append(result)
+            counts.append(("int", len(edges)))
+            for edge in edges:
                 target, _ = value_node(edge, 2, 2)
-                # Negative fixtures deliberately encode an unknown target.
-                refs.append(self.refs.get(text(target), ("int", len(self.declarations))))
-            encoded.append(n(413, self.refs[text(key)], result, n(1, *refs), payload))
-        if self.version == 3:
-            columns = [[], [], [], [], []]
-            for row, entry in enumerate(encoded):
-                key, result, reads, payload = value_node(entry, 413, 4)
-                targets = list_values(reads)
-                columns[0].append(key)
-                columns[1].append(result)
-                columns[2].append(("int", len(targets)))
-                columns[3].extend(targets)
-                if payload != n(4):
-                    require(value_node(payload, 5, 1)[0] == result, "query graph payload matches result hash")
-                    columns[4].append(("int", row))
-            return tree_document([n(412, ("text", V3), config, *self.tables,
-                                       *(n(1, *column) for column in columns))], schema=6)
-        return tree_document([n(412, ("text", V2), config, *self.tables, n(1, *encoded))], schema=6)
+                targets.append(self.refs.get(text(target), ("int", len(self.declarations))))
+            if payload != n(4):
+                require(value_node(payload, 5, 1)[0] == result, "query graph payload matches result hash")
+                locations.append(("int", ordinal))
+        columns = [keys, results, counts, targets, locations]
+        return tree_document([n(412, ("text", V3), config, *self.tables,
+                               *(n(1, *column) for column in columns))], schema=6)

@@ -4,15 +4,17 @@ set -euo pipefail
 . "$(dirname -- "$0")/test-events.sh" release-shared-bootstrap-orchestration
 root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 work=$(mktemp -d "${TMPDIR:-/tmp}/mlf-shared-bootstrap.XXXXXXXX")
+work=$(cd -- "$work" && pwd)
 trap 'rm -rf "$work"' EXIT
 project="$work/project with spaces"
 frozen="$project/bootstrap/shared-haskell-v1-bridge"
-mkdir -p "$project/scripts" "$project/libraries/example" "$project/runtime" "$frozen" "$work/archive/scripts"
+mkdir -p "$project/scripts" "$project/libraries/example" "$project/runtime" "$frozen" "$work/archive/scripts" "$work/archive/runtime"
 cp "$root/scripts/bootstrap-shared.sh" "$project/scripts/"
 printf 'shared source fixture\n' > "$project/libraries/example/Main.hs"
 printf '{}\n' > "$project/libraries/example/mlf-package.json"
 printf '{}\n' > "$project/mlf-package.json"
-printf 'runtime fixture\n' > "$project/runtime/mlf_runtime.c"
+printf 'current runtime fixture\n' > "$project/runtime/mlf_runtime.c"
+printf 'frozen bridge runtime fixture\n' > "$work/archive/runtime/mlf_runtime.c"
 printf 'helper fixture\n' > "$project/runtime/mlf_build_runner.c"
 printf '0.3.0\n' > "$project/VERSION"
 cat > "$project/shared-sources.json" <<'MANIFEST'
@@ -46,18 +48,20 @@ if [ "${1:-}" = --implementation-identity ]; then
   printf 'MLF/shared-haskell-v1 native-MLF\n'
   exit 0
 fi
-manifest= build= compiler= targets=
+manifest= build= compiler= runtime= targets=
 while [ "$#" -gt 0 ]; do
  case "$1" in
   --manifest) manifest=$2; shift 2 ;;
   --build-dir) build=$2; shift 2 ;;
   --compiler) compiler=$2; shift 2 ;;
+  --runtime) runtime=$2; shift 2 ;;
   --target) targets="$targets $2"; shift 2 ;;
   *) shift ;;
  esac
 done
 test "$manifest" = "$TEST_PROJECT/mlf-package.json"
 test "$compiler" = "$MLF_SHARED_BOOTSTRAP_DIR/bridge/stage2"
+test "$(cat "$runtime")" = "frozen bridge runtime fixture"
 test "$targets" = ' emlf mlfpkg'
 test -f "$TEST_PROJECT/libraries/example/Main.hs"
 printf '%s\n' "$manifest|$compiler|$targets" >> "$TEST_CALLS"
@@ -92,7 +96,7 @@ printf '#!/bin/sh\ntest "$1" = --protocol-version\nprintf "1\\n"\n' > "$output"
 chmod +x "$output"
 CLANG
 chmod +x "$work/seed" "$work/clang" "$work/archive/compiler" "$work/archive/manager" "$work/archive/scripts/bootstrap-async.sh"
-(cd "$work/archive"; shasum -a 256 compiler manager scripts/bootstrap-async.sh > bridge-inputs.sha256; tar -czf "$frozen/source.tar.gz" .)
+(cd "$work/archive"; shasum -a 256 compiler manager scripts/bootstrap-async.sh runtime/mlf_runtime.c > bridge-inputs.sha256; tar -czf "$frozen/source.tar.gz" .)
 (cd "$frozen"; shasum -a 256 source.tar.gz > source.tar.gz.sha256)
 export TEST_PROJECT="$project" TEST_SEED="$work/seed" TEST_CALLS="$work/calls" TEST_FORBIDDEN="$work/forbidden"
 export MLF_COMPILER="$TEST_SEED" MLF_PACKAGE_MANAGER="$TEST_SEED" CC="$work/clang"

@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
-import FrozenSourceKey (upgradeV6)
-import NamedQueryControls (checkRejections)
+import NamedQueryControls (checkBuiltinDictionary, checkRejections)
 import Prelude
 import Control.Exception (SomeException, evaluate, try, displayException)
 import Control.Monad (forM_, unless, foldM)
@@ -54,6 +53,7 @@ prepared body = S.PreparedGroup [("root",T.Nothing,body)] [("root",T.Nothing,bod
   [("value",False)]
 
 main = do
+  checkBuiltinDictionary
   rejected<-checkRejections F.encodeExpression (F.expressionKey F.inlineScopeKey)
     (F.canonicalExpression M.empty 0 M.empty 0)
     F.encodePattern (F.canonicalPattern M.empty M.empty 0)
@@ -89,13 +89,13 @@ main = do
         (context,_)=Q.reuseDatatypeContext pool (Q.emptyDatatypeContextEncoding pool) current
         actual=Q.sourceQueryKeyWithContext "crate" "fixed-compiler" group contracts context
         old=F.sourceQueryKey "crate" "fixed-compiler" group contracts current
-    check "whole original query key with reused datatype context" (actual==upgradeV6 (F.encodeDatatypeContext []) old)
+    check "whole original query key with reused datatype context" (actual==old)
   -- Existing structural encoders retain their original partial-value behavior.
   let bad label=errorWithoutStackTrace label
       broken=T.DataDecl (bad "datatype name first") [] [T.ConstructorDecl (bad "constructor next") []]
       pairs=[(Q.encodeDatatypeContext [broken],F.encodeDatatypeContext [broken]),
-             (Q.encodeDatatypeContextWithPool (Q.prepareSourceEncodings []) [broken],
-              F.encodeDatatypeContextWithPool (F.prepareSourceEncodings []) [broken]),
+             (Q.encodeSourceDatatypesWithPool (Q.prepareSourceEncodings []) [broken],
+              F.list F.encodeDatatype [broken]),
              (Q.sourceQueryKeyWithContext (bad "crate first") (bad "compiler next")
                 (prepared (T.SIntLit 0)) M.empty (bad "context later"),
               F.sourceQueryKeyWithContext (bad "crate first") (bad "compiler next")

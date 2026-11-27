@@ -725,7 +725,7 @@
     "command": [
       "python3",
       "-B",
-      "tools/shared/test_query_index.py"
+      "tools/shared/test_query_columns.py"
     ],
     "kind": "unittest",
     "prefix": "python-shared-query-index/",

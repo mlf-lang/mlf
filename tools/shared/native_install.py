@@ -133,7 +133,7 @@ def native_tool_inputs(clang):
 
 def manifest_for(root, native, request):
     result = read(native / 'metadata.json')
-    require(result['format'] == 'MLF-NATIVE-LIBRARY-1', 'metadata format')
+    require(result['format'] == 'MLF-NATIVE-LIBRARY-2', 'metadata format')
     require(result['export_abi'] == 'mlf-native-typed-tuple/2', 'metadata ABI')
     require(result['identity'] == read(root.parent / 'request.json')['input_identity'], 'metadata input identity mismatch')
     target = (native / 'target.ll').read_text()
@@ -154,7 +154,8 @@ def manifest_for(root, native, request):
 
 def runtime_contract(manifest):
     """Small per-invocation contract, derived from the full checked metadata."""
-    fields = ['format', 'identity', 'target_triple', 'data_layout', 'primitive_abi',
+    require(manifest.get('runtime_abi') == 'mlf_require_runtime_v5_abi', 'runtime ABI mismatch')
+    fields = ['format', 'identity', 'target_triple', 'data_layout', 'primitive_abi', 'runtime_abi',
               'export_abi', 'objects', 'clang', 'link_args', 'link_inputs', 'source_roots', 'reserved_type_names']
     return {field: manifest[field] for field in fields}
 

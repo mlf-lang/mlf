@@ -277,8 +277,6 @@ def forge_generation(cache, current, mode):
     """Rehash the modified index and incoming edges so checksum checks alone cannot detect it."""
     directory = cache_directory(cache)
     wire = Generation((directory / "generations" / (current + ".mlfqg")).read_bytes(), expected_hash=current)
-    require(mode != "wrong-address" or wire.version < 3, "wrong address attack requires v1/v2")
-    require(mode != "payload-row-range" or wire.version == 3, "payload row attack requires v3")
     config = wire.config
     rows = [value_node(row, 410, 4) for row in wire.rows]
     finishes = [(key, h, payload) for key, h, _, payload in rows if unpack(text(key))[0] == "FinishScc"]
@@ -312,12 +310,9 @@ def forge_generation(cache, current, mode):
                            for owner, digest in (value_node(edge, 2, 2) for edge in list_values(edges))))
         elif mode == "reordered" and k == key:
             edges = n(1, *reversed(list_values(edges)))
-        elif mode == "wrong-address" and k == key:
-            payload = n(5, donor)
         changed.append(n(410, k, h, edges, payload))
     raw = wire.encode_rows(changed, config)
     if mode == "payload-row-range":
-        require(wire.version == 3, "payload row attack requires v3")
         # v3 addresses payloads by row, not by a separately editable digest.
         # Preserve every normal column and append exactly one out-of-range row.
         root = read_document(raw, 6).values()[0]

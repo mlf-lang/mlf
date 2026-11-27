@@ -30,7 +30,7 @@ static MlfValue *failure(const char *message) {
     return mlf_thunk(panic_argument,env);
 }
 int main(int argc, char **argv) {
-    mlf_require_haskell_boundary_v4_abi();
+    mlf_require_runtime_v5_abi();
     if (argc == 2 && !strcmp(argv[1],"--unsigned-allocation")) {
         GC_INIT();
         MlfValue *zero = mlf_integer("0"), *negative = mlf_integer("-1");

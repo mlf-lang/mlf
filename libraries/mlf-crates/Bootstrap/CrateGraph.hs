@@ -206,25 +206,11 @@ module Bootstrap.CrateGraph where {
       Right (rawValue (templateReferences identity) "template" canonical)
     }
   };
-  rawValueFor info declarations references group fragment = case info of {
-    Right template -> templateValue declarations template fragment;
-    Left _ -> Right (rawValue references group fragment)
-  };
-  -- Reproduce the committed encoding during ICH validation. An admitted
-  -- ordinary body may belong to a valid pre-spine generation.
-  checkedRawHash expected info declarations references group fragment = let {
-    previous = case rawValueFor info declarations references group fragment of {
-      Left e -> ioReturn (Left e); Right value -> G.hashValueUsing W.indexedTextLimits value
-    }
-  } in case info of {
-    Right _ -> previous;
-    Left _ -> do {
-      hashed <- G.hashValueUsing W.indexedTextLimits (checkedRawValue references group fragment);
-      case hashed of {
-        Right digest -> if eqString digest expected then ioReturn hashed
-          else previous;
-        Left _ -> ioReturn hashed
-      }
+  checkedRawHash info declarations references group fragment = case info of {
+    Left _ -> G.hashValueUsing W.indexedTextLimits (checkedRawValue references group fragment);
+    Right template -> case templateValue declarations template fragment of {
+      Left e -> ioReturn (Left e);
+      Right value -> G.hashValueUsing W.indexedTextLimits value
     }
   };
   recordRaw info declarations cached wanted reads references group fragment session =
@@ -1222,7 +1208,7 @@ module Bootstrap.CrateGraph where {
                               case loaded of {
                                 Left e -> ioReturn (Left e);
                                 Right fragment -> do {
-                                  fingerprint <- if verify then checkedRawHash digest template declarations references group fragment
+                                  fingerprint <- if verify then checkedRawHash template declarations references group fragment
                                     else ioReturn (Right digest);
                                   ioReturn (do {
                                     actual <- fingerprint;
@@ -1341,7 +1327,7 @@ module Bootstrap.CrateGraph where {
       Source.AdaptedBody _ -> False
     }; rawHash = G.nodeHash rawNode } in
     if same && not recheck then ioReturn (Right rawHash) else do {
-      hashed <- if same then checkedRawHash rawHash template declarations finalRefs group final
+      hashed <- if same then checkedRawHash template declarations finalRefs group final
         else G.hashValueUsing W.indexedTextLimits (rawValue finalRefs group final);
       ioReturn (do { digest <- hashed;
         ensure (not same || eqString digest rawHash) "retained final fragment SHA mismatch";

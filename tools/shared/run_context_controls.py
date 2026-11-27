@@ -103,14 +103,14 @@ def require_graph_equal(left, left_root, right, right_root, message):
 
 
 def source_key_from_binary(context, declarations, compact):
-    # This is the historical logical-key oracle, not an artifact serialization.
+    # Recompute the complete key using the current typed datatype context.
     # Stored bytes remain independently verified MLFBIN graph nodes.
     _, typed, _ = binary_helpers()
     require(graph_node(context, context.roots[0], 244, 1) == (declarations,),
             'logical source key uses the independently validated context root')
     values = context.values()[0]
     require(len(compact) == 8 and compact[0] == 'MLF-SOURCE-CRATE-QUERY-7', 'complete compact source key')
-    logical = typed.logical_context(typed.list_values(typed.value_node(values, 244, 1)[0]), compact[0])
+    logical = typed.logical_context(typed.list_values(typed.value_node(values, 244, 1)[0]))
     return pack(compact[:5] + [logical] + compact[5:])
 
 def require(ok, message):
@@ -157,12 +157,11 @@ def snapshot(root, active_hashes):
     require(independently_checked['files'] == files, 'independent binary closure agrees with full physical snapshot')
     records = independently_checked['active_records']
     contexts = set(independently_checked['reachable_contexts'])
-    legacy = independently_checked['legacy_records']
     reachable = set(records) | contexts
     return {
         "files": files, "directories_excluding_root": directories,
         "active_records": records, "reachable_contexts": sorted(contexts),
-        "legacy_records": legacy, "reachable_files": sorted(reachable),
+        "reachable_files": sorted(reachable),
         "reachable_logical_bytes": sum(files[n]["bytes"] for n in reachable),
         "reachable_file_allocated_bytes": sum(files[n]["allocated"] for n in reachable),
         "all_cache_logical_bytes": sum(x["bytes"] for x in files.values()),
@@ -686,7 +685,7 @@ def main():
     try:
         if "helper" in active:
             helper = run("helper", ["helper", out / "helper-cache"])
-            require(helper.endswith(b"PASS helper CACHE1/CACHE2/CACHE3, complete-key and corrupt-input controls\n"), "helper terminal marker")
+            require(helper.endswith(b"PASS helper rejects obsolete text and checks current keys and corrupt inputs\n"), "helper terminal marker")
 
         if "raw-final" in active:
             raw_final = run("raw-final", ["raw-final", out / "raw-final-cache"])
@@ -718,11 +717,11 @@ def main():
             if "query-install-legacy" in active:
                 legacy = run("query-install-legacy", ["legacy-one", cache])
                 require(legacy == b"PASS fixture replaced one record with valid old CACHE1\n", "legacy injection marker")
-                mixed_before = snapshot(cache, [g["query_key"] for g in cold["query_report"]["groups"]])
+                retired = [name for name in cold["cache"]["active_records"]
+                           if (cache / name).read_bytes().startswith(pack(["MLF-QUERY-CACHE-1"]).encode())]
+                require(len(retired) == 1, "one retired record installed")
                 if "query-mixed-old-new" in active:
                     mixed = driver(kind, cache, root, "41", "query-mixed-old-new")
-                    retired = mixed_before["legacy_records"]
-                    require(len(retired) == 1 and not mixed["cache"]["legacy_records"], "one old cache record replaced")
                     require(mixed["query_report"]["inferred_groups"] == 1 and
                             mixed["query_report"]["reused_groups"] == cold["query_report"]["inferred_groups"] - 1,
                             "old source format reinfers only its group")

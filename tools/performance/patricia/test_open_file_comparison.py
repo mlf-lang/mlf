@@ -131,7 +131,7 @@ class ComparatorControls(unittest.TestCase):
         with mock.patch.dict(sys.modules, impostors):
             directory, reference, typed = F.load_oracles(C.ORACLE_PINS)
             self.assertTrue(directory.is_dir())
-            self.assertIs(typed.read_document, reference.read_document)
+            self.assertIs(typed.require, reference.require)
             for name in names:
                 self.assertIs(sys.modules[name], impostors[name])
             self.assertIsNot(reference, impostors[names[0]])

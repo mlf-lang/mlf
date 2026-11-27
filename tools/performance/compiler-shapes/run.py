@@ -149,15 +149,17 @@ def main():
     lanes_per_round = 3 if reference else 2
     inputs={str(p.resolve()):H.sha(p) for p in [args.setup,Path(H.__file__),HERE/'command_runner.py',HERE/'bench.py',HERE/'run.py',HERE/'worker.py',HERE/'generate.py',
         HERE/'data_shapes.py',HERE/'rank_shapes.py',HERE/'fit_growth.py',HERE/'analyze.py',HERE/'compiler_reference.py',
-        HERE/'framework_results.py',ROOT/'tools/testing/events.py',
+        HERE/'framework_results.py',HERE/'prepare.py',ROOT/'tools/testing/events.py',
         HERE/'matrix.json',HERE/'query_cache.py',HERE/'provenance.py',Q.SHARED/'artifact_binary_reference.py',
-        Q.SHARED/'test_query_index.py',Q.SHARED/'artifact_binary_open.py',
+        Q.SHARED/'query_generation.py',Q.SHARED/'artifact_binary_open.py',
+        Q.SHARED/'artifact_binary_typed.py',Q.SHARED/'artifact_structure_contract.json',
         Path(setup['producer'])/'receipt.json',Path(setup['producer'])/'bin/emlf',
         Path(setup['ghc']),Path(setup['clang']),Path(setup['runtime']),Path(setup['builtin']+'.mlfci'),
         Path(setup['builtin']+'.mlfco')]}
     if reference:
         inputs.update({str(Path(reference['producer'])/'receipt.json'):reference['receipt_sha256'],
-                       str(Path(reference['producer'])/'bin/emlf'):reference['emlf_sha256']})
+                       str(Path(reference['producer'])/'bin/emlf'):reference['emlf_sha256'],
+                       reference['runtime']:reference['runtime_sha256']})
     inputs.update(H.file_pins(Path(setup['package_db']).parent))
     inputs.update({c['source']:c['source_sha256'] for c in cases})
     inputs.update({lib['source']:lib['sha256'] for c in cases for lib in worker.dependencies(c)})
@@ -210,7 +212,7 @@ def main():
         plan['benchmark']['order'] = 'candidate between GHC and the committed compiler, reversing each round; ' + ('interleaved cells' if args.interleave_pairs else 'grouped cells')
     plan_path=out/'plan.json';H.save(plan_path,plan);plan_sha=H.sha(plan_path)
     scripts=out/'scripts';scripts.mkdir()
-    for name in ['run.py','worker.py','generate.py','data_shapes.py','rank_shapes.py','fit_growth.py','analyze.py',
+    for name in ['run.py','worker.py','prepare.py','generate.py','data_shapes.py','rank_shapes.py','fit_growth.py','analyze.py',
                  'matrix.json','query_cache.py','provenance.py','framework_results.py','compiler_reference.py']:
         shutil.copy2(HERE/name,scripts/name)
     shutil.copy2(ROOT/'tools/testing/events.py', scripts/'events.py')
@@ -246,6 +248,9 @@ def main():
                 H.require(r['stages']['complete'],'every compilation stage complete')
                 r['executable_sha256']=H.sha(build/'program')
                 if lane in ('mlf','reference'):
+                    if lane == 'mlf':
+                        H.require((build/'queries'/Q.CACHE_DIRECTORY/'CURRENT').is_file(),
+                                  'compiler published the current query graph')
                     if args.endpoint == worker.CACHED_ENDPOINT:
                         producer = plan['toolchain']['producer'] if lane == 'mlf' else plan['compiler_reference']
                         r['codegen_cache'] = Q.cold_codegen_evidence(build, producer['emlf_sha256'])
@@ -312,7 +317,7 @@ def main():
                 query=build/'queries'
                 if query.is_dir():
                     H.save(leg/'query-cache-inventory.json',{str(p.relative_to(query)):{'bytes':p.stat().st_size,'sha256':H.sha(p)} for p in sorted(query.rglob('*')) if p.is_file()})
-                    Q.snapshot(query,build/'unit.queries',leg/'query-graph-evidence.json')
+                    Q.snapshot(query,build/'unit.queries',leg/'query-graph-evidence.json', reference=lane=='reference')
                     shutil.rmtree(query)
             remaining[case['id']] -= 1
             if case['id'] in blocked or not remaining[case['id']]:

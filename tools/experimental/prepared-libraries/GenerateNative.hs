@@ -11,6 +11,7 @@ module Main where {
   import qualified Bootstrap.Data as D;
   import qualified Bootstrap.X.Pretty as Pretty;
   import qualified Bootstrap.PreparedLibraries as Prepared;
+  import qualified Bootstrap.LLVM as LLVM;
   import qualified Bootstrap.LLVM.Library as Library;
   import qualified MLF.PreparedLibraryData as Data;
   import qualified Package.Json as J;
@@ -22,9 +23,10 @@ module Main where {
   text = J.String;
   metadata :: Library.ExportLayout -> J.Json;
   metadata layout = J.Object [
-    (,) "format" (text "MLF-NATIVE-LIBRARY-1"),
+    (,) "format" (text "MLF-NATIVE-LIBRARY-2"),
     (,) "identity" (text (Library.identity layout)),
     (,) "export_abi" (text "mlf-native-typed-tuple/2"),
+    (,) "runtime_abi" (text LLVM.runtimeAbi),
     (,) "exports" (J.Array (zipWith (\slot ((,,) key hint ty) -> J.Object [
       (,) "key" (text key), (,) "hint" (text hint),
       (,) "type" (text (Pretty.prettyType ty)), (,) "slot" (J.Number (showInt slot))])

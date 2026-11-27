@@ -1238,7 +1238,13 @@ module Package.Benchmark where {
                                String ->
                                [] String ->
                                [] String -> Double -> IO (Either String ((,) String J.Json));
-  buildParallelWithIncludes directory compiler clang source runtime flags includes timeout =
+  buildParallelWithIncludes directory compiler clang source runtime flags includes timeout = do {
+    splitting <- getEnv "MLF_BENCH_SPLIT_RUNTIME";
+    buildParallelWithRuntime splitting directory compiler clang source runtime flags includes timeout
+  };
+  buildParallelWithRuntime :: String -> String -> String -> String -> String -> String ->
+    [] String -> [] String -> Double -> IO (Either String ((,) String J.Json));
+  buildParallelWithRuntime splitting directory compiler clang source runtime flags includes timeout =
     do {
       present <- directoryExists directory;
       files <- if present then O.entries directory else return [];
@@ -1273,7 +1279,6 @@ module Package.Benchmark where {
              let {
                streamLink = eqString linking "1"
              };
-             splitting <- getEnv "MLF_BENCH_SPLIT_RUNTIME";
              O.require (eqString splitting "" || eqString splitting "1")
                "invalid split runtime setting";
              let {

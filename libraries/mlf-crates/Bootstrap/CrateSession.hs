@@ -547,7 +547,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
         let { destination = cacheDir ++ "/" ++ digest ++ ".mlfq" };
         present <- fileExists destination;
         cachedRead <- if present then do {
-          observed <- Query.readLocalSourceUnit verifyAll readWindow cacheDir key digest (fst context) name
+          observed <- Query.readLocalSourceUnit verifyAll readWindow cacheDir digest (fst context) name
             bindings datatypes names destination;
           ioReturn (case observed of {
             (,,) next _ decoded -> case (do {
