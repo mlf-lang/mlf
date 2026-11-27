@@ -370,10 +370,10 @@ module Bootstrap.Crate where {
       let { expression = case find (\unit -> eqString (compilationName unit) (specEntry spec)) resolved of {
         Nothing -> Left "crate entry module was not resolved"; Just unit -> compilationEntry unit
       } };
-      entryAndBindings <- mapLeft (CompileError ModuleResolution) (entryBindingsFor spec ownBindings expression);
-      mapLeft (CompileError Inference) (case entryAndBindings of {
-        (,) entry bindings ->
-          do {
+      (,) entry bindings <- mapLeft (CompileError ModuleResolution) (entryBindingsFor spec ownBindings expression);
+      let { parts = Source.sourcePlanParts (Source.ResolvedInput bindings) };
+      body <- mapLeft (\message -> CompileError ModuleResolution (Modules.displayNames (compilationNames inputs) message)) (fst parts);
+      mapLeft (CompileError Inference) (do {
             let {
               localRows = concatMap (\unit -> map (\inst -> (,) (compilationName unit) inst)
                 (Modules.resolvedInstances (compilationContents unit))) resolved;
@@ -460,7 +460,7 @@ module Bootstrap.Crate where {
               let { closeLocal = Surface.closeIndexedInstance (Surface.helperScope bindings) };
               local <- traverseEither (\((,) metadata row) -> mapEither ((,) (fst (snd metadata))) (closeLocal (snd row)))
                 (zip localInstances localRows);
-              Source.prepareResolvedSourcePlanWithImports conventions bindings imported allData allClasses (map snd instances)
+              Source.sourcePlanFromBody conventions body (snd parts) imported allData allClasses (map snd instances)
                 (append importedInstances local) valueScopes (map (\((,) owner _) -> candidates owner) instances)
             });
             lowered <- case sourcePlan of {
@@ -477,7 +477,6 @@ module Bootstrap.Crate where {
                  lowered
                  entry
                  reach sourcePlan)
-          }
       })
     };
   -- Retained low-level artifact-format oracles use this closed-fragment

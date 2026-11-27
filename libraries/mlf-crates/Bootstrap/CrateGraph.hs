@@ -1038,7 +1038,7 @@ module Bootstrap.CrateGraph where {
       Right ((,,,) plan inventory checked steps)
     } of {
       Left e -> ioReturn (Left e);
-      Right ((,,,) plan inventory checked steps) -> startGroupWith begin owned occurrences declarationReads selectData verify crateId compilerHash
+      Right ((,,,) plan inventory checked steps) -> startGroupWith Nothing begin owned occurrences declarationReads selectData verify crateId compilerHash
         "source" inventory (Source.planData plan) checked steps
     };
   -- The already-lowered fallback has no unsigned-root evidence finalization.
@@ -1047,8 +1047,8 @@ module Bootstrap.CrateGraph where {
   -- calling contract, including mixed source/dictionary recursive groups.
   -- Standalone named callers own no resolver or class-lowering table.
   compileLowered verify crateId compilerHash cacheDir =
-    compileNamedQueries (openFileQueries cacheDir) verify crateId compilerHash;
-  compileNamedQueries begin verify crateId compilerHash imports datatypes members =
+    compileNamedQueries Nothing (openFileQueries cacheDir) verify crateId compilerHash;
+  compileNamedQueries scriptEntry begin verify crateId compilerHash imports datatypes members =
     case Dependency.declarationGroups members of {
       Left e -> ioReturn (Left e);
       Right groups -> let {
@@ -1056,7 +1056,7 @@ module Bootstrap.CrateGraph where {
         ids = V.indices (Dependency.symbolNodes base);
         scope = Source.declarationScope base ids [] (concatMap (compose (map fst) Separate.unitBindings) imports)
       } in case traverseEither (traverseEither (Source.requireDecl scope)) groups of {
-        Left e -> ioReturn (Left e); Right grouped -> startLoweredQueries begin scope (zip ids members) grouped
+        Left e -> ioReturn (Left e); Right grouped -> startLoweredQueries scriptEntry begin scope (zip ids members) grouped
           verify crateId compilerHash imports datatypes
       }
     };
@@ -1066,19 +1066,20 @@ module Bootstrap.CrateGraph where {
   compileLoweredIn lowered verify crateId compilerHash directory =
     compileLoweredQueries (openFileQueries directory) lowered verify crateId compilerHash;
   compileLoweredQueries begin lowered verify crateId compilerHash imports = case Inference.loweredDeclarationTable lowered of {
-    Nothing -> compileNamedQueries begin verify crateId compilerHash imports
+    Nothing -> compileNamedQueries (case lowered of { Inference.LoweredDeclarations entry _ _ _ -> entry; _ -> Nothing })
+      begin verify crateId compilerHash imports
       (Inference.loweredData lowered) (Inference.loweredValues lowered);
     Just generation -> let { entries = Inference.loweredIdValues lowered;
       scope = Source.loweredScope generation (map fst entries)
     } in case Surface.indexedMemberGroups entries of {
       Left e -> ioReturn (Left e);
-      Right grouped -> startLoweredQueries begin scope entries grouped verify crateId compilerHash imports
+      Right grouped -> startLoweredQueries Nothing begin scope entries grouped verify crateId compilerHash imports
         (Inference.loweredData lowered)
     }
   };
   startLowered scope entries grouped verify crateId compilerHash directory =
-    startLoweredQueries (openFileQueries directory) scope entries grouped verify crateId compilerHash;
-  startLoweredQueries begin scope entries grouped verify crateId compilerHash imports datatypes = case do {
+    startLoweredQueries Nothing (openFileQueries directory) scope entries grouped verify crateId compilerHash;
+  startLoweredQueries scriptEntry begin scope entries grouped verify crateId compilerHash imports datatypes = case do {
     inventory <- Q.prepareData datatypes;
     types <- foldM Inference.mergeExternal M.empty (concatMap Separate.unitBindings imports);
     checked <- Source.installContracts scope (M.map (\ty -> Source.SourceContract ty [] True) types);
@@ -1093,15 +1094,15 @@ module Bootstrap.CrateGraph where {
     };
     Right ((,,) inventory checked (map (\ids -> (,) ids (prepare ids)) grouped))
   } of { Left e -> ioReturn (Left e); Right ((,,) inventory checked steps) ->
-    startGroupWith begin False (Dependency.valueOccurrences True) (Dependency.valueOccurrences True False)
-      Q.requiredDataIn verify crateId compilerHash "lowered" inventory datatypes checked steps
+    startGroupWith scriptEntry begin False (Dependency.valueOccurrences True) (Dependency.valueOccurrences True False)
+      Q.requiredDataIn verify crateId compilerHash (case scriptEntry of { Nothing -> "lowered"; Just _ -> "script-expression" }) inventory datatypes checked steps
   };
   start = startWithData Q.requiredDataIn;
   startWithData = startUsing (Dependency.valueOccurrences True) (Dependency.valueOccurrences True False);
   startUsing = startGroupUsing False;
   startGroupUsing owned occurrences declarationReads selectData verify crateId compilerHash directory =
-    startGroupWith (openFileQueries directory) owned occurrences declarationReads selectData verify crateId compilerHash;
-  startGroupWith begin owned occurrences declarationReads selectData verify crateId compilerHash flavor inventory datatypes contracts groups = do {
+    startGroupWith Nothing (openFileQueries directory) owned occurrences declarationReads selectData verify crateId compilerHash;
+  startGroupWith scriptEntry begin owned occurrences declarationReads selectData verify crateId compilerHash flavor inventory datatypes contracts groups = do {
         statistics <- G.profile;
         graphStarted <- G.clock statistics;
         auditSetting <- getEnv "MLF_QUERY_SEMANTIC_AUDIT";
@@ -1110,26 +1111,26 @@ module Bootstrap.CrateGraph where {
         case started of { Left e -> ioReturn (Left e); Right session -> do {
           let { initial = Source.checkedIndexed contracts };
           G.elapsed statistics 0 graphStarted;
-          runCheckedGroups owned occurrences declarationReads selectData verify (eqString auditSetting "1") (Separate.compactOpenGroupName crateId) inventory initial ((,) Nothing Nothing) groups
+          runCheckedGroups scriptEntry owned occurrences declarationReads selectData verify (eqString auditSetting "1") (Separate.compactOpenGroupName crateId) inventory initial ((,) Nothing Nothing) groups
             (State session contracts (InferenceCaches M.empty M.empty M.empty Nothing Nothing Nothing) [] 0 0 [] statistics)
         } }
     };
   runGroups verify audit crateId = runGroupsWithOwner verify audit (Separate.compactOpenGroupName crateId);
   runGroupsWithOwner = runGroupsUsing Q.requiredDataIn;
   runGroupsUsing = runGroupsReading (Dependency.valueOccurrences True) (Dependency.valueOccurrences True False);
-  runGroupsReading = runCheckedGroups False;
+  runGroupsReading = runCheckedGroups Nothing False;
   data CheckedRoute = OrdinaryCheck | SharedArgumentCheck | GroupedRootCheck;
   data CheckedStep = ReplayOrdinary | CheckedStep ((,) (Maybe RebuiltHash) (Maybe RebuiltHash)) State;
   -- Rejection is a source/evidence decision. Cache, hash, input and publication
   -- errors remain errors on both paths. A rejected step never returns its
   -- session or its pending raw/evidence payloads to the caller.
   rejectedStep trial message = if trial then ioReturn (Right ReplayOrdinary) else ioReturn (Left message);
-  runCheckedGroups owned occurrences declarationReads selectData verify audit groupName inventory initial scopeHashes groups state = case groups of {
+  runCheckedGroups scriptEntry owned occurrences declarationReads selectData verify audit groupName inventory initial scopeHashes groups state = case groups of {
     [] -> ioReturn (Right state);
     (:) ((,) owners prepare) rest -> case state of {
       State _ contracts _ _ _ _ _ _ -> let {
         readGroup input = bindEither (prepare input) (Source.slotPreparedWith (occurrences False) contracts owners);
-        step = runOneCheckedGroup owned occurrences declarationReads selectData verify audit groupName inventory initial scopeHashes owners state
+        step = runOneCheckedGroup scriptEntry owned occurrences declarationReads selectData verify audit groupName inventory initial scopeHashes owners state
       } in case readGroup contracts of {
         Left e -> ioReturn (Left e); Right ordinary@((,) slots prepared) -> do {
           let { original = step OrdinaryCheck ordinary;
@@ -1156,13 +1157,13 @@ module Bootstrap.CrateGraph where {
           case selected of {
             Left e -> ioReturn (Left e);
             Right ReplayOrdinary -> ioReturn (Left "ordinary checking requested a replay");
-            Right (CheckedStep hashes next) -> runCheckedGroups owned occurrences declarationReads selectData verify audit groupName inventory initial hashes rest next
+            Right (CheckedStep hashes next) -> runCheckedGroups scriptEntry owned occurrences declarationReads selectData verify audit groupName inventory initial hashes rest next
           }
         }
       }
     }
   };
-  runOneCheckedGroup owned occurrences declarationReads selectData verify audit groupName inventory initial scopeHashes owners state route ((,) slots prepared) =
+  runOneCheckedGroup scriptEntry owned occurrences declarationReads selectData verify audit groupName inventory initial scopeHashes owners state route ((,) slots prepared) =
     let { trial = case route of { OrdinaryCheck -> False; _ -> True };
           grouped = case route of { GroupedRootCheck -> True; _ -> False }
     } in case state of {
@@ -1258,7 +1259,7 @@ module Bootstrap.CrateGraph where {
                                   members <- indexed;
                                   compile (Left reason) templates group currentParameters declarations members
                                 }
-                              } else mapEither (\fragment -> (,) fragment templates) (Inference.compileOpenGroup group
+                              } else mapEither (\fragment -> (,) fragment templates) (Inference.compileNamedOpenGroup scriptEntry group
                                 [Q.dependencyInterface (Source.groupBindings prepared)] declarations (Source.groupMembers prepared));
                               restored <- if grouped then Source.restoreRootDictionarySpine prepared (fst inferredResult)
                                 else Right (fst inferredResult);

@@ -35,23 +35,23 @@ module Bootstrap.InferenceUnit where {
   -- built. Its generated selectors/dictionaries become ordinary signed graph
   -- vertices. Inference queries consume this lowered representation directly.
   data LoweredDeclarations =
-    LoweredDeclarations ([] DataDecl) ([] ((,,) String (Maybe SAnnotation) SExpr)) (Map String String) |
+    LoweredDeclarations (Maybe String) ([] DataDecl) ([] ((,,) String (Maybe SAnnotation) SExpr)) (Map String String) |
     IndexedDeclarations ([] DataDecl) Dependency.GeneratedTable
       ([] ((,) (V.Index Declaration) ((,,) String (Maybe SAnnotation) SExpr))) (Map String String);
   loweredData lowered = case lowered of {
-    LoweredDeclarations ds _ _ -> ds; IndexedDeclarations ds _ _ _ -> ds
+    LoweredDeclarations _ ds _ _ -> ds; IndexedDeclarations ds _ _ _ -> ds
   };
   loweredValues lowered = case lowered of {
-    LoweredDeclarations _ values _ -> values; IndexedDeclarations _ _ values _ -> map snd values
+    LoweredDeclarations _ _ values _ -> values; IndexedDeclarations _ _ values _ -> map snd values
   };
   loweredNames lowered = case lowered of {
-    LoweredDeclarations _ _ names -> names; IndexedDeclarations _ _ _ names -> names
+    LoweredDeclarations _ _ _ names -> names; IndexedDeclarations _ _ _ names -> names
   };
   loweredDeclarationTable lowered = case lowered of {
-    LoweredDeclarations _ _ _ -> Nothing; IndexedDeclarations _ table _ _ -> Just table
+    LoweredDeclarations _ _ _ _ -> Nothing; IndexedDeclarations _ table _ _ -> Just table
   };
   loweredIdValues lowered = case lowered of {
-    LoweredDeclarations _ _ _ -> []; IndexedDeclarations _ _ rows _ -> rows
+    LoweredDeclarations _ _ _ _ -> []; IndexedDeclarations _ _ rows _ -> rows
   };
   recursiveAnnotation :: RecursiveMode -> Maybe SAnnotation;
   recursiveAnnotation mode =
@@ -146,7 +146,7 @@ module Bootstrap.InferenceUnit where {
       (,) (SProgram ds expression) names -> case generation of {
         Nothing -> do {
           declarations <- extractLoweredDeclarations expression;
-          Right (LoweredDeclarations ds (filter (\((,,) n _ _) -> not (M.member compareString n externals)) declarations) names)
+          Right (LoweredDeclarations Nothing ds (filter (\((,,) n _ _) -> not (M.member compareString n externals)) declarations) names)
         };
         Just table -> do {
           imported <- traverseEither (\key -> case Dependency.generatedImportId table key of {
@@ -311,7 +311,24 @@ module Bootstrap.InferenceUnit where {
       (,) externalTypes lowered <- prepareNamedGroup dependencies datatypes members;
       finishOpenGroup externalTypes members lowered
     };
+  -- A script exports the type of its final expression at its use site.
+  -- Inferring it inside an unused let can default an otherwise free
+  -- instance argument to bot before the expression is generalized.
+  compileNamedOpenGroup scriptEntry name dependencies datatypes members = case (,) scriptEntry members of {
+    (,) (Just entry) [((,,) n Nothing rhs)] -> if eqString n entry then do {
+      (,) externalTypes lowered <- prepareNamedBody dependencies datatypes members rhs;
+      (,,) declarations parameters body <- compileGroupBody externalTypes lowered;
+      let { fresh = 1 + Separate.maximumTermIdentity
+              (foldl (\largest pair -> max largest (X.nameId (fst pair))) 0 parameters) body };
+      checkGroupBody members ((,,) declarations parameters (XLet (XName fresh entry) body (XConstructor "()" [])))
+    } else compileOpenGroup name dependencies datatypes members;
+    _ -> compileOpenGroup name dependencies datatypes members
+  };
   prepareNamedGroup dependencies datatypes members = do {
+      body <- Surface.bindValues members (SConstructor "()");
+      prepareNamedBody dependencies datatypes members body
+  };
+  prepareNamedBody dependencies datatypes members body = do {
       ensure (not (null members)) "cannot infer an empty declaration group";
       externalTypes <- foldM mergeExternal M.empty (concatMap Separate.unitBindings dependencies);
       traverseEither
@@ -319,7 +336,6 @@ module Bootstrap.InferenceUnit where {
            ensure (not (M.member compareString n externalTypes))
              ("inference group also imports its own binding: " ++ n))
         members;
-      body <- Surface.bindValues members (SConstructor "()");
       let {
         -- Members already contain explicit evidence applications. Recovering
         -- source qualifications here would insert the managed argument twice.
@@ -2470,16 +2486,15 @@ module Bootstrap.InferenceUnit where {
             term -> (,) [] term
           }
       };
-      let {
-        declarations = fst coreAndData
-      };
-      let {
-        core = snd coreAndData
-      };
-      boundValueShared9 <-
-        if M.null externalTypes
-        then Right ((,) [] core)
-        else case core of {
+      (,) parameters body <- detachGroupParameters externalTypes (snd coreAndData);
+      Right ((,,) (fst coreAndData) parameters body)
+  };
+  detachGroupParameters externalTypes core =
+    if M.null externalTypes then Right ((,) [] core) else let {
+      under wrap inner = mapEither (\((,) ps body) -> (,) ps (wrap body)) (detachGroupParameters externalTypes inner)
+    } in case core of {
+               XTypeAbs v bound body -> under (XTypeAbs v bound) body;
+               XTypeApp body proof -> under (\term -> XTypeApp term proof) body;
                XLetRec bindings rest ->
                  do {
                    ensure
@@ -2499,8 +2514,6 @@ module Bootstrap.InferenceUnit where {
                  };
                _ -> Left "inference did not retain external parameters"
              };
-      Right ((,,) declarations (fst boundValueShared9) (snd boundValueShared9))
-  };
   finishOpenGroup = finishOpenGroupWith Compiler.finishCompilation;
   finishOpenGroupWith finish externalTypes members lowered = do {
     compiled <- compileGroupBodyWith finish externalTypes lowered;

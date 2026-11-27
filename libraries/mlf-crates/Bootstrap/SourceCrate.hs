@@ -37,10 +37,10 @@ module Bootstrap.SourceCrate
       root = last sources;
       owner = Modules.moduleIdentity root;
       identity = "emlf:source:" ++ owner
-    } in if Compiler.standalone root
+    } in if null interfaces && Compiler.standalone root
     then compileScriptWith storage root [] (\program -> do {
       (,) names lowered <- Compiler.lowerStandalone mode program;
-      Right ((,) (fromMaybe M.empty names) lowered)
+      Right ((,,) (fromMaybe M.empty names) Nothing lowered)
     })
     else case Compiler.atPhase ModuleResolution (traverseEither Separate.cleanParsedSource sources) of {
       Left error -> ioReturn (Left error);
@@ -77,7 +77,7 @@ module Bootstrap.SourceCrate
   -- preserves that boundary through lowering. Only then make the checked
   -- entry a declaration; its RHS still contains all of the user's local lets.
   compileScriptWith :: Session.QueryStorage -> SourceModule -> [] ((,) String Artifact.CrateInterface) ->
-    (SProgram -> Either CompileError ((,) (Map String String) ((,) SProgram (Map String String)))) ->
+    (SProgram -> Either CompileError ((,,) (Map String String) (Maybe ((,) ([] DataDecl) ([] SClassDecl))) ((,) SProgram (Map String String)))) ->
     IO (Either CompileError Session.SourceRoot);
   compileScriptWith storage source interfaces lower = let {
     owner = Modules.moduleIdentity source;
@@ -89,7 +89,7 @@ module Bootstrap.SourceCrate
   } in case choose 0 of { (,) identity entry -> case do {
     program <- Compiler.atPhase Parsing (Parser.standaloneProgramWith
       (SLetRec []) source);
-    (,) names ((,) lowered dictionaries) <- lower program;
+    (,,) names headers ((,) lowered dictionaries) <- lower program;
     case lowered of {
       SClassProgram _ _ _ _ -> Left (CompileError Inference "class translation did not produce a core program");
       SProgram declarations body -> do {
@@ -104,13 +104,13 @@ module Bootstrap.SourceCrate
         });
         body <- Compiler.atPhase Verification (insertScriptEntry entry local);
         members <- Compiler.atPhase Inference (Inference.extractLoweredDeclarations body);
-        Right ((,,,) names declarations members dictionaries)
+        Right ((,,) names (fromMaybe ((,) declarations []) headers) (Inference.LoweredDeclarations (Just entry) declarations members dictionaries))
       }
     }
   } of {
     Left error -> ioReturn (Left error);
-    Right ((,,,) names declarations members dictionaries) ->
-      Session.compileExpressionRoot storage identity owner names interfaces declarations members dictionaries
+    Right ((,,) names headers lowered) ->
+      Session.compileExpressionRoot storage identity owner entry names interfaces headers lowered
   } };
 
   insertScriptEntry :: String -> SExpr -> Either String SExpr;

@@ -259,7 +259,7 @@ def dependency_diagnostics(stderr):
     rows = []
     diagnostics = []
     for line in stderr.splitlines(keepends=True):
-        match = re.fullmatch(rb'dependency ([^\r\n]+): (native|ir|source|unused) \(([^\r\n]+)\)\n', line)
+        match = re.fullmatch(rb'dependency ([^\r\n]+): (native|ir|source|unused) \(([^\r\n]*)\)\n', line)
         if match:
             try:
                 name, mode, reason = (field.decode('utf-8') for field in match.groups())

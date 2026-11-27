@@ -1923,7 +1923,9 @@ module Tests.CompilerTests where {
             (S.concatMap (\path -> ["-i", path]) (J.getStrings "include_dirs" target))
         };
         TestAssert.liftIO (writeFile (stem ++ ".stdin") (J.getText "expected_stdin" "" row));
-        interpreter <- TestAssert.liftIO (parityOutput c row (S.append prefix ["--run", source]) stem "interpreter");
+        -- Run the independently checked target so stderr is the program's own.
+        -- Source CLI dependency decisions are covered by source-root-cli.
+        interpreter <- TestAssert.liftIO (parityOutput c row [compiler c, "--run-xmlf", stem ++ ".xmlf"] stem "interpreter");
         generated <- TestAssert.liftIO
           (O.exec (root c) (S.append prefix ["--emit-llvm", source]) "" (stem ++ ".ll") (stem ++ ".llvm.err") 1800);
         llvm <- if generated == 0

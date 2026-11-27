@@ -1258,12 +1258,12 @@ module Bootstrap.SourceInference where {
     mapEither fst (sourcePlanWith (NamedInput members) externals datatypes classes instances closed (Dependency.NamedScopes valueScopes) instanceScopes)
   };
   prepareResolvedSourcePlan bindings = sourcePlanWith (ResolvedInput bindings);
-  prepareResolvedSourcePlanWithImports conventions bindings = sourcePlanUsing conventions (ResolvedInput bindings);
-  sourcePlanWith = sourcePlanUsing M.empty;
-  sourcePlanUsing conventions input externals datatypes classes instances closedInstances valueScopes instanceScopes = do {
-    let {
-      entry = SConstructor "()";
-      parts = case input of {
+  sourcePlanWith input externals datatypes classes instances closedInstances valueScopes instanceScopes = do {
+    let { parts = sourcePlanParts input };
+    body <- fst parts;
+    sourcePlanFromBody M.empty body (snd parts) externals datatypes classes instances closedInstances valueScopes instanceScopes
+  };
+  sourcePlanParts input = let { entry = SConstructor "()" } in case input of {
         NamedInput members -> (,) (Surface.bindValues members entry)
           (\_ supports methods targets -> namedPlan members supports methods (Dependency.namedScopes targets));
         ResolvedInput bindings@(Dependency.BoundValues base _) -> let {
@@ -1282,9 +1282,8 @@ module Bootstrap.SourceInference where {
             } in indexedPlanFrom sourceRow edges generation supports (\i -> map snd (Classes.inventoryCandidateIds inventory i))
           }
         } in (,) (Surface.bindResolvedEdgeRows SDeclScope edges (V.at indexed) entry) graph
-      }
-    };
-    body <- fst parts;
+  };
+  sourcePlanFromBody conventions body makeGraph externals datatypes classes instances closedInstances valueScopes instanceScopes = do {
     prepared <- Classes.withClassScopesAndImports conventions externals (map fst closedInstances)
       valueScopes instanceScopes
       (SClassProgram datatypes classes (map snd closedInstances) body)
@@ -1294,7 +1293,7 @@ module Bootstrap.SourceInference where {
       graph <- case inventory of { Classes.ClassInventory _ _ _ scopes _ methods definitions _ _ ->
         let { supports = map (\((,,) name annotation rhs) -> (,,) name (Just annotation) rhs) (Classes.supportDefinitions definitions);
               targets = Dependency.mapScopes (map snd) scopes
-        } in snd parts inventory supports methods targets
+        } in makeGraph inventory supports methods targets
       };
       Right ((,) (mapOptional (\g -> SourcePlan inventory g count used externals legacy instances M.empty) graph) legacy)
     } }

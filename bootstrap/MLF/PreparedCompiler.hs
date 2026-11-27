@@ -702,8 +702,8 @@ module MLF.PreparedCompiler
   };
   lowerPreparedScript mode witness program = do {
     root <- Core.atPhase ModuleResolution (Standalone.rewriteRootWithNames mode rawNames rawEnvironment program);
-    lowered <- lowerPrepared witness root program;
-    Right ((,) (Standalone.rewrittenDisplay root) lowered)
+    (,) headers lowered <- lowerPrepared witness root program;
+    Right ((,,) (Standalone.rewrittenDisplay root) (Just headers) lowered)
   };
   sourcePhase phase root result = Core.atPhase phase
     (mapLeft (Modules.displayNames (Standalone.rewrittenDisplay root)) result);
@@ -748,8 +748,9 @@ module MLF.PreparedCompiler
         };
     (,) ownData ownClasses <- sourcePhase Inference root
       (Classes.canonicalSourceHeaders S.empty builtinData builtinClasses ds cs);
-    sourcePhase Inference root (Classes.lowerSeparateClasses externals instanceNames
+    lowered <- sourcePhase Inference root (Classes.lowerSeparateClasses externals instanceNames
       (SClassProgram (append builtinData ownData) (append builtinClasses ownClasses)
-        (append (map snd builtinInstances) instances) body))
+        (append (map snd builtinInstances) instances) body));
+    Right ((,) ((,) ownData ownClasses) lowered)
   }
 }

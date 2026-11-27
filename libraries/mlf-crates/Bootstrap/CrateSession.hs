@@ -494,18 +494,13 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
 
   -- Named script bindings retain their lexical source spelling. Only the
   -- outer declaration spine is split: nested lets and lambdas stay in the RHS.
-  compileExpressionRoot :: QueryStorage -> String -> String -> Map String String ->
-    [] ((,) String Artifact.CrateInterface) -> [] DataDecl ->
-    [] ((,,) String (Maybe SAnnotation) SExpr) -> Map String String -> IO (Either CompileError SourceRoot);
-  compileExpressionRoot storage identity owner names interfaces declarations members dictionaries = let {
-    entry = Artifact.definitionName identity (Modules.Entity owner "<crate-entry>" Modules.Value);
-    membersByName = map Source.sourceName members;
+  compileExpressionRoot :: QueryStorage -> String -> String -> String -> Map String String ->
+    [] ((,) String Artifact.CrateInterface) -> ((,) ([] DataDecl) ([] SClassDecl)) ->
+    Inference.LoweredDeclarations -> IO (Either CompileError SourceRoot);
+  compileExpressionRoot storage identity owner entry names interfaces ((,) ownData ownClasses) lowered = let {
+    membersByName = map Source.sourceName (Inference.loweredValues lowered);
     symbols = Dependency.symbols (map (\n -> (,) n False) membersByName);
     ids = V.indices (Dependency.symbolNodes symbols);
-    lowered = Inference.LoweredDeclarations declarations members dictionaries;
-    importedData = Set.fromList compareString (concatMap (compose (map D.datatypeName)
-      (compose Artifact.crateLoweredData snd)) interfaces);
-    localData = filter (\declaration -> not (Set.member compareString (D.datatypeName declaration) importedData)) declarations;
     moduleRow = Crate.CompilationModule owner (Modules.Renamed symbols [] [] [] [] Nothing)
       (Right (R.Local entry)) (Right Modules.emptyInterface);
     -- Script lowering admits exactly these dependency interfaces. Keep that
@@ -518,7 +513,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   } in case lookup eqString entry (zip membersByName ids) of {
     Nothing -> ioReturn (Left (CompileError Inference "class lowering lost the script entry declaration"));
     Just slot -> compilePreparedSourceRoot storage spec interfaces names
-      (FileCrate modules localData [] [] lowered (CrateEntry symbols slot) reach Nothing)
+      (FileCrate modules ownData ownClasses [] lowered (CrateEntry symbols slot) reach Nothing)
   };
 
   runSourceGroupsWithEncodings :: Maybe Query.SourceEncodings -> String -> String -> String ->
