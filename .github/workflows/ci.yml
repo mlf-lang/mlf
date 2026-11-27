@@ -144,10 +144,10 @@ jobs:
         if: matrix.optimization == '2'
         run: |
           python3 -B tools/shared/resource_watchdog.py --seconds 600 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-graph-guard python3 -B tools/testing/run.py --inherit-process-group source-query-api -- .mlf-build/shared-ghc/receipt.json .mlf-build/source-graph-guard/results
-      - name: Check retained legacy query API contexts and codecs
+      - name: Check source cache reuse, invalidation and recovery
         if: matrix.optimization == '2'
         run: |
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-context-cache-guard python3 -B tools/testing/run.py --inherit-process-group source-context-cache -- --legacy-query-only --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/source-context-cache-guard/results
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-context-cache-guard python3 -B tools/testing/run.py --inherit-process-group source-context-cache -- --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/source-context-cache-guard/results
       - name: Qualify optimized host demand and framework CLI contracts
         if: matrix.suite == 'optimizer'
         run: |
@@ -294,7 +294,7 @@ jobs:
         if: matrix.suite == 'routine'
         run: |
           python3 -B tools/testing/run.py figure12-direct -- --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/figure12-direct
-      - name: Exercise hosted frozen parity corpus
+      - name: Exercise hosted parity corpus
         if: ${{ !cancelled() && steps.hosted_campaign_tools.outcome == 'success' && matrix.suite == 'routine' }}
         run: |
           set -euo pipefail
@@ -453,7 +453,6 @@ jobs:
             .mlf-build/source-context-cache-guard/results/**/*.json
             .mlf-build/source-context-cache-guard/results/**/*.stdout
             .mlf-build/source-context-cache-guard/results/**/*.stderr
-            .mlf-build/source-context-cache-guard/results/**/*.legacy-bytes
             .mlf-build/contract-context-guard/bounded-receipt.json
             .mlf-build/contract-context-guard/build.log
             .mlf-build/contract-context/receipt.json

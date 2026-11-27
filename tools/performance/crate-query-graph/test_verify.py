@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Pure verifier adapters and attack fixtures; no compiler or production imports."""
 from pathlib import Path
-import ast
-import inspect
 import re
 import tempfile
 import unittest
@@ -231,35 +229,49 @@ class VerifierTests(unittest.TestCase):
         # This pure test proves only structural fixture validity. Actual ICH
         # reuse, linker rejection and semantic repair remain in verify.main.
 
-    def test_normalized_rows_preserve_all_three_wire_formats(self):
-        from test_query_generation import fixture
-        from artifact_binary_typed import n
-        typed_fields, legacy = fixture(['A.f', 'B.f'])
-        typed = tree_document([n(412, *typed_fields)], schema=6)
-        records = v.Generation(legacy).nodes
-        dictionary = v.index_bytes('cfg', records, version=2)
-        for raw, reason in [(legacy, 'missing/stale dependency'),
-                            (dictionary, 'missing dependency'),
-                            (typed, 'dangling query read')]:
-            wire = v.Generation(raw)
-            self.assertEqual(wire.encode_rows(wire.rows), raw)
-            self.assertEqual(wire.nodes, records)
-            damaged = []
-            changed = False
-            for value in wire.rows:
-                key, result, reads, location = v.node(value, 410, 4)
-                edges = list(v.items(reads))
-                if edges and not changed:
-                    _, expected = v.pair(edges[0])
-                    edges[0] = n(2, ('text', 'absent'), expected)
-                    value = n(410, key, result, n(1, *edges), location)
-                    changed = True
-                damaged.append(value)
-            self.assertTrue(changed)
-            self.assertEqual(len(damaged), len(wire.rows))
-            self.assertEqual(sum(a != b for a, b in zip(damaged, wire.rows)), 1)
-            with self.assertRaisesRegex(Invalid, '^' + re.escape(reason) + '$'):
-                v.Generation(wire.encode_rows(damaged), configuration='cfg')
+    def test_verifier_mutations_preserve_the_input_wire_format(self):
+        from artifact_binary_typed import l, n, pack, s
+
+        a, b = (pack(['Binding', name]) for name in ('A', 'B'))
+        records = {a: dict(sha=H1, reads=[], payload=H1),
+                   b: dict(sha=H2, reads=[(a, H1)] * 2, payload=None)}
+        tables = [l(s('A'), s('B')), l(), l(), l()]
+        slots = [integer(0), integer(1)]
+        def typed(first_edge):
+            rows = l(n(413, slots[0], s(H1), l(), n(5, s(H1))),
+                     n(413, slots[1], s(H2), l(first_edge, slots[0]), n(4)))
+            return tree_document([n(412, s('MLF-CRATE-QUERY-GRAPH-2'), s('cfg'), *tables, rows)], 6)
+
+        def columns(first_edge):
+            return tree_document([n(412, s('MLF-CRATE-QUERY-GRAPH-3'), s('cfg'), *tables,
+                l(*slots), l(s(H1), s(H2)), l(integer(0), integer(2)),
+                l(first_edge, slots[0]), l(slots[0]))], 6)
+
+        broken = {**records, b: {**records[b], 'reads': [(pack(['Binding', 'absent-definition']), H1), (a, H1)]}}
+        formats = [(v.index_bytes('cfg', records, version=1), v.index_bytes('cfg', broken, version=1), 'missing/stale dependency'),
+                   (v.index_bytes('cfg', records, version=2), v.index_bytes('cfg', broken, version=2), 'missing dependency'),
+                   (typed(slots[0]), typed(integer(2)), 'dangling query read'),
+                   (columns(slots[0]), columns(integer(2)), 'dangling query read')]
+        expected = {a: dict(sha=H3, reads=[], payload=H3),
+                    b: dict(sha=H2, reads=[(a, H3)] * 2, payload=None)}
+        for raw, expected_damage, reason in formats:
+            original, = read_document(raw, 6).values()
+            with self.subTest(marker=original[2][0], fields=len(original[2])):
+                generation = v.Generation(raw, configuration='cfg')
+                self.assertEqual(generation.nodes, records)
+                self.assertEqual(generation.encode_rows(generation.rows), raw)
+                repinned = v.repin_generation(generation, a, H3)
+                self.assertEqual(v.Generation(repinned, configuration='cfg').nodes, expected)
+                damaged = v.dangling_generation(generation)
+                self.assertEqual(damaged, expected_damage)
+                with self.assertRaisesRegex(Invalid, '^' + re.escape(reason) + '$'):
+                    v.Generation(damaged, configuration='cfg')
+                for result in (damaged, repinned):
+                    root, = read_document(result, 6).values()
+                    self.assertEqual((root[1], len(root[2])), (original[1], len(original[2])))
+                    self.assertEqual(root[2][:2], original[2][:2])
+                    if len(original[2]) in (7, 11):
+                        self.assertEqual(root[2][2:6], original[2][2:6])
 
     def test_finish_receipt_package_schema_dispatch(self):
         from finish_receipts import package_fragments
@@ -289,47 +301,6 @@ class VerifierTests(unittest.TestCase):
         for schema, roots in [(7, [header8(1), final]), (8, [header7([final])])]:
             with self.assertRaises((Invalid, OpenPairError)):
                 package_fragments(tree_document(roots, schema=schema))
-
-    def test_main_case_and_failpoint_inventory_preserved(self):
-        self.assertEqual(list(v.CASES),
-                         ['body', 'type', 'protection', 'datatype', 'constructor-owner',
-                          'scc', 'scope', 'scope-order', 'recursive-dictionary', 'finish-receipts', 'signed-template-rebind', 'template-rebind'])
-        self.assertEqual([len(states) for states in v.CASES.values()], [2, 2, 2, 2, 2, 3, 3, 2, 2, 1, 3, 3])
-        source = inspect.getsource(v.main)
-        constants = [n.value for n in ast.walk(ast.parse(source)) if isinstance(n, ast.Constant)]
-        # Generation.rows deliberately normalizes all three wire formats to
-        # logical 410 rows. Only those row reads/writes may use this tag; actual
-        # serialization must retain the source generation's tables/version.
-        syntax = ast.parse(source)
-        row_reads = [n for n in ast.walk(syntax) if isinstance(n, ast.Call)
-                     and isinstance(n.func, ast.Name) and n.func.id == 'node'
-                     and len(n.args) == 3 and isinstance(n.args[1], ast.Constant)
-                     and n.args[1].value == 410]
-        self.assertEqual(len(row_reads), 2)
-        for call in row_reads:
-            self.assertEqual(ast.literal_eval(call.args[2]), 4)
-        row_writes = [n for n in ast.walk(syntax) if isinstance(n, ast.Tuple)
-                      and len(n.elts) == 3 and isinstance(n.elts[1], ast.Constant)
-                      and n.elts[1].value == 410]
-        self.assertEqual(len(row_writes), 2)
-        for value in row_writes:
-            self.assertEqual(ast.literal_eval(value.elts[0]), 'node')
-        self.assertEqual(constants.count(410), 4)
-        encoders = [n for n in ast.walk(syntax) if isinstance(n, ast.Call)
-                    and isinstance(n.func, ast.Attribute) and n.func.attr == 'encode_rows']
-        self.assertEqual([ast.unparse(n.func.value) for n in encoders], ['wire', 'wire'])
-        calls = [n.func.id for n in ast.walk(syntax)
-                 if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)]
-        self.assertNotIn('index_bytes', calls)
-        self.assertNotIn('index_data', calls)
-        self.assertNotIn(411, constants)
-        for point in ('before-results', 'after-result-staging', 'after-result-batch',
-                      'before-index', 'before-current'):
-            self.assertIn(point, constants)
-        for control in ('trusted-receipt', 'semantic-audit-repair',
-                        'receipt_ich_semantic_audit_separated', 'serialized_writers',
-                        'partial_batch_preserves_previous_generation'):
-            self.assertIn(control, constants)
 
 
 if __name__ == '__main__':

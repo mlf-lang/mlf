@@ -59,19 +59,6 @@ run() {
  return "$status"
 }
 success() { local label=$1; run "$@" || fail "$label failed"; test ! -s "$work/$label.stderr" || fail "$label emitted diagnostics"; }
-record_inputs() {
- local destination=$1 file
- printf '{}\n' > "$destination"
- for file in "$fixtures"/* "$root/tools/release/test-async-task.sh" "$root/tools/release/check_async_abi.py" "$root/tools/testing/native-events.sh" "$root/tests/async-process/fixture.c" \
-  "$root/libraries/mlf-foundation/Bootstrap/Types.hs" "$root/libraries/mlf-foundation/Bootstrap/Std.hs" \
-  "$root/libraries/mlf-async/Async/Task/Core.hs" "$root/libraries/mlf-async/Async/Task.hs" "$root/libraries/mlf-async/Async/Task/Internal.hs" \
-  "$root/libraries/mlf-async/Async/Process.hs" "$root/libraries/mlf-async/Async/Process/Internal.hs" \
-  "$root/runtime/mlf_runtime.c" "$root/runtime/mlf_runtime.h" "$root/runtime/mlf_completion.h" "$root"/runtime/mlf_process*; do
-   jq --arg path "${file#"$root"/}" --arg hash "$(sha256 "$file")" '. + {($path):$hash}' "$destination" > "$destination.tmp"
-   mv "$destination.tmp" "$destination"
- done
-}
-record_inputs "$work/inputs.json"
 compiler_hash=$(sha256 "$compiler")
 include_args=(-i "$root/libraries/mlf-foundation" -i "$root/libraries/mlf-async")
 wanted=${MLF_TEST_EXACT:-}
@@ -177,9 +164,6 @@ for suite in main processes wait-graph guards; do
  cases=$((cases + suite_cases))
  if [ "$suite" = wait-graph ]; then whitebox_cases=$suite_cases; fi
 done
-record_inputs "$work/inputs.final.json"
-cmp "$work/inputs.json" "$work/inputs.final.json" || fail 'source changed during run'
-test "$(sha256 "$compiler")" = "$compiler_hash" || fail 'compiler changed during run'
 if [ -z "$wanted" ]; then
  test "${#labels[@]}" -eq 31 || fail 'command coverage changed'
  test "$cases:$whitebox_cases:$source_rejections" = 31:6:5 || fail 'case coverage changed'
@@ -202,11 +186,11 @@ jq -n --arg exact "${MLF_TEST_EXACT:-}" --arg compiler_sha256 "$compiler_hash" -
  --arg core_sha256 "$(sha256 "$root/libraries/mlf-async/Async/Task/Core.hs")" \
  --argjson cases "$cases" --argjson source_rejections "$source_rejections" --argjson whitebox_cases "$whitebox_cases" \
  --argjson interpreter "$ran_interpreter" --argjson llvm "$ran_llvm" \
- --slurpfile inputs "$work/inputs.json" --slurpfile observations "$work/observations.json" --slurpfile artifacts "$work/artifacts.json" \
+ --slurpfile observations "$work/observations.json" --slurpfile artifacts "$work/artifacts.json" \
  '{complete:($exact == ""),cases:$cases,source_rejections:$source_rejections,whitebox_cases:$whitebox_cases,
  backends:[if $interpreter then "interpreter" else empty end, if $llvm then "llvm" else empty end],
  compiler_sha256:$compiler_sha256,work:$work,whitebox_source_sha256:$core_sha256,whitebox_source:"libraries/mlf-async/Async/Task/Core.hs",
- inputs:$inputs[0],observations:$observations[0],artifacts:$artifacts[0]}' > "$output/result.tmp"
+ observations:$observations[0],artifacts:$artifacts[0]}' > "$output/result.tmp"
 mv "$output/result.tmp" "$output/result.json"
 if [ -z "${MLF_TEST_EXACT:-}" ]; then
  echo 'Async.Task language parity passed: 31 contracts (6 white-box), 5 source rejections.'

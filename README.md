@@ -111,7 +111,7 @@ Inferred-type agreement and source-erasure checks remain enabled for every
 new inference query.
 
 See the [crate migration ledger](docs/crate-migration.md) for accepted measurements
-and the [validation record](docs/crate-validation.json) for all six native groups,
+and the [validation record](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/crate-validation.json) for all six native groups,
 fresh self-hosting and the exact source/tool configuration. The [earlier bootstrap memory report](tools/profile/results/2026-10-19-bootstrap-memory/README.md)
 describes the previous per-module pipeline; its results are historical.
 
@@ -1389,7 +1389,7 @@ compilation, and linking; exact-executable runtime warm-up is applied equally
 to C and MLF. Every observed maximum MLF time divided by the corresponding
 minimum C time also remained below its limit.
 
-The later [crate migration acceptance](docs/crate-validation.json) uses reproducible
+The later [crate migration acceptance](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/crate-validation.json) uses reproducible
 O2 profiling of the compiler and runtime, trained only on fifteen existing language
 examples. Its fresh six-group validation and full nine-workload, three-sample
 median gates pass the same 3x compilation / 2x runtime limits. See the

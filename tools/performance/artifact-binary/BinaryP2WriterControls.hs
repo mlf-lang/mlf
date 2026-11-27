@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
--- Host-only actual binary publication checks, separate from the projected
--- historical text writer. Header/CRC inspection below does not call the codec.
+-- Current binary publication, public readers and the supported text encoding.
 module BinaryP2WriterControls where
 import Prelude
 import Control.Exception (SomeException, displayException, try)
@@ -22,8 +21,53 @@ import qualified Bootstrap.Bitstream as Wire
 import qualified Bootstrap.Types as T
 import qualified Bootstrap.Separate as S
 import qualified MLF.Host.Base as H
-import qualified RetainedP2Controls as Legacy
-import qualified FrozenFingerprint as Old
+import qualified Bootstrap.X.Pretty as Pretty
+import qualified Bootstrap.X.Checked as Checked
+import qualified FingerprintReference as Reference
+
+base :: H.String -> A.CrateInterface
+base identity = A.CrateInterface identity [] ["Fixture"] [("Fixture",[])]
+  [("Fixture",[])] [] [] [] [] [] "" "pending" []
+
+declA, declB :: T.DataDecl
+declA = T.DataDecl "Alpha" [] [T.ConstructorDecl "A" []]
+declB = T.DataDecl "Beta" [] [T.ConstructorDecl "B" []]
+
+unit :: H.String -> [T.DataDecl] -> [T.DataDecl] -> T.XTerm -> S.UnitObject
+unit name header body term =
+  let payload = if null body then term else T.XWithData body term
+      iface = S.UnitInterface name [] [] header [] [] []
+        (referenceDigest (Pretty.prettyTerm payload))
+  in S.UnitObject iface payload
+
+checkedUnit :: S.UnitObject
+checkedUnit =
+  let term = T.XStringTerm "checked: λ\x1f642\0\n"
+      checked = case Checked.check term of
+        T.Left message -> error (H.unpack message)
+        T.Right value -> value
+      iface = S.UnitInterface "Checked" [] [] [] [] [] []
+        (referenceDigest (Pretty.prettyTerm term))
+  in S.CheckedUnitObject iface checked
+
+fragmentCases :: [(String,[S.UnitObject])]
+fragmentCases =
+  [ ("empty",[])
+  , ("int",[unit "One" [] [] (T.XIntTerm 7)])
+  , ("unicode",[unit "Unicode" [] [] (T.XStringTerm "ASCII λ 中文 \x1f642 e\x0301\0\n")])
+  , ("shared-layout",[unit "One" [declA] [declA] (T.XIntTerm 1),
+                       unit "Two" [declA] [declA] (T.XIntTerm 2)])
+  , ("different-header-body",[unit "Different" [declA] [declB] (T.XIntTerm 3)])
+  , ("header-only",[unit "Header" [declA] [] (T.XIntTerm 4)])
+  , ("body-only",[unit "Body" [] [declB] (T.XIntTerm 5)])
+  , ("checked",[checkedUnit])
+  ]
+
+referenceDigest :: H.String -> H.String
+referenceDigest = H.literal . Reference.fingerprint . H.unpack
+
+expectedObject iface fragments =
+ A.CrateObject (A.withObjectFingerprint iface (referenceDigest (A.encodePooledPayload fragments))) fragments
 
 check ref group label ok = do
  unless ok (fail ("binary P2 writer: " ++ label))
@@ -56,7 +100,7 @@ rawInterface ref path expected = do
  roots <- case Wire.graphRoots g of [v] -> pure v; _ -> fail "interface roots"
  fields <- right "typed raw interface" (Structure.fromGraphCrateInterfaceFields g roots)
  iface <- right "interface fields" (A.fromBinaryInterfaceFields fields)
- check ref "raw-interface" path (H.utf8 (Old.oldEncodeInterface iface) == H.utf8 (Old.oldEncodeInterface expected))
+ check ref "raw-interface" path (H.utf8 (A.encodeInterface iface) == H.utf8 (A.encodeInterface expected))
 rawObject ref path expected = do
  g <- graph 4 path
  root <- case Wire.graphRoots g of [v] -> pure v; _ -> fail "object roots"
@@ -65,12 +109,12 @@ rawObject ref path expected = do
   Structure.CrateObjectFields legacy metadata fragments -> do
    iface <- right "raw metadata" (A.fromBinaryInterfaceFields metadata)
    pure (if legacy then A.LegacyCrateObject iface fragments else A.CrateObject iface fragments)
- check ref "raw-object" path (H.utf8 (Old.oldEncodeObject object) == H.utf8 (Old.oldEncodeObject expected))
+ check ref "raw-object" path (H.utf8 (A.encodeObject object) == H.utf8 (A.encodeObject expected))
 publicRead ref prefix expected = do
  iface <- A.readInterface (H.literal (prefix ++ ".mlfci")) >>= right "public interface"
- check ref "public-interface" prefix (H.utf8 (Old.oldEncodeInterface iface) == H.utf8 (Old.oldEncodeInterface (A.objectInterface expected)))
+ check ref "public-interface" prefix (H.utf8 (A.encodeInterface iface) == H.utf8 (A.encodeInterface (A.objectInterface expected)))
  object <- A.readObject (H.literal (prefix ++ ".mlfco")) iface >>= right "public object"
- check ref "public-object" prefix (H.utf8 (Old.oldEncodeObject object) == H.utf8 (Old.oldEncodeObject expected))
+ check ref "public-object" prefix (H.utf8 (A.encodeObject object) == H.utf8 (A.encodeObject expected))
 write mode prefix object = if mode == (0::Int) then A.writeObject (H.literal prefix) object
  else A.writeObjectWithPayload (H.literal prefix) object (error "binary paired writer forced unused text payload")
 reject ref label wanted result = check ref "corruption-rejection" label $ case result of
@@ -83,13 +127,15 @@ expectFailure ref label reason action = do
   Right _ -> False
 main = do
  args <- getArgs
- directory <- case args of [d] -> pure (d </> "binary-public"); _ -> fail "binary writer output argument"
+ output <- case args of [path] -> pure path; _ -> fail "binary writer output argument"
+ createDirectory output
+ let directory = output </> "binary-public"
  createDirectory directory
  count <- newIORef Map.empty
  check count "crc-vector" "independent standard CRC vector" (crc32 (BC.pack "123456789") == 0xcbf43926)
- let iface = Legacy.base "write:λ\x1f642"
-     cases = [(label, Old.oldMakeObject iface fragments, A.makeObject iface fragments) | (label,fragments) <- Legacy.fragmentCases]
-     legacyIface = A.withObjectFingerprint (Legacy.base "legacy") (A.legacyFragmentFingerprint [])
+ let iface = base "write:λ\x1f642"
+     cases = [(label, expectedObject iface fragments, A.makeObject iface fragments) | (label,fragments) <- fragmentCases]
+     legacyIface = A.withObjectFingerprint (base "legacy") (A.legacyFragmentFingerprint [])
      legacy = A.LegacyCrateObject legacyIface []
      allCases = cases ++ [("legacy",legacy,legacy)]
      -- Historical unequal header/body contexts are RAW wire cases only here.
@@ -97,14 +143,15 @@ main = do
      publicSuccess = ["empty","int","unicode","shared-layout","checked","legacy"]
  forM_ (zip [0::Int ..] allCases) $ \(i,(label,expected,actual)) -> do
   let root = directory </> show i
-      oldPrefix = root ++ "-old"
-  Old.oldWriteObject (H.literal oldPrefix) expected
+      textPrefix = root ++ "-text"
+  BS.writeFile (textPrefix ++ ".mlfco") (H.utf8 (A.encodeObject expected))
+  BS.writeFile (textPrefix ++ ".mlfci") (H.utf8 (A.encodeInterface (A.objectInterface expected)))
   forM_ [0::Int,1] $ \mode -> do
    let prefix = root ++ "-" ++ show mode
    write mode prefix actual
    forM_ [(".mlfci",3),(".mlfco",4)] $ \(suffix,schema) -> do
     bytes <- BS.readFile (prefix ++ suffix)
-    old <- BS.readFile (oldPrefix ++ suffix)
+    old <- BS.readFile (textPrefix ++ suffix)
     frame count (label ++ suffix) schema bytes
     check count "new-wire-not-legacy" (label ++ suffix) (bytes /= old)
    rawInterface count (prefix ++ ".mlfci") (A.objectInterface expected)
@@ -113,8 +160,8 @@ main = do
    first <- BS.readFile (root ++ "-0" ++ suffix)
    second <- BS.readFile (root ++ "-1" ++ suffix)
    check count "paired-byte-equality" label (first == second)
-  if label `elem` publicSuccess then forM_ [oldPrefix,root ++ "-0",root ++ "-1"] $ \prefix -> publicRead count prefix expected else pure ()
- let expected = Old.oldMakeObject iface []
+  if label `elem` publicSuccess then forM_ [textPrefix,root ++ "-0",root ++ "-1"] $ \prefix -> publicRead count prefix expected else pure ()
+ let expected = expectedObject iface []
      actual = A.makeObject iface []
      baseline = directory </> "0-0"
  forM_ [0::Int,1] $ \mode -> do
@@ -160,4 +207,4 @@ main = do
        ("public-interface",18),("public-object",18),("corruption-rejection",5),
        ("publication-failure",6),("first-write-no-interface",2),("temporary-cleanup",4)]
  unless (observed == expectedCounts) (fail ("binary writer control inventory: " ++ show observed))
- putStrLn "PASS actual binary P2 writers: 184 checks; 9 raw cases, 6 public-reader successes, 5 corruptions, 6 publication failures; independent envelope/CRC and frozen semantic bytes"
+ putStrLn "PASS actual binary P2 writers: 184 checks; 9 raw cases, 6 public-reader successes, 5 corruptions, 6 publication failures; independent envelope/CRC and semantic round trips"

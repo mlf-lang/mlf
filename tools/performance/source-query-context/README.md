@@ -1,5 +1,8 @@
 # Source-query shared context
 
+This report describes the historical text-cache experiments. Current binary
+cache behavior is covered by the [query graph suite](../crate-query-graph/README.md).
+
 This production slice changes persistence for source-group query caches in
 `Bootstrap.CrateQuery` and `Bootstrap.CrateSession`. It is not a migration of
 all compiler artifacts, a compression codec, or a claim of universal space or

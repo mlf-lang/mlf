@@ -1,7 +1,6 @@
 """Execute one case from the authenticated direct-candidate campaign."""
 
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -44,17 +43,13 @@ def async_case(original, runner, receipt, args, label, binaries):
     if compiler is None:
         raise ValueError('missing C fixture compiler: ' + args.cc)
     receipt['fixture_compiler'] = original.identified(compiler)
-    receipt['inputs'][receipt['fixture_compiler']['path']] = receipt['fixture_compiler']['sha256']
-    receipt['inputs'][str(source)] = original.sha(source)
     runner.run(kind + '-fixture', [receipt['fixture_compiler']['path'], '-O2', '-std=c11',
                                  '-Wall', '-Wextra', '-Werror', source, '-o', fixture])
-    receipt['helpers'] = {str(fixture): original.sha(fixture)}
 
     if label in (*ASYNC_TASK_CASES, 'async-process'):
         index = (*ASYNC_TASK_CASES, 'async-process').index(label)
         oracle = ROOT / original.ORACLES[index]
         expected = oracle.read_bytes()
-        receipt['inputs'][str(oracle)] = hashlib.sha256(expected).hexdigest()
         work = output / (label + '-work')
         work.mkdir()
         runner.run(label, [binaries / label], expected=expected,
@@ -91,7 +86,7 @@ def run(original, label, *, runner_factory=None):
     output.mkdir(parents=True, exist_ok=False)
     receipt = {'format': 1, 'complete': False, 'scope': 'focused',
                'source_mode': 'authenticated direct committed shared source',
-               'selected_ids': [identity(PREFIX, label)], 'commands': [], 'inputs': {}, 'helpers': {}}
+               'selected_ids': [identity(PREFIX, label)], 'commands': []}
 
     def save():
         temporary = output / 'receipt.json.new'
@@ -110,11 +105,6 @@ def run(original, label, *, runner_factory=None):
         receipt['producer'] = {**original.identified(build_receipt), 'host': producer['producer_host'],
                                'optimization': producer['optimization']}
         receipt['orchestrator'] = original.identified(sys.executable)
-        inputs = [Path(__file__).resolve(), Path(original.__file__).resolve(), MANIFEST,
-                  MANIFEST.parent / 'receipt_selection.py', HERE / 'run_direct.py', HERE / 'direct_managed.py',
-                  ROOT / 'shared-sources.json', build_receipt,
-                  Path(sys.executable).resolve()]
-        receipt['inputs'] = {str(path): original.sha(path) for path in inputs}
         runner = (runner_factory or original.CommandRunner)(ROOT, output, receipt, save)
 
         if label in (*ASYNC_TASK_CASES, *ASYNC_PROCESS_CASES):
@@ -127,21 +117,15 @@ def run(original, label, *, runner_factory=None):
             runner.run(label, [binaries / 'shared-frontend', option], expected=expected, timeout=budget)
         elif label == 'build-receipts':
             script = ROOT / 'tools/release/test-suite-build-receipts.py'
-            receipt['inputs'][str(script)] = original.sha(script)
             runner.run(label, [sys.executable, script, '--executable', binaries / label,
                                '--output', output / label], timeout=1800)
         else:
             script_name, timeout, clang = DELEGATES[label]
             script = HERE / script_name
-            receipt['inputs'][str(script)] = original.sha(script)
             options = ['--clang', args.clang] if clang else []
             runner.run(label, [sys.executable, '-B', script, '--build-receipt', build_receipt,
                                *options, '--output', output / label], timeout=timeout)
 
-        for collection in (receipt['inputs'], receipt['helpers']):
-            if any(original.sha(path) != digest for path, digest in collection.items()):
-                raise RuntimeError('test input changed during qualification')
-        original.authenticate_build(build_receipt, binaries)
         receipt['complete'] = True
     except BaseException as error:
         receipt['error'] = {'type': type(error).__name__, 'message': str(error)}

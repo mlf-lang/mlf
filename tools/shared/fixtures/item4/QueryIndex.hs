@@ -55,6 +55,7 @@ legacyNode k h reads location = W.VNode 410
     [W.VNode 2 [W.VText key,W.VText digest] | (key,digest) <- reads], location]
 legacy records = W.VNode 411 [W.VText "MLF-CRATE-QUERY-GRAPH-1",W.VText "config",W.VNode 1 records]
 withWork n (W.Limits a b c d e f g _) = W.Limits a b c d e f g n
+withWork _ (W.IndexedText _) = error "expected ordinary wire limits"
 work value = do
   (_, stats) <- W.planMeasured W.defaultLimits [value]
   T.Right (W.resourceExpandedWork stats)

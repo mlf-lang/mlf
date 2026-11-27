@@ -121,6 +121,33 @@ class CoreProofTests(unittest.TestCase):
             fingerprint.verify_no_retired_rules(counts, '2')
 
 
+class ProbeCompilerOptions(unittest.TestCase):
+    def test_current_probes_submit_the_selected_optimization_to_ghc(self):
+        class ReachedCompiler(Exception):
+            pass
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / 'host/ghc'
+            host.mkdir(parents=True)
+            guard = types.SimpleNamespace(sha=lambda path: hashlib.sha256(path.read_bytes()).hexdigest())
+            build = {'ghc': {'path': 'recording-ghc'}, 'cc': {'path': 'recording-cc'}}
+            for opt in ('0', '2'):
+                commands = []
+
+                def run(label, argv, cwd=root):
+                    if argv[0] == 'recording-ghc':
+                        commands.append(list(map(str, argv)))
+                        raise ReachedCompiler
+
+                with self.subTest(optimization=opt), self.assertRaises(ReachedCompiler):
+                    fingerprint.run_probe(guard, root, fingerprint.CONTROLS, root, build, {}, {}, opt, run)
+                self.assertEqual(len(commands), 1)
+                flags = [flag for flag in commands[0] if flag in ('-O', '-O0', '-O1', '-O2')]
+                self.assertEqual(flags[-1:], ['-O' + opt])
+                self.assertIn('-dcore-lint', commands[0])
+
+
 class QualificationControls(unittest.TestCase):
     """Exercise the real dispatcher and receipt checks with bounded stage doubles."""
 

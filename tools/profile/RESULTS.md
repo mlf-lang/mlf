@@ -337,7 +337,7 @@ Maximum compilation is n-body at **4.947x C**; maximum runtime is k-nucleotide
 at **1.673x C**. N-body has only about 1% compilation margin. All 63 final
 benchmark LLVM outputs match the original compiler byte for byte. The
 [benchmark table](../../benchmarks/RESULTS.md) and
-[raw report](../bench/results/2026-10-16-native-macos-arm64.json) preserve the
+[raw report](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/bench/results/2026-10-16-native-macos-arm64.json) preserve the
 measurements, commands, tool/source hashes and correctness checks.
 
 ## Native validation

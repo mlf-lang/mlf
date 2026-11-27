@@ -12,7 +12,6 @@ import qualified Bootstrap.Graph as G
 import qualified Bootstrap.IntMap as IM
 import qualified Bootstrap.Std as L
 import qualified CandidateSession as C
-import qualified LegacySession as F
 import qualified SessionOracle as O
 import qualified RetainedSurvivors as Retained
 

@@ -45,7 +45,7 @@ helper, its configurator and documentation changed afterwards. These three
 paths received a fresh native helper build and full nine-workload validation;
 the machine record links the input-hash bridge without relabelling core reports.
 The fresh next-stage compiler reproduced both
-LLVM and native bytes. The [machine record](compact-only.json) binds source and
+LLVM and native bytes. The [machine record](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/compact-only.json) binds source and
 actual tool hashes, group reports, benchmark results and compatibility controls.
 
 | Group | Previous two-layout run | Compact-GC only |
@@ -68,7 +68,7 @@ spans use the first supervisor process observation in the two-second samples. Gr
 timers include target builds, preparation and execution. The previous report
 remains unchanged.
 
-The [individual execution record](compact-only-execution-times.json) contains
+The [individual execution record](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/compact-only-execution-times.json) contains
 1175 checked backend paths, 1157 measured children, and 18 LLVM rejections before
 execution with null timers. There are 575 interpreter executions in backends,
 557 native child executions there, and 25 native port launches. Port has no

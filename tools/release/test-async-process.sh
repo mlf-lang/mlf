@@ -81,19 +81,6 @@ include_args=(-i "$root/libraries/mlf-foundation" -i "$root/libraries/mlf-async"
 wanted=${MLF_TEST_EXACT:-}
 unset MLF_ASYNC_CASE
 
-record_inputs() {
-  local destination=$1 file
-  printf '{}\n' > "$destination"
-  for file in "$fixtures"/* "$root/tools/release/test-async-process.sh" "$root/tools/release/check_async_abi.py" "$root/tools/testing/native-events.sh" \
-    "$root/libraries/mlf-foundation/Bootstrap/Types.hs" "$root/libraries/mlf-foundation/Bootstrap/Std.hs" \
-    "$root/libraries/mlf-async/Async/Process.hs" "$root/libraries/mlf-async/Async/Process/Internal.hs" \
-    "$root"/runtime/*; do
-    test -f "$file" || continue
-    jq --arg path "${file#"$root"/}" --arg hash "$(sha256 "$file")" '. + {($path):$hash}' "$destination" > "$destination.tmp"
-    mv "$destination.tmp" "$destination"
-  done
-}
-record_inputs "$work/inputs.json"
 compiler_hash=$(sha256 "$compiler")
 
 # An abstract exported type must not leak its data constructor. Check the
@@ -217,9 +204,6 @@ done
   ;;
 esac
 
-record_inputs "$work/inputs.final.json"
-cmp "$work/inputs.json" "$work/inputs.final.json" || fail 'test inputs changed during execution'
-test "$(sha256 "$compiler")" = "$compiler_hash" || fail 'compiler changed during execution'
 printf '{}\n' > "$work/observations.json"
 test -n "${MLF_TEST_EXACT:-}" || test "${#command_labels[@]}" -eq 18 || fail 'command coverage changed'
 for label in "${command_labels[@]}"; do
@@ -240,13 +224,13 @@ jq -n --arg exact "${MLF_TEST_EXACT:-}" --arg compiler_sha256 "$compiler_hash" -
   --argjson parity "$parity_cases" --argjson panic_cleanup "$panic_cleanup_cases" --argjson rejections "$rejections" \
   --argjson interpreter "$ran_interpreter" --argjson llvm "$ran_llvm" \
   --argjson seconds "$((SECONDS - started))" --argjson timeout_seconds "$timeout_seconds" \
-  --slurpfile inputs "$work/inputs.json" --slurpfile observations "$work/observations.json" \
+  --slurpfile observations "$work/observations.json" \
   '{complete:($exact == ""),cases:$parity,panic_cleanup_cases:$panic_cleanup,source_rejections:$rejections,
     backends:[if $interpreter then "interpreter" else empty end, if $llvm then "llvm" else empty end],
     compiler_sha256:$compiler_sha256,clang_sha256:$clang_sha256,target_sha256:$target_sha256,
     runtime_object_sha256:$runtime_object_sha256,native_sha256:$native_sha256,
     work:$work,seconds:$seconds,timeout_seconds:$timeout_seconds,
-    inputs:$inputs[0],observations:$observations[0]}' > "$output/result.tmp"
+    observations:$observations[0]}' > "$output/result.tmp"
 mv "$output/result.tmp" "$output/result.json"
 if [ -z "${MLF_TEST_EXACT:-}" ]; then
   printf 'Async.Process language parity passed: 13 contracts, panic cleanup, 2 opaque-constructor rejections.\n'

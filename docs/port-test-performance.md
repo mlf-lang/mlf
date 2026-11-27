@@ -31,7 +31,7 @@ used about 6.5 GB with the existing free-space divisor of one.
 
 These timings measure interpreter execution of unchanged checked targets, not
 the complete port command or a released compiler's benchmark performance.
-The [machine-readable record](port-test-performance.json) contains command exit
+The [machine-readable record](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/port-test-performance.json) contains command exit
 status, wall time, CPU time, peak process RSS, input and binary hashes, source
 hashes and the completed regression controls.
 

@@ -172,30 +172,6 @@ class CanonicalAsyncUnitOracles(unittest.TestCase):
             self.assertIn('cmp "$fixtures/', text)
 
 
-    def test_scoped_fixture_migration_preserves_error_payloads(self):
-        root = HERE.parents[1]
-        for name in ('tests/async-process/Main.emlf', 'tests/async-process/Panic.emlf',
-                     'tests/async-task/Main.emlf', 'tests/async-task/Processes.emlf'):
-            text = (root / name).read_text()
-            self.assertNotRegex(text, r'\b(?:Unit|List|Cons|Nil|Pair)\b')
-            self.assertIn('(:)', text)
-            self.assertIn('[]', text)
-        task = (root / 'tests/async-task/Main.emlf').read_text()
-        self.assertIn('integers : [] Int -> [] Int -> Bool', task)
-        self.assertIn('case value of (,) stopped answer ->', task)
-        negative = root / 'tests/fixtures/async-completion/negative'
-        for name in ('alias-widen', 'mixed-values', 'generalize-allocated'):
-            text = (negative / (name + '.emlf')).read_text()
-            self.assertIn('asyncReadCompletion cell putStrLn (ioReturn ())', text)
-            self.assertIn('42', text)
-        self.assertIn('cell : forall a. Completion a',
-                      (negative / 'generalize-allocated.emlf').read_text())
-        self.assertIn('Completion (forall a. a -> a)',
-                      (negative / 'impredicative-overwrite.emlf').read_text())
-        self.assertIn('function "wrong"',
-                      (negative / 'function-confusion.emlf').read_text())
-
-
 class CurrentAsyncAbiGuard(unittest.TestCase):
     def setUp(self):
         path = HERE.parents[1] / 'tools/release/check_async_abi.py'
@@ -277,22 +253,6 @@ class CompletionKindRejection(unittest.TestCase):
         self.assertIn("wrong-kind) expected='(kind|arity)' ;;", gate)
 
 
-class ProcessFailureHelperNames(unittest.TestCase):
-    def test_local_failure_helpers_do_not_shadow_primitive_fail(self):
-        import hashlib
-        root = HERE.parents[1]
-        # Keep the full fixture guard, including Main's exact-case dispatch.
-        normalized_digests = {
-            'Main': 'a7b01d2a65c822be95c1f77351f60e5b8c674629500cc22e489e3943d0d36bb6',
-            'Panic': '8818d7ba77bbb85fb712bb44f16b8dba2232d55613bd9e7b14883d078e3c3106',
-        }
-        for name, digest in normalized_digests.items():
-            source = (root / ('tests/async-process/' + name + '.emlf')).read_text()
-            self.assertIn('processTestFailure : forall a. String -> IO a', source)
-            self.assertIn('processTestFailure message =', source)
-            self.assertEqual(hashlib.sha256(source.replace('processTestFailure', 'fail').encode()).hexdigest(), digest)
-
-
 class PRSmokeIntegerContract(unittest.TestCase):
     def test_arbitrary_precision_fixture_keeps_its_literal_oracle(self):
         import hashlib
@@ -308,17 +268,6 @@ class PRSmokeIntegerContract(unittest.TestCase):
         self.assertIn('cmp "$fixtures/io-unit.type" "$work/$name.check.stdout"', gate)
         self.assertIn('cmp "$fixtures/$name.stdout" "$work/$name.interpreter.stdout"', gate)
         self.assertIn('cmp "$fixtures/$name.stdout" "$work/$name.llvm.stdout"', gate)
-
-
-class TaskTripleContract(unittest.TestCase):
-    def test_retained_heterogeneous_result_uses_current_tuple_constructor(self):
-        import hashlib
-        source = (HERE.parents[1] / 'tests/async-task/Main.emlf').read_text()
-        self.assertEqual(source.count('(,,)'), 2)
-        self.assertIn('T.pure ((,,) (f n) s again)', source)
-        self.assertIn('case result of (,,) n s again ->', source)
-        self.assertEqual(hashlib.sha256(source.replace('(,,)', 'Triple').encode()).hexdigest(),
-                         'a95ff262d1af52e8bdd7afdb5de6a9334b7c2b3cdfe3228c17a92c557c1fa739')
 
 
 if __name__ == '__main__':

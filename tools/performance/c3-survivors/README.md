@@ -77,13 +77,10 @@ the observed valid intervals/deltas, not ordinary exclusive CPU, physical
 allocation or a time breakdown. Earlier C3's discarded-publication saving is
 an inherited invariant, not a second gain from this patch.
 
-O0 and O2 controls compile the local owners separately against authenticated
-ordinary dependencies. They retain the entire maintained C3 Main, with a
-module-header view recorded in the current run: all 63 physical graph/index/scope traces, exact errors and
-failure Store epochs, repeated instantiations, expansion descriptors, full
-selection and eight partial-value/demand observations. The new wrapper compares
-the complete frozen accepted-C3 owner with the complete candidate. The original
-C3 gate continues independently against its earlier full owner.
+The O0 and O2 controls run all 63 C3 session traces and eight demand
+observations against the [session model](../c3-delayed-index/SessionModel.hs).
+The cases include success, rejection, repeated instantiation, expansion
+descriptors, component selection and the indexes visible after a rejection.
 
 The added independent `Data.Map.Lazy` model covers 29,160 valid patch combinations:
 729 unchanged/deleted/changed choices, five signed/wide offsets, two dense/gapped
@@ -94,12 +91,9 @@ reuse; an opaque-payload probe verifies that the merge itself inspects only IDs.
 These finite observations do not prove all partial values equivalent or measure
 ordinary physical allocations.
 
-The historical source-admission chain and inverse owner proofs are archived in
-Git at `496dcae024cae1a93096d9bdb9d6b93e57359dc0`. Current runs use the independent
-`oracles/LegacySession.hs` fixture directly and authenticate borrowed inputs
-against the actual producer receipt. The fixture preserves the complete
-accepted-C3 owner; [`oracles/README.md`](oracles/README.md) records its source and
-the one-time header adaptation.
+The historical comparison used the full
+[accepted C3 owner](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/performance/c3-survivors/oracles/LegacySession.hs).
+The current runner authenticates borrowed inputs against the producer receipt.
 
 All 14 scheduled integration checks passed: retained P1–P3, graph/transaction,
 Map balance, validation boundary, builtin, parsed-file comparisons through both

@@ -20,8 +20,7 @@ The original literal or independent assertions still decide the result.
 Each Backends family in `tests/test-catalog.json` records an expected
 `row_counts` array in its fixture-label order. Zero means the fixture
 checks a compiler or language contract without a differential execution.
-The counts for surviving labels come from the 575-row compact-GC report in
-`docs/compact-only-execution-times.json`. The 28 added or renamed labels
+The counts for surviving labels come from the [575-row compact-GC report](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/compact-only-execution-times.json). The 28 added or renamed labels
 each execute one row in the current fixture sources. They cover one IO case,
 four prelude cases, one surface case, eight guard cases, three numeric
 specializations, nine numeric runtime cases, and two primitive failures.

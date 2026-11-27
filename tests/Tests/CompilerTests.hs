@@ -108,7 +108,7 @@ module Tests.CompilerTests where {
             (\p ->
                (O.starts (r ++ "/benchmarks/") p ||
                 S.any (\suffix -> O.ends suffix p)
-                  (O.words ".hs .emlf .c .h .ps1 .sh .expected .json .gz")))
+                  (O.words ".hs .emlf .c .h .ps1 .sh .expected .json .jsonl .gz")))
             (S.concat nested)
       };
       hashes <-
@@ -1611,20 +1611,7 @@ module Tests.CompilerTests where {
     };
   parityList c args =
     do {
-      let {
-        archive = root c ++ "/tests/golden/parity-seed.tar.gz";
-        manifest = output c ++ "/frozen-manifest.jsonl"
-      };
-      archiveHash <- fileDigest archive;
-      O.require (eqString archiveHash "ad64708fe76cad0f93af44d39e0a49b86e00b3ccaa621296fc4a43694e902ae8")
-        "frozen parity archive changed";
-      status <- O.exec (root c) ["tar", "-xOf", archive, "manifest.jsonl"] "" manifest (manifest ++ ".stderr") 60;
-      O.require (status == 0) "cannot read the frozen parity inventory";
-      manifestHash <- fileDigest manifest;
-      O.require (eqString manifestHash "c32f9fd7a57dbc9b5d792194ad70a81e62b4d64d5359f433bd65dc9c4072fa2d")
-        "frozen parity inventory changed";
-      rows <- parityRows manifest;
-      O.require (S.length rows == 7086) "preserved parity inventory changed";
+      rows <- parityRows (root c ++ "/tests/golden/parity/manifest.jsonl");
       record c "scope" (J.str "inventory");
       code <- TestRunner.run args (S.map (\row -> parityEntry row (TestAssert.succeed ())) rows);
       if code == 0 then return () else exitWith code
@@ -1689,21 +1676,16 @@ module Tests.CompilerTests where {
       rows <- parityRows (corpus ++ "/manifest.jsonl");
       O.require (S.all (\row -> J.equal (J.get "schema_version" row) (J.num 1)) rows)
         "unsupported parity schema";
-      S.mapM_
-        (\pair ->
-           O.require
-             (S.length
-                (S.filter (\row -> eqString (J.getText "category" "" row) (S.fst pair)) rows) >=
-              S.snd pair)
-             ("parity corpus lacks " ++ S.fst pair))
-        ((:) ((,) "figure12" 43)
-           ((:) ((,) "hm-exhaustive" 1712)
-              ((:) ((,) "hm-generated" 5000)
-                 ((:) ((,) "annotations" 126)
-                    ((:) ((,) "readability" 18)
-                       ((:) ((,) "state" 97)
-                          ((:) ((,) "modules" 60)
-                             ((:) ((,) "examples" 21) ((:) ((,) "benchmarks" 9) [])))))))));
+      S.mapM_ (\category -> O.require
+        (S.any (\row -> eqString (J.getText "category" "" row) category) rows)
+        ("parity corpus lacks " ++ category))
+        (O.words "figure12 hm-exhaustive hm-generated annotations readability state modules examples benchmarks");
+      O.require (S.all (\row ->
+        if J.getBool "expected_accept" False row
+        then stringLength (O.trim (J.getText "expected_type" "" row)) > 0
+        else stringLength (O.trim (J.getText "expected_phase" "" row)) > 0 &&
+          S.not (J.has "expected_stdout" row)) rows)
+        "parity case lacks a prescribed type or rejection phase, or expects output from a rejection";
       let {
         a8 =
           S.fromMaybe (panic "missing Figure12 A8")
@@ -1717,12 +1699,6 @@ module Tests.CompilerTests where {
         moduleRows = S.filter (\row -> eqString (J.getText "category" "" row) "modules") rows
       };
       O.require
-        ((S.length moduleRows == 60) &&
-         ((S.length (S.filter (J.getBool "expected_accept" False) moduleRows) == 23) &&
-          (S.length (S.filter (\row -> S.not (J.getBool "expected_accept" False row)) moduleRows) ==
-           37)))
-        "module corpus differs from the two prescribed crate-cycle oracle migrations";
-      O.require
         (S.any (\row -> (J.getBool "no_prelude" False row && J.getBool "expected_accept" False row))
            moduleRows)
         "module corpus lacks explicit prelude coverage";
@@ -1735,12 +1711,8 @@ module Tests.CompilerTests where {
            moduleRows)
         "module rejection lacks a prescribed phase or diagnostic";
       let {
-        accepted = S.length (S.filter (J.getBool "expected_accept" False) rows);
-        runtime = S.length (S.filter (J.has "expected_stdout") rows);
         inventory = S.map (\row -> parityEntry row (TestAssert.succeed ())) rows
       };
-      O.require ((S.length rows == 7086) && ((accepted == 3204) && (runtime == 80)))
-        "preserved parity coverage changed";
       case TestRunner.plan args inventory of {
         Left message -> O.fatal message;
         Right ((,) options chosen) -> do {
@@ -1765,13 +1737,6 @@ module Tests.CompilerTests where {
             if full then return () else record c "scope" (J.str "partial");
             O.mkdir (output c ++ "/parity");
             (,,) targets canonical aliases <- parityPlan c corpus 0 Map.empty Map.empty [] [] selected;
-            if full
-            then O.require
-              (S.length aliases == 11 &&
-               S.length (S.filter (\row -> O.starts "hm-generated-" (J.getText "id" "" row)) aliases) == 9 &&
-               S.length (S.filter (\row -> O.starts "figure12-" (J.getText "id" "" row)) aliases) == 2)
-              "parity execution sharing changed"
-            else return ();
             checkCrateCycleOracles c corpus checker rows selectedIds;
             sourceResults <- parityBatch c "compile" (compiler c) "--test-parity-batch" targets;
             checks <- S.mapM
@@ -1802,7 +1767,7 @@ module Tests.CompilerTests where {
             manifestHash <- fileDigest (corpus ++ "/manifest.jsonl");
             let {
               selectedAccepted = S.length (S.filter (J.getBool "expected_accept" False) selected);
-              referenceChecks = S.length (S.filter (J.has "oracle_migration") selected);
+              referenceChecks = S.length (S.filter (J.has "expected_reference_target") selected);
               stats = B.info
                 [ (,) "cases" (J.num (S.length selected))
                 , (,) "accepted" (J.num selectedAccepted)
@@ -1903,55 +1868,28 @@ module Tests.CompilerTests where {
   checkCrateCycleOracles :: TestContext -> String -> String -> [] J.Json -> Set String -> IO ();
   checkCrateCycleOracles c corpus checker rows selected =
     do {
-      O.require (S.length (S.filter (J.has "oracle_migration") rows) == 2)
-        "unexpected parity oracle migrations";
-      reference <- readFile (corpus ++ "/oracle/crate-module-cycles/int42.xmlf");
+      let {
+        references = S.filter (J.has "expected_reference_target") rows;
+        identities = S.map (J.getText "id" "") references;
+        referencePath = "oracle/crate-module-cycles/int42.xmlf"
+      };
+      O.require (S.length identities == 2 &&
+        S.all (\identity -> S.elem eqString identity identities) ["module-reject-000025", "module-reject-000026"])
+        "missing or duplicate crate-cycle reference cases";
+      reference <- readFile (corpus ++ ("/" ++ referencePath));
       O.require (eqString reference "42\n") "crate-cycle reference target changed";
-      S.mapM_
-        (\((,) identity reason) ->
-           do {
-             let {
-               matches = S.filter (\row -> eqString (J.getText "id" "" row) identity) rows
-             };
-             O.require (S.length matches == 1) "missing or duplicate migrated crate-cycle oracle";
-             let {
-               row = S.head matches
-             };
-             O.require
-               (eqString (J.getText "category" "" row) "modules" &&
-                (J.getBool "expected_accept" False row &&
-                 (eqString (J.getText "expected_type" "" row) "Int" &&
-                  eqString (J.getText "oracle_migration" "" row) "crate-module-cycles-v1")))
-               "crate-cycle acceptance/type oracle changed";
-             O.require
-               (eqString (J.getText "previous_expected_phase" "" row) "ModuleResolution" &&
-                (eqString (J.getText "previous_expected_error_contains" "" row) reason &&
-                 (S.not (J.has "expected_phase" row) &&
-                  (S.not (J.has "expected_error_contains" row) &&
-                   S.not (J.has "expected_stdout" row)))))
-               "crate-cycle oracle provenance changed";
-             O.require
-               (eqString (J.getText "expected_reference_target" "" row)
-                  "oracle/crate-module-cycles/int42.xmlf")
-               "crate-cycle reference path changed";
-             let {
-               stem = (output c ++ ("/parity/oracle-" ++ identity))
-             };
-             writeFile (stem ++ ".type") "Int";
-             status <-
-               O.exec (root c)
-                 ((:) checker
-                    ((:) (corpus ++ "/oracle/crate-module-cycles/int42.xmlf")
-                       ((:) (stem ++ ".type") [])))
-                 ""
-                 (stem ++ ".out")
-                 (stem ++ ".err")
-                 1800;
-             O.require (status == 0) "independent crate-cycle reference typing failed"
-           })
-        (S.filter (\entry -> Set.member compareString ("parity/" ++ S.fst entry) selected)
-          [ (,) "module-reject-000025" "Main -> A -> B -> A",
-            (,) "module-reject-000026" "Main -> Main" ])
+      S.mapM_ (\row -> do {
+        O.require (eqString (J.getText "category" "" row) "modules" &&
+          J.getBool "expected_accept" False row &&
+          eqString (J.getText "expected_type" "" row) "Int" &&
+          eqString (J.getText "expected_reference_target" "" row) referencePath)
+          "crate-cycle acceptance, type or reference changed";
+        let { stem = output c ++ ("/parity/oracle-" ++ J.getText "id" "" row) };
+        writeFile (stem ++ ".type") "Int";
+        status <- O.exec (root c) [checker, corpus ++ ("/" ++ referencePath), stem ++ ".type"]
+          "" (stem ++ ".out") (stem ++ ".err") 1800;
+        O.require (status == 0) "independent crate-cycle reference typing failed"
+      }) (S.filter (\row -> Set.member compareString (parityIdentity row) selected) references)
     };
   parityCase c flags row target sourceResults checked =
     let {

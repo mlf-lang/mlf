@@ -12,8 +12,6 @@ def main():
     original=RETAINED/'Main.hs'
     spec=importlib.util.spec_from_file_location('c3_control_transport',RETAINED/'run_controls.py')
     driver=importlib.util.module_from_spec(spec);spec.loader.exec_module(driver)
-    driver.BASELINE='ffa3d201e4ea9c08109ff00df3f4fd66b56f3ab2'
-    driver.ORACLE_SHA='62eb461a5addb449b15b288c73ba3f269cefcbb634b63681d6ce237b6138d440'
     driver.HERE=HERE
     driver.CASE_PREFIX='fresh-survivors/'
     driver.EXPECTED+=('PASS 29160 independent sparse/wide signed fresh-delta models\n'

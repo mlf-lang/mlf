@@ -110,6 +110,10 @@ dense/gapped layouts and cutoff boundaries, plus nine payload-demand/first-error
 observations. Dependencies are authenticated ordinary O2; the local owners are
 compiled separately at O0 and O2.
 
+The current controls share the [C3 session model](../c3-delayed-index/SessionModel.hs)
+and the survivor suite's independent map model. The original comparison is
+available with its [historical session owner](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/performance/full-compiler/oracles/LegacySession.hs).
+
 An additional, deliberately malformed map with a bottom key **and** bottom count
 exposed different O2 exception order (old count first, new key first; O0 agreed).
 That input cannot arise at this private callsite: map constructors have forced

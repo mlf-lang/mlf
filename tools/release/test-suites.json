@@ -814,17 +814,6 @@
     "allow_skip": true,
     "exact": true
   },
-  "release-performance-fingerprint-fusion": {
-    "kind": "unittest",
-    "command": [
-      "python3",
-      "-B",
-      "tools/performance/fingerprint-fusion/test_controls.py"
-    ],
-    "prefix": "release-performance-fingerprint-fusion/",
-    "allow_skip": true,
-    "exact": true
-  },
   "release-performance-inference-controls": {
     "kind": "unittest",
     "command": [

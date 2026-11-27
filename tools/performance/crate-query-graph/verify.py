@@ -19,7 +19,7 @@ from receipt_selection import identity, select
 PREFIX = 'query-graph-acceptance/'
 from artifact_binary_reference import read_document, tree_document, Invalid, require
 from test_query_index import read_index
-from artifact_binary_typed import value_node as node, text, list_values as items, unpack
+from artifact_binary_typed import value_node as node, text, list_values as items, unpack, n, s, l
 from query_generation import Generation, cache_directory
 from finish_receipts import (check_receipts, forge_generation, wrong_template_stamp,
                              forge_template_generation, forge_direct_binding_generation)
@@ -116,6 +116,33 @@ def replace_result(records, wanted, digest):
               'payload': digest if key == wanted else entry['payload']}
         for key, entry in records.items()
     }
+
+
+def dangling_generation(wire):
+    """Break one read while retaining the generation's wire format."""
+    rows = list(wire.rows)
+    for index, row in enumerate(rows):
+        key, result, reads, location = node(row, 410, 4)
+        edges = list(items(reads))
+        if edges:
+            _, expected = pair(edges[0])
+            edges[0] = n(2, s(frame(['Binding', 'absent-definition'])), expected)
+            rows[index] = n(410, key, result, l(*edges), location)
+            return wire.encode_rows(rows)
+    raise Invalid('dangling fixture requires a dependency')
+
+
+def repin_generation(wire, key, digest):
+    """Repin the result, location and every incoming read in the original layout."""
+    rows = []
+    for row in wire.rows:
+        name, result, reads, location = node(row, 410, 4)
+        edges = [n(2, dep, s(digest) if text(dep) == key else observed)
+                 for dep, observed in map(pair, items(reads))]
+        if text(name) == key:
+            result, location = s(digest), n(5, s(digest))
+        rows.append(n(410, name, result, l(*edges), location))
+    return wire.encode_rows(rows)
 
 
 def reject_index(raw, configuration, reason):
@@ -396,20 +423,7 @@ def main():
         valid_generation, valid_nodes = graph(cache)
         index = cache_directory(cache) / 'generations' / (valid_generation + '.mlfqg')
         wire = Generation(index.read_bytes())
-        damaged_entries = []
-        changed = False
-        for value in wire.rows:
-            k, h, reads, location = node(value, 410, 4)
-            if not changed and items(reads):
-                edges = list(items(reads))
-                _, expected = pair(edges[0])
-                edges[0] = ('node', 2, (('text', frame(['Binding','absent-definition'])), expected))
-                value = ('node', 410, (k,h,('node',1,tuple(edges)),location))
-                changed = True
-            damaged_entries.append(value)
-        require(changed and len(damaged_entries) == len(wire.rows),
-                'dangling fixture preserves all original rows')
-        bad_bytes = wire.encode_rows(damaged_entries)
+        bad_bytes = dangling_generation(wire)
         try:
             Generation(bad_bytes, configuration=text(wire.config))
         except Invalid as error:
@@ -447,15 +461,7 @@ def main():
             assert changed[0]
             raw = tree_document([forged],schema=6); forged_hash = sha(raw)
             (path.parent/(forged_hash+'.mlfqr')).write_bytes(raw)
-            new_entries = []
-            for value in wire.rows:
-                k,h,edges,location = node(value,410,4)
-                new_edges = tuple(('node',2,(dep,('text',forged_hash) if text(dep)==key else digest))
-                                  for dep,digest in map(pair,items(edges)))
-                if text(k)==key:
-                    h=('text',forged_hash); location=('node',5,(('text',forged_hash),))
-                new_entries.append(('node',410,(k,h,('node',1,new_edges),location)))
-            encoded = wire.encode_rows(new_entries)
+            encoded = repin_generation(wire, key, forged_hash)
             checked = Generation(encoded, configuration=text(wire.config))
             require(checked.nodes == replace_result(wire.nodes, key, forged_hash),
                     'trusted fixture changed logical graph')

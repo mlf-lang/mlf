@@ -72,15 +72,14 @@ def closed_tree(root):
 
 
 def verify_control_receipt(path, binary, python, controls, inspector_hashes,
-                           legacy_query_only=False, selected=None):
+                           selected=None):
     receipt = json.loads(path.read_text())
     require(receipt.get('complete') is True and receipt.get('fixture_sha256') == sha(binary),
             'controls did not complete against this fixture')
     require(receipt.get('binary_inspector_inputs') == inspector_hashes,
             'controls did not use the pinned independent binary/typed inspectors')
     rows = receipt.get('commands', [])
-    expected = commands_for(legacy_query_only, selected)
-    require(receipt.get('legacy_query_only') is legacy_query_only, 'control scope mismatch')
+    expected = commands_for(selected)
     if selected is not None or 'planned_commands' in receipt:
         require(receipt.get('selected_case') == selected and receipt.get('planned_commands') == expected,
                 'inner selected phase or prerequisite plan differs')
@@ -108,7 +107,7 @@ def verify_control_receipt(path, binary, python, controls, inspector_hashes,
 
 
 def drivers_for(command_names):
-    return [kind for kind in ('query', 'session') if kind + '-cold' in command_names]
+    return ['query'] if 'query-cold' in command_names else []
 
 
 def main():
@@ -119,12 +118,10 @@ def main():
     parser.add_argument('--fixture', type=Path)
     parser.add_argument('--controls', type=Path)
     parser.add_argument('--output', type=Path)
-    parser.add_argument('--legacy-query-only', action='store_true',
-                        help='Run the 29 retained legacy Query/codec commands; graph CLI controls run separately.')
     parser.add_argument('--controls-timeout', type=int, default=900,
-                        help='One bound for the whole 40-command runner; not a guarantee of each per-command ceiling.')
+                        help='One bound for the whole per-group cache runner; not a guarantee of each per-command ceiling.')
     args = parser.parse_args()
-    available = commands_for(args.legacy_query_only)
+    available = commands_for()
     focused = select(PREFIX, available)
     selected = [focused] if focused is not None else available
     if args.framework_list:
@@ -132,7 +129,7 @@ def main():
         return
     if args.build_receipt is None or args.output is None:
         parser.error('--build-receipt and --output are required')
-    executed = commands_for(args.legacy_query_only, focused)
+    executed = commands_for(focused)
     require(1 <= args.controls_timeout <= 1800, 'controls timeout outside 1..1800')
     source = args.source_root.absolute()
     require(source.resolve(strict=True) == source and source.is_dir(), 'real source root required')
@@ -182,7 +179,6 @@ def main():
     record = {'format': 1, 'complete': False, 'commands': [],
               'selected_cases': selected, 'framework_cases': [], 'planned_controls_commands': executed,
               'mode': 'authenticated-production-source-context', 'source_root': str(source),
-              'legacy_query_only': args.legacy_query_only,
               'inputs': input_hashes, 'producer_receipt': str(receipt_path),
               'binary_inspector_inputs': inspector_hashes,
               'python_invocation': sys.executable, 'canonical_python': str(python),
@@ -272,13 +268,12 @@ def main():
         save()
         result = runner.run('source-context-controls', [python, '-I', '-B', controls,
                             '--fixture', binary, '--output', inner,
-                            *(['--legacy-query-only'] if args.legacy_query_only else []),
                             *(['--case', focused] if focused is not None else [])], timeout=args.controls_timeout)
         require(json.loads(result.stdout) == {'complete': True, 'commands': len(executed),
                                              'drivers': drivers_for(executed)},
                 'controls completion summary differs')
         checked = verify_control_receipt(controls_receipt, binary, python, controls, inspector_hashes,
-                                         args.legacy_query_only, focused)
+                                         focused)
         record['controls_receipt'] = {'path': str(controls_receipt), 'sha256': sha(controls_receipt)}
         record['controls_commands'] = executed
         postcheck()

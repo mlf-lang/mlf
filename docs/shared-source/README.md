@@ -89,8 +89,8 @@ The authenticated direct O0 runtime suite passed all 12 commands in 100.11
 seconds: async tasks/processes/wait graph, panic cleanup and child reaping,
 three frontend/MLF-semantic shards and suite-receipt checks. The separate
 TupleList runner passed 90 checks in 2.00 seconds. Current producer identities
-were re-authenticated after both runs. Evidence is under
-`tools/shared/evidence/{ghc,direct,tuplelist}-O0-complete-recovery/`.
+were re-authenticated after both runs. The archived O0 receipts cover
+[GHC](https://github.com/mlf-lang/mlf/tree/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/shared/evidence/ghc-O0-complete-recovery), [direct runtime](https://github.com/mlf-lang/mlf/tree/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/shared/evidence/direct-O0-complete-recovery), and [TupleList](https://github.com/mlf-lang/mlf/tree/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/shared/evidence/tuplelist-O0-complete-recovery).
 
 Recovery also hardens seed bundle integrity, preserves actual seed identity
 through the timed caller, and adds manager host identity checks to native
@@ -104,9 +104,9 @@ The unchanged source also completed the exact GHC O2 producer: 94 modules,
 process-tree RSS. O2 direct runtime checks passed all 12 commands in 17.02
 seconds, and TupleList passed all 90 checks. The separate PR source-smoke
 passed all five cases with both O0 and O2. Both producer receipts were
-re-authenticated after testing. Evidence is under
-`tools/shared/evidence/{ghc,direct,tuplelist,source-smoke}-O2-complete-recovery/`
-and `tools/shared/evidence/source-smoke-O0-complete-recovery/`.
+re-authenticated after testing. The archived O2 receipts cover
+[GHC](https://github.com/mlf-lang/mlf/tree/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/shared/evidence/ghc-O2-complete-recovery), [direct runtime](https://github.com/mlf-lang/mlf/tree/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/shared/evidence/direct-O2-complete-recovery), [TupleList](https://github.com/mlf-lang/mlf/tree/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/shared/evidence/tuplelist-O2-complete-recovery), and [source smoke](https://github.com/mlf-lang/mlf/tree/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/shared/evidence/source-smoke-O2-complete-recovery).
+The [O0 source-smoke receipt](https://github.com/mlf-lang/mlf/tree/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/shared/evidence/source-smoke-O0-complete-recovery) covers the same five cases.
 
 A separately reviewed direct GHC O2 Figure12 entry also passes the maintained
 43 labels / 41 distinct expressions and all 36 supplementary checks
@@ -114,8 +114,7 @@ A separately reviewed direct GHC O2 Figure12 entry also passes the maintained
 repairs), including current-target roundtrip type and erasure equality. Its
 fail-closed fixture decoder and oracle-helper guards pass 13 Python controls.
 This reuses authenticated compiler objects without interpreting a compiler
-inside a compiler; it is not full native-unit coverage. Evidence is in
-`tools/shared/evidence/figure12-direct-O2-complete-recovery/`.
+inside a compiler; it is not full native-unit coverage. The [archived Figure12 O2 results](https://github.com/mlf-lang/mlf/tree/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/shared/evidence/figure12-direct-O2-complete-recovery) include the receipts and command output.
 
 Real released-seed/native bootstrap, native fixed point and the full
 unit/Core/guest campaign remain pending. Direct host tests and source-smoke
@@ -162,8 +161,8 @@ Source checkpoint `351e95d` has complete exact-source producers at both GHC O0
 (43 labels / 41 expressions plus 36 supplementary checks). The new metadata,
 hygienic-name capture, strict artifact roundtrip and default-method demand
 regressions pass. Final source, tool, binary and object hashes were rechecked.
-Evidence is retained in `tools/shared/evidence/builtin-repair-recovery/`;
-pre-repair receipts remain historical rather than being relabeled.
+The [repair archive](https://github.com/mlf-lang/mlf/tree/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/shared/evidence/builtin-repair-recovery) preserves the qualification evidence.
+Pre-repair receipts retain their original identities.
 
 The maintained `--compile-crate` route also completed actual MLF inference,
 elaboration and checked-artifact production for foundation (12 modules),

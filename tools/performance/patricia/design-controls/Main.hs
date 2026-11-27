@@ -14,8 +14,8 @@ import qualified Bootstrap.CrateArtifact as Artifact
 import qualified Bootstrap.Separate as Separate
 import qualified Bootstrap.Std as Std
 import qualified Bootstrap.Map as Map
-import qualified FrozenDesignSet as Set
-import qualified FrozenDesignIdentityInventory as FI
+import qualified Data.Set as Set
+import qualified IdentityInventory as FI
 import qualified FrozenClassDemand as F
 import qualified Bootstrap.Runtime as R
 import qualified MLF.Tests.ClassDemand as QT
@@ -165,10 +165,10 @@ nameDemandControls = do
         result<-try(evaluate(sum xs `seq` xs))::IO(Either B.HostError [Int64])
         pure(case result of Left(B.HostError e)->Left e;Right ys->Right ys)
   forM_ (term:terms) $ \value -> do
-    expected<-observe(Set.toList(FI.termIdentities value Set.empty))
+    expected<-observe(Set.toAscList(FI.termIdentities value Set.empty))
     actual<-observe(IS.toList(Separate.termIdentities value IS.empty))
-    check "frozen identity inventory and demand" (expected==actual)
+    check "identity inventory and demand" (expected==actual)
 
 main = do
  rankControls;plannerControls;hostControls;runtimeControls;poolControls;nameDemandControls
- putStrLn "PASS index design: 20 signed index shapes; 150 frozen planner cases; 529 frozen identity cases; independent supply, exhaustion, demand order; host IntTable; interpreter stores; datatype pool"
+ putStrLn "PASS index design: 20 signed index shapes; 150 frozen planner cases; 529 identity cases; independent supply, exhaustion, demand order; host IntTable; interpreter stores; datatype pool"

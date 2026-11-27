@@ -393,10 +393,10 @@ Windows 文件助手只接受单个源文件和完整目标文件名，因此该
 断电持久性保证或 raw/final 分类型的堆驻留剖析。
 
 CI 的实际 CLI 查询指纹/发布检查使用 `tools/performance/crate-query-graph/verify.py`，
-source/fallback 及同进程 Session 失败重试使用 `source_checks.py`。保留的旧查询 API
-通过 `test_source_context_cache.py --legacy-query-only` 运行 29 项原有 codec/context/锁检查，
-包括 63 个冻结的 decoder 差分子例。旧格式专用的 Session 用例不用于判断新查询图；
-新验收验证 crate 失败后不发布成功前置 SCC、保留旧代，并在同一进程内释放锁后重试。
+source/fallback 及同进程 Session 失败重试使用 `source_checks.py`。
+`source-context-cache` 验证当前 source cache 的复用、失效和恢复。
+旧条目触发重新推断，写入当前格式后再次编译可以命中缓存。查询图验收还验证
+crate 失败后保留已发布代及其产物，并在同一进程内释放锁后重试。
 
 ## 验收
 

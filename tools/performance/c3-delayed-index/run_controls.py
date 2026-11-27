@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""Frozen full A1-owner differential; retained authored C4 fixtures and ABI bridge."""
+"""Compare private session behavior with the immutable public solver and an edge model."""
 from pathlib import Path
 import argparse
-import hashlib
 import re
 import shutil
 import sys
@@ -11,14 +10,12 @@ import types
 ROOT=Path(__file__).resolve().parents[3]
 HERE=Path(__file__).resolve().parent
 OWNER='libraries/mlf-crates/Bootstrap/CrateSession.hs'
-BASELINE='e123603d00f6f64e20e4d771836e49ddd808320f'
-ORACLE_SHA='93f8d5f686c05a8e2b56ef279c53a0ef0351af6f1ac7207746ee04623358fc66'
+MODEL = HERE / 'SessionModel.hs'
 EXPECTED=('PASS 63 physical graph/index/scope traces and legacy failure epochs\n'
           'PASS retained expansion descriptors and exact full component selection\n'
           'PASS repeated instances, reflexive equalities and literal fresh survivors\n'
           'PASS 8 demand, first-exception and unused-payload observations\n').encode()
 # Extensions may add an independent Main and named views of maintained controls.
-# The default CLI, frozen owner and complete expected inventory stay unchanged.
 EXTRA_SOURCES=[]
 EXTRA_PINS=[]
 
@@ -49,7 +46,7 @@ def main():
               and not producer.is_relative_to(out),'fresh isolated output')
     out.mkdir(parents=True)
     record=dict(complete=False,performance_samples=0,optimization=a.optimization,
-                baseline_ref=BASELINE,commands=[])
+                commands=[])
     save=lambda:H.save(out/'receipt.json',record)
     direct_path=a.producer_source.resolve()/'tools/shared/test_direct.py'
     direct=H.module(direct_path,'c3_control_authentication')
@@ -69,10 +66,7 @@ def main():
                               'unchanged borrowed dependency '+row['module'])
             A=H.module(HERE.parent/'patricia/adapt_oracles.py','retained_abi_adapter')
             src=out/'source';control_inputs=A.prepare(ROOT,src)
-            frozen_path=HERE/'oracles/LegacySession.hs'
-            frozen=frozen_path.read_bytes()
-            H.require(hashlib.sha256(frozen).hexdigest()==ORACLE_SHA,'frozen full private-owner oracle')
-            (src/'LegacySession.hs').write_bytes(frozen)
+            shutil.copy2(MODEL, src / MODEL.name)
             changed=A.private_module_view((ROOT/OWNER).read_bytes(),'CandidateSession')
             (src/'CandidateSession.hs').write_bytes(changed)
             shutil.copy2(HERE/'Main.hs',src/'Main.hs')
@@ -80,7 +74,7 @@ def main():
                 changed=A.private_module_view(source.read_bytes(),name,owner='Main')
                 (src/(name+'.hs')).write_bytes(changed)
             pins=H.file_pins(src)
-            pins.update({str(f):H.sha(f) for f in [Path(__file__),hp,direct_path,HERE/'Main.hs',frozen_path,ROOT/OWNER,
+            pins.update({str(f):H.sha(f) for f in [Path(__file__),hp,direct_path,HERE/'Main.hs',MODEL,ROOT/OWNER,
                 HERE.parent/'patricia/adapt_oracles.py',HERE.parent/'patricia/runtime_sources.py',
                 HERE.parent/'patricia/frozen_oracles.py',
                 producer/'receipt.json',producer/'host.o',producer/'supervisor.o']})

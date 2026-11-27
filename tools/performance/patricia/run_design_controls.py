@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Independent controls for slot supplies, rank views and integer state stores."""
 from pathlib import Path
-import argparse, hashlib, json, sys, types, traceback
+import argparse, json, sys, types, traceback
 
 ROOT = Path(__file__).resolve().parents[3]
 HERE = Path(__file__).resolve().parent
@@ -12,27 +12,6 @@ PREFIX = 'patricia-design/'
 TYPECHECK = 'all shared source typecheck'
 OPTIMIZATIONS = [('O0', ['-O0']), ('O2', ['-O2']), ('O2-narrow', ['-O2', '-DMLF_TEST_NARROW_INT_TABLE'])]
 LABELS = [TYPECHECK, *[label for label, _ in OPTIMIZATIONS]]
-DESIGN_DIRECTORY = HERE/'oracles/design'
-DESIGN_ORACLES = {'FrozenDesignIdentityInventory.hs': 'f2e4aefd62ad3039b9a9bfe9c2e131df670f013719a16980d75bf4c0a5605d05', 'FrozenDesignMap.hs': 'd48fab73e6a276190ed63641c7c4ef85ffc0ba05ef10f3fc9868e81eccab8741', 'FrozenDesignSet.hs': '5c221618fe54e5bf53afe5f366988d252ffe8561b1e7722dc666e237de936df1'}
-
-
-def require(value, message):
-    if not value:
-        raise RuntimeError(message)
-
-
-def digest(raw):
-    return hashlib.sha256(raw).hexdigest()
-
-
-def load_design_oracles(directory=DESIGN_DIRECTORY):
-    """Read the independently retained, already compile-ready references."""
-    sources = {}
-    for name, expected in DESIGN_ORACLES.items():
-        raw = (directory/name).read_bytes()
-        require(digest(raw) == expected, 'frozen design oracle changed: ' + name)
-        sources[name] = raw
-    return sources
 
 
 def run_stage(record, save, stage, action):
@@ -77,17 +56,7 @@ def qualify(a, out, record, save):
     stage('frozen-oracles')
     controls = HERE/'design-controls'
     oracle = H.load(controls/'oracle.json')
-    raw = (controls/'FrozenClassDemand.hs').read_bytes()
     H.require(H.sha(controls/'FrozenClassDemand.hs') == oracle['frozen_sha256'], 'frozen oracle bytes')
-    stage('load-independent-dependencies')
-    generated = load_design_oracles()
-    isolated = out/'frozen-dependencies'; isolated.mkdir()
-    for name, source in generated.items():
-        (isolated/name).write_bytes(source)
-    record['independent_dependencies'] = dict(
-        fixture_sha256=DESIGN_ORACLES,
-        shared_base='Types (including Map/Set data constructors), Std, Primitive, X.Syntax and host/runtime remain current; reference Map/Set algorithms are isolated')
-    save()
     direct_path=a.reference_source.resolve()/'tools/shared/test_direct.py'
     direct=H.module(direct_path,'design_control_authentication')
     def authenticate():
@@ -103,7 +72,7 @@ def qualify(a, out, record, save):
     manifest = H.load(ROOT/'shared-sources.json')
     inputs = [ROOT/x['path'] for x in manifest['modules']]
     inputs += list((ROOT/'host/ghc').rglob('*.hs')) + list(controls.iterdir())
-    inputs += [Path(__file__), hp, direct_path, identity_helper, ROOT/'shared-sources.json', ROOT/'tools/testing/receipt_selection.py', *isolated.iterdir(), *[DESIGN_DIRECTORY/name for name in DESIGN_ORACLES]]
+    inputs += [Path(__file__), hp, direct_path, identity_helper, ROOT/'shared-sources.json', ROOT/'tools/testing/receipt_selection.py']
     pins = {str(f):H.sha(f) for f in inputs if f.is_file()}
     limits = dict(address_space_per_process_bytes=6*1024**3, disk_free_floor_bytes=5*1024**3,
         host_available_floor_bytes=3*1024**3, process_tree_rss_bytes=5*1024**3,
@@ -132,7 +101,7 @@ def qualify(a, out, record, save):
                     continue
                 objects=out/(label+'-objects');binary=out/(label+'-binary')
                 common=['-fpedantic-bottoms','-fno-state-hack','-Werror=incomplete-patterns',
-                    '-Werror=incomplete-uni-patterns','-package-env','-','-i','-i'+str(isolated),'-i'+str(controls),
+                    '-Werror=incomplete-uni-patterns','-package-env','-','-i','-i'+str(controls),
                     *['-i'+str(ROOT/x) for x in manifest['source_roots']]]
                 run=lambda name,argv:H.Runner(out,limits).run(argv,ROOT,out/name,timed=False)
                 stage(label+'-build')

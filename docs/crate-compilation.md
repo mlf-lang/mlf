@@ -210,12 +210,13 @@ They exclude predecessor body hashes. SHA-256 addresses cache files; the full
 canonical key is also compared on reload. A damaged cache entry is a miss.
 Writers use locks and atomic replacement.
 
-`MLF-QUERY-CACHE-2` omits repeated datatype contexts only when both the fragment
-header and its actual term context match the layouts already recorded in the
-complete query key. Reloading restores those layouts from the current query,
-then performs the same ownership, scheme, context and independent term checks.
-This also permits canonical datatype-binder renaming. Older cache entries remain
-readable; an incompatible or malformed entry causes fresh inference.
+Source inference cache entries use the current binary query records with an
+input address and a result fingerprint. Shared contexts are addressed by the
+hash of their binary contents and checked against the complete source query
+key. Reloading validates group ownership, schemes, datatype context and the
+checked term. An older text or unaddressed binary source record is a cache miss.
+The compiler infers the group again and publishes a current entry. Malformed
+records also trigger fresh inference.
 
 The package manager's outer artifact cache remains conservative about source
 and implementation inputs because assembly and final code must reflect changed
@@ -242,7 +243,7 @@ LLVM currently optimizes the linked erased program. Nominal constructor tags,
 global optimization and closure layouts remain code-generation inputs.
 Inference-fragment reuse does not by itself imply native object reuse. The
 [migration ledger](crate-migration.md) records the implemented code-generation
-cache boundary and accepted measurements. The [validation record](crate-validation.json)
+cache boundary and accepted measurements. The [validation record](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/crate-validation.json)
 binds the six native groups, fresh self-hosting, exact tool/source identities
 and isolated performance evidence.
 

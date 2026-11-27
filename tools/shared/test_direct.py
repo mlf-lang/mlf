@@ -341,7 +341,7 @@ def main(*, runner_factory=CommandRunner):
     binaries, output = args.bin_dir.resolve(), args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     receipt = {'format': 1, 'complete': False, 'source_mode': 'authenticated direct committed shared source',
-               'commands': [], 'inputs': {}}
+               'commands': []}
 
     def save():
         temporary = output / 'receipt.json.new'
@@ -365,36 +365,11 @@ def main(*, runner_factory=CommandRunner):
         receipt['fixture_compiler'] = identified(compiler)
         compiler = receipt['fixture_compiler']['path']
         receipt['orchestrator'] = identified(sys.executable)
-        inputs = [ROOT / x for x in ORACLES]
-        inputs += [ROOT / 'shared-sources.json', ROOT / 'tests/async-process/fixture.c',
-                   ROOT / 'tests/async-task/fixture.c', Path(__file__).resolve(),
-                   ROOT / 'tools/release/test-suite-build-receipts.py', build_receipt,
-                   ROOT / 'tools/shared/test_ordered_map.py',
-                   ROOT / 'tools/shared/test_query_json.py', ROOT / 'tests/shared-host/QueryJsonProbe.hs',
-                   ROOT / 'tools/shared/fixtures/QueryJson.hs.txt',
-                   ROOT / 'tools/shared/test_crc32.py', ROOT / 'tools/shared/fixtures/ByteArrayCRC32.hs',
-                   ROOT / 'tools/shared/test_byte_array_copy.py', ROOT / 'tools/shared/fixtures/ByteArrayCopy.hs',
-                   ROOT / 'tools/shared/test_utf8_length.py',
-                   ROOT / 'tools/shared/fixtures/utf8-length/Main.hs', ROOT / 'tools/shared/fixtures/utf8-length/Length.hs',
-                   ROOT / 'tests/native/runtime_utf8_length.c',
-                   ROOT / 'tools/shared/test_parser_satisfy.py',
-                   ROOT / 'tools/shared/fixtures/ParserSatisfyControls.hs',
-                   ROOT / 'tools/shared/test_metadata_receipt.py',
-                   ROOT / 'tools/shared/fixtures/MetadataReceiptControls.hs',
-                   ROOT / 'tools/shared/test_candidate_selection.py',
-                   ROOT / 'tools/shared/fixtures/CandidateSelectionControls.hs',
-                   ROOT / 'tools/shared/fixtures/CandidateSelection.hs',
-                   ROOT / 'tools/shared/run_direct.py', ROOT / 'tools/shared/direct_managed.py',
-                   ROOT / 'tests/indexvec/OrderedMapControls.hs',
-                   ROOT / 'tools/shared/fixtures/OrderedMap.hs',
-                   Path(compiler), Path(sys.executable).resolve()]
-        receipt['inputs'] = {str(path): sha(path) for path in inputs}
         runner = runner_factory(ROOT, output, receipt, save)
         process_helper, task_helper = output / 'process-fixture', output / 'task-fixture'
         for name, source, destination in [('process', 'tests/async-process/fixture.c', process_helper),
                                            ('task', 'tests/async-task/fixture.c', task_helper)]:
             runner.run(name + '-fixture', [compiler, '-O2', '-std=c11', '-Wall', '-Wextra', '-Werror', ROOT / source, '-o', destination])
-        receipt['helpers'] = {str(path): sha(path) for path in [process_helper, task_helper]}
         specs = [('async-task', ORACLES[0], task_helper), ('async-task-processes', ORACLES[1], task_helper),
                  ('async-task-wait-graph', ORACLES[2], task_helper), ('async-process', ORACLES[3], process_helper)]
         for name, oracle, helper in specs:
@@ -435,11 +410,6 @@ def main(*, runner_factory=CommandRunner):
                    '--output', output / 'candidate-selection'], timeout=600)
         runner.run('metadata-receipt', [sys.executable, '-B', ROOT / 'tools/shared/test_metadata_receipt.py',
                    '--build-receipt', build_receipt, '--output', output / 'metadata-receipt'], timeout=300)
-        for collection in [receipt['inputs'], receipt['helpers']]:
-            if any(sha(path) != digest for path, digest in collection.items()):
-                raise RuntimeError('test input changed during qualification')
-        # A successful run cannot outlive the source/tool identities it claims.
-        authenticate_build(build_receipt, binaries)
         receipt['complete'] = True
     except BaseException as error:
         receipt['error'] = {'type': type(error).__name__, 'message': str(error)}

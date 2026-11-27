@@ -6,9 +6,9 @@ the original compact-reader slowdown that motivated the memo.
 
 ## Workload and identities
 
-`SourceContext64.hs` constructs 64 independent typed Int definitions:
+The archived [Haskell fixture](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/performance/source-context-read-reuse/SourceContext64.hs) constructs 64 independent typed Int definitions.
 `v000..v063 = 1000..1063`. One update changes only `v000` to 2000.
-The fixture and `run_workload64.py` are **byte-identical in both runs**.
+Both runs used the same fixture and runner bytes.
 
 The earlier producer is cleanup head `2c3ce0ee`. The new producer is based on
 merge `6a82267e` (which also contains PR25's `9dfcd662` projection change)
@@ -85,20 +85,9 @@ between the producer runs.
 
 ## Reproduction boundaries
 
-The committed Haskell fixture and Python runner are the exact tested bytes.
-Compile/link the fixture using the authenticated producer's object closure,
-the maintained source-context gate's package/strict-warning flags and the
-same two host C objects; authenticate that producer and pin its inputs
-before and after the run. The standalone runner is not itself a replacement
-for those build/authentication and process-tree resource checks.
-
-With that separately qualified executable and an **external bounded guard**:
-
-```sh
-python3 -I -B tools/performance/source-context-read-reuse/run_workload64.py \
-  --fixture /absolute/path/to/qualified/source-context-64 \
-  --output /absolute/path/to/fresh/workload64-output
-```
+The [original runner](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/performance/source-context-read-reuse/run_workload64.py) and
+[build and execution instructions](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/performance/source-context-read-reuse/README.md#reproduction-boundaries)
+use the text-cache encodings measured in this study.
 
 The runner requires a fresh output, ten fixed commands and a 180-second
 per-command timeout. It checks both whole cache trees against a 24 MiB
@@ -107,9 +96,5 @@ The recorded local outer guard retained 1800 seconds, 6 GiB address space,
 5 GiB tree RSS, 8 GiB complete experiment ROOT accounting and the existing
 memory/free-disk floors. Its resource observations are sampled.
 
-The maintained `test_source_context_cache.py` executes the **34 directed
-controls**, not this 64-group study. Those controls separately cover
-invalidations, real-lock lifecycle and raw/PreparedRaw rejection. This
-64-group study is not silently added as a new mandatory hosted CI benchmark.
-Neither experiment establishes native-backend, Windows, crash or hostile
-filesystem qualification.
+Current cache hit, invalidation and corruption-recovery checks exercise
+the compiler through the [query graph suite](../crate-query-graph/README.md).

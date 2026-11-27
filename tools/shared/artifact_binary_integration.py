@@ -21,16 +21,19 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures,selectio
         require(invoke('production-admission','admission')==b'PASS production-admission-distinct-from-raw-codec\n','production syntax-domain exact oracles')
     if wants('source-admission'):
         source_admission=output/'source-admission'
-        require(invoke('source-admission','source-admission',source_admission)==b'PASS source-key-context-admission-and-priority\n','real schema301 emptycontext expectedDS/memo/priority regression')
+        require(invoke('source-admission','source-admission',source_admission)==b'PASS source-key-context-admission-and-priority\n','current shared source cache, memo, and rejection regression')
         guarded_query=typed.inspect_artifact((source_admission/'record.mlfq').read_bytes(),2)
-        guarded_root=guarded_query.values()[0]
-        require(guarded_root[1]==301,'source admission record stays actual shared binary')
-        reference=typed.text(guarded_root[2][0]);carrier=source_admission/('context-'+reference+'.mlfqc')
+        guarded_root = guarded_query.values()[-1]
+        context_offsets = {303: 0, 306: 2}
+        require(len(guarded_query.roots) == 2 and guarded_root[1] in context_offsets,
+                'source admission publishes an addressed shared record')
+        reference = typed.text(guarded_root[2][context_offsets[guarded_root[1]]])
+        carrier = source_admission / ('context-' + reference + '.mlfqc')
         require(sha(carrier.read_bytes())==reference,'source admission physical context SHA')
         guarded_context=typed.inspect_artifact(carrier.read_bytes(),1)
         require(typed.list_values(typed.value_node(guarded_context.values()[0],244,1)[0])==(),'source admission real empty typed context')
         record['source_admission']={'record_sha256':sha((source_admission/'record.mlfq').read_bytes()),'context_sha256':reference,
-                                    'scope':'unchanged full key; int-only body; only expectedDS changes; cold and genuine warm memo; missing/digest/mismatch priority; actual legacy CACHE3 own SHA'}
+                                    'scope':'unchanged full key; int-only body; only expectedDS changes; cold and genuine warm memo; missing/digest/mismatch priority; legacy text and unaddressed records miss'}
     if wants('base64'):
         base64_dir=output/'base64'
         require(invoke('base64','base64',base64_dir)==b'PASS canonical-base64\n','base64 fixture complete marker')

@@ -32,14 +32,8 @@ bodies. Unchanged controls in other performance directories are reused in
 place. Ordinary control edits require no fixed SHA update. Receipts record
 all control inputs before execution and verify them again afterwards.
 
-Independent old algorithms live in `oracles/` or their existing frozen source
-locations. Their small fixture hash inventory protects those reference bytes;
-it does not qualify current compiler source or reconstruct a historical commit
-chain. [The oracle notes](oracles/README.md) identify their origins and scope.
-The direct sources were compared once with the previous preparation's final
-Haskell output: graph, P1/P2/P3, and validation match, with only an extra final
-blank line removed from two maintained controls.
-That conversion check is not a recurring CI gate.
+The [oracle notes](oracles/README.md) identify the reference algorithms and
+the maintained collection models used by the integrated suites.
 
 Private graph checks still need a test-only view of the current
 `Bootstrap.CrateSession`. The small header lexer changes its module name and
@@ -66,10 +60,11 @@ All retained finite rows remain, including oversized literals which wrap under
 Int64 and can duplicate other rows. This does not claim the former arbitrary
 precision arithmetic contract.
 
-For graph controls, `OracleTypes.hs` bridges finite, total container spines to
-the old frozen Graph/Solver/Constraint algorithms. Its representation checks
-use `Data.Bits`, not candidate constructors. Map payloads remain lazy. This
-finite bridge does not prove equivalence for arbitrary partial tree spines.
+The graph controls use `Data.Map.Lazy` and `Data.Set` with full-width `Int64`
+keys. `OracleTypes.hs` checks finite Patricia spines with `Data.Bits`, reads
+their entries and independently encodes the model's results into graph fields.
+It also supplies a balanced-tree view for graph algorithms that consume ranks
+and ordered projections. All conversions preserve lazy map values.
 Wide identity layouts use 2^60 instead of 10^40/10^30, with unchanged injective
 relationships, success/rejection expectations, and test count. The 216
 heteroinput cases retain all permutations and authored outcomes. Their wide-ID
@@ -91,11 +86,11 @@ wraps before the first remainder. `appendDatatypeEncoding` now admits only
 canonical residues to composition. The gate keeps all 922 old checks and adds
 seven full-width seed checks.
 
-The P2 suite executes both the retained pure/fingerprint and old text-writer
-cases and the current `BinaryP2WriterControls`; it also retains the separate
-native-compatibility checks. The fixed text writer is only an independent
-reference for those old cases and explicitly refuses binary-envelope objects.
-Current binary IO is exercised through the actual public writer and readers.
+P2 compares the current scalar and block fingerprints against a two-residue
+reference using fixed digests, Unicode and block boundaries, signed seeds, and
+deterministic generated strings. The binary writer tests exercise publication,
+corrupt files, and both supported text and binary reads. The separate summary
+controls compare serialized text and pooled chunk digests to the same reference.
 
 `run_fingerprint.py` directly compiles `controls/fingerprint/Oracle.hs`,
 `Probe.hs`, and `Tests.hs`, with authored stdout/stderr expectations beside
@@ -182,11 +177,10 @@ demand and failed-write behavior.
 Run `run_design_controls.py --reference-producer PRODUCER --reference-source SOURCE
 --output FRESH_DIRECTORY` before the ordinary installation build. It checks all
 shared modules, O0/O2, the narrower-host fallback, 150 frozen planner cases and
-529 frozen identity-inventory cases, plus signed rank/select and demand probes.
-The planner oracle is in `design-controls`; the directly compiled frozen
-Map, Set and identity collector are in `oracles/design`. Their established
-preparation was materialized once, so no historical tree or inverse-source
-check is required at runtime.
+529 identity-inventory cases, plus signed rank/select and demand probes.
+The planner reference and the identity visitor live in `design-controls`.
+The visitor collects identifiers in `Data.Set Int64` and compares their
+signed enumeration and exception behavior to the compiler's inventory.
 The runner rejects a stale canonical builtin source identity before compiling;
 the normal installation subsequently verifies exact fresh regeneration. These
 controls also run in the existing bounded Int64/Patricia CI step.

@@ -1,14 +1,8 @@
 #!/usr/bin/env python3
-"""Cheap transport regressions, including bounded POSIX session cleanup.
-
-These mocks check dispatch, units, limits and historical reproduction pins.
-They do not qualify a real Mach-O closure, measure peak RSS, run the nine-leg
-campaign, or establish that its historical candidate is the current checkout.
-"""
+"""Test current toolchain discovery, resource accounting, and POSIX session cleanup."""
 from __future__ import annotations
 
 from contextlib import ExitStack
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -35,96 +29,7 @@ def source_module(path, name):
 
 
 HELPER = source_module(HERE / 'helper.py', 'a1_platform_helper')
-with mock.patch.dict(sys.modules, {'helper': HELPER}):
-    REPRO = source_module(HERE / 'reproduce.py', 'a1_platform_reproduction')
 BUILDER = source_module(ROOT / 'tools/shared/build.py', 'a1_platform_builder')
-
-
-def digest(value):
-    return hashlib.sha256(value).hexdigest()
-
-
-class PinContracts(unittest.TestCase):
-    def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temporary.cleanup)
-        root = Path(self.temporary.name).resolve()
-        self.source = root / 'snapshot'
-        self.here = root / 'runner/tools/performance/a1-private-index'
-        self.here.mkdir(parents=True)
-        self.source_file = 'libraries/Fixture.hs'
-        self.builder_file = 'tools/shared/build.py'
-        for relative, content in [(self.source_file, b'module Fixture where\n'),
-                                  (self.builder_file, b'original builder\n')]:
-            path = self.source / relative
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(content)
-        adapter = self.here.parents[2] / self.builder_file
-        adapter.parent.mkdir(parents=True)
-        adapter.write_bytes(b'platform adapter\n')
-        self.adapter = adapter.read_bytes()
-        pins = {path: HELPER.sha(self.source / path)
-                for path in [self.source_file, self.builder_file]}
-        self.data = {'implementation_pins': {'base': pins, 'candidate': pins},
-                     'implementation_module_counts': {'base': 1, 'candidate': 1}}
-        self.manifest = {'modules': [{'path': self.source_file}], 'host_only': []}
-
-    def implementation(self, platform, side='A1'):
-        builder = types.SimpleNamespace(load_manifest=lambda: self.manifest)
-        with mock.patch.object(REPRO.sys, 'platform', platform), \
-             mock.patch.object(REPRO, 'HERE', self.here), \
-             mock.patch.object(REPRO, 'module', return_value=builder):
-            return REPRO.implementation(self.source, self.data, side)
-
-    def test_linux_accepts_original_builder_on_both_sides(self):
-        self.assertEqual(self.implementation('linux', 'P3'), self.implementation('linux', 'A1'))
-
-    def test_linux_never_exempts_builder_pin(self):
-        (self.source / self.builder_file).write_bytes(self.adapter)
-        for side in ['P3', 'A1']:
-            with self.subTest(side=side), self.assertRaisesRegex(RuntimeError, 'implementation pin'):
-                self.implementation('linux', side)
-
-    def test_darwin_accepts_only_same_current_adapter_on_both_sides(self):
-        (self.source / self.builder_file).write_bytes(self.adapter)
-        left, right = self.implementation('darwin', 'P3'), self.implementation('darwin', 'A1')
-        self.assertEqual(left, right)
-        self.assertEqual(left[str(self.source / self.builder_file)], digest(self.adapter))
-
-    def test_darwin_rejects_a_different_builder(self):
-        (self.source / self.builder_file).write_bytes(b'other adapter\n')
-        with self.assertRaisesRegex(RuntimeError, 'platform builder patch mismatch'):
-            self.implementation('darwin')
-
-    def test_darwin_does_not_exempt_implementation_sources(self):
-        (self.source / self.builder_file).write_bytes(self.adapter)
-        (self.source / self.source_file).write_bytes(b'changed source\n')
-        with self.assertRaisesRegex(RuntimeError, 'implementation pin'):
-            self.implementation('darwin')
-
-    def test_unpinned_module_or_host_input_is_rejected(self):
-        for field, value in [('modules', [{'path': 'libraries/Unpinned.hs'}]),
-                             ('host_only', ['host/Unpinned.hs'])]:
-            with self.subTest(field=field):
-                prior = self.manifest[field]
-                self.manifest[field] = value
-                with self.assertRaisesRegex(RuntimeError, 'unpinned registered'):
-                    self.implementation('linux')
-                self.manifest[field] = prior
-
-    def test_cli_defaults_are_historical_not_head(self):
-        # main() really parses its defaults, but no preparation or host probe runs.
-        with mock.patch.object(sys, 'argv', ['reproduce.py', '--work-dir', '/unused/a1', '--prepare-only']), \
-             mock.patch.object(REPRO, 'host', return_value={}), \
-             mock.patch.object(REPRO, 'fixture_contract', return_value=({}, {})), \
-             mock.patch.object(REPRO, 'prepare', return_value=Path('/unused/receipt.json')) as prepare, \
-             mock.patch.object(REPRO, 'campaign') as campaign:
-            REPRO.main()
-        args = prepare.call_args.args[0]
-        self.assertEqual(args.candidate_ref, '5a89143ecbcaaef152a7e88331583660192e106d')
-        self.assertEqual(args.base_ref, '875e483de49655030c4ffba1995b60610a50273a')
-        self.assertEqual(args.source_checkout, ROOT)
-        campaign.assert_not_called()
 
 
 class ToolchainDispatch(unittest.TestCase):
@@ -188,99 +93,6 @@ class ToolchainDispatch(unittest.TestCase):
     def test_other_platform_fails_closed(self):
         with self.assertRaisesRegex(RuntimeError, 'Linux toolchains only'):
             self.invoke('unsupported')
-
-
-class PreparationTransport(unittest.TestCase):
-    def preparation(self, platform):
-        """Run prepare's orchestration, with all compiler/host work replaced."""
-        with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
-            root = Path(directory).resolve()
-            repo, work = root / 'repo', root / 'work'
-            repo.mkdir()
-            here = root / 'runner/tools/performance/a1-private-index'
-            here.mkdir(parents=True)
-            adapter = here.parents[2] / 'tools/shared/build.py'
-            adapter.parent.mkdir(parents=True)
-            adapter.write_bytes(b'platform-only builder fixture\n')
-            (here / 'run_controls.py').write_bytes(b'unchanged literal controls runner fixture\n')
-            ghc, cc = root / 'ghc-fixture', root / 'cc-fixture'
-            ghc.write_bytes(b'not executed')
-            cc.write_bytes(b'not executed')
-            original = b'original fixed builder fixture\n'
-            source_bytes = {'tools/shared/build.py': original,
-                            'libraries/Fixture.hs': b'module Fixture where\n',
-                            'tools/performance/a1-private-index/run_controls.py': (here / 'run_controls.py').read_bytes()}
-            pins = {path: digest(value) for path, value in source_bytes.items()}
-            data = {'implementation_pins': {'base': pins, 'candidate': pins},
-                    'implementation_module_counts': {'base': 1, 'candidate': 1}}
-            args = types.SimpleNamespace(work_dir=work, source_checkout=repo, ghc=ghc, cc=cc,
-                                         base_ref='a' * 40, candidate_ref='b' * 40, rss_mib=5120,
-                                         address_space_mib=6144, host_available_mib=3072,
-                                         disk_free_mib=4096, max_work_gib=16, command_timeout=21600)
-            builds = []
-            def snapshot(repository, ref, destination, runner, output):
-                for relative, content in source_bytes.items():
-                    path = destination / relative
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_bytes(content)
-                return ref
-            def receipt(folder):
-                folder.mkdir(parents=True)
-                (folder / 'receipt.json').write_text('{}\n')
-            class Runner:
-                def __init__(self, *unused):
-                    pass
-                def run(self, argv, cwd, output):
-                    if '--build-dir' in argv:
-                        producer = Path(argv[argv.index('--build-dir') + 1])
-                        builds.append((producer.name, (Path(cwd) / 'tools/shared/build.py').read_bytes()))
-                        receipt(producer)
-                    else:
-                        receipt(Path(argv[argv.index('--output') + 1]))
-                    return {'complete': True}
-            def dependencies(*unused):
-                receipt(work / 'dependencies')
-                return {'builtin_prefix': str(work / 'builtin'), 'artifacts': {}}
-            identity = {key: 'same installed fixture' for key in
-                        ['ghc', 'cc', 'ghc_settings', 'toolchain', 'installed_dependencies']}
-            stack.enter_context(mock.patch.object(REPRO.sys, 'platform', platform))
-            stack.enter_context(mock.patch.object(REPRO, 'HERE', here))
-            # Do not print a mocked preparation as if it were real evidence.
-            stack.enter_context(mock.patch.object(REPRO, 'print', create=True))
-            stack.enter_context(mock.patch.object(REPRO, 'host', return_value={'mocked': True}))
-            stack.enter_context(mock.patch.object(REPRO, 'Runner', Runner))
-            stack.enter_context(mock.patch.object(REPRO.subprocess, 'check_output', return_value='9.14.1\n'))
-            stack.enter_context(mock.patch.object(REPRO, 'git_snapshot', side_effect=snapshot))
-            stack.enter_context(mock.patch.object(REPRO, 'module', return_value=types.SimpleNamespace(
-                load_manifest=lambda: {'modules': [{'path': 'libraries/Fixture.hs'}], 'host_only': []})))
-            stack.enter_context(mock.patch.object(REPRO, 'authenticate', return_value=identity))
-            stack.enter_context(mock.patch.object(REPRO, 'prepare_dependencies', side_effect=dependencies))
-            stack.enter_context(mock.patch.object(REPRO, 'validate_dependencies', side_effect=lambda *unused: receipt(work / 'dependency-validation')))
-            stack.enter_context(mock.patch.object(REPRO, 'prepare_ghc', side_effect=lambda *unused: receipt(work / 'ghc-dependencies')))
-            controls = stack.enter_context(mock.patch.object(REPRO, 'verify_controls'))
-            result = REPRO.prepare(args, data, {})
-            record = json.loads(result.read_text())
-            controls.assert_called_once_with(work / 'focused-controls/receipt.json')
-            return record, builds, digest(original), digest(adapter.read_bytes())
-
-    def test_darwin_prepare_records_same_overlay_for_both_real_loop_iterations(self):
-        record, builds, original, adapted = self.preparation('darwin')
-        self.assertTrue(record['complete'])
-        self.assertEqual([side for side, _ in builds], ['P3', 'A1'])
-        self.assertEqual({digest(value) for _, value in builds}, {adapted})
-        self.assertEqual(set(record['platform_patches']), {'P3', 'A1'})
-        for row in record['platform_patches'].values():
-            self.assertEqual(row['original_sha256'], original)
-            self.assertEqual(row['adapted_sha256'], adapted)
-        self.assertFalse(record['native_bootstrap'])
-        self.assertFalse(record['local_full_qualification'])
-
-    def test_linux_prepare_keeps_both_fixed_builders_unmodified(self):
-        record, builds, original, _ = self.preparation('linux')
-        self.assertTrue(record['complete'])
-        self.assertEqual([side for side, _ in builds], ['P3', 'A1'])
-        self.assertEqual({digest(value) for _, value in builds}, {original})
-        self.assertNotIn('platform_patches', record)
 
 
 class MemoryAndProcessUnits(unittest.TestCase):

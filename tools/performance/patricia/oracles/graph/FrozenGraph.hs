@@ -7,8 +7,8 @@ module FrozenGraph where {
   import OracleTypes;
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Map as M;
-  import qualified FrozenIntMap as IM;
-  import qualified FrozenIntSet as IS;
+  import qualified GraphMapModel as IM;
+  import qualified GraphSetModel as IS;
   import qualified Bootstrap.ST as ST;
   -- Persistent graph operations. Identities are retained through aliases, while
   -- permissions are always checked on the immutable graph before unification.
@@ -762,22 +762,7 @@ module FrozenGraph where {
   -- when public graph identities are sparse or arbitrary-precision integers.
   denseDisjoint :: forall a b. IntMap a -> IntMap b -> Bool;
   denseDisjoint left right =
-    case left of {
-      IntMap leftTree ->
-        case right of {
-          IntMap rightTree ->
-            if (IM.size left <= IM.size right)
-            then denseNoKeys leftTree rightTree
-            else denseNoKeys rightTree leftTree
-        }
-    };
-  denseNoKeys :: forall a b. Map Int a -> Map Int b -> Bool;
-  denseNoKeys smaller larger =
-    case smaller of {
-      MapEmpty -> True;
-      MapNode count key value left right ->
-        (L.not (IM.memberTree key larger) && (denseNoKeys left larger && denseNoKeys right larger))
-    };
+    L.all (\key -> IM.notMember key right) (IM.keys left);
   denseBounds :: Graph -> Maybe ((,) Int Int);
   denseBounds graph =
     case IM.lookupMin (nodes graph) of {

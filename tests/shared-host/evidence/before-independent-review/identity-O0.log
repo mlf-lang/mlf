@@ -1,1 +1,0 @@
-PASS actual Prelude.Bool, custom Monad without Applicative, IO pure, numeric patterns/guards and opaque String literals

@@ -605,7 +605,7 @@
     "host/ghc/cbits/host.c": "bfcf4b400902afaa89e0d6cbe0de5901a4e1e89c6100d203e50c3099ba7fc694",
     "runtime/mlf_system.h": "eb1f0f97ece2bd95a60a75e4c7445b5c2cbd2ff75c75545e2ac673f2f3157cff"
   },
-  "focused_evidence": "tests/shared-host/evidence/latest/receipt.json",
+  "focused_evidence": "https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tests/shared-host/evidence/latest/receipt.json",
   "independent_review": "docs/shared-source/independent-runtime-adapter-review.md",
   "qualification_scope": "Bounded Linux adapter probes only; whole-compiler/native-fixed-point gates separate"
 }

@@ -56,7 +56,7 @@ run release-generated-string-pool
 run release-prepared-verification
 run release-performance-a1-platform
 run release-performance-local-transaction
-run release-performance-fingerprint-fusion
+run python-patricia-fingerprint-core
 run release-performance-inference-controls
 run release-io-action-controls
 run release-framework-controls

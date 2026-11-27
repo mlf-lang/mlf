@@ -119,17 +119,16 @@ def main():
                 stdout=(out/(module+'-run')/'stdout').read_bytes();stderr=(out/(module+'-run')/'stderr').read_bytes()
                 H.require(not stderr,'control stderr empty '+module)
                 if module=='P2Controls':
-                    oracle=(out/'source/FrozenFingerprint.hs').read_text()
-                    H.require(oracle.startswith('{-# OPTIONS_GHC -fno-enable-rewrite-rules -fomit-interface-pragmas -dcore-lint #-}\n'),'P2 oracle isolation retained')
-                    record['frozen_P2_rewrite_rules_disabled']=True
-                    record['frozen_P2_interface_unfoldings_omitted']=True
-                if module in ['P1Controls','P2Controls','P3Controls']:
+                    H.require(stdout.splitlines()[-1:] == [
+                        b'PASS fingerprint literals, boundaries, seeded scalar streams, artifact admission and binary publication'],
+                        'current fingerprint and publication checks')
+                if module in ['P1Controls','P3Controls']:
                     summaries=[json.loads(s) for s in stdout.decode().splitlines() if s.startswith('{')]
                     H.require(len(summaries)==1 and summaries[0]['complete'] is True,'one complete summary')
-                    H.require(summaries[0]['differential_controls' if module=='P3Controls' else 'checks']==dict(P1Controls=154072,P2Controls=2503,P3Controls=929)[module],'all retained control cases')
+                    H.require(summaries[0]['differential_controls' if module=='P3Controls' else 'checks']==dict(P1Controls=154072,P3Controls=929)[module],'all retained control cases')
                 if module=='NativeCompatibilityControls':
                     H.require(stdout==b'{"complete":true,"native_compatibility_controls":1243}\n',
-                              'all frozen supplemental P2 native-integration controls')
+                              'all P2 serializer and summary controls')
                     record['native_compatibility_controls']=1243
                 if module=='BinaryBuiltinControls':
                     H.require(stdout==b'PASS current builtin: canonical literal, full check, exact wire, 7 malformed/mismatch rejections\nPASS binary builtin: public readers, canonical bytes, fixed literal/full check, 5 binary rejections, separate frozen legacy 7\n','binary controls and all retained explicit legacy builtin controls')

@@ -15,18 +15,10 @@ from test_direct import CommandRunner, authenticate_build, identified, verify_fi
 ROOT = Path(__file__).resolve().parents[2]
 IDENTITY = 'MLF/shared-haskell-v1 GHC'
 
-# These sources also run in the native package. A source change requires
-# reviewing its host projection before updating the exact input digest.
-CORPUS = {
-    'Tests.Helpers': ('tests/Tests/Helpers.emlf', '49091120fa91fc998e78cf5529fa5185643d883f11f22d2db19a2b5e8e6328fd'),
-    'Tests.Map': ('tests/Tests/Map.emlf', '104b5066749811d3c9cc106fc40e83cd406c838fbc211e42da62237f626a8d25'),
-    'Tests.Set': ('tests/Tests/Set.emlf', '07a3b77d3ade77e08aa7cd72e03e5a7023c3d7b3c976bbf652e35745a6989920'),
-    'Tests.Figure12': ('tests/Tests/Figure12.emlf', 'dd7f8b94c22d9cc1634867d75317ff177282a6562f617b28c4391577c65857a1'),
-    'Tests.Oracle': ('tests/Tests/Oracle.emlf', 'eab513eeba291a299ad8ab645e2f4c2bb563e5bc6d01c716c07bd981d0d32722'),
-    'Tests.Corpus': ('tests/Tests/Corpus.emlf', '30ff36016ad21d172daeaf61f4c228396052149b61a77d8e61f5b8189a7a09e4'),
-    'CorpusMain': ('tests/CorpusMain.emlf', 'd353b1db226ea57079ff4486dcc0fdbb07650bb4466cd95580574136078eeb12'),
-}
-CHECKER = ('tests/CheckTarget.emlf', '90efc9b11d3864ecc8185e687474766c6dfc6df31a8b6fb3425bb56fc78e6861')
+# Compile fixture modules in import order. Both programs expose the same
+# guest entry interface, main :: IO (), to the GHC host wrapper.
+CORPUS = ('Tests.Helpers', 'Tests.Map', 'Tests.Set', 'Tests.Figure12',
+          'Tests.Oracle', 'Tests.Corpus', 'CorpusMain')
 
 PRAGMA = ('{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, '
           'FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings, KindSignatures #-}\n')
@@ -34,6 +26,8 @@ PRAGMA = ('{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes
 # and type annotations. In particular, keep embedded guest programs intact.
 TOKENS = re.compile(
     r'--[^\n]*|"(?:[^"\\]|\\.)*"|\b(?:true|false)\b|'
+    r'(?P<recursive>\blet[ \t]+rec\b)|'
+    r"\((?P<binder>[a-z][\w']*)[ \t]+:[ \t]+\*[ \t]*->[ \t]*\*\)|"
     r'(?:^[ ]*|(?<=[{;] ))[a-z][A-Za-z0-9_]* +:(?= +)',
     re.MULTILINE,
 )
@@ -41,6 +35,10 @@ TOKENS = re.compile(
 
 def host_token(match):
     token = match[0]
+    if match.group('recursive'):
+        return 'let'
+    if match.group('binder'):
+        return '(' + match.group('binder') + ' :: Type -> Type)'
     if token in ('true', 'false'):
         return token.capitalize()
     if token.endswith(':') and not token.startswith(('--', '"')):
@@ -50,21 +48,15 @@ def host_token(match):
 
 def host_source(module, source):
     source = re.sub(r'^import Prelude hiding .*\n', '', source, flags=re.MULTILINE)
-    source = source.replace('import MLF.Primitive (Monad, return, bind)\n', '')
     hidden = {'Tests.Helpers': ' hiding (Eq, fail, fmap)', 'Tests.Oracle': ' hiding (fail)'}
     imports = 'import MLF.Primitive' + hidden.get(module, '') + '\n'
     if module == 'Tests.Helpers':
         imports += 'import Data.Kind (Type)\n'
-        source = source.replace('(m : * -> *)', '(m :: Type -> Type)')
-    if module == 'Main':
-        imports += 'import MLF.Host.IO (runEntry)\n'
-        source = source.replace('\nmain = do\n', '\nmain :: IO ()\nmain = runEntry entry\n\nentry = do\n')
-    declaration = f'module {module} where\n'
-    source = source.replace(declaration, declaration + imports, 1)
-    source = TOKENS.sub(host_token, source)
-    if module == 'Tests.Figure12':
-        source = source.replace('freeNames e = let rec {', 'freeNames e = let {')
-    return PRAGMA + source
+    declaration = re.compile(r'^module[ \t]+' + re.escape(module) + r'[ \t]+where[ \t]*$', re.MULTILINE)
+    source, count = declaration.subn(lambda match: match[0] + '\n' + imports, source)
+    if count != 1:
+        raise ValueError('expected a single module declaration for ' + module)
+    return PRAGMA + TOKENS.sub(host_token, source)
 
 
 def verify_objects(build, objects):
@@ -121,35 +113,25 @@ def prepare(build_receipt, output):
         binary_dir = output / 'bin'
         binary_dir.mkdir()
 
-        def project(module, identity, target):
-            relative, digest = identity
-            path = ROOT / relative
-            source = path.read_bytes()
-            if hashlib.sha256(source).hexdigest() != digest:
-                raise ValueError('reviewed parity fixture source changed: ' + relative)
+        def project(module):
+            path = Path(*module.split('.'))
+            relative = Path('tests') / path.with_suffix('.emlf')
+            source = (ROOT / relative).read_bytes()
+            target = (output / 'sources' / path).with_suffix('.hs')
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(host_source(module, source.decode('utf-8')).encode('utf-8'))
-            record['sources'][relative] = {'original': {'path': str(path), 'sha256': digest},
-                                           'projection': identified(target)}
+            target.write_text(host_source(module, source.decode('utf-8')), encoding='utf-8')
+            record['sources'][str(relative)] = {
+                'original': {'path': str(ROOT / relative), 'sha256': hashlib.sha256(source).hexdigest()},
+                'projection': identified(target),
+            }
+            obj = (modules / path).with_suffix('.o')
+            compile_module(module, target, obj)
+            return obj
 
         def compile_module(label, source, target):
             target.parent.mkdir(parents=True, exist_ok=True)
             runner.run('compile-' + label, [ghc, '-c', *flags, '-i', '-i' + str(modules),
                        '-i' + str(build / 'objects'), '-o', target, '-ohi', target.with_suffix('.hi'), source])
-
-        corpus_sources = []
-        for module, identity in CORPUS.items():
-            relative = Path(*module.split('.'))
-            source = (output / 'sources/corpus' / relative).with_suffix('.hs')
-            target = (modules / relative).with_suffix('.o')
-            project(module, identity, source)
-            corpus_sources.append((module, source, target))
-        corpus_entry = output / 'sources/corpus/Main.hs'
-        corpus_entry.write_bytes(b'module Main where\nimport MLF.Host.IO (runEntry)\n'
-                                 b'import qualified CorpusMain as Entry\nmain :: IO ()\nmain = runEntry Entry.main\n')
-        record['corpus_entry'] = identified(corpus_entry)
-        checker_entry = output / 'sources/check-target/Main.hs'
-        project('Main', CHECKER, checker_entry)
 
         link_inputs = [build / name for name in sorted(objects)
                        if name.endswith('.o') and Path(name) != Path('objects/Main.o')]
@@ -165,23 +147,30 @@ def prepare(build_receipt, output):
             link_inputs.append(target)
         record['transports'] = transports
 
-        for module, source, target in corpus_sources:
-            compile_module(module, source, target)
-        for name, entry, private in [('corpus', corpus_entry, [obj for _, _, obj in corpus_sources]),
-                                     ('check-target', checker_entry, [])]:
+        entries = {}
+        for name, module, dependencies in [('corpus', 'CorpusMain', CORPUS),
+                                           ('check-target', 'CheckTarget', ('CheckTarget',))]:
+            private = [project(dependency) for dependency in dependencies]
+            entry = output / 'sources' / name / 'Main.hs'
+            entry.parent.mkdir(parents=True, exist_ok=True)
+            entry.write_text(f'module Main where\nimport MLF.Host.IO (runEntry)\n'
+                             f'import qualified {module} as Entry\nmain :: IO ()\nmain = runEntry Entry.main\n')
+            entries[name] = identified(entry)
             main = output / 'objects' / name / 'Main.o'
             compile_module(name, entry, main)
             binary = binary_dir / name
             runner.run('link-' + name, [ghc, *flags, '-rtsopts=ignoreAll', main, *private, *link_inputs, '-o', binary])
             record['outputs'][name] = identified(binary)
 
+        record['corpus_entry'] = entries['corpus']
+        record['checker_entry'] = entries['check-target']
         authenticate_build(build_receipt, build / 'bin')
         verify_file(producer_identity)
         verify_objects(build, objects)
         for source in record['sources'].values():
             verify_file(source['original'])
             verify_file(source['projection'])
-        for identity in [record['preparer'], record['corpus_entry'], *transports, *record['outputs'].values()]:
+        for identity in [record['preparer'], *entries.values(), *transports, *record['outputs'].values()]:
             verify_file(identity)
         record['complete'] = True
     except BaseException as error:

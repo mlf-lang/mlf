@@ -7,8 +7,8 @@ module FrozenConstraint where {
   import OracleTypes;
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
-  import qualified FrozenIntMap as IM;
-  import qualified FrozenIntSet as IS;
+  import qualified GraphMapModel as IM;
+  import qualified GraphSetModel as IS;
   import qualified Bootstrap.Data as D;
   import qualified Bootstrap.Kinding as K;
   import qualified Bootstrap.Kind as Kind;

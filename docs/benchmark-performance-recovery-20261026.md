@@ -8,7 +8,7 @@ are not a claim that the final ten-workload gate passes.
 
 The user requested a pause after this round's testing and PR #25 push. See the
 [handoff](benchmark-performance-handoff-20261027.md) and
-[compact closeout evidence](benchmark-performance-recovery-evidence-20261027.json).
+[compact closeout evidence](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/benchmark-performance-recovery-evidence-20261027.json).
 The full performance goal remains incomplete.
 
 ## 2026-10-27 checkpoint

@@ -31,21 +31,6 @@ def unpack(text):
 
 
 class ModularControls(unittest.TestCase):
-    def test_wire_limits_projections_only_add_rejections_to_the_frozen_fixtures(self):
-        for path, project, added in (
-            (M.LEGACY_GHC_FIXTURE, M.project_legacy_limits_fixture, 9),
-            (M.LEGACY_QUERY_FIXTURE, M.project_legacy_query_fixture, 1),
-        ):
-            with self.subTest(path=path):
-                archive = (SOURCE / path).read_bytes()
-                projected = project(archive)
-                original = [line for line in projected.splitlines(keepends=True)
-                            if b'W.IndexedText _' not in line]
-                self.assertEqual(b''.join(original), archive)
-                self.assertEqual(projected.count(b'W.IndexedText _'), added)
-                with self.assertRaisesRegex(ValueError, 'archived GHC .*fixture identity mismatch'):
-                    project(archive + b'\n')
-
     def test_current_primitive_abi_is_append_only_and_closed(self):
         import artifact_binary_reference as R
         import artifact_binary_typed as T

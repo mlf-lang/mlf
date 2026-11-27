@@ -179,10 +179,9 @@ transaction; the lowered route retains its existing conservative protection.
 The actual `CrateSession.compileSpecFile` API is also exercised repeatedly in one
 process: a failed crate must not publish its successful prerequisite, retries
 must release the lock, and a failed replacement must preserve the previous
-generation and its exact final artifacts. Retained legacy Query/codec controls
-run separately with `test_source_context_cache.py --legacy-query-only`; their
-29 commands include all 63 frozen decoder differential cases. The new graph CLI
-and same-process controls replace the old-format Session tests for this route.
+generation and its exact final artifacts. Source cache controls run separately
+with the registered `source-context-cache` suite. They exercise current cache
+reuse, invalidation, recovery, and rebuilding an old record as a current entry.
 `external_checks.py` covers old-cache migration without modifying old files,
 mixed old/new object formats, cross-crate body reuse/type invalidation, and
 relocation without caches.

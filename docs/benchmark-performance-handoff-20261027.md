@@ -15,7 +15,7 @@
 
 详细诊断见 [performance recovery](benchmark-performance-recovery-20261026.md)，
 各 cohort 的摘要、范围与 receipt SHA 见
-[closeout evidence](benchmark-performance-recovery-evidence-20261027.json)。
+[closeout evidence](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/benchmark-performance-recovery-evidence-20261027.json)。
 下文 `.mlf-build/` 路径相对上述工作区；原始日志和可执行文件保留在本机，未作为源码提交。
 已有 receipt 不应覆盖，后续运行使用新的输出目录。
 

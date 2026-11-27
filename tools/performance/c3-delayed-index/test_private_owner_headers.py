@@ -22,7 +22,7 @@ class HeaderControls(unittest.TestCase):
             b'module Bootstrap.CrateSession\n (compileSpecFile, extra)\n where',
             b'module\tBootstrap.CrateSession\nwhere',
         ):
-            for target in ('LegacySession', 'CandidateSession'):
+            for target in ('SessionUnderTest', 'CandidateSession'):
                 with self.subTest(header=header, target=target):
                     self.assertEqual(A.private_module_view(self.PREFIX + header + self.BODY, target),
                                      self.PREFIX + ('module ' + target + ' where').encode() + self.BODY)
@@ -36,8 +36,8 @@ class HeaderControls(unittest.TestCase):
 
     def test_no_export_list_still_preserves_every_body_byte(self):
         body = b'\r\n-- where (module)\r\nprivateFunction x = x\r\n'
-        self.assertEqual(A.private_module_view(b'module Bootstrap.CrateSession where' + body, 'LegacySession'),
-                         b'module LegacySession where' + body)
+        self.assertEqual(A.private_module_view(b'module Bootstrap.CrateSession where' + body, 'SessionUnderTest'),
+                         b'module SessionUnderTest where' + body)
         self.assertEqual(A.private_module_view(b'module Main (main) where' + body,
                                               'RetainedC3', owner='Main'),
                          b'module RetainedC3 where' + body)

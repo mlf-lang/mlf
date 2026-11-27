@@ -7,8 +7,8 @@ module FrozenSolver where {
   import OracleTypes;
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Map as M;
-  import qualified FrozenIntMap as IM;
-  import qualified FrozenIntSet as IS;
+  import qualified GraphMapModel as IM;
+  import qualified GraphSetModel as IS;
   import qualified FrozenGraph as G;
   -- The incremental solver projects a component closed under both directions
   -- of type structure and binding. Generalization scopes are retained with
@@ -50,44 +50,16 @@ module FrozenSolver where {
   withGraph graph (Solver old parents descendants scopes) =
     mkSolver graph parents descendants scopes;
   insertIndex :: Int -> Int -> IntMap IntSet -> IntMap IntSet;
-  insertIndex key value (IntMap tree) = IM.wrap (insertIndexTree key value tree);
-  -- Find and update the reverse edge in one map traversal. Force each changed
-  -- set root as before, while preserving unrelated lazy values and balancing.
-  insertIndexTree :: Int -> Int -> Map Int IntSet -> Map Int IntSet;
-  insertIndexTree key value tree =
-    case tree of {
-      MapEmpty ->
-        let {
-          updated = IS.singleton value
-        } in
-        seq (forceIntSet updated) (M.singleton key updated);
-      MapNode count oldKey oldValue left right ->
-        if (key < oldKey)
-        then M.balance oldKey oldValue (insertIndexTree key value left) right
-        else if (key > oldKey)
-             then M.balance oldKey oldValue left (insertIndexTree key value right)
-             else let {
-                    updated = IS.insert value oldValue
-                  } in
-                  seq (forceIntSet updated) (M.node count key updated left right)
-    };
+  insertIndex key value index =
+    let { updated = IS.insert value (IM.findWithDefault IS.empty key index) } in
+    seq (forceIntSet updated) (IM.insert key updated index);
   removeIndex :: Int -> Int -> IntMap IntSet -> IntMap IntSet;
-  removeIndex key value (IntMap tree) = IM.wrap (removeIndexTree key value tree);
-  removeIndexTree :: Int -> Int -> Map Int IntSet -> Map Int IntSet;
-  removeIndexTree key value tree =
-    case tree of {
-      MapEmpty -> MapEmpty;
-      MapNode count oldKey oldValue left right ->
-        if (key < oldKey)
-        then M.balance oldKey oldValue (removeIndexTree key value left) right
-        else if (key > oldKey)
-             then M.balance oldKey oldValue left (removeIndexTree key value right)
-             else let {
-                    remaining = IS.delete value oldValue
-                  } in
-                  if (IS.size remaining == 0)
-                  then M.glue left right
-                  else M.node count key remaining left right
+  removeIndex key value index =
+    case IM.lookup key index of {
+      Nothing -> index;
+      Just values ->
+        let { remaining = IS.delete value values } in
+        if IS.null remaining then IM.delete key index else IM.insert key remaining index
     };
   addNode :: Solver -> (,) Int Node -> Solver;
   addNode (Solver graph parents descendants scopes) ((,) n v) =

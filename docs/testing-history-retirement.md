@@ -29,9 +29,19 @@ last complete archive of that infrastructure is commit
   of the entire current Types module. Run its four interface tests with
   `python3 -B tools/testing/run.py python-frozen-query`. The O2 CI job runs
   them before compiling the datatype-context controls.
-- Current package/lock snapshots, producer identities, source immutability
-  during execution, binary compatibility, independent algorithm oracles and
-  failure propagation remain qualification boundaries.
+- Hosted parity loads the maintained [case manifest](../tests/golden/parity/manifest.jsonl)
+  for discovery and execution. It stages current examples from the checkout and
+  reads the other fixtures directly. Independent type, result, error and
+  reference-target checks run against those inputs.
+- Async and hosted direct suites use isolated builds and check compiler behavior.
+  Hosted direct suites validate the build receipt once. Async receipts identify
+  the compiler and generated artifacts alongside the observations.
+- Patricia collection controls compare operations with Haskell library models
+  and exercise signed key boundaries, rank/select and lazy payload behavior.
+  Fingerprint controls use a direct arithmetic reference, and the Session
+  controls rebuild indexes from published graph edges and check rejection state.
+- Current package/lock snapshots, binary admission checks, independent algorithm
+  models and failure propagation remain qualification boundaries.
 
 Immutable reference fixtures may retain origin hashes. Those hashes identify
 the reference algorithm; they do not admit or reject the current implementation
@@ -54,8 +64,17 @@ upstream adaptations remain pinned by `benchmarks/manifest.json`; obsolete
 historical transition manifests are no longer benchmark inputs.
 
 The full-compiler timing-analysis tests and current source-manifest checker
-remain. A test named “contract” or “migration” is not automatically historical:
-for example, actual old/new query-cache format compatibility is behavior.
+remain. Current cache tests exercise warm hits, source and dependency
+invalidation, corruption recovery, and rebuilding older source records in
+the current binary format.
+
+The parity migration replay, inverse async migrations, fixed A1 experiment,
+DeclId comparison scripts, machine-specific source-context launchers and
+historical runtime ABI matrix are archived at
+[0704d216](https://github.com/mlf-lang/mlf/tree/0704d216b8cf6d887d3737efa30a2eae3c152f0a).
+That tree also holds the removed execution logs and October benchmark reports.
+Current ABI checks exercise the matching runtime and verify that an incompatible
+guard fails at link time.
 
 ## Inspect or reproduce an old record
 
@@ -76,7 +95,7 @@ different current tree.
 Current correctness receipts and current performance measurements should be
 produced by the maintained runners in the current checkout.
 
-## Validation of this retirement
+## Validation of the initial retirement
 
 The following checks were run on Linux with GHC 9.14.1 and a complete current
 O0 bootstrap producer. A lane described as O2 below actually recompiles its

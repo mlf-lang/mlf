@@ -142,7 +142,7 @@ python3 -B "$runner" query-graph-acceptance --exact query-graph-acceptance/body 
 python3 -B "$runner" source-query-api --list
 python3 -B "$runner" source-query-api --exact source-query-api/source-change-body-1 -- \
   .mlf-build/phase2/ghc-o2/receipt.json .mlf-build/phase2/receipts/source-query-one
-python3 -B "$runner" source-context-cache --list -- --legacy-query-only
+python3 -B "$runner" source-context-cache --list
 python3 -B "$runner" source-context-cache --exact source-context-cache/lock-after-session -- \
   --build-receipt .mlf-build/phase2/ghc-o0/receipt.json --output .mlf-build/phase2/receipts/context-one
 ```

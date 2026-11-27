@@ -83,25 +83,19 @@ the independent raw-byte comparison. These are diagnostic source-path counts,
 not ordinary allocated-byte measurements, exclusive CPU shares or a percentage
 of time saved.
 
-O0 and O2 controls compare the full frozen baseline owner in
-`oracles/LegacySession.hs` with the complete candidate. The fixture was prepared
-once with a module/export-header change; only the current candidate still
-needs the private header view at runtime. All 28
-retained authored/renamed C4 fixtures and 35 offset variants are retained:
-63 exact graph/index/scope traces, exact success/error outcomes, legacy failure
-Store epochs, repeated instantiations, reflexive equalities, old expansion
-descriptors, full component selection and handwritten fresh-survivor graphs.
-Eight partial-value observations retain source/target exception order, prefix
-and survivor Name demand, and unused Name/Kind/alias laziness. These finite
-controls supplement the full retained oracle; they do not prove all partial
-values equivalent.
+The O0 and O2 controls run 28 authored/renamed C4 fixtures and 35 offset
+variants against the private session. [SessionModel.hs](SessionModel.hs) uses
+the public immutable solver for the expected graph, expansion descriptor and
+first diagnostic. It rebuilds structural and binder reverse indexes from graph
+edges. On a rejected instantiation, the caller's retained handle exposes its
+original graph and scopes, together with the index edges of any expansion
+published before rejection. The model checks that state after the failure.
 
-The historical source-admission ledger and inverse transition proofs are
-archived in Git at `496dcae024cae1a93096d9bdb9d6b93e57359dc0`. Current controls
-copy the fixed independent owner directly and validate current borrowed inputs
-against the actual producer receipt. Ordinary runs need no migration ledger or
-historical commit fetch. [`oracles/README.md`](oracles/README.md) records the
-fixture origin and the one-time preparation.
+For component selection the model follows graph edges in both directions and
+stops at generalization nodes. The controls also check repeated instantiations,
+reflexive equality, handwritten survivor graphs and eight demand observations.
+The historical full-owner comparison is available in the
+[recorded revision](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/performance/c3-delayed-index/oracles/LegacySession.hs).
 
 All 14 scheduled integration checks passed: retained P1–P3, graph/transaction,
 Map balance, validation boundary, builtin, nine parsed-file cases through both

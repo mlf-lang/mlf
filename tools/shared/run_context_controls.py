@@ -62,26 +62,17 @@ def graph_text(document, index):
     require(node.kind == 2, 'independent graph text leaf')
     return document.symbols[node.data]
 
-def binary_query(raw, shared=True):
+def binary_query(raw):
     document = binary_artifact(raw, 2)
     root = binary_helpers()[1].query_payload_root(document)
-    if shared:
-        tag = document.nodes[root].data[0]
-        if tag in (303,306):
-            if tag == 306:
-                key, result, reference, header, body = graph_node(document, root, tag, 5)
-            else:
-                reference, key, result, header, body = graph_node(document, root, tag, 5)
-            fingerprint = binary_helpers()[1].verify_source_result(document)
-            return {'document': document, 'reference': graph_text(document, reference),
-                    'fingerprint': fingerprint, 'header': header, 'body': body}
-        reference, compact, header, body = graph_node(document, root, 301, 4)
-        return {'document': document, 'reference': graph_text(document, reference),
-                'compact': [graph_text(document, i) for i in graph_node(document, compact, 1)],
-                'header': header, 'body': body}
-    key, unit = graph_node(document, root, 300, 2)
-    header, body = graph_node(document, unit, 241, 2)
-    return {'document': document, 'key': graph_text(document, key), 'header': header, 'body': body}
+    tag = document.nodes[root].data[0]
+    if tag == 306:
+        _, _, reference, header, body = graph_node(document, root, tag, 5)
+    else:
+        reference, _, _, header, body = graph_node(document, root, 303, 5)
+    return {'document': document, 'reference': graph_text(document, reference),
+            'fingerprint': binary_helpers()[1].verify_source_result(document),
+            'header': header, 'body': body}
 
 def binary_context(raw, reference):
     require(digest(raw) == reference, 'actual complete binary context SHA256')
@@ -89,88 +80,27 @@ def binary_context(raw, reference):
     declarations, = graph_node(document, document.roots[0], 244, 1)
     return document, declarations
 
-def graph_equal(left, left_root, right, right_root, rename=None):
-    """Compare complete DAG structures in linear distinct-pair work, no tree expansion.
-
-    Optional rename permits exactly one XName identity's hint substitution;
-    integer identity, constructor tags, types and all other metadata stay exact.
-    """
-    pending, seen, changed = [(left_root, right_root)], set(), set()
+def require_graph_equal(left, left_root, right, right_root, message):
+    """Compare complete DAGs without expanding shared nodes."""
+    pending, seen = [(left_root, right_root)], set()
     while pending:
-        a, b = pending.pop()
-        if (a, b) in seen:
+        pair = pending.pop()
+        if pair in seen:
             continue
-        seen.add((a, b)); x, y = left.nodes[a], right.nodes[b]
-        if x.kind != y.kind:
-            return False, changed
+        seen.add(pair)
+        a, b = pair
+        x, y = left.nodes[a], right.nodes[b]
+        require(x.kind == y.kind, message)
         if x.kind == 3:
-            xtag, xs = x.data; ytag, ys = y.data
-            if xtag != ytag or len(xs) != len(ys):
-                return False, changed
-            if rename is not None and xtag == 31:
-                identity, old_hint, new_hint = rename
-                if len(xs) == 2 and left.nodes[xs[0]].kind == 0 and left.nodes[xs[0]].data == identity:
-                    if (right.nodes[ys[0]].kind != 0 or right.nodes[ys[0]].data != identity or
-                        graph_text(left, xs[1]) != old_hint or graph_text(right, ys[1]) != new_hint):
-                        return False, changed
-                    changed.add(a)
-                    continue
+            xtag, xs = x.data
+            ytag, ys = y.data
+            require(xtag == ytag and len(xs) == len(ys), message)
             pending.extend(zip(xs, ys))
         elif x.kind == 2:
-            if left.symbols[x.data] != right.symbols[y.data]:
-                return False, changed
-        elif x.data != y.data:
-            return False, changed
-    return True, changed
+            require(left.symbols[x.data] == right.symbols[y.data], message)
+        else:
+            require(x.data == y.data, message)
 
-def require_graph_equal(left, left_root, right, right_root, message):
-    require(graph_equal(left, left_root, right, right_root)[0], message)
-
-def require_alpha_graph(raw_query, poisoned_query, identity, old_hint, new_hint, owner):
-    left, right = raw_query['document'], poisoned_query['document']
-    same, changed = graph_equal(left, raw_query['body'], right, poisoned_query['body'],
-                                (identity, old_hint, new_hint))
-    require(same and changed, 'complete binary body changes only the source-issued XName hint')
-    pending, seen, references = [raw_query['body']], set(), 0
-    while pending:
-        index = pending.pop()
-        if index in seen:
-            continue
-        seen.add(index); node = left.nodes[index]
-        if node.kind == 3:
-            references += sum(child in changed for child in node.data[1])
-            pending.extend(node.data[1])
-    require(references >= 2, 'binary evidence identity occurs at its binder and a reference')
-    root = raw_query['body']
-    while left.nodes[root].kind == 3 and left.nodes[root].data[0] == 71:
-        root = graph_node(left, root, 71, 3)[2]  # actual external parameter prefix
-    bound_owner, value, result = graph_node(left, root, 75, 3)
-    _, owner_hint = graph_node(left, bound_owner, 31, 2)
-    require(graph_text(left, owner_hint) == owner, 'actual raw singleton declaration owns the poisoned evidence')
-    binder, _, _ = graph_node(left, value, 71, 3)
-    binder_id, binder_hint = graph_node(left, binder, 31, 2)
-    require(left.nodes[binder_id].kind == 0 and left.nodes[binder_id].data == identity and
-            graph_text(left, binder_hint) == old_hint, 'changed XName is the actual root evidence abstraction')
-    constructor, arguments = graph_node(left, result, 82, 2)
-    require(graph_text(left, constructor) == '()' and not graph_node(left, arguments, 1),
-            'actual singleton raw root retains its unit result')
-
-def require_contextual_unit(query, context, declarations, object_document, unit):
-    header, term = graph_node(object_document, unit, 241, 2)
-    full = graph_node(object_document, header, 240, 8)
-    compact = graph_node(query['document'], query['header'], 240, 8)
-    # Shared-query checksum covers the body alone, just like historical MLFF2;
-    # a full object checksum includes its independently stored datatype prefix.
-    for field in (0, 1, 2, 4, 5, 6):
-        require_graph_equal(query['document'], compact[field], object_document, full[field],
-                            'binary contextual header equals actual complete final interface')
-    require_graph_equal(context, declarations, object_document, full[3],
-                        'binary contextual declarations equal actual final header datatype context')
-    body_context, body = graph_node(object_document, term, 84, 2)
-    require_graph_equal(context, declarations, object_document, body_context,
-                        'binary contextual declarations equal actual final body datatype context')
-    require_graph_equal(query['document'], query['body'], object_document, body,
-                        'complete whole-final binary payload equals actual cold target fragment')
 
 def source_key_from_binary(context, declarations, compact):
     # This is the historical logical-key oracle, not an artifact serialization.
@@ -203,15 +133,6 @@ def unpack(text):
 
 def pack(fields):
     return "".join(f"{len(value)}:{value}" for value in fields)
-
-def legacy_fingerprint(text):
-    """Independent scalar recurrence for explicitly legacy witness checksums."""
-    first, second = 0, 1
-    for char in text:
-        code = ord(char)
-        first = (first * 65599 + code) % 2147483647
-        second = (second * 131 + code) % 2147483629
-    return str(first) + '-' + str(second)
 
 def snapshot(root, active_hashes):
     files, directories = {}, 0
@@ -412,96 +333,6 @@ def independent_lock_probe(arguments):
 
 
 
-DECODER_DIFFERENTIAL_RIGHT = [
-    "writer-raw41", "writer-second-raw41", "writer-box-context",
-    "codec-raw42-original-key", "codec-raw42-other-key", "unicode-scalar-framing",
-]
-DECODER_DIFFERENTIAL_LEFT = [
-    *["compact-field-" + name for name in
-      ["tag", "crate", "compiler", "members", "bindings", "prepared", "contracts", "scopes"]],
-    "compact-leading-zero-length", "compact-truncated", "compact-trailing-bytes",
-    "compact-seven-fields", "compact-nine-fields", "compact-empty", "compact-nondigit-length",
-    "unicode-utf8-length", "unicode-utf16-length", "unicode-short-scalar-length",
-    "full-key-leading-zero-length", "full-key-truncated", "full-key-trailing-bytes",
-    "full-key-eight-fields", "full-key-ten-fields", "full-key-wrong-tag",
-    "single-expected-context-field", "same-context-other-record-key", "same-context-other-expected-key",
-    "actual-datatypes-mismatch", "box-layout-mismatch", "context-carrier-mismatch",
-    "context-carrier-wrong-tag", "context-carrier-leading-zero-length", "context-carrier-truncated",
-    "context-carrier-extra-field", "record-wrong-format", "record-invalid-reference",
-    "actual-digest-mismatch", "record-leading-zero-length", "record-truncated", "record-trailing-bytes",
-    "record-three-fields", "record-five-fields", "payload-empty", "owner-mismatch", "binding-mismatch",
-    "declaration-mismatch", "priority-framing-before-key", "priority-truncation-before-key",
-    "priority-record-shape-before-key", "priority-reference-before-key", "priority-key-before-context",
-    "priority-datatypes-before-compact", "priority-context-before-compact",
-    "priority-compact-framing-before-payload", "priority-key-mismatch-before-payload",
-    "priority-payload-before-owner", "priority-owner-before-declarations",
-]
-
-
-def decoder_seed_snapshot(cache):
-    # This command reads this run's original helper-cache only, after all 37
-    # preceding commands. Helper's terminal source has exactly these six
-    # records, two canonical contexts and its existing zero regular lock.
-    # No added tree, seed write, glob-selected record, old P cache or W cache.
-    directory = publication_directory_identity(cache)
-    source_records = ["record.mlfq", "second.mlfq", "box.mlfq"]
-    record_leaves = source_records + ["pooled.mlfq", "fallback.mlfq", "legacy2.mlfq"]
-    selected, references = {}, {}
-    expected_compact = ["MLF-SOURCE-CRATE-QUERY-7", "crate:α😀", "compiler", "member:opaque:😀",
-                        "bindings", "source-group", "observed-contracts", "scope-table:α😀"]
-    fields = ["st_dev", "st_ino", "st_mode", "st_nlink", "st_size", "st_mtime_ns", "st_ctime_ns", "st_blocks"]
-
-    def sample(path, cap):
-        before = path.lstat()
-        require(stat.S_ISREG(before.st_mode) and before.st_nlink == 1 and before.st_size <= cap,
-                "bounded single-link decoder seed file")
-        if path.name == ".lock":
-            # Never reopen/close this inode under the parent's POSIX lockf.
-            require(before.st_size == 0, "decoder seed existing zero regular lock")
-            raw = b""
-        else:
-            raw = path.read_bytes()
-        after = path.lstat()
-        require(len(raw) == before.st_size and all(getattr(before, f) == getattr(after, f) for f in fields),
-                "decoder seed changed while sampling")
-        return {**{f: getattr(before, f) for f in fields}, "sha256": digest(raw)}, raw
-
-    for leaf in source_records:
-        identity, raw = sample(cache / leaf, 65536)
-        record = binary_query(raw)
-        compact = expected_compact.copy()
-        if leaf == "second.mlfq":
-            compact[1] = "another-crate"
-        require(record['compact'] == compact, "fixed full non-context binary seed key fields")
-        references[leaf] = record['reference']
-        selected[leaf] = identity
-    require(references["record.mlfq"] == references["second.mlfq"] and
-            references["box.mlfq"] != references["record.mlfq"], "exact two helper seed contexts")
-    context_leaves = sorted({"context-" + value + ".mlfqc" for value in references.values()})
-    expected_leaves = sorted([".lock", *record_leaves, *context_leaves])
-    require(directory["children"] == expected_leaves and len(expected_leaves) == 9,
-            "exact helper terminal nine-file population")
-    # Preserve the original individual and aggregate cache limit. Only the
-    # three decoder record reads use 64KiB and the two context reads 128KiB.
-    require(sum((cache / leaf).lstat().st_size for leaf in expected_leaves) <= 16 * 1024**2,
-            "decoder seed remains inside original complete cache cap")
-    identities = {}
-    for leaf in expected_leaves:
-        cap = 128 * 1024 if leaf in context_leaves else 65536 if leaf in source_records or leaf == ".lock" else 16 * 1024**2
-        identity, raw = sample(cache / leaf, cap)
-        identities[leaf] = identity
-        if leaf in selected:
-            require(identity == selected[leaf], "fixed decoder record stable across seed checks")
-        if leaf in context_leaves:
-            binary_context(raw, leaf[8:-6])
-        elif leaf in record_leaves and leaf not in source_records:
-            binary_query(raw, shared=(leaf == 'pooled.mlfq'))
-    require(publication_directory_identity(cache) == directory, "decoder seed directory stable while read")
-    return {"directory": directory, "files": identities, "references": references,
-            "source_record_count": 3, "context_count": 2, "all_regular_files": 9,
-            "identity_scope": "dev/ino/mode/nlink/size/mtime/ctime/blocks/full SHA; atime deliberately excluded"}
-
-
 WINDOW_HIDDEN_MARKERS = [
     'alternating contexts reuse without files', 'MRU promotion survives ninth insertion',
     'ninth insertion evicts least recent route', 'oversized input prefix hit returns only eight',
@@ -510,9 +341,9 @@ WINDOW_HIDDEN_MARKERS = [
     'encoded guard refuses hidden context reuse',
     *[name + ' guard refuses hidden context reuse' for name in ['kind', 'constructor', 'field']],
     'alpha structural guard refuses hidden context reuse',
-    'legacy CACHE1 and CACHE2 clear all entries with exact raw', 'malformed record clears all entries',
+    'obsolete source record clears all entries', 'malformed record clears all entries',
     'unsafe reference clears all entries', 'malformed full key clears all entries',
-    'complete key mismatch clears after reuse', 'malformed compact key clears before lookup',
+    'complete key mismatch clears before reuse',
     'raw payload rejection clears after reuse',
 ]
 WINDOW_RESTORED_MARKERS = [
@@ -564,7 +395,10 @@ def window_snapshot(cache, references, hidden):
     for rel, reference in records.items():
         identity, raw = window_sample(cache / rel, 65536)
         query = binary_query(raw)
-        require(query['reference'] == reference and query['compact'] == compact,
+        carrier = cache / Path(rel).parent / ('context-' + reference + '.mlfqc' + suffix)
+        doc, declarations = binary_context(carrier.read_bytes(), reference)
+        key = source_key_from_binary(doc, declarations, compact)
+        require(query['reference'] == reference and query['fingerprint'] == digest(key.encode()),
                 'canonical real binary window writer record and complete typed raw payload')
         result['records'][rel] = identity
     for rel, reference in context_paths.items():
@@ -723,270 +557,9 @@ def run_window_owned(fixture, out, record, save, name, arguments, dialogue):
     save()
 
 
-def session_window_snapshot(cache):
-    current = sorted(p.name for p in cache.iterdir() if re.fullmatch(r'[0-9a-f]{64}\.mlfq', p.name))
-    carriers = sorted(p.name for p in cache.iterdir() if re.fullmatch(r'context-[0-9a-f]{64}\.mlfqc', p.name))
-    require(1 <= len(current) <= 16 and 1 <= len(carriers) <= len(current), 'bounded real Session cache population')
-    directories = {'.': publication_directory_identity(cache),
-                   'retained-raw': publication_directory_identity(cache / 'retained-raw')}
-    require(directories['.']['children'] == sorted(['.lock', 'retained-raw', *current, *carriers]) and
-            directories['retained-raw']['children'] == current, 'entire cold/terminal cache namespace accounted')
-    files, referenced = {}, set()
-    for name in ['.lock', *current, *carriers, *['retained-raw/' + n for n in current]]:
-        identity, raw = window_sample(cache / name, 65536 if name == '.lock' else 2 * 1024**2)
-        files[name] = identity
-        if name in current:
-            query = binary_query(raw)
-            require(query['fingerprint']+'.mlfq'==name, 'real session record input fingerprint')
-            referenced.add('context-' + query['reference'] + '.mlfqc')
-            _, retained = window_sample(cache / 'retained-raw' / name, 2 * 1024**2)
-            require(raw == retained, 'every original raw record independently equal retained cold copy')
-        elif name in carriers:
-            binary_context(raw, name[8:-6])
-            require(identity['sha256'] == name[8:-6],
-                    'every actual Session binary context canonical and exact-SHA bound')
-    require(referenced == set(carriers), 'all actual Session context files reached by real records')
-    logical = sum(v['bytes'] for v in files.values())
-    allocated = sum(v['blocks'] * 512 for v in files.values()) + sum(v['blocks'] * 512 for v in directories.values())
-    require(logical <= 16 * 1024**2 and allocated <= 16 * 1024**2, 'original complete cache budget still applies')
-    return {'files': files, 'directories': directories, 'records': current, 'contexts': carriers,
-            'logical': logical, 'allocated': allocated}
-
-
-def session_window_audit(root, leaf, cold_snapshot):
-    cache = root / 'cache'
-    inventory_id, inventory_raw = window_sample(root / 'target.inventory', 2 * 1024**2)
-    target = unpack(inventory_raw.decode('utf-8'))
-    require(len(target) == 10 and target[0] == leaf and re.fullmatch(r'[0-9a-f]{64}\.mlfq', leaf),
-            'actual target inventory and fixed released marker')
-    leaf, group, packed_names, reference, compact, payload, raw_iface, raw_object, final_iface, final_object = target
-    wanted = unpack(packed_names)
-    require(len(wanted) == 1 and raw_object != final_object and re.fullmatch('[0-9a-f]{64}', reference),
-            'actual singleton raw/final counterexample')
-    plan_id, plan_raw = window_sample(root / 'source-plan.inventory', 65536)
-    planned = {}
-    for value in unpack(plan_raw.decode('utf-8')):
-        fields = unpack(value)
-        require(len(fields) == 2 and fields[0] not in planned, 'complete unique parsed source-plan groups')
-        planned[fields[0]] = unpack(fields[1])
-    require(len(planned) == 4 and planned.get(group) == wanted, 'fixed four-group actual parsed source owns negative target')
-    rows, baseline, baseline_graphs, stable_groups, keys = {}, None, None, None, None
-    counts = {'cold': (len(planned), 0), 'warm': (0, len(planned)),
-              'cache3-repair': (1, len(planned) - 1), 'cache1-repair': (1, len(planned) - 1),
-              'query-support': (0, len(planned))}
-    for phase in ['cold', 'query-support', 'warm', 'cache3-repair', 'cache1-repair']:
-        rid, report_raw = window_sample(root / (phase + '.queries'), 65536)
-        report = json.loads(report_raw)
-        require(report['format'] == 1 and report['crate'] == 'session-window-raw' and
-                len(report['groups']) == len(planned) and
-                {g['id']: g['members'] for g in report['groups']} == planned and
-                (report['inferred_groups'], report['reused_groups']) == counts[phase],
-                'exact Session/support parsed population and inference/hit counts')
-        current = [{k: g[k] for k in ['id', 'members', 'semantic_fingerprint', 'query_key']} for g in report['groups']]
-        current_keys = [g['query_key'] for g in report['groups']]
-        require(len(set(current_keys)) == len(planned) and all(re.fullmatch('[0-9a-f]{64}', k) for k in current_keys),
-                'distinct canonical actual source-query keys')
-        for g in report['groups']:
-            expected_hit = phase != 'cold' and not (phase in ['cache3-repair', 'cache1-repair'] and g['id'] == group)
-            require(g['cached'] is expected_hit, 'only the actual poisoned group may reinfer')
-        if stable_groups is None:
-            stable_groups, keys = current, current_keys
-        require(current == stable_groups and current_keys == keys, 'all full group identities/keys/semantic hashes stable')
-        row = {'report': report, 'report_identity': rid}
-        if phase != 'query-support':
-            iid, interface = window_sample(root / (phase + '.interface'), 2 * 1024**2)
-            oid, obj = window_sample(root / (phase + '.object'), 2 * 1024**2)
-            if baseline is None:
-                baseline = (interface, obj)
-                baseline_graphs = (binary_artifact(interface, 3), binary_artifact(obj, 4))
-            require((interface, obj) == baseline, 'all actual complete Session interface/object bytes equal')
-            # Exact full-byte equality permits reusing this local independent
-            # inspection; do not spend the unchanged live-owner deadline on
-            # reparsing the identical formal graph for every phase.
-            interface_graph, object_graph = baseline_graphs
-            _, embedded_interface, _ = graph_node(object_graph, object_graph.roots[0], 243, 3)
-            require_graph_equal(interface_graph, interface_graph.roots[0], object_graph, embedded_interface,
-                                'actual binary object contains the exact standalone interface fields')
-            row.update(interface_identity=iid, object_identity=oid,
-                       binary_interface=interface_graph.accounting(), binary_object=object_graph.accounting())
-        rows[phase] = row
-    require(any(g['id'] == group and g['query_key'] + '.mlfq' == leaf for g in rows['cold']['report']['groups']),
-            'poison filename binds actual target QueryReport key')
-    originals_id, originals_raw = window_sample(root / 'cold-records.inventory', 65536)
-    originals = unpack(originals_raw.decode('utf-8'))
-    require(originals == sorted(k + '.mlfq' for k in keys) and len(set(originals)) == len(planned),
-            'every cold raw record preserved')
-    require(sorted(p.name for p in (cache / 'retained-raw').iterdir()) == originals and
-            sorted(p.name for p in cache.iterdir() if p.suffix == '.mlfq') == originals,
-            'exact original/current raw-record path populations')
-    raw_rows = {}
-    for name in originals:
-        retained_id, retained = window_sample(cache / 'retained-raw' / name, 2 * 1024**2)
-        current_id, current = window_sample(cache / name, 2 * 1024**2)
-        require(current == retained, 'complete original raw bytes recovered after both poison repairs')
-        raw_rows[name] = {'retained': retained_id, 'current': current_id, 'full_bytes_equal': True}
-    carrier_id, carrier_raw = window_sample(cache / ('context-' + reference + '.mlfqc'), 2 * 1024**2)
-    context_graph, declarations = binary_context(carrier_raw, reference)
-    compact_fields = unpack(compact)
-    require(carrier_id['sha256'] == reference and len(compact_fields) == 8 and
-            compact_fields[0] == 'MLF-SOURCE-CRATE-QUERY-7', 'real binary target carrier and complete compact key')
-    full_key = source_key_from_binary(context_graph, declarations, compact_fields)
-    require(digest(full_key.encode('utf-8')) + '.mlfq' == leaf, 'unaltered complete source-key filename')
-    original_id, original = window_sample(root / 'target.original.mlfq', 2 * 1024**2)
-    poison3_id, poison3 = window_sample(root / 'target.poisoned-cache3.mlfq', 2 * 1024**2)
-    poison1_id, poison1 = window_sample(root / 'target.poisoned-cache1.mlfq', 2 * 1024**2)
-    original_query = binary_query(original)
-    poison_query = binary_query(poison3)
-    c1 = unpack(poison1.decode('utf-8', 'strict'))  # explicitly historical text branch
-    require(original_query['reference'] == poison_query['reference'] == reference and
-            original_query['fingerprint'] == poison_query['fingerprint'] == digest(full_key.encode()),
-            'binary poison preserves actual context reference and all eight key fields')
-    alpha_id, alpha_raw = window_sample(root / 'alpha-slot.inventory', 2 * 1024**2)
-    alpha = unpack(alpha_raw.decode('utf-8'))
-    require(len(alpha) == 7, 'complete actual alpha-slot identity and checked object witness')
-    old_hint, new_hint, binder_id, old_token, new_token, poison_iface, poison_object = alpha
-    require(re.fullmatch(r'[A-Za-z][A-Za-z0-9_]*', old_hint) and new_hint == old_hint + 'WindowPoison' and
-            re.fullmatch(r'-?(0|[1-9][0-9]*)', binder_id) and old_token == old_hint + '_' + binder_id and
-            new_token == new_hint + '_' + binder_id, 'same actual binder identity; only evidence hint changes')
-    raw_header, poison_header = unpack(raw_iface), unpack(poison_iface)
-    raw_object_fields, poison_object_fields = unpack(raw_object), unpack(poison_object)
-    require(len(raw_header) == len(poison_header) == 8 and raw_header[:7] == poison_header[:7] and
-            len(raw_object_fields) == len(poison_object_fields) == 4 and
-            raw_object_fields[:2] == poison_object_fields[:2] == ['MLFO-1', group] and
-            raw_object_fields[2] == poison_object_fields[2],
-            'complete checked alpha raw interface metadata/types/owner unchanged except checksum')
-    # MLFO-1 field2 fingerprints interface fields0..6, unchanged above;
-    # MLFI-4 field7 fingerprints the term body and is legitimately refreshed.
-    token = re.compile(r'(?<![A-Za-z0-9_])' + re.escape(old_token) + r'(?![A-Za-z0-9_])')
-    def alpha_only(before, after):
-        require(len(token.findall(before)) >= 2 and new_token not in before and
-                token.sub(new_token, before) == after,
-                'independent complete body differs only at actual evidence binder and all its references')
-    alpha_only(raw_object_fields[3], poison_object_fields[3])
-    raw_payload = unpack(payload)
-    require(original == (cache / 'retained-raw' / leaf).read_bytes() and poison3 != original and
-            c1 == ['MLF-QUERY-CACHE-1', full_key, poison_iface, poison_object] and poison_object != final_object,
-            'two poison codecs carry only alpha raw provenance change, not wholesale final or envelope corruption')
-    poison_payload_id, poison_payload_raw = window_sample(root / 'target.poisoned-payload.legacy', 2 * 1024**2)
-    poison_payload = unpack(poison_payload_raw.decode('utf-8', 'strict'))
-    require(len(raw_payload) == len(poison_payload) == 3 and raw_payload[0] == poison_payload[0] == 'MLFF-2' and
-            unpack(raw_payload[1])[:7] == unpack(poison_payload[1])[:7],
-            'separate legacy contextual witnesses preserve complete interface/types except checksum')
-    alpha_only(raw_payload[2], poison_payload[2])
-    require(' = \\(' + old_token + ' : ' in raw_payload[2], 'changed identity is the actual root evidence abstraction')
-    require(pack(poison_payload).encode('utf-8') == poison_payload_raw and pack(c1).encode('utf-8') == poison1,
-            'canonical legacy poison witnesses, not malformed-envelope misses')
-    raw_contextual_header, poison_contextual_header = unpack(raw_payload[1]), unpack(poison_payload[1])
-    require(len(raw_contextual_header) == len(poison_contextual_header) == 8 and
-            raw_contextual_header[7] == legacy_fingerprint(raw_payload[2]) and
-            poison_contextual_header[7] == legacy_fingerprint(poison_payload[2]) and
-            raw_header[7] == legacy_fingerprint(raw_object_fields[3]) and
-            poison_header[7] == legacy_fingerprint(poison_object_fields[3]) and
-            raw_object_fields[2] == legacy_fingerprint(pack(raw_header[:7])) and
-            poison_object_fields[2] == legacy_fingerprint(pack(poison_header[:7])),
-            'independent complete legacy body and interface checksums; contextual and full scope kept distinct')
-    original_header = graph_node(original_query['document'], original_query['header'], 240, 8)
-    binary_poison_header = graph_node(poison_query['document'], poison_query['header'], 240, 8)
-    for field in range(7):
-        require_graph_equal(original_query['document'], original_header[field],
-                            poison_query['document'], binary_poison_header[field],
-                            'binary alpha poison preserves every metadata/type field except body checksum')
-    require(graph_text(original_query['document'], original_header[0]) == group and
-            graph_text(poison_query['document'], binary_poison_header[0]) == group and
-            graph_text(original_query['document'], original_header[7]) == raw_contextual_header[7] and
-            graph_text(poison_query['document'], binary_poison_header[7]) == poison_contextual_header[7],
-            'binary metadata binds actual owner and complete contextual body fingerprints')
-    require_alpha_graph(original_query, poison_query, int(binder_id), old_hint, new_hint, wanted[0])
-    wholesale3_id, wholesale3 = window_sample(root / 'target.wholesale-cache3.mlfq', 2 * 1024**2)
-    wholesale1_id, wholesale1 = window_sample(root / 'target.wholesale-cache1.mlfq', 2 * 1024**2)
-    wholesale_query = binary_query(wholesale3)
-    w1 = unpack(wholesale1.decode('utf-8', 'strict'))
-    require(wholesale_query['reference'] == reference and wholesale_query['fingerprint'] == digest(full_key.encode()) and
-            not graph_equal(wholesale_query['document'], wholesale_query['body'],
-                            original_query['document'], original_query['body'])[0] and
-            not graph_equal(wholesale_query['document'], wholesale_query['body'],
-                            poison_query['document'], poison_query['body'])[0] and
-            w1 == ['MLF-QUERY-CACHE-1', full_key, final_iface, final_object] and
-            pack(w1).encode('utf-8') == wholesale1,
-            'separate whole-final witnesses retain actual final fragment and original envelope')
-    wholesale_payload_id, wholesale_payload_raw = window_sample(root / 'target.wholesale-payload.legacy', 2 * 1024**2)
-    wholesale_payload = unpack(wholesale_payload_raw.decode('utf-8', 'strict'))
-    require(len(wholesale_payload) == 3 and wholesale_payload[0] == 'MLFF-2' and
-            pack(wholesale_payload).encode('utf-8') == wholesale_payload_raw,
-            'separate canonical whole-final legacy contextual witness')
-    wholesale_legacy_header = unpack(wholesale_payload[1])
-    wholesale_binary_header = graph_node(wholesale_query['document'], wholesale_query['header'], 240, 8)
-    require(len(wholesale_legacy_header) == 8 and wholesale_legacy_header[1] == group and
-            wholesale_legacy_header[7] == legacy_fingerprint(wholesale_payload[2]) and
-            graph_text(wholesale_query['document'], wholesale_binary_header[7]) == wholesale_legacy_header[7],
-            'whole-final binary shared checksum covers exactly the complete contextual body')
-    # Independently bind the whole-final contextual witness to the actual cold
-    # CrateObject pool, not merely to an author-created expected payload.
-    cold_object = baseline_graphs[1]
-    legacy_flag, crate_interface, fragment_list = graph_node(cold_object, cold_object.roots[0], 243, 3)
-    graph_node(cold_object, legacy_flag, 6, 0)
-    crate_fields = graph_node(cold_object, crate_interface, 242, 13)
-    require(graph_text(cold_object, crate_fields[0]) == 'session-window-raw', 'actual complete cold binary CrateObject identity')
-    final_candidates = []
-    for unit in graph_node(cold_object, fragment_list, 1):
-        header, _ = graph_node(cold_object, unit, 241, 2)
-        fields = graph_node(cold_object, header, 240, 8)
-        if graph_text(cold_object, fields[0]) == group:
-            final_candidates.append(unit)
-    require(len(final_candidates) == 1, 'exactly one actual cold target fragment in binary shared table')
-    require_contextual_unit(wholesale_query, context_graph, declarations, cold_object, final_candidates[0])
-    wholesale_rejections_id, wholesale_rejections = window_sample(root / 'wholesale-rejection.inventory', 65536)
-    require(unpack(wholesale_rejections.decode('utf-8')) == ['cached dependency parameter mismatch'] * 2,
-            'both wholesale-final codecs must fail generic envelope before PreparedRaw')
-    rejection_id, rejection = window_sample(root / 'prepared-rejection.txt', 65536)
-    legacy_rejection_id, legacy_rejection = window_sample(root / 'prepared-rejection-legacy.txt', 65536)
-    require(rejection == legacy_rejection == b'raw source evidence prefix identity mismatch',
-            'both generic-accepted alpha codecs must fail actual PreparedRaw at source-issued identity boundary')
-    for phase in ['interface', 'object']:
-        require((root / ('probe.mlfci' if phase == 'interface' else 'probe.mlfco')).read_bytes() ==
-                (root / ('cache1-repair.' + phase)).read_bytes(), 'actual final public output matches saved full artifact')
-    no_query_scratch(cache)
-    require(not os.path.lexists(cache / 'source-context.new'), 'Session repair leaves no context stage')
-    final_snapshot = session_window_snapshot(cache)
-    require(cold_snapshot['records'] == final_snapshot['records'] == originals and
-            cold_snapshot['contexts'] == final_snapshot['contexts'] and
-            set(cold_snapshot['files']) == set(final_snapshot['files']), 'same entire raw/context/lock/retained namespace')
-    for name, identity in cold_snapshot['files'].items():
-        current_identity = final_snapshot['files'][name]
-        if name == leaf:
-            require(all(identity[k] == current_identity[k] for k in ['bytes', 'sha256']), 'target full original raw restored')
-        else:
-            require(identity == current_identity, 'every non-target record/context/retained copy/lock full identity unchanged')
-    for name, identity in cold_snapshot['directories'].items():
-        require(all(identity[k] == final_snapshot['directories'][name][k] for k in ['device', 'inode', 'mode', 'links']),
-                'original Session cache directories preserved; staging may change directory times')
-    return {'plan_identity': plan_id, 'parsed_groups': planned, 'target_inventory_identity': inventory_id,
-            'target_group': group, 'target_names': wanted, 'target_leaf': leaf, 'target_reference': reference,
-            'phases': rows, 'original_records_identity': originals_id, 'raw_records': raw_rows,
-            'original_target': original_id, 'poison_cache3': poison3_id, 'poison_cache1': poison1_id,
-            'prepared_rejection': rejection_id, 'legacy_prepared_rejection': legacy_rejection_id, 'target_context': carrier_id,
-            'alpha_slot': alpha_id, 'whole_final_cache3': wholesale3_id, 'whole_final_cache1': wholesale1_id,
-            'poisoned_payload_legacy_evidence': poison_payload_id,
-            'whole_final_payload_legacy_evidence': wholesale_payload_id,
-            'binary_graph_checks': {'original': original_query['document'].accounting(),
-                                    'alpha_poison': poison_query['document'].accounting(),
-                                    'whole_final': wholesale_query['document'].accounting(),
-                                    'actual_cold_object': cold_object.accounting(),
-                                    'full_typed_fields_and_alpha_identity_compared': True},
-            'whole_final_rejections': wholesale_rejections_id,
-            'cache': snapshot(cache, keys), 'cold_full_identity': cold_snapshot, 'terminal_full_identity': final_snapshot,
-            'alpha_raw_generic_right_and_prepared_left_asserted_by_real_fixture': True,
-            'whole_final_generic_left_asserted_by_real_fixture': True,
-            'scope': 'four actual Session compileSpecFile calls plus one all-hit public Query support call. Wholesale final is an envelope-negative witness; alpha-only real raw provenance poison is dual generic Right then actual PreparedRaw Left. No fake PreparedGroup or direct observed multi-entry worker reset count'}
-
-
-def run_added_window_controls(fixture, out, record, save, include_session=True, include_helper=True):
+def run_window_controls(fixture, out, record, save):
     window_cache = out / 'window-helper-cache'
-    session_root = out / 'window-session-raw'
-    session_cache = session_root / 'cache'
-    evidence = {'helper': {}} if include_helper else {}
-    if include_session:
-        evidence['session_prepared_raw'] = {}
+    evidence = {'helper': {}}
     record['context_read_window'] = evidence
     hidden_markers = b''.join(('PASS window ' + label + '\n').encode('ascii') for label in WINDOW_HIDDEN_MARKERS)
     restored_markers = b''.join(('PASS window ' + label + '\n').encode('ascii') for label in WINDOW_RESTORED_MARKERS)
@@ -1025,141 +598,30 @@ def run_added_window_controls(fixture, out, record, save, include_session=True, 
                      scope='ten real private carriers absent while owner holds both real locks; all entries from verified reads; not hostile-mutation or foundation hit-count evidence')
         save(); ack(b'WINDOW-RELEASED-ACK\n')
         return released_output + b'PASS window helper complete\n'
-    if include_helper:
-        run_window_owned(fixture, out, record, save, 'window-helper', ['window-helper', window_cache], window_dialogue)
-    if not include_session:
-        return window_cache, None
-    def session_dialogue(owner, wait_marker, ack, row, started):
-        # Both computations and both10s parent audits share the absolute case60.
-        _, cold_output = wait_marker(b'SESSION-RAW-COLD', rb'SESSION-RAW-COLD\n', phase_seconds=60)
-        cold_started = time.monotonic()
-        cold_snapshot = session_window_snapshot(session_cache)
-        evidence['session_prepared_raw']['cold_full_identity'] = cold_snapshot
-        require(time.monotonic() < min(started + 60, cold_started + 10), 'cold audit/ACK within case60 and10s barrier')
-        save(); ack(b'SESSION-RAW-COLD-ACK\n', cold_started + 10)
-        prefix = cold_output + b'SESSION-RAW-RELEASED '
-        matched, released_output = wait_marker(prefix, re.escape(prefix) + rb'([0-9a-f]{64}\.mlfq)\n', phase_seconds=60)
-        audit_started = time.monotonic()
-        value = session_window_audit(session_root, matched.group(1).decode('ascii'), cold_snapshot)
-        value['live_release_probe'] = live_window_release_probe(owner, session_cache / '.lock')
-        require(time.monotonic() < min(started + 60, audit_started + 10), 'terminal audit/ACK within case60 and10s barrier')
-        value['complete'] = True
-        evidence['session_prepared_raw'] = value
-        save(); ack(b'SESSION-RAW-RELEASED-ACK\n', audit_started + 10)
-        return released_output + b'PASS actual Session whole-final generic Left and alpha raw generic Right PreparedRaw Left; both repairs preserve final and raw bytes\n'
-    run_window_owned(fixture, out, record, save, 'session-window-raw-final',
-                     ['session-window-raw-final', session_cache, session_root], session_dialogue)
-    return window_cache if include_helper else None, session_cache
-
-def canonical_session_builtin_pair(prefix):
-    """Pin the already produced session-cold dependency; never generate/copy it here."""
-    records, documents = {}, {}
-    for suffix, schema in ((".mlfci", 3), (".mlfco", 4)):
-        path = Path(str(prefix) + suffix)
-        before = path.lstat()
-        require(path.resolve(strict=True) == path and stat.S_ISREG(before.st_mode)
-                and before.st_nlink == 1 and before.st_size <= 2 * 1024**2,
-                "bounded real canonical session builtin pair")
-        raw = path.read_bytes()
-        after = path.lstat()
-        stamp = lambda x: (x.st_dev, x.st_ino, x.st_mode, x.st_nlink, x.st_size,
-                           x.st_mtime_ns, x.st_ctime_ns, x.st_blocks)
-        require(stamp(before) == stamp(after) and len(raw) == before.st_size,
-                "session builtin changed during complete read")
-        records[str(path)] = {"sha256": digest(raw), "bytes": before.st_size,
-            "device": before.st_dev, "inode": before.st_ino, "mode": before.st_mode,
-            "links": before.st_nlink, "mtime_ns": before.st_mtime_ns,
-            "ctime_ns": before.st_ctime_ns, "blocks": before.st_blocks}
-        documents[suffix] = binary_artifact(raw, schema)
-    meta, obj = documents[".mlfci"], documents[".mlfco"]
-    iface = graph_node(meta, meta.roots[0], 242, 13)
-    require(graph_text(meta, iface[0]) == "mlf:builtin-shared-haskell-v1:15"
-            and graph_node(meta, iface[1], 1) == ()
-            and sorted(graph_text(meta, n) for n in graph_node(meta, iface[2], 1)) == ["MLF.Primitive", "Prelude"]
-            and graph_text(meta, iface[10]) == "", "canonical ABI11 builtin identity/ownership/dependencies")
-    _, object_iface, fragments = graph_node(obj, obj.roots[0], 243, 3)
-    units = graph_node(obj, fragments, 1)
-    require(bool(units), "canonical builtin has a nonempty fully typed fragment list")
-    require_graph_equal(meta, meta.roots[0], obj, object_iface, "full canonical builtin interface/object binding")
-    # The actual producer splits canonical builtin declarations into SCC units.
-    # Do not guess a magic count: derive the complete export inventory from the
-    # independently typed crate interface and verify every unit and type below.
-    expected_bindings = {}
-    for binding in graph_node(meta, iface[9], 1):
-        name, ty = graph_node(meta, binding, 2, 2)
-        text = graph_text(meta, name)
-        require(text not in expected_bindings, "unique canonical crate export")
-        expected_bindings[text] = ty
-    def declarations_by_name(document, index):
-        declarations = {}
-        for declaration in graph_node(document, index, 1):
-            node = document.nodes[declaration]
-            require(node.kind == 3 and node.data[0] in (26, 27) and len(node.data[1]) == 3,
-                    "complete typed datatype declaration")
-            name = graph_text(document, node.data[1][0])
-            require(name not in declarations, "unique canonical datatype declaration name")
-            declarations[name] = declaration
-        return declarations
-    crate_declarations = declarations_by_name(meta, iface[8])
-    unit_prefix = "MLF.Split.C" + "".join(str(ord(c)) + "_" for c in graph_text(meta, iface[0])) + ".SCC"
-    seen_bindings, inventory = set(), []
-    for index, raw_unit in enumerate(units):
-        unit_iface, term = graph_node(obj, raw_unit, 241, 2)
-        fields = graph_node(obj, unit_iface, 240, 8)
-        name = graph_text(obj, fields[0])
-        require(name == unit_prefix + str(index), "complete ordered canonical SCC inventory")
-        require(all(not graph_node(obj, fields[k], 1) for k in (1, 2, 4, 5)),
-                "canonical split unit has no forged dependency/entity/class/instance fields")
-        unit_declarations = declarations_by_name(obj, fields[3])
-        require(set(unit_declarations) == set(crate_declarations), "exact canonical datatype declaration name set")
-        for declaration_name in crate_declarations:
-            require_graph_equal(meta, crate_declarations[declaration_name], obj, unit_declarations[declaration_name],
-                                "complete canonical datatype declaration graph by name; order is not semantic")
-        exports = []
-        for binding in graph_node(obj, fields[6], 1):
-            key, ty = graph_node(obj, binding, 2, 2)
-            text = graph_text(obj, key)
-            require(text in expected_bindings and text not in seen_bindings,
-                    "each canonical export belongs to exactly one SCC unit")
-            require_graph_equal(meta, expected_bindings[text], obj, ty, "exact canonical export type")
-            seen_bindings.add(text); exports.append(text)
-        require(bool(exports), "canonical declaration SCC has at least one export")
-        inventory.append({"name": name, "exports": exports})
-    require(seen_bindings == set(expected_bindings), "all canonical exports represented by complete SCC inventory")
-    return {"files": records, "fragments": inventory}
+    run_window_owned(fixture, out, record, save, 'window-helper',
+                     ['window-helper', window_cache], window_dialogue)
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--fixture", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument('--legacy-query-only', action='store_true',
-                        help='Retain all legacy Query/codec controls; the graph CLI has its own session controls.')
     parser.add_argument('--case', help='one control plus its required setup and paired processes')
     args = parser.parse_args()
     plan = run_path(str(Path(__file__).with_name('context_control_plan.py')))
-    expected_commands = plan['commands_for'](args.legacy_query_only, args.case)
+    expected_commands = plan['commands_for'](args.case)
     active = set(expected_commands)
-    drivers = [kind for kind in ('query', 'session') if kind + '-cold' in active]
-    memo_drivers = [kind for kind in ('query', 'session') if 'memo-' + kind in active]
-    left_modes = [kind for kind in ('legacy', 'source', 'session') if 'left-' + kind in active]
+    drivers = ['query'] if 'query-cold' in active else []
+    memo_drivers = ['query'] if 'memo-query' in active else []
+    left_modes = [kind for kind in ('legacy', 'source') if 'left-' + kind in active]
     fixture, out = args.fixture.absolute(), args.output.absolute()
     require(fixture.is_file() and fixture.resolve() == fixture, "qualified regular fixture path")
     require(not out.exists() and out.parent.is_dir() and out.parent.resolve() == out.parent, "fresh real output")
     inspector_inputs = binary_helpers()[2]
     out.mkdir()
     record = {"complete": False, "fixture_sha256": digest(fixture.read_bytes()), "commands": [], "drivers": {},
-              "legacy_query_only": args.legacy_query_only,
               "selected_case": args.case, "planned_commands": expected_commands,
               "binary_inspector_inputs": inspector_inputs,
-              "format_migration": {
-                  "default_query_context_schemas": [2, 1], "formal_interface_object_schemas": [3, 4],
-                  "legacy_differential_cases_unchanged": 63,
-                  "one_format_specific_oracle_change": {
-                      "old_marker": "malformed compact key clears after reuse",
-                      "new_marker": "malformed compact key clears before lookup",
-                      "old_memo_reused": True, "new_memo_reused": False,
-                      "reason": "malformed binary typed compact fields are rejected before context memo lookup; window is cleared"}},
               "limitations": [
         "Small synthetic source population, not corpus-wide performance or space estimate.",
         "One cooperative POSIX same-cache pair; no same-process thread, hostile-directory, crash, permission-failure or GC qualification.",
@@ -1211,38 +673,15 @@ def main():
         save()
         return captures["stdout"].read_bytes()
     def driver(kind, cache, root, value, name):
-        argv = ["query", cache, root / "final.objects", value] if kind == "query" else ["session", cache, root, value]
-        raw = run(name, argv)
+        raw = run(name, ["query", cache, root / "final.objects", value])
         report = json.loads(raw)
         require(report["format"] == 1 and len(report["groups"]) > 0, "actual query report")
         no_query_scratch(cache)
         hashes = [x["query_key"] for x in report["groups"]]
         require(len(hashes) == len(set(hashes)), "distinct query records")
-        result_files = [root / "final.objects"] if kind == "query" else [root / "probe.mlfci", root / "probe.mlfco"]
-        artifacts = {p.name: digest(p.read_bytes()) for p in result_files}
-        measured = {"query_report": report, "cache": snapshot(cache, hashes), "artifact_sha256": artifacts}
-        if kind == 'session':
-            measured['binary_artifacts'] = {p.name: binary_artifact(p.read_bytes(), schema).accounting()
-                                            for p, schema in zip(result_files, (3, 4))}
-        if kind == "query":
-            evidence = (root / "final.objects.legacy-bytes").read_bytes()
-            rows = unpack(evidence.decode("utf-8"))
-            require(rows and rows[0] == "MLF-QUERY-LEGACY-BYTES-1", "legacy accounting schema")
-            sizes = {}
-            for row in rows[1:]:
-                key, size = unpack(row)
-                require(key in hashes and key not in sizes and size.isascii() and size.isdecimal(), "legacy accounting record")
-                sizes[key] = int(size)
-                require(str(sizes[key]) == size and sizes[key] > 0, "canonical legacy byte count")
-            require(set(sizes) == set(hashes), "complete active legacy comparison")
-            measured["legacy_self_contained_comparison"] = {
-                "per_record_utf8_bytes": sizes, "total_utf8_bytes": sum(sizes.values()),
-                "new_complete_reachable_binary_and_legacy_bytes": measured["cache"]["reachable_logical_bytes"],
-                "evidence_sha256": digest(evidence),
-                "semantic_roundtrip_verified_by_fixture": True,
-                "scope": "synthetic Query empty datatype context only; old bytes constructed in memory",
-                "not_a_physical_baseline_or_io_measurement": True,
-            }
+        artifact = root / "final.objects"
+        measured = {"query_report": report, "cache": snapshot(cache, hashes),
+                    "artifact_sha256": {artifact.name: digest(artifact.read_bytes())}}
         return measured
     try:
         if "helper" in active:
@@ -1259,16 +698,8 @@ def main():
             cache = root / "cache"
             sentinels = seed_cache(cache)
             cold = driver(kind, cache, root, "41", kind + "-cold")
-            if kind == "session":
-                require(not record.get("left_session_builtin_dependency"), "fresh session builtin provenance")
-                record["left_session_builtin_dependency"] = {
-                    "producer_command": "session-cold",
-                    "cold_pair": canonical_session_builtin_pair(out / "session/builtin"),
-                    "before_live_probe": None, "after_live_probe": None}
-                save()
             require(cold["query_report"]["inferred_groups"] > 0 and cold["query_report"]["reused_groups"] == 0, "cold actually infers")
-            if kind == "query":
-                require(len(cold["cache"]["active_records"]) == 2 and len(cold["cache"]["reachable_contexts"]) == 1, "two groups share one context")
+            require(len(cold["cache"]["active_records"]) == 2 and len(cold["cache"]["reachable_contexts"]) == 1, "two groups share one context")
             entry = {"sentinels": sentinels, "cold": cold}
             record["drivers"][kind] = entry
             save()
@@ -1284,16 +715,27 @@ def main():
             mixed = None
             before_change = warm
             entry["warm"] = warm
-            if kind == "query" and "query-install-legacy" in active:
+            if "query-install-legacy" in active:
                 legacy = run("query-install-legacy", ["legacy-one", cache])
                 require(legacy == b"PASS fixture replaced one record with valid old CACHE1\n", "legacy injection marker")
                 mixed_before = snapshot(cache, [g["query_key"] for g in cold["query_report"]["groups"]])
                 if "query-mixed-old-new" in active:
                     mixed = driver(kind, cache, root, "41", "query-mixed-old-new")
-                    require(mixed["query_report"]["inferred_groups"] == 0 and mixed["cache"]["legacy_records"], "valid legacy CACHE1 remains a hit")
-                    for n in mixed["cache"]["legacy_records"]:
-                        require(mixed_before["files"][n] == mixed["cache"]["files"][n], "legacy hit not rewritten")
+                    retired = mixed_before["legacy_records"]
+                    require(len(retired) == 1 and not mixed["cache"]["legacy_records"], "one old cache record replaced")
+                    require(mixed["query_report"]["inferred_groups"] == 1 and
+                            mixed["query_report"]["reused_groups"] == cold["query_report"]["inferred_groups"] - 1,
+                            "old source format reinfers only its group")
+                    require(mixed["artifact_sha256"] == cold["artifact_sha256"] and
+                            mixed["cache"]["files"][retired[0]]["sha256"] == cold["cache"]["files"][retired[0]]["sha256"],
+                            "rebuilding restores the current bytes and exact output")
                     before_change = mixed
+                    if "query-rebuilt-warm" in active:
+                        rebuilt = driver(kind, cache, root, "41", "query-rebuilt-warm")
+                        require(rebuilt["query_report"]["inferred_groups"] == 0 and
+                                rebuilt["query_report"]["reused_groups"] == cold["query_report"]["inferred_groups"] and
+                                rebuilt["artifact_sha256"] == cold["artifact_sha256"], "rebuilt source record hits")
+                        entry["rebuilt_warm"] = before_change = rebuilt
             entry.update(mixed_legacy=mixed, before_one_value_change=before_change)
             save()
             if kind + "-one-value-change" not in active:
@@ -1443,24 +885,10 @@ def main():
             root.mkdir()
             cache = root / "cache"
             sentinels = seed_cache(cache)
-            if mode == "session":
-                dependency = record["left_session_builtin_dependency"]
-                dependency["before_live_probe"] = canonical_session_builtin_pair(out / "session/builtin")
-                require(dependency["before_live_probe"] == dependency["cold_pair"],
-                        "original successful session-cold builtin exact full stat/SHA unchanged")
-                require(not any((root / name).exists() for name in ("builtin.mlfci", "builtin.mlfco", "builtin.lock")),
-                        "left-session has no substituted local builtin or warm target cache")
-                save()
-            argv = ["left-" + mode, cache] + ([root, out / "session/builtin.mlfci"] if mode == "session" else [])
+            argv = ["left-" + mode, cache]
             raw = run_with_live_probe("left-" + mode, argv,
                     b"PASS business Left after held-lock group execution\n", "lock-after-" + mode, cache, sentinels)
             require(raw == b"PASS business Left after held-lock group execution\n", "business Left marker")
-            if mode == "session":
-                dependency["after_live_probe"] = canonical_session_builtin_pair(out / "session/builtin")
-                require(dependency["after_live_probe"] == dependency["before_live_probe"] == dependency["cold_pair"],
-                        "explicit builtin dependency exact full stat/SHA remains unchanged after live probe")
-                require(not any((root / name).exists() for name in ("builtin.mlfci", "builtin.mlfco", "builtin.lock")),
-                        "public Session reused validated explicit dependency, no hidden local cold generation")
             no_query_scratch(cache)
             verify_sentinels(cache, sentinels)
             message_path = Path(str(cache) + ".left-message")
@@ -1682,7 +1110,7 @@ def main():
             tail = ["memo rejects bad payload", "memo rejects full scope key change", "memo rejects owner change",
                     "memo rejects parameter change", "memo rejects declaration change", "memo rejects context field change",
                     "memo rejects different digest", "memo rejects unsafe reference", "memo does not cross cache directory",
-                    "legacy readers clear memo without changing raw", "memo rejects datatype kind change",
+                    "obsolete source record clears memo", "memo rejects datatype kind change",
                     "memo rejects datatype constructor change", "memo rejects datatype field change",
                     "datatype switch and structural guards", "prepared authority rejects memo-decoded final payload",
                     "memo helper complete"]
@@ -1699,7 +1127,7 @@ def main():
         if "memo-helper" in active:
             run_memo_helper()
         phases = ["cold", "warm", "mixed", "restored-warm", "corrupt-repair", "missing-repair"]
-        expected_counts = [(2, 0), (0, 2), (0, 2), (0, 2), (1, 1), (1, 1)]
+        expected_counts = [(2, 0), (0, 2), (1, 1), (0, 2), (1, 1), (1, 1)]
         for kind in memo_drivers:
             root = out / ("memo-" + kind)
             cache = root / "cache"
@@ -1734,7 +1162,7 @@ def main():
             context = cache / final_snapshot["reachable_contexts"][0]
             require(context.read_bytes() == (root / "context.original").read_bytes(), "final context exact original bytes")
             memo_results[kind] = {"phases": rows, "final_cache": final_snapshot,
-                                  "mixed_legacy_scope": "Haskell checked full bytes and mtime during mixed hit only; explicit fingerprint record restoration is test setup; no added ctime/devino claim",
+                                  "mixed_legacy_scope": "A valid obsolete record is replaced by the exact current record. The following warm run reuses both groups.",
                                   "cross_invocation_scope": "all-fingerprinted warm ends verified; next corrupt/missing invocations must each infer one and hit one, not reuse global state"}
             save()
 
@@ -1753,7 +1181,7 @@ def main():
             existing_identity = small_identity(existing)
             existing_query = binary_query(existing.read_bytes())
             require(existing_query['reference'] == reference, "setup binary record really references observed context")
-            require(len(existing_query['compact']) == 8, "setup compact source key remains complete")
+            require(re.fullmatch(r"[0-9a-f]{64}", existing_query["fingerprint"]), "setup result fingerprint verified")
             original_context_identity = publication_context_identity(context_path)
             original_context = context_path.read_bytes()
             binary_context(original_context, reference)
@@ -1831,43 +1259,8 @@ def main():
             publication["cleanup_failure"]["protected_after"] = with_publication_lock(stage_cache, verify_cleanup_failure)
             save()
 
-        # One new pure-API comparison mode; seed IO reads the fixed, real
-        # writer output of this same K invocation, never an earlier campaign.
-        if "decoder-differential" in active:
-            decoder_cache = out / "helper-cache"
-            seed_before = with_publication_lock(decoder_cache, lambda: decoder_seed_snapshot(decoder_cache))
-            differential = {"seed_before": seed_before, "expected_right": DECODER_DIFFERENTIAL_RIGHT,
-                            "expected_left": DECODER_DIFFERENTIAL_LEFT, "case_count": 63,
-                            "scope": "explicit legacy-only stateless decoder API differential against frozen P body; real binary seed IO is independently inspected, then fixture derives separate legacy in-memory seeds and their own legacy context SHA; all 63 full Right bytes and exact Left errors remain unchanged",
-                            "not_a_prepared_raw_or_performance_claim": True}
-            record["decoder_differential"] = differential
-            save()
-            try:
-                compared = run("decoder-differential", ["decoder-differential", decoder_cache], timeout=60)
-            finally:
-                # Preserve bounded seed post-evidence even on nonzero exit/timeout;
-                # an audit error is recorded without replacing the target error.
-                try:
-                    differential["seed_after"] = with_publication_lock(decoder_cache, lambda: decoder_seed_snapshot(decoder_cache))
-                    differential["seed_identity_unchanged"] = differential["seed_after"] == seed_before
-                except BaseException as seed_error:
-                    differential["seed_audit_error"] = type(seed_error).__name__ + ": " + str(seed_error)
-                    differential["seed_identity_unchanged"] = False
-                save()
-            require(len(DECODER_DIFFERENTIAL_RIGHT) == 6 and len(DECODER_DIFFERENTIAL_LEFT) == 57,
-                    "fixed six valid and fifty-seven invalid differential subcases")
-            expected = "".join("PASS decoder differential " + label + " " + kind + "\n"
-                               for labels, kind in [(DECODER_DIFFERENTIAL_RIGHT, "Right"), (DECODER_DIFFERENTIAL_LEFT, "Left")]
-                               for label in labels) + "PASS decoder differential complete 63 cases\n"
-            require(compared == expected.encode("ascii"), "complete ordered decoder differential markers")
-            require(differential.get("seed_identity_unchanged") is True, "decoder comparison changed original helper cache identity")
-            differential["complete"] = True
-            save()
-
-        if {"window-helper", "session-window-raw-final"} & active:
-            run_added_window_controls(fixture, out, record, save,
-                                      include_session="session-window-raw-final" in active,
-                                      include_helper="window-helper" in active)
+        if "window-helper" in active:
+            run_window_controls(fixture, out, record, save)
         cache_roots = []
         if "helper" in active:
             cache_roots.append(out / "helper-cache")
@@ -1886,8 +1279,7 @@ def main():
         cache_roots.extend(out / ('memo-' + kind) / 'cache' for kind in memo_drivers)
         for case, directory in (("context-directory-setup", "context-directory-cache"),
                                 ("context-stage-cleanup-failure", "context-stage-cleanup-cache"),
-                                ("window-helper", "window-helper-cache"),
-                                ("session-window-raw-final", "window-session-raw/cache")):
+                                ("window-helper", "window-helper-cache")):
             if case in active:
                 cache_roots.append(out / directory)
         record["all_cache_inventory"] = {str(root.relative_to(out)): physical_inventory(root) for root in cache_roots}
@@ -1899,11 +1291,6 @@ def main():
         require([row['name'] for row in record['commands']] == expected_commands, "fixed selected command inventory")
         require(all(digest(Path(path).read_bytes()) == expected for path, expected in inspector_inputs.items()),
                 'independent binary inspector input changed during controls')
-        if "left-session" in active:
-            dependency = record["left_session_builtin_dependency"]
-            dependency["terminal_pair"] = canonical_session_builtin_pair(out / "session/builtin")
-            require(dependency["terminal_pair"] == dependency["cold_pair"] == dependency["before_live_probe"] == dependency["after_live_probe"],
-                    "explicit builtin dependency retained unchanged through all original forty controls")
         record["complete"] = True
         save()
         print(json.dumps({"complete": True, "commands": len(record["commands"]), "drivers": drivers}))

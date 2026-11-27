@@ -39,14 +39,6 @@
 
 ## 复验
 
-独立安装、四种生产方／消费方组合、query 恢复及三种 shared-frontend 模式的命令见[迁移计划](../../../docs/declid-migration-plan.md)。以下命令使用该计划定义的绝对路径和已配置的原生 runner。自编译工具从新目录开始，核对发布的 CURRENT、接口和对象，分别验证编译器的组级暖命中与包管理器的整库复用。
+原实验的[复验命令](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/benchmarks/results/2026-11-05-declid/README.md#复验)和[六个验收脚本](https://github.com/mlf-lang/mlf/tree/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/performance/declid-migration)保存在同一提交中。实验比较了迁移前后的安装、自编译、xMLF 交叉执行、可搬移发布包以及 Foundation 的冷、暖和编辑结果。
 
-```sh
-python3 -B tools/performance/declid-migration/check_self_build.py "$AFTER" "$OUT/self-build"
-python3 -B tools/performance/declid-migration/check_portable_release.py --before-manager "$BEFORE/bin/mlfpkg" --after-prefix "$AFTER" --runtime "$PWD/runtime/mlf_runtime.c" --output "$OUT/portable-release"
-python3 -B tools/performance/declid-migration/check_xmlf.py "$BEFORE/bin/emlf" "$AFTER/bin/emlf" "$OUT/xmlf"
-python3 -B tools/performance/dense-decode/foundation.py "$BEFORE/bin/emlf" "$AFTER/bin/emlf" \
-  "$OUT/fixture/libraries/mlf-foundation" "$OUT/foundation" --warm-rounds 12 --cold-rounds 3 --profile-rounds 3
-python3 -B tools/performance/declid-migration/compare_foundation.py "$OUT/foundation"
-python3 -B tools/performance/declid-migration/check_foundation_receipts.py "$BEFORE/bin/emlf" "$AFTER/bin/emlf" "$OUT/foundation"
-```
+当前的[发布包测试](../../../tests/Tests/PackageReleases.emlf)覆盖无源码执行、传递依赖和搬移。[查询图检查](../../../tools/performance/crate-query-graph/verify.py)覆盖冷编译、暖复用和损坏恢复。[CLI 测试](../../../tools/release/pr-smoke-cli.sh)检查生成的 xMLF，并在解释器和 LLVM 后端运行。

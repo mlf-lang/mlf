@@ -309,15 +309,15 @@ variants, independent implementations, fixture limits and generated-loop counts
 are not derived from classification metadata.
 
 The pre-merge family-selection validation record is
-[`test-family-selection-validation.json`](../docs/test-family-selection-validation.json).
+[`test-family-selection-validation.json`](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/test-family-selection-validation.json).
 Earlier execution-unit classification results remain separately recorded in
-[`test-classification-validation.json`](../docs/test-classification-validation.json).
+[`test-classification-validation.json`](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/test-classification-validation.json).
 Each record states its tested source/tool identities, scope and command wall
 times. Both describe historical snapshots before integration of the split
 libraries and parallel-build changes from `main`. The 161 individual-family
 timings in the family-selection record apply to that pre-merge snapshot.
 Fresh integration results are recorded separately in
-[`test-family-pr-integration-validation.json`](../docs/test-family-pr-integration-validation.json).
+[`test-family-pr-integration-validation.json`](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/test-family-pr-integration-validation.json).
 Shared-cache measurements are not a performance comparison against a
 previous layout, and a focused pass does not establish a full-campaign pass.
 
@@ -335,16 +335,17 @@ retains the persistent map algorithm, Kahn traversal, and path-based LCA.
 `Tests.IndependentCheck` and `Tests.IndependentType` are frozen test checking
 modules rather than aliases to the candidate's checking implementation.
 
-`golden/parity-seed.tar.gz` preserves the previously verified source corpus and
-Haskell-seed expected types. `Tests.Corpus` reproduces the exhaustive, seeded,
-annotation, and Figure 12 inputs and validates their independent acceptance
-oracles before use. It checks current repository inputs against the reviewed
-baseline. Golden expectations are never rewritten from candidate inference.
-Exactly two archived module-import-cycle rejections have explicit, source-guarded
-acceptance overlays for crate compilation. Their prescribed type is `Int`,
-checked against the independent literal target `42`; the archive itself is
-unchanged. The resulting corpus has 3,204 accepted cases. See the
-[oracle migration record](../docs/crate-migration.md#oracle-migration).
+The [parity manifest](golden/parity/manifest.jsonl) defines the IDs, input paths
+and independent expectations used by both discovery and execution. It contains
+7,086 cases, including 3,204 acceptances with checked types and 80 runtime
+cases with exact output on both backends. `Tests.Corpus` unpacks the reviewed
+[case sources](golden/parity/cases.tar.gz) and copies the 30 example and
+benchmark inputs from the checkout. It reproduces the exhaustive, seeded,
+annotation and Figure 12 terms and checks their acceptance independently.
+The two import-cycle programs each evaluate to the literal 42. The independent
+checker checks their reference xMLF and their compiler-emitted targets against
+the prescribed type `Int`.
+
 The `unit` and `packages` groups now validate structured execution evidence
 against [`golden/unit-inventory.json`](golden/unit-inventory.json). Completed
 callbacks emit case IDs, explicit aliases and measured execution counts. The
@@ -455,7 +456,7 @@ choose-id source/type/roundtrip check previously repeated in Core. These changes
 reduce Core's method count from 686 to 684; they preserve the underlying graph
 inputs, principal-type assertion, Figure 12 labels and independent parity oracle.
 
-The historical [cache-cleanup validation record](../docs/test-cache-cleanup.json)
+The historical [cache-cleanup validation record](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/test-cache-cleanup.json)
 covers unit, packages, backends and cold/warm port execution on the source
 snapshot before upstream integration. The warm port control
 changed an unrelated inventory file and corrupted one prepared target: 24
@@ -466,7 +467,7 @@ times were 25m 6s and 5m 13s under concurrent host load; these are not a
 controlled before/after speed benchmark. Self-host and parity were not rerun.
 These results predate the upstream regex additions and do not validate the
 combined source tree.
-The subsequent [integration record](../docs/test-cache-cleanup-integration.json)
+The subsequent [integration record](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/test-cache-cleanup-integration.json)
 records a rebuilt manager and a passing full unit group on upstream `4af369d`,
 including regex, both cache regressions, Core and Figure 12. That record predates
 this framework integration and does not validate the current merged source tree.
@@ -483,18 +484,18 @@ Historical validation on 2026-10-15 passed all six root groups through the nativ
 package manager, with GHC, Cabal, and Python blocked on `PATH`. The blocker log
 was empty. Both matrices ran independently for both backends and runtime
 layouts; the fresh self-host build reproduced the compiler's LLVM and binary
-hashes. The [validation record](../docs/native-tests-validation.json) records
+hashes. The [validation record](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/native-tests-validation.json) records
 the source manifest, artifact hashes, coverage totals, and local log paths.
 
 After retiring the Haskell compiler and old harnesses, the 2026-10-19
-[complete native validation](../docs/native-only-validation.json) passed all six
+[complete native validation](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/native-only-validation.json) passed all six
 groups with a fresh two-generation native build and `--locked test`. Both full
 matrices and the self-host fixed point passed; the forbidden-tool log was
 empty. All 72 benchmark pins and the archived measurements remain unchanged.
 That record precedes the crate migration and does not validate its changes;
 the [crate migration ledger](../docs/crate-migration.md) records separate acceptance.
 
-The 2026-10-20 [crate validation](../docs/crate-validation.json) completes all six
+The 2026-10-20 [crate validation](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/crate-validation.json) completes all six
 native groups against the immutable R11 source and recorded PGO compiler. Both
 backend/port layouts pass, and a fresh source self-host reproduces complete LLVM
 and native bytes using the same profile. Each group has a successful actual outer

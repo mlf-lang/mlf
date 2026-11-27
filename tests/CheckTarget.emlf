@@ -1,4 +1,4 @@
-module Main where
+module CheckTarget where
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Bootstrap.X.Parser as P

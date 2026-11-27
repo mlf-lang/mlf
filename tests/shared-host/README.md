@@ -24,9 +24,8 @@ Every command is bounded by a 60-second timeout. The source list, SHA-256 hashes
 exact commands, environments, return codes and expected observations are written to
 `.runs/<UTC timestamp>/receipt.json`; objects and executable files remain ignored.
 
-`evidence/latest/` preserves the final reviewed receipt and text logs without binaries.
-Earlier defect observations are retained in `evidence/before-*`,
-`evidence/cancel-before.log`, and `evidence/argument-review.log`.
+The [reviewed checkpoint](https://github.com/mlf-lang/mlf/tree/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tests/shared-host/evidence/latest) archives the final receipt and text logs.
+The [earlier captures](https://github.com/mlf-lang/mlf/tree/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tests/shared-host/evidence) include the pre-fix, cancellation, and argument-review logs.
 
 ## Coverage
 

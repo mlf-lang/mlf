@@ -79,28 +79,20 @@ class RuntimeAdapters(unittest.TestCase):
             graph.prepare_validation(self.root, out)
         self.assertFalse((out / 'V1SessionUnderTest.hs').exists())
 
-    def test_p123_preparation_retains_legacy_and_current_binary_controls(self):
+    def test_p123_prepares_independent_fingerprint_and_current_binary_controls(self):
         self.copy_sources(legacy.SOURCES['p123'])
         out = self.root.parent / 'p123'
         control = self.root / legacy.SOURCES['p123']['P1Controls.hs']
         control.write_bytes(control.read_bytes() + b'\n-- maintained assertion documentation\n')
         modules, inputs = legacy.prepare(self.root, out, 'p123')
         self.assertEqual(modules, ['P1Controls', 'P2Controls', 'NativeCompatibilityControls', 'P3Controls'])
-        for name in ('LegacyArtifactWriter.hs', 'BinaryP2WriterControls.hs', 'P1Controls.hs'):
+        for name in ('FingerprintReference.hs', 'BinaryP2WriterControls.hs', 'P1Controls.hs'):
             source = self.root / legacy.SOURCES['p123'][name]
             self.assertEqual((out / name).read_bytes(), source.read_bytes())
             self.assertEqual(inputs[str(source)], hashlib.sha256(source.read_bytes()).hexdigest())
         self.assertFalse((out / 'adaptations.json').exists())
         self.assertFalse((self.root / 'tools/performance/artifact-binary/source_migration_adapter.py').exists())
         self.assertFalse((self.root / 'libraries/mlf-crates/Bootstrap/CrateArtifact.hs').exists())
-
-    def test_changed_frozen_writer_is_rejected(self):
-        self.copy_sources(legacy.SOURCES['p123'])
-        oracle = self.root / legacy.SOURCES['p123']['LegacyArtifactWriter.hs']
-        oracle.write_bytes(oracle.read_bytes() + b'\n')
-        with self.assertRaisesRegex(ValueError, 'frozen runtime oracle changed'):
-            legacy.prepare(self.root, self.root.parent / 'p123', 'p123')
-
 
 if __name__ == '__main__':
     unittest.main()

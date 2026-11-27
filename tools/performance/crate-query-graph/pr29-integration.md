@@ -56,7 +56,7 @@ The final compiler passed:
 
 The retained legacy Query API has a separate 29-command run, including all 63
 frozen decoder differential cases and their exact assertions. Eleven old-format
-Session commands are excluded explicitly with `--legacy-query-only`; the graph
+The archived runner uses [`--legacy-query-only`](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/shared/test_source_context_cache.py) to exclude Session commands; the graph
 CLI and same-process Session controls above exercise the replacement route.
 The default historical 40-command mode remains available. CI runs both the new
 graph controls and the selected legacy controls. This is not a claim that the
