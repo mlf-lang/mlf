@@ -134,6 +134,7 @@ module MLF.Entry.Emlf where {
       Right session -> compileCrateLLVMInSession session False file prefix report
     }
   });
+  crateLLVMArguments :: (String -> String -> Maybe ((,) String String) -> IO ()) -> [] String -> IO ();
   crateLLVMArguments compile arguments = case arguments of {
     [file, "-o", prefix] -> compile file prefix Nothing;
     [file, "-o", prefix, "--codegen-cache", cache, "--query-report", report] ->
