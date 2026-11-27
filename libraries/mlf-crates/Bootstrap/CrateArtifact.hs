@@ -1699,15 +1699,16 @@ module Bootstrap.CrateArtifact where {
     XApply function argument -> directEntryMonotype dictionaries function && directEntryMonotype dictionaries argument;
     _ -> False
   };
-  -- Preserve the old import adapter's rejection of noncanonical legacy
-  -- schemes (including dead quantifiers). Bounded schemes use inference.
-  directEntryImport ty = case ty of {
+  -- The entry is used at its own checked scheme. Its independent bounded
+  -- quantifiers must keep their order. Other imported selectors still obey
+  -- the legacy adapter, and dead quantifiers still require admission there.
+  directEntryImport isEntry ty = let { valid = directEntryImport isEntry } in case ty of {
     XVar _ -> True;
-    XArrow a b -> directEntryImport a && directEntryImport b;
-    XCon _ arguments -> all directEntryImport arguments;
-    XApply f a -> directEntryImport f && directEntryImport a;
-    XForall variable XBot body -> Set.member T.compareTyVar variable (T.freeVars body) && directEntryImport body;
-    XForall variable (XBotKind _) body -> Set.member T.compareTyVar variable (T.freeVars body) && directEntryImport body;
+    XArrow a b -> valid a && valid b;
+    XCon _ arguments -> all valid arguments;
+    XApply f a -> valid f && valid a;
+    XForall variable bound body -> Set.member T.compareTyVar variable (T.freeVars body) &&
+      (case bound of { XBot -> True; XBotKind _ -> True; _ -> isEntry && valid bound }) && valid body;
     _ -> False
   };
   directEntry signatures available entry = do {
@@ -1776,7 +1777,7 @@ module Bootstrap.CrateArtifact where {
                  signatures
            };
            case M.lookup compareString entry signatures of {
-             Just ty -> if directEntryType dictionaries ty && all (compose directEntryImport snd) (M.toList signatures)
+             Just ty -> if directEntryType dictionaries ty && all (\((,) n t) -> directEntryImport (eqString n entry) t) (M.toList signatures)
                then directEntry signatures available entry
                else inferEntry serial interfaces available entry visibleInstances signatures conventions externals;
              Nothing -> inferEntry serial interfaces available entry visibleInstances signatures conventions externals

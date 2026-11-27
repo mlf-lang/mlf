@@ -163,7 +163,11 @@ module Bootstrap.Separate where {
                freshPure ((,) n new)
              })
           names;
-      freshPure (M.union compareString (M.fromList compareString pairs) env)
+      -- Infix markers and prefix uses must name the same lexical binder
+      -- after freshening, so resolution can enforce the canonical operator.
+      let { markers = map (\((,) n fresh) -> (,) ("$MLF.Infix." ++ n) ("$MLF.Infix." ++ fresh))
+              (filter (\pair -> Set.member compareString (fst pair) Lexer.sharedValueOperatorSet) pairs) };
+      freshPure (M.union compareString (M.fromList compareString (append pairs markers)) env)
     };
   hygieneRef env ref = case ref of {
     LexicalRef n -> LexicalRef (hygieneName env n);
