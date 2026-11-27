@@ -13,6 +13,7 @@ module Package.Scheduler where {
   import qualified Package.Json as J;
   import qualified Package.Manifest as M;
   import qualified Package.Build as B;
+  import qualified Package.DependencyMode as Mode;
   -- The coordinator resolves one graph. Workers deserialize it and execute one
   -- action; they never acquire the build-directory lock or call ordinary build.
   moduleJson m =
@@ -154,17 +155,17 @@ module Package.Scheduler where {
             };
             let {
               compilation =
-                J.set "codegen-identity" (J.str (M.crateIdentity p ("target-" ++ label)))
+                J.set "profile" profile (J.set "codegen-identity" (J.str (M.crateIdentity p ("target-" ++ label)))
                  (J.set "name" (J.str name)
                   (J.set "entry" (J.str entry)
                      (J.set "modules" (J.Array (S.map moduleJson modules))
-                        (J.set "no-prelude" (J.Boolean noPrelude) (job "target" compileId deps)))))
+                        (J.set "no-prelude" (J.Boolean noPrelude) (job "target" compileId deps))))))
             };
             let {
               emission =
-                J.set "crate" (J.str compileId)
+                J.set "profile" profile (J.set "crate" (J.str compileId)
                   (J.set "identity" (J.str (M.crateIdentity p ("target-" ++ label)))
-                     (job "emit" emitId ((:) compileId [])))
+                     (job "emit" emitId ((:) compileId []))))
             };
             let {
               object =
@@ -173,10 +174,10 @@ module Package.Scheduler where {
             };
             let {
               link =
-                J.set "llvm" (J.str objectId)
+                J.set "emitted" (J.str emitId) (J.set "llvm" (J.str objectId)
                   (J.set "runtime" (J.str runtimeId)
                      (J.set "profile" profile
-                        (job "link" linkId ((:) objectId ((:) runtimeId [])))))
+                        (job "link" linkId [objectId, runtimeId, emitId]))))
             };
             let {
               assembly =
@@ -242,11 +243,16 @@ module Package.Scheduler where {
   runCompileJob b selected dependencies = do {
     let { graph = B.graph b;
           kind = J.getText "kind" "" selected;
-          noPrelude = J.getBool "no-prelude" False selected };
+          noPrelude = J.getBool "no-prelude" False selected;
+          closed = J.getBool "closed-llvm" False selected;
+          profile = J.getObject "profile" selected };
     if eqString kind "library"
-    then B.libraryResult b (jobPackage graph selected) dependencies noPrelude
+    then B.libraryResultUsing (S.not closed) b (jobPackage graph selected) dependencies noPrelude
     else if eqString kind "target"
-    then B.compileTargetCrateResult b (M.rootPackage graph) ("target-" ++ J.getText "name" "" selected)
+    then let { compile = if closed then B.compileTargetCrateResult
+             else \builder pkg kind identity entry modules deps mode ->
+               B.compilePackageTarget builder pkg kind identity entry modules deps mode profile }
+         in compile b (M.rootPackage graph) ("target-" ++ J.getText "name" "" selected)
            (J.getText "codegen-identity" "" selected) (J.getText "entry" "" selected)
            (S.map moduleFrom (J.values (J.get "modules" selected))) dependencies noPrelude
     else case dependencies of {
@@ -255,7 +261,9 @@ module Package.Scheduler where {
           "LLVM emission requires its declared target crate";
         metadata <- fileDigest (crate ++ "/unit.mlfci");
         object <- fileDigest (crate ++ "/unit.mlfco");
-        B.emitCrateResult b (J.getText "identity" "" selected) crate metadata object
+        let { identity = J.getText "identity" "" selected };
+        if closed then B.emitCrateResult b identity crate metadata object
+          else B.emitPackageCrate b identity crate metadata object profile
       };
       _ -> O.fatal "LLVM emission requires exactly one target crate"
     }
@@ -265,7 +273,7 @@ module Package.Scheduler where {
   llvmPlan :: B.Builder -> String -> J.Json -> IO ([] J.Json);
   llvmPlan b name target = do {
     jobs <- planTarget b [] (request name target True);
-    ioReturn (S.filter isCompileJob jobs)
+    ioReturn (S.map (J.set "closed-llvm" (J.Boolean True)) (S.filter isCompileJob jobs))
   };
   -- All members of a library are inputs to its checked crate. Pinned releases
   -- bind their object inventory through the verified manifest.
@@ -346,7 +354,8 @@ module Package.Scheduler where {
         } else if eqString kind "link" then do {
           llvm <- dependency (J.getText "llvm" "" selected);
           runtime <- dependency (J.getText "runtime" "" selected);
-          B.linkNativeWithPgoResult b llvm runtime gc profile
+          emitted <- dependency (J.getText "emitted" "" selected);
+          B.linkPackageResult b llvm runtime emitted gc profile
         } else if eqString kind "assemble" then do {
           crate <- dependency (J.getText "crate" "" selected);
           emitted <- dependency (J.getText "emitted" "" selected);
@@ -403,9 +412,11 @@ module Package.Scheduler where {
   mergeReport b identity report =
     S.mapM_
       (\((,) key value) ->
-         if S.elem eqString key (O.words "commands builds crates releases codegen native_inputs")
-         then S.mapM_ (\row -> B.record b key (J.set "job_id" (J.str identity) row))
-                (J.values value)
+         if S.elem eqString key (O.words "commands builds crates releases codegen native_inputs dependency_modes")
+         then S.mapM_ (\row -> do {
+                if eqString key "dependency_modes" then Mode.emit (B.savedDecision row) else ioReturn ();
+                B.record b key (J.set "job_id" (J.str identity) row)
+              }) (J.values value)
          else ioReturn ())
       (J.items report);
   -- A killed coordinator releases its lock before every descendant is reaped.

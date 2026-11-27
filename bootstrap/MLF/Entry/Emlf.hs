@@ -13,6 +13,7 @@ module MLF.Entry.Emlf where {
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Compiler as C;
   import qualified MLF.PreparedCompiler as Prepared;
+  import qualified Package.DependencyMode as Mode;
   import qualified MLF.NativeBuild as NativeBuild;
   import qualified Bootstrap.X.Check as Check;
   import qualified Bootstrap.X.Checked as Checked;
@@ -24,6 +25,7 @@ module MLF.Entry.Emlf where {
   import qualified Bootstrap.CrateSession as CrateSession;
   import qualified Bootstrap.CrateArtifact as CrateArtifact;
   import qualified Bootstrap.CrateCodegen as CrateCodegen;
+  import qualified MLF.CrateNativeCommand as NativeCommand;
   import qualified Package.Json as J;
   import qualified Package.OS as O;
   data Command =
@@ -134,29 +136,37 @@ module MLF.Entry.Emlf where {
       Right session -> compileCrateLLVMInSession session False file prefix report
     }
   });
-  crateLLVMArguments :: (String -> String -> Maybe ((,) String String) -> IO ()) -> [] String -> IO ();
+  data CrateEmission = DirectLLVM | CachedLLVM String String | NativeLLVM NativeCommand.Plan String;
+  crateLLVMArguments :: (String -> String -> CrateEmission -> IO ()) -> [] String -> IO ();
   crateLLVMArguments compile arguments = case arguments of {
-    [file, "-o", prefix] -> compile file prefix Nothing;
+    [file, "-o", prefix] -> compile file prefix DirectLLVM;
     [file, "-o", prefix, "--codegen-cache", cache, "--query-report", report] ->
-      compile file prefix (Just ((,) cache report));
+      compile file prefix (CachedLLVM cache report);
+    (:) file ((:) "-o" ((:) prefix options)) -> case NativeCommand.arguments options of {
+      Just ((,) plan report) -> compile file prefix (NativeLLVM plan report);
+      Nothing -> fatal crateUsage
+    };
     _ -> fatal crateUsage
   };
-  compileCrateLLVMInSession session verifyAll file prefix cacheReport = do {
-    result <- CrateSession.compileInSession session verifyAll Prepared.installCompilerPrelude file prefix;
-    case result of {
-      Left message -> fatal message;
-      Right compiled -> do {
-        linked <- Prepared.linkCompiledCrateRetaining (CrateSession.sessionObjects session) compiled;
-        case linked of {
-          Left message -> fatal message;
-          Right checked -> case cacheReport of {
-            Nothing -> printLLVM (LLVM.emitCheckedChunks False checked);
-            Just ((,) cache report) -> emitCachedCrateUsing
-              (CrateCodegen.emitCrateCheckedUsing (ioReturn (CrateSession.compiledCompilerDigest compiled)))
-              cache (Just report) checked
-          }
-        }
-      }
+  requireResult :: forall a. Either String a -> IO a;
+  requireResult result = case result of {
+    Left message -> fatal message;
+    Right value -> ioReturn value
+  };
+  compileCrateLLVMInSession session verifyAll file prefix emission = do {
+    compiled <- ioBind (CrateSession.compileInSession session verifyAll Prepared.installCompilerPrelude file prefix) requireResult;
+    let { retained = CrateSession.sessionObjects session;
+          link = ioBind (Prepared.linkCompiledCrateRetaining retained compiled) requireResult };
+    case emission of {
+      DirectLLVM -> do { checked <- link; printLLVM (LLVM.emitCheckedChunks False checked) };
+      CachedLLVM cache report -> do {
+        checked <- link;
+        emitCachedCrateUsing
+          (CrateCodegen.emitCrateCheckedUsing (ioReturn (CrateSession.compiledCompilerDigest compiled)))
+          cache (Just report) checked
+      };
+      NativeLLVM plan report -> ioBind (NativeCommand.emitRetained plan report prefix retained
+        (CrateSession.compiledInterfaces compiled) (CrateSession.compiledObject compiled)) printChunks
     }
   };
   runArgs :: PreludeMode -> [] String -> [] String -> IO ();
@@ -164,6 +174,17 @@ module MLF.Entry.Emlf where {
     ["--test-parity-batch", request] -> testParityBatch request;
     (:) "--compile-crate-plan" ((:) plan rest) -> compileCratePlanCommand plan rest;
     (:) "--compile-crate-to-llvm-gc" rest -> compileCrateLLVMCommand False rest;
+    (:) "--crate-library-to-llvm" rest -> case rest of {
+      [file, "--native-identity", identity, "--native-contract", contract] -> ioBind (NativeCommand.emitLibrary file identity contract) printChunks;
+      _ -> fatal crateUsage
+    };
+    (:) "--crate-to-native-llvm" rest -> case rest of {
+      (:) file options -> case NativeCommand.arguments options of {
+        Just ((,) plan report) -> ioBind (NativeCommand.emitFile plan report file) printChunks;
+        Nothing -> fatal crateUsage
+      };
+      _ -> fatal crateUsage
+    };
     (:) "-Zincremental-verify-ich" ((:) "--compile-crate-to-llvm-gc" rest) -> compileCrateLLVMCommand True rest;
     (:) "-Zincremental-verify-ich" ((:) "--compile-crate" rest) -> compileCrateCommand True rest;
     (:) "--compile" rest -> NativeBuild.run mode paths rest;
@@ -336,7 +357,7 @@ module MLF.Entry.Emlf where {
   sourceCommand mode paths command args arguments = case parseSource True arguments of {
     Left message -> fatal message;
     Right source -> do {
-      compiled <- Prepared.compileSource mode paths source;
+      compiled <- Prepared.compileSourceWithDecisions Mode.emit mode paths source;
       case compiled of {
         Left error -> fatal (C.prettyError error);
         Right result -> case command of {
@@ -409,7 +430,7 @@ module MLF.Entry.Emlf where {
   nativeSourceCommand mode paths arguments = case parseSource True arguments of {
     Left message -> fatal message;
     Right source -> do {
-      result <- Prepared.compileNative mode paths source;
+      result <- Prepared.compileNativeWithDecisions Mode.emit mode paths source;
       case result of {
         Left error -> fatal (C.prettyError error);
         Right native -> printChunks (Prepared.nativeChunks native)
@@ -519,7 +540,7 @@ module MLF.Entry.Emlf where {
     "  emlf --xmlf-to-llvm [XMLF_FILE]            Write LLVM IR.\n\n" ++
     "Use emlf --version for the compiler version or emlf --help tools for stage and package commands.\n\n" ++
     -- Released package managers and benchmark tools probe these exact words.
-    "Tool capabilities: --implementation-identity --compile-crate-to-llvm-gc --compile-crate-plan --codegen-cache --query-report --native-target-flags\n";
+    "Tool capabilities: --implementation-identity --compile-crate-to-llvm-gc --compile-crate-plan --codegen-cache --query-report --native-target-flags --crate-library-to-llvm --crate-to-native-llvm --native-plan-sha256\n";
   toolsUsage :: String;
   toolsUsage =
     "Source and xMLF stages\n" ++
@@ -544,6 +565,9 @@ module MLF.Entry.Emlf where {
     "  emlf [-Zincremental-verify-ich] --compile-crate SPEC -o PREFIX\n" ++
     "  emlf [-Zincremental-verify-ich] --compile-crate-to-llvm-gc SPEC -o PREFIX [--codegen-cache DIR --query-report FILE]\n" ++
     "  emlf --compile-crate-plan PLAN SPEC -o PREFIX [--codegen-cache DIR --query-report FILE]\n" ++
+    "  emlf --crate-library-to-llvm FILE.mlfci --native-identity SHA256 --native-contract FILE\n" ++
+    "  emlf --crate-to-native-llvm FILE.mlfci --native-dependencies PLAN --native-plan-sha256 SHA256 --native-target TARGET.json --native-report FILE\n" ++
+    "  The retained crate commands accept the same native plan options.\n" ++
     "  emlf --show-crate FILE.mlfci\n" ++
     "  emlf --link-crate FILE.mlfci\n" ++
     "  emlf --run-crate FILE.mlfci [-- ARG ...]\n" ++

@@ -27,19 +27,20 @@ main = H.withScratch (\directory -> do
   H.assert (eqString (B.regexRedux pinnedInput) pinnedOutput) "independent regex-redux oracle disagrees with upstream"
   let adversarial = ">agggtaaa hidden\nagggtaaaagggtaaa\ntttacccttttaccct\ntHaNaNDcaNHaDHaSWaSaNaSa tBY\n<x><>||a|b|c||\n>last header without newline"
   let boundary = (:) "" ((:) (B.fasta 0) ((:) (B.fasta 1) ((:) (B.fasta 7) ((:) (B.fasta 31) ((:) pinnedInput ((:) adversarial []))))))
-  Coverage.mapCounted "harness" "regex-redux-native-executed" (runCase directory ((:) binary [])) boundary
+  Coverage.mapCounted "harness" "regex-redux-native-executed" (runCase false directory ((:) binary [])) boundary
   Coverage.passed "harness" "test_regex_redux_measured_native_source_matches_independent_oracle"
   putStrLn "PASS test_regex_redux_measured_native_source_matches_independent_oracle"
   -- Small but non-vacuous cases exercise interpreted matching and replacement;
   -- the larger pinned fixture is checked by the native execution above.
   let interpreted = (:) compiler (S.append (O.words "-i libraries/mlf-foundation --run") ((:) source []))
-  Coverage.mapCounted "harness" "regex-redux-interpreted-executed" (runCase directory interpreted) ((:) (B.fasta 1) ((:) adversarial []))
+  Coverage.mapCounted "harness" "regex-redux-interpreted-executed" (runCase true directory interpreted) ((:) (B.fasta 1) ((:) adversarial []))
   Coverage.passed "harness" "test_regex_redux_measured_interpreter_source_matches_independent_oracle"
   putStrLn "PASS test_regex_redux_measured_interpreter_source_matches_independent_oracle")
 
-runCase : String -> [] String -> String -> IO ()
-runCase directory command source = do
+runCase : Bool -> String -> [] String -> String -> IO ()
+runCase fromSource directory command source = do
   let input = directory ++ "/input"
   writeFile input source
   (,,) status output errors <- ABI.capture directory command input
-  H.assert (status == 0 && eqString errors "" && eqString output (B.regexRedux source)) "regex-redux measured output differs from independent oracle"
+  diagnostics <- if fromSource then ABI.sourceDiagnostics directory (directory ++ "/err") else return errors
+  H.assert (status == 0 && eqString diagnostics "" && eqString output (B.regexRedux source)) "regex-redux measured output differs from independent oracle"

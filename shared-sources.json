@@ -344,6 +344,11 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.NativeCrate",
+      "path": "libraries/mlf-crates/Bootstrap/NativeCrate.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.OpenFragment",
       "path": "libraries/mlf-crates/Bootstrap/OpenFragment.hs",
       "role": "implementation"
@@ -534,6 +539,11 @@
       "role": "implementation"
     },
     {
+      "module": "MLF.CrateNativeCommand",
+      "path": "bootstrap/MLF/CrateNativeCommand.hs",
+      "role": "implementation"
+    },
+    {
       "module": "MLF.NativeBuild",
       "path": "bootstrap/MLF/NativeBuild.hs",
       "role": "implementation"
@@ -614,6 +624,11 @@
       "role": "implementation"
     },
     {
+      "module": "Package.DependencyMode",
+      "path": "libraries/mlf-package-core/Package/DependencyMode.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Package.Distribution",
       "path": "libraries/mlf-package-core/Package/Distribution.hs",
       "role": "implementation"
@@ -626,6 +641,11 @@
     {
       "module": "Package.Manifest",
       "path": "libraries/mlf-package-core/Package/Manifest.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Package.NativeArtifact",
+      "path": "libraries/mlf-package-core/Package/NativeArtifact.hs",
       "role": "implementation"
     },
     {

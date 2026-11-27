@@ -13,6 +13,7 @@ esac
 test "$#" -eq 0
 compiler=$(command -v "${EMLF:-emlf}")
 . "$root/tools/testing/native-events.sh"
+. "$root/tools/testing/compiler-diagnostics.sh"
 compiler=$(cd -- "$(dirname -- "$compiler")" && pwd)/$(basename -- "$compiler")
 cc=$(command -v "${CC:-clang}")
 output=${MLF_ASYNC_COMPLETION_BUILD_DIR:-"$root/.mlf-build/async-completion-gate"}
@@ -78,7 +79,7 @@ record_inputs() {
     jq --arg path "${file#"$root"/}" --arg hash "$(sha256 "$file")" '. + {($path):$hash}' "$destination" > "$destination.tmp"
     mv "$destination.tmp" "$destination"
   done < <({ find "$fixtures" "$root/runtime" -type f; printf '%s\n' \
-    "$root/tools/release/check_async_abi.py" "$root/tools/testing/native-events.sh" "$root/tests/native/completion_cell_tests.c" "$root/tests/native/async_completion_primitives.c" \
+    "$root/tools/release/check_async_abi.py" "$root/tools/testing/native-events.sh" "$root/tools/testing/compiler-diagnostics.sh" "$root/tests/native/completion_cell_tests.c" "$root/tests/native/async_completion_primitives.c" \
     "$root/libraries/mlf-foundation/Bootstrap/Types.hs" \
     "$root/libraries/mlf-language-core/Bootstrap/Data.hs" "$root/libraries/mlf-language-core/Bootstrap/Primitive.hs" \
     "$root/libraries/mlf-frontend/Bootstrap/Module.hs" \
@@ -90,7 +91,7 @@ compiler_hash=$(sha256 "$compiler")
 cc_hash=$(sha256 "$cc")
 printf 'IO ()\n' > "$work/io-unit.type"
 if mlf_case_selected async-completion/capability; then mlf_case_start async-completion/capability; fi
-success capability "$compiler" --run --expr 'do { reply <- processSupervisor "MLF-PROCESS-1\0version\0"; printInt (stringCodeAt reply 2) }'
+mlf_source_success capability "$compiler" --run --expr 'do { reply <- processSupervisor "MLF-PROCESS-1\0version\0"; printInt (stringCodeAt reply 2) }'
 test "$(cat "$work/capability.stdout")" = 49 || fail 'real host bridge required'
 mlf_case_result pass 0
 read -r -a cflags <<< "$(pkg-config --cflags gmp)"
@@ -122,10 +123,10 @@ for source in "$fixtures"/runtime/*.emlf; do
   name=$(basename "$source" .emlf)
   mlf_case_selected "async-completion/runtime/$name" || continue
   mlf_case_start "async-completion/runtime/$name"
-  success "$name.compile" "$compiler" -i "$fixtures" "$source"
+  mlf_source_success "$name.compile" "$compiler" -i "$fixtures" "$source"
   success "$name.check" "$compiler" --check "$work/$name.compile.stdout"
   cmp "$work/io-unit.type" "$work/$name.check.stdout" || fail "$name is not IO ()"
-  success "$name.interpreter" "$compiler" -i "$fixtures" --run "$source"
+  mlf_source_success "$name.interpreter" "$compiler" -i "$fixtures" --run "$source"
   success "$name.target-interpreter" "$compiler" --run-xmlf "$work/$name.compile.stdout"
   cmp "$fixtures/runtime/$name.expected" "$work/$name.interpreter.stdout" || fail "$name source interpreter differs"
   cmp "$fixtures/runtime/$name.expected" "$work/$name.target-interpreter.stdout" || fail "$name target interpreter differs"
@@ -154,7 +155,8 @@ for source in "$fixtures"/negative/*.emlf; do
     generalize-allocated) expected='^Inference: cannot raise a protected type variable' ;;
     *) expected='^Inference:' ;;
   esac
-  grep -Eq "$expected" "$work/$label.stderr" || fail "$name wrong rejection phase"
+  mlf_compiler_diagnostics < "$work/$label.stderr" > "$work/$label.diagnostics"
+  grep -Eq "$expected" "$work/$label.diagnostics" || fail "$name wrong rejection phase"
   mlf_case_result pass "$status"
   negative=$((negative + 1))
 done

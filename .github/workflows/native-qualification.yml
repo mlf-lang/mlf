@@ -70,7 +70,16 @@ jobs:
           for tool in emlf mlfpkg; do
             key=$(jq -er --arg kind "executable mlf-compiler:$tool" '[.builds[] | select(.kind == $kind) | .key] | if length == 1 then .[0] else error("missing unique native tool") end' "$build/build-report.json")
             cmp "$build/cache/$key/program" "$build/bin/$tool"
-            cp "$build/cache/$key/program.ll" ".mlf-build/portable-llvm/$tool.ll"
+            target="$build/cache/$key"
+            object_count=0
+            if [[ -f "$target/native-dependencies.json" ]]; then
+              object_count=$(jq -er '.objects | if type == "array" then length else error("missing native object inventory") end' "$target/native-dependencies.json")
+            fi
+            if (( object_count > 0 )); then
+              "$build/bin/emlf" --crate-to-llvm-gc "$target/unit.mlfci" >".mlf-build/portable-llvm/$tool.ll"
+            else
+              cp "$target/program.ll" ".mlf-build/portable-llvm/$tool.ll"
+            fi
           done
           (cd .mlf-build/portable-llvm && shasum -a 256 emlf.ll mlfpkg.ll > SHA256SUMS)
           cp "$build/build-report.json" .mlf-build/mac-candidate/build-report.json

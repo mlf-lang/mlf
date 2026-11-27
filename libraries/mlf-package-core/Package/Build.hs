@@ -12,6 +12,8 @@ module Package.Build where {
   import qualified Package.OS as O;
   import qualified Package.Json as J;
   import qualified Package.Manifest as M;
+  import qualified Package.DependencyMode as Mode;
+  import qualified Package.NativeArtifact as Native;
   import qualified Package.Release as R;
   data Builder = Builder M.PackageGraph J.Json String J.Json J.Json;
   config :: Builder -> J.Json;
@@ -40,6 +42,19 @@ module Package.Build where {
       report <- J.read (reportPath b);
       J.write (reportPath b) (J.add key value report)
     };
+  recordDependencyMode b stage decision = do {
+    let { value = J.set "stage" (J.str stage) (Mode.json decision) };
+    Mode.emit decision;
+    record b "dependency_modes" value
+  };
+  savedDecision row = Mode.Decision (J.getText "dependency" "" row)
+    (case J.getText "mode" "" row of {
+      "native" -> Mode.Native;
+      "ir" -> Mode.CheckedIR;
+      "source" -> Mode.Source;
+      "unused" -> Mode.Unused;
+      _ -> panic "invalid dependency mode"
+    }) (J.getText "reason" "" row);
   info :: [] ((,) String J.Json) -> J.Json;
   info fields = J.Object fields;
   obj1 :: String -> J.Json -> J.Json;
@@ -275,6 +290,8 @@ module Package.Build where {
           S.elem eqString "--compile-crate-to-llvm-gc" (O.words help) &&
           S.elem eqString "--codegen-cache" (O.words help)
       };
+      let { nativeCrates = S.all (\flag -> S.elem eqString flag (O.words help))
+              ["--crate-library-to-llvm", "--crate-to-native-llvm", "--native-plan-sha256"] };
       implementation <-
         if S.elem eqString "--implementation-identity" (O.words help)
         then raw buildDirectory
@@ -364,7 +381,7 @@ module Package.Build where {
                    else baseIdentity))))
       };
       let {
-        b =
+        baseBuilder =
           Builder g
             (J.set "build-directory" (J.str buildDirectory)
                (J.set "cache-dir" (J.str cache) (J.set "native-pgo" profile options)))
@@ -372,6 +389,22 @@ module Package.Build where {
             identity
             snapshot
       };
+      nativeTarget <- if S.not nativeCrates then ioReturn (Left "compiler lacks native crate support") else do {
+        let { emptyC = buildDirectory ++ "/native-target.c"; output = buildDirectory ++ "/native-target.ll" };
+        writeFile emptyC "";
+        let { probeFlags = S.filter (\flag -> S.not (eqString flag "-c")) (llvmObjectFlags baseBuilder J.empty) };
+        code <- O.exec "" (S.append [J.getText "path" "" cc] (S.append probeFlags
+          ["-S", "-emit-llvm", "-x", "c", emptyC, "-o", "-"])) "" output (buildDirectory ++ "/native-target.err") 1800;
+        if code /= 0 then ioReturn (Left "Clang did not supply a native target layout") else do {
+          probe <- readFile output;
+          ioReturn (Native.targetConfig identity (llvmObjectFlags baseBuilder J.empty) J.empty probe)
+        }
+      };
+      let { toolchain = case nativeTarget of {
+              Left reason -> J.set "native-crate-unavailable" (J.str reason) identity;
+              Right target -> J.set "native-crate-target" target identity
+            };
+            b = Builder g (config baseBuilder) buildDirectory toolchain snapshot };
       J.write (reportPath b)
         (J.set "cache_directory" (J.str cache)
            (info
@@ -379,7 +412,7 @@ module Package.Build where {
                  ((:) ((,) "complete" (J.Boolean False))
                     ((:) ((,) "implementation" (J.str "MLF"))
                        ((:) ((,) "packages" snapshot)
-                          ((:) ((,) "toolchain" identity)
+                          ((:) ((,) "toolchain" toolchain)
                              ((:) ((,) "commands" (J.Array []))
                                 ((:) ((,) "builds" (J.Array []))
                                    ((:) ((,) "tests" (J.Array [])) []))))))))));
@@ -403,7 +436,7 @@ module Package.Build where {
     };
   reportKeys :: [] String;
   reportKeys =
-    O.words "commands builds crates releases codegen native_inputs tests pending-publications";
+    O.words "commands builds crates releases codegen native_inputs dependency_modes tests pending-publications";
   mergeReport :: Builder -> J.Json -> IO ();
   mergeReport b saved =
     S.mapM_ (\key -> S.mapM_ (record b key) (J.values (J.getOr key (J.Array []) saved)))
@@ -935,8 +968,17 @@ module Package.Build where {
   compileTargetCrateResult b p kind codegenIdentity entry modules dependencies noPrelude =
     compileCrateResultUsing
       (if J.getBool "compiler-fused-codegen" False (tools b) && S.not (eqString entry "")
-       then Just codegenIdentity else Nothing)
+       then Just ((,) codegenIdentity []) else Nothing)
       b p kind entry modules dependencies noPrelude;
+  compilePackageTarget b p kind codegenIdentity entry modules dependencies noPrelude profile =
+    if S.not (supportsNativeCrates b && J.getBool "compiler-fused-codegen" False (tools b)) ||
+       S.null dependencies || S.not (S.null (J.items profile))
+    then compileTargetCrateResult b p kind codegenIdentity entry modules dependencies noPrelude
+    else do {
+      rows <- nativeChoices b profile (S.map (\path -> path ++ "/unit.mlfci") dependencies);
+      compileCrateResultUsing (Just ((,) codegenIdentity (S.filter eligibleNative rows)))
+        b p kind entry modules dependencies noPrelude
+    };
   compileCrateResultUsing codegenIdentity b p kind entry modules dependencies noPrelude =
     do {
       let {
@@ -989,7 +1031,9 @@ module Package.Build where {
       let {
         inputs = case codegenIdentity of {
           Nothing -> checkedInputs;
-          Just _ -> J.set "emission" (J.str "retained-root-v1") checkedInputs
+          Just ((,) _ rows) -> if S.null rows then J.set "emission" (J.str "retained-root-v1") checkedInputs
+            else J.set "native-plan" (J.Array (S.map nativeChoiceKey rows))
+              (J.set "emission" (J.str "retained-native-root-v1") checkedInputs)
         }
       };
       let {
@@ -1035,7 +1079,7 @@ module Package.Build where {
                      [compiler b, "--compile-crate", work ++ "/crate.spec", "-o", work ++ "/unit"] "" "";
                    ioReturn ()
                  };
-                 Just identity -> do {
+                 Just ((,) identity []) -> do {
                    codegen <- codegenDirectory b identity;
                    O.mkdir codegen;
                    ignored <- capture b work
@@ -1044,6 +1088,15 @@ module Package.Build where {
                      "" (work ++ "/retained.ll");
                    present <- fileExists (work ++ "/retained-codegen-query.json");
                    O.require present "compiler did not report retained-root LLVM emission"
+                 };
+                 Just ((,) _ rows) -> do {
+                   let { report = work ++ "/retained-native-report.json" };
+                   nativeArgs <- nativeArguments b work rows report;
+                   ignored <- capture b work (S.append [compiler b, "--compile-crate-to-llvm-gc", work ++ "/crate.spec",
+                     "-o", work ++ "/unit"] nativeArgs)
+                     "" (work ++ "/retained.ll");
+                   present <- fileExists report;
+                   O.require present "compiler did not report native-root dependency selections"
                  }
                };
                S.mapM_
@@ -1116,7 +1169,21 @@ module Package.Build where {
   -- Materialization still runs on a cache hit to verify the pinned producer
   -- bundle and repair any damaged installed dependency before receipt reuse.
   libraryResult :: Builder -> M.Package -> [] String -> Bool -> IO J.Json;
-  libraryResult b p dependencies noPrelude =
+  libraryResult = libraryResultUsing True;
+  libraryResultUsing prime b p dependencies noPrelude = do {
+    result <- checkedLibraryResult b p dependencies noPrelude;
+    let { released = M.isRelease p; cached = J.getBool "cached" False result;
+          identity = M.crateIdentity p "library";
+          metadata = importPath result ++ "/unit.mlfci" };
+    recordDependencyMode b "check" (if released
+      then Mode.Decision identity Mode.CheckedIR "admitted pinned checked release"
+      else if cached then Mode.Decision identity Mode.CheckedIR "reused checked crate"
+      else Mode.Decision identity Mode.Source "compiled package sources");
+    if prime && supportsNativeCrates b && S.not (released || cached)
+      then primeNativeLibrary b metadata else ioReturn ();
+    ioReturn result
+  };
+  checkedLibraryResult b p dependencies noPrelude =
     if S.not (M.isRelease p)
     then compileCrateResult b p "library" "" (M.packageModules p) dependencies noPrelude
     else do {
@@ -1292,12 +1359,139 @@ module Package.Build where {
         else directory b ++ "/codegen-cache/" ++ partition) ++
        "/" ++ J.getText "sha256" "" (J.get "compiler" (tools b)))
   };
+  supportsNativeCrates b = case J.get "native-crate-target" (tools b) of {
+    J.Object _ -> True;
+    _ -> False
+  };
+  nativeLibraryKind :: String;
+  nativeLibraryKind = "native crate library";
+  -- A fixed-point compiler must emit the same symbols when rebuilt with its
+  -- own executable or a different cache directory. The artifact key and
+  -- admission receipt independently bind the producer, layout and all bodies.
+  nativeSymbol b crate = fingerprint b (obj2 "crate" (J.str crate) "export-abi" (J.str Native.exportAbi));
+  nativeLibraryInputs b metadata = do {
+    result <- Native.producerInputs (J.get "native-crate-target" (tools b)) metadata;
+    case result of { Left message -> O.fatal message; Right inputs -> ioReturn inputs }
+  };
+  primeNativeLibrary b metadata = do {
+    inputs <- nativeLibraryInputs b metadata;
+    identity <- nativeSymbol b (J.getText "crate_id" "" inputs);
+    let { validate path = do {
+      checked <- Native.admit path inputs identity;
+      ioReturn (S.either (\_ -> False) (\_ -> True) checked)
+    } };
+    ignored <- cachedCheckedResult b nativeLibraryKind inputs validate (\work -> do {
+      let { ir = work ++ "/library.ll"; contract = work ++ "/contract.json" };
+      emitted <- capture b work [compiler b, "--crate-library-to-llvm", metadata,
+        "--native-identity", identity, "--native-contract", contract] "" ir;
+      status <- J.read contract;
+      if eqString (J.getText "status" "" status) "eligible" then do {
+        compiled <- capture b work (S.append ((:) (clang b) (llvmObjectFlags b J.empty))
+          [ir, "-o", work ++ "/unit.o"]) "" "";
+        ioReturn ()
+      } else O.require (eqString (J.getText "status" "" status) "unsupported")
+        "invalid native crate producer status";
+      published <- Native.publish work inputs identity;
+      case published of { Left message -> O.fatal message; Right _ -> ioReturn () }
+    });
+    ioReturn ()
+  };
+  missingNative crate reason = info [(,) "crate_id" (J.str crate),
+    (,) "status" (J.str "unsupported"), (,) "reason" (J.str reason)];
+  nativeStampFiles key inputs value = case value of {
+    J.Object _ -> case J.get "files" value of {
+      files@(J.Object entries) -> do {
+        S.ensure (J.equal (J.get "key" value) (J.str key) && J.equal inputs (J.get "inputs" value))
+          "cached native artifact inputs changed";
+        S.ensure (J.has "contract.json" files && J.has "native.json" files &&
+          S.all (S.compose validDigest S.snd) entries) "invalid native producer file inventory";
+        Right files
+      };
+      _ -> Left "invalid native producer file inventory"
+    };
+    _ -> Left "invalid native producer receipt"
+  };
+  cachedNativeObject dir key inputs symbol = do {
+    let { stamp = dir ++ "/artifact.json" };
+    present <- fileExists stamp;
+    if S.not present then ioReturn (Left "no cached native object") else do {
+      parsed <- Native.readJson stamp;
+      case S.bindEither parsed (nativeStampFiles key inputs) of {
+        Left message -> ioReturn (Left message);
+        Right files -> do {
+          checked <- Native.admit dir inputs symbol;
+          case checked of {
+            Left message -> ioReturn (Left message);
+            Right row -> do {
+              receipt <- fileDigest (dir ++ "/native.json");
+              ioReturn (do {
+                S.ensure (J.equal (J.get "native.json" files) (J.str receipt) &&
+                  J.equal (J.get "contract.json" files) (J.get "contract_sha256" row) &&
+                  (if eligibleNative row then J.equal (J.get "unit.o" files) (J.get "sha256" row)
+                   else S.not (J.has "unit.o" files))) "cached native artifact failed validation";
+                Right row
+              })
+            }
+          }
+        }
+      }
+    }
+  };
+  nativeChoice b profile graphRows prepared ((,) metadata iface) = let {
+    id = Artifact.crateId iface;
+    missing reason = ioReturn (missingNative id reason)
+  } in if S.not (supportsNativeCrates b) then missing
+      (J.getText "native-crate-unavailable" "compiler lacks native crate support" (tools b))
+    else if S.not (S.null (J.items profile)) then missing "target uses whole-program native PGO"
+    else if eqString id Artifact.builtinCrateIdentity then missing "compiler-owned checked Prelude"
+    else if O.starts (cacheDirectory b ++ "/.releases/") metadata then missing "pinned checked release"
+    else do {
+      let { inputs = S.fromMaybe (panic "missing native producer inputs") (S.lookup eqString metadata prepared) };
+      identity <- nativeSymbol b id;
+      key <- fingerprint b (obj2 "kind" (J.str nativeLibraryKind) "inputs" inputs);
+      checked <- cachedNativeObject (cacheDirectory b ++ "/" ++ key) key inputs identity;
+      case checked of {
+        Left message -> missing message;
+        Right row -> ioReturn (if eligibleNative row
+          then J.set "pinned" (Native.pinnedRow graphRows metadata inputs row) row else row)
+      }
+    };
+  nativeChoices b profile paths = do {
+    loaded <- Artifact.loadInterfaces paths;
+    case loaded of {
+      Left message -> O.fatal message;
+      Right rows -> do {
+        prepared <- if supportsNativeCrates b && S.null (J.items profile)
+          then Native.producerInputsFor (J.get "native-crate-target" (tools b)) rows
+          else ioReturn (Right []);
+        case prepared of {
+          Left message -> O.fatal message;
+          Right inputs -> S.mapM (nativeChoice b profile rows inputs)
+            (S.sortBy (\a c -> compareString (Artifact.crateId (S.snd a)) (Artifact.crateId (S.snd c))) rows)
+        }
+      }
+    }
+  };
+  eligibleNative row = eqString (J.getText "status" "" row) "eligible";
+  nativeArguments b work rows report = do {
+    let { target = work ++ "/native-target.json"; plan = work ++ "/native-plan.json" };
+    J.write target (J.get "native-crate-target" (tools b));
+    targetHash <- fileDigest target;
+    J.write plan (info [(,) "format" (J.str Native.pinnedPlanFormat),
+      (,) "target_sha256" (J.str targetHash), (,) "dependencies" (J.Array (S.map (J.get "pinned") rows))]);
+    digest <- fileDigest plan;
+    ioReturn ["--native-dependencies", plan, "--native-plan-sha256", digest,
+      "--native-target", target, "--native-report", report]
+  };
+  nativeChoiceKey row = J.Object (S.filter (\((,) key _) -> S.not (eqString key "contract")) (J.items row));
   -- The compile action publishes these outputs in its ordinary immutable
   -- artifact receipt. File existence alone is not evidence that LLVM belongs
   -- to the current checked root and compiler. Older/checked-only artifacts
   -- continue through the independently cached disk emission path.
   validRetainedEmission :: Builder -> String -> String -> String -> IO Bool;
-  validRetainedEmission b crate metadataHash objectHash = do {
+  validRetainedEmission b crate metadataHash objectHash =
+    validRetainedFor b crate metadataHash objectHash [];
+  validRetainedFor b crate metadataHash objectHash native = do {
     stampExists <- fileExists (crate ++ "/artifact.json");
     if S.not stampExists then ioReturn False else do {
       text <- readFile (crate ++ "/artifact.json");
@@ -1305,7 +1499,11 @@ module Package.Build where {
         Left _ -> ioReturn False;
         Right stamp -> do {
           let { inputs = J.get "inputs" stamp; files = J.get "files" stamp };
-          if S.not (eqString (J.getText "emission" "" inputs) "retained-root-v1" &&
+          let { nativeMode = S.not (S.null native);
+                basis = if nativeMode then eqString (J.getText "emission" "" inputs) "retained-native-root-v1" &&
+                  J.equal (J.get "native-plan" inputs) (J.Array (S.map nativeChoiceKey native))
+                else eqString (J.getText "emission" "" inputs) "retained-root-v1" };
+          if S.not (basis &&
                   J.equal (J.get "compiler" inputs) (J.get "compiler" (tools b)) &&
                   eqString (J.getText "unit.mlfci" "" files) metadataHash &&
                   eqString (J.getText "unit.mlfco" "" files) objectHash)
@@ -1317,7 +1515,7 @@ module Package.Build where {
                 actual <- fileDigest path;
                 ioReturn (J.equal expected (J.str actual))
               }
-            }) ["retained.ll", "retained-codegen-query.json"];
+            }) ["retained.ll", if nativeMode then "retained-native-report.json" else "retained-codegen-query.json"];
             ioReturn (S.and matches)
           }
         }
@@ -1330,9 +1528,61 @@ module Package.Build where {
   -- Bootstrap seeds predate explicit report outputs. Their query storage is
   -- private to this worker even if an interrupted coordinator is restarted.
   emitCrateResult b targetIdentity crate metadataHash objectHash =
+    emitCrateResultUsing b targetIdentity crate metadataHash objectHash Nothing;
+  emitPackageCrate b targetIdentity crate metadataHash objectHash profile = do {
+    loaded <- Artifact.readInterface (crate ++ "/unit.mlfci");
+    case loaded of {
+      Left message -> O.fatal message;
+      Right iface -> do {
+        rows <- nativeChoices b profile (S.map Artifact.dependencyPath (Artifact.crateDependencies iface));
+        emitCrateResultUsing b targetIdentity crate metadataHash objectHash (Just rows)
+      }
+    }
+  };
+  nativeLinkInventory rows report = do {
+    let { eligible = S.filter eligibleNative rows; id row = J.getText "crate_id" "" row;
+          selected = J.getStrings "selected" report; modes = J.values (J.get "dependency_modes" report);
+          availableIds = S.map id rows; ids = S.map id eligible;
+          decisionIds = S.map (J.getText "dependency" "") modes };
+    O.require (eqString (J.getText "format" "" report) Native.reportFormat &&
+      S.length decisionIds == S.length (S.nubBy eqString decisionIds) &&
+      S.all (\key -> S.elem eqString key availableIds) decisionIds &&
+      S.all (\key -> S.elem eqString key decisionIds) ids &&
+      S.length selected == S.length (S.nubBy eqString selected) &&
+      S.all (\key -> S.elem eqString key ids) selected)
+      "native program report differs from compiler request";
+    decisions <- S.mapM (\row -> do {
+      let { key = id row;
+            bound = S.elem eqString key selected;
+            result = S.find (\decision -> eqString (J.getText "dependency" "" decision) key) modes;
+            mode = if bound then Mode.Native else case result of {
+              Just actual -> if eqString (J.getText "mode" "" actual) "unused" then Mode.Unused else Mode.CheckedIR;
+              Nothing -> Mode.CheckedIR
+            };
+            reason = case result of { Just actual -> if S.not (eligibleNative row) &&
+                eqString (J.getText "mode" "" actual) "ir" then J.getText "reason" "" row
+                else J.getText "reason" "" actual;
+              Nothing -> J.getText "reason" "" row } };
+      O.require (S.not (eqString reason "") && case result of {
+        Nothing -> S.not (eligibleNative row);
+        Just actual -> eqString (J.getText "mode" "" actual) (Mode.name mode)
+      }) "incomplete native dependency decision";
+      ioReturn (Mode.json (Mode.Decision key mode reason))
+    }) rows;
+    let { objects = S.map (\row -> info
+            [(,) "dependency" (J.get "crate_id" row), (,) "identity" (J.get "identity" row),
+             (,) "path" (J.get "path" row), (,) "sha256" (J.get "sha256" row),
+             (,) "contract_sha256" (J.get "contract_sha256" row)])
+          (S.filter (\row -> S.elem eqString (id row) selected) eligible) };
+    ioReturn (info [(,) "dependency_modes" (J.Array decisions), (,) "objects" (J.Array objects)])
+  };
+  emptyNativeReport = info [(,) "format" (J.str Native.reportFormat),
+    (,) "selected" (J.Array []), (,) "dependency_modes" (J.Array [])];
+  emitCrateResultUsing b targetIdentity crate metadataHash objectHash choices =
     do {
+      let { rows = S.fromMaybe [] choices; native = S.filter eligibleNative rows };
       let {
-        inputs =
+        basis =
           info
             ((:) ((,) "compiler" (J.get "compiler" (tools b)))
                ((:) ((,) "crate-path" (J.str crate))
@@ -1340,12 +1590,16 @@ module Package.Build where {
                      ((:) ((,) "object" (J.str objectHash))
                         ((:) ((,) "abi" (J.str "compact-bdwgc-v1")) [])))))
       };
+      let { inputs = case choices of {
+        Nothing -> basis;
+        Just _ -> J.set "dependency-artifacts" (J.Array (S.map nativeChoiceKey rows)) basis
+      } };
       let {
         explicitReport = J.getBool "compiler-query-report" False (tools b)
       };
       codegen <- codegenDirectory b targetIdentity;
       O.mkdir codegen;
-      retained <- validRetainedEmission b crate metadataHash objectHash;
+      retained <- validRetainedFor b crate metadataHash objectHash native;
       result <-
         cachedResult b "LLVM emission" inputs
           (\work ->
@@ -1364,13 +1618,38 @@ module Package.Build where {
                                   then (:) "--query-report" ((:) report [])
                                   else [])))))
                };
-               if retained then do {
-                 O.copy (crate ++ "/retained.ll") (work ++ "/program.ll");
-                 O.copy (crate ++ "/retained-codegen-query.json") report
+               if S.not (S.null native) then do {
+                 let { output = work ++ "/native-report.json" };
+                 nativeArgs <- nativeArguments b work native output;
+                 if retained then do {
+                   O.copy (crate ++ "/retained.ll") (work ++ "/program.ll");
+                   O.copy (crate ++ "/retained-native-report.json") output
+                 } else do {
+                   ignored <- capture b work (S.append [compiler b, "--crate-to-native-llvm", crate ++ "/unit.mlfci"]
+                     nativeArgs) "" (work ++ "/program.ll");
+                   ioReturn ()
+                 };
+                 modes <- J.read output;
+                 inventory <- nativeLinkInventory rows modes;
+                 J.write (work ++ "/native-dependencies.json") inventory;
+                 J.write report (info [(,) "backend" (J.str "native-crate"),
+                   (,) "input_reused" (J.Boolean False), (,) "optimized_reused" (J.Boolean False)])
                } else do {
-                 ignored <- capture b work arguments "" (work ++ "/program.ll");
-                 if explicitReport then ioReturn ()
-                 else O.copy (codegen ++ "/last-query.json") report
+                 case choices of {
+                   Nothing -> ioReturn ();
+                   Just _ -> do {
+                     inventory <- nativeLinkInventory rows emptyNativeReport;
+                     J.write (work ++ "/native-dependencies.json") inventory
+                   }
+                 };
+                 if retained then do {
+                   O.copy (crate ++ "/retained.ll") (work ++ "/program.ll");
+                   O.copy (crate ++ "/retained-codegen-query.json") report
+                 } else do {
+                   ignored <- capture b work arguments "" (work ++ "/program.ll");
+                   if explicitReport then ioReturn ()
+                   else O.copy (codegen ++ "/last-query.json") report
+                 }
                };
                present <- fileExists report;
                O.require present "compiler did not report the LLVM cache query"
@@ -1394,7 +1673,8 @@ module Package.Build where {
           J.set "outer_cached" (J.Boolean reused)
             (J.set "cache_source"
                (J.str (if reused then "emission-artifact"
-                       else if retained then "retained-root" else "codegen-queries"))
+                       else if retained then "retained-root"
+                       else if S.null native then "codegen-queries" else "native-crates"))
                current)
       };
       let {
@@ -1404,8 +1684,20 @@ module Package.Build where {
                ((:) ((,) "query_report" (J.str (artifact ++ "/codegen-query.json")))
                   ((:) ((,) "queries" queries) [])))
       };
-      record b "codegen" row;
-      ioReturn (J.set "codegen" (J.Array ((:) row [])) result)
+      let { reported = case choices of {
+        Nothing -> row;
+        Just _ -> J.set "native_report" (J.str (artifact ++ "/native-dependencies.json")) row
+      } };
+      record b "codegen" reported;
+      case choices of {
+        Nothing -> ioReturn ();
+        Just _ -> do {
+          inventory <- J.read (artifact ++ "/native-dependencies.json");
+          S.mapM_ (S.compose (recordDependencyMode b "link") savedDecision)
+            (J.values (J.get "dependency_modes" inventory))
+        }
+      };
+      ioReturn (J.set "codegen" (J.Array ((:) reported [])) result)
     };
   nativeLLVMObject :: Builder -> String -> IO String;
   nativeLLVMObject b emitted = nativeLLVMObjectWithPgo b emitted J.empty;
@@ -1415,15 +1707,14 @@ module Package.Build where {
       result <- nativeLLVMObjectWithPgoResult b emitted profile;
       ioReturn (artifactPath result)
     };
+  llvmObjectFlags b profile = S.append (O.words "-O2 -Wno-override-module -c")
+    (S.append (J.getStrings "ir-flags" (tools b)) (S.append (objectFlags b) (pgoFlags profile)));
   nativeLLVMObjectWithPgoResult :: Builder -> String -> J.Json -> IO J.Json;
   nativeLLVMObjectWithPgoResult b emitted profile =
     do {
       digest <- fileDigest (emitted ++ "/program.ll");
       let {
-        options =
-          S.append (O.words "-O2 -Wno-override-module -c")
-            (S.append (J.getStrings "ir-flags" (tools b))
-               (S.append (objectFlags b) (pgoFlags profile)))
+        options = llvmObjectFlags b profile
       };
       let {
         inputs =
@@ -1457,6 +1748,29 @@ module Package.Build where {
     };
   linkNativeWithPgoResult :: Builder -> String -> String -> J.Json -> J.Json -> IO J.Json;
   linkNativeWithPgoResult b llvm runtime gc profile =
+    linkNativeObjects b llvm runtime gc profile [];
+  verifyNativeLink b objects = do {
+    let { paths = S.map (J.getText "path" "") objects };
+    O.require (S.length paths == S.length (S.nubBy eqString paths)) "duplicate native library object";
+    S.mapM_ (\row -> do {
+      let { path = J.getText "path" "" row; dir = O.parent path; key = O.base dir };
+      O.require (eqString path (cacheDirectory b ++ ("/" ++ (key ++ "/unit.o"))) &&
+        validDigest (J.str key) && validDigest (J.get "sha256" row) && validDigest (J.get "contract_sha256" row))
+        "invalid native link artifact";
+      valid <- validDependencyFiles (obj2 path (J.get "sha256" row)
+        (dir ++ "/contract.json") (J.get "contract_sha256" row));
+      O.require valid ("native crate library changed before publication: " ++ path)
+    }) objects
+  };
+  linkPackageResult b llvm runtime emitted gc profile = do {
+    inventory <- J.read (emitted ++ "/native-dependencies.json");
+    let { objects = J.values (J.get "objects" inventory) };
+    verifyNativeLink b objects;
+    result <- linkNativeObjects b llvm runtime gc profile objects;
+    verifyNativeLink b objects;
+    ioReturn result
+  };
+  linkNativeObjects b llvm runtime gc profile objects =
     do {
       llvmHash <- fileDigest (llvm ++ "/program.o");
       runtimeHash <- fileDigest (runtime ++ "/runtime.o");
@@ -1491,20 +1805,20 @@ module Package.Build where {
                      ((:) ((,) "runtime-object" (J.str runtimeHash))
                         ((:) ((,) "flags" (J.stringArray (S.append options trailing))) [])))))
       };
+      let { withLibraries = if S.null objects then inputs else J.set "native-crates" (J.Array objects) inputs };
       cachedResult b "native link"
         (pgoInputs profile
            (if J.has "windows" (tools b)
-            then J.set "windows" (J.get "windows" (tools b)) inputs
-            else inputs))
+            then J.set "windows" (J.get "windows" (tools b)) withLibraries
+            else withLibraries))
         (\work ->
            do {
              ignored <-
                capture b work
                  (S.append ((:) (clang b) options)
-                    ((:) (llvm ++ "/program.o")
-                       ((:) (runtime ++ "/runtime.o")
-                          (S.append trailing
-                             ((:) "-o" ((:) (executable b (work ++ "/program")) []))))))
+                    (S.append ((:) (llvm ++ "/program.o") (S.map (J.getText "path" "") objects))
+                       ((:) (runtime ++ "/runtime.o") (S.append trailing
+                          ["-o", executable b (work ++ "/program")]))))
                  ""
                  "";
              present <- fileExists (executable b (work ++ "/program"));
@@ -1533,23 +1847,22 @@ module Package.Build where {
                      (S.maybe [] (\path -> (:) path [])
                         (S.lookup eqString (M.packageName p) built)))
             };
-            compilation <- compileTargetCrateResult b p ("target-" ++ name)
-              (M.crateIdentity p ("target-" ++ name)) entry ms dependencies noPrelude;
+            let { profile = pgoForTarget b p name };
+            compilation <- compilePackageTarget b p ("target-" ++ name)
+              (M.crateIdentity p ("target-" ++ name)) entry ms dependencies noPrelude profile;
             let { crate = artifactPath compilation };
             metadataHash <- fileDigest (crate ++ "/unit.mlfci");
             objectHash <- fileDigest (crate ++ "/unit.mlfco");
             emission <-
-              emitCrateResult b (M.crateIdentity p ("target-" ++ name)) crate metadataHash
-                objectHash;
+              emitPackageCrate b (M.crateIdentity p ("target-" ++ name)) crate metadataHash
+                objectHash profile;
             let {
               emitted = artifactPath emission
             };
-            let {
-              profile = pgoForTarget b p name
-            };
             llvm <- nativeLLVMObjectWithPgo b emitted profile;
             runtime <- runtimeObjectWithPgo b gc profile;
-            linked <- linkNativeWithPgo b llvm runtime gc profile;
+            link <- linkPackageResult b llvm runtime emitted gc profile;
+            let { linked = artifactPath link };
             result <- assembleTargetResult b p name target crate emitted linked profile;
             let {
               artifact = artifactPath result
@@ -1569,6 +1882,7 @@ module Package.Build where {
       objectHash <- fileDigest (crate ++ "/unit.mlfco");
       binaryHash <- fileDigest (executable b (linked ++ "/program"));
       llvmHash <- fileDigest (emitted ++ "/program.ll");
+      nativeInventory <- fileDigest (emitted ++ "/native-dependencies.json");
       let {
         inputs =
           info
@@ -1582,7 +1896,7 @@ module Package.Build where {
       };
       result <-
         cachedCheckedResult b ("executable " ++ (M.packageName p ++ (":" ++ name)))
-          (pgoInputs profile inputs)
+          (pgoInputs profile (J.set "native-dependencies" (J.str nativeInventory) inputs))
           validCrateClosure
           (\work ->
              do {
@@ -1590,6 +1904,7 @@ module Package.Build where {
                O.copy (crate ++ "/unit.mlfco") (work ++ "/unit.mlfco");
                O.copy (crate ++ "/dependency-files.json") (work ++ "/dependency-files.json");
                O.copy (emitted ++ "/program.ll") (work ++ "/program.ll");
+               O.copy (emitted ++ "/native-dependencies.json") (work ++ "/native-dependencies.json");
                O.copy (executable b (linked ++ "/program")) (executable b (work ++ "/program"));
                copyWindowsFiles b work
              });
@@ -2119,6 +2434,10 @@ module Package.Build where {
            }
       else ioReturn ();
       report <- J.read (reportPath b);
+      S.mapM_ (\row -> if J.has "native_report" row then do {
+        saved <- J.read (J.getText "native_report" "" row);
+        verifyNativeLink b (J.values (J.get "objects" saved))
+      } else ioReturn ()) (J.values (J.getOr "codegen" (J.Array []) report));
       S.mapM_
         (\value ->
            do {

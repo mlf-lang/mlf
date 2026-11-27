@@ -7,6 +7,7 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import shutil
 import signal
 import subprocess
@@ -236,6 +237,46 @@ def child_cpu_interval(before, after):
     return result
 
 
+def source_compiler_command(argv):
+    if Path(argv[0]).name not in ('emlf', 'emlf.exe'):
+        return False
+    args = argv[1:]
+    while args:
+        option = str(args[0])
+        if option == '-i':
+            args = args[2:]
+        elif option == '--no-prelude' or (option.startswith('-i') and len(option) > 2):
+            args = args[1:]
+        else:
+            break
+    return (not args or not str(args[0]).startswith('-') or args[0] in
+            ('-', '-o', '--build-dir', '--expr', '--type', '--run', '--compile',
+             '--emit-llvm', '--emit-llvm-gc', '--emit-native-llvm'))
+
+
+def dependency_diagnostics(stderr):
+    """Separate the compiler's structured decisions from program/error diagnostics."""
+    rows = []
+    diagnostics = []
+    for line in stderr.splitlines(keepends=True):
+        match = re.fullmatch(rb'dependency ([^\r\n]+): (native|ir|source|unused) \(([^\r\n]+)\)\n', line)
+        if match:
+            try:
+                name, mode, reason = (field.decode('utf-8') for field in match.groups())
+                # The compiler JSON-escapes the label and the reason on each line.
+                rows.append(dict(dependency=json.loads('"' + name + '"'), mode=mode,
+                                 reason=json.loads('"' + reason + '"')))
+                continue
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                pass
+        diagnostics.append(line)
+    return rows, b''.join(diagnostics)
+
+
+def command_diagnostics(argv, stderr):
+    return dependency_diagnostics(stderr) if source_compiler_command(argv) else ([], stderr)
+
+
 class CommandRunner:
     def __init__(self, root, output, receipt, save):
         self.root, self.output, self.receipt, self.save = root, output, receipt, save
@@ -308,10 +349,17 @@ class CommandRunner:
             entry['exit_code'] = process.returncode
             if entry.get('timed_out'):
                 raise RuntimeError(name + ' exceeded ' + str(timeout) + ' seconds')
-            if process.returncode != status or (expected is not None and stdout != expected) or (status == 0 and stderr):
+            modes, diagnostics = command_diagnostics(command, stderr)
+            if Path(command[0]).name in ('mlfpkg', 'mlfpkg.exe') and '--manifest' in command:
+                modes, diagnostics = dependency_diagnostics(stderr)
+                diagnostics = b''.join(line for line in diagnostics.splitlines(keepends=True)
+                                       if not re.fullmatch(rb'Building [^\r\n]+\n', line))
+            if modes:
+                entry['dependency_modes'] = modes
+            if process.returncode != status or (expected is not None and stdout != expected) or (status == 0 and diagnostics):
                 raise RuntimeError(name + ' failed; see ' + str(self.output / (name + '.stderr')))
             entry['state'] = 'passed'
-            return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+            return subprocess.CompletedProcess(command, process.returncode, stdout, diagnostics)
         except BaseException as error:
             entry['state'] = 'failed'
             entry['error'] = str(error)

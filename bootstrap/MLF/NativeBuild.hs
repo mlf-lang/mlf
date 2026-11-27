@@ -10,6 +10,7 @@ module MLF.NativeBuild (run) where {
   import qualified MLF.PreparedCompiler as Prepared;
   import qualified MLF.PreparedNativeData as Native;
   import qualified Package.Json as J;
+  import qualified Package.DependencyMode as Mode;
   import qualified Package.OS as O;
 
   fatal :: forall a. String -> IO a;
@@ -136,7 +137,7 @@ module MLF.NativeBuild (run) where {
         (,) "compiler" (J.str compiler), (,) "fresh_user_compilation" (J.Boolean True),
         (,) "llvm_jobs" (J.num 1), (,) "commands" (J.array [])] };
       sourceHash <- fileDigest source;
-      result <- Prepared.compileNativeFile selected roots source;
+      result <- Prepared.compileNativeWithDecisions Mode.emit selected roots (Prepared.SourceFile source);
       case result of {
         Left error -> fatal (Core.prettyError error);
         Right compiled -> case Prepared.nativeLink compiled of {
@@ -146,14 +147,19 @@ module MLF.NativeBuild (run) where {
                   count = Prepared.nativeExportCount compiled;
                   inlineCount = Prepared.nativeInlineCount compiled;
                   sourceInputs = Prepared.nativeInputs compiled;
-                  receipt = J.set "installation" installation
+                  runtime = Mode.Decision "runtime" Mode.Native "installed runtime object";
+                  decisions = S.snoc (Prepared.nativeDecisions compiled) runtime;
+                  linkObjects = J.array (S.map (\((,) path digest) -> J.object
+                    [(,) "path" (J.str path), (,) "sha256" (J.str digest)]) objectFiles);
+                  receipt = J.set "dependency_modes" (J.array (S.map Mode.json decisions))
+                    (J.set "link_objects" linkObjects (J.set "installation" installation
                     (J.set "source_sha256" (J.str sourceHash)
                     (J.set "fixed_library_reused" (J.Boolean (eqString fallback "" && count > 0))
                     (J.set "stdlib_path" (J.str (if eqString fallback "" then "installed" else "fallback"))
                     (J.set "native_export_count" (J.num count)
                     (J.set "builtin_inline_count" (J.num inlineCount)
                     (J.set "fixed_runtime_reused" (J.Boolean True)
-                    (J.set "fallback_reason" (J.str fallback) initial))))))) };
+                    (J.set "fallback_reason" (J.str fallback) initial))))))))) };
             -- The compiler already authenticated this exact manifest
             -- and its files. Keep their paths for destination protection; the
             -- bytes are checked again immediately before and after linking.
@@ -162,7 +168,7 @@ module MLF.NativeBuild (run) where {
                   tool = J.get "clang" installation };
             clang <- validateFile ((,) (J.getText "path" "" tool) (J.getText "sha256" "" tool));
             protect output (S.append [source, compiler, Native.manifestPath, clang]
-              (S.append (S.map S.fst sourceInputs) (S.append objects dependencies)));
+              (S.append (S.map S.fst sourceInputs) (S.append (S.map S.fst Native.objectPaths) dependencies)));
             canonicalOutput <- destinationPath output;
             sourceRoots <- S.mapM canonicalPath (J.getStrings "source_roots" installation);
             require (S.not (S.any (\root -> O.starts (root ++ "/") canonicalOutput || eqString root canonicalOutput) sourceRoots))
@@ -190,6 +196,7 @@ module MLF.NativeBuild (run) where {
                   ["-c", build ++ "/program.ll", "-o", build ++ "/program.o"]));
             validateFiles objectFiles;
             validateFiles linkFiles;
+            Mode.emit runtime;
             afterLink <- runPhase build afterLLVM "link"
               (S.append [clang, build ++ "/program.o"]
                 (S.append objects (S.append flags ["-o", build ++ "/program"])));

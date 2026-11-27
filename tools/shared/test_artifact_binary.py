@@ -498,6 +498,9 @@ def main():
         require(manifest['primitive_abi'] == 'mlf-primitive-137-v12' and
                 manifest['builtin_interface'] == 'mlf-primitive/shared-haskell-v1/17',
                 'this finite suite requires the UTF-8 byte-length primitive ABI')
+        lexer = (source / 'libraries/mlf-frontend/Bootstrap/Lexer.hs').read_text()
+        require(re.findall(r'^  primitiveAbi = "([^"]+)"', lexer, re.MULTILINE) == [manifest['primitive_abi']],
+                'package native primitive ABI differs from the source inventory')
         objects = producer.get('object_inputs', {})
         require(objects, 'producer object/interface inventory missing')
         check_objects(); before = closed_tree(producer_dir)

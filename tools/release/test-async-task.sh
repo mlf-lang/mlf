@@ -5,6 +5,7 @@ set -euo pipefail
 test "$#" -eq 2 || { echo 'Usage: test-async-task.sh COMPILER OUTPUT-DIRECTORY' >&2; exit 2; }
 root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 . "$root/tools/testing/native-events.sh"
+. "$root/tools/testing/compiler-diagnostics.sh"
 compiler=$(cd -- "$(dirname -- "$1")" && pwd)/$(basename -- "$1")
 test -x "$compiler"
 mkdir -p -- "$2"
@@ -74,15 +75,16 @@ for kind in opaque-fiber opaque-task opaque-internal-fiber opaque-internal-task 
  run "$kind" "$compiler" "${include_args[@]}" "$fixtures/$kind.emlf" || status=$?
  test "$status" -eq 1 || fail "$kind expected rejection, got $status"
  test ! -s "$work/$kind.stdout" || fail "$kind emitted target"
+ mlf_compiler_diagnostics < "$work/$kind.stderr" > "$work/$kind.diagnostics"
  case $kind in
   opaque-*)
    case $kind in *fiber) constructor=Fiber ;; *) constructor=Task ;; esac
-   grep -F "$constructor" "$work/$kind.stderr" >/dev/null || fail "$kind unrelated rejection"
-   grep -Ei 'unknown|unbound|not (in scope|exported)|undefined|unresolved' "$work/$kind.stderr" >/dev/null || fail "$kind constructor diagnostic absent" ;;
+   grep -F "$constructor" "$work/$kind.diagnostics" >/dev/null || fail "$kind unrelated rejection"
+   grep -Ei 'unknown|unbound|not (in scope|exported)|undefined|unresolved' "$work/$kind.diagnostics" >/dev/null || fail "$kind constructor diagnostic absent" ;;
   mixed-fiber)
-   grep -Ei 'type constructor mismatch|cannot unify|incompatible' "$work/$kind.stderr" >/dev/null || fail "$kind unrelated rejection"
-   grep -F 'String' "$work/$kind.stderr" >/dev/null || fail "$kind missing String diagnostic"
-   grep -F 'Int' "$work/$kind.stderr" >/dev/null || fail "$kind missing Int diagnostic" ;;
+   grep -Ei 'type constructor mismatch|cannot unify|incompatible' "$work/$kind.diagnostics" >/dev/null || fail "$kind unrelated rejection"
+   grep -F 'String' "$work/$kind.diagnostics" >/dev/null || fail "$kind missing String diagnostic"
+   grep -F 'Int' "$work/$kind.diagnostics" >/dev/null || fail "$kind missing Int diagnostic" ;;
  esac
  mlf_case_result pass "$status"
  source_rejections=$((source_rejections + 1))
@@ -131,7 +133,7 @@ for suite in main processes wait-graph guards; do
   oracle_file="$work/$suite.expected"
   grep -Fx "PASS $MLF_ASYNC_CASE" "$fixtures/$oracle" > "$oracle_file" || fail "unknown $suite case"
  fi
- success "$suite.compile" "$compiler" "${args[@]}" "$fixtures/$entry"
+ mlf_source_success "$suite.compile" "$compiler" "${args[@]}" "$fixtures/$entry"
  artifact_files+=("$work/$suite.compile.stdout")
  success "$suite.check" "$compiler" --check "$work/$suite.compile.stdout"
  cmp "$fixtures/$type_oracle" "$work/$suite.check.stdout" || fail "$suite target type"

@@ -1029,5 +1029,7 @@ module Bootstrap.Lexer where {
   frontendSemanticVersion :: String;
   frontendSemanticVersion = "mlf-frontend/shared-haskell-v1/9";
   builtinInterfaceVersion :: String;
-  builtinInterfaceVersion = "mlf-primitive/shared-haskell-v1/17"
+  builtinInterfaceVersion = "mlf-primitive/shared-haskell-v1/17";
+  primitiveAbi :: String;
+  primitiveAbi = "mlf-primitive-137-v12"
 }

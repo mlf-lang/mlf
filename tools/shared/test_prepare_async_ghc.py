@@ -72,6 +72,8 @@ class Preparation(unittest.TestCase):
             stdout = b'wrong\n'
         kwargs['stdout'].write(stdout)
         kwargs['stdout'].flush()
+        if label in ('process-capability', 'completion-capability'):
+            kwargs['stderr'].write(b'dependency Main: source (root input)\n')
         if self.bad == 'stderr' and label == 'process-capability':
             kwargs['stderr'].write(b'diagnostic\n')
         if self.bad == 'timeout':

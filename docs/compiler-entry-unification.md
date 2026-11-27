@@ -77,24 +77,78 @@ drivers are package targets with their own runtime and link requirements.
 [package scheduler](../libraries/mlf-package-core/Package/Scheduler.hs) ·
 [backend driver targets](../bootstrap/mlf-package.json)
 
-## Installed native dependencies
+## Choosing dependency implementations
 
-The installed compiler binds a checked standard-library interface to its export
-slots, constructor layout, ABI, and pinned native objects. The source loader
-honors explicit search roots before installation defaults. For an admitted
-installation, the compiler projects the checked root onto the exact exports it
-uses. It can materialize selected checked builtin definitions in the root and
-reference other exports through the installation's typed ABI. Clang compiles the
-user IR and links the installed library and runtime objects. The build receipt
-records how many native slots and inline builtins the root used. If a source
-override or an incompatible native layout requires closed-program emission,
-`fallback_reason` records the reason and the compiler emits from the checked
-root. A missing or corrupt native installation is a build error.
+For a native executable the builder chooses an implementation for each crate.
+It prefers a compatible native object, then checked xMLF, and compiles source
+when it needs a checked implementation. The program can use several native
+objects and checked IR in the same link. Type checking uses the crate
+interfaces in every case.
 
-The package manifest accepts source packages and checked releases. Each carries
-its own crate identity and export contracts. The compiler installation has its
-own fixed identity. Equal module names or matching source text alone cannot
-authorize substituting its machine code for a package dependency.
+| Choice | Inputs and work |
+| --- | --- |
+| `native` | The builder checks the object digest, compiler and target identity, ABI, constructor layout, and typed exports. Clang links the selected object into the executable. |
+| `ir` | The compiler combines checked implementations from their `.mlfco` objects with the user root before LLVM optimization and machine-code generation. |
+| `source` | The compiler checks source declarations and creates the crate's checked implementation. An eligible source library can also produce a native object for later links. |
 
-[Installed compiler and native ABI](../tools/shared/prepared-build.md) ·
-[package dependencies and checked releases](package-manager.md#local-packages)
+A dependency with no reachable implementation can appear as `unused`; its interface can still participate in checking.
+
+An IR-only dependency remains usable beside a native dependency. A change to a
+library body invalidates its native object even when its interface still allows
+consumers to reuse their checked declarations. Whole-program profile-guided builds select checked IR so the optimizer sees
+the instrumented program. The package release format
+distributes pinned `.mlfci` and `.mlfco` files. The package manager admits
+native objects produced for its own toolchain and target.
+
+Each generic native library exports a typed function that accepts the checked
+values it imports and returns its exports. The root applies that function once
+and shares the result. A native library can therefore use values supplied by
+another native library or by checked IR without generating a second copy of the
+dependency. The ABI fixes the export order and boxed representation. User
+constructor tags derive from qualified names, with collisions checked across
+the full target.
+
+Each decision appears on stderr with the dependency identity, mode and reason.
+For example, `dependency demo/1.0/library: source (compiled package sources)`
+reports preparation of that library. The executable's link decision for the
+same library can subsequently say `native`. The package build report's
+`dependency_modes` rows distinguish the check and link stages. A direct
+`emlf -o` build also saves its decisions in `receipt.json`.
+
+```sh
+./mlfpkg build --target app 2>build.log
+rg '^dependency ' build.log
+jq '.dependency_modes' .mlf-build/build-report.json
+```
+
+The package manager records the native compiler handoff in `native-plan.json`
+and `native-target.json`. A build tool can use the same stage with an
+independently pinned plan:
+
+```sh
+emlf --crate-to-native-llvm "$ROOT_INTERFACE" \
+  --native-dependencies "$PLAN" --native-plan-sha256 "$PLAN_SHA256" \
+  --native-target "$TARGET" --native-report "$REPORT" >program.ll
+```
+
+The plan binds the target, dependency interfaces, typed contract, and machine
+object digests. An optional checked implementation has its own path and digest.
+A selected native dependency can link with its `.mlfco` absent. If the object is
+unusable, the compiler loads a pinned checked fallback on demand or identifies
+the reachable dependency that lacks an implementation. The report lists the
+objects to pass to the native linker.
+
+The interpreter and standalone xMLF or LLVM output require a closed program.
+These commands select checked IR and source implementations. They print their
+result on stdout, so a command such as `emlf Main.emlf >main.xmlf` can be used
+without filtering compiler diagnostics.
+
+The installed compiler additionally knows its fixed standard library and
+runtime. Source search roots take precedence over installation defaults. When
+the library object is missing or incompatible, the compiler can compose its
+checked IR or compile available source. Creating the executable still requires
+the authenticated runtime and native toolchain.
+
+[Native crate ABI](../libraries/mlf-llvm/Bootstrap/LLVM/Library.hs) ·
+[package artifact admission](../libraries/mlf-package-core/Package/NativeArtifact.hs) ·
+[installed compiler](../tools/shared/prepared-build.md)

@@ -78,6 +78,7 @@
         "MLF.PreparedCompiler": "bootstrap/MLF/PreparedCompiler.hs",
         "MLF.PreparedLibraryData": "bootstrap/MLF/PreparedLibraryData.hs",
         "MLF.PreparedNativeData": "bootstrap/MLF/PreparedNativeData.hs",
+        "MLF.CrateNativeCommand": "bootstrap/MLF/CrateNativeCommand.hs",
         "MLF.NativeBuild": "bootstrap/MLF/NativeBuild.hs"
       }
     },

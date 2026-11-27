@@ -16,6 +16,8 @@ checkout="$scratch/checkout with spaces"
 mkdir -p "$scratch/bin" "$checkout/tools/release" "$checkout/bootstrap" "$checkout/tests/Tests" "$checkout/tests/pr-smoke" \
   "$checkout/libraries/mlf-foundation/Bootstrap" "$checkout/libraries/mlf-frontend/Bootstrap"
 cp "$scripts/source-smoke.sh" "$checkout/tools/release/"
+mkdir -p "$checkout/tools/testing"
+cp "$scripts/../testing/compiler-diagnostics.sh" "$checkout/tools/testing/"
 for source in bootstrap/Fake.emlf libraries/mlf-foundation/Bootstrap/Types.emlf libraries/mlf-frontend/Bootstrap/Compiler.emlf \
   libraries/mlf-foundation/mlf-package.json libraries/mlf-frontend/mlf-package.json \
   tests/PRQuickMain.emlf tests/Tests/IndependentCheck.emlf tests/Tests/IndependentType.emlf tests/pr-smoke/fixture; do
@@ -113,6 +115,7 @@ done
 printf 'target\n' > "$output/polymorphic-let.xmlf"
 printf 'target\n' > "$output/impredicative-self-application.xmlf"
 printf 'Completed all five current-source cases\n' > "$output/progress.log"
+printf '%s\n' 'dependency Main: source (root input)' >&2
 cat "$output/expected.log"
 SH
 chmod +x "$scratch/bin/"*

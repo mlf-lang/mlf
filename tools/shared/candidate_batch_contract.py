@@ -45,14 +45,19 @@ def parse(raw,direction):
     require(offset==len(raw),'unconsumed bytes')
     return rows
 
+def clean_batch_stderr(lane, argv, stderr):
+    from test_direct import command_diagnostics
+    return not (command_diagnostics(argv, stderr)[1] if lane == 'interpreter' else stderr)
+
+
 def physical_record(command_id,lane,direction,argv,stdout,stderr,exit_code):
     require(type(command_id)is str and bool(command_id),'physical identity')
     require(lane in ('host','interpreter'),'physical lane')
     require(type(argv)is list and bool(argv) and all(type(a)is str for a in argv),'physical argv')
-    require(type(exit_code)is int and exit_code==0 and stderr==b'','physical success')
+    require(type(exit_code)is int and exit_code==0 and clean_batch_stderr(lane, argv, stderr),'physical success')
     return dict(id=command_id,lane=lane,direction=direction,argv=argv,
         exit_code=exit_code,stdout_sha256=digest(stdout),stdout_bytes=len(stdout),
-        stderr_sha256=digest(stderr),vectors=parse(stdout,direction),scope=SCOPE)
+        stderr_sha256=digest(stderr), stderr=stderr.decode('utf-8'),vectors=parse(stdout,direction),scope=SCOPE)
 
 def project(record,stdout,index,original_argv,original_expected):
     require(record['stdout_sha256']==digest(stdout),'capture identity')
@@ -79,7 +84,8 @@ def aggregate(physical,projections):
         expected=b''.join(('%d\n%d\n'%(BEGIN,i)).encode()+cases()[i]['expected']+
             ('%d\n'%END).encode() for i in order_for(p['direction']))
         require(type(p['exit_code'])is int and p['exit_code']==0 and
-            p['stderr_sha256']==digest(b'') and p['stdout_sha256']==digest(expected) and
+            clean_batch_stderr(p['lane'], p['argv'], p['stderr'].encode()) and
+            p['stderr_sha256']==digest(p['stderr'].encode()) and p['stdout_sha256']==digest(expected) and
             type(p['stdout_bytes'])is int and p['stdout_bytes']==len(expected) and
             p['vectors']==parse(expected,p['direction']),'physical capture ledger')
     for row in projections:

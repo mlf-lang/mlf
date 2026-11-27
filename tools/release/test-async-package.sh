@@ -5,6 +5,7 @@ set -euo pipefail
 test "$#" -eq 3 || { echo 'Usage: test-async-package.sh COMPILER MANAGER OUTPUT-DIRECTORY' >&2; exit 2; }
 root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 . "$root/tools/testing/native-events.sh"
+. "$root/tools/testing/compiler-diagnostics.sh"
 compiler=$(cd -- "$(dirname -- "$1")" && pwd)/$(basename -- "$1")
 manager=$(cd -- "$(dirname -- "$2")" && pwd)/$(basename -- "$2")
 runner="$(dirname -- "$manager")/mlf-build-runner"
@@ -70,14 +71,14 @@ record_inputs() {
  while IFS= read -r file; do
   jq --arg path "$file" --arg hash "$(sha256 "$base/$file")" '. + {($path):$hash}' "$destination" > "$destination.tmp"
   mv "$destination.tmp" "$destination"
- done < <(cd "$base"; find libraries/mlf-foundation libraries/mlf-async runtime tests/async-package tools/release/test-async-package.sh tools/testing/native-events.sh -type f | LC_ALL=C sort)
+ done < <(cd "$base"; find libraries/mlf-foundation libraries/mlf-async runtime tests/async-package tools/release/test-async-package.sh tools/testing/native-events.sh tools/testing/compiler-diagnostics.sh -type f | LC_ALL=C sort)
 }
 record_inputs "$root" "$work/inputs.json"
 cp -R "$root/libraries/mlf-foundation" "$root/libraries/mlf-async" "$source/libraries/"
 cp -R "$root/runtime" "$source/runtime"
 cp -R "$root/tests/async-package" "$source/tests/async-package"
 cp "$root/tools/release/test-async-package.sh" "$source/tools/release/"
-cp "$root/tools/testing/native-events.sh" "$source/tools/testing/"
+cp "$root/tools/testing/native-events.sh" "$root/tools/testing/compiler-diagnostics.sh" "$source/tools/testing/"
 record_inputs "$source" "$work/snapshot.json"
 cmp "$work/inputs.json" "$work/snapshot.json" || fail 'source changed while copying'
 compiler_hash=$(sha256 "$compiler")
@@ -117,15 +118,16 @@ for kind in opaque-fiber opaque-task opaque-internal-fiber opaque-internal-task 
  test "$status" -eq 1 || fail "$kind expected rejection 1, got $status"
  test ! -e "$work/build/bin/$kind" || fail "$kind published a rejected executable"
  cp "$work/build/build-report.json" "$work/$kind.build-report.json"
+ mlf_compiler_diagnostics < "$work/$kind.stderr" > "$work/$kind.diagnostics"
  case $kind in
   mixed-fiber)
-   grep -Ei 'type constructor mismatch|cannot unify|incompatible' "$work/$kind.stderr" >/dev/null || fail "$kind unrelated rejection"
-   grep -F 'String' "$work/$kind.stderr" >/dev/null || fail "$kind lacks String diagnostic"
-   grep -F 'Int' "$work/$kind.stderr" >/dev/null || fail "$kind lacks Int diagnostic" ;;
+   grep -Ei 'type constructor mismatch|cannot unify|incompatible' "$work/$kind.diagnostics" >/dev/null || fail "$kind unrelated rejection"
+   grep -F 'String' "$work/$kind.diagnostics" >/dev/null || fail "$kind lacks String diagnostic"
+   grep -F 'Int' "$work/$kind.diagnostics" >/dev/null || fail "$kind lacks Int diagnostic" ;;
   *)
    case $kind in *fiber) constructor=Fiber ;; *task) constructor=Task ;; *handle) constructor=ProcessHandle ;; *scope) constructor=ProcessScope ;; esac
-   grep -F "$constructor" "$work/$kind.stderr" >/dev/null || fail "$kind unrelated rejection"
-   grep -Ei 'unknown|unbound|not (in scope|exported)|undefined|unresolved' "$work/$kind.stderr" >/dev/null || fail "$kind missing inaccessible-constructor diagnostic" ;;
+   grep -F "$constructor" "$work/$kind.diagnostics" >/dev/null || fail "$kind unrelated rejection"
+   grep -Ei 'unknown|unbound|not (in scope|exported)|undefined|unresolved' "$work/$kind.diagnostics" >/dev/null || fail "$kind missing inaccessible-constructor diagnostic" ;;
  esac
  # Require the rejection to have consumed the already-compiled async library.
  jq -e '.complete == false and any(.builds[]; (.kind | startswith("crate mlf-async/")) and .cached == true)' "$work/$kind.build-report.json" >/dev/null || fail "$kind did not validate cached package interface"

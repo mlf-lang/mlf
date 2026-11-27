@@ -3670,13 +3670,18 @@ module Bootstrap.CrateArtifact where {
     (Map String CrateInterface) (Map String CrateObject)
     (Map String EnvelopeLinkArtifact)
     (Map String ((,) String ((,,,) Int Int Int Int)));
-  envelopePrepareKnownObjects objects roots checkLegacyInterfaces = do {
-    uniqueNames "object identity" (map (\object -> crateId (objectInterface object)) objects);
-    let { interfaces = map objectInterface objects;
+  envelopePrepareKnownObjects = envelopePrepareObjectInputs [];
+  -- Machine-code providers contribute checked interface metadata, never a
+  -- synthetic checked object. Every IR object keeps its own admission ledger.
+  envelopePrepareObjectInputs external objects roots checkLegacyInterfaces = do {
+    let { interfaces = append external (map objectInterface objects);
           byName = interfaceMap interfaces;
           objectMap = M.fromList compareString (map (\object -> (,) (crateId (objectInterface object)) object) objects) };
+    uniqueNames "object identity" (map crateId interfaces);
     ordered <- dependencyClosure byName [] [] roots;
-    initial <- envelopeCollectLinkAdmissions objectMap ordered M.empty;
+    let { actual = if null external then ordered
+            else filter (\iface -> M.member compareString (crateId iface) objectMap) ordered };
+    initial <- envelopeCollectLinkAdmissions objectMap actual M.empty;
     _ <- if checkLegacyInterfaces then traverseEither (\iface ->
       if M.member compareString (crateId iface) initial then Right () else validateInterface iface) ordered
       else Right [];
@@ -3881,22 +3886,37 @@ module Bootstrap.CrateArtifact where {
     (ByteArray -> CrateInterface -> IO (Either String CrateObject)) ->
     String -> CrateInterface -> IO (Either String CrateObject);
   readObjectWithOpenReader = readObjectWithOpenReaderProfiled Nothing;
+  decodeObjectWithOpenReader profile openReader iface bytes = do {
+    open <- Open.packageFamily bytes;
+    recognized <- envelopeHasFamily bytes;
+    if open then openReader bytes iface
+    else if recognized then envelopeDecode crateEnvelopeLimits iface bytes else do {
+      input <- Host.phaseIO profile "decode_ms" (Storage.decode 4 bytes);
+      ioReturn (bindEither input (\decoded -> case decoded of {
+        Storage.LegacyText text -> decodeObject iface text;
+        Storage.BinaryInput graph -> decodeBinaryObject iface graph
+      }))
+    }
+  };
+  -- Hash and decode the same bytes even when the caller pins a fallback at a
+  -- path other than the usual .mlfco adjacent to its interface.
+  readPinnedObjectWithInterfaces interfaces path digest iface = do {
+    raw <- Storage.readRaw path;
+    case raw of {
+      Left message -> ioReturn (Left message);
+      Right bytes -> do {
+        actual <- byteArrayDigest bytes;
+        if not (eqString actual digest) then ioReturn (Left ("checked object SHA-256 mismatch: " ++ path))
+        else decodeObjectWithOpenReader Nothing (\input expected -> decodeOpenObject input expected
+          (openInterfaceDependencies interfaces expected)) iface bytes
+      }
+    }
+  };
   readObjectWithOpenReaderProfiled profile openReader path iface = Host.phaseIO profile "validate_ms" (do {
     raw <- Host.phaseIO profile "read_ms" (Storage.readRaw path);
     result <- case raw of {
       Left message -> ioReturn (Left message);
-      Right bytes -> do {
-        open <- Open.packageFamily bytes;
-        recognized <- envelopeHasFamily bytes;
-        if open then openReader bytes iface
-        else if recognized then envelopeDecode crateEnvelopeLimits iface bytes else do {
-          input <- Host.phaseIO profile "decode_ms" (Storage.decode 4 bytes);
-          ioReturn (bindEither input (\decoded -> case decoded of {
-            Storage.LegacyText text -> decodeObject iface text;
-            Storage.BinaryInput graph -> decodeBinaryObject iface graph
-          }))
-        }
-      }
+      Right bytes -> decodeObjectWithOpenReader profile openReader iface bytes
     };
     ioReturn (mapLeft (\message -> path ++ ": " ++ message) result)
   });

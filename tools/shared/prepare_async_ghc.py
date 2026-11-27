@@ -67,7 +67,8 @@ def prepare(root, output, clang, optimization="0"):
         save()
         if result.returncode != 0:
             raise RuntimeError(label + ' failed; see ' + str(stderr))
-        if expected is not None and (stdout.read_bytes() != expected or stderr.stat().st_size):
+        diagnostics = auth.command_diagnostics(argv, stderr.read_bytes())[1] if expected is not None else b''
+        if expected is not None and (stdout.read_bytes() != expected or diagnostics):
             raise ValueError(label + ' capability or identity mismatch')
 
     run('build', [sys.executable, '-B', root / 'tools/shared/build.py', '--bootstrap-only',

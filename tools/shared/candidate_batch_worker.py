@@ -136,9 +136,12 @@ def execute():
                     row['cleanup_delegated_to_supervisor']=True
                     raise
                 row['exit_code']=process.returncode
-                require(process.returncode==status and (expected is None or stdout==expected) and (status!=0 or not stderr),'physical command failed: '+name)
+                modes, diagnostics = direct.command_diagnostics(argv, stderr)
+                if modes:
+                    row['dependency_modes'] = modes
+                require(process.returncode==status and (expected is None or stdout==expected) and (status!=0 or not diagnostics),'physical command failed: '+name)
                 row['state']='passed'
-                return subprocess.CompletedProcess(argv,process.returncode,stdout,stderr),row
+                return subprocess.CompletedProcess(argv,process.returncode,stdout,diagnostics),row
             except BaseException as error:
                 row.update(state='failed',error=repr(error)); raise
             finally:
@@ -174,9 +177,9 @@ def execute():
                     for artifact in (source,obj,hi,binary):
                         require(digest(artifact.read_bytes())==generated[str(artifact)],'batch artifact drift after target')
                     stdout=Path(row['stdout_path']).read_bytes();stderr=Path(row['stderr_path']).read_bytes()
-                    require(stdout==result.stdout and stderr==result.stderr,'actual capture identity')
+                    require(stdout==result.stdout and direct.command_diagnostics(row['argv'],stderr)[1]==result.stderr,'actual capture identity')
                     physical=contract.physical_record(row['id'],lane,direction,row['argv'],stdout,stderr,result.returncode)
-                    state['batch_commands'].append(physical);batch_results[physical['id']]=(physical,stdout,stderr)
+                    state['batch_commands'].append(physical);batch_results[physical['id']]=(physical,stdout,result.stderr)
                     for index in contract.FORWARD:
                         original_argv=[str(build/'bin/emlf'),'-i',str(self.root/'libraries/mlf-foundation'),
                             '--run',str(HERE/'fixtures/CandidateSelection.hs'),'--',*contract.cases()[index]['arguments']]

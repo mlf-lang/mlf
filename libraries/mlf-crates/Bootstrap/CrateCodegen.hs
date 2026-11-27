@@ -11,6 +11,25 @@ module Bootstrap.CrateCodegen where {
   import qualified Bootstrap.CrateArtifact as Artifact;
   import qualified Bootstrap.CrateQuery as Query;
   import qualified Bootstrap.Separate as Separate;
+  import qualified Bootstrap.Map as M;
+
+  -- The producer checks its own implementation. Foreign factory arguments
+  -- and their data layouts need only the authenticated dependency interfaces.
+  loadNativeFile :: String -> IO (Either String ((,) ([] ((,) String Artifact.CrateInterface)) Artifact.CrateObject));
+  loadNativeFile path = do {
+    loaded <- Artifact.loadInterfaces [path];
+    case loaded of {
+      Left message -> ioReturn (Left message);
+      Right rows -> case reverse rows of {
+        [] -> ioReturn (Left "no root crate metadata");
+        (:) root _ -> do {
+          let { headers = map snd rows };
+          result <- Artifact.readClosureObject Nothing M.empty headers root;
+          ioReturn (mapEither ((,) rows) result)
+        }
+      }
+    }
+  };
   -- Both queries start from a checked linked program. The first erases types;
   -- the second observes the existing whole-program optimizer's result. No
   -- function-level optimization facts are replayed across unrelated programs.

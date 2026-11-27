@@ -15,6 +15,7 @@ import shlex
 import sys
 from build import DEMAND_FLAGS, EXHAUSTIVENESS_FLAGS, PACKAGES
 from test_direct import CommandRunner, authenticate_build, sha
+from package_dependency_cli import check_package_dependencies
 from source_root_cli import check_source_root, check_installed_root
 from test_native_string_index import local_c_closure, resolve_tool
 from header_validation_adapter import (input_paths as header_validation_inputs,
@@ -58,6 +59,7 @@ HOST_FIXTURES = {
 }
 FRONTEND_CASE = 'installed-frontend-controls'
 SOURCE_CLI = 'source-root-cli'
+PACKAGE_CLI = 'package-dependency-cli'
 INSTALLED_CLI = 'installed-root-cli'
 PREFIX = 'mlf_fixed_' + 'a' * 64
 FRONTEND_FIXTURE = ROOT / 'tools/experimental/prepared-libraries/NativeFrontendControls.hs'
@@ -82,7 +84,7 @@ def verify_root_shape(source, count):
 
 
 def case_inventory(installed):
-    frontend = (FRONTEND_CASE, INSTALLED_CLI) if installed else (SOURCE_CLI,)
+    frontend = (FRONTEND_CASE, INSTALLED_CLI) if installed else (SOURCE_CLI, PACKAGE_CLI)
     return frontend + tuple(HOST_FIXTURES) + NATIVE_CASES
 
 
@@ -126,7 +128,7 @@ def main():
     output.mkdir(parents=True, exist_ok=False)
     record = {'format': 1, 'complete': False, 'status': 'running',
               'scope': 'checked-fixed-native-library', 'compiler_modules_rebuilt': False,
-              'native_execution': native_selected or selection == INSTALLED_CLI, 'full_corpus_qualification': False,
+              'native_execution': native_selected or selection in (INSTALLED_CLI, PACKAGE_CLI), 'full_corpus_qualification': False,
               'performance_assertions': False, 'native_toolchain_closure_complete': False,
               'installed_frontend_controls_requested': args.frontend_source_root is not None,
               'framework_selection': selection, 'framework_plan': [selection] if selection else list(inventory),
@@ -188,10 +190,12 @@ def main():
                  *sorted((gc / 'include').rglob('*.h'))]
         paths.append(ROOT / 'tools/testing/receipt_selection.py')
         paths.extend(ROOT / 'tools/shared' / name for name in (
-            'source_root_cli.py', 'query_generation.py', 'artifact_binary_reference.py',
+            'source_root_cli.py', 'package_dependency_cli.py', 'query_generation.py', 'artifact_binary_reference.py',
             'artifact_binary_typed.py', 'artifact_structure_contract.json'))
         if args.frontend_source_root is not None:
             paths.append(FRONTEND_FIXTURE)
+        if not installed and wants(PACKAGE_CLI):
+            paths.extend(local_c_closure(ROOT / 'runtime/mlf_build_runner.c'))
         inputs = {str(p.resolve(strict=True)): sha(p) for p in paths}
         record.update(producer_receipt=str(receipt), producer_receipt_sha256=sha(receipt),
                       optimization=producer['optimization'], inputs=inputs, object_inputs=objects)
@@ -286,6 +290,12 @@ def main():
             check_cli = check_installed_root if installed else check_source_root
             check_cli(cli_runner, producer_dir / 'bin/emlf')
             passed(cli_case, native=installed)
+        if not installed and wants(PACKAGE_CLI):
+            cli_root = output / PACKAGE_CLI
+            cli_root.mkdir()
+            check_package_dependencies(CommandRunner(cli_root, output, record, save),
+                                       producer_dir / 'bin', ROOT, clang, gc)
+            passed(PACKAGE_CLI, native=True)
         if wants('checked-boundary-controls'):
             runner.run('checked-boundary-controls', [executables['NativeBoundaryTests']],
                        expected=BOUNDARY_OUTPUT, timeout=120)

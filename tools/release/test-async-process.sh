@@ -5,6 +5,7 @@ set -euo pipefail
 test "$#" -eq 2 || { printf '%s\n' 'Usage: test-async-process.sh COMPILER OUTPUT-DIRECTORY' >&2; exit 2; }
 root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 . "$root/tools/testing/native-events.sh"
+. "$root/tools/testing/compiler-diagnostics.sh"
 compiler=$(cd -- "$(dirname -- "$1")" && pwd)/$(basename -- "$1")
 test -x "$compiler" || { printf '%s\n' 'Candidate compiler is not executable.' >&2; exit 2; }
 mkdir -p -- "$2"
@@ -93,9 +94,10 @@ for kind in handle scope; do
   run "$label" "$compiler" "${include_args[@]}" "$fixtures/$label.emlf" || status=$?
   test "$status" -eq 1 || fail "$label returned $status, expected source rejection 1"
   test ! -s "$work/$label.stdout" || fail "$label produced a target"
+  mlf_compiler_diagnostics < "$work/$label.stderr" > "$work/$label.diagnostics"
   if [ "$kind" = handle ]; then constructor=ProcessHandle; else constructor=ProcessScope; fi
-  grep -F "$constructor" "$work/$label.stderr" >/dev/null || fail "$label rejected for an unrelated reason"
-  grep -Ei 'unknown|unbound|not (in scope|exported)|undefined|unresolved' "$work/$label.stderr" >/dev/null || fail "$label did not report inaccessible constructor"
+  grep -F "$constructor" "$work/$label.diagnostics" >/dev/null || fail "$label rejected for an unrelated reason"
+  grep -Ei 'unknown|unbound|not (in scope|exported)|undefined|unresolved' "$work/$label.diagnostics" >/dev/null || fail "$label did not report inaccessible constructor"
   mlf_case_result pass "$status"
   printf 'PASS opaque %s constructor\n' "$kind"
 done
@@ -134,7 +136,7 @@ if [ -n "$wanted" ]; then
   oracle_file="$work/suite.expected"
   grep -Fx "PASS $MLF_ASYNC_CASE" "$fixtures/suite.stdout" > "$oracle_file" || fail 'unknown process case'
 fi
-success compile "$compiler" "${include_args[@]}" "$fixtures/Main.emlf"
+mlf_source_success compile "$compiler" "${include_args[@]}" "$fixtures/Main.emlf"
 success check "$compiler" --check "$work/compile.stdout"
 cmp "$fixtures/io-unit.type" "$work/check.stdout" || fail 'checked target does not have type IO Unit'
 if "$emit_llvm"; then
@@ -174,7 +176,7 @@ esac
 # cleanup and native fail() cleanup are independent paths, so execute both.
 case "$wanted" in ''|async-process/panic-cleanup/*)
 export MLF_ASYNC_FIXTURE="$work/fixture"
-success panic.compile "$compiler" "${include_args[@]}" "$fixtures/Panic.emlf"
+mlf_source_success panic.compile "$compiler" "${include_args[@]}" "$fixtures/Panic.emlf"
 success panic.check "$compiler" --check "$work/panic.compile.stdout"
 cmp "$fixtures/io-unit.type" "$work/panic.check.stdout" || fail 'panic target does not have type IO Unit'
 if "$emit_llvm"; then

@@ -211,7 +211,12 @@ if [ -e "$build/timed-out.log" ]; then
   exit 1
 fi
 test "$status" -eq 0
-test ! -s "$build/tests.stderr.log"
+if [ "$mode" = interpreted-checkout-source ]; then
+  . "$PWD/tools/testing/compiler-diagnostics.sh"
+  mlf_compiler_diagnostics < "$build/tests.stderr.log" | cmp /dev/null -
+else
+  test ! -s "$build/tests.stderr.log"
+fi
 cmp "$build/expected.log" "$build/tests.log"
 test -s "$build/polymorphic-let.xmlf"
 test -s "$build/impredicative-self-application.xmlf"

@@ -5,11 +5,27 @@ import json
 from artifact_binary_reference import read_document
 from artifact_binary_typed import unpack
 from query_generation import Generation, digest
+from test_direct import dependency_diagnostics, sha
 
 
 def require(condition, message):
     if not condition:
         raise ValueError(message)
+
+
+def modes(runner, name):
+    raw = (runner.output / (name + '.stderr')).read_bytes()
+    decisions, diagnostics = dependency_diagnostics(raw)
+    require(decisions and not diagnostics, name + ' must write only dependency decisions to stderr')
+    return decisions
+
+
+def require_source(runner, name, *dependencies):
+    rows = modes(runner, name)
+    sources = {row['dependency'] for row in rows if row['mode'] == 'source'}
+    require(set(dependencies) <= sources and any(row['reason'] == 'root input' for row in rows),
+            name + ' omitted the source input or a compiled dependency')
+    return rows
 
 
 def published_queries(cache):
@@ -91,9 +107,15 @@ def check_source_root(runner, compiler):
     unusable.write_text('not a cache directory\n')
     no_storage = {'MLF_SOURCE_CACHE_DIR': str(unusable)}
 
+    runner.run('literal-type', [compiler, '--no-prelude', '--type', '--expr', '5'],
+               overrides=no_storage, expected=b'Int\n')
+    literal = require_source(runner, 'literal-type')
+    require(len(literal) == 1, 'a primitive expression should report its single source root')
     runner.run('expr-run', [*argv, '--run', '--expr', source], overrides=no_storage, expected=b'42\n')
     runner.run('stdin-type', [*argv, '--type'], stdin=source.encode(), overrides=no_storage, expected=b'IO ()\n')
     runner.run('stdin-run', [*argv, '--run', '-'], stdin=source.encode(), overrides=no_storage, expected=b'42\n')
+    for name in ('expr-run', 'stdin-type', 'stdin-run'):
+        require_source(runner, name, 'Even', 'Odd')
     default_build = work / '.mlf-build'
     require(not default_build.exists(), 'expression or stdin created a default cache')
     # An inaccessible implicit cache must still allow checking a read-only project.
@@ -107,8 +129,14 @@ def check_source_root(runner, compiler):
 
     target = work / 'root.xmlf'
     target.write_bytes(file_run('file-target', [entry]).stdout)
+    require_source(runner, 'file-target', 'Even', 'Odd')
     runner.run('check-target', [compiler, '--check', target], expected=b'IO ()\n')
     runner.run('run-target', [compiler, '--run-xmlf', target], expected=b'42\n')
+    llvm = file_run('file-llvm', ['--emit-llvm', entry]).stdout
+    require_source(runner, 'file-llvm', 'Even', 'Odd')
+    require(b'define i32 @main(' in llvm and b'dependency ' not in llvm, 'expected standalone LLVM on stdout')
+    file_run('file-llvm-warm', ['--emit-llvm-gc', entry], expected=llvm)
+    require_source(runner, 'file-llvm-warm', 'Even', 'Odd')
     cold = published_queries(cache)
     require(cold and any(cache.rglob('*.mlfqr')), 'file root did not publish checked queries')
     file_run('file-warm', ['--run', entry], expected=b'42\n')
@@ -116,6 +144,8 @@ def check_source_root(runner, compiler):
 
     odd.write_text(odd_source.replace('then false', 'then true'))
     file_run('dependency-changed', ['--run', entry], expected=b'7\n')
+    require(file_run('dependency-changed-llvm', ['--emit-llvm', entry]).stdout != llvm,
+            'editing an imported function reused obsolete LLVM')
     changed = published_queries(cache)
     require(changed != cold, 'editing an imported definition reused the old generation')
 
@@ -139,14 +169,36 @@ def check_installed_root(runner, compiler):
     entry = work / 'NativeMain.emlf'
     # Bootstrap.Std.length crosses the installed object boundary. A local-only
     # program could return the same value after entirely bypassing that object.
-    entry.write_text('import qualified Bootstrap.Std as S\n'
-                     'main = printInt (S.length ((:) 3 ((:) 4 [])))\n')
+    (work / 'Local.emlf').write_text('module Local (items) where\nitems = (:) 3 ((:) 4 [])\n')
+    entry.write_text('module Main where\nimport qualified Bootstrap.Std as S\nimport qualified Local\n'
+                     'main = printInt (S.length Local.items)\n')
     executable = work / 'native-main'
     receipt = work / 'native-build/receipt.json'
-    runner.run('build-installed-file', [compiler, entry, '-o', executable, '--build-dir', 'native-build'],
+    installation = json.loads(runner.run('installed-info', [compiler, '--native-install-info']).stdout)
+    argv = [compiler, '-i', work]
+    includes = [arg for path in installation['source_roots'] for arg in ('-i', path)]
+    checked = runner.run('installed-standalone-llvm', [*argv, *includes, '--emit-llvm', entry]).stdout
+    checked_rows = require_source(runner, 'installed-standalone-llvm', 'Main', 'Local')
+    require(b'define i32 @main(' in checked and b'dependency ' not in checked,
+            'standalone LLVM includes invalid text or has no entry')
+    runner.run('build-installed-file', [*argv, entry, '-o', executable, '--build-dir', 'native-build'],
                overrides={'MLF_SOURCE_CACHE_DIR': ''}, expected=(str(receipt) + '\n').encode())
     runner.run('execute-installed-file', [executable], expected=b'2\n')
     report = json.loads(receipt.read_text())
+    selected = require_source(runner, 'build-installed-file', 'Main', 'Local')
+    require(selected == report.get('dependency_modes'), 'stderr disagrees with the executable receipt')
+    runner.run('installed-native-llvm', [*argv, '--emit-native-llvm', entry],
+               expected=(receipt.parent / 'program.ll').read_bytes())
+    emitted = require_source(runner, 'installed-native-llvm', 'Main', 'Local')
+    require(emitted == [row for row in selected if row['dependency'] != 'runtime'],
+            'native LLVM and executable compilation selected different dependencies')
+    owners = {row['dependency'] for row in selected if row['mode'] == 'native' and row['dependency'] != 'runtime'}
+    require(owners and owners <= {row['dependency'] for row in checked_rows if row['mode'] == 'ir'},
+            'standalone IR and native linking did not consume the same installed dependencies')
+    linked = report['link_objects']
+    link = next(row for row in report['commands'] if row['phase'] == 'link')['command']
+    require(len(linked) >= 2 and all(row['path'] in link and sha(row['path']) == row['sha256'] for row in linked),
+            'link did not receive both the recorded native library object and runtime')
     require(report.get('complete') and report.get('fixed_library_reused')
             and report.get('native_export_count', 0) > 0 and report.get('stdlib_path') == 'installed',
             'executable did not use checked exports from the installed library')
@@ -154,6 +206,22 @@ def check_installed_root(runner, compiler):
             'executable preparation skipped file-root query publication')
     require(not list(work.rglob('*.mlfci')) and not list(work.rglob('*.mlfco')),
             'direct executable compilation published package crate artifacts')
+
+    # An explicit local module with the same public name has different semantics.
+    override = work / 'override'
+    (override / 'Bootstrap').mkdir(parents=True)
+    (override / 'Bootstrap/Std.emlf').write_text('module Bootstrap.Std (length) where\nlength xs = 19\n')
+    shadow_exe = work / 'shadowed-main'
+    shadow_receipt = work / 'shadow-build/receipt.json'
+    runner.run('build-shadowed-source', [compiler, '-i', override, '-i', work, entry, '-o', shadow_exe,
+                                        '--build-dir', 'shadow-build'],
+               expected=(str(shadow_receipt) + '\n').encode())
+    shadow = json.loads(shadow_receipt.read_text())
+    shadow_rows = require_source(runner, 'build-shadowed-source', 'Main', 'Local', 'Bootstrap.Std')
+    require(shadow_rows == shadow['dependency_modes'] and not shadow['fixed_library_reused']
+            and len(shadow['link_objects']) == 1 and shadow['link_objects'][0] in linked,
+            'the shadowed standard-library object still entered the native link')
+    runner.run('execute-shadowed-source', [shadow_exe], expected=b'19\n')
 
     # Missing imported sources attempt the ordinary fallback and keep their
     # module-resolution diagnostic. Malformed source fails before admission.

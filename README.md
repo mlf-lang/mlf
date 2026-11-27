@@ -33,7 +33,10 @@ to interpret an IO program. A file can import modules without a package manifest
 For an expression, try `emlf --type --expr '42'`.
 
 In a package, use `mlfpkg build` or `mlfpkg build --target NAME`. The package
-manager schedules the declared dependencies and reuses checked artifacts.
+manager prefers compatible native objects for executable links, reuses
+checked IR when needed, and compiles sources when a checked implementation is
+missing. It reports each dependency's choice and reason on stderr. The same
+decisions appear in the build report under `dependency_modes`.
 For an intermediate result, `emlf Main.emlf` writes checked xMLF and
 `emlf --emit-llvm Main.emlf` writes LLVM IR. `emlf --help tools` lists the
 stage commands available to build tools. See [compiler roots and

@@ -3,11 +3,11 @@
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
 module MLF.PreparedCompiler
-  (Source(..), readSource, Compilation, compileSource, compileFileWithPrelude, compileSourceWithImports,
+  (Source(..), readSource, Compilation, compileSource, compileSourceWithDecisions, compileFileWithPrelude, compileSourceWithImports,
    checkedTerm, compiledTerm, sourceType, reused, dictionaryIdentities, verifyBuiltin, verifyBuiltinImages, installCompilerPrelude, cratePrelude, linkCrateFile, linkCrateFileProfiled, linkCompiledCrate, linkCompiledCrateRetaining,
    emitNativeFileChunks, emitNativeSourceChunks, nativeInstallInfo,
-   NativeCompilation, compileNative, compileNativeFile, compileNativeSource,
-   NativeLink(..), nativeLink, nativeChunks, nativeManifest, nativeInstallation, nativeExportCount, nativeInlineCount, nativeFallback, nativeInputs,
+   NativeCompilation, compileNative, compileNativeWithDecisions, compileNativeFile, compileNativeSource,
+   NativeLink(..), nativeLink, nativeChunks, nativeManifest, nativeInstallation, nativeExportCount, nativeInlineCount, nativeFallback, nativeInputs, nativeDecisions,
    emitNativeLibraryChunks, nativeLibraryMetadata) where {
   import MLF.Primitive;
   import Bootstrap.Types;
@@ -42,6 +42,7 @@ module MLF.PreparedCompiler
   import qualified Bootstrap.Constraint as Constraint;
   import qualified Bootstrap.X.Pretty as Pretty;
   import qualified Package.Json as Json;
+  import qualified Package.DependencyMode as Mode;
   import qualified Package.OS as OS;
 
   -- The native installation is compiler-owned immutable expected metadata.
@@ -147,18 +148,22 @@ module MLF.PreparedCompiler
       "installed native link arguments differ from their authenticated input inventory";
     Right (NativeLink NativeData.objectPaths files arguments)
   };
-  data InstalledNative = InstalledNative String Json.Json Libraries.RawLibrary NativeLink;
+  data InstalledNative = InstalledNative String Json.Json (Either String Libraries.RawLibrary) NativeLink;
   installationManifest (InstalledNative text _ _ _) = text;
   installationData (InstalledNative _ manifest _ _) = manifest;
   installationLibrary (InstalledNative _ _ raw _) = raw;
   nativeInstallInfo :: IO (Either String String);
   nativeInstallInfo = do {
     installed <- loadNativeInstallation;
-    ioReturn (mapEither installationManifest installed)
+    ioReturn (do {
+      value <- installed;
+      installationLibrary value;
+      Right (installationManifest value)
+    })
   };
   loadNativeInstallation :: IO (Either String InstalledNative);
   loadNativeInstallation = if not NativeData.enabled then ioReturn (Left "native installation is disabled") else do {
-    files <- validateNativeFiles ((:) ((,) NativeData.manifestPath NativeData.manifestSHA) NativeData.objectPaths);
+    files <- checkNativeFile ((,) NativeData.manifestPath NativeData.manifestSHA);
     case files of {
       Left message -> ioReturn (Left message);
       Right () -> do {
@@ -166,16 +171,17 @@ module MLF.PreparedCompiler
         afterRead <- fileDigest NativeData.manifestPath;
         let { inspected = do {
           ensure (eqString afterRead NativeData.manifestSHA) "installed native manifest changed while reading";
-          raw <- fixedNativeLibrary;
-          ensure (eqString NativeData.identity (Libraries.inputIdentity raw)) "installed native library identity mismatch";
-          ensure (eqString NativeData.exportABI nativeExportABI) "installed native export ABI mismatch";
-          ensure (not (null NativeData.objectPaths)) "installed native object inventory is empty";
+          let { raw = case filter (\candidate -> eqString NativeData.identity (Libraries.inputIdentity candidate))
+                  LibraryData.libraries of {
+                  [candidate] -> Right candidate;
+                  _ -> Left "installed native library identity mismatch"
+                } };
           manifest <- Json.parse text;
           traverseEither (\((,) field expected) -> ensure
             (eqString (Json.getText field "" manifest) expected) ("installed native manifest mismatch: " ++ field))
             [(,) "identity" NativeData.identity, (,) "target_triple" NativeData.targetTriple,
              (,) "data_layout" NativeData.dataLayout, (,) "primitive_abi" NativeData.primitiveABI,
-             (,) "export_abi" NativeData.exportABI, (,) "runtime_abi" LLVM.runtimeAbi];
+             (,) "runtime_abi" LLVM.runtimeAbi];
           -- The compiled manifest hash binds the layout produced and checked
           -- during independent installation regeneration. Reconstructing the
           -- full export schema here repeats that proof on every invocation;
@@ -191,29 +197,50 @@ module MLF.PreparedCompiler
         } };
         case inspected of {
           Left message -> ioReturn (Left message);
-          Right installed@(InstalledNative _ _ _ (NativeLink _ inputs _)) -> do {
-            valid <- validateNativeFiles inputs;
-            ioReturn (mapEither (\_ -> installed) valid)
+          Right (InstalledNative report manifest raw link@(NativeLink objects inputs _)) -> case objects of {
+            -- MLF-NATIVE-LIBRARY-2 authenticates these two producer roles in this order.
+            [library, runtime] -> do {
+              valid <- validateNativeFiles ((:) runtime inputs);
+              case valid of {
+                Left message -> ioReturn (Left message);
+                Right () -> do {
+                  optional <- checkNativeFile library;
+                  let { admitted = do {
+                    optional;
+                    ensure (eqString NativeData.exportABI nativeExportABI &&
+                      eqString (Json.getText "export_abi" "" manifest) nativeExportABI) "installed native export ABI mismatch";
+                    raw
+                  } };
+                  ioReturn (Right (InstalledNative report manifest admitted link))
+                }
+              }
+            };
+            _ -> ioReturn (Left "installed native library and runtime object inventory is invalid")
           }
         }
       }
     }
   };
-  data NativeCompilation = NativeCompilation InstalledNative ([] String) Int Int String ([] ((,) String String));
-  nativeLink (NativeCompilation (InstalledNative _ _ _ link) _ _ _ _ _) = link;
-  nativeManifest (NativeCompilation installed _ _ _ _ _) = installationManifest installed;
-  nativeInstallation (NativeCompilation installed _ _ _ _ _) = installationData installed;
-  nativeChunks (NativeCompilation _ chunks _ _ _ _) = chunks;
-  nativeExportCount (NativeCompilation _ _ count _ _ _) = count;
-  nativeInlineCount (NativeCompilation _ _ _ count _ _) = count;
-  nativeFallback (NativeCompilation _ _ _ _ reason _) = reason;
-  nativeInputs (NativeCompilation _ _ _ _ _ inputs) = inputs;
+  data NativeCompilation = NativeCompilation InstalledNative ([] String) Int Int String
+    ([] ((,) String String)) ([] Mode.Decision);
+  nativeLink (NativeCompilation (InstalledNative _ _ _ link@(NativeLink objects inputs flags)) _ count _ _ _ _) =
+    if count == 0 then NativeLink (drop 1 objects) inputs flags else link;
+  nativeManifest (NativeCompilation installed _ _ _ _ _ _) = installationManifest installed;
+  nativeInstallation (NativeCompilation installed _ _ _ _ _ _) = installationData installed;
+  nativeChunks (NativeCompilation _ chunks _ _ _ _ _) = chunks;
+  nativeExportCount (NativeCompilation _ _ count _ _ _ _) = count;
+  nativeInlineCount (NativeCompilation _ _ _ count _ _ _) = count;
+  nativeFallback (NativeCompilation _ _ _ _ reason _ _) = reason;
+  nativeInputs (NativeCompilation _ _ _ _ _ inputs _) = inputs;
+  nativeDecisions (NativeCompilation _ _ _ _ _ _ rows) = rows;
   compileNativeFile :: PreludeMode -> [] String -> String -> IO (Either CompileError NativeCompilation);
   compileNativeFile mode paths file = compileNative mode paths (SourceFile file);
   compileNativeSource :: PreludeMode -> [] String -> String -> String -> IO (Either CompileError NativeCompilation);
   compileNativeSource mode paths file input = compileNative mode paths (SourceText file input);
   compileNative :: PreludeMode -> [] String -> Source -> IO (Either CompileError NativeCompilation);
-  compileNative mode paths source = withSource source (\input ->
+  compileNative = compileNativeWithDecisions (\_ -> ioReturn ());
+  compileNativeWithDecisions :: (Mode.Decision -> IO ()) -> PreludeMode -> [] String -> Source -> IO (Either CompileError NativeCompilation);
+  compileNativeWithDecisions report mode paths source = withSource source (\input ->
     if not NativeData.enabled then ioReturn (Left (CompileError Verification
       "standard native installation is unavailable; build the compiler with tools/shared/build.py")) else do {
       installed <- loadNativeInstallation;
@@ -227,40 +254,36 @@ module MLF.PreparedCompiler
               ioReturn (Left err)
             };
             Left err -> ioReturn (Left err);
-            Right graph -> do {
-              result <- compileLoadedSource source mode paths (Just dependency) graph;
-              case result of {
-                Left err -> ioReturn (Left err);
-                Right compiled -> emitNativeRoot dependency graph compiled
-              }
-            }
+            Right graph -> compileLoadedSource report source mode paths (Just dependency) graph (emitNativeRoot dependency graph)
           }
         }
       }
     });
   reportNativeFallback err = putErr ("native library fallback: " ++ Core.prettyError err ++ "\n");
-  emitNativeRoot installed graph (CompiledRoot root dependencies admission) = let {
+  emitNativeRoot installed graph compiled@(CompiledRoot root dependencies admission _ _) = let {
     inputs = map (\entry -> (,) (Modules.sourcePath (Modules.loadedSource entry))
       (Modules.loadedText entry)) (Modules.loadedEntries graph);
     candidate = do {
+      verified <- Core.atPhase Verification (installationLibrary installed);
       raw <- admission;
-      bound <- Core.atPhase Verification
-        (Libraries.nativeCrateRoot raw [] (Session.rootObject root));
+      Core.atPhase Verification (ensure (eqString (Libraries.inputIdentity verified) (Libraries.inputIdentity raw))
+        "selected checked library has no installed native object");
+      bound <- Core.atPhase Verification (Libraries.nativeCrateRoot raw [] (Session.rootObject root));
       layout <- Core.atPhase Verification (nativeLayoutFor raw (Libraries.nativeLayoutIds bound));
       chunks <- Core.atPhase Verification (NativeLLVM.emitRootIds layout
         (Libraries.nativeSelectedIds bound) (Libraries.nativeCheckedWrapper bound));
-      Right (NativeCompilation installed chunks (length (M.keys (Libraries.nativeSignatures bound)))
-        (Libraries.nativeBuiltinCount bound) "" inputs)
+      let { keys = Libraries.nativeSignatures bound;
+            rows = dependencyModes graph compiled keys "" };
+      Right ((,) (NativeCompilation installed chunks (length (M.keys keys))
+        (Libraries.nativeBuiltinCount bound) "" inputs rows) rows)
     }
   } in case candidate of {
-    Right compiled -> ioReturn (Right compiled);
+    Right result -> Right result;
     Left err -> do {
-      reportNativeFallback err;
-      ioReturn (do {
-        ordinary <- closeSourceRoot dependencies root;
-        chunks <- Core.atPhase Verification (LLVM.emitCheckedChunks False (SourceCrate.checkedTerm ordinary));
-        Right (NativeCompilation installed chunks 0 0 (Core.prettyError err) inputs)
-      })
+      ordinary <- closeSourceRoot dependencies root;
+      chunks <- Core.atPhase Verification (LLVM.emitCheckedChunks False (SourceCrate.checkedTerm ordinary));
+      let { reason = Core.prettyError err; rows = dependencyModes graph compiled M.empty reason };
+      Right ((,) (NativeCompilation installed chunks 0 0 reason inputs rows) rows)
     }
   };
   emitNativeFileChunks :: PreludeMode -> [] String -> String -> IO (Either CompileError ([] String));
@@ -451,14 +474,16 @@ module MLF.PreparedCompiler
       }
     };
   data RootSource = ModuleSources ([] SourceModule) | PreparedScript SourceModule Context.PreparedPrelude;
-  data CheckedDependencies = CheckedObjects ([] Artifact.CrateObject) | FixedPrelude Context.PreparedPrelude;
+  data CheckedDependencies = CheckedObjects ([] Artifact.CrateObject) | FixedPrelude Context.PreparedPrelude | SourcePrelude Artifact.CrateObject;
   data RootPlan = RootPlan RootSource ([] ((,) String Artifact.CrateInterface))
     CheckedDependencies (Either CompileError Libraries.RawLibrary);
-  data CompiledRoot = CompiledRoot Session.SourceRoot CheckedDependencies (Either CompileError Libraries.RawLibrary);
+  data CompiledRoot = CompiledRoot Session.SourceRoot CheckedDependencies (Either CompileError Libraries.RawLibrary)
+    RootSource ([] ((,) String Artifact.CrateInterface));
   builtinMetadata :: Artifact.CrateInterface -> [] ((,) String Artifact.CrateInterface);
   builtinMetadata iface = [(,) "/mlf/implicit-dependencies/builtin.mlfci" iface];
   closeSourceRoot dependencies root = case dependencies of {
     CheckedObjects objects -> SourceCrate.close objects root;
+    SourcePrelude object -> SourceCrate.close [object] root;
     FixedPrelude witness -> let { object = Session.rootObject root;
       iface = Artifact.objectInterface object } in if null (Artifact.crateDependencies iface)
       then SourceCrate.close [] root else do {
@@ -468,7 +493,7 @@ module MLF.PreparedCompiler
         Right (SourceCrate.finish root checked)
       }
   };
-  sourcePlan mode graph candidates = let {
+  sourcePlan mode graph candidate = let {
     sources = Modules.loadedSources graph;
     ordinary err = if not (SourceCrate.needsBuiltin mode sources)
       then Right (RootPlan (ModuleSources sources) [] (CheckedObjects []) (Left err)) else case prepared of {
@@ -477,19 +502,19 @@ module MLF.PreparedCompiler
         Left _ -> do {
           object <- Core.atPhase Verification Artifact.builtinPrelude;
           Right (RootPlan (ModuleSources sources) (builtinMetadata (Artifact.objectInterface object))
-            (CheckedObjects [object]) (Left err))
+            (SourcePrelude object) (Left err))
         }
       };
-    select remaining rejected = case remaining of {
-      [] -> ordinary rejected;
-      (:) raw rest -> case Libraries.nativeCrateInputsUsing LibraryData.parseLibrary raw mode graph of {
-        Left err -> select rest err;
-        Right ((,) own interfaces) -> Right (RootPlan (ModuleSources own) interfaces
+    select selection = case selection of {
+      Left err -> ordinary err;
+      Right raw -> do {
+        (,) own interfaces <- Libraries.nativeCrateInputsUsing LibraryData.parseLibrary raw mode graph;
+        Right (RootPlan (ModuleSources own) interfaces
           (CheckedObjects (map Libraries.libraryObject (Libraries.libraryObjects raw))) (Right raw))
       }
     }
   } in do {
-    plan <- select candidates (CompileError Verification "no installed checked library");
+    plan <- select candidate;
     case plan of {
       RootPlan (ModuleSources [source]) interfaces _ admission ->
         if not (Compiler.standalone source) then Right plan else do {
@@ -528,49 +553,89 @@ module MLF.PreparedCompiler
     };
     _ -> ioReturn Session.MemoryQueries
   };
-  compileLoadedSource source mode paths installed graph = let {
-    loaded = S.fromList compareString (map Modules.moduleIdentity (Modules.loadedSources graph));
-    referencesLibrary raw = any (\entry -> S.member compareString (Libraries.sourceName entry) loaded)
-      (Libraries.librarySources raw);
-    candidates = case installed of {
-      Nothing -> sortBy (\a b -> compareInt (length (Libraries.librarySources b))
-        (length (Libraries.librarySources a))) (filter referencesLibrary LibraryData.libraries);
-      Just dependency -> [installationLibrary dependency]
+  rootSources input = case input of { ModuleSources sources -> sources; PreparedScript script _ -> [script] };
+  sourceRows input rejected = let { sources = rootSources input; root = Modules.moduleIdentity (last sources) } in
+    map (\item -> let { name = Modules.moduleIdentity item } in Mode.Decision name Mode.Source
+      (if eqString name root then "root input" else rejected)) sources;
+  dependencyModes graph (CompiledRoot root dependencies admission input interfaces) nativeKeys reason = let {
+    sourceReason = case admission of {
+      Left (CompileError Verification "no installed checked library") -> "no admitted dependency artifact";
+      Left err -> Core.prettyError err;
+      Right _ -> "no admitted dependency artifact"
     };
+    loaded = S.fromList compareString (map Modules.moduleIdentity (Modules.loadedSources graph));
+    direct = map Artifact.dependencyId (Artifact.crateDependencies (Artifact.objectInterface (Session.rootObject root)));
+    choose ((,) _ iface) = let {
+      name = Artifact.crateId iface;
+      native = any (\binding -> M.member compareString (fst binding) nativeKeys) (Artifact.crateBindings iface);
+      present = any (\value -> S.member compareString value loaded) (Artifact.crateModules iface);
+      irReason = if eqString reason "" then "checked dependency" else reason
+    } in if native then [Mode.Decision name Mode.Native "linked exports"]
+      else if elem eqString name direct && (present || eqString name Artifact.builtinCrateIdentity)
+        then case dependencies of {
+          SourcePrelude _ -> [Mode.Decision name Mode.Source "compiled builtin Prelude"];
+          _ -> [Mode.Decision name Mode.CheckedIR irReason]
+        } else []
+  } in append (concatMap choose interfaces) (sourceRows input sourceReason);
+  compileLoadedSource :: forall a. (Mode.Decision -> IO ()) -> Source -> PreludeMode -> [] String -> Maybe InstalledNative -> Modules.LoadedModules ->
+    (CompiledRoot -> Either CompileError ((,) a ([] Mode.Decision))) -> IO (Either CompileError a);
+  compileLoadedSource report source mode paths installed graph use = let {
+    loaded = S.fromList compareString (map Modules.moduleIdentity (Modules.loadedSources graph));
+    relevant raw = any (\entry -> S.member compareString (Libraries.sourceName entry) loaded)
+      (Libraries.librarySources raw);
+    preferred raw = case installed of {
+      Nothing -> False;
+      Just _ -> eqString (Libraries.inputIdentity raw) NativeData.identity
+    };
+    sorted = sortBy (\a b -> compareInt (length (Libraries.librarySources b))
+      (length (Libraries.librarySources a))) LibraryData.libraries;
+    candidates = append (filter preferred sorted) (filter (\raw -> not (preferred raw) && relevant raw) sorted);
     defaults = case installed of {
       Nothing -> [];
       Just dependency -> Json.getStrings "source_roots" (installationData dependency)
+    };
+    attempt remaining reason = let {
+      selection = case remaining of { [] -> Left reason; (:) raw _ -> Right raw };
+      next err = case remaining of { [] -> ioReturn (Left err); (:) _ rest -> attempt rest err }
+    } in case sourcePlan mode graph selection of {
+      Left err -> next err;
+      Right (RootPlan input interfaces dependencies admission) -> do {
+        storage <- sourceStorage source mode paths defaults interfaces;
+        compiled <- case input of {
+          ModuleSources sources -> SourceCrate.compile storage mode sources interfaces;
+          PreparedScript script witness -> SourceCrate.compileScriptWith storage script interfaces
+            (lowerPreparedScript mode witness)
+        };
+        case compiled of {
+          Left err -> case (,) err remaining of {
+            (,) (CompileError Verification _) ((:) _ _) -> next err;
+            _ -> do { mapM_ report (sourceRows input "no admitted dependency artifact"); ioReturn (Left err) }
+          };
+          Right root -> case use (CompiledRoot root dependencies admission input interfaces) of {
+            Left err -> next err;
+            Right ((,) result rows) -> do { mapM_ report rows; ioReturn (Right result) }
+          }
+        }
+      }
     }
-  } in case sourcePlan mode graph candidates of {
-    Left err -> ioReturn (Left err);
-    Right (RootPlan input interfaces dependencies admission) -> do {
-      storage <- sourceStorage source mode paths defaults interfaces;
-      compiled <- case input of {
-        ModuleSources sources -> SourceCrate.compile storage mode sources interfaces;
-        PreparedScript script witness -> SourceCrate.compileScriptWith storage script interfaces
-          (lowerPreparedScript mode witness)
-      };
-      ioReturn (mapEither (\root -> CompiledRoot root dependencies admission) compiled)
-    }
-  };
+  } in attempt candidates (CompileError Verification "no installed checked library");
   compileFileWithPrelude mode paths file = compileSource mode paths (SourceFile file);
   compileSourceWithImports mode paths file input = compileSource mode paths (SourceText file input);
   compileSource :: PreludeMode -> [] String -> Source -> IO (Either CompileError Compilation);
-  compileSource mode paths source = withSource source (\input -> do {
+  compileSource = compileSourceWithDecisions (\_ -> ioReturn ());
+  compileSourceWithDecisions :: (Mode.Decision -> IO ()) -> PreludeMode -> [] String -> Source -> IO (Either CompileError Compilation);
+  compileSourceWithDecisions report mode paths source = withSource source (\input -> do {
     loaded <- loadSourceGraph paths Nothing input;
     case loaded of {
       Left err -> ioReturn (Left err);
-      Right graph -> do {
-        result <- compileLoadedSource source mode paths Nothing graph;
-        ioReturn (do {
-          CompiledRoot root dependencies _ <- result;
+      Right graph -> compileLoadedSource report source mode paths Nothing graph
+        (\compiled@(CompiledRoot root dependencies _ _ _) -> do {
           closed <- closeSourceRoot dependencies root;
           let { usesDependencies = not (null (Artifact.crateDependencies
                   (Artifact.objectInterface (Session.rootObject root)))) };
-          Right (Compilation (SourceCrate.checkedTerm closed) (SourceCrate.sourceType closed)
-            usesDependencies (SourceCrate.dictionaryIdentities closed))
+          Right ((,) (Compilation (SourceCrate.checkedTerm closed) (SourceCrate.sourceType closed)
+            usesDependencies (SourceCrate.dictionaryIdentities closed)) (dependencyModes graph compiled M.empty ""))
         })
-      }
     }
   });
   preparedScriptRoot mode program = case mode of {

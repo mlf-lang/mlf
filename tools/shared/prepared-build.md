@@ -146,10 +146,11 @@ python3 tools/shared/build_native_program.py \
   --build-dir FRESH_BUILD_DIRECTORY
 ```
 
-The driver obtains authenticated installation information, emits the fresh user
-LLVM module, invokes exactly one ordinary Clang `-O2` compilation, and links the
-installed objects. Measure the entire driver invocation to include metadata,
-file validation, fresh frontend/emission, compilation, linking and publication.
+The Python wrapper invokes the same installed compiler with `-o` and forwards
+its output. The compiler records dependency choices in `receipt.json` and
+prints them on stderr. Its link command includes the library object when the
+program uses native exports, together with the authenticated runtime and link
+inputs.
 
 The complete typed native metadata stays in installation evidence. The installed
 compiler seals a small `runtime-contract.json` projection containing identities,

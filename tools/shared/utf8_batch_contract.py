@@ -78,16 +78,21 @@ def parse(raw, direction):
     return rows
 
 
+def clean_batch_stderr(lane, argv, stderr):
+    from test_direct import command_diagnostics
+    return not (command_diagnostics(argv, stderr)[1] if lane == 'interpreter' else stderr)
+
+
 def physical_record(command_id, lane, direction, argv, stdout, stderr, exit_code):
     """Called ONLY after a real process exits; execution/cleanup proof is external."""
     require(type(command_id) is str and command_id, 'physical command id')
     require(lane in ('host', 'interpreter'), 'physical lane')
     require(type(argv) is list and argv and all(type(a) is str for a in argv), 'physical argv')
-    require(type(exit_code) is int and exit_code == 0 and stderr == b'', 'batch execution failed')
+    require(type(exit_code) is int and exit_code == 0 and clean_batch_stderr(lane, argv, stderr), 'batch execution failed')
     rows = parse(stdout, direction)
     return dict(id=command_id, lane=lane, direction=direction, argv=argv,
                 exit_code=exit_code, stdout_sha256=digest(stdout), stdout_bytes=len(stdout),
-                stderr_sha256=digest(stderr), vectors=rows, scope=SCOPE)
+                stderr_sha256=digest(stderr), stderr=stderr.decode('utf-8'), vectors=rows, scope=SCOPE)
 
 
 def project(record, stdout, index, original_argv, original_expected):
@@ -123,7 +128,8 @@ def aggregate(physical_commands, logical_vectors, original_host_outputs):
     require(len(by_id) == 4, 'duplicate physical id')
     for p in physical_commands:
         require(type(p['exit_code']) is int and p['exit_code'] == 0 and
-                p['stderr_sha256'] == digest(b''), 'physical execution status changed')
+                clean_batch_stderr(p['lane'], p['argv'], p['stderr'].encode()) and
+                p['stderr_sha256'] == digest(p['stderr'].encode()), 'physical execution status changed')
         require(tuple(r['index'] for r in p['vectors']) == order_for(p['direction']),
                 'physical vector inventory changed')
         require(type(p['stdout_bytes']) is int and 0 < p['stdout_bytes'] <= 32768,

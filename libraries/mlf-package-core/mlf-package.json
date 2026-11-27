@@ -11,15 +11,20 @@
     },
     "mlf-frontend": {
       "path": "../mlf-frontend"
+    },
+    "mlf-llvm": {
+      "path": "../mlf-llvm"
     }
   },
   "library": {
     "modules": {
       "Package.Build": "Package/Build.hs",
       "Package.Command": "Package/Command.hs",
+      "Package.DependencyMode": "Package/DependencyMode.hs",
       "Package.Distribution": "Package/Distribution.hs",
       "Package.Json": "Package/Json.hs",
       "Package.Manifest": "Package/Manifest.hs",
+      "Package.NativeArtifact": "Package/NativeArtifact.hs",
       "Package.OS": "Package/OS.hs",
       "Package.Release": "Package/Release.hs",
       "Package.Scheduler": "Package/Scheduler.hs"
