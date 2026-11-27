@@ -3,7 +3,7 @@
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
 module MLF.PreparedCompiler
-  (Source(..), readSource, Compilation, compileSource, compileSourceWithDecisions, compileFileWithPrelude, compileSourceWithImports,
+  (Source(..), readSource, Compilation, compileSource, compileSourceWithDecisions, compileSourceAndDecisions, compileFileWithPrelude, compileSourceWithImports,
    checkedTerm, compiledTerm, sourceType, reused, dictionaryIdentities, verifyBuiltin, verifyBuiltinImages, installCompilerPrelude, cratePrelude, linkCrateFile, linkCrateFileProfiled, linkCompiledCrate, linkCompiledCrateRetaining,
    emitNativeFileChunks, emitNativeSourceChunks, nativeInstallInfo,
    NativeCompilation, compileNative, compileNativeWithDecisions, compileNativeFile, compileNativeSource,
@@ -603,7 +603,7 @@ module MLF.PreparedCompiler
   rootSources input = case input of { ModuleSources sources -> sources; PreparedScript script _ -> [script] };
   sourceRows input rejected = let { sources = rootSources input; root = Modules.moduleIdentity (last sources) } in
     map (\item -> let { name = Modules.moduleIdentity item } in Mode.Decision name Mode.Source
-      (if eqString name root then "root input" else rejected)) sources;
+      (if eqString name root then "root input" else if eqString rejected "" then "local source input" else rejected)) sources;
   dependencyModes graph (CompiledRoot root dependencies admission input interfaces) nativeKeys reason = let {
     sourceReason = case admission of {
       Left (CompileError Verification "no installed checked library") -> "no admitted dependency artifact";
@@ -674,7 +674,10 @@ module MLF.PreparedCompiler
   compileSource :: PreludeMode -> [] String -> Source -> IO (Either CompileError Compilation);
   compileSource = compileSourceWithDecisions (\_ -> ioReturn ());
   compileSourceWithDecisions :: (Mode.Decision -> IO ()) -> PreludeMode -> [] String -> Source -> IO (Either CompileError Compilation);
-  compileSourceWithDecisions report mode paths source = withSource source (\input -> do {
+  compileSourceWithDecisions report = compileSourceResult report (\value _ -> value);
+  compileSourceAndDecisions :: PreludeMode -> [] String -> Source -> IO (Either CompileError ((,) Compilation ([] Mode.Decision)));
+  compileSourceAndDecisions = compileSourceResult (\_ -> ioReturn ()) (,);
+  compileSourceResult report result mode paths source = withSource source (\input -> do {
     loaded <- loadSourceGraph paths Nothing input;
     case loaded of {
       Left err -> ioReturn (Left err);
@@ -685,8 +688,10 @@ module MLF.PreparedCompiler
             closed <- linked;
             let { usesDependencies = not (null (Artifact.crateDependencies
                     (Artifact.objectInterface (Session.rootObject root)))) };
-            Right ((,) (Compilation (SourceCrate.checkedTerm closed) (SourceCrate.sourceType closed)
-              usesDependencies (SourceCrate.dictionaryIdentities closed)) (dependencyModes graph compiled M.empty ""))
+            let { value = Compilation (SourceCrate.checkedTerm closed) (SourceCrate.sourceType closed)
+                    usesDependencies (SourceCrate.dictionaryIdentities closed);
+                  decisions = dependencyModes graph compiled M.empty "" };
+            Right ((,) (result value decisions) decisions)
           })
         })
     }

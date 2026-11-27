@@ -398,11 +398,17 @@ module MLF.Entry.Emlf where {
         mode = if J.getBool "no_prelude" False row then NoImplicitPrelude else ImplicitPrelude;
         paths = J.getStrings "include_dirs" row
       };
-      compiled <- Prepared.compileSource mode paths (Prepared.SourceFile source);
+      compiled <- Prepared.compileSourceAndDecisions mode paths (Prepared.SourceFile source);
       let {
+        -- Only decisions produced by the source compiler can precede program stderr.
+        metadata = case compiled of {
+          Right ((,) _ rows) -> if J.has "expected_stdout" row
+            then J.set "dependency_stderr" (J.str (L.unlines (L.map Mode.line rows))) J.empty else J.empty;
+          Left _ -> J.empty
+        };
         result = case compiled of {
           Left error -> (,,,) 1 (C.prettyError error ++ "\n") "" (Right "");
-          Right value ->
+          Right ((,) value _) ->
             let {
               target = "-- type: " ++ Prepared.sourceType value ++ "\n" ++
                 Pretty.prettyTerm (Prepared.compiledTerm value) ++ "\n";
@@ -427,7 +433,7 @@ module MLF.Entry.Emlf where {
           putStrLn (J.render (J.set "id" (J.get "id" row)
             (J.set "compile_exit" (J.num status)
               (J.set "candidate_check_exit"
-                (J.num (case checked of { Left _ -> 1; Right _ -> 0 })) J.empty))))
+                (J.num (case checked of { Left _ -> 1; Right _ -> 0 })) metadata))))
         }
       }
     };

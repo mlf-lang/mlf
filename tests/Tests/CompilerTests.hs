@@ -1740,6 +1740,7 @@ module Tests.CompilerTests where {
             };
             flags <-
               if selectedRuntime == 0 then return [] else do {
+                parityStderrControl c;
                 options <- nativeFlags c;
                 compileRuntime c options False "runtime.o";
                 return options
@@ -1923,9 +1924,9 @@ module Tests.CompilerTests where {
             (S.concatMap (\path -> ["-i", path]) (J.getStrings "include_dirs" target))
         };
         TestAssert.liftIO (writeFile (stem ++ ".stdin") (J.getText "expected_stdin" "" row));
-        -- Run the independently checked target so stderr is the program's own.
-        -- Source CLI dependency decisions are covered by source-root-cli.
-        interpreter <- TestAssert.liftIO (parityOutput c row [compiler c, "--run-xmlf", stem ++ ".xmlf"] stem "interpreter");
+        TestAssert.assert (J.has "dependency_stderr" compiled) "missing source dependency decisions";
+        interpreter <- TestAssert.liftIO (parityOutput c row (J.getText "dependency_stderr" "" compiled)
+          (S.append prefix ["--run", source]) stem "interpreter");
         generated <- TestAssert.liftIO
           (O.exec (root c) (S.append prefix ["--emit-llvm", source]) "" (stem ++ ".ll") (stem ++ ".llvm.err") 1800);
         llvm <- if generated == 0
@@ -1935,7 +1936,7 @@ module Tests.CompilerTests where {
               (S.append (O.words "clang -O2 -Wno-override-module")
                 (S.append [stem ++ ".ll", output c ++ "/runtime.o"] (S.append flags ["-lm", "-o", binary])))
               "" (stem ++ ".link.out") (stem ++ ".link.err") 1800);
-            if linked == 0 then TestAssert.liftIO (parityOutput c row [binary] stem "llvm")
+            if linked == 0 then TestAssert.liftIO (parityOutput c row "" [binary] stem "llvm")
             else do {
               diagnostics <- TestAssert.liftIO (readFile (stem ++ ".link.err"));
               TestAssert.succeed (Just ("LLVM link failed: " ++ diagnostics))
@@ -1952,7 +1953,27 @@ module Tests.CompilerTests where {
       }
       else TestAssert.succeed ()
     };
-  parityOutput c row argv stem backend =
+  parityStderrControl c = do {
+    let { stem = output c ++ "/parity/stderr-control";
+          source = stem ++ ".emlf";
+          message = "dependency Main: source (root input)\nprogram diagnostic\n";
+          row = B.info [(,) "id" (J.str "stderr-control"), (,) "source" (J.str source),
+            (,) "stem" (J.str stem), (,) "expected_stdout" (J.str ""), (,) "expected_stderr" (J.str message)] };
+    writeFile source "main = putErr \"dependency Main: source (root input)\\nprogram diagnostic\\n\"\n";
+    writeFile (stem ++ ".stdin") "";
+    batch <- parityBatch c "stderr-control-compile" (compiler c) "--test-parity-batch" [row];
+    let { compiled = S.fromMaybe J.empty (Map.lookup compareString "stderr-control" batch);
+          prefix = J.getText "dependency_stderr" "" compiled;
+          run sample tag = parityOutput c sample prefix [compiler c, "--run", source] stem tag };
+    O.require (J.equal (J.get "compile_exit" compiled) (J.num 0) && S.not (eqString prefix ""))
+      "stderr control did not compile with a dependency decision";
+    correct <- run row "matching";
+    incorrect <- run (J.set "expected_stderr" (J.str "program diagnostic\n") row) "mismatching";
+    O.require (S.not (S.isJust correct) && S.isJust incorrect) "parity lost program stderr resembling a dependency decision"
+  };
+  -- Match the whole stream. A program can print a decision-shaped line of
+  -- its own; it must still occur verbatim in the prescribed program stderr.
+  parityOutput c row decisionPrefix argv stem backend =
     do {
       let {
         outPath = stem ++ ("." ++ (backend ++ ".out"));
@@ -1962,7 +1983,7 @@ module Tests.CompilerTests where {
       out <- readFile outPath;
       err <- readFile errPath;
       return (if code == 0 && eqString out (J.getText "expected_stdout" "" row) &&
-                 eqString err (J.getText "expected_stderr" "" row)
+                 eqString err (decisionPrefix ++ J.getText "expected_stderr" "" row)
               then Nothing
               else Just (backend ++ (" output/status mismatch (" ++
                  (showInt code ++ ("); see " ++ (outPath ++ (" and " ++ errPath)))))))
