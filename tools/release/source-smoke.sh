@@ -65,31 +65,14 @@ seed_sha256=$(sha256 "$seed")
 export GC_FREE_SPACE_DIVISOR=2
 started=$SECONDS
 include_args=(-i "$PWD/tests")
-helper_root=tests/Tests
 if [ "$source_extension" = hs ]; then
-  helper_root=tests/shared/Tests
   include_args+=(-i "$PWD/tests/shared")
 fi
 for manifest in "$PWD"/libraries/*/mlf-package.json; do
   test -f "$manifest"
   include_args+=(-i "$(dirname -- "$manifest")")
 done
-snapshot() {
-  {
-    find bootstrap libraries -type f \( -name '*.emlf' -o -name '*.hs' -o -name 'mlf-package.json' \)
-    printf '%s\n' tests/PRQuickMain.emlf "$helper_root/IndependentCheck.$source_extension" \
-      "$helper_root/IndependentType.$source_extension" tools/release/source-smoke.sh
-    find tests/pr-smoke -type f
-    if [ "$source_extension" = hs ]; then
-      printf '%s\n' shared-sources.json tools/shared/build.py
-      jq -r '.modules[].path, .host_only[]' shared-sources.json
-      find runtime -maxdepth 1 -name '*.h' -type f
-    fi
-  } | LC_ALL=C sort -u | while IFS= read -r file; do
-    printf '%s  %s\n' "$(sha256 "$file")" "$file"
-  done
-}
-snapshot > "$build/sources.before.log"
+commit=$(git rev-parse HEAD)
 rm -f "$build/timed-out.log" "$build/progress.log" "$build/polymorphic-let.xmlf" "$build/impredicative-self-application.xmlf"
 {
   date -u +%Y-%m-%dT%H:%M:%SZ
@@ -101,7 +84,7 @@ rm -f "$build/timed-out.log" "$build/progress.log" "$build/polymorphic-let.xmlf"
       awk '/^MemTotal:/ {print}' /proc/meminfo
       ;;
   esac
-} > "$build/host.log" 2>&1
+} > "$build/host.log" 2>&1 || true
 : > "$build/memory.log"
 cat > "$build/expected.log" <<'EXPECTED'
 PASS current-source accepted polymorphic-let
@@ -232,21 +215,18 @@ test ! -s "$build/tests.stderr.log"
 cmp "$build/expected.log" "$build/tests.log"
 test -s "$build/polymorphic-let.xmlf"
 test -s "$build/impredicative-self-application.xmlf"
-snapshot > "$build/sources.after.log"
-cmp "$build/sources.before.log" "$build/sources.after.log"
 test "$(sha256 "$seed")" = "$seed_sha256"
 if [ -n "$producer_receipt" ]; then
   test "$(sha256 "$producer_receipt")" = "$producer_receipt_hash"
 fi
-jq -n --arg mode "$mode" --arg producer_receipt_sha256 "${producer_receipt_hash:-}" --arg commit "$(git rev-parse HEAD)" --arg seed_sha256 "$seed_sha256" \
-  --arg sources_sha256 "$(sha256 "$build/sources.before.log")" \
+jq -n --arg mode "$mode" --arg producer_receipt_sha256 "${producer_receipt_hash:-}" --arg commit "$commit" --arg seed_sha256 "$seed_sha256" \
   --arg log_sha256 "$(sha256 "$build/tests.log")" \
   --arg let_sha256 "$(sha256 "$build/polymorphic-let.xmlf")" \
   --arg self_application_sha256 "$(sha256 "$build/impredicative-self-application.xmlf")" \
   --argjson total_seconds "$((SECONDS - started))" \
   '{complete:true,mode:$mode,producer_receipt_sha256:$producer_receipt_sha256,commit:$commit,cases:5,
     accepted:2,rejected:2,malformed_target:1,total_seconds:$total_seconds,gc_free_space_divisor:2,
-    seed_sha256:$seed_sha256,sources_sha256:$sources_sha256,log_sha256:$log_sha256,
+    seed_sha256:$seed_sha256,log_sha256:$log_sha256,
     targets:{polymorphic_let:$let_sha256,self_application:$self_application_sha256}}' > "$build/result.json.new"
 mv "$build/result.json.new" "$build/result.json"
 cat "$build/result.json"

@@ -35,7 +35,14 @@ if [ "$TEST_SMOKE_MODE" = telemetry ] && [ "$1" = -s ]; then printf 'Darwin\n'; 
 SH
 cat > "$scratch/bin/sysctl" <<'SH'
 #!/usr/bin/env bash
-if [ "$TEST_SMOKE_MODE" = telemetry ]; then printf 'test host counters: %s\n' "$*"; else exec "$TEST_SMOKE_REAL_SYSCTL" "$@"; fi
+if [ "$TEST_SMOKE_MODE" = telemetry ] && [ "$1" = hw.memsize ]; then
+  printf 'Injected host telemetry failure.\n' >&2
+  exit 1
+elif [ "$TEST_SMOKE_MODE" = telemetry ]; then
+  printf 'test memory counters: %s\n' "$*"
+else
+  exec "$TEST_SMOKE_REAL_SYSCTL" "$@"
+fi
 SH
 cat > "$scratch/bin/vm_stat" <<'SH'
 #!/usr/bin/env bash
@@ -44,6 +51,12 @@ if [ "$TEST_SMOKE_MODE" = telemetry ]; then
   exit 1
 fi
 exec "$TEST_SMOKE_REAL_VM_STAT" "$@"
+SH
+# Supply process telemetry for the live mock seed without relying on host ps access.
+cat > "$scratch/bin/ps" <<'SH'
+#!/usr/bin/env bash
+test "$1" = -p && kill -0 "$2" 2>/dev/null || exit 1
+printf ' %s 00:00 0:00.00 0.0 1\n' "$2"
 SH
 # Accelerate only the watchdog in timeout cases. Production still requests 900s.
 cat > "$scratch/bin/sleep" <<'SH'
@@ -139,9 +152,6 @@ for mode in success timeout progress telemetry; do
   test -e "$scratch/stale-progress-cleared"
   test -s "$build/host.log"
   test -s "$build/memory.log"
-  grep -Fq '  libraries/mlf-foundation/Bootstrap/Types.emlf' "$build/sources.before.log"
-  grep -Fq '  libraries/mlf-frontend/Bootstrap/Compiler.emlf' "$build/sources.before.log"
-  grep -Fq '  libraries/mlf-foundation/mlf-package.json' "$build/sources.before.log"
   seed_pid=$(cat "$scratch/seed.pid")
   grep -Eq "^ *$seed_pid +" "$build/process.log"
   grep -Eq ' 900$' "$scratch/sleep-pids.log"
@@ -154,6 +164,7 @@ for mode in success timeout progress telemetry; do
     test ! -e "$build/timed-out.log"
     cmp "$build/expected.log" "$build/tests.log"
     if [ "$mode" = telemetry ]; then
+      grep -Fxq 'Injected host telemetry failure.' "$build/host.log"
       grep -Fxq 'Injected memory telemetry failure.' "$build/memory.log"
     fi
   else

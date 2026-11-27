@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "scope": "Ordered public tuple/list case IDs, checked against executable discovery and case reports. Historical migration metadata lives separately in tuple-list-migration-contract.json.",
+  "scope": "Ordered public tuple/list case IDs, checked against executable discovery and case reports.",
   "framework_ids": [
     "tuple-list/focused/pair-ast",
     "tuple-list/focused/triple-ast",

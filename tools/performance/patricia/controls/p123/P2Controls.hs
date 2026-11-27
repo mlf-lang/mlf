@@ -47,16 +47,23 @@ fingerprints = do
   let fails label expected action = do
         result <- try action
         case result of
-          Left (H.HostError message) -> check label (expected == message)
-          Right _ -> fail label
+          Left (H.HostError message) ->
+            check (label ++ ": expected " ++ show expected ++ ", got " ++ show message) (expected == message)
+          Right _ -> fail (label ++ ": expected " ++ show expected)
   forM_ [("A", -1, 0, 1, "string index out of bounds"),
+         (H.failure "text", H.failure "offset", 0, 1, "offset"),
+         (H.failure "text", 0, 0, 1, "text"),
+         ("A", -1, H.failure "seed a", 1, "seed a"),
+         ("A", -1, 0, H.failure "seed b", "string index out of bounds"),
          ("A", 0, H.failure "seed a", H.failure "seed b", "seed a"),
          ("A", 0, 7, H.failure "seed b", "seed b"),
          (H.literal ['\xd800'], 0, 0, 1, "invalid Unicode scalar")] $ \(value,offset,a,b,message) -> do
     let state = S.fingerprintStateFrom value offset a b
-    fails "state demand" message (evaluate (fst state + snd state))
+    -- A nonterminal step forces both updates before it can return a pair.
+    fails "state pair demand" message (evaluate state)
     fails "digest demand" message (evaluate (length (H.unpack (S.fingerprintFrom value offset a b))))
   forM_ [("",0), ("A",1), ("A",3)] $ \(value,offset) -> do
+    _ <- evaluate (S.fingerprintStateFrom value offset (H.failure "seed a") (H.failure "seed b"))
     let state = S.fingerprintStateFrom value offset 43 (H.failure "unused")
     check "terminal state" (fst state == 43 && snd (S.fingerprintStateFrom value offset (H.failure "unused") 59) == 59)
 

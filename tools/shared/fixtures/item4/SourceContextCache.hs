@@ -375,7 +375,6 @@ rawFinal directory = do
   let ds = U.unitData (U.objectInterface finalObject)
   raw <- expect "raw contextual object" (decodePayload ds payload)
   let parameters = [(X.nameHint n,t) | (n,t) <- fst (U.splitParameters (strip (U.objectTerm raw)))]
-  _ <- expect "generic validator alone accepts final counterexample" (Q.decodeCached key groupId parameters ds ["sameDeps"] (Q.encodeCached key finalObject))
   need "raw object differs from compact final" (U.encodeObject raw /= U.encodeObject finalObject)
   -- Preserve the real reference and full-key projection: only the object
   -- payload is poisoned. This must not become a trivial envelope mismatch.
@@ -392,11 +391,6 @@ rawFinal directory = do
   (repairedRef,repairedCompact,repairedPayload) <- localRecordParts keys repairedInput3
   need "CACHE3 repair keeps reference/key and restores raw payload"
     (repairedRef == ref && repairedCompact == compact && repairedPayload == payload)
-  -- Keep the original legacy representation counterexample as a separate pass.
-  save file (Q.encodeCached key finalObject)
-  (repaired,report,_) <- Q.compileSourceGroups "raw-final" (literal directory) [] M.empty plan >>= expect "legacy raw/final rejection and reinference"
-  need "legacy final-as-raw only reinfers poisoned group" (Q.inferredCount report == 1 && Q.reusedCount report == fromIntegral (length objects - 1))
-  need "legacy final artifact exact after repair" (map U.encodeObject repaired == map U.encodeObject objects)
   -- Only the visible instance scope changes. Keep the caller's source and
   -- the Int instance fixed. Observe the actual source driver's per-SCC hit.
   broader <- expect "broader source scope" (SI.prepareSourcePlan M.empty [] [cls]

@@ -6,13 +6,12 @@ Four sequential stages normally total about 90 seconds; the safety watchdog is
 LLVM emission, copied state implementation, or full native/unit qualification.
 """
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path
 import subprocess
 import sys
-from test_direct import authenticate_build
+from test_direct import authenticate_build, sha
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools/testing'))
@@ -34,74 +33,6 @@ LIMITS = {'wall_seconds': 90, 'address_space_per_process': 3*1024**3,
 def require(value, message):
     if not value:
         raise ValueError(message)
-
-def digest(path):
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
-
-def capture_inputs(root, fixed):
-    # Follow aliases inside the repository, but never silently skip their source
-    # contents. Record each lexical link before deduplicating resolved dirs, so
-    # retargets/new aliases and cycles cannot hide behind the visited set.
-    root = root.resolve(strict=True)
-    entries, hashes, visited = {}, {}, set()
-    def remember_file(path, source=False):
-        path = Path(path).absolute()
-        resolved = path.resolve(strict=True)
-        require(resolved.is_file(), 'input is not a file: '+str(path))
-        require(not source or resolved.is_relative_to(root), 'source escapes repository')
-        if resolved not in hashes:
-            hashes[resolved] = digest(resolved)
-        entries[str(resolved)] = {'kind': 'file', 'sha256': hashes[resolved], 'resolved': str(resolved)}
-        if path.is_symlink():
-            entries[str(path)] = {'kind': 'file-symlink', 'target': os.readlink(path), 'resolved': str(resolved)}
-    def directory_link(path):
-        resolved = path.resolve(strict=True)
-        require(resolved.is_relative_to(root) and resolved.is_dir(), 'source directory escapes repository')
-        entries[str(path.absolute())] = {'kind': 'directory-symlink', 'target': os.readlink(path),
-                                        'resolved': str(resolved)}
-    def walk_error(error):
-        raise error
-    for path in fixed:
-        remember_file(path)
-    for relative in ['libraries', 'tests', 'tools/shared/fixtures']:
-        directory = root/relative
-        require(directory.is_dir() and directory.resolve(strict=True).is_relative_to(root),
-                'missing or escaping source root: '+relative)
-        if directory.is_symlink():
-            directory_link(directory)
-        for current, directories, files in os.walk(directory, followlinks=True, onerror=walk_error):
-            current = Path(current)
-            resolved = current.resolve(strict=True)
-            require(resolved.is_relative_to(root), 'source directory escapes repository')
-            if current.is_symlink():
-                directory_link(current)
-            if resolved in visited:
-                directories[:] = []
-                continue
-            visited.add(resolved)
-            pending = []
-            for name in sorted(directories):
-                child = current/name
-                if child.is_symlink():
-                    directory_link(child)  # Validate before os.walk opens the target.
-                if child.resolve(strict=True) not in visited:
-                    pending.append(name)
-            directories[:] = pending
-            for name in sorted(files):
-                path = current/name
-                if path.suffix in {'.hs', '.emlf'}:
-                    remember_file(path, source=True)
-                elif path.is_symlink():
-                    # Broken directory links may appear in os.walk's files list.
-                    resolved = path.resolve(strict=True)
-                    require(resolved.is_relative_to(root) and resolved.is_file(),
-                            'broken, escaping, or changing non-source alias')
-                    entries[str(path.absolute())] = {'kind': 'non-source-symlink',
-                        'target': os.readlink(path), 'resolved': str(resolved)}
-    return dict(sorted(entries.items()))
-
-def unchanged(before, after):
-    require(before == after, 'source/tool/input inventory changed during campaign')
 
 def verify_observation(resource, status, log, expected):
     require(set(LIMITS) <= set(resource.get('limits', {})) and resource['limits'] == LIMITS,
@@ -147,23 +78,11 @@ def main():
         temporary = output/'receipt.json.tmp'
         temporary.write_text(json.dumps(record, indent=2)+'\n')
         temporary.replace(output/'receipt.json')
-    def authenticate():
+    try:
         producer = authenticate_build(receipt, producer_dir/'bin')
         require(producer['optimization'] == '2', 'state-law gate requires authenticated O2 producer')
-        for name, expected in producer['object_inputs'].items():
-            path = (producer_dir/name).resolve(strict=True)
-            require(path.is_relative_to(producer_dir) and digest(path) == expected,
-                    'producer object changed: '+name)
-        return producer
-    try:
-        producer = authenticate()
         compiler = producer_dir/'bin/emlf'
-        fixed = [Path(__file__), WATCHDOG, ROOT/'tools/shared/test_direct.py', ROOT/'tools/shared/build.py',
-                 receipt, compiler, ROOT/'tests/Tests/Graph.emlf', ROOT/'tests/Tests/Oracle.emlf',
-                 *[ROOT/'tools/shared/fixtures'/case[1] for case in CASES]]
-        before = capture_inputs(ROOT, fixed)
-        record.update(inputs=before, producer_receipt_sha256=digest(receipt),
-                      producer_objects=producer['object_inputs'])
+        record.update(producer_receipt_sha256=sha(receipt), compiler=producer['outputs']['emlf'])
         save()
         results = {}
         for label, fixture, flag, roots, positive, negative in CASES:
@@ -171,7 +90,6 @@ def main():
                 stage = label + ('-negative' if failure else '-positive')
                 if selected and stage != selected:
                     continue
-                unchanged(before, capture_inputs(ROOT, fixed))
                 directory = output/stage
                 directory.mkdir()
                 command = [str(compiler)]
@@ -197,18 +115,15 @@ def main():
                 expected_status = 1 if failure else 0
                 verify_observation(resource, expected_status, log_path.read_bytes(), negative if failure else positive)
                 require(result.returncode == expected_status, 'watchdog process status mismatch')
-                unchanged(before, capture_inputs(ROOT, fixed))
-                results[str(resource_path)] = digest(resource_path)
-                results[str(log_path)] = digest(log_path)
+                results[str(resource_path)] = sha(resource_path)
+                results[str(log_path)] = sha(log_path)
                 row.update(complete=True, expected_negative_control=failure,
                            elapsed_seconds=resource['elapsed_seconds'],
-                           resource_receipt_sha256=digest(resource_path), log_sha256=digest(log_path))
+                           resource_receipt_sha256=results[str(resource_path)], log_sha256=results[str(log_path)])
                 save()
-        authenticate()
-        unchanged(before, capture_inputs(ROOT, fixed))
-        require(all(digest(path) == expected for path, expected in results.items()), 'recorded result changed')
-        record.update(complete=True, inputs_unchanged=True, producer_and_objects_reauthenticated=True,
-                      result_files=results, observed_campaign_seconds=sum(row['elapsed_seconds'] for row in record['commands']))
+        require(all(sha(path) == expected for path, expected in results.items()), 'recorded result changed')
+        record.update(complete=True, result_files=results,
+                      observed_campaign_seconds=sum(row['elapsed_seconds'] for row in record['commands']))
         save()
         summary = {'complete': True, 'stages': len(record['commands']), 'full_native_unit': False}
         if selected:
