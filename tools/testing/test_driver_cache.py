@@ -32,7 +32,7 @@ class DriverCacheTests(unittest.TestCase):
         drivers = {}
         for name in ('RuntimeDriver', 'LLVMDriver'):
             stages = {}
-            products = {'llvm': (f'source {name} LLVM', 'program.ll'), 'object': ('LLVM object', 'program.o'),
+            products = {'llvm': (f'crate {name} LLVM', 'program.ll'), 'object': ('LLVM object', 'program.o'),
                         'linked': ('test driver native link', 'program'), 'runtime': ('test driver C object', 'object.o')}
             if name == 'RuntimeDriver':
                 products['trace'] = ('test driver C object', 'object.o')
@@ -51,7 +51,7 @@ class DriverCacheTests(unittest.TestCase):
                 row = {'key': key, 'kind': kind, 'cached': any(b['key'] == key for b in builds)}
                 builds.append(row)
                 stages[stage] = dict(row, directory=str(directory), files=files, artifact_sha256=stamp_hash)
-            drivers[name] = {'frontend': 'source', 'artifacts': stages, 'sha256': stages['linked']['files']['program'],
+            drivers[name] = {'frontend': 'crate', 'artifacts': stages, 'sha256': stages['linked']['files']['program'],
                              'llvm_sha256': stages['llvm']['files']['program.ll']}
         build = {'implementation': 'MLF', 'complete': True, 'format': 1,
                  'cache_directory': str(self.source), 'builds': builds}
@@ -153,6 +153,28 @@ class DriverCacheTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, message):
                 cache.export(self.report, self.snapshot)
             self.assertFalse(self.snapshot.exists())
+
+    def test_frontend_must_match_the_recorded_llvm_build(self):
+        for frontend in ('source', 'unknown'):
+            with self.subTest(frontend=frontend):
+                prepared = copy.deepcopy(self.prepared)
+                prepared['drivers']['LLVMDriver']['frontend'] = frontend
+                write(self.report, prepared)
+                with self.assertRaises(ValueError):
+                    cache.export(self.report, self.snapshot)
+                self.assertFalse(self.snapshot.exists())
+
+    def test_source_driver_receipts_still_round_trip(self):
+        build = cache.read(self.build_report)
+        for name, driver in self.prepared['drivers'].items():
+            driver['frontend'] = 'source'
+            llvm = driver['artifacts']['llvm']
+            next(row for row in build['builds'] if row['key'] == llvm['key'])['kind'] = f'source {name} LLVM'
+            llvm['kind'] = f'source {name} LLVM'
+        self.prepared['driver_build']['sha256'] = write(self.build_report, build)
+        write(self.report, self.prepared)
+        self.assertEqual(cache.export(self.report, self.snapshot), {'exported': 8})
+        self.assertFalse(cache.restore(self.snapshot, self.dest)['misses'])
 
     def test_mismatched_artifact_identity_or_bytes_cannot_publish(self):
         for field, change in [('directory', str(self.source)), ('key', '../escape'),

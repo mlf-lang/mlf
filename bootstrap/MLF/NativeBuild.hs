@@ -138,7 +138,7 @@ module MLF.NativeBuild (run) where {
         (,) "llvm_jobs" (J.num 1), (,) "commands" (J.array [])] };
       sourceHash <- fileDigest source;
       input <- readFile source;
-      result <- Prepared.compileNativeSource selected roots source input;
+      result <- Prepared.compileNative selected roots (Prepared.SourceText source input);
       case result of {
         Left error -> fatal (Core.prettyError error);
         Right compiled -> case J.parse (Prepared.nativeManifest compiled) of {
@@ -159,7 +159,7 @@ module MLF.NativeBuild (run) where {
                     (J.set "builtin_inline_count" (J.num inlineCount)
                     (J.set "fixed_runtime_reused" (J.Boolean True)
                     (J.set "fallback_reason" (J.str fallback) initial))))))) };
-            -- compileNativeSource already authenticated this exact manifest
+            -- The compiler already authenticated this exact manifest
             -- and its files. Keep their paths for destination protection; the
             -- bytes are checked again immediately before and after linking.
             let { objects = S.map (J.getText "path" "") objectRows;

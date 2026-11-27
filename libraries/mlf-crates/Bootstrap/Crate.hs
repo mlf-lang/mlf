@@ -357,18 +357,11 @@ module Bootstrap.Crate where {
       (,) inputs@(CompilationModules table resolved ownedReach) complete <- resolve (specMode spec) external mangle sources;
       let { symbols = Modules.bindingSymbols table;
             ownBindings = Dependency.BoundValues symbols (concatMap compilationBindings resolved) };
-      -- Canonicalize only this crate's freshly resolved source declarations.
-      -- Imported checked layouts are validation context, never rewrite input.
-      -- Do this before SourcePlan, dictionary inventory and cache-key creation.
-      ownData <- D.canonicalSourceDeclarations
-        (concatMap (\p -> Artifact.crateData (snd p)) interfaces)
-        (concatMap (\r -> Modules.renamedDatatypes (compilationContents r)) resolved);
-      -- Checked class headers are ABI context. Canonicalize only this crate's
-      -- fresh headers, before selectors, dictionary inventory and saved metadata.
-      ownClasses <- Classes.canonicalSourceClasses Set.empty
-        (append (concatMap (\p -> Artifact.crateData (snd p)) interfaces) ownData)
-        (concatMap (\p -> Artifact.crateClasses (snd p)) interfaces)
-        (concatMap (\r -> Modules.renamedClasses (compilationContents r)) resolved);
+      (,) ownData ownClasses <- Classes.canonicalSourceHeaders Set.empty
+        (concatMap (compose Artifact.crateData snd) interfaces)
+        (concatMap (compose Artifact.crateClasses snd) interfaces)
+        (concatMap (compose Modules.renamedDatatypes compilationContents) resolved)
+        (concatMap (compose Modules.renamedClasses compilationContents) resolved);
       let { expression = case find (\unit -> eqString (compilationName unit) (specEntry spec)) resolved of {
         Nothing -> Left "crate entry module was not resolved"; Just unit -> compilationEntry unit
       } };
@@ -500,7 +493,9 @@ module Bootstrap.Crate where {
     (Artifact.CrateObject -> String -> Query.QueryReport -> a) ->
     CrateSpec -> [] ((,) String Artifact.CrateInterface) -> PreparedCrate ->
     IO (Either String a);
-  compilePreparedWithEncoding shareEncoding complete spec interfaces prepared =
+  compilePreparedWithEncoding shareEncoding = compilePreparedUsing
+    (if shareEncoding then Query.compileParsedSourceGroups else Query.compileSourceGroups);
+  compilePreparedUsing compileGroups complete spec interfaces prepared =
     do {
       let {
         lowered = preparedLowered prepared
@@ -521,11 +516,7 @@ module Bootstrap.Crate where {
           M.empty (concatMap (\p -> Artifact.crateProtection (snd p)) interfaces)
       };
       compiled <- case preparedSourcePlan prepared of {
-        Just plan -> if shareEncoding
-          then Query.compileParsedSourceGroups (specIdentity spec) (specCache spec)
-            imported protected plan
-          else Query.compileSourceGroups (specIdentity spec) (specCache spec)
-            imported protected plan;
+        Just plan -> compileGroups (specIdentity spec) (specCache spec) imported protected plan;
         Nothing -> do {
           result <- Query.compileLoweredFileGroups (specIdentity spec) (specCache spec) imported lowered;
           ioReturn (mapEither (\((,) fragments report) -> (,,) fragments report
@@ -760,36 +751,30 @@ module Bootstrap.Crate where {
           }
       }
     };
-  compileSpecFile file prefix =
-    do {
-      present <- fileExists file;
-      if not present
-      then ioReturn (Left ("crate specification does not exist: " ++ file))
-      else do {
-             text <- readFile file;
-             case decodeSpec text of {
-               Left message -> ioReturn (Left message);
-               Right spec ->
-                 do {
-                   sourceResult <- loadSourcesInPackage (specIdentity spec) (specSources spec);
-                   paths <- mapM canonicalPath (specDependencies spec);
-                   let {
-                     normalized = withDependencies spec paths
-                   };
-                   dependencies <- Artifact.loadInterfaces paths;
-                   case do {
-                          sources <- sourceResult;
-                          interfaces <- dependencies;
-                          Right ((,) sources interfaces)
-                        } of {
-                     Left message -> ioReturn (Left message);
-                     Right ((,) sources interfaces) ->
-                       -- Both source and dependency values originate in the
-                       -- parsers/decoders above, not caller-supplied lazy ASTs.
-                       compileSourcesWithEncoding True normalized sources interfaces prefix
-                   }
-                 }
-             }
-           }
+  loadSpecFile load file = do {
+    present <- fileExists file;
+    if not present then ioReturn (Left ("crate specification does not exist: " ++ file)) else do {
+      text <- readFile file;
+      case decodeSpec text of {
+        Left message -> ioReturn (Left message);
+        Right spec -> do {
+          sourceResult <- loadSourcesInPackage (specIdentity spec) (specSources spec);
+          paths <- mapM canonicalPath (specDependencies spec);
+          dependencies <- load paths;
+          ioReturn (do {
+            sources <- sourceResult;
+            interfaces <- dependencies;
+            Right ((,,) (withDependencies spec paths) sources interfaces)
+          })
+        }
+      }
     }
+  };
+  compileSpecFile file prefix = do {
+    loaded <- loadSpecFile Artifact.loadInterfaces file;
+    case loaded of {
+      Left message -> ioReturn (Left message);
+      Right ((,,) spec sources interfaces) -> compileSourcesWithEncoding True spec sources interfaces prefix
+    }
+  }
 }

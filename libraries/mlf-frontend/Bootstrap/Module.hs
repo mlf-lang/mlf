@@ -233,43 +233,25 @@ module Bootstrap.Module where {
   fetchFileWithEvidence paths name = fetchFileWithEvidenceUsing Parser.parseModule paths name;
   -- The callback returns raw syntax, not authenticated evidence. Graph and
   -- compiler checks remain mandatory, including for caller-supplied parsers.
-  fetchFileWithEvidenceUsing parseSource paths name =
-    do {
-      let {
-        stem = intercalate "/" (components name)
-      };
-      let {
-        files =
-          concatMap
-            (\path ->
-               (:) (joinPath path (stem ++ ".emlf")) ((:) (joinPath path (stem ++ ".hs")) []))
-            paths
-      };
-      found <- findFiles files;
-      let {
-        legacy = any (\file -> Lexer.sourceHasSuffix file ".emlf") found
-      };
-      let {
-        shared = any (\file -> Lexer.sourceHasSuffix file ".hs") found
-      };
-      if (legacy && shared)
-      then ioReturn
-             (Left
-                ("ambiguous source module " ++
-                 (name ++
-                  (": both .emlf and .hs candidates exist: " ++
-                   (intercalate ", " found ++ "; use an explicit manifest mapping")))))
-      else case found of {
-             [] ->
-               ioReturn
-                 (Left
-                    ("cannot find module " ++ (name ++ ("; searched " ++ intercalate ", " files))));
-             (:) file _ ->
-               do {
-                 source <- readFile file;
-                 ioReturn (mapEither (\parsed -> LoadedModule parsed source) (parseSource file source))
-               }
-           }
+  moduleCandidates paths name = let { stem = intercalate "/" (components name) } in
+    concatMap (\path -> [joinPath path (stem ++ ".emlf"), joinPath path (stem ++ ".hs")]) paths;
+  fetchFileWithEvidenceUsing parseSource paths name = do {
+    let { files = moduleCandidates paths name };
+    found <- findFiles files;
+    readModuleCandidate parseSource name files found
+  };
+  readModuleCandidate parseSource name files found =
+    if any (\file -> Lexer.sourceHasSuffix file ".emlf") found &&
+       any (\file -> Lexer.sourceHasSuffix file ".hs") found
+    then ioReturn (Left ("ambiguous source module " ++ name ++
+      ": both .emlf and .hs candidates exist: " ++ intercalate ", " found ++
+      "; use an explicit manifest mapping"))
+    else case found of {
+      [] -> ioReturn (Left ("cannot find module " ++ name ++ "; searched " ++ intercalate ", " files));
+      (:) file _ -> do {
+        source <- readFile file;
+        ioReturn (mapEither (\parsed -> LoadedModule parsed source) (parseSource file source))
+      }
     };
   loadModuleFiles :: [] String -> SourceModule -> IO (Either String ([] SourceModule));
   -- Search roots need not exist: an unused -i path must not abort loading.
@@ -294,12 +276,10 @@ module Bootstrap.Module where {
   -- Presence is decided before parsing, so an explicit malformed or ambiguous
   -- source never silently falls through to a different installed definition.
   fetchFileWithEvidenceUsingFallback parseSource paths defaults name = do {
-    let { stem = intercalate "/" (components name);
-          files = concatMap (\path ->
-            [joinPath path (stem ++ ".emlf"), joinPath path (stem ++ ".hs")]) paths };
+    let { files = moduleCandidates paths name };
     found <- findFiles files;
     if null found then fetchFileWithEvidenceUsing parseSource defaults name
-      else fetchFileWithEvidenceUsing parseSource paths name
+      else readModuleCandidate parseSource name files found
   };
   loadModuleFilesWithEvidenceUsingFallback parseSource includes defaults root input = do {
     result <- loadGraphBy loadedSource
@@ -1746,11 +1726,20 @@ module Bootstrap.Module where {
   linkModules mode supplied = mapEither fst (linkModulesUsing Surface.bindResolvedExpr Surface.closeResolvedInstance mode supplied);
   linkModulesInScopes = linkModulesUsing Surface.bindIndexedExpr Surface.closeIndexedInstance;
   linkModulesUsing = linkModulesWithScopeTable resolvedCrateValueScopes;
-  linkModulesForCompilation = linkModulesWithScopeTable
+  resolveSourceRoot :: PreludeMode -> [] SourceModule -> Either String ResolvedCrate;
+  resolveSourceRoot mode = resolveCrateWithAllocator mode M.empty freshNames;
+  linkModulesForCompilation mode supplied = do {
+    root <- resolveSourceRoot mode supplied;
+    linkResolvedForCompilation root
+  };
+  linkResolvedForCompilation = linkResolvedWithScopeTable
     (\crate -> resolvedModuleScopesIn crate (resolvedCrateModules crate)) Surface.bindIndexedExpr Surface.closeIndexedInstance;
-  linkModulesWithScopeTable scopeTable bind close mode supplied =
+  linkModulesWithScopeTable scopeTable bind close mode supplied = do {
+    root <- resolveSourceRoot mode supplied;
+    linkResolvedWithScopeTable scopeTable bind close root
+  };
+  linkResolvedWithScopeTable scopeTable bind close crate =
     do {
-      crate <- resolveCrateWithAllocator mode M.empty freshNames supplied;
       let {
         publicNames = resolvedCrateDisplayNames crate
       };

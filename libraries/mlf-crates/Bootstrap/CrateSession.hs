@@ -4,7 +4,8 @@
              MultiParamTypeClasses, OverloadedStrings #-}
 -- File-owned candidate route. No raw AST, Solver, region, or callback escapes.
 module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, compileSpecFileWithVerification, compileSpecFileUsingInstaller,
-    CompiledCrate, compiledObject, compiledInterfaces, compiledMetadata, PlanInputs(..), compilerImageDigest,
+    CompiledCrate, compiledObject, compiledInterfaces, compiledMetadata, compiledCompilerDigest, PlanInputs(..), compilerImageDigest,
+    CompilationSession, freshSession, loadPlan, compileInSession, sessionObjects,
     compileSpecFileRetainedUsingInstaller, compileSpecFileRetainedInPlan) where {
   import MLF.Primitive;
   import Bootstrap.Types;
@@ -20,11 +21,8 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.IntRank as Rank;
   import qualified Bootstrap.BuiltinPreludeContext as Builtin;
-  import Bootstrap.Crate (CrateSpec, PreparedCrate, withPreludeLoading, ensureBuiltinWith, prepareCrate,
-    withDependencies, loadSourcesInPackage, decodeSpec, specIdentity, specSources,
-    specDependencies, specCache, specMode, preparedLowered, preparedSourcePlan,
-    preparedResolution, preparedNames, preparedLayouts, preparedReach, CrateEntry(..), preparedEntryId,
-    preparedData, preparedClasses, preparedInstances, preparedEntry);
+  import Bootstrap.Crate (CrateSpec, PreparedCrate, CrateEntry(..), withPreludeLoading,
+    ensureBuiltinWith, specIdentity, specDependencies, specCache);
   import qualified Bootstrap.Crate as Crate;
   import qualified Bootstrap.CrateQuery as Query;
   import qualified Bootstrap.CrateGraph as CrateGraph;
@@ -55,136 +53,84 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   -- successful object/query publication and owns the exact checked root plus
   -- the dependency metadata snapshot used to infer it.
   data CompiledCrate = CompiledCrate Artifact.CrateObject
-    ([] ((,) String Artifact.CrateInterface)) (Maybe Artifact.PublishedMetadata);
-  compiledObject (CompiledCrate object _ _) = object;
-  compiledInterfaces (CompiledCrate _ interfaces _) = interfaces;
-  compiledMetadata (CompiledCrate _ _ metadata) = metadata;
+    ([] ((,) String Artifact.CrateInterface)) (Maybe Artifact.PublishedMetadata) String;
+  compiledObject (CompiledCrate object _ _ _) = object;
+  compiledInterfaces (CompiledCrate _ interfaces _ _) = interfaces;
+  compiledMetadata (CompiledCrate _ _ metadata _) = metadata;
+  compiledCompilerDigest (CompiledCrate _ _ _ digest) = digest;
   data PlanInputs = PlanInputs String (Map String Artifact.PublishedMetadata);
   compilerImageDigest = ioBind getExecutablePath fileDigest;
+
+  -- A fresh invocation reads dependencies from disk. A plan keeps both
+  -- indexes of each successfully published dependency under its canonical
+  -- metadata path. The artifact readers still validate the current bytes.
+  data CompilationSession = FreshSession |
+    RetainedSession PlanInputs (Map String Artifact.CrateObject);
+  freshSession = FreshSession;
+  sessionObjects FreshSession = M.empty;
+  sessionObjects (RetainedSession _ objects) = objects;
+  compileInSession :: CompilationSession -> Bool -> (String -> IO (Either String String)) ->
+    String -> String -> IO (Either String CompiledCrate);
+  compileInSession session = compileSpecFileRetainedFor (case session of {
+    FreshSession -> Nothing;
+    RetainedSession inputs _ -> Just inputs
+  });
+  loadPlan :: (String -> IO (Either String String)) -> String ->
+    IO (Either String CompilationSession);
+  loadPlan install path = do {
+    contents <- readFile path;
+    case planEntries contents of {
+      Left message -> ioReturn (Left message);
+      Right entries -> do {
+        compiler <- compilerImageDigest;
+        loadPlanEntries install compiler M.empty M.empty entries
+      }
+    }
+  };
+  planEntries contents = do {
+    fields <- Separate.unpack contents;
+    case fields of {
+      ["MLF-CRATE-PLAN-1", entries] -> do {
+        rows <- Separate.unpack entries;
+        traverseEither (\row -> do {
+          fields <- Separate.unpack row;
+          case fields of {
+            [spec, prefix] -> if eqString spec "" || eqString prefix ""
+              then Left "empty crate plan specification or output"
+              else Right ((,) spec prefix);
+            _ -> Left "invalid crate plan row"
+          }
+        }) rows
+      };
+      _ -> Left "invalid crate plan"
+    }
+  };
+  loadPlanEntries install compiler headers objects entries = let {
+    session = RetainedSession (PlanInputs compiler headers) objects
+  } in case entries of {
+    [] -> ioReturn (Right session);
+    (:) ((,) spec prefix) rest -> do {
+      result <- compileInSession session False install spec prefix;
+      case result of {
+        Left message -> ioReturn (Left message);
+        Right compiled -> case compiledMetadata compiled of {
+          Nothing -> ioReturn (Left "crate plan publication lacks metadata");
+          Just header -> do {
+            path <- canonicalPath (prefix ++ ".mlfci");
+            loadPlanEntries install compiler (M.insert compareString path header headers)
+              (M.insert compareString path (compiledObject compiled) objects) rest
+          }
+        }
+      }
+    }
+  };
 
   compilePreparedWithEncoding :: forall a. Bool -> Bool ->
     (Artifact.CrateObject -> String -> Query.QueryReport -> a) ->
     CrateSpec -> [] ((,) String Artifact.CrateInterface) -> PreparedCrate ->
     IO (Either String a);
-  compilePreparedWithEncoding verifyAll shareEncoding complete spec interfaces prepared =
-    do {
-      let {
-        lowered = preparedLowered prepared
-      };
-      let {
-        imported =
-          map
-            (\((,) _ iface) ->
-               Separate.UnitInterface (Artifact.crateId iface) [] [] [] [] []
-                 (Artifact.crateBindings iface)
-                 "metadata")
-            interfaces
-      };
-      let {
-        protected = foldl
-          (\acc entry -> M.insert compareString (fst entry)
-            (snd entry || M.findWithDefault compareString False (fst entry) acc) acc)
-          M.empty (concatMap (\p -> Artifact.crateProtection (snd p)) interfaces)
-      };
-      compiled <- case preparedSourcePlan prepared of {
-        Just plan -> if shareEncoding
-          then compileParsedSourceGroups verifyAll (specIdentity spec) (specCache spec)
-            imported protected plan
-          else Query.compileSourceGroups (specIdentity spec) (specCache spec)
-            imported protected plan;
-        Nothing -> do {
-          result <- Query.compileLoweredFileGroups (specIdentity spec) (specCache spec) imported lowered;
-          ioReturn (mapEither (\((,) fragments report) -> (,,) fragments report
-            (M.fromList compareString
-              (map (\((,) name ty) -> (,) name (Source.SourceContract ty [] True))
-                (concatMap (\f -> Separate.unitBindings (Separate.objectInterface f)) fragments)))) result)
-        }
-      };
-      case compiled of {
-        Left message -> ioReturn (Left message);
-        Right ((,,) fragments report contracts) ->
-          ioReturn
-            (do {
-               let {
-                 resolved = Modules.resolvedCrateModules (preparedResolution prepared)
-               };
-               exports <-
-                 traverseEither
-                   (\r ->
-                      mapEither
-                        (\scope ->
-                           (,) (Modules.moduleIdentity (Modules.resolvedSource r))
-                             (Set.toList (Modules.visible scope)))
-                        (Modules.resolvedExports (specMode spec) r))
-                   resolved;
-               let {
-                 dependencies =
-                   map
-                     (\path ->
-                        case find (\p -> eqString (fst p) path) interfaces of {
-                          Nothing -> panic "missing direct crate metadata";
-                          Just ((,) _ iface) ->
-                            (,,) (Artifact.crateId iface) path
-                              (Artifact.semanticFingerprint iface)
-                        })
-                     (specDependencies spec)
-               };
-               let {
-                 externalLayouts =
-                   Set.fromList compareString
-                     (concatMap
-                        (\((,) _ iface) -> map D.datatypeName (Artifact.crateLoweredData iface))
-                        interfaces)
-               };
-               let {
-                 layouts =
-                   filter (\d -> not (Set.member compareString (D.datatypeName d) externalLayouts))
-                     (preparedLayouts prepared)
-               };
-               let {
-                 modules = map (\r -> Modules.moduleIdentity (Modules.resolvedSource r)) resolved
-               };
-               let {
-                 reach =
-                   map
-                     (\name ->
-                        (,) name
-                          (Set.toList
-                             (M.findWithDefault compareString Set.empty name
-                                (preparedReach prepared))))
-                     modules
-               };
-               let {
-                 bindings =
-                   concatMap (\f -> Separate.unitBindings (Separate.objectInterface f)) fragments
-               };
-               protection <- traverseEither
-                 (\((,) name _) -> case M.lookup compareString name contracts of {
-                   Just contract -> Right ((,) name (Source.contractProtected contract));
-                   Nothing -> Left ("final source binding lacks a protection contract: " ++ name)
-                 }) bindings;
-               let {
-                 iface =
-                   Artifact.CrateInterface (specIdentity spec) dependencies modules exports reach
-                     (preparedData prepared)
-                     (preparedClasses prepared)
-                     (preparedInstances prepared)
-                     layouts
-                     bindings
-                     (preparedEntry prepared)
-                     "pending"
-                     protection
-               };
-               case Artifact.makeObjectWithPayload iface fragments of {
-                 (,) object payload -> do {
-                   Artifact.validateInterface (Artifact.objectInterface object);
-                   Right (complete object payload report)
-                 }
-               }
-             })
-      }
-    };
-
+  compilePreparedWithEncoding verifyAll shareEncoding = Crate.compilePreparedUsing
+    (if shareEncoding then compileParsedSourceGroups verifyAll else Query.compileSourceGroups);
   compileSourcesWithEncoding :: Bool -> Maybe ((,) Builtin.PreparedPrelude String) -> Bool -> CrateSpec -> [] SourceModule ->
     [] ((,) String Artifact.CrateInterface) -> String -> IO (Either String ());
   compileSourcesWithEncoding verifyAll witness = compileSourcesUsingInstaller verifyAll (ensureBuiltinWith witness);
@@ -236,7 +182,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
                       names
                 } in
                 ioReturn (Left (Modules.displayNames diagnostics message));
-              Right ((,) object metadata) -> ioReturn (Right (CompiledCrate object loaded metadata))
+              Right ((,,) object metadata compiler) -> ioReturn (Right (CompiledCrate object loaded metadata compiler))
             }
           }
       }
@@ -294,7 +240,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
               published <- QueryGraph.publish session;
               QueryGraph.elapsed (CrateGraph.statistics state) 5 publishStarted;
               QueryGraph.writeProfile (prefix ++ ".query-profile") (CrateGraph.statistics state);
-              ioReturn (mapEither (\_ -> (,) object metadata) published)
+              ioReturn (mapEither (\_ -> (,,) object metadata compiler) published)
             } }
           } }
         }
@@ -445,7 +391,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
     result <- compileSpecFileRetainedUsingInstaller verifyAll install file prefix;
     ioReturn (mapEither (\_ -> ()) result)
   };
-  compileSpecFileRetainedUsingInstaller = compileSpecFileRetainedFor Nothing;
+  compileSpecFileRetainedUsingInstaller = compileInSession freshSession;
   compileSpecFileRetainedInPlan inputs = compileSpecFileRetainedFor (Just inputs);
   compileSpecFileRetainedFor planInputs verifyAll install file prefix = let {
     load = case planInputs of {
@@ -453,39 +399,15 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
       Just (PlanInputs _ retained) -> Artifact.loadGraphRetaining retained
     }
   } in do {
-      present <- fileExists file;
-      if not present
-      then ioReturn (Left ("crate specification does not exist: " ++ file))
-      else do {
-             text <- readFile file;
-             case decodeSpec text of {
-               Left message -> ioReturn (Left message);
-               Right spec ->
-                 do {
-                   sourceResult <- loadSourcesInPackage (specIdentity spec) (specSources spec);
-                   paths <- mapM canonicalPath (specDependencies spec);
-                   let {
-                     normalized = withDependencies spec paths
-                   };
-                   dependencies <- load [] [] paths;
-                   case do {
-                          sources <- sourceResult;
-                          interfaces <- dependencies;
-                          Right ((,) sources interfaces)
-                        } of {
-                     Left message -> ioReturn (Left message);
-                     Right ((,) sources interfaces) ->
-                       -- loadInterfaces admitted every existing metadata value. Keep
-                       -- that snapshot for inference and check any newly installed
-                       -- dependency through the same graph loader.
-                       compileSourcesRetainedUsingPlan planInputs (Crate.withPreludeMetadata (compose Right fst)
-                         (load [] interfaces))
-                         verifyAll install True normalized sources interfaces prefix
-                   }
-                 }
-             }
-           }
-    };
+    loaded <- Crate.loadSpecFile (load [] []) file;
+    case loaded of {
+      Left message -> ioReturn (Left message);
+      Right ((,,) spec sources interfaces) ->
+        compileSourcesRetainedUsingPlan planInputs
+          (Crate.withPreludeMetadata (compose Right fst) (load [] interfaces))
+          verifyAll install True spec sources interfaces prefix
+    }
+  };
 
   runSourceGroupsWithEncodings :: Maybe Query.SourceEncodings -> String -> String -> String ->
     Query.TypeInventory -> Source.SourcePlan -> [] ([] String) -> Map String Source.SourceContract ->
@@ -757,43 +679,11 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
     };
 
   finishCompilation :: (,) SProgram (Map String String) -> Either CompileError Compiler.Compilation;
-  finishCompilation ((,) program names) =
-    case program of {
-      SClassProgram _ _ _ _ ->
-        Left (CompileError Inference "class translation did not produce a core program");
-      SProgram declarations expression ->
-        do {
-          constraints <- Compiler.atPhase Inference (C.generateProgram program);
-          solved <- Compiler.atPhase Inference (solveGenerated constraints);
-          let {
-            graph = S.solverGraph solved
-          };
-          let {
-            types = E.prepareValidatedSolvedTypes solved
-          };
-          evidence <- Compiler.atPhase Resolution (E.resolveEvidenceIn types (C.skeleton constraints));
-          body <-
-            Compiler.atPhase Elaboration
-              (E.elaboratePreparedIn types solved evidence (C.skeleton constraints));
-          let {
-            term = if L.null declarations then body else XWithData declarations body
-          };
-          checked <- Compiler.atPhase Verification (Checked.check term);
-          let {
-            ty = Checked.typeOf checked
-          };
-          let {
-            expected = E.schemeTypeIn types (C.generalization (C.skeleton constraints))
-          };
-          if L.not (T.alphaEq ty expected)
-          then Left (CompileError Verification "elaboration changed the inferred type")
-          else if L.not
-                    (X.equalErased (X.erase term)
-                       (C.eraseSourceWith evidence (C.skeleton constraints)))
-               then Left (CompileError Verification "elaboration changed source erasure")
-               else Right (Compiler.Compilation checked graph (Classes.prettyQualified names ty))
-        }
-    };
+  finishCompilation = Compiler.finishSolvedCompilation E.prepareValidatedSolvedTypes (\program -> do {
+    constraints <- C.generateProgram program;
+    solved <- solveGenerated constraints;
+    Right ((,) constraints solved)
+  });
 
   -- Private epoch state: old Graph/ScopeIndex values are immutable, while the
   -- Store always denotes the CURRENT epoch. Never use an old Session as history.

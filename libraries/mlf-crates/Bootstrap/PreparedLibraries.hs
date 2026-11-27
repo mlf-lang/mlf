@@ -173,9 +173,6 @@ module Bootstrap.PreparedLibraries
     any (\source -> not (elem eqString (Modules.moduleIdentity source) selected) &&
       any (\name -> S.member compareString name protected &&
         not (D.sourceBuiltinType name || D.sourceBuiltinConstructor name)) (Modules.sourceUsed source)) sources;
-  original mode sources names = mapEither (\compiled ->
-    Compilation (Core.checkedTerm compiled) (Core.sourceType compiled) False names)
-    (Compiler.compileLinked mode sources);
   compileLoadedV1 registry mode loaded = let {
     sources = Modules.loadedSources loaded;
     entries = Modules.loadedEntries loaded;
@@ -183,13 +180,12 @@ module Bootstrap.PreparedLibraries
       (filter (matches mode entries) registry);
     planned = Modules.prepareCrateResolution mode M.empty sources;
     resolution = bindEither planned (Modules.resolveCratePlan Modules.freshNames);
-    -- The normal result does not force this qualification-only name inventory.
-    -- An ineligible program must not pay for a second module resolution.
-    ordinaryNames = case resolution of {
-      Left _ -> Modules.Names M.empty;
-      Right value -> Modules.resolvedCrateNames value
-    };
-    fallback = original mode sources ordinaryNames
+    fallback = do {
+      root <- Core.atPhase ModuleResolution resolution;
+      compiled <- Compiler.compileResolvedRoot root;
+      Right (Compilation (Core.checkedTerm compiled) (Core.sourceType compiled) False
+        (Modules.resolvedCrateNames root))
+    }
   } in
     case candidates of {
       [] -> fallback;
@@ -210,14 +206,9 @@ module Bootstrap.PreparedLibraries
           }
       }
     };
-  canonicalParts resolution = do {
-    let { resolved = Modules.resolvedCrateModules resolution };
-    ds <- D.canonicalSourceDeclarations []
-      (concatMap (compose Modules.renamedDatatypes Modules.resolvedContents) resolved);
-    cs <- Classes.canonicalSourceClasses S.empty ds []
-      (concatMap (compose Modules.renamedClasses Modules.resolvedContents) resolved);
-    Right ((,) ds cs)
-  };
+  canonicalHeaders resolved = Classes.canonicalSourceHeaders S.empty [] []
+    (concatMap (compose Modules.renamedDatatypes Modules.resolvedContents) resolved)
+    (concatMap (compose Modules.renamedClasses Modules.resolvedContents) resolved);
   supportNames klass = append ["Dict_" ++ Modules.className klass, "Make_" ++ Modules.className klass]
     (append (map (\method -> "select_" ++ fst method) (Modules.classMethods klass))
       (map (\index -> "super_" ++ Modules.className klass ++ "_" ++ showInt index)
@@ -239,9 +230,7 @@ module Bootstrap.PreparedLibraries
       "prepared library support identity collision";
     -- Exact source header correspondence is checked independently of the
     -- opaque bodies. The full fresh order below remains the layout authority.
-    ds <- D.canonicalSourceDeclarations [] (concatMap (compose Modules.renamedDatatypes Modules.resolvedContents) imported);
-    cs <- Classes.canonicalSourceClasses S.empty ds []
-      (concatMap (compose Modules.renamedClasses Modules.resolvedContents) imported);
+    (,) ds cs <- canonicalHeaders imported;
     ensure (Artifact.sameDeclarations ds (concatMap Artifact.crateData (interfaces raw)))
       "prepared library source datatype mismatch";
     ensure (eqString (Artifact.sourceMetadata [] cs [])
@@ -410,7 +399,11 @@ module Bootstrap.PreparedLibraries
     Just table -> Parameters.fromGenerated table signatures;
     Nothing -> Left "prepared library lowering lost its declaration table"
   };
-  compileNativeResolvedRootV1 raw resolution = do {
+  -- Inference checks the root against the same selected import signatures
+  -- whether the implementations will be grafted from xMLF or linked as objects.
+  data CheckedLibraryRoot = CheckedLibraryRoot Imported.Compilation Parameters.Signatures (Map String XType);
+  checkLibraryRoot :: RawLibrary -> Modules.ResolvedCrate -> Either CompileError CheckedLibraryRoot;
+  checkLibraryRoot raw resolution = do {
     let { display = Modules.displayNames (Modules.resolvedCrateDisplayNames resolution);
           sourcePhase phase result = Core.atPhase phase (mapLeft display result);
           resolved = Modules.resolvedCrateModules resolution;
@@ -421,7 +414,7 @@ module Bootstrap.PreparedLibraries
           entryModule = last resolved };
     entry <- sourcePhase ModuleResolution (Modules.entryExpr resolution entryModule);
     body <- sourcePhase ModuleResolution (Surface.bindIndexedExpr bindings entry);
-    parts <- sourcePhase Inference (canonicalParts resolution);
+    parts <- sourcePhase Inference (canonicalHeaders resolved);
     instances <- sourcePhase Inference (instanceRows raw resolution bindings);
     let { signatures = M.fromList compareString (concatMap Artifact.crateBindings (interfaces raw));
           dictionaries = M.fromList compareString
@@ -438,11 +431,14 @@ module Bootstrap.PreparedLibraries
       (SClassProgram (fst parts) (snd parts) (map snd instances) body));
     imports <- sourcePhase Verification (wrapperImports full signatures);
     selected <- sourcePhase Verification (Parameters.select imports (fst full));
-    let { lowered = fst selected; selectedSignatures = Parameters.project (snd selected);
-          diagnostic = Modules.displayNames (M.union compareString (M.map display (snd lowered))
-            (Modules.resolvedCrateDisplayNames resolution)) };
-    compiled <- mapLeft (\(CompileError phase message) -> CompileError phase (diagnostic message))
-      (Imported.finishSelected (snd selected) lowered);
+    compiled <- Compiler.finishWithSourceNames (Modules.resolvedCrateDisplayNames resolution)
+      (Imported.finishSelected (snd selected)) (fst selected);
+    Right (CheckedLibraryRoot compiled imports (Parameters.project (snd selected)))
+  };
+  compileNativeResolvedRootV1 raw resolution = do {
+    CheckedLibraryRoot compiled imports selectedSignatures <- checkLibraryRoot raw resolution;
+    let { display = Modules.displayNames (Modules.resolvedCrateDisplayNames resolution);
+          sourcePhase phase result = Core.atPhase phase (mapLeft display result) };
     let { wrapper = Imported.checkedWrapper compiled;
           declarations = case Checked.term wrapper of { XWithData ds _ -> ds; _ -> [] } };
     Core.atPhase Verification (do {
@@ -477,39 +473,10 @@ module Bootstrap.PreparedLibraries
       (Imported.inferredType compiled) declarations (length (filter (\key -> S.member compareString key builtinKeys) (M.keys usedSignatures))) imports)
   };
   compilePreparedV1 raw admitted resolution = do {
+    CheckedLibraryRoot compiled _ selectedSignatures <- checkLibraryRoot raw resolution;
     let { linked = libraryState admitted;
           display = Modules.displayNames (Modules.resolvedCrateDisplayNames resolution);
-          sourcePhase phase result = Core.atPhase phase (mapLeft display result);
-          resolved = Modules.resolvedCrateModules resolution;
-          ownership = owners raw;
-          own = filter (\entry -> not (M.member compareString
-            (Modules.moduleIdentity (Modules.resolvedSource entry)) ownership)) resolved;
-          bindings = Modules.boundIn resolution own;
-          entryModule = last resolved };
-    entry <- sourcePhase ModuleResolution (Modules.entryExpr resolution entryModule);
-    body <- sourcePhase ModuleResolution (Surface.bindIndexedExpr bindings entry);
-    parts <- sourcePhase Inference (canonicalParts resolution);
-    instances <- sourcePhase Inference (instanceRows raw resolution bindings);
-    let { signatures = M.fromList compareString (concatMap Artifact.crateBindings (interfaces raw));
-          dictionaries = M.fromList compareString
-            (map (\klass -> (,) ("Dict_" ++ Modules.className klass) (Modules.className klass)) (snd parts));
-          sourceValues = S.fromList compareString (concatMap
-            (compose Modules.renamedValueNames Modules.resolvedContents)
-            (filter (\r -> M.member compareString (Modules.moduleIdentity (Modules.resolvedSource r)) ownership) resolved));
-          externals = M.mapWithKey (\name ty -> if S.member compareString name sourceValues
-            then Separate.sourceScheme dictionaries ty else Separate.sourceSchemeIn M.empty False ty) signatures };
-    let { conventions = M.mapWithKey (\name ty -> if S.member compareString name sourceValues
-            then Separate.importClasses dictionaries ty else []) signatures };
-    full <- sourcePhase Inference (Classes.lowerSeparateClassesAndSlotsWithImports conventions externals (map fst instances)
-      (Modules.resolvedModuleScopesIn resolution own) (Modules.resolvedCrateInstanceScopes resolution)
-      (SClassProgram (fst parts) (snd parts) (map snd instances) body));
-    imports <- sourcePhase Verification (wrapperImports full signatures);
-    selected <- sourcePhase Verification (Parameters.select imports (fst full));
-    let { lowered = fst selected; selectedSignatures = Parameters.project (snd selected);
-          diagnostic = Modules.displayNames (M.union compareString (M.map display (snd lowered))
-            (Modules.resolvedCrateDisplayNames resolution)) };
-    compiled <- mapLeft (\(CompileError phase message) -> CompileError phase (diagnostic message))
-      (Imported.finishSelected (snd selected) lowered);
+          sourcePhase phase result = Core.atPhase phase (mapLeft display result) };
     let { fresh = snd (Separate.freshObject (Artifact.fragmentSerial linked)
             (Checked.term (Imported.checkedWrapper compiled)));
           rootData = case fresh of { XWithData declarations _ -> declarations; _ -> [] } };

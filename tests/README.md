@@ -132,13 +132,16 @@ Root builds and nested test builds share a checked artifact store through
 `{cache}` and `--cache-dir`. Each test group keeps its own `suite-build` report
 and logs. Source/tool identities, artifact checksums and recursive dependency
 receipts still control reuse; a fresh self-host stage keeps a new store.
-Prepared port targets and source driver LLVM now use the compiler module loader's
-current import closure, including ordered search roots and newly introduced
-module shadows. Search roots come from the resolved package graph, including
-the compiler libraries under `libraries/`; Port also includes `tests/`.
-Unrelated example, benchmark and test files remain in the full
-verification snapshot without invalidating these artifacts. Port targets retain
-their independent checking and serialization receipts.
+Port preparation resolves each fixture's imports using the compiler's search
+order, including `tests/` and the packages under `libraries/`. Each target
+retains its independent checking and serialization receipts.
+
+`bootstrap/mlf-package.json` declares the `runtime` and `llvm` driver targets.
+On a cache miss, driver preparation executes the package build plan through LLVM
+emission, then links the runtime and trace objects required by the matrix.
+The transferable LLVM artifact binds the compiler, builder, target manifest
+and inputs of the participating packages. A fresh group can reuse that
+artifact directly.
 Driver LLVM objects, native links, runtime objects and trace objects also share
 checked artifacts. Their keys include actual native inputs, resolved C headers,
 library bytes, compiler/environment identities and ordered flags. Group reports
@@ -157,12 +160,9 @@ RuntimeDriver, while Port retains its own runtime preparation.
 Self-host selects the candidate artifact from its actual package build report,
 checks that report's source snapshot and retains a copy. Equal native binary
 hashes elsewhere in the shared store do not identify the producing LLVM input.
-The backend group's two test drivers preserve the source frontend's verified LLVM; crate linking
-regressed RuntimeDriver's interpreter performance. Their LLVM artifacts are
-shared by actual source/tool identity, and each test group retains its own
-traced runtime linking. Port prepares only LLVMDriver; it does not build or launch
-an outer RuntimeDriver. Focused interpreter coverage remains in backends, parity,
-package integration and the LLVM-compiled RuntimeCases/StateRuntime probes.
+Port prepares only LLVMDriver. The backends and parity groups exercise the
+interpreter, alongside package integration and the LLVM-compiled RuntimeCases
+and StateRuntime probes.
 
 Port preparation compiles each of the 25 fixtures once per source/tool identity.
 It checks the inferred target with the independent checker, checks its serialized

@@ -15,6 +15,7 @@ module Tests.CompilerTests where {
   import qualified Package.Command as C;
   import qualified Package.Verification as V;
   import qualified Package.Manifest as M;
+  import qualified Package.Scheduler as Jobs;
   import qualified Tests.Coverage as Coverage;
   import qualified Tests.TestDrivers as TD;
   import qualified Tests.TestSources as TS;
@@ -831,13 +832,13 @@ module Tests.CompilerTests where {
                  ((:) "1 target dependency integration test passed"
                     ((:) "28 checked package release cases passed" [])))))
     };
-  testBuilder :: TestContext -> String -> IO B.Builder;
+  testBuilder :: TestContext -> String -> String -> IO B.Builder;
   -- Build.create fingerprints the executable actually running its build/cache
   -- code. Here that is the campaign runner, distinct from the package manager
   -- used for nested CLI builds and recorded separately in verification.json.
-  testBuilder c name =
+  testBuilder c manifest name =
     do {
-      graph <- M.load (root c ++ "/mlf-package.json");
+      graph <- M.load (O.join (root c) manifest);
       let {
         options =
           B.info
@@ -849,46 +850,33 @@ module Tests.CompilerTests where {
       configured <- C.configureGC (root c) options;
       B.create graph configured (output c ++ ("/" ++ name))
     };
-  driverIR :: TestContext -> B.Builder -> String -> IO String;
-  -- Share the verified source frontend output. The crate-linked interpreter
-  -- regressed the nested compiler workloads despite identical fixture targets.
-  driverIR c builder name =
-    do {
-      let {
-        entry = (root c ++ ("/bootstrap/" ++ (name ++ ".emlf")))
-      };
-      let {
-        roots = TS.packageRoots (B.graph builder)
-      };
-      inputs <- TS.sourceInputs roots entry;
-      let {
-        identity =
-          B.info
-            ((:) ((,) "format" (J.num 2))
-               ((:) ((,) "compiler" (J.get "compiler" (B.tools builder)))
-                  ((:) ((,) "manager" (J.get "manager" (B.tools builder)))
-                     ((:) ((,) "source_inputs" inputs)
-                        ((:) ((,) "entry" (J.str entry))
-                           ((:) ((,) "frontend" (J.str "source --emit-llvm-gc")) []))))))
-      };
-      B.cached builder ("source " ++ (name ++ " LLVM")) identity
-        (\work ->
-           do {
-             ignored <-
-               B.capture builder (root c)
-                 (S.append ((:) (compiler c) [])
-                    (S.append (S.concatMap (\path -> (:) "-i" ((:) path [])) roots)
-                       ((:) "--emit-llvm-gc" ((:) entry []))))
-                 ""
-                 (work ++ "/program.ll");
-             text <- readFile (work ++ "/program.ll");
-             O.require (stringLength text > 0) "test driver emitted empty LLVM"
-           })
-    };
+  driverIR :: B.Builder -> String -> String -> IO String;
+  driverIR builder name targetName = do {
+    let { graph = B.graph builder;
+          package = M.rootPackage graph;
+          target = J.get targetName (J.get "executables" (M.packageData package)) };
+    plan <- Jobs.llvmPlan builder targetName target;
+    inputs <- B.hashFiles (Jobs.llvmPlanFiles graph plan);
+    let { identity = B.info [(,) "compiler" (J.get "compiler" (B.tools builder)),
+                             (,) "manager" (J.get "manager" (B.tools builder)),
+                             (,) "target" (J.str targetName), (,) "files" inputs] };
+    B.cached builder ("crate " ++ (name ++ " LLVM")) identity (\work -> do {
+      emitted <- Jobs.executeLLVMPlan builder plan;
+      stamp <- J.read (emitted ++ "/artifact.json");
+      let { expected = J.getText "program.ll" "" (J.get "files" stamp);
+            outputPath = work ++ "/program.ll" };
+      O.copy (emitted ++ "/program.ll") outputPath;
+      actual <- fileDigest outputPath;
+      emptyDigest <- ioBind (byteArrayFromString "") byteArrayDigest;
+      O.require (eqString actual expected && S.not (eqString actual emptyDigest))
+        "test driver LLVM is empty or differs from its emission receipt";
+      B.verifyHashes inputs
+    })
+  };
   prepareDrivers :: TestContext -> Bool -> IO ([] String);
   prepareDrivers c portFixtures =
     do {
-      builder <- testBuilder c "driver-build";
+      builder <- testBuilder c "bootstrap/mlf-package.json" "driver-build";
       flags <- nativeFlags c;
       native <- TD.nativeIdentity builder (S.append flags ((:) "-lm" []));
       let {
@@ -928,12 +916,12 @@ module Tests.CompilerTests where {
       extra <- stack c;
       drivers <-
         S.mapM
-          (\name ->
+          (\((,) name targetName) ->
              do {
                let {
                  ir = (output c ++ ("/" ++ (name ++ ".ll")))
                };
-               emitted <- driverIR c builder name;
+               emitted <- driverIR builder name targetName;
                O.copy (emitted ++ "/program.ll") ir;
                object <- B.nativeLLVMObject builder emitted;
                let {
@@ -967,10 +955,11 @@ module Tests.CompilerTests where {
                return
                  ((,) name
                     (J.set "artifacts" (J.Object receipts)
-                       (J.set "frontend" (J.str "source")
+                       (J.set "frontend" (J.str "crate")
                           (B.obj2 "sha256" (J.str hash) "llvm_sha256" (J.str llvm)))))
              })
-          (if portFixtures then (:) "LLVMDriver" [] else O.words "RuntimeDriver LLVMDriver");
+          (S.append (if portFixtures then [] else [(,) "RuntimeDriver" "runtime"])
+            [(,) "LLVMDriver" "llvm"]);
       B.copyWindowsFiles builder (output c);
       B.finish builder;
       buildHash <- fileDigest (B.reportPath builder);
@@ -1357,7 +1346,7 @@ module Tests.CompilerTests where {
   -- only the cache identity above uses the new dependency-specific format.
   preparePortSelection c binary selected shard =
     do {
-      builder <- testBuilder c "port-preparation";
+      builder <- testBuilder c "mlf-package.json" "port-preparation";
       originalCollection <- getEnv "GC_FREE_SPACE_DIVISOR";
       requestedCollection <- getEnv "MLF_TEST_MATRIX_GC_DIVISOR";
       memoryCollection <-

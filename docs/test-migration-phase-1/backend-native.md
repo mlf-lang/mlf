@@ -38,8 +38,8 @@ The default, `--families`, and `--from` paths now use one registry, and
 `--list`, `--exact`, `--format`, and `--report` use the common runner.
 The parent maintains its family and matrix receipts alongside the case
 report. Routine CI supplies the GHC-hosted -O0 compiler and manager, and the
-C build runner is built explicitly. The campaign builds the traced runtime
-interpreter and the LLVM driver from source using that producer. These
+C build runner is built explicitly. The campaign uses that producer to compile the `runtime` and `llvm` targets
+in `bootstrap/mlf-package.json` through package LLVM emission. These
 driver binaries retain the test-only stdio interposition required for raw
 byte traces. The native release campaign retains the self-built producer.
 

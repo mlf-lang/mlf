@@ -91,6 +91,21 @@ supports its existing explicitly polymorphic recursion. Acyclic declarations
 retain separate generalization. Unrestricted inferred polymorphic recursion is
 not added by this migration. See the [migration evidence](crate-migration.md).
 
+## Compiler entry points
+
+Use `emlf` for a source file, an expression or standard input, and `mlfpkg build`
+for a package target. An individual file keeps its existing generalization
+boundaries across its imports. The package manifest defines which modules form
+an independently compiled unit.
+
+Source resolution supplies the names and instance scopes for the root. When
+a checked library is available, the root is checked against its selected import
+signatures. Installed native code uses that checked root with the installation's
+export layout. A separately compiled crate publishes its interface and checked
+object before either can be retained in a compiler session. Disk and retained
+objects enter the same linker, including its Prelude admission checks.
+`emlf --help tools` lists the commands for running a stage independently.
+
 ## Artifacts
 
 `emlf --compile-crate SPEC -o PREFIX` writes:

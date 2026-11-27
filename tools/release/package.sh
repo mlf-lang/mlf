@@ -105,7 +105,7 @@ for group in $groups; do
     ($v.drivers | keys) == (if $group == "port" then ["LLVMDriver"] else ["LLVMDriver","RuntimeDriver"] end) and
     all($v.drivers | to_entries[];
       .key as $name | .value as $driver |
-      $driver.frontend == "source" and
+      $driver.frontend == "crate" and
       ($driver.sha256 | digest) and ($driver.llvm_sha256 | digest) and
       ($driver.artifacts | keys) ==
         (if $name == "RuntimeDriver" then ["linked","llvm","object","runtime","trace"] else ["linked","llvm","object","runtime"] end) and
@@ -116,7 +116,7 @@ for group in $groups; do
         ($receipt.cached | type == "boolean") and
         $receipt.directory == ($b.cache_directory + "/" + $receipt.key) and
         $receipt.kind ==
-          (if $stage == "llvm" then "source " + $name + " LLVM" elif $stage == "object" then "LLVM object" elif $stage == "linked" then "test driver native link" else "test driver C object" end) and
+          (if $stage == "llvm" then $driver.frontend + " " + $name + " LLVM" elif $stage == "object" then "LLVM object" elif $stage == "linked" then "test driver native link" else "test driver C object" end) and
         any($b.builds[]; . == ($receipt | {kind,key,cached})) and
         ($receipt.files | keys) ==
           [if $stage == "llvm" then "program.ll" elif $stage == "object" then "program.o" elif $stage == "linked" then "program" else "object.o" end] and

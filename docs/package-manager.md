@@ -164,8 +164,10 @@ For example, `./mlfpkg test --target unit --target packages` selects two groups.
 Plain `test` runs every declared group. Every selected test command executes;
 test-group results are not cached. Checked build artifacts and port preparation
 can be shared, while the compact-GC layout and backend executions still run.
-Port preparation and source driver LLVM track their resolved import closures
-rather than the complete repository inventory. Driver native objects and links
+Port preparation tracks the resolved source imports of each fixture. The backend
+drivers use the same package build actions through LLVM emission as ordinary
+executables. Their transferable LLVM artifact covers the target and its declared
+dependency inputs. Driver native objects and links
 are cached with their native toolchain, headers, libraries and ordered flags;
 each group's verification report records the actual artifact keys and reuse.
 The retained `driver-build/build-report.json` is bound by its SHA-256 in that

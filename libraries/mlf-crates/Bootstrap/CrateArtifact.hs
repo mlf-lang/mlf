@@ -755,10 +755,9 @@ module Bootstrap.CrateArtifact where {
       let {
         modules = Modules.resolvedCrateModules resolution
       };
-      sourceData <- D.canonicalSourceDeclarations []
-        (concatMap (\r -> Modules.renamedDatatypes (Modules.resolvedContents r)) modules);
-      classes <- Classes.canonicalSourceClasses Set.empty sourceData []
-        (concatMap (\r -> Modules.renamedClasses (Modules.resolvedContents r)) modules);
+      (,) sourceData classes <- Classes.canonicalSourceHeaders Set.empty [] []
+        (concatMap (compose Modules.renamedDatatypes Modules.resolvedContents) modules)
+        (concatMap (compose Modules.renamedClasses Modules.resolvedContents) modules);
       let {
         values = concatMap (\r -> Modules.renamedValues (Modules.resolvedContents r)) modules
       };
@@ -2008,30 +2007,85 @@ module Bootstrap.CrateArtifact where {
   loadInterfaces = loadInterfacesProfiled Nothing;
   loadInterfacesProfiled profile paths = loadGraphProfiled profile [] [] paths;
   linkCheckedFile = linkCheckedFileProfiled Nothing;
-  linkCheckedFileProfiled profile path =
-    do {
-      loaded <- loadInterfacesProfiled profile ((:) path []);
-      case loaded of {
-        Left e -> ioReturn (Left e);
-        Right interfaces ->
-          do {
-            objects <-
-              mapM (\((,) metadata iface) ->
-                readObjectWithInterfacesProfiled profile (map snd interfaces) (objectPath metadata) iface) interfaces;
-            case sequenceEither objects of {
-              Left message -> ioReturn (Left message);
-              Right os -> case reverse interfaces of {
-                [] -> ioReturn (Left "no root crate metadata");
-                (:) ((,) _ root) _ -> if any envelopeMarked os
-                  then Host.phaseValue profile "link_ms" (Host.phaseEither (\value -> seq value ()))
-                    (linkCheckedObjects os (crateId root))
-                  else linkCheckedObjectsV1Profiled profile finishLinkedState
-                    (FragmentState 0 M.empty [] [] Set.empty) [] os (crateId root)
+  linkCheckedFileProfiled profile = linkCheckedFileUsing profile (\_ _ -> ioReturn Nothing);
+  linkCheckedFileUsing profile admitPrelude path = do {
+    loaded <- loadInterfacesProfiled profile [path];
+    case loaded of {
+      Left message -> ioReturn (Left message);
+      Right interfaces -> linkCheckedClosure profile admitPrelude M.empty interfaces Nothing
+    }
+  };
+
+  -- A file-owned root is already checked in this process; a disk root is the
+  -- last entry in the admitted dependency graph. Both link the same closure.
+  linkCheckedClosure :: Maybe Host.PhaseProfile ->
+    (String -> CrateInterface -> IO (Maybe ([] CrateObject -> String -> IO (Either String Checked.CheckedTerm)))) ->
+    Map String CrateObject -> [] ((,) String CrateInterface) -> Maybe CrateObject ->
+    IO (Either String Checked.CheckedTerm);
+  linkCheckedClosure profile admitPrelude retained interfaces compiledRoot = let {
+    storedInterfaces = map snd interfaces;
+    available = maybe storedInterfaces (\object -> (:) (objectInterface object) storedInterfaces) compiledRoot;
+    loadObject = readClosureObject profile retained available;
+    loadObjects rows = do {
+      results <- mapM loadObject rows;
+      ioReturn (mapEither (\objects -> maybe objects (snoc objects) compiledRoot) (sequenceEither results))
+    };
+    ordinary objects name = if any envelopeMarked objects
+      then Host.phaseValue profile "link_ms" (Host.phaseEither (\value -> seq value ()))
+        (envelopeLinkCheckedObjects objects name)
+      else linkCheckedObjectsV1Profiled profile finishLinkedState
+        (FragmentState 0 M.empty [] [] Set.empty) [] objects name;
+    linkAll name = do {
+      loaded <- loadObjects interfaces;
+      case loaded of { Left message -> ioReturn (Left message); Right objects -> ordinary objects name }
+    };
+    link name = case interfaces of {
+      (:) first@((,) path iface) rest -> if not (eqString (crateId iface) builtinCrateIdentity)
+        then linkAll name else do {
+          admitted <- admitPrelude path iface;
+          case admitted of {
+            Nothing -> linkAll name;
+            Just finish -> do {
+              loaded <- loadObjects rest;
+              case loaded of {
+                Left message -> ioReturn (Left message);
+                Right objects -> if not (any envelopeMarked objects) then finish objects name else do {
+                  -- Envelope limits cover the whole assembled closure, including the Prelude.
+                  builtin <- loadObject first;
+                  case builtin of {
+                    Left message -> ioReturn (Left message);
+                    Right object -> ordinary ((:) object objects) name
+                  }
+                }
               }
             }
           }
+        };
+      [] -> linkAll name
+    }
+  } in case compiledRoot of {
+    Just object -> link (crateId (objectInterface object));
+    Nothing -> case reverse interfaces of {
+      [] -> ioReturn (Left "no root crate metadata");
+      (:) ((,) _ root) _ -> link (crateId root)
+    }
+  };
+  readClosureObject profile retained available ((,) metadata expected) = let {
+    path = objectPath metadata;
+    ordinary = readObjectWithInterfacesProfiled profile available path expected
+  } in case M.lookup compareString metadata retained of {
+    Just object@(OpenCrateObject saved _) -> if not (sameAdmittedInterface expected saved) then ordinary else do {
+      bytes <- Storage.readRaw path;
+      case bytes of {
+        Left _ -> ordinary;
+        Right input -> do {
+          digest <- byteArrayDigest input;
+          if eqString digest (crateObjectFingerprint saved) then ioReturn (Right object) else ordinary
+        }
       }
     };
+    _ -> ordinary
+  };
   linkFile path =
     do {
       linked <- linkCheckedFile path;

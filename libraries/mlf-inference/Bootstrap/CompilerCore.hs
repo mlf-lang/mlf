@@ -48,7 +48,11 @@ module Bootstrap.CompilerCore where {
   });
   finishFileCompilation :: (,) SProgram (Map String String) -> Either CompileError Compilation;
   finishFileCompilation = finishCompilationUsing C.generateAndSolveFileProgram;
-  finishCompilationUsing infer ((,) program names) =
+  finishCompilationUsing = finishSolvedCompilation E.prepareSolvedTypes;
+  finishSolvedCompilation :: (Solver -> E.TypeContext) ->
+    (SProgram -> Either String ((,) Constraints Solver)) ->
+    (,) SProgram (Map String String) -> Either CompileError Compilation;
+  finishSolvedCompilation prepareTypes infer ((,) program names) =
     case program of {
       SClassProgram _ _ _ _ ->
         Left (CompileError Inference "class translation did not produce a core program");
@@ -59,7 +63,7 @@ module Bootstrap.CompilerCore where {
             graph = Solver.solverGraph solved
           };
           let {
-            types = E.prepareSolvedTypes solved
+            types = prepareTypes solved
           };
           evidence <- atPhase Resolution (E.resolveEvidenceIn types (C.skeleton constraints));
           body <-

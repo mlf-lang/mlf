@@ -234,15 +234,21 @@ module Bootstrap.Classes where {
             (superclasses declaration)) declarations);
         freshPure (map canonicalSourceClass ownHeaders)
       });
+  -- Only declarations owned by this compilation unit are normalized. Checked
+  -- dependency declarations supply the layout and class context for validation.
+  canonicalSourceHeaders :: Set String -> [] DataDecl -> [] SClassDecl ->
+                            [] DataDecl -> [] SClassDecl -> Either String ((,) ([] DataDecl) ([] SClassDecl));
+  canonicalSourceHeaders importedNames checkedData checkedClasses datatypes classes = do {
+    ownData <- D.canonicalSourceDeclarations checkedData datatypes;
+    ownClasses <- canonicalSourceClasses importedNames (append checkedData ownData) checkedClasses classes;
+    Right ((,) ownData ownClasses)
+  };
   canonicalSourceProgram :: Set String -> SProgram -> Either String SProgram;
-  canonicalSourceProgram importedNames original = do {
-    program <- D.canonicalSourceProgram original;
-    case program of {
-      SProgram _ _ -> Right program;
-      SClassProgram datatypes declarations instances body -> do {
-        normalized <- canonicalSourceClasses importedNames datatypes [] declarations;
-        Right (SClassProgram datatypes normalized instances body)
-      }
+  canonicalSourceProgram importedNames original = case original of {
+    SProgram _ _ -> D.canonicalSourceProgram original;
+    SClassProgram datatypes classes instances body -> do {
+      (,) ownData ownClasses <- canonicalSourceHeaders importedNames [] [] datatypes classes;
+      Right (SClassProgram ownData ownClasses instances body)
     }
   };
   unique :: String -> [] String -> Either String ();

@@ -92,11 +92,12 @@ def export(report_path, output):
     for name, driver in report['drivers'].items():
         stages = driver['artifacts']
         expected = set(OUTPUTS) if name == 'RuntimeDriver' else set(OUTPUTS) - {'trace'}
-        require(driver.get('frontend') == 'source' and set(stages) == expected,
+        frontend = driver.get('frontend')
+        require(frontend in ('source', 'crate') and set(stages) == expected,
                 f'incomplete driver stages: {name}')
         for stage, row in stages.items():
             key = digest(row['key'])
-            kind = {'llvm': f'source {name} LLVM', 'object': 'LLVM object',
+            kind = {'llvm': f'{frontend} {name} LLVM', 'object': 'LLVM object',
                     'linked': 'test driver native link'}.get(stage, 'test driver C object')
             decision = {'key': key, 'kind': kind, 'cached': row['cached']}
             require(row['kind'] == kind and type(row['cached']) is bool and decision in build['builds'],

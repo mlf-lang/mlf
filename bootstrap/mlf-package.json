@@ -1,0 +1,29 @@
+{
+  "format": 1,
+  "name": "mlf-backend-drivers",
+  "version": "0.3.0",
+  "dependencies": {
+    "mlf-foundation": {
+      "path": "../libraries/mlf-foundation"
+    },
+    "mlf-interpreter": {
+      "path": "../libraries/mlf-interpreter"
+    },
+    "mlf-llvm": {
+      "path": "../libraries/mlf-llvm"
+    },
+    "mlf-xmlf": {
+      "path": "../libraries/mlf-xmlf"
+    }
+  },
+  "executables": {
+    "runtime": {
+      "main": "RuntimeDriver.emlf",
+      "dependencies": ["mlf-foundation", "mlf-interpreter", "mlf-xmlf"]
+    },
+    "llvm": {
+      "main": "LLVMDriver.emlf",
+      "dependencies": ["mlf-foundation", "mlf-llvm", "mlf-xmlf"]
+    }
+  }
+}

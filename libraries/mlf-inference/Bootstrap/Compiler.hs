@@ -2,7 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
-module Bootstrap.Compiler (Compilation, inferredType, compiledTerm, checkedTerm, presolution, sourceType, phase, diagnostic, prettyPhase, prettyError, atPhase, compile, compileWithPrelude, compileModules, compileModulesWithPrelude, compileFile, compileFileWithPrelude, compileSourceWithImports, standalone, compileStandalone, compileLinked, compileExpr, compileExprWithPrelude, compileProgram, compileProgramWithPrelude, finishCompilation) where {
+module Bootstrap.Compiler (Compilation, inferredType, compiledTerm, checkedTerm, presolution, sourceType, phase, diagnostic, prettyPhase, prettyError, atPhase, compile, compileWithPrelude, compileModules, compileModulesWithPrelude, compileFile, compileFileWithPrelude, compileSourceWithImports, standalone, compileStandalone, compileLinked, compileResolvedRoot, compileExpr, compileExprWithPrelude, compileProgram, compileProgramWithPrelude, finishWithSourceNames, finishCompilation) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import qualified Bootstrap.Std as L;
@@ -78,39 +78,36 @@ module Bootstrap.Compiler (Compilation, inferredType, compiledTerm, checkedTerm,
       compileProgramWithPrelude mode program
     };
   compileLinked :: PreludeMode -> [] SourceModule -> Either CompileError Compilation;
-  compileLinked mode modules =
-    do {
-      boundValueShared1 <- atPhase ModuleResolution (Modules.linkModulesForCompilation mode modules);
-      case boundValueShared1 of {
-        (,) (LinkedModule program names _ instanceScopes) valueScopes ->
-          do {
-            let {
-              display = Modules.displayNames names
-            };
-            canonical <- case Classes.canonicalSourceProgram S.empty program of {
-              Left message -> Left (CompileError Inference (display message));
-              Right value -> Right value
-            };
-            lowered <-
-              case Classes.lowerClassesInScopes valueScopes instanceScopes canonical of {
-                Left err -> Left (CompileError Inference (display err));
-                Right lowered -> Right lowered
-              };
-            case lowered of {
-              (,) core classes ->
-                let {
-                  diagnosticNames = M.union compareString (M.map display classes) names
-                } in
-                case finishCompilation lowered of {
-                  Left (CompileError p message) ->
-                    Left (CompileError p (Modules.displayNames diagnosticNames message));
-                  Right (Compilation checked graph source) ->
-                    Right (Compilation checked graph (display source))
-                }
-            }
-          }
-      }
-    };
+  compileLinked mode modules = do {
+    root <- atPhase ModuleResolution (Modules.resolveSourceRoot mode modules);
+    compileResolvedRoot root
+  };
+  compileResolvedRoot :: Modules.ResolvedCrate -> Either CompileError Compilation;
+  compileResolvedRoot root = do {
+    (,) (LinkedModule program names _ instanceScopes) valueScopes <-
+      atPhase ModuleResolution (Modules.linkResolvedForCompilation root);
+    compileNamedProgram S.empty names (Classes.lowerClassesInScopes valueScopes instanceScopes) program
+  };
+  lowerSourceProgram imports lower program = do {
+    canonical <- Classes.canonicalSourceProgram imports program;
+    lower canonical
+  };
+  finishWithSourceNames :: forall a. Map String String ->
+    ((,) SProgram (Map String String) -> Either CompileError a) ->
+    (,) SProgram (Map String String) -> Either CompileError a;
+  finishWithSourceNames names finish lowered =
+    let {
+      classes = M.map (Modules.displayNames names) (L.snd lowered);
+      display = Modules.displayNames (M.union compareString classes names)
+    } in L.mapLeft (\(CompileError p message) -> CompileError p (display message)) (finish lowered);
+  -- A linked module supplies its defining scopes. A standalone root supplies
+  -- its normalized imports. Both own one program through inference and checking.
+  compileNamedProgram imports names lower program = do {
+    let { display = Modules.displayNames names };
+    lowered <- atPhase Inference (L.mapLeft display (lowerSourceProgram imports lower program));
+    Compilation checked graph source <- finishWithSourceNames names finishCompilation lowered;
+    Right (Compilation checked graph (display source))
+  };
   compileExpr :: SExpr -> Either CompileError Compilation;
   compileExpr expr = compileExprWithPrelude ImplicitPrelude expr;
   compileExprWithPrelude :: PreludeMode -> SExpr -> Either CompileError Compilation;
@@ -122,39 +119,14 @@ module Bootstrap.Compiler (Compilation, inferredType, compiledTerm, checkedTerm,
     do {
       normalized <- atPhase ModuleResolution (Standalone.normalize mode original);
       case normalized of {
-        Nothing -> compileLegacyProgramWithPrelude mode original;
-        Just ((,,) imports source names) -> do {
-          let { display = Modules.displayNames names };
-          canonical <- case Classes.canonicalSourceProgram imports source of {
-            Left message -> Left (CompileError Inference (display message));
-            Right value -> Right value
-          };
-          lowered <- case Classes.lowerClassesWithImports imports canonical of {
-            Left message -> Left (CompileError Inference (display message));
-            Right result -> Right result
-          };
-          case lowered of { (,) core classes ->
-            let { diagnosticNames = M.union compareString (M.map display classes) names } in
-            case finishCompilation lowered of {
-              Left (CompileError p message) ->
-                Left (CompileError p (Modules.displayNames diagnosticNames message));
-              Right (Compilation checked graph text) ->
-                Right (Compilation checked graph (display text))
-            }
+        Nothing -> case Prelude.withPrelude mode original of {
+          (,) imports source -> do {
+            lowered <- atPhase Inference (lowerSourceProgram imports (Classes.lowerClassesWithImports imports) source);
+            finishCompilation lowered
           }
-        }
+        };
+        Just ((,,) imports source names) ->
+          compileNamedProgram imports names (Classes.lowerClassesWithImports imports) source
       }
-    };
-  -- Preserve the historical class-free/abstract-nominal route byte-for-byte
-  -- when no genuine standard-facade capability is used by the public AST.
-  compileLegacyProgramWithPrelude :: PreludeMode -> SProgram -> Either CompileError Compilation;
-  compileLegacyProgramWithPrelude mode original =
-    case Prelude.withPrelude mode original of {
-      (,) imports source ->
-        do {
-          canonical <- atPhase Inference (Classes.canonicalSourceProgram imports source);
-          lowered <- atPhase Inference (Classes.lowerClassesWithImports imports canonical);
-          finishCompilation lowered
-        }
     }
 }

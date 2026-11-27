@@ -24,6 +24,20 @@ Windows x64 and Linux x64 alongside Apple Silicon on macOS 26+.
 See [installation and releases](docs/releases.md) for platform dependencies,
 checksums, installation and validation coverage.
 
+## Compile a program
+
+With a compiler installation that includes the native runtime and standard
+library, compile a file to an executable with `emlf Main.emlf -o main`.
+Use `emlf --type Main.emlf` to print the inferred type or `emlf --run Main.emlf`
+to interpret an IO program. A file can import modules without a package manifest.
+For an expression, try `emlf --type --expr '42'`.
+
+In a package, use `mlfpkg build` or `mlfpkg build --target NAME`. The package
+manager schedules the declared dependencies and reuses checked artifacts.
+For an intermediate result, `emlf Main.emlf` writes checked xMLF and
+`emlf --emit-llvm Main.emlf` writes LLVM IR. `emlf --help tools` lists the
+stage commands available to build tools.
+
 ## Build and run
 
 The [developer commands](CONTRIBUTING.md#developer-commands) cover native builds, tests and benchmarks from one entry point.
