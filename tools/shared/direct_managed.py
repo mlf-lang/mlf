@@ -64,8 +64,10 @@ def validate_route(runner,suite,argv,overrides,status,expected,timeout):
             type(timeout)is int and timeout==600 and not overrides and type(status)is int and status==0 and expected is None and runner.root==direct.ROOT,
             'unexpected '+suite.name+' invocation')
     producer=runner.receipt.get('producer',{})
-    require(argv[4]==producer.get('path') and bool(producer.get('sha256')) and
-            runner.receipt.get('inputs',{}).get(argv[4])==producer['sha256'] and
+    # The receipt records the producer path and its digest; an inputs map was
+    # never written, so authenticate the file the command actually receives.
+    require(bool(producer.get('path')) and bool(producer.get('sha256')) and
+            Path(argv[4]).resolve()==Path(producer['path']).resolve() and
             direct.sha(Path(argv[4]))==producer['sha256'],'producer is not the authenticated instance')
 
 def validate_terminal(status,guard,worker,stderr,*,worker_argv,pins,producer_path,producer_sha,work,cleanup):
